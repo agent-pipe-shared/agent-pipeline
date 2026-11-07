@@ -1,0 +1,67 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs
+index 14d7cf2524428b065d7ec5e6a1d88bfff3cc515e..b6189aaa388c6c26f3e782f44265b5e84dc8711b 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs
+@@ -187,3 +187,34 @@ test("approve-plan success output announces the required set-phase --phase imple
+     rmSync(dir, { recursive: true, force: true });
+   }
+ });
++
++function approveWithDesignStatus(featureId, status) {
++  const dir = freshDir();
++  try {
++    const planPath = `.claude/plans/${featureId}.md`;
++    authorPlanSources(dir, planPath);
++    assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], { dir, now: FIXED_NOW }), 0);
++    assert.equal(initializeLifecycleContinuity(dir, featureId, planPath), 0);
++    assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "mini"], lifecycleDeps(dir, planPath)), 0);
++    assert.equal(run(["present-plan", "--by", "coordinator"], lifecycleDeps(dir, planPath)), 0);
++    const deps = { ...lifecycleDeps(dir, planPath), architectureDesignAfterApproval: () => ({ ok: true, status }) };
++    const approved = captureConsole(() => run(["approve-plan", "--by", "po-test"], deps));
++    assert.equal(approved.value, 0);
++    return approved.text;
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++}
++
++test("G20-32: an approved greenfield design names materialize-architecture first, with no PO step and no adoption route", () => {
++  const text = approveWithDesignStatus("approve-materialize", "materialization-required");
++  const next = text.split("\n").find((line) => line.startsWith("Next"));
++  assert.match(next, /^Next \(agent, no PO step\): run `pipeline-state\.mjs materialize-architecture`, then `set-phase --phase implementation`\./u);
++  assert.match(next, /never take the architecture-adoption route/u);
++});
++
++test("G20-32 control: a design that needs no materialization keeps the plain set-phase line", () => {
++  const text = approveWithDesignStatus("approve-materialized", "materialized");
++  assert.match(text, /^Next: implementation writes remain refused until you run `set-phase --phase implementation`/mu);
++  assert.doesNotMatch(text, /materialize-architecture/u);
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index a646856b9cc310013918b2d11b8363ae197e458e..58530f1746fb73cc3f403508944976077732246c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -12691,7 +12691,22 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       }
+       syncNextActionDocs(dir, written.transition.state);
+       console.log(`Plan approved by "${by}" on ${approvedAt}; lifecycle="approved".`);
+-      console.log('Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.');
++      // G20-32 (Claude greenfield): this line named only set-phase. set-phase then refused with an adoption text, and the session took
++      // the brownfield adoption route (signatures, two override ceremonies, about eight PO terminal commands). An approved greenfield
++      // design package is materialized by the agent first; say so here, with no PO step in between.
++      let approvedDesignStatus = null;
++      try {
++        approvedDesignStatus = (deps.architectureDesignAfterApproval ?? ((root) => inspectArchitectureDesign(root, undefined, {
++          gitCandidate: deps.gitCandidate,
++          trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
++          verifyReadinessExecution: deps.verifyDesignReadinessHostExecution,
++        })))(dir)?.status ?? null;
++      } catch { approvedDesignStatus = null; }
++      if (approvedDesignStatus === "materialization-required") {
++        console.log('Next (agent, no PO step): run `pipeline-state.mjs materialize-architecture`, then `set-phase --phase implementation`. The approved design package is the architecture decision; never take the architecture-adoption route for it.');
++      } else {
++        console.log('Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.');
++      }
+       // H-AC-11 human-legible briefing (PHX-WP-HUMANLEGIBLE-APPROVAL): the
+       // gate presentation shows the same closed-vocabulary briefing derived
+       // and persisted at submit-plan time -- never raw digests/paths alone --

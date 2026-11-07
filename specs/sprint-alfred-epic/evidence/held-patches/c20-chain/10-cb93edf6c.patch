@@ -1,0 +1,46 @@
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.mjs b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+index 5f67dc28c82011f755fa5169a64dbdf2f436e051..4f5a0fcc52b0f326a56db24af151669c5e077b1c 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+@@ -617,8 +617,10 @@ function runCli() {
+       }
+       // Toolbox D10: the missing or malformed instant used to end in a TypeError from the authority module. It is part of the signed request,
+       // so name the flag and the exact form here, before anything is built or written.
++      // G20-18: the agent has no admitted way to read the clock (node -e is refused), so `now` is resolved here, once, into the signed instant.
++      if (decidedAt === "now") decidedAt = new Date().toISOString();
+       if (typeof decidedAt !== "string" || !Number.isFinite(Date.parse(decidedAt)) || new Date(decidedAt).toISOString() !== decidedAt) {
+-        console.error("Error: prepare needs --decided-at <UTC instant in the form new Date().toISOString() prints, for example 2026-11-01T10:00:00.000Z>. It is part of the request the PO signs; apply reads it back from that request file, so it is given once, here.");
++        console.error("Error: prepare needs --decided-at now (recommended) or a UTC instant in the form new Date().toISOString() prints, for example 2026-11-01T10:00:00.000Z. It is part of the request the PO signs; apply reads it back from that request file, so it is given once, here.");
+         process.exit(1);
+       }
+       const request = prepareAdoptionAuthority({ rootDir, decision, scope, rationale, expiresAt: expires, reviewDate, decidedAt, decisionRef });
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+index 000b3143e56b317162c92268b8964a1ba1087adc..7f5f3c1c819e6ba530d76203edb54b220a8a3f91 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+@@ -506,13 +506,24 @@ describe("ADOPT-SIGN-T: adoption request file for the signing ceremony", () => {
+     for (const args of [without, prepareArgs().map((value) => (value === "2026-01-01T00:00:00.000Z" ? "2026-01-01" : value))]) {
+       const refused = spawnSync(process.execPath, [script, "prepare", ...args, "--out", target], { encoding: "utf8" });
+       assert.equal(refused.status, 1, refused.stdout + refused.stderr);
+-      assert.match(refused.stderr, /prepare needs --decided-at <UTC instant/u);
++      assert.match(refused.stderr, /prepare needs --decided-at now \(recommended\) or a UTC instant/u);
+       assert.doesNotMatch(refused.stderr, /TypeError|canonical ISO-8601 at/u);
+       assert.equal(refused.stdout, "", "no request is printed");
+       assert.equal(fs.existsSync(target), false, "no request file is written");
+     }
+   });
+ 
++  it("G20-18: prepare --decided-at now signs the instant it was prepared at, in canonical form", () => {
++    const before = Date.now();
++    const args = prepareArgs().map((value) => (value === "2026-01-01T00:00:00.000Z" ? "now" : value));
++    const printed = spawnSync(process.execPath, [script, "prepare", ...args], { encoding: "utf8" });
++    const after = Date.now();
++    assert.equal(printed.status, 0, printed.stderr);
++    const decidedAt = JSON.parse(printed.stdout).subject.decidedAt;
++    assert.equal(new Date(decidedAt).toISOString(), decidedAt, "the signed instant is canonical");
++    assert.ok(Date.parse(decidedAt) >= before - 1000 && Date.parse(decidedAt) <= after + 1000, decidedAt);
++  });
++
+   it("ADOPT-SIGN-T: prepare --out refuses a path outside scratch/, names the boundary and writes nothing", () => {
+     for (const target of [
+       path.join(root, "adoption-request.json"),

@@ -1,0 +1,544 @@
+diff --git a/docs/operating-model.md b/docs/operating-model.md
+index 4358831126d04af852cac302287fcf92233b69aa..9714c3de311211868a31f148cb665f2daed63018 100644
+--- a/docs/operating-model.md
++++ b/docs/operating-model.md
+@@ -396,7 +396,10 @@ configured scanner reads as one of four states — `passed`, `failed`,
+ configured scanners (`baseline-security`). Under a critical calibration
+ (`stakes` critical, high, kritisch or hoch) a scanner that did not execute
+ blocks with `SEC-CLOSE-SCANNER-NOT-EXECUTED`; any other calibration admits it
+-but still reports it as `not executed`. A typed
++but still reports it as `not executed`. A critical project with no security
++gate configured is refused at Verify, close and push with
++`SEC-CLOSE-GATE-NOT-CONFIGURED`, naming the one command that configures the
++gate. A typed
+ unavailable runner capability stops that capability honestly; it is not an
+ invitation to weaken permissions, invent evidence or change runner/model.
+ 
+diff --git a/guardrails/security.md b/guardrails/security.md
+index cfe38c7040cdc5f38d7a295aee289ee318ce9716..b4c677f556c42957846100d6fb6d43445264d58b 100644
+--- a/guardrails/security.md
++++ b/guardrails/security.md
+@@ -43,7 +43,7 @@ Rule IDs: `SEC-xx`.
+ - When the project manifest (`project/pipeline.yaml`, else `.claude/pipeline.yaml`) declares the `security-scan` phase and the `security` gate is not `mode: off`, the security-scan phase **MUST** run as part of the verify chain — adapters gitleaks (secrets), osv-scanner (known vulnerabilities), semgrep (rule-based static findings, `rules_dir` from the manifest), license-check (declared `third-party-licenses.json` vs. an allowlist).
+ - Each adapter reports one of exactly four statuses: `PASS | FINDINGS | SKIPPED | ERROR`. **MUST NOT** treat `SKIPPED` (tool not installed/available) as `PASS` — it is reported honestly in the evidence artifact and in any completion report referencing it (QG-05 gate honesty: a gate that silently checks less than assumed produces confident-wrong "done").
+ - `ERROR` (adapter crashed) is fail-closed — never treated as clean, always blocking-class regardless of findings.
+-- Close, push and Verify report each configured scanner in four states: `passed` (PASS), `failed` (FINDINGS), `not executed` (SKIPPED or ERROR) and `not applicable` (no security gate configured). The hardness follows the calibration's `stakes`: critical (critical, high, kritisch, hoch) **MUST** block a `not executed` scanner with `SEC-CLOSE-SCANNER-NOT-EXECUTED`, naming the platform guidance (`toolchain-preflight.mjs`) and the run command (`security-scan.mjs`); any other or absent calibration admits it but **MUST** still report it as `not executed`, never as clean. The normal Verify runs the configured scanners as the `baseline-security` suite.
++- Close, push and Verify report each configured scanner in four states: `passed` (PASS), `failed` (FINDINGS), `not executed` (SKIPPED or ERROR) and `not applicable` (no security gate configured). The hardness follows the calibration's `stakes`: critical (critical, high, kritisch, hoch) **MUST** block a `not executed` scanner with `SEC-CLOSE-SCANNER-NOT-EXECUTED`, naming the platform guidance (`toolchain-preflight.mjs`) and the run command (`security-scan.mjs`); any other or absent calibration admits it but **MUST** still report it as `not executed`, never as clean. The normal Verify runs the configured scanners as the `baseline-security` suite. A critical project with NO security gate (no manifest, no `gates.security`, or `mode: off`) is refused at Verify, close and push with `SEC-CLOSE-GATE-NOT-CONFIGURED`; the refusal names the repair `security-gate-configure.mjs --root <root>`, which writes the onboarding gate block (`mode: blocking`, `type: automated`) and nothing else. An absent or unrecognised `stakes` counts as `standard`.
+ - A finding whose severity is contained in the manifest's `security.thresholds.block_on` (default `[critical, high]`; set-membership check — the list enumerates the blocking severities explicitly, not an ordinal "at or above" relation) blocks the push gate; the gate mode (`blocking|warn|off`) governs how the block surfaces (exit 2 / warn / no-op) — see `guardrails/quality-gates.md` QG-06 and `docs/adr/0027-gate-philosophy.md` for the mode-is-calibration argument.
+ - **MUST NOT** run the security-scan phase itself inside the gate hook (10s hook budget) — the gate hook only validates the already-written evidence. For an active blocking security gate it requires `pipeline.security-evidence.v1`, a clean detached-worktree snapshot verified before and after scanning, the exact pushed commit and tree, a candidate inventory/repository identity, policy bindings, and a valid payload digest; it never recomputes a scan (`docs/adr/0029-file-handoffs-status.md`).
+ - **Why:** Slopsquatting (SEC-04) and secret leaks (SEC-01) are exactly the failure modes a scanner catches mechanically and cheaply — but only if a skipped tool is never mistaken for a clean result, and a project without the manifest is never silently unprotected without saying so.
+diff --git a/plugins/pipeline-core/docs/operating-model.md b/plugins/pipeline-core/docs/operating-model.md
+index 4358831126d04af852cac302287fcf92233b69aa..9714c3de311211868a31f148cb665f2daed63018 100644
+--- a/plugins/pipeline-core/docs/operating-model.md
++++ b/plugins/pipeline-core/docs/operating-model.md
+@@ -396,7 +396,10 @@ configured scanner reads as one of four states — `passed`, `failed`,
+ configured scanners (`baseline-security`). Under a critical calibration
+ (`stakes` critical, high, kritisch or hoch) a scanner that did not execute
+ blocks with `SEC-CLOSE-SCANNER-NOT-EXECUTED`; any other calibration admits it
+-but still reports it as `not executed`. A typed
++but still reports it as `not executed`. A critical project with no security
++gate configured is refused at Verify, close and push with
++`SEC-CLOSE-GATE-NOT-CONFIGURED`, naming the one command that configures the
++gate. A typed
+ unavailable runner capability stops that capability honestly; it is not an
+ invitation to weaken permissions, invent evidence or change runner/model.
+ 
+diff --git a/plugins/pipeline-core/guardrails/security.md b/plugins/pipeline-core/guardrails/security.md
+index cfe38c7040cdc5f38d7a295aee289ee318ce9716..b4c677f556c42957846100d6fb6d43445264d58b 100644
+--- a/plugins/pipeline-core/guardrails/security.md
++++ b/plugins/pipeline-core/guardrails/security.md
+@@ -43,7 +43,7 @@ Rule IDs: `SEC-xx`.
+ - When the project manifest (`project/pipeline.yaml`, else `.claude/pipeline.yaml`) declares the `security-scan` phase and the `security` gate is not `mode: off`, the security-scan phase **MUST** run as part of the verify chain — adapters gitleaks (secrets), osv-scanner (known vulnerabilities), semgrep (rule-based static findings, `rules_dir` from the manifest), license-check (declared `third-party-licenses.json` vs. an allowlist).
+ - Each adapter reports one of exactly four statuses: `PASS | FINDINGS | SKIPPED | ERROR`. **MUST NOT** treat `SKIPPED` (tool not installed/available) as `PASS` — it is reported honestly in the evidence artifact and in any completion report referencing it (QG-05 gate honesty: a gate that silently checks less than assumed produces confident-wrong "done").
+ - `ERROR` (adapter crashed) is fail-closed — never treated as clean, always blocking-class regardless of findings.
+-- Close, push and Verify report each configured scanner in four states: `passed` (PASS), `failed` (FINDINGS), `not executed` (SKIPPED or ERROR) and `not applicable` (no security gate configured). The hardness follows the calibration's `stakes`: critical (critical, high, kritisch, hoch) **MUST** block a `not executed` scanner with `SEC-CLOSE-SCANNER-NOT-EXECUTED`, naming the platform guidance (`toolchain-preflight.mjs`) and the run command (`security-scan.mjs`); any other or absent calibration admits it but **MUST** still report it as `not executed`, never as clean. The normal Verify runs the configured scanners as the `baseline-security` suite.
++- Close, push and Verify report each configured scanner in four states: `passed` (PASS), `failed` (FINDINGS), `not executed` (SKIPPED or ERROR) and `not applicable` (no security gate configured). The hardness follows the calibration's `stakes`: critical (critical, high, kritisch, hoch) **MUST** block a `not executed` scanner with `SEC-CLOSE-SCANNER-NOT-EXECUTED`, naming the platform guidance (`toolchain-preflight.mjs`) and the run command (`security-scan.mjs`); any other or absent calibration admits it but **MUST** still report it as `not executed`, never as clean. The normal Verify runs the configured scanners as the `baseline-security` suite. A critical project with NO security gate (no manifest, no `gates.security`, or `mode: off`) is refused at Verify, close and push with `SEC-CLOSE-GATE-NOT-CONFIGURED`; the refusal names the repair `security-gate-configure.mjs --root <root>`, which writes the onboarding gate block (`mode: blocking`, `type: automated`) and nothing else. An absent or unrecognised `stakes` counts as `standard`.
+ - A finding whose severity is contained in the manifest's `security.thresholds.block_on` (default `[critical, high]`; set-membership check — the list enumerates the blocking severities explicitly, not an ordinal "at or above" relation) blocks the push gate; the gate mode (`blocking|warn|off`) governs how the block surfaces (exit 2 / warn / no-op) — see `guardrails/quality-gates.md` QG-06 and `docs/adr/0027-gate-philosophy.md` for the mode-is-calibration argument.
+ - **MUST NOT** run the security-scan phase itself inside the gate hook (10s hook budget) — the gate hook only validates the already-written evidence. For an active blocking security gate it requires `pipeline.security-evidence.v1`, a clean detached-worktree snapshot verified before and after scanning, the exact pushed commit and tree, a candidate inventory/repository identity, policy bindings, and a valid payload digest; it never recomputes a scan (`docs/adr/0029-file-handoffs-status.md`).
+ - **Why:** Slopsquatting (SEC-04) and secret leaks (SEC-01) are exactly the failure modes a scanner catches mechanically and cheaply — but only if a skipped tool is never mistaken for a clean result, and a project without the manifest is never silently unprotected without saying so.
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index 3999edea00f19d473c47ea0640e37fee819d95ba..41809223848cd9400556388bd7c026a1b75f1de6 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -178,6 +178,7 @@ function projectCalibrationRelPath(rootDir) {
+   return projectAuthorityRelPath(rootDir, "calibration", NEUTRAL_CALIBRATION, LEGACY_CALIBRATION);
+ }
+ import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
++import { securityGateNotConfiguredRefusal } from "../lib/security-close-status.mjs";
+ import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+@@ -2590,6 +2591,12 @@ try {
+         carryForward: (evidenceCommit) => carryDecisionFor("security", { commit: evidenceCommit }),
+       }),
+     );
++  } else {
++    // C20 G20-25 (PO decision 2026-11-07): a project calibrated critical with no security gate (absent or mode off) is refused at push
++    // too, with the one command that configures the gate; any other calibration keeps the gate optional. Dispatched as a blocking
++    // security failure below (no gate means no warn mode).
++    const gateRefusal = securityGateNotConfiguredRefusal(evidenceProjectDir, "this push");
++    if (gateRefusal !== null) securityFailures.push(gateRefusal);
+   }
+ 
+   // Methodological Agent Guard: Block push if there are uncommitted files in specs/, docs/, or backlog/
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 3bd5af025b6116d8883b0892fe7ed201a12ac9ad..3e18e25f33739d47acbcc36b023d33f0c1c047d8 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -391,7 +391,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
+     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
+ }
+ 
+-import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT } from "./constants.mjs";
++import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT } from "./constants.mjs";
+ 
+ // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
+ // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
+@@ -643,6 +643,8 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+       && args[4] === "--activate" && args.length === 5;
+   }
+   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
++  // C20 w257 (G20-25): exactly `--root <this root>`; the script validates the manifest itself and refuses without writing.
++  if (script === SECURITY_GATE_CONFIGURE_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
+   if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
+   if (script === PRE_PUSH_HOOK_INSTALL_SCRIPT) return args[0] === "--install" && args.length === 1;
+   // ALF-C-P8-02B (AC-167): a freshly reset clone in `draft` must be able to run the two mandatory-hook
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index b69f69356f42db33e983623a73f8a1ed0270a548..5352fb540d912156eeeb678e0459de936d04b64f 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -202,6 +202,8 @@ export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts
+ export const CREATE_ADR_SCRIPT = fileURLToPath(new URL("../../scripts/create-adr.mjs", import.meta.url));
+ // C20 w256 (G20-23): the one way ADR proposals are bound into the design package (manifest, chat selections, v2 bindings block).
+ export const BIND_ADR_PROPOSALS_SCRIPT = fileURLToPath(new URL("../../scripts/bind-adr-proposals.mjs", import.meta.url));
++// C20 w257 (G20-25): the one command that configures a missing security gate (the repair a critical project's refusal names); exact `--root <root>` shape.
++export const SECURITY_GATE_CONFIGURE_SCRIPT = fileURLToPath(new URL("../../scripts/security-gate-configure.mjs", import.meta.url));
+ // D165 (S1): the brownfield adoption route the preflight publishes; each is admitted by an exact argv grammar in command-catalogue.mjs.
+ export const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-adoption.mjs", import.meta.url));
+ // D166-PH: the read-only `plan` form of the proof-gated Phoenix authority revision wrapper (command-catalogue.mjs).
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index ac6dfaa0df1ad350fc2d077c330fe363aa772162..204432a6ca1010bd891eee68f52d012f143a79ec 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -688,6 +688,24 @@ test("C20 w256 bind-adr-proposals: the closed shape is admitted, every near-miss
+   });
+ });
+ 
++// ---- C20 w257 (G20-25): `security-gate-configure.mjs`, the repair a critical project's refusal names, in its one closed shape ----
++test("C20 w257 security-gate-configure: exactly `--root <this root>` is admitted, every near-miss is not", () => {
++  withFixture("feature", f => {
++    const script = join(scriptsDir, "security-gate-configure.mjs");
++    bothAdmit(scriptAction(script, "--root", f.root), f, "exact root");
++    for (const [label, action] of [
++      ["foreign root", scriptAction(script, "--root", join(f.root, ".."))],
++      ["relative root", scriptAction(script, "--root", ".")],
++      ["no root", scriptAction(script)],
++      ["root flag without a value", scriptAction(script, "--root")],
++      ["extra flag", scriptAction(script, "--root", f.root, "--force")],
++      ["extra positional", scriptAction(script, "--root", f.root, "extra")],
++      ["repeated root", scriptAction(script, "--root", f.root, "--root", f.root)],
++      ["flag before root", scriptAction(script, "--force", "--root", f.root)],
++    ]) bothRefuse(action, f, label);
++  });
++});
++
+ test("D64 model-role bootstrap admits a host session: admitted by its exact argv (K152/G7, e9e866fec); any other shape stays refused", () => {
+   withFixture("feature", f => {
+     // QG-04 justification: the D64 pin held the bootstrap refused as a pending product decision. That decision was made
+diff --git a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+index 801806e12b31e1604d20137f081b2cfab8b3ce21..e033f6bca70c756ef7d6a7f38adefa0d3de61cd8 100644
+--- a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
++++ b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+@@ -12,6 +12,14 @@
+ //      the calibration does not configure is "not applicable", a configured one without a run is "not executed" (also with no
+ //      evidence at all);
+ //   C6 security-scan.mjs accepts --out-dir under scratch/ for an analysis run and refuses any other target without writing.
++//   C9  (PO decision 2026-11-07, "muss in die Meldung wie es geht") a critical project whose manifest configures no security gate (no
++//       manifest, no gates.security, or mode off) is blocked at the close entry and at Verify with a typed refusal that names the exact
++//       repair argv;
++//   C10 running that argv configures gates.security (blocking, automated) in the tier the loader reads, every other byte unchanged
++//       (comments, CRLF, other gates), a second run is a no-op, and the same Verify run then reaches the scanners;
++//   C11 standard, absent and unrecognised stakes + no gate stay "not applicable" and admitted;
++//   C12 a refused repair (invalid manifest, a shape it cannot edit byte-safely) leaves every byte and the directory unchanged; a twin
++//       manifest pair stays byte-identical; the block is the one onboarding writes.
+ // The scanner observation is injected as evidence files (no scanner is spawned, nothing is downloaded).
+ import test, { after } from "node:test";
+ import assert from "node:assert/strict";
+@@ -21,6 +29,7 @@ import { dirname, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+ import { checkSecurityCompleteness } from "../security-completeness-gate.mjs";
++import { gateConfig, loadManifest } from "../manifest.mjs";
+ import {
+   SECURITY_STATES, isCriticalStakes, readCalibrationStakes, securityCloseElements, formatSecurityCloseStatus,
+ } from "../security-close-status.mjs";
+@@ -210,3 +219,124 @@ test("C6 security-scan.mjs --out-dir under scratch/ writes there; any other targ
+   assert.equal(existsSync(join(root, "evidence")), false);
+   assert.deepEqual(readdirSync(root).sort(), ["project", "scratch"].filter((name) => existsSync(join(root, name))).sort());
+ });
++
++// ---- C9-C12 (G20-25, gate repair): the critical project without a security gate, and the one command that configures it ----
++const gateScript = resolve(here, "../../scripts/security-gate-configure.mjs");
++// The argv is the END of the message line: nothing may follow the root, so a copied line is exactly the one argv the guard admits.
++const REPAIR_RE = /node (\S+security-gate-configure\.mjs) --root (\S+)\s*$/mu;
++const BLOCK = (eol = "\n") => ["  security:", "    mode: blocking", "    type: automated", ""].join(eol);
++const HEADER = "schema: pipeline.manifest.v0\n";
++const WITHOUT_SECURITY = `${HEADER}gates:\n  # human plan approval\n  dev-plan:\n    mode: blocking\n    type: human\n  push:\n    mode: blocking\n    type: human\n`;
++const MODE_OFF = `${HEADER}gates:\n  dev-plan:\n    mode: blocking\n    type: human\n  security:\n    mode: off   # not yet\n    type: automated\n  push:\n    mode: blocking\n    type: human\n`;
++function put(dir, rel, text) { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), text); }
++function verifyCheck(root) {
++  return (async () => {
++    const { runSecurityCloseCheck } = await import("../../scripts/consumer-verify-check.mjs");
++    const lines = [];
++    const log = console.log; const error = console.error;
++    console.log = (...a) => lines.push(a.join(" ")); console.error = (...a) => lines.push(a.join(" "));
++    try { return { code: runSecurityCloseCheck(root, { PATH: "", Path: "", HOME: root }), text: lines.join("\n") }; } finally { console.log = log; console.error = error; }
++  })();
++}
++function listing(dir) { return readdirSync(dir, { recursive: true }).sort().join("\n"); }
++const runArgv = (text) => {
++  const match = REPAIR_RE.exec(text);
++  assert.ok(match, `the refusal names the repair argv:\n${text}`);
++  assert.equal(match[1], gateScript, "the argv names the physical plugin script");
++  return { root: match[2], run: () => spawnSync(process.execPath, [match[1], "--root", match[2]], { encoding: "utf8", timeout: 20_000 }) };
++};
++
++test("C9 critical + no security gate (no manifest, no gates.security, mode off) is a typed block at Verify and at the close entry, naming the repair argv", async () => {
++  const variants = { "no manifest": null, "no gates.security": WITHOUT_SECURITY, "mode off": MODE_OFF };
++  for (const [label, manifest] of Object.entries(variants)) {
++    const dir = project("critical");
++    if (manifest !== null) put(dir, ".claude/pipeline.yaml", manifest);
++    const verify = await verifyCheck(dir);
++    assert.equal(verify.code, 1, label);
++    assert.match(verify.text, /SEC-CLOSE-GATE-NOT-CONFIGURED/u, label);
++    assert.equal(runArgv(verify.text).root, dir, label);
++
++    const fixture = closeFixture({ stakes: "critical" });
++    if (manifest !== null) { put(fixture.dir, ".claude/pipeline.yaml", manifest); }
++    const closed = runClose(fixture.dir);
++    assert.equal(closed.status, 2, `${label}: ${closed.stdout}${closed.stderr}`);
++    assert.match(closed.stderr, /SEC-CLOSE-GATE-NOT-CONFIGURED/u, label);
++    assert.equal(runArgv(closed.stderr).root, fixture.dir, label);
++  }
++});
++
++test("C10 the repair argv configures the gate, changes no other byte, is a no-op the second time, and the same Verify then reaches the scanners", async () => {
++  const cases = [
++    ["no manifest", null, `${HEADER}gates:\n${BLOCK()}`],
++    ["gates without security", WITHOUT_SECURITY, `${WITHOUT_SECURITY}${BLOCK()}`],
++    ["security mode off", MODE_OFF, MODE_OFF.replace("    mode: off   # not yet\n", "    mode: blocking   # not yet\n")],
++    ["no gates block, trailing comment", `${HEADER}language:\n  human_facing: en\n# end\n`, `${HEADER}language:\n  human_facing: en\n# end\ngates:\n${BLOCK()}`],
++    ["CRLF file", WITHOUT_SECURITY.replace(/\n/gu, "\r\n"), `${WITHOUT_SECURITY.replace(/\n/gu, "\r\n")}${BLOCK("\r\n")}`],
++    ["no final newline", WITHOUT_SECURITY.trimEnd(), `${WITHOUT_SECURITY}${BLOCK()}`],
++  ];
++  for (const [label, before, after] of cases) {
++    const dir = project("critical");
++    if (before !== null) put(dir, ".claude/pipeline.yaml", before);
++    const { run } = runArgv((await verifyCheck(dir)).text);
++    const first = run();
++    assert.equal(first.status, 0, `${label}: ${first.stdout}${first.stderr}`);
++    assert.equal(readFileSync(join(dir, ".claude/pipeline.yaml"), "utf8"), after, label);
++    const loaded = loadManifest(dir);
++    assert.equal(loaded.status, "ok", `${label}: ${JSON.stringify(loaded.errors)}`);
++    assert.deepEqual([gateConfig(loaded.manifest, "security").mode, gateConfig(loaded.manifest, "security").type], ["blocking", "automated"], label);
++    const second = run();
++    assert.equal(second.status, 0, label);
++    assert.match(second.stdout, /already configured/u, label);
++    assert.equal(readFileSync(join(dir, ".claude/pipeline.yaml"), "utf8"), after, `${label}: second run changed bytes`);
++    const reverify = await verifyCheck(dir);
++    assert.doesNotMatch(reverify.text, /SEC-CLOSE-GATE-NOT-CONFIGURED/u, label);
++    assert.match(reverify.text, /SEC-CLOSE-SCANNER-NOT-EXECUTED/u, `${label}: the scanner chain now runs`);
++  }
++});
++
++test("C11 standard, absent and unrecognised stakes with no gate stay not applicable and admitted (Verify and close entry)", async () => {
++  for (const stakes of ["standard", undefined, "whatever"]) {
++    const verify = await verifyCheck(project(stakes));
++    assert.equal(verify.code, 0, String(stakes));
++    assert.match(verify.text, /not applicable/u, String(stakes));
++    assert.doesNotMatch(verify.text, /SEC-CLOSE-GATE-NOT-CONFIGURED/u, String(stakes));
++    const fixture = closeFixture({ stakes });
++    const closed = runClose(fixture.dir);
++    assert.equal(closed.status, 0, `${stakes}: ${closed.stderr}`);
++    assert.match(closed.stdout, /not applicable/u, String(stakes));
++  }
++});
++
++test("C12 a refused repair leaves every byte and the directory unchanged; twin manifests stay identical; the block is the one onboarding writes", async () => {
++  const refused = {
++    "unparseable yaml": `${HEADER}gates: [\n`,
++    "flow-style gates": `${HEADER}gates: {}\n`,
++    "flow-style security": `${HEADER}gates:\n  security: {mode: off, type: automated}\n`,
++    "schema violation": `${HEADER}gates:\n  security:\n    mode: off\n`,
++  };
++  for (const [label, text] of Object.entries(refused)) {
++    const dir = project("critical");
++    put(dir, ".claude/pipeline.yaml", text);
++    const before = listing(dir);
++    const result = spawnSync(process.execPath, [gateScript, "--root", dir], { encoding: "utf8", timeout: 20_000 });
++    assert.equal(result.status, 1, `${label}: ${result.stdout}${result.stderr}`);
++    assert.ok(result.stderr.length > 0, label);
++    assert.equal(readFileSync(join(dir, ".claude/pipeline.yaml"), "utf8"), text, label);
++    assert.equal(listing(dir), before, `${label}: a refused repair leaves no state`);
++  }
++  for (const argv of [[], ["--root"], ["--root", "relative/path"], ["--root", project("critical"), "--extra"]]) {
++    const result = spawnSync(process.execPath, [gateScript, ...argv], { encoding: "utf8", timeout: 20_000 });
++    assert.equal(result.status, 1, argv.join(" "));
++  }
++  const twin = project("critical");
++  put(twin, ".claude/pipeline.yaml", WITHOUT_SECURITY);
++  put(twin, "project/pipeline.yaml", WITHOUT_SECURITY);
++  assert.equal(spawnSync(process.execPath, [gateScript, "--root", twin], { encoding: "utf8", timeout: 20_000 }).status, 0);
++  const [neutral, legacy] = ["project/pipeline.yaml", ".claude/pipeline.yaml"].map((rel) => readFileSync(join(twin, rel), "utf8"));
++  assert.equal(neutral, legacy, "the twin pair must not drift (PA-MANIFEST-DRIFT)");
++  assert.equal(neutral, `${WITHOUT_SECURITY}${BLOCK()}`);
++  const { freshGateChapter } = await import("../project-onboarding-v3.mjs");
++  assert.ok(freshGateChapter().endsWith(BLOCK()), "the security block is the one onboarding writes for a new project");
++  const { SECURITY_GATE_BLOCK } = await import("../../scripts/security-gate-configure.mjs");
++  assert.equal(SECURITY_GATE_BLOCK, BLOCK());
++});
+diff --git a/plugins/pipeline-core/lib/security-close-status.mjs b/plugins/pipeline-core/lib/security-close-status.mjs
+index de416cdcb11567aee1bbb04579e2bc4da9f559cd..abc94b10380ebcc4d219ad734930ca152bd07d9e 100644
+--- a/plugins/pipeline-core/lib/security-close-status.mjs
++++ b/plugins/pipeline-core/lib/security-close-status.mjs
+@@ -13,6 +13,7 @@
+ // any other value, or an absent field, keeps today's behaviour (admitted, status "not executed"). Pure and offline: no scanner is spawned.
+ import { existsSync, readFileSync } from "node:fs";
+ import { join } from "node:path";
++import { fileURLToPath } from "node:url";
+ 
+ export const SECURITY_STATES = Object.freeze(["passed", "failed", "not executed", "not applicable"]);
+ export const SECURITY_ELEMENTS = Object.freeze(["gitleaks", "osv-scanner", "semgrep", "license-check"]);
+@@ -100,6 +101,20 @@ export function formatSecurityCloseStatus(elements) {
+   return elements.map(({ element, state, reason }) => `${element}: ${state}${reason ? ` -- ${reason}` : ""}`);
+ }
+ 
++/**
++ * The typed refusal of a critical calibration whose manifest configures no security gate (no manifest, no gates.security, or mode off),
++ * or null for any other calibration (those keep reading "not applicable"). It names the exact repair argv: the physical plugin script
++ * with this root, which the guard admits without a ceremony and which sets gates.security to the block onboarding writes.
++ */
++export const GATE_NOT_CONFIGURED_CODE = "SEC-CLOSE-GATE-NOT-CONFIGURED";
++const word = (value) => (/^[\w@%+=:,./\\-]+$/u.test(value) ? value : JSON.stringify(value));
++export function securityGateNotConfiguredRefusal(root, where = "this check") {
++  if (!isCriticalStakes(readCalibrationStakes(root))) return null;
++  const script = fileURLToPath(new URL("../scripts/security-gate-configure.mjs", import.meta.url));
++  return `${GATE_NOT_CONFIGURED_CODE}: the security gate is not configured (${where}: no manifest, no gates.security, or mode off) and this project is `
++    + `calibrated critical (stakes in the project calibration). Run this command to configure it, then run this check again: node ${word(script)} --root ${word(root)}`;
++}
++
+ /** The typed refusal of a critical calibration for a scanner that did not execute: names the scanner and the commands that repair it. */
+ export function scannerNotExecutedRefusal(element, where = "the security evidence") {
+   return `${SCANNER_NOT_EXECUTED_CODE}: ${element} did not execute (${where}) and this project is calibrated critical (stakes in the project calibration). `
+diff --git a/plugins/pipeline-core/scripts/check-close-security-completeness.mjs b/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
+index b7510bb72a34136c4271c260ececcc208d4527a2..8e05358ec6f965868ea1b7e616c458be8412895d 100644
+--- a/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
++++ b/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
+@@ -39,7 +39,7 @@ import { readFileSync } from "node:fs";
+ import { join } from "node:path";
+ 
+ import {
+-  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, securityCloseElements,
++  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, securityCloseElements, securityGateNotConfiguredRefusal,
+ } from "../lib/security-close-status.mjs";
+ 
+ import { loadManifest, gateConfig } from "../lib/manifest.mjs";
+@@ -82,11 +82,11 @@ if (isDirectInvocation(import.meta.url)) {
+   const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+   const result = checkCloseSecurityCompleteness(root);
+   if (result.skipped) {
+-    // Nothing configured is "not applicable", said out loud: a silent exit 0 here read like a passed security check.
+-    const hint = isCriticalStakes(readCalibrationStakes(root))
+-      ? " This project is calibrated critical: configure the security gate (gates.security mode: blocking) in the project manifest."
+-      : "";
+-    console.log(`CLOSE SECURITY CHAIN: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off).${hint}`);
++    // A critical calibration without a gate is blocked and names the repair command (G20-25); any other calibration is "not applicable",
++    // said out loud: a silent exit 0 here read like a passed security check.
++    const refusal = securityGateNotConfiguredRefusal(root, "the close chain");
++    if (refusal) { console.error(`CLOSE SECURITY COMPLETENESS FAILED: ${refusal}`); process.exit(2); }
++    console.log("CLOSE SECURITY CHAIN: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off).");
+     process.exit(0);
+   }
+   for (const line of formatSecurityCloseStatus(result.elements)) console.log(`  ${line}`);
+diff --git a/plugins/pipeline-core/scripts/consumer-verify-check.mjs b/plugins/pipeline-core/scripts/consumer-verify-check.mjs
+index 7ca5c2d27cb338be78c14a402ba0cbbfda43d459..b8d935bd13291691f18199909b334d99ce1bc723 100644
+--- a/plugins/pipeline-core/scripts/consumer-verify-check.mjs
++++ b/plugins/pipeline-core/scripts/consumer-verify-check.mjs
+@@ -5,7 +5,7 @@ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+-import { elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal } from "../lib/security-close-status.mjs";
++import { elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal, securityGateNotConfiguredRefusal } from "../lib/security-close-status.mjs";
+ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { readProjectCalibrationIdentity } from "../lib/project-calibration-identity.mjs";
+ import { gateConfig, loadManifest } from "../lib/manifest.mjs";
+@@ -19,6 +19,8 @@ export function runSecurityCloseCheck(root, env = process.env) {
+   const loaded = loadManifest(root);
+   const gate = gateConfig(loaded.manifest, "security");
+   if (loaded.status === "absent" || !gate || gate.mode === "off") {
++    const refusal = securityGateNotConfiguredRefusal(root, "this Verify run");
++    if (refusal) { console.error(refusal); return 1; }
+     console.log("security close chain: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off)");
+     return 0;
+   }
+diff --git a/plugins/pipeline-core/scripts/security-gate-configure.mjs b/plugins/pipeline-core/scripts/security-gate-configure.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..5047637b45dd791c498235e368917bd8b9eed067
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/security-gate-configure.mjs
+@@ -0,0 +1,154 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * security-gate-configure.mjs -- the one command that configures a missing security gate (Candidate 20, G20-25, AC-108).
++ *
++ * A project calibrated critical (stakes) whose manifest configures no `gates.security` (no manifest, no gate, or mode off) is refused at
++ * close and at Verify (SEC-CLOSE-GATE-NOT-CONFIGURED); that refusal names exactly this command:
++ *
++ *   node <plugin-root>/scripts/security-gate-configure.mjs --root <project root>
++ *
++ * It sets `gates.security` to the block onboarding writes for a new project (mode: blocking, type: automated), in the manifest tier the
++ * loader reads, and changes no other byte of the file (comments, order, line endings and every other gate stay as they are). Idempotent:
++ * a gate that is already configured (any mode but off) is reported and left alone. A twin manifest pair (project/pipeline.yaml and
++ * .claude/pipeline.yaml) receives the same edit in both files, so the pair does not drift (PA-MANIFEST-DRIFT). The manifest is created
++ * only where the loader would read it, when no tier exists.
++ *
++ * Nothing is written unless the edited bytes validate as a manifest with a blocking security gate and differ from the original only in
++ * gates.security. A refusal (invalid manifest, a shape that cannot be edited byte-safely, a bad argument) exits 1 and writes nothing.
++ * It never repairs a broken manifest and needs no ceremony: it only strengthens the project's own gate.
++ *
++ * VERIFY: node --test plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
++ */
++import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
++import { dirname, isAbsolute, join } from "node:path";
++import { isDeepStrictEqual } from "node:util";
++
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { gateConfig, validateManifest } from "../lib/manifest.mjs";
++import { LEGACY_MANIFEST, NEUTRAL_MANIFEST, resolveAuthorityArtifactPath } from "../lib/project-authority-read.mjs";
++import { parseYaml } from "../lib/yaml-lite.mjs";
++
++/** The block onboarding writes for a new project (lib/project-onboarding-v3.mjs, DEV_PLAN_BLOCKING_GATE); pinned equal by the C12 pin. */
++export const SECURITY_GATE_BLOCK = "  security:\n    mode: blocking\n    type: automated\n";
++export const SECURITY_GATE_CONFIGURE_REFUSED = "SEC-GATE-CONFIGURE-REFUSED";
++
++const refusal = (reason) => ({ refusal: reason });
++const lineBody = (line) => line.replace(/\r?\n$/u, "");
++const stripSecurityGate = (manifest) => {
++  const copy = structuredClone(manifest);
++  if (copy.gates && typeof copy.gates === "object") delete copy.gates.security;
++  if (copy.gates === null || (copy.gates && Object.keys(copy.gates).length === 0)) delete copy.gates;
++  return copy;
++};
++
++/** Returns {text} (the edited bytes), {unchanged: true}, or {refusal}. Pure: reads nothing but its arguments. */
++export function configureManifestText(text, rootDir) {
++  let parsed;
++  try { parsed = parseYaml(text); } catch (error) { return refusal(`the manifest cannot be parsed (${error instanceof Error ? error.message : String(error)}); it is not repaired here`); }
++  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return refusal("the manifest is not a mapping");
++  const current = parsed.gates?.security;
++  if (current && typeof current === "object" && current.mode !== "off") return { unchanged: true, mode: current.mode };
++
++  const eol = text.includes("\r\n") ? "\r\n" : "\n";
++  const lines = text.match(/[^\n]*\n|[^\n]+$/gu) ?? [];
++  const block = (indent) => SECURITY_GATE_BLOCK.replace(/^ {2}/gmu, indent).replace(/\n/gu, eol);
++  const insert = (index, chunk) => {
++    const out = lines.slice();
++    if (index > 0 && !out[index - 1].endsWith("\n")) out[index - 1] += eol;
++    out.splice(index, 0, chunk);
++    return out.join("");
++  };
++  const finish = (edited) => {
++    let reparsed;
++    try { reparsed = parseYaml(edited); } catch (error) { return refusal(`the edited manifest does not parse (${error instanceof Error ? error.message : String(error)})`); }
++    const checked = validateManifest(reparsed, { rootDir });
++    if (checked.status !== "ok") return refusal(`the edited manifest would be invalid: ${JSON.stringify(checked.errors.slice(0, 3))}`);
++    const gate = gateConfig(reparsed, "security");
++    if (gate?.mode !== "blocking") return refusal("the edited manifest does not configure a blocking security gate");
++    if (!isDeepStrictEqual(stripSecurityGate(parsed), stripSecurityGate(reparsed))) return refusal("the edit would change more than gates.security");
++    return { text: edited };
++  };
++
++  if (!Object.hasOwn(parsed, "gates")) return finish(insert(lines.length, `gates:${eol}${block("  ")}`));
++  const gatesAt = lines.findIndex((line) => /^gates:[ \t]*(?:#.*)?\r?\n?$/u.test(line));
++  if (gatesAt < 0) return refusal("gates is not a plain block mapping (flow style or an inline value); set gates.security to mode: blocking, type: automated by hand");
++  let end = lines.length;
++  let last = gatesAt;
++  let childIndent = null;
++  for (let i = gatesAt + 1; i < lines.length; i += 1) {
++    const body = lineBody(lines[i]);
++    if (/^\s*$/u.test(body)) continue;
++    if (/^\S/u.test(body)) { if (body.startsWith("#")) continue; end = i; break; }
++    last = i;
++    if (childIndent === null && !/^\s*#/u.test(body)) childIndent = /^ */u.exec(body)[0];
++  }
++  const indent = childIndent ?? "  ";
++  const securityAt = lines.findIndex((line, i) => i > gatesAt && i < end && new RegExp(`^${indent}security:`, "u").test(line));
++  if (securityAt < 0) return finish(insert(last + 1, block(indent)));
++  if (!/^[ \t]*(?:#.*)?$/u.test(lineBody(lines[securityAt]).slice(indent.length + "security:".length))) {
++    return refusal("gates.security is written in flow style; set it to mode: blocking, type: automated by hand");
++  }
++  const out = lines.slice();
++  let modeEdited = false;
++  for (let i = securityAt + 1; i < end; i += 1) {
++    const body = lineBody(lines[i]);
++    if (/^\s*$/u.test(body)) continue;
++    if (!body.startsWith(`${indent} `)) break;
++    const mode = /^(\s+mode:[ \t]*)(\S+)([ \t]*(?:#.*)?)$/u.exec(body);
++    const type = /^(\s+type:[ \t]*)(\S+)([ \t]*(?:#.*)?)$/u.exec(body);
++    if (mode && /^["']?off["']?$/u.test(mode[2])) { out[i] = `${mode[1]}blocking${mode[3]}${lines[i].slice(body.length)}`; modeEdited = true; }
++    else if (type && type[2].replace(/["']/gu, "") !== "automated") out[i] = `${type[1]}automated${type[3]}${lines[i].slice(body.length)}`;
++  }
++  return modeEdited ? finish(out.join("")) : refusal("gates.security has no plain `mode: off` line to change; set it to mode: blocking, type: automated by hand");
++}
++
++/** The manifest files to edit: every existing tier (a twin pair gets the same edit), else the one path the loader would read. */
++function manifestTargets(root) {
++  const existing = [NEUTRAL_MANIFEST, LEGACY_MANIFEST].filter((rel) => existsSync(join(root, rel)));
++  return existing.length > 0 ? existing : [resolveAuthorityArtifactPath("manifest", { rootDir: root }).relPath];
++}
++
++/** Plans, validates and only then writes. Returns {status: "configured"|"unchanged"|"refused", files, reason?}. */
++export function configureSecurityGate(root) {
++  const plans = [];
++  for (const rel of manifestTargets(root)) {
++    const path = join(root, rel);
++    let before = null;
++    if (existsSync(path)) {
++      const info = lstatSync(path);
++      if (info.isSymbolicLink() || !info.isFile()) return { status: "refused", files: [], reason: `${rel} is not a regular file` };
++      before = readFileSync(path, "utf8");
++    }
++    const result = before === null
++      ? configureManifestText("schema: pipeline.manifest.v0\n", root)
++      : configureManifestText(before, root);
++    if (result.refusal) return { status: "refused", files: [], reason: `${rel}: ${result.refusal}` };
++    plans.push({ rel, path, before, result });
++  }
++  const changed = plans.filter((plan) => !plan.result.unchanged);
++  if (changed.length === 0) return { status: "unchanged", files: plans.map((plan) => plan.rel), mode: plans[0].result.mode };
++  for (const plan of changed) {
++    mkdirSync(dirname(plan.path), { recursive: true });
++    const temp = `${plan.path}.tmp-${process.pid}`;
++    try { writeFileSync(temp, plan.result.text, { flag: "wx" }); renameSync(temp, plan.path); }
++    catch (error) { rmSync(temp, { force: true }); return { status: "refused", files: [], reason: `${plan.rel} could not be written (${error instanceof Error ? error.message : String(error)})` }; }
++  }
++  return { status: "configured", files: changed.map((plan) => plan.rel) };
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  const args = process.argv.slice(2);
++  const fail = (reason) => { console.error(`${SECURITY_GATE_CONFIGURE_REFUSED}: ${reason}; nothing was written.`); process.exit(1); };
++  if (args.length !== 2 || args[0] !== "--root" || !isAbsolute(args[1] ?? "")) fail("usage: security-gate-configure.mjs --root <absolute project root>");
++  let isDirectory = false;
++  try { isDirectory = statSync(args[1]).isDirectory(); } catch { /* reported below */ }
++  if (!isDirectory) fail("the root is not a directory");
++  const result = configureSecurityGate(args[1]);
++  if (result.status === "refused") fail(result.reason);
++  if (result.status === "unchanged") {
++    console.log(`security gate: already configured (mode ${result.mode}) in ${result.files.join(", ")} -- nothing changed.`);
++  } else {
++    console.log(`security gate: configured in ${result.files.join(", ")} (gates.security mode: blocking, type: automated). Run the check that refused again: it now runs the scanners.`);
++  }
++}

@@ -1,0 +1,256 @@
+diff --git a/plugins/pipeline-core/lib/path-spelling.mjs b/plugins/pipeline-core/lib/path-spelling.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..5724bdb29085d406410c642da9a370fbd8120fba
+--- /dev/null
++++ b/plugins/pipeline-core/lib/path-spelling.mjs
+@@ -0,0 +1,151 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * path-spelling.mjs -- one shared answer to "do these two spellings name the same path?" (candidate 20, separator sweep).
++ *
++ * Measured in the three greenfield runs and the follow-up audit (specs/sprint-alfred-epic/evidence/held-patches/
++ * w252-separator-sweep-audit.md): about thirty guard and script sites compared an agent-typed path or interpreter word with
++ * a canonical spelling by string equality. On native Windows an agent naturally types `D:/Dev/x`, `d:\Dev\x`, `/d/Dev/x`
++ * (MSYS) or `"C:/Program Files/nodejs/node.exe"`; each of those was refused although it names the same file. macOS has the
++ * same class with other causes: a case-insensitive APFS volume, `/tmp` and `/var` being links into `/private`, and Unicode
++ * file names arriving in either composed (NFC) or decomposed (NFD) form.
++ *
++ * Rules (closed, conservative):
++ * - win32: `\` and `/` are equal, MSYS `/x/...` is `X:/...`, case is folded (NTFS default), a trailing separator is ignored.
++ * - darwin: names are compared in NFC; case is folded only when the volume holding the path is measured case-insensitive.
++ * - every platform: duplicate separators and a trailing separator are ignored; a path with a `.` or `..` segment is never
++ *   treated as equal to anything but itself (no lexical traversal is resolved here).
++ * Callers that need physical identity (links) realpath both sides first; this module never resolves links on its own except
++ * for the Node interpreter rule, which needs the physical file.
++ */
++import { lstatSync, realpathSync } from "node:fs";
++import { basename, posix, win32 } from "node:path";
++
++const DOT_SEGMENT = /(^|[\\/])\.\.?([\\/]|$)/u;
++
++function platformOf(options) { return options?.platform ?? process.platform; }
++
++/** MSYS/Git-Bash drive form `/d/Dev/x` to `D:/Dev/x`; anything else unchanged. */
++export function msysToWindows(value) {
++  return typeof value === "string" ? value.replace(/^\/([A-Za-z])(?=\/|$)/u, (_m, drive) => `${drive.toUpperCase()}:`) : value;
++}
++
++/** The normalised spelling WITHOUT case folding (separators, MSYS, duplicate/trailing separators, NFC), or null. */
++function unfoldedSpelling(value, platform) {
++  if (typeof value !== "string" || value === "" || /[\x00-\x1f\x7f]/u.test(value) || DOT_SEGMENT.test(value)) return null;
++  let text = value.normalize("NFC");
++  if (platform === "win32") {
++    text = msysToWindows(text).replace(/\\/gu, "/");
++    const unc = text.startsWith("//");
++    text = (unc ? "//" : "") + text.slice(unc ? 2 : 0).replace(/\/{2,}/gu, "/");
++    if (text.length > 1 && !/^[A-Za-z]:\/$/u.test(text)) text = text.replace(/\/+$/u, "");
++    return text;
++  }
++  text = text.replace(/\/{2,}/gu, "/");
++  if (text.length > 1) text = text.replace(/\/+$/u, "");
++  return text;
++}
++
++/** The comparison key of one spelling, or null for a non-string, empty, control-character or dot-segment value. */
++export function pathSpellingKey(value, options = {}) {
++  const platform = platformOf(options);
++  const text = unfoldedSpelling(value, platform);
++  if (text === null) return null;
++  return platform === "win32" ? text.toLowerCase() : text;
++}
++
++/**
++ * darwin only: is the volume that holds `path` case-insensitive? Measured, never assumed: the path (or its nearest existing
++ * ancestor) is looked up again with its case swapped; the same inode answers yes. Any failure answers no (exact compare).
++ */
++export function caseInsensitiveVolume(path, options = {}) {
++  if (platformOf(options) !== "darwin" || typeof path !== "string" || !path.startsWith("/")) return false;
++  const lstat = options.lstatFn ?? lstatSync;
++  let probe = path;
++  for (let depth = 0; depth < 64 && probe !== "/"; depth += 1) {
++    const name = basename(probe);
++    const swapped = name.replace(/[A-Za-z]/gu, (c) => (c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase()));
++    if (swapped !== name) {
++      try {
++        const original = lstat(probe);
++        const other = lstat(posix.join(posix.dirname(probe), swapped));
++        return original.ino === other.ino && original.dev === other.dev;
++      } catch { /* try the parent */ }
++    }
++    probe = posix.dirname(probe);
++  }
++  return false;
++}
++
++/** Do `a` and `b` name the same path under the rules above? */
++export function samePathSpelling(a, b, options = {}) {
++  if (a === b && typeof a === "string") return true;
++  const left = pathSpellingKey(a, options);
++  const right = pathSpellingKey(b, options);
++  if (left === null || right === null) return false;
++  if (left === right) return true;
++  return platformOf(options) === "darwin" && left.toLowerCase() === right.toLowerCase()
++    && caseInsensitiveVolume(left, options) && caseInsensitiveVolume(right, options);
++}
++
++/**
++ * The `/`-separated path of `value` relative to `root` when `value` is the root ("") or below it in any equivalent spelling;
++ * otherwise null. A relative `value` is not resolved here (it is the caller's spelling of a relative path) and returns null.
++ */
++export function relativeUnderRoot(value, root, options = {}) {
++  const platform = platformOf(options);
++  const valueKey = pathSpellingKey(value, options);
++  const rootKey = pathSpellingKey(root, options);
++  if (valueKey === null || rootKey === null) return null;
++  const absolute = platform === "win32" ? /^(?:[a-z]:\/|\/\/)/u.test(valueKey) : valueKey.startsWith("/");
++  if (!absolute) return null;
++  const fold = platform === "darwin" && valueKey.toLowerCase().startsWith(rootKey.toLowerCase()) && valueKey !== rootKey
++    && !valueKey.startsWith(rootKey) && caseInsensitiveVolume(root, options);
++  const v = fold ? valueKey.toLowerCase() : valueKey;
++  const r = fold ? rootKey.toLowerCase() : rootKey;
++  if (v === r) return "";
++  const prefix = r.endsWith("/") ? r : `${r}/`;
++  if (!v.startsWith(prefix)) return null;
++  // Keep the caller's own case for the tail (only the comparison was folded); fall back to the key if lengths diverge.
++  const unfolded = unfoldedSpelling(value, platform);
++  const tailLength = v.length - prefix.length;
++  return unfolded !== null && unfolded.length === v.length ? unfolded.slice(unfolded.length - tailLength) : v.slice(prefix.length);
++}
++
++/** `value` rewritten to the canonical native spelling below `root` when it names the root or a path under it; else unchanged. */
++export function canonicalUnderRoot(value, root, options = {}) {
++  const rel = relativeUnderRoot(value, root, options);
++  if (rel === null) return value;
++  if (rel === "") return root;
++  return platformOf(options) === "win32" ? win32.join(root, ...rel.split("/")) : posix.join(root, rel);
++}
++
++/**
++ * Is `word` an admissible Node interpreter for a command the guard admits by its script and argv? Admitted: bare `node`
++ * (and `node.exe` on win32), any spelling of the trusted interpreter (`process.execPath` by default), or an absolute path
++ * whose basename is node/node.exe that resolves to an executable regular file OUTSIDE the project root (a runner sandbox or
++ * a version manager brings its own Node; an agent cannot plant its own "node" in the repository). Bare `node` from PATH is
++ * already admitted, so this widens no authority: every script/argv rule of the caller still applies.
++ */
++export function isNodeInterpreterWord(word, options = {}) {
++  if (typeof word !== "string" || word === "") return false;
++  const platform = platformOf(options);
++  if (word === "node" || (platform === "win32" && word.toLowerCase() === "node.exe")) return true;
++  const trusted = options.trustedNode ?? process.execPath;
++  if (samePathSpelling(word, trusted, options)) return true;
++  const physical = platform === "win32" ? msysToWindows(word) : word;
++  const absolute = platform === "win32" ? win32.isAbsolute(physical) : posix.isAbsolute(physical);
++  if (!absolute || !["node", "node.exe"].includes(basename(physical.replace(/\\/gu, "/")).toLowerCase())) return false;
++  const root = options.root;
++  if (typeof root !== "string" || root === "") return false;
++  try {
++    const realpathFn = options.realpathFn ?? realpathSync;
++    const real = realpathFn(physical);
++    let realRoot;
++    try { realRoot = realpathFn(root); } catch { realRoot = root; }
++    if (relativeUnderRoot(real, realRoot, options) !== null) return false;
++    const stat = (options.lstatFn ?? lstatSync)(real);
++    return stat.isFile() && (platform === "win32" || (stat.mode & 0o111) !== 0);
++  } catch {
++    return false;
++  }
++}
+diff --git a/plugins/pipeline-core/lib/path-spelling.test.mjs b/plugins/pipeline-core/lib/path-spelling.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..8146e8a4d3d253061fb296f6900bfc58555b82dd
+--- /dev/null
++++ b/plugins/pipeline-core/lib/path-spelling.test.mjs
+@@ -0,0 +1,93 @@
++// SPDX-License-Identifier: SUL-1.0
++// path-spelling.mjs: the shared path/interpreter equivalence (candidate 20 separator sweep). Windows and macOS rules are
++// exercised with an injected platform; the physical interpreter and case-probe rules use real files on this host.
++import assert from "node:assert/strict";
++import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { canonicalUnderRoot, caseInsensitiveVolume, isNodeInterpreterWord, msysToWindows, pathSpellingKey, relativeUnderRoot, samePathSpelling } from "./path-spelling.mjs";
++
++const win = { platform: "win32" };
++const mac = { platform: "darwin" };
++const linux = { platform: "linux" };
++
++test("win32: separator, drive-letter case, MSYS and trailing separator are one path", () => {
++  for (const spelling of ["D:\\Dev\\App", "D:/Dev/App", "d:/dev/app", "/d/Dev/App", "D:\\Dev\\App\\", "D://Dev//App"]) {
++    assert.equal(samePathSpelling(spelling, "D:\\Dev\\App", win), true, spelling);
++  }
++  assert.equal(msysToWindows("/c/Program Files/nodejs/node.exe"), "C:/Program Files/nodejs/node.exe");
++  assert.equal(pathSpellingKey("C:\\", win), "c:/");
++});
++
++test("win32 control: another directory, a prefix, a dot segment or a control character is never equal", () => {
++  assert.equal(samePathSpelling("D:/Dev/App2", "D:\\Dev\\App", win), false);
++  assert.equal(samePathSpelling("D:/Dev", "D:\\Dev\\App", win), false);
++  assert.equal(samePathSpelling("D:/Dev/x/../App", "D:\\Dev\\App", win), false);
++  assert.equal(samePathSpelling("D:/Dev/App\n", "D:\\Dev\\App", win), false);
++  assert.equal(samePathSpelling("E:/Dev/App", "D:\\Dev\\App", win), false);
++});
++
++test("linux: only duplicate and trailing separators are folded; case is significant; a backslash is a file name character", () => {
++  assert.equal(samePathSpelling("/home/u/app/", "/home/u/app", linux), true);
++  assert.equal(samePathSpelling("/home//u/app", "/home/u/app", linux), true);
++  assert.equal(samePathSpelling("/home/u/App", "/home/u/app", linux), false);
++  assert.equal(samePathSpelling("\\home\\u\\app", "/home/u/app", linux), false);
++});
++
++test("darwin: NFC and NFD spellings of a Unicode name are one path", () => {
++  const nfc = "/Users/po/Übung".normalize("NFC");
++  const nfd = "/Users/po/Übung".normalize("NFD");
++  assert.notEqual(nfc, nfd);
++  assert.equal(samePathSpelling(nfd, nfc, mac), true);
++});
++
++test("darwin: case is folded only when the volume is measured case-insensitive", () => {
++  const same = { ino: 7, dev: 1 };
++  const insensitive = { ...mac, lstatFn: () => same };
++  assert.equal(caseInsensitiveVolume("/Users/po/Dev", insensitive), true);
++  assert.equal(samePathSpelling("/users/po/dev", "/Users/po/Dev", insensitive), true);
++  // A case-sensitive volume: only the exact spellings exist.
++  const inodes = new Map([["/Users", 3], ["/Users/po", 2], ["/Users/po/Dev", 1]]);
++  let calls = 0;
++  const sensitive = { ...mac, lstatFn: (p) => { calls += 1; if (!inodes.has(p)) throw new Error("ENOENT"); return { ino: inodes.get(p), dev: 1 }; } };
++  assert.equal(caseInsensitiveVolume("/Users/po/Dev", sensitive), false);
++  assert.equal(samePathSpelling("/Users/po/dev", "/Users/po/Dev", sensitive), false);
++  assert.ok(calls > 0);
++  // Never on another platform.
++  assert.equal(caseInsensitiveVolume("/Users/po/Dev", { platform: "linux", lstatFn: () => same }), false);
++});
++
++test("relativeUnderRoot and canonicalUnderRoot rewrite any spelling under the root to the native one and keep the tail's case", () => {
++  assert.equal(relativeUnderRoot("d:/dev/app/scratch/MyReq.json", "D:\\Dev\\App", win), "scratch/MyReq.json");
++  assert.equal(canonicalUnderRoot("/d/Dev/App/project/.resume-hint-input.json", "D:\\Dev\\App", win), "D:\\Dev\\App\\project\\.resume-hint-input.json");
++  assert.equal(canonicalUnderRoot("D:/Dev/App", "D:\\Dev\\App", win), "D:\\Dev\\App");
++  assert.equal(relativeUnderRoot("D:/Dev/AppOther/x", "D:\\Dev\\App", win), null);
++  assert.equal(relativeUnderRoot("scratch/x.json", "D:\\Dev\\App", win), null, "a relative value is not resolved here");
++  assert.equal(canonicalUnderRoot("/home/u/app//scratch/x.json", "/home/u/app", linux), "/home/u/app/scratch/x.json");
++  assert.equal(canonicalUnderRoot("/home/u/other/x.json", "/home/u/app", linux), "/home/u/other/x.json");
++});
++
++test("isNodeInterpreterWord: bare node, node.exe on win32, any spelling of the trusted node, a real node outside the root", () => {
++  const outside = mkdtempSync(join(tmpdir(), "path-spelling-node-"));
++  const root = mkdtempSync(join(tmpdir(), "path-spelling-root-"));
++  try {
++    assert.equal(isNodeInterpreterWord("node", { root }), true);
++    assert.equal(isNodeInterpreterWord("node.exe", { ...win, root }), true);
++    assert.equal(isNodeInterpreterWord("node.exe", { ...linux, root }), false);
++    assert.equal(isNodeInterpreterWord("C:/Program Files/nodejs/node.exe", { ...win, root: "D:\\Dev\\App", trustedNode: "C:\\Program Files\\nodejs\\node.exe" }), true);
++    const foreign = join(outside, "node");
++    symlinkSync(process.execPath, foreign);
++    assert.equal(isNodeInterpreterWord(foreign, { root, trustedNode: "/nonexistent/node" }), true);
++    mkdirSync(join(root, "bin"));
++    const planted = join(root, "bin", "node");
++    writeFileSync(planted, "#!/bin/sh\n", { mode: 0o755 });
++    assert.equal(isNodeInterpreterWord(planted, { root, trustedNode: "/nonexistent/node" }), false, "planted inside the root");
++    assert.equal(isNodeInterpreterWord(join(outside, "python3"), { root, trustedNode: "/nonexistent/node" }), false);
++    assert.equal(isNodeInterpreterWord(join(outside, "missing", "node"), { root, trustedNode: "/nonexistent/node" }), false);
++    assert.equal(isNodeInterpreterWord(foreign, { trustedNode: "/nonexistent/node" }), false, "no root, no foreign admission");
++  } finally {
++    rmSync(outside, { recursive: true, force: true });
++    rmSync(root, { recursive: true, force: true });
++  }
++});

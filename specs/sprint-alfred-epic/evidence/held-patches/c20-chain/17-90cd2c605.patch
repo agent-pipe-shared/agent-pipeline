@@ -1,0 +1,76 @@
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index 0bcf7e3c6d47597ceec3478c7a9c62b17c5fc42e..eccf7dc09916bddae36ea7ff35d784c458cf44ab 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -751,12 +751,42 @@ export function sanctionedHumanOverrideArgs(args, root) {
+  * identified `script` path and its `args`, exactly as `isSanctionedLifecycleCommand`
+  * itself used to compute them inline.
+  */
++/**
++ * C20 (greenfield G20-17, Claude on Windows; same class as G20-1): the catalogue matched the interpreter only as `node` or the
++ * guard's own `process.execPath`. The Windows session typed `"C:/Program Files/nodejs/node.exe"` (forward slashes) and every
++ * sanctioned human-override preparation step (`plan`, `prepare-for-signature`) was refused as an opaque script, so the PO had to run
++ * them by hand. An agent on Antigravity or Codex likewise names its own version-manager Node. Admitted here, besides the two exact
++ * forms: an absolute path whose basename is node/node.exe and that resolves to an executable regular file OUTSIDE the project root
++ * (an agent cannot plant its own "node" in the repository). Bare `node` from PATH is already admitted, so this widens no authority:
++ * every script/argv rule below still applies unchanged.
++ */
++function foreignNodeInterpreter(word, root, options = {}) {
++  if (typeof word !== "string" || typeof root !== "string" || root === "") return false;
++  const isAbs = /^[A-Za-z]:[\\/]/u.test(word) || word.startsWith("/") || word.startsWith("\\\\");
++  if (!isAbs || !["node", "node.exe"].includes(basename(word.replace(/\\/gu, "/")).toLowerCase())) return false;
++  try {
++    const realpathFn = options.realpathFn ?? realpathSync;
++    const real = realpathFn(word);
++    let realRoot;
++    try { realRoot = realpathFn(root); } catch { realRoot = resolve(root); }
++    const inside = (options.platform ?? process.platform) === "win32"
++      ? (real.toLowerCase() === realRoot.toLowerCase() || real.toLowerCase().startsWith(`${realRoot.toLowerCase().replace(/[\\/]+$/u, "")}\\`))
++      : (real === realRoot || real.startsWith(`${realRoot.replace(/\/+$/u, "")}/`));
++    if (inside) return false;
++    const stat = (options.lstatFn ?? lstatSync)(real);
++    return stat.isFile() && ((options.platform ?? process.platform) === "win32" || (stat.mode & 0o111) !== 0);
++  } catch {
++    return false;
++  }
++}
++
+ export function resolveSanctionedScriptInvocation(command, root, options = {}) {
+   const words = simpleWords(command, root, options);
+   const platform = options.platform ?? process.platform;
+   const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
+   const trustedNode = options.processExecPath ?? process.execPath;
+-  if (!words || words.length < 2 || ![...directNode, trustedNode].includes(words[0])) return null;
++  if (!words || words.length < 2) return null;
++  if (![...directNode, trustedNode].includes(words[0]) && !foreignNodeInterpreter(words[0], root, options)) return null;
+   const [script, ...args] = words.slice(1);
+   // Windows accepts either separator spelling of this one trusted script identity.
+   // Keep every other script lexical and preserve case, roots, segments and argv.
+diff --git a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+index 42abf0a74b6a20fcddbb594492d5f1f59aa370d9..5f8bc1284e3d3b8f4c202e824a16d8492bbf3615 100644
+--- a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+@@ -90,6 +90,23 @@ test('AC-207 point 1 control: continuity near-misses stay refused', () => {
+   for (const [name, command] of Object.entries(nears)) assert.equal(admittedByClosedArgv(command), false, name);
+ });
+ 
++test('G20-17: a sanctioned lifecycle command spelled with another absolute Node outside the root is admitted; a planted one is not', async () => {
++  const { symlinkSync, mkdtempSync: mkTemp } = await import('node:fs');
++  const { tmpdir } = await import('node:os');
++  const outside = mkTemp(join(tmpdir(), 'g20-17-node-'));
++  try {
++    const foreignNode = join(outside, 'node');
++    symlinkSync(process.execPath, foreignNode);
++    assert.equal(admittedByClosedArgv(`${q(foreignNode)} ${q(state)} inspect`), true, 'version-manager style node outside the root');
++    mkdirSync(join(root, 'scratch', 'bin2'), { recursive: true });
++    const planted = join(root, 'scratch', 'bin2', 'node');
++    writeFileSync(planted, '#!/bin/sh\n', { mode: 0o755 });
++    assert.equal(admittedByClosedArgv(`${q(planted)} ${q(state)} inspect`), false, 'planted node inside the root');
++    assert.equal(admittedByClosedArgv(`${q(join(outside, 'python3'))} ${q(state)} inspect`), false, 'not a node basename');
++    assert.equal(admittedByClosedArgv(`${q(join(outside, 'missing', 'node'))} ${q(state)} inspect`), false, 'nonexistent node');
++  } finally { rmSync(outside, { recursive: true, force: true }); }
++});
++
+ test('AC-207 point 2: exactly `node scratch/<name>.mjs` is admitted in the draft lifecycle', () => {
+   assert.equal(refused('node scratch/forensics.mjs'), false);
+   assert.equal(refused('node scratch/a-b_c.1.mjs'), false);

@@ -1,0 +1,57 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index a2a523cce6a953e0ae447f5fc589400e238f3d6d..61016a5252e4e03d9773286a65594f22d57e0891 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -547,11 +547,11 @@ export function architectureCommitStep(rootDir, extraPaths = []) {
+   const status = spawnSync("git", ["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--", "architecture", ...extraPaths],
+     { cwd: resolve(rootDir), encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+   if (status.status !== 0 || status.error) {
+-    return { uncommittedPaths: [], nextAction: "The commit state of the materialized architecture could not be read; stage and commit everything under architecture/ with the project's commit route before implementation." };
++    return { uncommittedPaths: [], commitStep: "The commit state of the materialized architecture could not be read; stage and commit everything under architecture/ with the project's commit route before implementation." };
+   }
+   const uncommittedPaths = status.stdout.split("\0").filter(Boolean).map(entry => entry.slice(3)).sort();
+-  if (uncommittedPaths.length === 0) return { uncommittedPaths, nextAction: null };
+-  return { uncommittedPaths, nextAction: `The materialized architecture is not committed yet; commit it so the audit trail holds it: git add -- ${uncommittedPaths.join(" ")} ; then commit with a Conventional Commit message (for example docs(architecture): materialize the approved architecture design) through the project's commit route, before implementation starts.` };
++  if (uncommittedPaths.length === 0) return { uncommittedPaths, commitStep: null };
++  return { uncommittedPaths, commitStep: `The materialized architecture is not committed yet; commit it so the audit trail holds it: git add -- ${uncommittedPaths.join(" ")} ; then commit with a Conventional Commit message (for example docs(architecture): materialize the approved architecture design) through the project's commit route, before implementation starts.` };
+ }
+ 
+ export function materializeArchitectureDesign(rootDir, { lock, ...inspectDeps } = {}) {
+diff --git a/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs b/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
+index d378f50d12f6458ca4b1028c6d973b417ae42fcb..4bc417c8d94b4361ee7f9df4b1469f4a1c576e56 100644
+--- a/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
+@@ -105,11 +105,13 @@ test('G20-36 materialize-architecture names the exact commit step while the mate
+   assert.equal(output.status, 'materialized');
+   assert(output.uncommittedPaths.includes('architecture/design-materialization.json'), JSON.stringify(output.uncommittedPaths));
+   assert(output.uncommittedPaths.every(path => !path.includes('\\')), 'repository-relative paths');
+-  assert.match(output.nextAction, /git add -- .*architecture\/design-materialization\.json/u);
+-  assert.match(output.nextAction, /commit/u);
++  // The prose commit step is `commitStep`; `nextAction` stays reserved for the structured action guided drivers execute.
++  assert.match(output.commitStep, /git add -- .*architecture\/design-materialization\.json/u);
++  assert.match(output.commitStep, /commit/u);
++  assert.equal(output.nextAction, undefined, 'no prose nextAction for a guided driver to stop on');
+   fixture.git(f, 'add', '--', ...output.uncommittedPaths);
+   fixture.git(f, 'commit', '-q', '-m', 'docs(architecture): commit the materialized architecture\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true');
+-  assert.deepEqual(architectureCommitStep(f.dir), { uncommittedPaths: [], nextAction: null });
++  assert.deepEqual(architectureCommitStep(f.dir), { uncommittedPaths: [], commitStep: null });
+ });
+ 
+ test('G27-PUBLIC-007 wrong source root has no Greenfield materialization authority', () => {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 7864bd86f613645aa34204eff2ca07217923af79..6204a22b922fc5172023b64ee7a126784fd6ce1b 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11585,9 +11585,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+           trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
+           verifyReadinessExecution: deps.verifyDesignReadinessHostExecution });
+         // G20-36: the writer publishes files; while any of them is uncommitted the output names the exact commit step (additive keys).
++        // The prose lives in `commitStep`, never in `nextAction`: `nextAction` is the structured, executable action every guided driver
++        // follows (onboarding-init stopped with unsupported-next-action on a prose value).
+         const commitStep = result.ok && result.status === "materialized" ? architectureCommitStep(dir, result.referencePath ? [result.referencePath] : []) : null;
+         console.log(JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", status: result.status,
+-          code: result.code ?? null, receipt: result.receipt ?? null, ...(commitStep?.nextAction ? commitStep : {}) }));
++          code: result.code ?? null, receipt: result.receipt ?? null, ...(commitStep?.commitStep ? commitStep : {}) }));
+         return result.ok && result.status === "materialized" ? 0 : 2;
+       } finally { releaseContinuityLock(lock); }
+     }

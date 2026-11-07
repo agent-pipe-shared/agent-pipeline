@@ -1,0 +1,85 @@
+diff --git a/plugins/pipeline-core/lib/guard/denial-route.mjs b/plugins/pipeline-core/lib/guard/denial-route.mjs
+index 9c974ce868d3e3739fcf7daf92ce31a9cab42461..12cb4771a1dd480e202b1bfd4e2082c7f1d738b7 100644
+--- a/plugins/pipeline-core/lib/guard/denial-route.mjs
++++ b/plugins/pipeline-core/lib/guard/denial-route.mjs
+@@ -197,6 +197,8 @@ export function humanOverrideRoute(code, reason, subject, root, toolName, toolIn
+         overrideGuidance = [
+           "",
+           `Human override available for this exact ${subject} (one use; audited; the human confirms):`,
++          // G20-17 (PO decision "signing parity", 2026-11-02): in the Windows run the PO typed plan and prepare-for-signature by hand.
++          "The agent runs this read-only plan step and the preparation it returns itself; the PO only runs the one signing command.",
+           planCommand.text,
+           approvalMode === "chat"
+             ? "The plan JSON gives the mode-specific nextAction; follow each returned action. The human confirms in-session; chat is attribution, not proof."
+diff --git a/plugins/pipeline-core/scripts/guard-human-override.mjs b/plugins/pipeline-core/scripts/guard-human-override.mjs
+index afaac1ce0d517298487151822168d6d6ce671445..dec72a343fe52d5446fe881a0fa32722fc278966 100644
+--- a/plugins/pipeline-core/scripts/guard-human-override.mjs
++++ b/plugins/pipeline-core/scripts/guard-human-override.mjs
+@@ -32,7 +32,7 @@ import {
+ } from "../lib/governance-hgo-consumption-action.mjs";
+ // `render-copy-safe` remains a backward-compatible view of the same shared
+ // renderer now used in the default hook hand-off.
+-import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
++import { placeholder, renderHumanCopySafeCommand, renderPoTerminalCommand } from "../lib/copy-safe-command.mjs";
+ import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+ 
+ const SCRIPT = fileURLToPath(import.meta.url);
+@@ -504,10 +504,15 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
+         proofDirectory: typeof options.proofDirectory === "string" ? options.proofDirectory : null,
+       });
+       const output = hasReadiness ? { ...prepared, environmentReadiness: readiness } : prepared;
+-      const signIntent = copySafeActionText(
+-        "sign-intent",
+-        prepared.signIntentCommand,
+-      );
++      // G20-16 (Claude on Windows): the PO pasted the POSIX and the PowerShell block together into PowerShell. The PO's one
++      // command is rendered for the PO's own terminal only (WSL: two labelled options, PowerShell through wsl.exe).
++      const signIntent = renderPoTerminalCommand({
++        label: "sign-intent",
++        executable: prepared.signIntentCommand.executable,
++        argv: prepared.signIntentCommand.argv,
++        ...(options.terminalEnv === undefined ? {} : { env: options.terminalEnv }),
++        ...(options.hostPlatform === undefined ? {} : { hostPlatform: options.hostPlatform }),
++      }).text;
+       // PO decision 2026-10-27: the operator-facing channel carries exactly ONE command. The import
+       // (`authorizeBySignatureCommand`, with the full proof path) is an agent action in the JSON
+       // channel only; the proof path is never printed into the operator block, whose lines stay
+diff --git a/plugins/pipeline-core/scripts/guard-human-override.test.mjs b/plugins/pipeline-core/scripts/guard-human-override.test.mjs
+index 94bea1ad2967dca08e1505e933799a0d6ec956fa..ea7bcf113f46928e33174acb446e40162b9ce782 100644
+--- a/plugins/pipeline-core/scripts/guard-human-override.test.mjs
++++ b/plugins/pipeline-core/scripts/guard-human-override.test.mjs
+@@ -771,9 +771,22 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
+     });
+     // SIG-A (PO decision 2026-10-27, revises the two-block hand-off): the operator channel carries
+     // the one signing command only; the import is an agent action in the JSON channel.
+-    assert.match(first.stderr, /Step: sign-intent\nPOSIX:/u);
++    // Restated 2026-11-07 (candidate 20, G20-16, QG-04): the block is rendered for the PO's own terminal. The host is
++    // pinned per case, so the expectation no longer depends on where the suite runs; the bound and the one-command rule stay.
++    for (const [hostPlatform, terminalEnv, expectations] of [
++      ["linux", {}, { first: /^Step: sign-intent\nPOSIX:/mu, absent: /PowerShell:/u }],
++      ["win32", {}, { first: /^Step: sign-intent \(PowerShell\)\nPowerShell:/mu, absent: /POSIX:/u }],
++      ["linux", { WSL_DISTRO_NAME: "Ubuntu" }, { first: /^Step: sign-intent, option A: WSL terminal\nPOSIX:[\s\S]*^Step: sign-intent, option B: Windows PowerShell\nPowerShell:/mu, absent: /cmd\.exe:/u }],
++    ]) {
++      const rendered = io();
++      assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], rendered,
++        { proofDirectory: SYNTHETIC_PROOF_DIRECTORY, hostPlatform, terminalEnv }), 0, rendered.stderr);
++      assert.match(rendered.stderr, expectations.first, `${hostPlatform} ${JSON.stringify(terminalEnv)}`);
++      assert.doesNotMatch(rendered.stderr, expectations.absent);
++      assert.doesNotMatch(rendered.stderr, /Step: authorize-by-signature/u);
++      assert.equal(rendered.stderr.trimEnd().split(/\r?\n/u).every((line) => line.length <= 72), true, rendered.stderr);
++    }
+     assert.doesNotMatch(first.stderr, /Step: authorize-by-signature/u);
+-    assert.match(first.stderr, /PowerShell:/u);
+     assert.equal(first.stderr.trimEnd().split(/\r?\n/u).every((line) => line.length <= 72), true, first.stderr);
+     assert.doesNotMatch(first.stderr, /available on demand|render-copy-safe/u);
+     assert.doesNotMatch(first.stdout, /Step:|POSIX:|PowerShell:/u,
+@@ -830,7 +843,8 @@ test("SIG-A2 the operator hand-off is one command with no placeholder anywhere,
+       denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
+     });
+     const captured = io();
+-    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, { proofDirectory: SYNTHETIC_PROOF_DIRECTORY }), 0, captured.stderr);
++    // G20-16: pinned to a non-WSL host, where the one command is exactly one block; the WSL two-option form is pinned in §3.3 above.
++    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, { proofDirectory: SYNTHETIC_PROOF_DIRECTORY, hostPlatform: "linux", terminalEnv: {} }), 0, captured.stderr);
+     const value = JSON.parse(captured.stdout);
+     assert.equal(value.operatorCommandCount, 1);
+     assert.equal((captured.stderr.match(/^Step: /gmu) ?? []).length, 1, captured.stderr);

@@ -1,0 +1,48 @@
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+index 92bfec9ae606f7d6708c24fc62c6a635da01263d..8c2a88f6b4ecb261fdd9500e7c19fb51f4fcac8c 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+@@ -130,6 +130,8 @@ afterwards.
+ - `spec.md` — a first-draft Spec with the same `Source:` line, needing EARS
+   acceptance criteria (each user-facing one with its `Journeys:` and `Asserts:`
+   clauses, see `templates/spec.md` §5) and implementation detail authored before binding.
++  Its plan is sliced vertical first (`templates/spec.md` §2, *Slice order*): one thin
++  end-to-end path for the most important journey before any horizontal layer.
+ 
+ Use the accepted criterion table header `| # | Criterion | Evidence |` and a
+ row such as `| AC-1 | WHEN the project is submitted, the system SHALL retain
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+index d661c0d4124e847281435a9a5f0b5b8fd2516ef2..9e1db1f2533564def41f6aa9b27336b4c662c8c9 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+@@ -249,7 +249,10 @@ interfaces/state/data, operational constraints, test/verification approach,
+ and PRD-to-Spec traceability. Every user-facing acceptance criterion in the Spec
+ names its journeys and state transitions and the actual effect asserted
+ (`Journeys:` and `Asserts:` clauses, template `templates/spec.md` §5); the plan
+-hand-off refuses a Spec that does not (`PLR-HANDOFF-NO-JOURNEY`). Favor thorough, comprehensive coverage of the
++hand-off refuses a Spec that does not (`PLR-HANDOFF-NO-JOURNEY`). The Spec's plan
++is sliced vertical first (`templates/spec.md` §2, *Slice order*): one thin
++end-to-end path for the most important journey, then widened journey by journey,
++never all of one horizontal layer before the next. Favor thorough, comprehensive coverage of the
+ material input over brevity — a short initial goal is not a reason for a
+ thin PRD/Spec. When the initial goal is short relative to that coverage
+ list, treat the gap as a prompt to ask the user follow-up questions against
+diff --git a/templates/spec.md b/templates/spec.md
+index d950638eba5610c038f9b9807354163a8865c760..12b5584e3552987fd6e19dd524200a5cb36232b3 100644
+--- a/templates/spec.md
++++ b/templates/spec.md
+@@ -80,6 +80,14 @@ matters now. No solution language here.}}
+ data flow, integration points. One diagram (mermaid/ASCII) where it clarifies.
+ This is the "how" at architecture altitude — file-level detail belongs in §4.}}
+ 
++**Slice order (vertical first).** {{Name the first slice as ONE thin end-to-end path a
++user can walk (input → domain → persistence → visible result) for the most important
++journey in §5, with every layer only as deep as that journey needs. Later slices widen
++it journey by journey. Do not plan horizontal layers first (all models, then all
++services, then all screens): nothing is runnable or reviewable until the last layer
++lands, and a wrong assumption surfaces only at the end. Name each slice with the
++criteria (AC-n) it makes walkable.}}
++
+ ### 2a. Stateful guard/control pre-readiness checklist (conditional, mandatory)
+ 
+ {{Complete this section before the first independent readiness dispatch WHEN the

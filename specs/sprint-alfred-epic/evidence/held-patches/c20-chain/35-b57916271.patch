@@ -1,0 +1,499 @@
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index 0ae9cc6b30313e838567099e0f237d481d56b6ad..090d058d23751414c8824448a9badbf44fcacedb 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -195,11 +195,18 @@ export function sanctionedTranscriptRecoveryArgs(args, root) {
+   // Preserve the original flag-only reader for compatibility.  `list` and
+   // `read` are the only operation prefixes: their exact flag sets keep this
+   // hook from becoming a general runner-session directory read capability.
+-  if (args[0] === "list") return matchFlagSpec(args.slice(1), base);
++  // C20 G20-31: `list` may add --page-size [--cursor] and `read` --window-bytes [--cursor] (bounded digits; an opaque cursor of
++  // URL-safe characters). The cursor never stands without its size flag, mirroring the script's own parseArgs.
++  const sizeValue = (value) => typeof value === "string" && /^\d{1,9}$/u.test(value);
++  const cursorValue = (value) => typeof value === "string" && /^[A-Za-z0-9_.-]{1,1024}$/u.test(value);
++  const pagedFlags = (sizeFlag) => ({ optionalValue: { [sizeFlag]: sizeValue, "--cursor": cursorValue } });
++  const cursorNeeds = (sizeFlag) => !args.includes("--cursor") || args.includes(sizeFlag);
++  if (args[0] === "list") return cursorNeeds("--page-size") && matchFlagSpec(args.slice(1), { ...base, ...pagedFlags("--page-size") });
+   if (args[0] === "read") {
+-    return matchFlagSpec(args.slice(1), {
++    return cursorNeeds("--window-bytes") && matchFlagSpec(args.slice(1), {
+       ...base,
+       requiredValue: { ...base.requiredValue, "--session-id": sessionId },
++      ...pagedFlags("--window-bytes"),
+     });
+   }
+   // ALF-C-N1-02C: `export` takes the read flag set but admits all three runners, because the Claude and
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 6ed4f6d3c34a44e88b4b445084b8693e940f0c86..6baa88d1c9823a918c24b226058b39c0d4c2c438 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -379,6 +379,33 @@ function bothRefuse(action, f, label) {
+   assert.equal(guardCode(action, f), 2, `${label}: real guard`);
+ }
+ 
++// ---- C20 G20-31: the transcript reader's page and window flags, in their closed shapes ----
++test("C20 G20-31 transcript recovery: list --page-size [--cursor] and read --window-bytes [--cursor] are admitted, every near-miss is not", () => {
++  withFixture("feature", f => {
++    const script = join(scriptsDir, "runner-transcript-recovery.mjs");
++    const base = ["--root", f.root, "--runner", "codex", "--exclude-session", "current-session"];
++    bothAdmit(scriptAction(script, "list", ...base), f, "plain list");
++    bothAdmit(scriptAction(script, "list", ...base, "--page-size", "50"), f, "paged list");
++    bothAdmit(scriptAction(script, "list", ...base, "--page-size", "50", "--cursor", "WzE3MDAsInMxIiwwXQ"), f, "paged list with cursor");
++    bothAdmit(scriptAction(script, "read", ...base, "--session-id", "s1"), f, "plain read");
++    bothAdmit(scriptAction(script, "read", ...base, "--session-id", "s1", "--window-bytes", "65536"), f, "windowed read");
++    bothAdmit(scriptAction(script, "read", ...base, "--session-id", "s1", "--window-bytes", "65536", "--cursor", "1200.0123456789abcdef"), f, "windowed read with cursor");
++    for (const [label, argv] of [
++      ["list cursor without a page size", ["list", ...base, "--cursor", "abc"]],
++      ["list with a window size", ["list", ...base, "--window-bytes", "10"]],
++      ["list with a non-numeric page size", ["list", ...base, "--page-size", "ten"]],
++      ["list with a negative page size", ["list", ...base, "--page-size", "-1"]],
++      ["list with a cursor holding a separator", ["list", ...base, "--page-size", "2", "--cursor", "a/b"]],
++      ["list with a repeated page size", ["list", ...base, "--page-size", "2", "--page-size", "3"]],
++      ["read cursor without a window size", ["read", ...base, "--session-id", "s1", "--cursor", "abc"]],
++      ["read with a page size", ["read", ...base, "--session-id", "s1", "--page-size", "2"]],
++      ["read with a non-numeric window size", ["read", ...base, "--session-id", "s1", "--window-bytes", "big"]],
++      ["export with a page size", ["export", ...base, "--session-id", "s1", "--page-size", "2"]],
++      ["export with a cursor", ["export", ...base, "--session-id", "s1", "--cursor", "abc"]],
++    ]) bothRefuse(scriptAction(script, ...argv), f, label);
++  });
++});
++
+ test("D64 pipeline-state documented help and readback forms are admitted", () => {
+   withFixture("feature", f => {
+     for (const word of ["--help", "-h", "help"]) bothAdmit(stateAction(word), f, word);
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+index 7e87b33f67e535d2f1354f87be4b7acf81d5d4c1..e033f828ec89780c2e5f6777be26ef8b8b963157 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+@@ -236,7 +236,10 @@ function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env =
+   const candidates = regularJsonlFiles(sessionsDirectory, limits?.maxCandidates ?? MAX_CANDIDATES, enumeration)
+     .map((filePath) => candidateMetadata(filePath, projectIdentity))
+     .filter((candidate) => candidate !== null && candidate.sessionId !== excludeSession)
+-    .sort((left, right) => right.mtimeMs - left.mtimeMs);
++    // Recency, then session id and path: a total order, so a pagination cursor stays stable across equal mtimes.
++    .sort((left, right) => right.mtimeMs - left.mtimeMs
++      || (left.sessionId < right.sessionId ? -1 : left.sessionId > right.sessionId ? 1 : 0)
++      || (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0));
+   if (candidates.length === 0) {
+     return { unavailable: unavailable(runner, "no-prior-project-matching-transcript") };
+   }
+@@ -319,19 +322,115 @@ export function recoverRunnerTranscript({ rootDir, runner, excludeSession, env =
+ export function listRunnerTranscripts(options = {}) {
+   const conflict = claimedSessionConflict(options);
+   if (conflict !== null) return conflict;
++  const { pageSize, cursor } = options;
++  const paged = pageSize !== undefined;
++  if (paged && !(Number.isSafeInteger(pageSize) && pageSize >= 1 && pageSize <= MAX_PAGE_SIZE)) {
++    return unavailable(CODEX_RUNNER, "invalid-page-size");
++  }
++  const after = cursor === undefined ? null : decodeListCursor(cursor);
++  if (cursor !== undefined && (after === null || !paged)) return unavailable(CODEX_RUNNER, "invalid-cursor");
+   const found = priorProjectMatchingCandidates(options);
+   if (found.unavailable) return found.unavailable;
++  // The position of each candidate in the total order: (mtime desc, session id, duplicate ordinal of equal segments).
++  const seen = new Map();
++  const keyed = found.candidates.map((candidate) => {
++    const base = `${candidate.mtimeMs}|${candidate.sessionId}`;
++    const ordinal = seen.get(base) ?? 0;
++    seen.set(base, ordinal + 1);
++    return { candidate, key: [candidate.mtimeMs, candidate.sessionId, ordinal] };
++  });
++  const remaining = after === null ? keyed : keyed.filter((entry) => listKeyOrder(entry.key, after) > 0);
++  const slice = paged ? remaining.slice(0, pageSize) : remaining;
++  const more = slice.length < remaining.length;
++  const nextCursor = more ? encodeListCursor(slice[slice.length - 1].key) : null;
+   return {
+     schema: SCHEMA,
+     status: "available",
+     runner: CODEX_RUNNER,
+-    sessions: found.candidates.map((candidate) => ({
++    // The candidate enumeration is capped; metadata is complete only when that cap did not truncate it.
++    metadataComplete: found.boundReached !== true,
++    page: {
++      pageSize: paged ? pageSize : null,
++      returned: slice.length,
++      total: keyed.length,
++      more,
++      nextCursor,
++      nextCall: more ? { operation: "list", pageSize, cursor: nextCursor } : null,
++      candidateBoundReached: found.boundReached === true,
++    },
++    sessions: slice.map(({ candidate }) => ({
+       sessionId: candidate.sessionId,
+       excerpt: operationalExcerpt(readTranscriptPrefix(candidate.filePath, MAX_EXCERPT_BYTES) ?? Buffer.alloc(0)),
+     })),
+   };
+ }
+ 
++const MAX_PAGE_SIZE = 500;
++const MAX_WINDOW_BYTES = 8 * 1024 * 1024;
++
++function encodeListCursor(key) { return Buffer.from(JSON.stringify(key)).toString("base64url"); }
++
++function decodeListCursor(value) {
++  if (typeof value !== "string" || !/^[A-Za-z0-9_-]{1,1024}$/u.test(value)) return null;
++  try {
++    const key = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
++    return Array.isArray(key) && key.length === 3 && typeof key[0] === "number" && Number.isFinite(key[0])
++      && typeof key[1] === "string" && Number.isSafeInteger(key[2]) && key[2] >= 0 ? key : null;
++  } catch { return null; }
++}
++
++/** Order of two list keys in the list's own order: mtime descending, then session id, then duplicate ordinal. */
++function listKeyOrder(left, right) {
++  if (left[0] !== right[0]) return right[0] - left[0];
++  if (left[1] !== right[1]) return left[1] < right[1] ? -1 : 1;
++  return left[2] - right[2];
++}
++
++/**
++ * Read one bounded window of one session's merged raw events, resumable by cursor. The window holds whole lines only (a
++ * single line longer than the window is returned whole). `eventsComplete` is true only for the window that reaches the end;
++ * `metadataComplete` says the session's segments were authenticated and read as a snapshot. The cursor binds the byte offset
++ * to the session digest, so a session that changed between windows is `cursor-stale`, never a silently shifted read.
++ */
++export function readRunnerTranscriptWindow({ windowBytes, cursor, ...options } = {}) {
++  if (!(Number.isSafeInteger(windowBytes) && windowBytes >= 1 && windowBytes <= MAX_WINDOW_BYTES)) {
++    return unavailable(CODEX_RUNNER, "invalid-window-size");
++  }
++  let offset = 0;
++  let digest = null;
++  if (cursor !== undefined) {
++    const match = typeof cursor === "string" ? /^(\d{1,15})\.([0-9a-f]{16})$/u.exec(cursor) : null;
++    if (match === null) return unavailable(CODEX_RUNNER, "invalid-cursor");
++    offset = Number(match[1]);
++    digest = match[2];
++  }
++  const whole = readRunnerTranscript(options);
++  if (whole.status !== "available") return whole;
++  const all = whole.bytes;
++  const wholeDigest = createHash("sha256").update(all).digest("hex").slice(0, 16);
++  if (digest !== null && (digest !== wholeDigest || offset >= all.length)) return unavailable(CODEX_RUNNER, "cursor-stale");
++  let end = Math.min(all.length, offset + windowBytes);
++  if (end < all.length && all[end - 1] !== 10) {
++    const lastNewline = all.subarray(offset, end).lastIndexOf(10);
++    if (lastNewline >= 0) end = offset + lastNewline + 1;
++    else { const next = all.indexOf(10, end); end = next < 0 ? all.length : next + 1; }
++  }
++  const bytes = all.subarray(offset, end);
++  const done = end >= all.length;
++  const nextCursor = done ? null : `${end}.${wholeDigest}`;
++  return {
++    schema: SCHEMA, status: "available", runner: CODEX_RUNNER,
++    segmentCount: whole.segmentCount, segmentOrder: whole.segmentOrder,
++    metadataComplete: true,
++    eventsComplete: done,
++    startOffset: offset, endOffset: end, totalBytes: all.length,
++    lineCount: bytes.toString("utf8").split("\n").filter((line) => line !== "").length,
++    nextCursor,
++    nextCall: done ? null : { operation: "read", windowBytes, cursor: nextCursor },
++    bytes,
++  };
++}
++
+ /**
+  * Read every project-authenticated segment selected by one public session id.
+  * Storage mtime, then pathname, gives a deterministic storage order, not a claim
+@@ -639,6 +738,26 @@ function describeTurns(runner, records) {
+       turnAt[index] = latest;
+     });
+   }
++  // Per-turn counters from the records the transcript carries: the turn's end time is its last timestamped record, its
++  // tool calls are the call records of the runner's own spelling. Absent timestamps stay null, never a guess.
++  const counters = markers.map(() => ({ recordCount: 0, toolCallCount: 0, endMs: null }));
++  records.forEach((row, index) => {
++    const turn = turnAt[index];
++    if (turn === null || counters[turn] === undefined) return;
++    counters[turn].recordCount += 1;
++    const ms = recordTimestampMs(row);
++    if (ms !== null && (counters[turn].endMs === null || ms > counters[turn].endMs)) counters[turn].endMs = ms;
++    const blocks = isObject(row?.message) && Array.isArray(row.message.content) ? row.message.content : [];
++    if ((row?.type === "response_item" && row.payload?.type === "function_call")
++      || (runner === CLAUDE_RUNNER && row?.type === "assistant")) {
++      counters[turn].toolCallCount += runner === CLAUDE_RUNNER ? blocks.filter((block) => block?.type === "tool_use").length : 1;
++    }
++  });
++  markers.forEach((marker, ordinal) => {
++    marker.endTimestamp = isoOrNull(counters[ordinal].endMs);
++    marker.recordCount = counters[ordinal].recordCount;
++    marker.toolCallCount = counters[ordinal].toolCallCount;
++  });
+   return {
+     turns: { model: TURN_MODELS[runner] ?? "unknown", count: markers.length, markersTruncated: markers.length > MAX_TURN_MARKERS, markers: markers.slice(0, MAX_TURN_MARKERS) },
+     turnAt,
+@@ -998,6 +1117,10 @@ function describeExport({ runner, sessionId, snapshots, options, found }) {
+     // Totals below are only totals of what was read: a consumer must read this field with them.
+     completeness: incompleteReasons.length === 0 ? "complete" : "partial",
+     incompleteReasons,
++    // Two different claims: the metadata (candidate set, children) is whole, and every event was actually read. A byte ceiling
++    // or a skipped line leaves digests and counts valid for the whole file but events unread, so only the second flag drops.
++    metadataComplete: !incompleteReasons.some((reason) => reason === "candidate-bound-reached" || children.incompleteReasons.includes(reason)),
++    eventsComplete: !incompleteReasons.some((reason) => reason === "records-skipped" || reason === "byte-ceiling"),
+     // A list when the runner records its children (empty when none), otherwise a typed reason; never a guess.
+     childSessions: children.value,
+     turns: turnView.turns,
+@@ -1035,24 +1158,35 @@ function parseArgs(argv) {
+   const operation = argv[0] === "list" || argv[0] === "read" || argv[0] === "export" ? argv[0] : "legacy";
+   const values = operation === "legacy" ? argv : argv.slice(1);
+   const takesSessionId = operation === "read" || operation === "export";
+-  const expectedLength = takesSessionId ? 8 : 6;
+-  if (values.length !== expectedLength) return null;
++  // G20-31: `list` may add --page-size [--cursor]; `read` may add --window-bytes [--cursor]. A cursor without its size flag is
++  // refused (the size is part of the next call it names). Every other shape keeps its original exact length.
++  const requiredLength = takesSessionId ? 8 : 6;
++  const extra = operation === "list" ? ["--page-size", "--cursor"] : operation === "read" ? ["--window-bytes", "--cursor"] : [];
++  if (values.length < requiredLength || values.length > requiredLength + 2 * extra.length || values.length % 2 !== 0) return null;
+   const fields = new Map();
+-  const permitted = takesSessionId
+-    ? ["--root", "--runner", "--exclude-session", "--session-id"]
+-    : ["--root", "--runner", "--exclude-session"];
++  const permitted = [...(takesSessionId ? ["--root", "--runner", "--exclude-session", "--session-id"] : ["--root", "--runner", "--exclude-session"]), ...extra];
+   for (let index = 0; index < values.length; index += 2) {
+     const flag = values[index];
+     const value = values[index + 1];
+     if (!permitted.includes(flag) || typeof value !== "string" || value === "" || value.startsWith("-") || fields.has(flag)) return null;
+     fields.set(flag, value);
+   }
++  // The four mandatory flags must all be present (a length check alone would let an optional flag stand in for one).
++  const mandatory = takesSessionId ? ["--root", "--runner", "--exclude-session", "--session-id"] : ["--root", "--runner", "--exclude-session"];
++  if (!mandatory.every((flag) => fields.has(flag))) return null;
++  const sizeFlag = operation === "list" ? "--page-size" : "--window-bytes";
++  if (fields.has("--cursor") && !fields.has(sizeFlag)) return null;
++  const size = fields.has(sizeFlag) ? Number(fields.get(sizeFlag)) : undefined;
++  if (size !== undefined && !(/^\d{1,9}$/u.test(fields.get(sizeFlag)))) return null;
+   return {
+     operation,
+     rootDir: fields.get("--root"),
+     runner: fields.get("--runner"),
+     excludeSession: fields.get("--exclude-session"),
+     sessionId: fields.get("--session-id"),
++    ...(operation === "list" && size !== undefined ? { pageSize: size } : {}),
++    ...(operation === "read" && size !== undefined ? { windowBytes: size } : {}),
++    ...(fields.has("--cursor") ? { cursor: fields.get("--cursor") } : {}),
+   };
+ }
+ 
+@@ -1081,11 +1215,14 @@ export function main(argv = process.argv.slice(2), seams = {}) {
+   const result = args === null ? unavailable("unknown", "invalid-invocation") : (() => {
+     if (args.operation === "audit-current") return auditCurrentRunnerSession(args);
+     if (args.operation === "list") return listRunnerTranscripts(args);
+-    if (args.operation === "read") return readRunnerTranscript(args);
++    if (args.operation === "read") return args.windowBytes === undefined ? readRunnerTranscript(args) : readRunnerTranscriptWindow(args);
+     if (args.operation === "export") return exportFromCommandLine(args, argv, seams);
+     return recoverRunnerTranscript(args);
+   })();
+-  if (args?.operation === "read" && result.status === "available") process.stdout.write(result.bytes);
++  if (args?.operation === "read" && args.windowBytes !== undefined && result.status === "available") {
++    const { bytes, ...window } = result;
++    process.stdout.write(`${JSON.stringify({ ...window, text: bytes.toString("utf8") })}\n`);
++  } else if (args?.operation === "read" && result.status === "available") process.stdout.write(result.bytes);
+   else process.stdout.write(`${JSON.stringify(result)}\n`);
+   return result;
+ }
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+index 55bdda00db7bca1bf5cda4fca42d07c856e919f7..af85ab6685ac7d99ef39b424e7ba681bdcef8a80 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+@@ -244,6 +244,9 @@ const claudeAssistant = (sessionId, cwd, timestamp, id, usage, model = "claude-s
+   type: "assistant", sessionId, cwd, timestamp, message: { id, role: "assistant", model, usage },
+ });
+ 
++// The turn description as it was before C20 G20-31 added endTimestamp, recordCount and toolCallCount to each marker.
++const legacyTurns = (turns) => ({ ...turns, markers: turns.markers.map(({ index, record, timestamp }) => ({ index, record, timestamp })) });
++
+ function runMain(argv, env) {
+   const chunks = [];
+   const originalWrite = process.stdout.write;
+@@ -305,9 +308,11 @@ test("export merges a multi-segment Codex session in first-record-timestamp orde
+ 
+     // Data-minimising: counts, digests and timestamps only.
+     assert.deepEqual(Object.keys(result).sort(), [
+-      "childSessions", "completeness", "firstTimestamp", "incompleteReasons", "lastTimestamp", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
++      "childSessions", "completeness", "eventsComplete", "firstTimestamp", "incompleteReasons", "lastTimestamp", "metadataComplete", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
+       "segments", "sessionId", "status", "turns", "unparsedLineCount", "usage",
+     ]);
++    // Justification (C20 G20-31, restated in place, nothing weakened): the key set is still pinned; the two new keys are the
++    // split of `completeness` into metadataComplete and eventsComplete.
+     // Justification (AC-175 part B): the key set stays pinned on purpose; `turns` is the new turn-boundary marker block.
+     // Justification (G23.forensics Slice A): the key set is pinned on purpose; the three new keys are the completeness marker.
+     assert.equal(result.completeness, "partial", "this session holds a damaged line");
+@@ -719,7 +724,9 @@ test("AC-175B: the Claude export lists child sessions with agent type, turn span
+       firstTimestamp: stamp("09:00:05"), lastTimestamp: stamp("09:00:20"),
+     });
+     assert.deepEqual(result.childSessions[0].usage, { status: "available", source: "claude-assistant-message-usage", observations: 1, counters: { input_tokens: 10, output_tokens: 2 } });
+-    assert.deepEqual(result.turns, {
++    // Justification (C20 G20-31, restated in place): turn markers gained endTimestamp/recordCount/toolCallCount; the original
++    // fields are still compared exactly through legacyTurns, the new ones are pinned by the G20-31 cases.
++    assert.deepEqual(legacyTurns(result.turns), {
+       model: "claude-assistant-message-id", count: 4, markersTruncated: false,
+       markers: [
+         { index: 0, record: 1, timestamp: stamp("09:00:01") }, { index: 1, record: 2, timestamp: stamp("09:00:02") },
+@@ -742,7 +749,7 @@ test("AC-175B: a Claude session without a subagent directory lists no children,
+     const plain = recovery.exportRunnerTranscript({ ...args, sessionId: "plain" });
+     assert.deepEqual(plain.childSessions, []);
+     assert.equal(plain.completeness, "complete");
+-    assert.deepEqual(plain.turns, { model: "claude-assistant-message-id", count: 1, markersTruncated: false, markers: [{ index: 0, record: 1, timestamp: stamp("08:00:01") }] });
++    assert.deepEqual(legacyTurns(plain.turns), { model: "claude-assistant-message-id", count: 1, markersTruncated: false, markers: [{ index: 0, record: 1, timestamp: stamp("08:00:01") }] });
+ 
+     claudeSegment(claudeHome, project, "linked.jsonl", [claudeUser("linked", project, stamp("08:10:00"))]);
+     const projectDirectory = join(claudeHome, "projects", realpathSync(project).replace(/[^A-Za-z0-9]/gu, "-"));
+@@ -810,7 +817,7 @@ test("AC-175B: the Codex export lists spawned child sessions with turn span, rol
+     assert.equal(result.childSessions[0].transcript.sha256, sha256Of(readFileSync(child1)));
+     assert.equal(result.childSessions[0].transcript.recordCount, 3);
+     assert.deepEqual(result.childSessions[0].usage, { status: "available", source: "codex-token-count-total", observations: 1, counters: codexCounters(40) });
+-    assert.deepEqual(result.turns, {
++    assert.deepEqual(legacyTurns(result.turns), {
+       model: "codex-task-started", count: 3, markersTruncated: false,
+       markers: [{ index: 0, record: 1, timestamp: stamp("10:00:01") }, { index: 1, record: 5, timestamp: stamp("10:05:00") }, { index: 2, record: 10, timestamp: stamp("10:10:00") }],
+     });
+@@ -867,7 +874,7 @@ test("AC-175B: the Antigravity export reads the current conversation through the
+     assert.equal(result.lastTimestamp, stamp("11:05:09"));
+     assert.equal(result.completeness, "complete");
+     assert.deepEqual(result.usage, { status: "available", source: "antigravity-turn-completed", observations: 2, counters: { input_tokens: 15, cached_input_tokens: 2, output_tokens: 4 } });
+-    assert.deepEqual(result.turns, {
++    assert.deepEqual(legacyTurns(result.turns), {
+       model: "antigravity-turn-started", count: 2, markersTruncated: false,
+       markers: [{ index: 0, record: 0, timestamp: stamp("11:00:00") }, { index: 1, record: 3, timestamp: stamp("11:05:00") }],
+     });
+@@ -1099,3 +1106,141 @@ test("AC-175C: the stale-handoff sweep removes expired and foreign leftovers and
+     assert.equal(handoff.sweepAntigravityHostHandoffs({ root: join(root, "no-such-root") }).removed, 0);
+   });
+ });
++
++// ---------------------------------------------------------------------------------------------
++// C20 G20-31: the forensics reader paginates and separates 'metadata complete' from 'all events read'.
++// ---------------------------------------------------------------------------------------------
++
++function withFiveSessions(run) {
++  withExportFixture(({ project, codexHome, ...rest }) => {
++    ["s1", "s2", "s3", "s4", "s5"].forEach((id, index) => {
++      const target = codexSegment(codexHome, `${id}.jsonl`, { cwd: project, sessionId: id, metaTimestamp: stamp(`0${index}:00:00`), records: [tokenCount(stamp(`0${index}:01:00`), index)] });
++      const when = new Date(Date.UTC(2026, 8, 1, index, 0, 0));
++      utimesSync(target, when, when);
++    });
++    run({ project, codexHome, ...rest, args: { rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome } } });
++  });
++}
++
++test("G20-31 list paginates with a stable cursor, says when more exists and names the next call, and never silently caps", () => {
++  withFiveSessions(({ args }) => {
++    const whole = recovery.listRunnerTranscripts(args);
++    assert.deepEqual(whole.sessions.map((s) => s.sessionId), ["s5", "s4", "s3", "s2", "s1"]);
++    assert.equal(whole.page.more, false, "an unpaged list returns everything and says nothing is left");
++    assert.equal(whole.metadataComplete, true);
++    const seen = [];
++    let cursor;
++    let calls = 0;
++    for (;;) {
++      const page = recovery.listRunnerTranscripts({ ...args, pageSize: 2, ...(cursor === undefined ? {} : { cursor }) });
++      assert.equal(page.status, "available");
++      assert.ok(page.sessions.length <= 2);
++      seen.push(...page.sessions.map((s) => s.sessionId));
++      calls += 1;
++      if (!page.page.more) { assert.equal(page.page.nextCursor, null); assert.equal(page.page.nextCall, null); break; }
++      assert.equal(typeof page.page.nextCursor, "string");
++      assert.deepEqual(page.page.nextCall, { operation: "list", pageSize: 2, cursor: page.page.nextCursor });
++      cursor = page.page.nextCursor;
++    }
++    assert.equal(calls, 3);
++    assert.deepEqual(seen, ["s5", "s4", "s3", "s2", "s1"]);
++    for (const bad of [{ pageSize: 0 }, { pageSize: 1.5 }, { pageSize: 501 }, { pageSize: 2, cursor: "not-a-cursor" }]) {
++      assert.equal(recovery.listRunnerTranscripts({ ...args, ...bad }).reason, bad.cursor ? "invalid-cursor" : "invalid-page-size");
++    }
++  });
++});
++
++test("G20-31 list is metadata-incomplete when the enumeration cap truncates, and says so", () => {
++  withFiveSessions(({ args }) => {
++    const capped = recovery.listRunnerTranscripts({ ...args, limits: { maxCandidates: 3 } });
++    assert.equal(capped.status, "available");
++    assert.equal(capped.metadataComplete, false);
++    assert.equal(capped.page.candidateBoundReached, true);
++  });
++});
++
++test("G20-31 a session is read window by window to the end and the windows concatenate to the whole read", () => {
++  withExportFixture(({ project, codexHome }) => {
++    const records = Array.from({ length: 6 }, (_, index) => ({ timestamp: stamp(`05:0${index}:00`), type: "event_msg", payload: { type: "agent_message", message: `event-${index}-${"x".repeat(40)}` } }));
++    codexSegment(codexHome, "long.jsonl", { cwd: project, sessionId: "long", metaTimestamp: stamp("05:00:00"), records });
++    const args = { rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, sessionId: "long" };
++    const whole = recovery.readRunnerTranscript(args);
++    const parts = [];
++    let cursor;
++    let windows = 0;
++    for (;;) {
++      const window = recovery.readRunnerTranscriptWindow({ ...args, windowBytes: 150, ...(cursor === undefined ? {} : { cursor }) });
++      assert.equal(window.status, "available");
++      assert.equal(window.totalBytes, whole.bytes.length);
++      assert.ok(window.bytes.length > 0 && window.bytes.at(-1) === 10, "a window holds whole lines only");
++      parts.push(window.bytes);
++      windows += 1;
++      assert.equal(window.metadataComplete, true);
++      assert.equal(window.eventsComplete, window.nextCursor === null, "complete only when no window is left unread");
++      if (window.nextCursor === null) break;
++      assert.equal(window.endOffset < window.totalBytes, true);
++      assert.deepEqual(window.nextCall, { operation: "read", windowBytes: 150, cursor: window.nextCursor });
++      cursor = window.nextCursor;
++    }
++    assert.ok(windows > 1);
++    assert.deepEqual(Buffer.concat(parts), whole.bytes);
++    assert.equal(recovery.readRunnerTranscriptWindow({ ...args, windowBytes: 150, cursor: "bogus" }).reason, "invalid-cursor");
++    assert.equal(recovery.readRunnerTranscriptWindow({ ...args, windowBytes: 0 }).reason, "invalid-window-size");
++  });
++});
++
++test("G20-31 export separates metadataComplete from eventsComplete and never says complete while a window is unread", () => {
++  withExportFixture(({ project, codexHome }) => {
++    codexSegment(codexHome, "clean.jsonl", { cwd: project, sessionId: "clean", metaTimestamp: stamp("05:00:00"), records: [tokenCount(stamp("05:01:00"), 7)] });
++    const args = { rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, sessionId: "clean" };
++    const clean = recovery.exportRunnerTranscript(args);
++    assert.deepEqual([clean.metadataComplete, clean.eventsComplete, clean.completeness], [true, true, "complete"]);
++    const unread = recovery.exportRunnerTranscript({ ...args, limits: { maxSegmentBytes: 10 } });
++    assert.equal(unread.metadataComplete, true, "the digest and counts identify the whole file");
++    assert.equal(unread.eventsComplete, false, "the events past the ceiling were not read");
++    assert.equal(unread.completeness, "partial");
++  });
++});
++
++test("G20-31 turn markers carry an end time and per-turn counters where the transcript records them", () => {
++  withExportFixture(({ project, codexHome }) => {
++    const call = (timestamp) => ({ timestamp, type: "response_item", payload: { type: "function_call", name: "shell", call_id: `c${timestamp}` } });
++    codexSegment(codexHome, "turns.jsonl", { cwd: project, sessionId: "turns", metaTimestamp: stamp("05:00:00"), records: [
++      { timestamp: stamp("05:00:01"), type: "event_msg", payload: { type: "task_started" } },
++      call(stamp("05:00:05")), call(stamp("05:00:09")),
++      { timestamp: stamp("05:00:20"), type: "event_msg", payload: { type: "task_started" } },
++      call(stamp("05:00:30")),
++    ] });
++    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, sessionId: "turns" });
++    const [first, second] = result.turns.markers;
++    assert.equal(first.endTimestamp, stamp("05:00:09"));
++    assert.equal(first.recordCount, 3);
++    assert.equal(first.toolCallCount, 2);
++    assert.equal(second.endTimestamp, stamp("05:00:30"));
++    assert.equal(second.toolCallCount, 1);
++  });
++});
++
++test("G20-31 the CLI passes the page and window flags and refuses every other shape", () => {
++  withFiveSessions(({ project, args }) => {
++    const env = { CODEX_HOME: args.env.CODEX_HOME, CODEX_SESSION_ID: "current-session", CODEX_THREAD_ID: "current-session" };
++    const base = ["--root", project, "--runner", "codex", "--exclude-session", "current-session"];
++    const page = JSON.parse(runMain(["list", ...base, "--page-size", "2"], env));
++    assert.equal(page.sessions.length, 2);
++    assert.equal(page.page.more, true);
++    const next = JSON.parse(runMain(["list", ...base, "--page-size", "2", "--cursor", page.page.nextCursor], env));
++    assert.deepEqual(next.sessions.map((s) => s.sessionId), ["s3", "s2"]);
++    const window = JSON.parse(runMain(["read", ...base, "--session-id", "s5", "--window-bytes", "60"], env));
++    assert.equal(window.status, "available");
++    assert.equal(window.eventsComplete, false);
++    assert.equal(typeof window.text, "string");
++    const invalid = { schema: SCHEMA, status: "unavailable", runner: "unknown", reason: "invalid-invocation" };
++    for (const argv of [
++      ["list", ...base, "--cursor", "x"],
++      ["list", ...base, "--window-bytes", "60"],
++      ["read", ...base, "--session-id", "s5", "--page-size", "2"],
++      ["read", ...base, "--session-id", "s5", "--cursor", "x"],
++      ["export", ...base, "--session-id", "s5", "--page-size", "2"],
++    ]) assert.deepEqual(JSON.parse(runMain(argv, env)), invalid, argv.join(" "));
++  });
++});

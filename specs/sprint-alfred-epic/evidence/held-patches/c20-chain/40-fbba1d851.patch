@@ -1,0 +1,23 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 648f7b9051c4c45c547cd95f2462a0a40e4b7d76..4c784574257107fac1be4f118b1f596ee2f0c5f8 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3497,6 +3497,18 @@
+       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs",
+       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs"
+     },
++    {
++      "name": "pin-durable-evidence-survives-a-fresh-clone-tests",
++      "file": "plugins/pipeline-core/lib/pins/durable-evidence-survives-a-fresh-clone.test.mjs",
++      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/durable-evidence-survives-a-fresh-clone.test.mjs",
++      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/durable-evidence-survives-a-fresh-clone.test.mjs"
++    },
++    {
++      "name": "pin-acceptance-criteria-are-examined-as-whole-user-journeys-tests",
++      "file": "plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs",
++      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs",
++      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs"
++    },
+     {
+       "name": "pin-declared-product-criteria-need-matching-acceptance-evidence-tests",
+       "file": "plugins/pipeline-core/lib/pins/declared-product-criteria-need-matching-acceptance-evidence.test.mjs",

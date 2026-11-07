@@ -1,0 +1,449 @@
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.mjs b/plugins/pipeline-core/lib/close-chain-guide.mjs
+index a2e274c4af11f73ea172683563ba48b351a3e97e..be18399f37844eea0056d3ec152e766d0c077287 100644
+--- a/plugins/pipeline-core/lib/close-chain-guide.mjs
++++ b/plugins/pipeline-core/lib/close-chain-guide.mjs
+@@ -135,12 +135,12 @@ const CONTINUITY_RESULT_STEPS = Object.freeze([
+   },
+   {
+     id: "reconcile-signature", who: "po-only", mayRefuseWith: [],
+-    command: "the signatureCommand printed by the bootstrap completion (po-human-approval.mjs authorize-critical --kind feature-package-reconcile), run in the PO's own terminal",
++    command: "ONLY when the bootstrap completion's preview.requiredAuthority is \"po\" (a plan that also changes a non-result entry; a result-only plan prints no signatureCommand and needs no signature, G20-38): the signatureCommand it prints (po-human-approval.mjs authorize-critical --kind feature-package-reconcile), run in the PO's own terminal",
+     source: "close-feature SKILL, Continuity route step 4",
+   },
+   {
+     id: "reconcile", who: "agent", mayRefuseWith: [],
+-    command: "the reconcileCommand printed by the bootstrap completion (pipeline-state.mjs feature-package-reconcile ...); needs the PO's own name and the requestPath, authorityPath and proofPath the signing terminal printed",
++    command: "the reconcileCommand printed by the bootstrap completion (pipeline-state.mjs feature-package-reconcile ...); result-only plan (requiredAuthority \"agent\"): run it as printed, no proof flags; PO route: it needs the PO's own name and the requestPath, authorityPath and proofPath the signing terminal printed",
+     source: "close-feature SKILL, Continuity route step 5",
+   },
+ ]);
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization.mjs b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+index e416096c162d1e48ad5c6231304ea27ee147a1d3..c28ba773da54ca896e37164f9117dd297cf7e805 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+@@ -191,6 +191,8 @@ function pinTrustAnchorOnFirstUse(anchorDir, policy, kind, signer) {
+  * pure relocation of this block.
+  */
+ export const CRITICAL_APPROVAL_STORE_SCHEMA = "pipeline.critical-approval-record.v1";
++/** G20-38: the label on the reconcile record the agent writes for a result-only plan; it states on its face that no PO proof backed it. */
++export const AGENT_RESULT_ONLY_RECONCILE_BASIS = "agent-result-only-reconcile-no-po-proof";
+ export const CRITICAL_APPROVAL_CONSUMPTION_SCHEMA = "pipeline.critical-approval-consumption.v1";
+ /** kind -> the tracked-state slot the legacy record lived in (readers still see it under that name). */
+ const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-package-reconcile": "featurePackageReconcileApproval" });
+diff --git a/plugins/pipeline-core/lib/feature-package-topology.mjs b/plugins/pipeline-core/lib/feature-package-topology.mjs
+index 21e916a7cf329ae689934710625660b8f7884120..1267f4d140d7a9f8329d0812e608f8ba99222a6a 100644
+--- a/plugins/pipeline-core/lib/feature-package-topology.mjs
++++ b/plugins/pipeline-core/lib/feature-package-topology.mjs
+@@ -412,6 +412,16 @@ export function reconcileNoDriftOk(preimageValue, postimageValue, options = {})
+   return sameJsonValue(preRest, postRest);
+ }
+ 
++/**
++ * G20-38: is this recomputed reconcile preview the unchanged-approved-package case, i.e. a `reconcile-preview` whose
++ * every change is a `result`-class entry? Decided from the plan object alone (never from a caller flag): a legacy Result
++ * repair plan, a rejected or noop plan and any plan that also moves a non-result entry are all `false`.
++ */
++export function reconcilePlanIsResultOnly(plan) {
++  return plan?.status === "reconcile-preview" && plan.requiredAuthority === "agent" && Array.isArray(plan.changes)
++    && plan.changes.length > 0 && plan.changes.every((change) => change?.class === "result");
++}
++
+ /**
+  * Checks the Result fence's three independently-typed preconditions, each with its own
+  * refusal so evidence can tell them apart:
+@@ -517,7 +527,11 @@ export function planFeaturePackageReconcile(rootDir = process.cwd(), manifestPat
+     from: checked.receipt.state,
+     to: checked.receipt.state,
+     changes,
+-    requiredAuthority: "po",
++    // G20-38 (PO decision 2026-11-07): a plan that moves ONLY `result`-class entries (their fence-proven digest, and the
++    // N29 authority lift of the sole Result entry Continuity binds) leaves every other artifact at the digest the approved
++    // manifest pins -- the approved package is unchanged, so the agent runs it. The classification is derived here from the
++    // plan's own changes and is part of the plan digest; nothing a caller passes can change it.
++    requiredAuthority: changes.every((change) => change.class === "result") ? "agent" : "po",
+     preimage: value,
+     postimage: nextValue,
+   };
+diff --git a/plugins/pipeline-core/lib/human-approval-trace.mjs b/plugins/pipeline-core/lib/human-approval-trace.mjs
+index 7599dd658cd11f9607090b6ff6bd52c34c6ba513..f3a2d2023f61efae8d731385412cc33c647a4e7d 100644
+--- a/plugins/pipeline-core/lib/human-approval-trace.mjs
++++ b/plugins/pipeline-core/lib/human-approval-trace.mjs
+@@ -19,7 +19,7 @@ import { lstatSync, readFileSync, readdirSync } from "node:fs";
+ import { join, resolve } from "node:path";
+ import { spawnSync } from "node:child_process";
+ import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
+-import { CRITICAL_APPROVAL_STORE_SCHEMA, criticalApprovalStoreRoot, readPrivateCriticalConsumption, resolveCriticalApprovalCommonDir } from "./critical-action-authorization.mjs";
++import { AGENT_RESULT_ONLY_RECONCILE_BASIS, CRITICAL_APPROVAL_STORE_SCHEMA, criticalApprovalStoreRoot, readPrivateCriticalConsumption, resolveCriticalApprovalCommonDir } from "./critical-action-authorization.mjs";
+ import { canonical, criticalActionAuthority, object, SHA256, trustAnchorsFor, validCandidate } from "./critical-action-authorization-read.mjs";
+ import { verifyAgainstTrustAnchors } from "./critical-human-proof-policy-read.mjs";
+ import { createPoApprovalIntent } from "./po-approval-proof.mjs";
+@@ -37,6 +37,8 @@ const readJson = (path) => { try { return JSON.parse(readFileSync(path, "utf8"))
+ const isChat = (record) => (object(record?.criticalProofWaiver) && /chat/u.test(String(record.criticalProofWaiver.mode ?? "chat")))
+   || (object(record?.humanApproval) && /chat/u.test(String(record.humanApproval.mode ?? "")));
+ 
++const isAgentResultOnly = (record) => object(record?.criticalProofWaiver) && record.criticalProofWaiver.mode === AGENT_RESULT_ONLY_RECONCILE_BASIS;
++
+ function readTraceState(root) {
+   for (const path of ["project/pipeline-state.json", ".claude/pipeline-state.json"]) {
+     const value = readJson(join(root, path));
+@@ -132,6 +134,8 @@ export function traceHumanApprovals({ repositoryRoot, candidate, state, machineP
+     if (approval.forCommit !== audited.commit) { outOfCandidate += 1; continue; }
+     const recorded = approval.criticalProof;
+     if (recorded === null || recorded === undefined) {
++      // G20-38: an agent-run, result-only reconcile states on its face that no PO proof backed it; it is reported as such, not as a missing proof.
++      if (isAgentResultOnly(approval)) { rows.push({ ...baseRow({ kind: entry.kind, source: entry.source, approval, mode: "agent" }), verdict: "attribution-only" }); continue; }
+       const row = baseRow({ kind: entry.kind, source: entry.source, approval, mode: isChat(approval) ? "chat" : "none" });
+       if (isChat(approval)) rows.push({ ...row, verdict: "attribution-only" }); else rows.push({ ...row, break: "PROOF-MISSING" });
+       continue;
+diff --git a/plugins/pipeline-core/lib/human-approval-trace.test.mjs b/plugins/pipeline-core/lib/human-approval-trace.test.mjs
+index 25e0ac4d35a5eb7fbe99ea774a158194ff04df4f..d53a0567c960d922214ca065aff622cececa0292 100644
+--- a/plugins/pipeline-core/lib/human-approval-trace.test.mjs
++++ b/plugins/pipeline-core/lib/human-approval-trace.test.mjs
+@@ -127,6 +127,16 @@ test("a chat-mode approval is labelled attribution-only and never as proof", ()
+   assert.equal(result.status, "attribution-only"); assert.equal(row(result).verdict, "attribution-only"); assert.equal(row(result).proofSha256, null);
+ });
+ 
++test("G20-38: an agent-run, result-only reconcile record is labelled attribution-only (mode agent), never a missing proof and never a PO proof", () => {
++  const repo = repository({ anchors: [] });
++  const approval = { approvedBy: "agent", approvedAt: NOW, forCommit: repo.candidate.commit, criticalProof: null,
++    criticalProofWaiver: { mode: "agent-result-only-reconcile-no-po-proof", kind: "feature-package-reconcile", planSha256: "a".repeat(64), manifest: "specs/demo/lifecycle.json" } };
++  assert.equal(writeCriticalApproval({ gitCommonDir: repo.common, kind: "feature-package-reconcile", approval }).ok, true);
++  const result = trace(repo);
++  const reconcile = row(result, "feature-package-reconcile");
++  assert.equal(reconcile.verdict, "attribution-only"); assert.equal(reconcile.mode, "agent"); assert.equal(reconcile.break, null); assert.equal(reconcile.proofSha256, null);
++});
++
+ test("a candidate with no approval record at all is untraceable, not silently clean", () => {
+   const repo = repository({ anchors: [] });
+   const result = trace(repo);
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 0f3b03b9ce32edf3bd0075fbccdee1bc1f6134a7..22478a06dc8d72ee6058dc4c5b20902cc9c700ae 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -704,7 +704,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+       const checked = validateFeaturePackage(root, registeredManifest);
+       if (!checked.ok) {
+         const digestOnly = checked.findings.every((finding) => /: digest does not bind file bytes$/u.test(finding));
+-        fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}${digestOnly ? `; the package only lags its bytes: apply the PO-bound feature-package-reconcile plan for ${registeredManifest} (the Result bootstrap completion names its --plan-sha256), then plan this transition again on the same lifecycle` : ""}`);
++        fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}${digestOnly ? `; the package only lags its bytes: apply the feature-package-reconcile plan for ${registeredManifest} (the Result bootstrap completion names its --plan-sha256 and whether the agent runs it or the PO signs it), then plan this transition again on the same lifecycle` : ""}`);
+       }
+       const packageValue = readJsonFile(root, registeredManifest, "feature package").value;
+       for (const [kind, path, digest] of [
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 22fa39842b684796908d9a38ef7360182526171e..5467591c5a5c7b8245b4eeb8e058071352d302e5 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -359,18 +359,29 @@ test("G20-35: the close path from implementation to release preflight is walked
+       const stateWriter = (label, verb, extra = []) => step(log, `${identity.runner}: ${label}`, process.execPath, [script("pipeline-state.mjs"), verb, ...extra], { cwd: fx.root });
+       const bootstrap = json(stateWriter("continuity-result-bootstrap-plan", "continuity-result-bootstrap-plan"));
+       const bootstrapApplied = step(log, `${identity.runner}: continuity-result-bootstrap-apply (the action the plan returned)`, bootstrap.applyAction.executable, bootstrap.applyAction.argv, { cwd: fx.root });
+-      // Measured (w265 finding 2): a REGISTERED package lags the Result the bootstrap just bound, and the sanctioned repair is a PO-signed
+-      // `feature-package-reconcile` (always a human proof). The fixture signs it with its own test key, the way the Result bootstrap suite does.
++      // Measured (w265 finding 2): a REGISTERED package lags the Result the bootstrap just bound. G20-38 (PO decision 2026-11-07), restated
++      // from the w265 walk, which signed this reconcile with the fixture's own test key: the plan moves only the Result entry, so every other
++      // artifact keeps the digest the approved manifest pins and the agent runs the reconcile itself, with no proof flags and no signature.
+       const completion = JSON.parse(bootstrapApplied.stdout).completion;
+       assert.equal(completion.state, "reconciliation-pending");
+-      const signing = completion.signatureCommand;
+-      assert.equal(signing.kind, "feature-package-reconcile");
+-      const proofFiles = fx.signProof({ kind: signing.kind, subjectSha256: signing.subjectSha256, candidate: signing.candidate, expiresAt: signing.expiresAt });
+-      const reconcileArgv = completion.reconcileCommand.argv.map((entry) => {
+-        const hit = completion.reconcileCommand.placeholders.find((placeholder) => placeholder.token === entry);
+-        return hit === undefined ? entry : { "--by": "Fixture PO", "--proof-request": proofFiles.request, "--proof-authority": proofFiles.authority, "--proof": proofFiles.proof }[hit.flag];
+-      });
+-      step(log, `${identity.runner}: feature-package-reconcile (fixture-signed)`, completion.reconcileCommand.executable, reconcileArgv, { cwd: fx.root });
++      assert.equal(completion.preview.requiredAuthority, "agent");
++      assert.equal(completion.signatureCommand, undefined, "no signing command is printed for an unchanged approved package");
++      assert.deepEqual(completion.reconcileCommand.requiredInputs, []);
++      // The other side of the rule: when a non-result entry also drifted, the plan names the PO and the same command without a proof is refused.
++      const manifestRel = completion.manifest;
++      const driftEntry = JSON.parse(readFileSync(join(fx.root, manifestRel), "utf8")).artifacts.find((entry) => !["result", "prd", "spec"].includes(entry.class));
++      assert.ok(driftEntry, "the registered package holds a non-result, non-authority artifact to drift");
++      const driftPath = join(fx.root, driftEntry.path); const driftOriginal = readFileSync(driftPath);
++      writeFileSync(driftPath, Buffer.concat([driftOriginal, Buffer.from("\ndrifted after the approval\n")]));
++      const mixed = json(stateWriter("continuity-result-bootstrap-plan (a non-result entry also drifted)", "continuity-result-bootstrap-plan"));
++      assert.equal(mixed.preview.requiredAuthority, "po");
++      assert.equal(mixed.signatureCommand.kind, "feature-package-reconcile", "the PO-signed route still prints its signing command");
++      const unsigned = step(log, `${identity.runner}: feature-package-reconcile without a proof is refused when a non-result entry drifted`, process.execPath,
++        [script("pipeline-state.mjs"), "feature-package-reconcile", "--root", fx.root, "--manifest", manifestRel, "--plan-sha256", mixed.planSha256], { cwd: fx.root, expectedStatus: 2 });
++      assert.match(unsigned.stderr, /FTP-RECONCILE-APPROVAL-REJECTED/);
++      writeFileSync(driftPath, driftOriginal); // the approved bytes are back: the plan is the result-only one again
++      const reconciled = step(log, `${identity.runner}: feature-package-reconcile (agent-run, result-only)`, completion.reconcileCommand.executable, completion.reconcileCommand.argv, { cwd: fx.root });
++      assert.deepEqual(JSON.parse(reconciled.stdout).approval, { basis: "agent-result-only-reconcile-no-po-proof", poProof: false });
+       commit(log, fx.root, "chore: bind the Result and reconcile the feature package");
+       const bound = JSON.parse(readFileSync(statePath, "utf8"));
+       // review -> close through the sanctioned Result-close verb (plan, then the action it returns); no hand edit of the Continuity state
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index c0a36d219f7aedb5367d381cb3b824de25e95bb6..eb082359a9d95d78c3c52e9fc5d4037fa6987e31 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
+ import { execFileSync, spawn, spawnSync } from "node:child_process";
+ import { createHash, createHmac, generateKeyPairSync, sign } from "node:crypto";
+ import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
++import { readLastPrivateApproval, resolveCriticalApprovalCommonDir } from "../lib/critical-action-authorization.mjs";
+ import { afterEach, test } from "node:test";
+ import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { observeNativePlatformProcess } from "../lib/native-platform-process-observer.mjs";
+@@ -575,7 +576,10 @@ test("N29 anchor: a package whose Result entry has authority:false closes from c
+   assert.equal(completion.state, "reconciliation-pending"); assert.equal(completion.preview.status, "reconcile-preview");
+   assert.equal(completion.preview.changes.length, 1);
+   assert.equal(completion.preview.changes[0].class, "result"); assert.deepEqual(completion.preview.changes[0].authority, { from: false, to: true });
+-  assert.equal(completion.preview.requiredAuthority, "po");
++  // G20-38 (PO decision 2026-11-07), restated in place: this plan moves only the Result entry (digest and authority lift), so every other
++  // artifact keeps the digest the approved manifest pins and the preview names the agent, not the PO. A plan that also changes a
++  // non-result entry still names "po": see the G20-38 cases at the end of this file.
++  assert.equal(completion.preview.requiredAuthority, "agent");
+   assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes);
+   const replay = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(replay.status, 0, replay.err);
+   assert.equal(JSON.parse(replay.out).completion.planSha256, completion.planSha256);
+@@ -616,9 +620,15 @@ test("N30 anchor: the completion prints the signing command with the subject dig
+   const gitDeps = { gitCandidate: () => ({ ok: true, ...candidate }) };
+   const p = plan(f);
+   const applied = invoke(f.root, p.applyAction.argv.slice(1), gitDeps); assert.equal(applied.status, 0, applied.err);
+-  const completion = JSON.parse(applied.out).completion;
++  // G20-38 (PO decision 2026-11-07), restated in place: a result-only plan needs no signature and prints no signing route, so this case now
++  // proves the signing route on a plan that ALSO changes a non-result entry (the candidate evidence drifts after the approval). Every
++  // assertion below is unchanged; only the plan they are made on needs the PO.
++  writeFileSync(join(f.root, "specs/feature/candidate-evidence.md"), "candidate evidence changed after the approval\n");
++  const reread = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], gitDeps).out);
++  assert.equal(reread.preview.requiredAuthority, "po");
++  const completion = { state: "reconciliation-pending", planSha256: reread.planSha256, signatureCommand: reread.signatureCommand, reconcileCommand: reread.reconcileCommand };
+   assert.equal(completion.state, "reconciliation-pending");
+-  const expectedSubject = { manifest: manifestPath, planSha256: completion.planSha256, candidate };
++  const expectedSubject ={ manifest: manifestPath, planSha256: completion.planSha256, candidate };
+   const expectedDigest = criticalActionSubjectSha256({ kind: "feature-package-reconcile", candidate, subject: expectedSubject });
+   const signature = completion.signatureCommand;
+   assert.equal(signature.kind, "feature-package-reconcile");
+@@ -677,7 +687,12 @@ test("N30: without a readable candidate the completion says why it has no signin
+   const f = fixture("n30-nocandidate"); registerPackageWithoutResultAuthority(f);
+   const p = plan(f);
+   const applied = invoke(f.root, p.applyAction.argv.slice(1), { gitCandidate: () => ({ ok: false, error: "no commit" }) }); assert.equal(applied.status, 0, applied.err);
+-  const completion = JSON.parse(applied.out).completion;
++  // G20-38, restated in place: a result-only plan prints no signing route at all, so the "why there is no signing command" message is proven
++  // on a plan that also changes a non-result entry (the PO route); the completion is read again after the drift.
++  writeFileSync(join(f.root, "specs/feature/candidate-evidence.md"), "candidate evidence changed after the approval\n");
++  const reread = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], { gitCandidate: () => ({ ok: false, error: "no commit" }) }).out);
++  assert.equal(reread.preview.requiredAuthority, "po");
++  const completion = { state: "reconciliation-pending", signatureCommand: reread.signatureCommand, signatureUnavailable: reread.signatureUnavailable, nextAction: reread.nextAction };
+   assert.equal(completion.state, "reconciliation-pending");
+   assert.equal(completion.signatureCommand, null);
+   assert.match(completion.signatureUnavailable, /candidate/u);
+@@ -693,7 +708,11 @@ test("N31r: a read-only bootstrap plan after the apply prints the pending reconc
+   const gitDeps = { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) };
+   const p = plan(f);
+   const applied = invoke(f.root, p.applyAction.argv.slice(1), gitDeps); assert.equal(applied.status, 0, applied.err);
+-  const completion = JSON.parse(applied.out).completion;
++  // G20-38, restated in place: both commands this case compares exist only for a plan that needs the PO (a result-only plan prints no
++  // signing command), so the plan also changes a non-result entry and the first read of it stands in for the apply's completion.
++  writeFileSync(join(f.root, "specs/feature/candidate-evidence.md"), "candidate evidence changed after the approval\n");
++  const completion = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], gitDeps).out);
++  assert.equal(completion.preview.requiredAuthority, "po");
+   const before = readFileSync(f.statePath); const manifestBefore = readFileSync(join(f.root, manifestPath));
+   const reread = invoke(f.root, ["continuity-result-bootstrap-plan"], gitDeps);
+   assert.equal(reread.status, 0, reread.err);
+@@ -713,7 +732,9 @@ test("N31r: the reconcile command marks --by as the PO's own value and names whe
+   const p = plan(f);
+   const applied = invoke(f.root, p.applyAction.argv.slice(1), { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) });
+   assert.equal(applied.status, 0, applied.err);
+-  const placeholders = JSON.parse(applied.out).completion.reconcileCommand.placeholders;
++  // G20-38, restated in place: the placeholders exist only on the PO route, i.e. for a plan that also changes a non-result entry.
++  writeFileSync(join(f.root, "specs/feature/candidate-evidence.md"), "candidate evidence changed after the approval\n");
++  const placeholders = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) }).out).reconcileCommand.placeholders;
+   const by = placeholders.find((entry) => entry.flag === "--by");
+   assert.equal(by.token, "<po-name>");
+   assert.match(by.from, /PO/u); assert.match(by.from, /never the agent/u);
+@@ -1008,3 +1029,70 @@ test("N29: the reconcile plan lifts authority only on the Result entry Continuit
+   const state = structuredClone(lifted); state.state = "verifying";
+   assert.equal(reconcileNoDriftOk(before, state, { liftResultAuthorityPath: "r" }), false, "no manifest key moves");
+ });
++
++// ---- G20-38 (PO decision 2026-11-07, "Agent bei unveraendertem Paket"): a reconcile that moves ONLY the fence-proven Result digest
++// (and the N29 authority lift of the sole Result entry) leaves every other artifact at the digest the approved manifest pins, so the
++// approved package is unchanged: the agent runs it, with no proof flags, and the receipt is the readback. Any other plan keeps the
++// PO-signed route. "Unchanged" is decided from the recomputed plan itself, never from a flag the caller passes. ----
++
++const AGENT_BASIS = "agent-result-only-reconcile-no-po-proof";
++
++function bootstrappedPending(name, deps = {}) {
++  const f = fixture(name); const { manifestPath } = registerPackageWithoutResultAuthority(f);
++  const gitDeps = { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }), ...deps };
++  const p = plan(f);
++  const applied = invoke(f.root, p.applyAction.argv.slice(1), gitDeps); assert.equal(applied.status, 0, applied.err);
++  return { f, manifestPath, gitDeps, completion: JSON.parse(applied.out).completion };
++}
++
++test("G20-38: a result-only preview names the agent as the authority, prints no signing route and no proof inputs", () => {
++  const { completion } = bootstrappedPending("g2038-preview");
++  assert.equal(completion.state, "reconciliation-pending");
++  assert.equal(completion.preview.requiredAuthority, "agent");
++  assert.equal(completion.signatureCommand, undefined, "no signing command is printed for an unchanged approved package");
++  assert.equal(completion.signatureUnavailable, undefined);
++  assert.deepEqual(completion.reconcileCommand.requiredInputs, []);
++  assert.equal(completion.reconcileCommand.placeholders, undefined);
++  assert.equal(completion.reconcileCommand.argv.includes("--by"), false);
++  assert.equal(completion.reconcileCommand.argv.includes("--proof"), false);
++  assert.match(completion.nextAction, /no PO signature/u); assert.doesNotMatch(completion.nextAction, /obtain the PO-bound/u);
++});
++
++test("G20-38: the agent runs a result-only reconcile with no proof flags; the receipt is the readback and the ledger says no PO proof backed it", () => {
++  const { f, manifestPath, gitDeps, completion } = bootstrappedPending("g2038-agent-run");
++  const before = JSON.parse(readFileSync(join(f.root, manifestPath)));
++  const reconciled = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", manifestPath, "--plan-sha256", completion.planSha256], gitDeps);
++  assert.equal(reconciled.status, 0, reconciled.err);
++  const receipt = JSON.parse(reconciled.out);
++  assert.equal(receipt.status, "applied"); assert.equal(receipt.planSha256, completion.planSha256);
++  assert.deepEqual(receipt.approval, { basis: AGENT_BASIS, poProof: false });
++  assert.equal(receipt.changes.length, 1); assert.equal(receipt.changes[0].class, "result");
++  assert.equal(receipt.changes[0].from, before.artifacts.find((entry) => entry.class === "result").sha256);
++  assert.equal(receipt.changes[0].to, hash(readFileSync(f.resultPath)));
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
++  const after = JSON.parse(readFileSync(join(f.root, manifestPath)));
++  for (const entry of after.artifacts.filter((candidate) => candidate.class !== "result")) {
++    assert.deepEqual(entry, before.artifacts.find((old) => old.path === entry.path), `${entry.class} keeps the digest the approved manifest pins`);
++  }
++  const record = readLastPrivateApproval(resolveCriticalApprovalCommonDir(f.root), "feature-package-reconcile");
++  assert.equal(record.approval.criticalProof, null, "no proof backed it");
++  assert.equal(record.approval.criticalProofWaiver.mode, AGENT_BASIS, "labelled on its face, the way a waived proof is");
++  assert.equal(record.approval.forCommit, "a".repeat(40));
++  assert.notEqual(record.approval.approvedBy, "PO", "never recorded as a PO approval");
++});
++
++test("G20-38: when a non-result entry also drifted the preview names the PO, prints the signing route, and the command without a proof is refused with zero mutation", () => {
++  const { f, manifestPath, gitDeps, completion } = bootstrappedPending("g2038-non-result");
++  assert.equal(completion.preview.requiredAuthority, "agent");
++  writeFileSync(join(f.root, "specs/feature/candidate-evidence.md"), "candidate evidence changed after the approval\n");
++  const reread = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], gitDeps).out);
++  assert.equal(reread.status, "reconcile-preview"); assert.equal(reread.preview.changes.length, 2, "the Result and the changed candidate evidence");
++  assert.equal(reread.preview.requiredAuthority, "po");
++  assert.equal(typeof reread.signatureCommand?.subjectSha256, "string", "the PO-signed route prints its signing command");
++  assert.deepEqual(reread.reconcileCommand.requiredInputs, ["by", "proof-request", "proof-authority", "proof"]);
++  const manifestBefore = readFileSync(join(f.root, manifestPath));
++  const refused = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", manifestPath, "--plan-sha256", reread.planSha256], gitDeps);
++  assert.equal(refused.status, 2, refused.err); assert.match(refused.err, /FTP-RECONCILE-APPROVAL-REJECTED/);
++  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBefore, "zero mutation");
++  assert.equal(readLastPrivateApproval(resolveCriticalApprovalCommonDir(f.root), "feature-package-reconcile"), null, "no ledger record");
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 6204a22b922fc5172023b64ee7a126784fd6ce1b..c5e3f731b96768f33a6c81c36b34dd1985bfc3e5 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -438,6 +438,7 @@ import {
+   externalPushLedgerGate,
+ } from "../lib/external-push-ledger.mjs";
+ import {
++  AGENT_RESULT_ONLY_RECONCILE_BASIS,
+   isCriticalProofConsumedPrivately,
+   readLastPrivateApproval,
+   resolveCriticalApprovalCommonDir,
+@@ -502,6 +503,7 @@ import {
+   planFeaturePackageBootstrap,
+   planFeaturePackageReconcile,
+   planFeaturePackageTransition,
++  reconcilePlanIsResultOnly,
+   validateFeaturePackage,
+ } from "../lib/feature-package-topology.mjs";
+ import { armReconcileCommitCapability } from "../lib/human-guard-override.mjs";
+@@ -6188,6 +6190,15 @@ function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
+   } catch (error) { return unavailable(`the signing command could not be rendered (${error?.message ?? "invalid input"})`); }
+ }
+ 
++/** G20-38: the follow-on command for a result-only plan. It carries no proof inputs: the agent runs it as printed. */
++function agentReconcileCommand(dir, manifest, planSha256) {
++  return {
++    executable: process.execPath,
++    argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", realpathSync(resolve(dir)), "--manifest", manifest, "--plan-sha256", planSha256],
++    requiredInputs: [], approvalKind: "feature-package-reconcile", executionBoundary: "host-authorized-wsl",
++  };
++}
++
+ function resultBootstrapCompletion(dir, state, packageBinding, deps = {}) {
+   const path = `${dirname(state.continuity.authority.prd.path).split(sep).join("/")}/lifecycle.json`;
+   if (packageBinding === null) {
+@@ -6209,7 +6220,11 @@ function resultBootstrapCompletion(dir, state, packageBinding, deps = {}) {
+   const preview = ordinary.status === "rejected" && ordinary.reason === "reconcile-result-metadata-only"
+     ? planLegacyResultRepair(dir, state, manifest) ?? ordinary : ordinary;
+   const pending = preview.status === "reconcile-preview" || preview.status === "legacy-repair-preview";
+-  const signing = pending ? reconcileSigningRoute(dir, state, manifest, sha256CanonicalJson(preview), deps) : {};
++  // G20-38: a result-only plan leaves the approved package unchanged, so the agent runs it: no signing route, no proof inputs.
++  const agentRun = reconcilePlanIsResultOnly(preview);
++  const signing = !pending ? {}
++    : agentRun ? { reconcileCommand: agentReconcileCommand(dir, manifest, sha256CanonicalJson(preview)) }
++      : reconcileSigningRoute(dir, state, manifest, sha256CanonicalJson(preview), deps);
+   return {
+     scope: "feature-closure", state: pending ? "reconciliation-pending" : "authenticated-recovery-required", workflowTerminal: false,
+     manifest, preview,
+@@ -6217,6 +6232,7 @@ function resultBootstrapCompletion(dir, state, packageBinding, deps = {}) {
+     ...signing,
+     nextAction: preview.status === "legacy-repair-preview"
+       ? "obtain the PO-bound feature-package-reconcile approval for this exact legacy repair plan and candidate, then run feature-package-reconcile with this manifest and plan digest; a second preview will reconcile the package after Result and State repair; signatureCommand prints the signing command with its subject digest and reconcileCommand the command to run afterwards"
++      : agentRun ? `this plan moves only the Result entry (its fence-proven digest${preview.changes.some((change) => change.authority !== undefined) ? " and the authority lift of the one Result entry Continuity binds" : ""}); every other artifact keeps the digest the approved manifest pins, so the approved package is unchanged and the agent runs the reconcile itself, with no PO signature and no proof flags: run reconcileCommand (feature-package-reconcile --root <project-root> --manifest ${manifest} --plan-sha256 ${sha256CanonicalJson(preview)}); it prints the receipt with the before and after digests as the readback; a close lifecycle stopped at checkpointed then continues with its feature-close-prepared transition, without restarting plan-start, and the whole close order is in the close-feature skill, section "Closing a feature with active Continuity: the ordered route"`
+       : preview.status === "reconcile-preview" ? `obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it: feature-package-reconcile --root <project-root> --manifest ${manifest} --plan-sha256 ${sha256CanonicalJson(preview)}${preview.changes.some((change) => change.authority !== undefined) ? "; this plan also lifts the registered Result entry to authority, the one entry Continuity binds" : ""}; a close lifecycle stopped at checkpointed then continues with its feature-close-prepared transition, without restarting plan-start; the signing command and its subject digest are printed in signatureCommand (the PO runs it in their own terminal), the reconcile command to run afterwards in reconcileCommand, and the whole close order in the close-feature skill, section "Closing a feature with active Continuity: the ordered route"` : "resolve package drift through authenticated recovery",
+     ...(preview.status === "legacy-repair-preview" ? { repairAction: { executable: process.execPath,
+       argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", realpathSync(resolve(dir)), "--manifest", manifest, "--plan-sha256", sha256CanonicalJson(preview)],
+@@ -9377,6 +9393,9 @@ function runFeaturePackageReconcileCommand(argv, deps) {
+       candidate: { commit: observedCandidate.commit, tree: observedCandidate.tree },
+       holderLock: lock,
+       holderRoot: root,
++      // G20-38: computed here from the freshly recomputed plan, never read from the caller. A test double that destructures
++      // only the older fields never sees it; the default closure offers the agent route only when this is true.
++      agentRunnable: reconcilePlanIsResultOnly(plan),
+     });
+     if (!approvalCheck?.ok) {
+       // F3 (Critic pac08-fb-critic-review-5420c5e7.md): a replayed proof already verified
+@@ -9468,6 +9487,8 @@ function runFeaturePackageReconcileCommand(argv, deps) {
+       changes: postimage.changes,
+       planSha256,
+       manifestSha256: postimage.postSha256,
++      // G20-38: an agent-run result-only reconcile says on its face that no PO proof backed it.
++      ...(approvalCheck.agentRun === true ? { approval: { basis: AGENT_RESULT_ONLY_RECONCILE_BASIS, poProof: false } } : {}),
+       commitCapability,
+     }, null, 2));
+     return exit;
+@@ -9560,11 +9581,26 @@ function runFeaturePackageRecoverCommand(argv, deps) {
+  * still correctly refused -- see PS44Vc, which this design deliberately leaves intact.
+  */
+ export function defaultFeaturePackageReconcileApproval(argv, deps) {
+-  return ({ manifest, planSha256, candidate, holderLock, holderRoot }) => {
++  return ({ manifest, planSha256, candidate, holderLock, holderRoot, agentRunnable = false }) => {
+     const dir = deps.dir ?? projectDir();
+     const kind = "feature-package-reconcile";
+     const parsedArgv = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_RECONCILE_FLAGS);
+     const flags = parsedArgv.ok ? parsedArgv.value : {};
++    // G20-38 (PO decision 2026-11-07, "Agent bei unveraendertem Paket"): when the recomputed plan moves only the Result entry the
++    // approved package is unchanged, and a call that carries no attribution and no proof flag is the agent's own run. It records an
++    // agent-run, result-only reconcile in the same private ledger, labelled on its face as carrying no PO proof the way a waived proof
++    // is, and never as a PO approval. A caller that DOES pass --by or any proof flag keeps the PO-bound route below exactly as before.
++    if (agentRunnable === true && [flags.by, flags["proof-request"], flags["proof-authority"], flags.proof].every(isBlank)) {
++      const agentNow = (deps.now ?? (() => new Date().toISOString()))();
++      const agentCommon = resolveCriticalApprovalCommonDir(dir);
++      if (agentCommon === null) return { ok: false, code: "CRITICAL-APPROVAL-STORE-UNAVAILABLE" };
++      const agentStored = writeCriticalApproval({ gitCommonDir: agentCommon, kind, consumedAt: agentNow, approval: {
++        approvedBy: "agent", approvedAt: agentNow, forCommit: candidate.commit, criticalProof: null,
++        criticalProofWaiver: { mode: AGENT_RESULT_ONLY_RECONCILE_BASIS, kind, planSha256, manifest },
++      } });
++      if (!agentStored.ok) return { ok: false, code: agentStored.code };
++      return { ok: true, mode: "agent", proofSha256: null, agentRun: true };
++    }
+     const configured = criticalProofWaiverFor(dir, kind);
+     if (configured.code !== null && configured.code !== undefined) return { ok: false, code: configured.code };
+     const waived = configured.waived === true;
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index ca5e1502a23caad0f0914325eb2903dc88f76072..262caa00867bfd8ed1d6f2cb4e7ffeb00cd71041 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -213,10 +213,11 @@ A feature whose State carries `continuity` closes in this order. Every step is f
+ 
+ 1. Start the close lifecycle: `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, then apply the returned action.
+ 2. Take it to checkpointed: `close-coordinator.mjs plan-transition ... --phase checkpointed`, apply the returned action.
+-3. Make the Result a Continuity binding: `pipeline-state.mjs continuity-result-bootstrap-plan`, then run the returned `applyAction` (`continuity-result-bootstrap-apply ... --activate`). Its completion prints, while the package is stale, `signatureCommand` and `reconcileCommand`.
++3. Make the Result a Continuity binding: `pipeline-state.mjs continuity-result-bootstrap-plan`, then run the returned `applyAction` (`continuity-result-bootstrap-apply ... --activate`). Its completion prints, while the package is stale, the pending `preview` with its `requiredAuthority` and the `reconcileCommand`, and for a plan that needs the PO also `signatureCommand`.
+    **Project WITH a session-authority catalogue (D231):** the direct `pipeline-state.mjs` call refuses (`SDC-AUTHORITY-UNAVAILABLE`) because the State write must be owner-bound. For exactly the four entries `continuity-result-bootstrap-plan`, `continuity-result-bootstrap-apply`, `continuity-result-close-plan` and `continuity-result-close-apply`, run `node <plugin-root>/scripts/continuity-owner-route.mjs run --root <root> --lifecycle <id> -- <entry> [<entry flags>]` from the repository root, after the lifecycle reached checkpointed (take the entry and flags from the printed `applyAction.argv` from the entry name onward). One call binds a fresh per-invocation owner (a `controller-<random>` descriptor, not the host session and not the hook-observed owner, which is unauthenticated), runs that one entry through the unchanged gates and releases. A call killed in between leaves a binding: the next call prints `COR-BINDING-HELD` naming `routine-repair.mjs run heal --root <root> --reason "<why>"`, which releases it. A State write moves the image, and the next owner is refused (`companion-historical-owner-witness-missing`) until another route changes it; `close-feature` (step 7) is NOT on this route yet and keeps the direct route or the attended close until the follow-up slice.
+-4. Sign the reconcile (PO only, in the PO's own terminal): run `signatureCommand` exactly as printed. It is the `po-human-approval.mjs authorize-critical --kind feature-package-reconcile` line, and `signatureCommand.subjectSha256` is the digest it binds (`criticalActionSubjectSha256` over `{ manifest, planSha256, candidate }`). It is never executed by the pipeline. A new commit changes the candidate and with it the digest: take the command again from a fresh `continuity-result-bootstrap-plan`.
+-5. Reconcile the package: run `reconcileCommand` (`pipeline-state.mjs feature-package-reconcile ...`) after replacing its four placeholders. `<po-name>` is the PO's own name, supplied by the PO, never by the agent. `<proof-request>`, `<proof-authority>` and `<proof>` are the `requestPath`, `authorityPath` and `proofPath` the signing terminal printed.
++   **Read `preview.requiredAuthority` first.** `"agent"` (the usual case, G20-38): the plan moves only the Result entry, the fence-proven digest and the authority lift of the one Result entry Continuity binds, so every other artifact keeps the digest the approved manifest pins and the approved package is unchanged. There is no `signatureCommand`, no step 4 and no PO signature: run step 5 yourself with `reconcileCommand` exactly as printed (it has no placeholders and no proof inputs) and show the receipt it prints, which carries the before and after digests as the readback. The ledger records it as an agent-run, result-only reconcile labelled `agent-result-only-reconcile-no-po-proof`, never as a PO approval. `"po"`: the plan also changes a non-result entry (or is a legacy Result repair), so steps 4 and 5 below stay the PO-signed route.
++4. Sign the reconcile (PO only, in the PO's own terminal, only when `requiredAuthority` is `"po"`): run `signatureCommand` exactly as printed. It is the `po-human-approval.mjs authorize-critical --kind feature-package-reconcile` line, and `signatureCommand.subjectSha256` is the digest it binds (`criticalActionSubjectSha256` over `{ manifest, planSha256, candidate }`). It is never executed by the pipeline. A new commit changes the candidate and with it the digest: take the command again from a fresh `continuity-result-bootstrap-plan`.
++5. Reconcile the package: run `reconcileCommand` (`pipeline-state.mjs feature-package-reconcile ...`); on the PO route after replacing its four placeholders. `<po-name>` is the PO's own name, supplied by the PO, never by the agent. `<proof-request>`, `<proof-authority>` and `<proof>` are the `requestPath`, `authorityPath` and `proofPath` the signing terminal printed.
+ 6. Write the Continuity close request (below) and plan `close-coordinator.mjs plan-transition ... --phase feature-close-prepared --architecture-impact <impact> --continuity-close-request <request>`; apply the returned action.
+ 7. Run the State-writer action that apply returns (`pipeline-state.mjs close-feature ...` with `--continuity-close-request`), as shown in Step 2.
+ 

@@ -1,0 +1,112 @@
+diff --git a/plugins/pipeline-core/lib/copy-safe-command.mjs b/plugins/pipeline-core/lib/copy-safe-command.mjs
+index ad98691a4fbb65bdfdbd176e1e7e0b0b86958e42..9330b0b9dd0ee8b90bed3123bb3850a7cbf712d1 100644
+--- a/plugins/pipeline-core/lib/copy-safe-command.mjs
++++ b/plugins/pipeline-core/lib/copy-safe-command.mjs
+@@ -304,6 +304,29 @@ export function boundedCopySafeCommand({ executable, argv, forceCopyCommand = fa
+   return { executable, argv: resolvedArgv, command, copyCommand };
+ }
+ 
++/**
++ * C20 (greenfield G20-16, all three runners): the PO's own terminal step was rendered as one 260-361 character line (agy, Codex) or as
++ * mixed POSIX and PowerShell blocks (Claude on Windows). Pasted into PowerShell, the agy line ran Linux paths and opened the Node REPL;
++ * the Claude PO pasted both blocks at once and got dozens of parser errors. This renders the step for the PO's actual terminal:
++ * - native Windows host: one PowerShell block;
++ * - Linux inside WSL (WSL_DISTRO_NAME): a block for the WSL terminal and a PowerShell block that runs the SAME argv through
++ *   `wsl.exe -d <distro> --` (Linux paths only ever reach Linux), under a line telling the PO to copy exactly one block;
++ * - any other host: one POSIX block.
++ * The argv is unchanged in every block; only the wrapper and quoting differ.
++ */
++export function renderPoTerminalCommand({ label, executable, argv, env = process.env, hostPlatform = process.platform } = {}) {
++  if (hostPlatform === "win32") {
++    return renderHumanCopySafeCommand({ label: `${label} (PowerShell)`, executable, argv, platform: "powershell" });
++  }
++  const distro = typeof env?.WSL_DISTRO_NAME === "string" && /^[A-Za-z0-9._-]{1,64}$/u.test(env.WSL_DISTRO_NAME) ? env.WSL_DISTRO_NAME : null;
++  if (distro === null) return renderHumanCopySafeCommand({ label, executable, argv, platform: "posix" });
++  const linux = renderHumanCopySafeCommand({ label: `${label}, option A: WSL terminal`, executable, argv, platform: "posix" });
++  const windows = renderHumanCopySafeCommand({ label: `${label}, option B: Windows PowerShell`,
++    executable: "wsl.exe", argv: ["-d", distro, "--", executable, ...argv], platform: "powershell" });
++  const text = ["Copy exactly ONE of the two blocks below, into the terminal it names.", linux.text, windows.text].join("\n");
++  return { ...linux, text, options: { wsl: linux.text, powershell: windows.text } };
++}
++
+ /**
+  * The default human hand-off form. It always emits bounded POSIX and
+  * PowerShell blocks and emits cmd.exe only when the exact argv is representable
+diff --git a/plugins/pipeline-core/lib/copy-safe-command.test.mjs b/plugins/pipeline-core/lib/copy-safe-command.test.mjs
+index 026cf8308aeb2ebbc67438a2b1621b4600eba100..a73cbdd8c9c1b6878abed4ac8fb3df84c20d5fa5 100644
+--- a/plugins/pipeline-core/lib/copy-safe-command.test.mjs
++++ b/plugins/pipeline-core/lib/copy-safe-command.test.mjs
+@@ -28,6 +28,7 @@ import {
+   forcedQuote,
+   placeholder,
+   renderHumanCopySafeCommand,
++  renderPoTerminalCommand,
+ } from "./copy-safe-command.mjs";
+ 
+ test("boundedOpaqueCopyCommand is re-exported unchanged -- the same function object project-onboarding-v3.mjs already exported, not a reimplementation", () => {
+@@ -442,6 +443,40 @@ test("renderHumanCopySafeCommand emits bounded POSIX and PowerShell blocks by de
+   assert.equal(rendered.text.includes(rendered.command), false, "the unsafe unbounded primary line must not be printed");
+ });
+ 
++test("G20-16: renderPoTerminalCommand renders one block for the PO's terminal, and wraps the WSL argv through wsl.exe for PowerShell", () => {
++  const argv = ["/home/po/plugin/scripts/po-human-approval.mjs", "sign-intent", "--repo-root", "/home/po/src/project", "--request", `/home/po/src/project/scratch/${"r".repeat(90)}.json`];
++  const bounded = (text, max) => text.split(/\r?\n/u).every((line) => line.length <= max);
++  const windows = renderPoTerminalCommand({ label: "sign", executable: "C:\\Program Files\\nodejs\\node.exe",
++    argv: ["D:\\plugin\\po-human-approval.mjs", "sign-intent"], env: {}, hostPlatform: "win32" });
++  assert.match(windows.text, /^Step: sign \(PowerShell\)\nPowerShell:\n/u);
++  assert.doesNotMatch(windows.text, /POSIX:|cmd\.exe:/u);
++  const linux = renderPoTerminalCommand({ label: "sign", executable: "/usr/bin/node", argv, env: {}, hostPlatform: "linux" });
++  assert.match(linux.text, /^Step: sign\nPOSIX:\n/u);
++  assert.doesNotMatch(linux.text, /PowerShell:|cmd\.exe:/u);
++  assert.ok(bounded(linux.text, linux.copyCommand.maxColumns), linux.text);
++  assert.equal(linux.text.includes(linux.command), false, "never the unbounded single line");
++  const wsl = renderPoTerminalCommand({ label: "sign", executable: "/usr/bin/node", argv, env: { WSL_DISTRO_NAME: "Ubuntu" }, hostPlatform: "linux" });
++  assert.match(wsl.text, /^Copy exactly ONE of the two blocks below, into the terminal it names\.\n/u);
++  assert.match(wsl.options.wsl, /option A: WSL terminal\nPOSIX:\n/u);
++  assert.match(wsl.options.powershell, /option B: Windows PowerShell\nPowerShell:\n/u);
++  assert.match(wsl.options.powershell.replace(/\n/gu, ""), /wsl\.exe/u);
++  assert.match(wsl.options.powershell.replace(/\n/gu, ""), /Ubuntu/u);
++  assert.ok(bounded(wsl.text, wsl.copyCommand.maxColumns), wsl.text);
++  // An odd distro name is never interpolated; the plain POSIX form is used instead.
++  const odd = renderPoTerminalCommand({ label: "sign", executable: "/usr/bin/node", argv, env: { WSL_DISTRO_NAME: "Ubuntu; rm -rf /" }, hostPlatform: "linux" });
++  assert.doesNotMatch(odd.text, /PowerShell:|rm -rf/u);
++});
++
++test("G20-16: the WSL-terminal block reproduces the exact Linux argv (with spaces) in a real bash", () => {
++  const argv = ["/home/po/plugin/scripts/po-human-approval.mjs", "sign-intent", "--repo-root", "/home/po/src/my project", "--request", `/home/po/src/my project/scratch/${"r".repeat(90)}.json`];
++  const wsl = renderPoTerminalCommand({ label: "sign", executable: "/usr/bin/node", argv, env: { WSL_DISTRO_NAME: "Ubuntu" }, hostPlatform: "linux" });
++  const posixBlock = wsl.options.wsl.split("\n").slice(2).join("\n");
++  const script = `${posixBlock.replace(/eval "\$CMD"\s*$/u, "")}\nprintf '%s\\0' $CMD >/dev/null; eval "set -- $CMD"; printf '%s\\n' "$@"`;
++  const out = spawnSync("bash", ["-c", script], { encoding: "utf8" });
++  if (out.error?.code === "ENOENT") return;
++  assert.deepEqual(out.stdout.trimEnd().split("\n"), ["/usr/bin/node", ...argv]);
++});
++
+ test("renderHumanCopySafeCommand preserves exact argv through every real shell available on this host", () => {
+   const expected = ["/a very long/absolute path/with spaces/über/file.txt", "snowman-☃", "z".repeat(80)];
+   const rendered = renderHumanCopySafeCommand({
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 58530f1746fb73cc3f403508944976077732246c..73747b406082da01203753704d72f9b3f6966441 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -472,7 +472,7 @@ import {
+   verifyDesignWorkflowPackageApproval,
+ } from "../lib/design-workflow-approval.mjs";
+ import { materializeArchitectureDesign as materializeArchitectureDesignSource } from "../lib/architecture-design.mjs";
+-import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
++import { boundedCopySafeCommand, placeholder, renderPoTerminalCommand } from "../lib/copy-safe-command.mjs";
+ import { publishRuntimeNextAction as publishRuntimeNextActionSource } from "../lib/runtime-handover-projection.mjs";
+ import {
+   applyLegacyV2RevocationRecovery,
+@@ -12201,7 +12201,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         console.log(JSON.stringify(approvalReview, null, 2));
+         console.log(`Exact PO request: ${approvalRequestPath}.`);
+         const mode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn });
+-        if (mode?.mode === "signature") console.log(`node "${fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url))}" sign-intent --repo-root "${resolve(dir)}" --request "${resolve(dir, approvalRequestPath)}"`);
++        // G20-16: the PO's step is rendered for the PO's own terminal, bounded, never as one long line.
++        if (mode?.mode === "signature") console.log((deps.renderPoTerminalCommand ?? renderPoTerminalCommand)({ label: "PO signs the design approval",
++          executable: process.execPath,
++          argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "sign-intent", "--repo-root", resolve(dir), "--request", resolve(dir, approvalRequestPath)] }).text);
+         else console.log(`Next: approve-plan --by <name> --design-approval-request ${approvalRequestPath}`);
+         console.log("The request is pending only; it does not approve the package or unlock implementation.");
+       } else {

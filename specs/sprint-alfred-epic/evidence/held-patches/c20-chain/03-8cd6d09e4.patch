@@ -1,0 +1,528 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 890242c0432382abacf96b19e7304f6f4652de2e..353d3d852aae603039bf0027fdec6697ac174cd8 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -13004,6 +13004,9 @@ function d165s1Admitted(path) {
+     `node ${D165S1_ADOPTION} check --root ${path} --json`,
+     `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope src/ --rationale measured-baseline`,
+     `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope src/ --scope lib/ --decision-ref D162-migration --out scratch/adoption-request.json`,
++    // C20 w252 (G20-5): the signed apply (the script verifies the proof and binds every field to the signed subject).
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json`,
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision partial --request scratch/adoption-request.json --proof scratch/adoption-proof.json --json`,
+     `node ${D165S1_MEASURE} --root ${path}`,
+     `node ${D165S1_MEASURE} --root ${path} --apply`,
+     `node ${D165S1_FITNESS} --root ${path}`,
+@@ -13014,8 +13017,19 @@ function d165s1Admitted(path) {
+ 
+ function d165s1Refused(path) {
+   return [
+-    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json`,
++    // C20 w252: the signed apply moved to the admitted table; every widening of it stays refused.
+     `node ${D165S1_ADOPTION} apply --root ${path}`,
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json`,
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --chat-approval scratch/c.json`,
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json --by PO`,
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json --scope src/`,
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json --rationale x`,
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision deferred --request scratch/r.json --proof scratch/p.json`,
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request docs/r.json --proof scratch/p.json`,
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/../r.json --proof scratch/p.json`,
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.txt --proof scratch/p.json`,
++    `node ${D165S1_ADOPTION} apply --root ${path}-other --decision approved-scoped --request scratch/r.json --proof scratch/p.json`,
++    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json extra`,
+     `node ${D165S1_ADOPTION} propose --root ${path} --bogus`,
+     `node ${D165S1_ADOPTION} propose --root ${path} extra`,
+     `node ${D165S1_ADOPTION} propose --root ${path} --json --json`,
+@@ -13054,7 +13068,7 @@ for (const status of ["draft", "approved"]) {
+     } finally { rmSync(path, { recursive: true, force: true }); }
+   });
+ 
+-  test(`D165-S1 ${status}: apply, unknown flags, extra positionals, foreign roots and repeated flags stay refused`, () => {
++  test(`D165-S1 ${status}: unsigned or widened apply, unknown flags, extra positionals, foreign roots and repeated flags stay refused`, () => {
+     const path = d165s1Fixture(status);
+     try {
+       mkdirSync(join(path, "scratch"), { recursive: true });
+diff --git a/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs b/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs
+index 4af7db6363b8e0ef50839ba347314ec5662e2af7..25ba4068a4faa3c15d568490d917730f6f30bce8 100644
+--- a/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs
++++ b/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs
+@@ -70,7 +70,7 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
+     ? (greenfieldScaffold ? "design-pending" : "adoption-required")
+     : migrationRequired ? "migration-required" : "decision-recorded";
+   const guidance = status === "design-pending"
+-    ? "The greenfield navigation scaffold exists but is not an adopted architecture baseline. Complete initial design, then record a scoped architecture disposition before implementation."
++    ? "The greenfield navigation scaffold exists but is not an adopted architecture baseline. Put the architecture design block in the PRD; it is approved with the plan. After approve-plan, run pipeline-state.mjs materialize-architecture (an agent step, no separate PO decision) before set-phase implementation. Do not use architecture-adoption.mjs prepare/apply: that route is for existing repositories."
+     : status === "adoption-required"
+       ? "No usable architecture adoption decision exists. Review the staged read-only adoption proposal with the PO before implementation."
+       : status === "migration-required"
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index 343048578c7c61d05c003be36321cf703ac7bdaa..d7c36788582c98c9864c33540f02e84f865ccbba 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -8,7 +8,7 @@
+  * fitness evaluation answer whether the physical architecture evidence is
+  * actually present and valid. One cannot substitute for the other.
+  */
+-import { existsSync, lstatSync, readFileSync } from "node:fs";
++import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+ import { relative, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+@@ -113,6 +113,23 @@ function proposalAction(root, inspectedDesign = null, deps = {}) {
+     mutation: true, requiresConfirmation: false,
+     expected: { schema: "pipeline.architecture-design-materialization.v1", statuses: ["materialized"] },
+   };
++  // C20 w252 (G20-5): a greenfield design cannot materialize while foreign entries sit beside the scaffold
++  // (for example an adoption-state.json left by the brownfield route). Name them and the repair, never a bare code.
++  if (!design.ok && design.code === "ARCHITECTURE-DESIGN-EXISTING-ESTATE") {
++    const extra = [];
++    try {
++      for (const entry of readdirSync(resolve(root, "architecture")).sort()) if (entry !== "map") extra.push(`architecture/${entry}`);
++      for (const entry of readdirSync(resolve(root, "architecture/map")).sort()) {
++        if (entry !== "index.md" && entry !== "inventory.json") extra.push(`architecture/map/${entry}`);
++      }
++    } catch { /* the listing is guidance only */ }
++    return {
++      kind: "repair-required",
++      code: "ARCHITECTURE-DESIGN-EXISTING-ESTATE",
++      entries: extra,
++      guidance: `The approved design can only materialize over the bare greenfield scaffold (architecture/map/index.md and inventory.json). Move these entries out of architecture/ (for example into scratch/, nothing is lost): ${extra.length ? extra.join(", ") : "(listing unavailable)"}. Then run: node "${fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url))}" materialize-architecture. If an entry is your own committed architecture, this is not a greenfield repository: use the adoption proposal instead.`,
++    };
++  }
+   if (!design.ok && design.status === "design-required" && typeof design.prdPath === "string") return {
+     kind: "architecture-design-required",
+     prdPath: design.prdPath,
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+index 9bfde3229197a426d302a7e8a83b8a0512cec4f3..e6422603a82057c7babd0e084f9e3a13cc1121db 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+@@ -106,6 +106,29 @@ test("incomplete greenfield design keeps the PRD authoring action instead of est
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++test("C20 w252 (G20-5): a greenfield estate blocked by foreign entries names them and the materialize repair, never the PRD authoring action", () => {
++  const root = fixture();
++  const prdPath = "specs/feature/prd.md";
++  try {
++    mkdirSync(join(root, "architecture/map"), { recursive: true });
++    writeFileSync(join(root, "architecture/map/index.md"), "# scaffold\n", "utf8");
++    writeFileSync(join(root, "architecture/map/inventory.json"), "{}\n", "utf8");
++    writeFileSync(join(root, "architecture/adoption-state.json"), "{}\n", "utf8");
++    writeFileSync(join(root, "architecture/map/extra.md"), "x\n", "utf8");
++    const result = inspectArchitectureEntryReadiness({ rootDir: root, deps: {
++      inspectArchitectureDesign: () => ({ ok: false, status: "design-required",
++        code: "ARCHITECTURE-DESIGN-EXISTING-ESTATE", prdPath }),
++    } });
++    assert.equal(result.status, "blocked");
++    assert.equal(result.nextAction.kind, "repair-required");
++    assert.equal(result.nextAction.code, "ARCHITECTURE-DESIGN-EXISTING-ESTATE");
++    assert.deepEqual(result.nextAction.entries, ["architecture/adoption-state.json", "architecture/map/extra.md"]);
++    assert.match(result.nextAction.guidance, /architecture\/adoption-state\.json/u);
++    assert.match(result.nextAction.guidance, /materialize-architecture/u);
++    assert.doesNotMatch(result.nextAction.guidance, /architecture\/map\/index\.md,|inventory\.json,/u, "the scaffold files are not listed as foreign");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("a materialized map without a project-owned AGENTS pointer has an actionable typed refusal", () => {
+   const root = fixture();
+   try {
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 26e64e6032db20ab8e568a470e4ad37ea2eb641a..3584c70e7157d7abf9023ac0b0d49561e12445ba 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -286,10 +286,26 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
+ // a real directory (or absent) and the target a regular file (or absent), so the fixed write cannot be redirected by a link.
+ // --validate reads an arbitrary path and stays refused; --compile-summary combined with any other flag or argument stays refused.
+ const COMPILED_SUMMARY_OUT = "project/architecture-decisions.compiled.json";
++// C20 w252 (G20-7, Antigravity greenfield): the architecture-decision skill tells the agent to validate each ADR sidecar and
++// to compile the summary while drafting the design. `--validate` was not admitted at all and `--compile-summary --format json`
++// was refused for its format flag, so every check ended in a human-override offer. `--validate` only reads one sidecar.
++const ADR_SIDECAR = /^docs\/adr\/[A-Za-z0-9][A-Za-z0-9._-]{0,200}\.json$/u;
++function adrSidecarPath(root, value) {
++  if (typeof value !== "string" || value.includes("\0")) return false;
++  const rel = posix.isAbsolute(value) || win32.isAbsolute(value)
++    ? relative(root, value).split(sep).join("/")
++    : value;
++  return ADR_SIDECAR.test(rel) && !rel.split("/").some((part) => part === "." || part === "..")
++    && (rel === value || resolve(root, rel) === value);
++}
+ function sanctionedArchitectureBaselineArgs(args, root) {
++  if (args.includes("--validate")) {
++    return args.length === 2 && args[0] === "--validate" && adrSidecarPath(root, args[1]);
++  }
+   if (args.includes("--compile-summary")) {
+-    return args.length === 3 && args[0] === "--root" && args[1] === root && args[2] === "--compile-summary"
+-      && physicalDesignCoursePath(root, COMPILED_SUMMARY_OUT);
++    const base = args.length >= 3 && args[0] === "--root" && args[1] === root && args[2] === "--compile-summary";
++    const format = args.length === 3 || (args.length === 5 && args[3] === "--format" && (args[4] === "json" || args[4] === "text"));
++    return base && format && physicalDesignCoursePath(root, COMPILED_SUMMARY_OUT);
+   }
+   if (args.length === 1) return args[0] === "--help" || args[0] === "-h";
+   const matched = matchFlagSpec(args, {
+@@ -346,11 +362,12 @@ function sanctionedAntigravityNativeDispatchPrepareArgs(args, root) {
+ }
+ 
+ // D165 (S1): the brownfield adoption route. Each script is admitted as exact argv shapes only; `architecture-adoption.mjs apply`
+-// (PO proof) is deliberately NOT admitted. Every flag is single-use except `prepare --scope` (at most 8, handled by a pre-pass
++// is admitted only in its signed shape (C20 w252, below), never with a chat approval. Every flag is single-use except `prepare --scope` (at most 8, handled by a pre-pass
+ // because matchFlagSpec refuses repeats). The fitness script ignores unknown flags itself, so this catalogue is the strict side.
+ const ADOPTION_MAX_SCOPES = 8;
+ const ADOPTION_TEXT = /^[A-Za-z0-9][A-Za-z0-9 ._:,+@/()-]{0,400}$/u;
+ const ADOPTION_OUT = /^scratch\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}$/u;
++const ADOPTION_SIGNED_FILE = /^scratch\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\.json$/u;
+ function adoptionScope(value) {
+   if (typeof value !== "string" || value.startsWith("/") || !/^[A-Za-z0-9._][A-Za-z0-9._/-]{0,200}$/u.test(value)) return false;
+   const parts = value.split("/");
+@@ -404,6 +421,24 @@ function sanctionedArchitectureAdoptionToolArgs(script, args, root) {
+   }
+   const rest = args.slice(1);
+   if (["propose", "status", "check"].includes(args[0])) return matchFlagSpec(rest, { requiredValue: rootFlag, optional: { "--json": true } });
++  // C20 w252 (G20-5): the signed apply. D165 S1 kept `apply` out of the catalogue, so the agent needed a human-override
++  // ceremony (two more PO commands and a second signature) to record a decision the PO had just signed. The script
++  // verifies the Ed25519 proof against the request itself (verifyAdoptionAuthority, requireCurrent) and binds every
++  // field to the signed subject digest, so the agent cannot change what was signed. Only this exact shape is admitted:
++  // a scratch/ request and proof, no --chat-approval (an attribution record, not a proof), no --by (EL-36), no
++  // --scope/--rationale/--decision-ref (they are read from the signed request).
++  if (args[0] === "apply") {
++    const signedFile = (value) => ADOPTION_SIGNED_FILE.test(value) && adoptionPhysicalOut(root, value);
++    return matchFlagSpec(rest, {
++      requiredValue: {
++        ...rootFlag,
++        "--decision": (value) => value === "approved-scoped" || value === "partial",
++        "--request": signedFile,
++        "--proof": signedFile,
++      },
++      optional: { "--json": true },
++    });
++  }
+   if (args[0] !== "prepare") return false;
+   const others = [];
+   let scopes = 0;
+diff --git a/plugins/pipeline-core/lib/guard/entry-gates.mjs b/plugins/pipeline-core/lib/guard/entry-gates.mjs
+index 17846ce25f2ad7175660003c39febbbfdc7ed7a2..a5a8d66bd75acbcd056de802ba2d2cf4568d1955 100644
+--- a/plugins/pipeline-core/lib/guard/entry-gates.mjs
++++ b/plugins/pipeline-core/lib/guard/entry-gates.mjs
+@@ -134,7 +134,10 @@ export function architectureAdoptionAuthorityVerdict(root, command, dependencies
+     2,
+     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+       + `${ARCHITECTURE_ADOPTION_DENIAL_CODE}: ${detail}\n`
+-      + "Record one PO-owned approved-scoped or partial adoption decision for the active plan scope before requesting implementation authority.\n",
++      // C20 w252 (G20-5): an approved greenfield design is resolved by materialization, never by a PO adoption decision.
++      + (disposition?.disposition === "materialization-required"
++        ? "This is not an adoption decision: the approved design package already carries it. Materialize it, then retry the same set-phase.\n"
++        : "Record one PO-owned approved-scoped or partial adoption decision for the active plan scope before requesting implementation authority.\n"),
+   );
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index f3cf51d1ac91c9eda2f9921bc0d11d3f45ab05e0..99c212a721c77ed2d4a64f37828a96f6f43aad62 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -553,12 +553,19 @@ test("D115 architecture baseline --compile-summary: the exact documented form is
+     // an already compiled summary (a regular file) is overwritten in place: still the same one output path
+     writeFileSync(join(f.root, "project", "architecture-decisions.compiled.json"), "{}\n");
+     bothAdmit(base("--root", f.root, "--compile-summary"), f, "compile-summary over an existing regular file");
++    // QG-04 (C20 w252, G20-7): "with a format" was pinned refused. An Antigravity greenfield session ran the documented step
++    // with `--format json` (stdout only; the output file is the same one fixed path) and was sent into an override ceremony.
++    // The trailing format is now admitted for json and text; every other placement or value stays refused below.
++    bothAdmit(base("--root", f.root, "--compile-summary", "--format", "json"), f, "compile-summary with a json format");
++    bothAdmit(base("--root", f.root, "--compile-summary", "--format", "text"), f, "compile-summary with a text format");
+     for (const [label, action] of [
+       ["flag before the root", base("--compile-summary", "--root", f.root)],
+       ["no root", base("--compile-summary")],
+       ["foreign root", base("--root", join(f.root, ".."), "--compile-summary")],
+       ["relative root", base("--root", ".", "--compile-summary")],
+-      ["with a format", base("--root", f.root, "--compile-summary", "--format", "json")],
++      ["with an unknown format", base("--root", f.root, "--compile-summary", "--format", "yaml")],
++      ["with a format and no value", base("--root", f.root, "--compile-summary", "--format")],
++      ["with a repeated format", base("--root", f.root, "--compile-summary", "--format", "json", "--format", "json")],
+       ["format before the flag", base("--root", f.root, "--format", "json", "--compile-summary")],
+       ["with a diff", base("--root", f.root, "--compile-summary", "--diff", "HEAD")],
+       ["with a range", base("--root", f.root, "--compile-summary", "--from", "a".repeat(40), "--through", "b".repeat(40))],
+@@ -589,6 +596,27 @@ test("D115 architecture baseline --compile-summary: the exact documented form is
+   });
+ });
+ 
++// ---- C20 w252 (G20-7): `architecture-baseline --validate <ADR sidecar>` reads one docs/adr/*.json and nothing else ----
++test("C20 w252 architecture baseline --validate: one ADR sidecar under docs/adr is admitted, any other read target is not", () => {
++  withFixture("feature", f => {
++    const base = (...rest) => scriptAction(baselineScript, ...rest);
++    bothAdmit(base("--validate", "docs/adr/0001-offline-file-compatible-modular-architecture.json"), f, "relative sidecar");
++    bothAdmit(base("--validate", join(f.root, "docs", "adr", "0002-local-persistence.json")), f, "absolute sidecar inside the root");
++    for (const [label, action] of [
++      ["markdown ADR", base("--validate", "docs/adr/0001.md")],
++      ["outside docs/adr", base("--validate", "docs/other/0001.json")],
++      ["nested below docs/adr", base("--validate", "docs/adr/sub/0001.json")],
++      ["dot segment", base("--validate", "docs/adr/../../x.json")],
++      ["absolute outside the root", base("--validate", join(f.root, "..", "docs", "adr", "0001.json"))],
++      ["credential-like path", base("--validate", "/etc/passwd")],
++      ["no value", base("--validate")],
++      ["with a root", base("--root", f.root, "--validate", "docs/adr/0001.json")],
++      ["repeated", base("--validate", "docs/adr/0001.json", "--validate", "docs/adr/0002.json")],
++      ["extra argument", base("--validate", "docs/adr/0001.json", "extra")],
++    ]) bothRefuse(action, f, label);
++  });
++});
++
+ test("D64 model-role bootstrap admits a host session: admitted by its exact argv (K152/G7, e9e866fec); any other shape stays refused", () => {
+   withFixture("feature", f => {
+     // QG-04 justification: the D64 pin held the bootstrap refused as a pending product decision. That decision was made
+diff --git a/plugins/pipeline-core/lib/pins/greenfield-architecture-entry-names-materialization.test.mjs b/plugins/pipeline-core/lib/pins/greenfield-architecture-entry-names-materialization.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..01b6cac6b0e0291bdddfe210205058cd98f62d2a
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/greenfield-architecture-entry-names-materialization.test.mjs
+@@ -0,0 +1,93 @@
++// SPDX-License-Identifier: SUL-1.0
++// C20 w252 (G20-5, Claude greenfield on Windows, 2026-11-07): after a signed approve-plan, `set-phase --phase
++// implementation` was refused with GUARD-ARCHITECTURE-ADOPTION-UNRESOLVED and "Record one PO-owned approved-scoped or
++// partial adoption decision". The approved PRD carried a valid architecture design block, so the sanctioned next step
++// was the agent-run `pipeline-state.mjs materialize-architecture`. Following the text, the session took the brownfield
++// adoption route: a PO adoption signature, two human-override ceremonies, about eight PO terminal commands, and then
++// ARCHITECTURE-DESIGN-EXISTING-ESTATE because the adoption record now sat beside the scaffold.
++//
++// Pinned here: the adoption disposition, the guard and the adoption CLI name the materialization step for an approved
++// greenfield design, and every other disposition keeps its previous text.
++import assert from "node:assert/strict";
++import { mkdtempSync, rmSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++
++import {
++  STATE_MATERIALIZATION_REQUIRED,
++  checkPlanningAdoptionDisposition,
++  greenfieldMaterializationPending,
++} from "../../scripts/architecture-adoption.mjs";
++import { architectureAdoptionAuthorityVerdict } from "../guard/entry-gates.mjs";
++import { ARCHITECTURE_ADOPTION_DENIAL_CODE, PIPELINE_STATE_SCRIPT } from "../guard/constants.mjs";
++import { observeArchitectureAdoptionOrientation } from "../architecture-adoption-orientation.mjs";
++
++const COMMAND = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
++const PLAN = "specs/f/prd.md";
++const pending = () => ({ ok: true, status: "materialization-required", targets: [], receipt: null, scope: ["src/"] });
++
++function withRoot(fn) {
++  const root = mkdtempSync(join(tmpdir(), "c20-w252-g20-5-"));
++  try { return fn(root); } finally { rmSync(root, { recursive: true, force: true }); }
++}
++
++test("checkPlanningAdoptionDisposition names materialize-architecture for an approved greenfield design", () => withRoot((root) => {
++  const result = checkPlanningAdoptionDisposition(root, PLAN, new Date(), { inspectArchitectureDesign: pending });
++  assert.equal(result.ok, false, "an unmaterialized design is still no implementation authority");
++  assert.equal(result.disposition, STATE_MATERIALIZATION_REQUIRED);
++  assert.match(result.error, /materialize-architecture/u);
++  assert.match(result.error, /no separate PO adoption decision/u);
++  assert.ok(result.error.includes(PIPELINE_STATE_SCRIPT), "the exact writer path is named");
++}));
++
++test("checkPlanningAdoptionDisposition keeps adoption-required for a repository without an approved design", () => withRoot((root) => {
++  const notRequired = () => ({ ok: true, status: "not-required" });
++  const result = checkPlanningAdoptionDisposition(root, PLAN, new Date(), { inspectArchitectureDesign: notRequired });
++  assert.equal(result.ok, false);
++  assert.equal(result.disposition, "adoption-required");
++  assert.doesNotMatch(result.error, /materialize-architecture/u);
++}));
++
++test("the guard denial names the materialization step and drops the PO adoption line for that disposition only", () => withRoot((root) => {
++  const base = { activeFeaturePlanningScopeFn: () => PLAN };
++  const materialize = architectureAdoptionAuthorityVerdict(root, COMMAND, { ...base,
++    checkPlanningAdoptionDispositionFn: (r, s) => checkPlanningAdoptionDisposition(r, s, new Date(), { inspectArchitectureDesign: pending }) });
++  assert.equal(materialize.exitCode, 2, "still a denial: implementation authority needs the materialized design");
++  assert.match(materialize.stderr, new RegExp(ARCHITECTURE_ADOPTION_DENIAL_CODE, "u"));
++  assert.match(materialize.stderr, /materialize-architecture/u);
++  assert.match(materialize.stderr, /This is not an adoption decision/u);
++  assert.doesNotMatch(materialize.stderr, /Record one PO-owned/u);
++
++  const brownfield = architectureAdoptionAuthorityVerdict(root, COMMAND, { ...base,
++    checkPlanningAdoptionDispositionFn: () => ({ ok: false, disposition: "adoption-required", error: "Architecture adoption disposition is unresolved (adoption-required)." }) });
++  assert.equal(brownfield.exitCode, 2);
++  assert.match(brownfield.stderr, /Record one PO-owned approved-scoped or partial adoption decision/u, "the brownfield text is unchanged");
++  assert.doesNotMatch(brownfield.stderr, /This is not an adoption decision/u);
++
++  const resolved = architectureAdoptionAuthorityVerdict(root, COMMAND, { ...base,
++    checkPlanningAdoptionDispositionFn: () => ({ ok: true, disposition: "approved-scoped" }) });
++  assert.equal(resolved, null, "a resolved disposition is still admitted");
++}));
++
++test("the adoption CLI refuses prepare/apply only while an approved greenfield design awaits materialization", () => withRoot((root) => {
++  assert.equal(greenfieldMaterializationPending(root, { inspectArchitectureDesign: pending }), true);
++  for (const other of [
++    () => ({ ok: true, status: "not-required" }),
++    () => ({ ok: true, status: "materialized" }),
++    () => ({ ok: false, status: "design-required", code: "ARCHITECTURE-DESIGN-EXISTING-ESTATE" }),
++    () => { throw new Error("inspection failed"); },
++  ]) assert.equal(greenfieldMaterializationPending(root, { inspectArchitectureDesign: other }), false, "every other state keeps the adoption route");
++}));
++
++test("the design-pending orientation names the materialization step and warns off the adoption route", () => withRoot((root) => {
++  const readback = observeArchitectureAdoptionOrientation({ rootDir: root, deps: {
++    resolveAdoptionState: () => ({ state: "adoption-required" }),
++    hasExactGreenfieldDesignPendingScaffold: () => true,
++  } });
++  assert.equal(readback.status, "design-pending");
++  assert.match(readback.guidance, /materialize-architecture/u);
++  assert.match(readback.guidance, /no separate PO decision/u);
++  assert.match(readback.guidance, /Do not use architecture-adoption\.mjs prepare\/apply/u);
++  assert.doesNotMatch(readback.guidance, /then record a scoped architecture disposition/u, "the sentence that sent the session down the brownfield route is gone");
++}));
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.mjs b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+index c8e7132440cdef0b85844d0b4e4f4d704822b7da..5f67dc28c82011f755fa5169a64dbdf2f436e051 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+@@ -39,6 +39,19 @@ export const STATE_ADOPTION_REQUIRED = "adoption-required";
+ export const STATE_APPROVED_SCOPED = "approved-scoped";
+ export const STATE_DEFERRED = "deferred";
+ export const STATE_PARTIAL = "partial";
++/** Not a stored state: an approved greenfield design package awaiting `pipeline-state.mjs materialize-architecture`. */
++export const STATE_MATERIALIZATION_REQUIRED = "materialization-required";
++const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
++
++/** C20 w252 (G20-5): the adoption route is for existing repositories; refuse it while an approved design awaits materialization. */
++export function greenfieldMaterializationPending(rootDir, deps = {}) {
++  try {
++    const design = (deps.inspectArchitectureDesign ?? inspectArchitectureDesign)(rootDir);
++    return design.ok === true && design.status === "materialization-required";
++  } catch {
++    return false;
++  }
++}
+ 
+ function contractExists(rootDir, contractPath) {
+   const directoryGlob = typeof contractPath === "string" && contractPath.endsWith("/**");
+@@ -364,11 +377,20 @@ function scopeValueForState(scope) {
+  * Asserts task scope has a resolved architecture disposition ('approved-scoped' or 'deferred')
+  * before implementation authority per AC-17.
+  */
+-export function checkPlanningAdoptionDisposition(rootDir = DEFAULT_ROOT, taskScope = null, now = new Date()) {
+-  const design = inspectArchitectureDesign(rootDir, taskScope);
++export function checkPlanningAdoptionDisposition(rootDir = DEFAULT_ROOT, taskScope = null, now = new Date(), deps = {}) {
++  const design = (deps.inspectArchitectureDesign ?? inspectArchitectureDesign)(rootDir, taskScope);
+   if (design.ok && design.status === "materialized") return {
+     ok: true, disposition: design.disposition, scope: design.scope, authority: design.authority,
+   };
++  // C20 w252 (G20-5): an approved greenfield design package carries its own scoped disposition. Until it is
++  // materialized the repository still reads as adoption-required, and naming the brownfield adoption route here
++  // sent a live greenfield session through a PO adoption signature and two override ceremonies. Name the one
++  // agent step that resolves it instead.
++  if (design.ok && design.status === "materialization-required") return {
++    ok: false,
++    disposition: STATE_MATERIALIZATION_REQUIRED,
++    error: `The approved design package carries the scoped architecture disposition but is not materialized yet. Run: node "${PIPELINE_STATE_SCRIPT}" materialize-architecture (an agent step; no separate PO adoption decision, no architecture-adoption.mjs prepare/apply), then request implementation authority again.`,
++  };
+   if (fs.existsSync(path.join(rootDir, "architecture/design-materialization.json")) && !design.ok) return {
+     ok: false, disposition: "design-authority-stale", error: design.code,
+   };
+@@ -506,6 +528,7 @@ function runCli() {
+   let chatApproval = null;
+   let by = "PO";
+   let rationale = "Architecture adoption decision applied via CLI";
++  let rationaleGiven = false;
+   let json = false;
+   let taskScope = null;
+   let out = null;
+@@ -538,6 +561,7 @@ function runCli() {
+       by = args[++i];
+     } else if (arg === "--rationale" && args[i + 1]) {
+       rationale = args[++i];
++      rationaleGiven = true;
+     } else if (arg === "--out" && args[i + 1]) {
+       out = args[++i];
+     } else if (arg === "--json") {
+@@ -555,6 +579,24 @@ function runCli() {
+     process.exit(1);
+   }
+ 
++  // C20 w252 (G20-5): an approved greenfield design package resolves its disposition through materialization.
++  if ((command === "prepare" || command === "apply") && greenfieldMaterializationPending(rootDir)) {
++    console.error(`ADOPTION-GREENFIELD-MATERIALIZE: this repository has an approved design package awaiting materialization; it carries the scoped architecture disposition. Run: node "${PIPELINE_STATE_SCRIPT}" materialize-architecture (an agent step, no PO signature). The adoption route (prepare/apply) is for existing repositories only. Nothing was written.`);
++    process.exit(1);
++  }
++
++  // C20 w252 (G20-5): apply reads the decision fields from the signed request when they are not given again.
++  // The subject digest comparison in applyAdoptionDecision still binds every value to the signature.
++  if (command === "apply" && approvalRequest?.subject && typeof approvalRequest.subject === "object") {
++    const subject = approvalRequest.subject;
++    if (decision === null || decision === undefined) decision = subject.decision;
++    if (scope === null) scope = subject.scope;
++    if (!rationaleGiven && typeof subject.rationale === "string") rationale = subject.rationale;
++    if (decisionRef === null) decisionRef = subject.decisionRef ?? null;
++    if (expires === null) expires = subject.expiresAt ?? null;
++    if (reviewDate === null) reviewDate = subject.reviewDate ?? null;
++  }
++
+   if (out !== null && command !== "prepare") {
+     console.error("Error: --out is only valid with the 'prepare' command");
+     process.exit(1);
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+index f510459c6d014f49034e5276eff76fa2e4bc4025..000b3143e56b317162c92268b8964a1ba1087adc 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+@@ -402,6 +402,31 @@ describe("Adoption authority anti-forgery and durable readback", () => {
+     setupAdoptionFixture(root);
+     assert.equal(resolveAdoptionState(root).state, "adoption-required");
+   });
++  it("C20 w252 (G20-5): CLI apply with only --request/--proof reads the decision fields from the signed request; a changed field is still refused", () => {
++    const plugin = path.join(root, "plugin");
++    fs.cpSync(path.resolve("plugins/pipeline-core"), plugin, { recursive: true });
++    const script = path.join(plugin, "scripts/architecture-adoption.mjs");
++    const prepareArgv = ["--root", root, "--decision", input.decision, "--scope", input.scope, "--rationale", input.rationale, "--decision-ref", input.decisionRef, "--decided-at", input.decidedAt, "--json"];
++    const prepared = spawnSync(process.execPath, [script, "prepare", ...prepareArgv], { encoding: "utf8" });
++    assert.equal(prepared.status, 0, prepared.stderr);
++    const req = JSON.parse(prepared.stdout);
++    fs.writeFileSync(path.join(root, "request.json"), JSON.stringify(req));
++    fs.writeFileSync(path.join(root, "proof.json"), JSON.stringify(signAdoptionRequest(req, key)));
++    const signed = ["--request", path.join(root, "request.json"), "--proof", path.join(root, "proof.json")];
++    // A field given again with a different value than the signed one still breaks the subject binding.
++    const changed = spawnSync(process.execPath, [script, "apply", "--root", root, "--decision", input.decision, "--rationale", "a different rationale", ...signed], { encoding: "utf8" });
++    assert.notEqual(changed.status, 0, "a re-given field that differs from the signed subject is refused");
++    assert.match(changed.stderr, /ADOPTION-AUTHORITY-SUBJECT-MISMATCH/u, "refused by the subject binding, not by something else");
++    assert.equal(resolveAdoptionState(root).state, "adoption-required", "nothing was written by the refused apply");
++    // Only the signed files: every omitted field comes from the request, the digest comparison binds them.
++    const applied = spawnSync(process.execPath, [script, "apply", "--root", root, "--decision", input.decision, ...signed, "--json"], { encoding: "utf8" });
++    assert.equal(applied.status, 0, applied.stderr);
++    const state = JSON.parse(applied.stdout);
++    assert.equal(state.state, input.decision);
++    assert.equal(state.rationale, input.rationale.trim(), "the signed rationale, not the CLI default");
++    assert.equal(state.decisionRef, input.decisionRef);
++    assert.deepEqual(state.scope, req.subject.scope);
++  });
+   it("actual CLI prepares, applies and reads back from a plugin-only installation", () => {
+     const plugin = path.join(root, "plugin");
+     fs.cpSync(path.resolve("plugins/pipeline-core"), plugin, { recursive: true });
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md b/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md
+index 618c6ba783c47bb4efefce4be907c2082222449c..b0200f18a3a35523d21731c1c68970bbe2c3ab73 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md
+@@ -8,8 +8,13 @@ from an `AGENTS.md` pointer.
+ When its status is `adoption-required`, execute its nested, read-only
+ `nextAction` verbatim to obtain the staged proposal and surface it to the PO.
+ For `design-pending`, state that the physical greenfield scaffold exists but
+-is not an adopted baseline; finish initial design before asking the PO for a
+-scoped disposition. For `decision-recorded`, read the declared architecture
++is not an adopted baseline. The scoped disposition is part of the PRD's
++architecture design block and is approved with the plan; there is no separate
++PO adoption step. After `approve-plan`, run
++`pipeline-state.mjs materialize-architecture` yourself, then
++`set-phase --phase implementation`. Never use `architecture-adoption.mjs
++prepare`/`apply` on a greenfield repository; that route is for existing ones
++and leaves an entry that blocks materialization. For `decision-recorded`, read the declared architecture
+ map and compiled decision summary in the AGENTS re-entry order, then only
+ concepts for touched modules. `unavailable` is an honest retry/diagnosis,
+ never a claim that a map exists.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index b1861ee1019470c506e224bf96c870b48ce0e06a..29a0a49f7b62238ee8250e0acbfcf1ff086efa84 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -43,7 +43,10 @@ command tables.
+    The `register-feature-package.mjs` result carries `pushThreatModel`: `present: false` names the command and says the file belongs in that same commit.
+    This is enforced, not advice: while the push approval is active, `pipeline-state.mjs submit-plan`, `push-prepare.mjs` and the feature close
+    (`feature-close-prepared`) refuse with `PUSH-THREAT-MODEL-MISSING`, `-EMPTY` or `-INVALID` (no markdown heading) and print the repair command and the commit rule.
+-7. `pipeline-state.mjs set-phase --phase implementation` (agent). Source files stay out of the draft commit until then.
++7. Greenfield only: `pipeline-state.mjs materialize-architecture` (agent, no flags, no PO step). The approved PRD's architecture design block carries the
++   scoped disposition; this writes the map, fitness model and baseline. Never take the `architecture-adoption.mjs prepare`/`apply` route in a greenfield
++   repository (owner: `references/architecture-orientation.md`).
++8. `pipeline-state.mjs set-phase --phase implementation` (agent). Source files stay out of the draft commit until then.
+ 
+ ## 2. Implementation (one dispatch per task, from the template)
+ 

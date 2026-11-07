@@ -1,0 +1,46 @@
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+index b6f26bf661f588de6ae06c670d946e4e763093c4..41765657c81b3a224641c79c0092b54000072d7a 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+@@ -12,7 +12,7 @@ import { PIPELINE_STATE_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT } from "./consta
+ import { isReadOnlyDiagnosticCommand, simpleWords } from "./shell-grammar.mjs";
+ import { verdict } from "./verdict.mjs";
+ import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
+-import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand, observedOnboardingCommandMatch, resolveBoundArtifactPublicationInvocation } from "./command-catalogue.mjs";
++import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand, observedOnboardingCommandMatch, resolveBoundArtifactPublicationInvocation, sameNodeInterpreter } from "./command-catalogue.mjs";
+ 
+ /**
+  * GUARD-DEVPLAN-SHELL -- the `Bash|PowerShell` lane of the Dev-Plan-Gate (`guard-devplan.mjs`),
+@@ -117,7 +117,7 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
+     // argument is a draft-phase scratch script, not an opaque implementation write.
+     // G20-21: the Pipeline itself prints absolute interpreter and script paths, so the same scratch script spelled with an absolute
+     // `node` and/or an absolute path inside <root>/scratch/ is the same draft-phase shape, not an opaque implementation write.
+-    const draftScratchScript = words !== null && words.length === 2 && isNodeInterpreterWord(words[0])
++    const draftScratchScript = words !== null && words.length === 2 && sameNodeInterpreter(words[0], "node", root, dependencies)
+       && scratchScriptRelative(words[1], root) !== null;
+     const opaqueScript = words === null || draftScratchScript ? null : opaqueScriptExecutionCandidate(words, root);
+     if (opaqueScript !== null
+@@ -195,6 +195,7 @@ function isNodeInterpreterWord(word) {
+   if (word === "node") return true;
+   return typeof word === "string" && isAbsolute(word) && ["node", "node.exe"].includes(basename(word).toLowerCase());
+ }
++// isNodeInterpreterWord only shapes the advice text; admission uses sameNodeInterpreter (an executable outside the project root).
+ 
+ function scratchScriptRelative(word, root) {
+   if (typeof word !== "string" || word === "") return null;
+diff --git a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+index 3386c1674510a03429e46a53b362e9372d4a0e42..42abf0a74b6a20fcddbb594492d5f1f59aa370d9 100644
+--- a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+@@ -111,6 +111,11 @@ test('G20-21 control: absolute spellings outside <root>/scratch/, nested, with a
+     `${q(node)} scratch/forensics.mjs arg`,
+     `"/usr/bin/python3" scratch/forensics.mjs`,
+   ]) assert.equal(refused(command), true, command);
++  // A "node" planted inside the project root is never an interpreter for this admission.
++  mkdirSync(join(root, 'scratch', 'bin'), { recursive: true });
++  const planted = join(root, 'scratch', 'bin', 'node');
++  writeFileSync(planted, '#!/bin/sh\n', { mode: 0o755 });
++  assert.equal(refused(`${q(planted)} scratch/forensics.mjs`), true, 'planted node');
+ });
+ 
+ test('AC-207 point 2 control: scratch-script near-misses stay refused', () => {

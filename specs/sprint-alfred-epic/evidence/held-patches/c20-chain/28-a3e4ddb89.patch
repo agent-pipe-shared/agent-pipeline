@@ -1,0 +1,156 @@
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index 83874951e3cff7efdb09060e4b32c0787ade21cf..7392795efc68281e57cffa5fe290dc577bdddedf 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -3,7 +3,7 @@
+ 
+ import { readOnlyGitApplyCheckArguments } from "../protected-test-paths.mjs";
+ import { homedir } from "node:os";
+-import { lstatSync, realpathSync, statSync } from "node:fs";
++import { existsSync, lstatSync, realpathSync, statSync } from "node:fs";
+ import { fileURLToPath } from "node:url";
+ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
+@@ -1321,15 +1321,24 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
+     });
+   }
+   let index = 0;
++  let operandRoot = root;
+   while (index < args.length && args[index].startsWith("-")) {
+     if (args[index] === "-C") {
+-      // The directory must be a real (non-symlink) directory inside the project/approved roots.
++      // The directory must be a real (non-symlink) directory inside the project/approved roots -- or (C20 G20-34, PO decision
++      // 2026-11-07) another Git repository outside them that the passive read policy admits (the same credential-root rule the
++      // native Read lane applies: reading outside the project is allowed, credential roots are not). Only the read-only
++      // subcommands below are admitted for it, and their path operands must stay inside THAT repository.
+       const target = args[index + 1];
+       if (typeof target !== "string" || target === "" || target.startsWith("-")) return false;
+       const directory = resolve(root, target);
+       try {
+         if (!lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink()) return false;
+-        if (!isApprovedSingleCommandReadArg(realpathSync(directory), root, extraRoots, true)) return false;
++        const real = realpathSync(directory);
++        if (!isApprovedSingleCommandReadArg(real, root, extraRoots, true)) {
++          if (!existsSync(join(real, ".git"))
++            || !isAllowedPassiveReadTarget(real, { rootDir: root, recursive: true })) return false;
++          operandRoot = real;
++        }
+       } catch { return false; }
+       index += 2;
+     } else if (["--no-pager", "-p", "--literal-pathspecs"].includes(args[index])) {
+@@ -1341,7 +1350,7 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
+   const subcommand = args[index];
+   const subargs = args.slice(index + 1);
+   return isReadOnlyGitSubcommand(subcommand, subargs)
+-    && areGitReadOperandsInsideRoot(subcommand, subargs, root);
++    && areGitReadOperandsInsideRoot(subcommand, subargs, operandRoot);
+ }
+ 
+ // C6g1 F3 (ALF-C-C6G1-CORR-A, refined by ALF-C-C6G1-CORR-A2 under the PO decision of 2026-10-17): the output/execution denylist
+diff --git a/plugins/pipeline-core/lib/pins/read-only-git-c-on-another-repository-is-not-a-mutation.test.mjs b/plugins/pipeline-core/lib/pins/read-only-git-c-on-another-repository-is-not-a-mutation.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..b86eb967749e66251b5f24ccd43617ad7b3199fd
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/read-only-git-c-on-another-repository-is-not-a-mutation.test.mjs
+@@ -0,0 +1,101 @@
++// SPDX-License-Identifier: SUL-1.0
++// Regression pin for candidate 20 finding G20-34 (observed 2026-11-07, PO decision 2026-11-07: fix in candidate 20).
++// A read-only `git -C <another repository> log` was refused as GUARD-CROSS-REPO-MUTATION. Decision: read-only git subcommands
++// with `-C` follow the passive read policy (reading outside the project is allowed, credential roots are not); every
++// mutating subcommand against another repository stays refused. Every case runs through the real guard
++// (evaluateLifecycleReadyGuard); nothing under test is mocked.
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
++
++const SCRATCH_ROOT = fileURLToPath(new URL("../../../../scratch/", import.meta.url));
++
++function gitInit(dir) {
++  mkdirSync(dir, { recursive: true });
++  const result = spawnSync("git", ["init", "-q", dir], { encoding: "utf8" });
++  assert.equal(result.status, 0, result.stderr);
++  writeFileSync(join(dir, "a.txt"), "a\n");
++}
++
++function fixture() {
++  mkdirSync(SCRATCH_ROOT, { recursive: true });
++  const base = realpathSync(mkdtempSync(join(SCRATCH_ROOT, "g2034-")));
++  const project = join(base, "project");
++  mkdirSync(join(project, ".agent-pipeline"), { recursive: true });
++  writeFileSync(join(project, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
++    schema: "pipeline.onboarding-consent-marker.v1",
++    status: "consent-given-onboarding-incomplete",
++    consentGivenAt: "2026-09-29T00:00:00.000Z",
++  }));
++  const other = join(base, "other-repo");
++  gitInit(other);
++  const plain = join(base, "plain-dir");
++  mkdirSync(plain, { recursive: true });
++  return { base, project, other, plain };
++}
++
++const withFixture = (fn) => {
++  const paths = fixture();
++  try { return fn(paths); } finally { rmSync(paths.base, { recursive: true, force: true }); }
++};
++const run = (command, project) => {
++  const r = evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, { projectDir: project });
++  return { exitCode: r.exitCode, text: String(r.stderr ?? "") };
++};
++const fwd = (p) => p.replaceAll("\\", "/");
++
++test("G2034-1 read-only git subcommands with -C on another repository are admitted", () => withFixture(({ project, other }) => {
++  for (const command of [
++    `git -C ${fwd(other)} log --oneline -3`,
++    `git -C ${fwd(other)} status --short`,
++    `git -C ${fwd(other)} rev-parse HEAD`,
++    `git -C ${fwd(other)} show HEAD:a.txt`,
++    `git -C ${fwd(other)} diff -- a.txt`,
++  ]) {
++    const result = run(command, project);
++    assert.equal(result.exitCode, 0, `${command}\n${result.text}`);
++  }
++}));
++
++test("G2034-2 mutating git subcommands with -C on another repository stay refused", () => withFixture(({ project, other }) => {
++  for (const command of [
++    `git -C ${fwd(other)} commit -m x`,
++    `git -C ${fwd(other)} add a.txt`,
++    `git -C ${fwd(other)} checkout -b x`,
++    `git -C ${fwd(other)} reset --hard`,
++  ]) {
++    const result = run(command, project);
++    assert.equal(result.exitCode, 2, `${command} must stay refused`);
++  }
++}));
++
++test("G2034-3 the read stays inside THAT repository: a path operand that escapes it is refused", () => withFixture(({ project, other }) => {
++  const result = run(`git -C ${fwd(other)} log -- ../project/x`, project);
++  assert.equal(result.exitCode, 2, result.text);
++}));
++
++test("G2034-4 a -C target outside the project that is not a Git repository is not admitted as a read", () => withFixture(({ project, plain }) => {
++  const result = run(`git -C ${fwd(plain)} log --oneline -3`, project);
++  assert.equal(result.exitCode, 2, result.text);
++}));
++
++test("G2034-5 a repository under a credential root is refused even for a read", () => withFixture(({ base, project }) => {
++  const home = join(base, "home");
++  const vault = join(home, ".ssh", "keys-repo");
++  gitInit(vault);
++  const previous = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
++  process.env.HOME = home;
++  process.env.USERPROFILE = home;
++  try {
++    const result = run(`git -C ${fwd(vault)} log --oneline -3`, project);
++    assert.equal(result.exitCode, 2, result.text);
++  } finally {
++    for (const [key, value] of Object.entries(previous)) {
++      if (value === undefined) delete process.env[key]; else process.env[key] = value;
++    }
++  }
++}));

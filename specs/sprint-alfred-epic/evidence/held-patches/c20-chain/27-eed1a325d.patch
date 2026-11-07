@@ -1,0 +1,710 @@
+diff --git a/plugins/pipeline-core/config/runner-capabilities.json b/plugins/pipeline-core/config/runner-capabilities.json
+index 5ba2e081e4b07ab0e1c39d1cb79f471340b27fdf..344efd76ccb16275c6f3b1e6e85a5c3ec9646821 100644
+--- a/plugins/pipeline-core/config/runner-capabilities.json
++++ b/plugins/pipeline-core/config/runner-capabilities.json
+@@ -7,7 +7,7 @@
+       "topic": "Dispatch carrier",
+       "claude": "`Agent` / `Task`, functional `agentType`",
+       "codex": "`spawn_agent`, `nativeAgentType: \"worker\"`",
+-      "antigravity": "`antigravity-native-dispatch-prepare.mjs`, then `invoke_subagent`; implementation is not native",
++      "antigravity": "`invoke_subagent` (flat args); read-only roles after `antigravity-native-dispatch-prepare.mjs`, Goldfish roles from the generated briefing, no consent",
+       "owner": "skills/pipeline-start/references/implementation-continuation.md; references/antigravity-native-dispatch.md"
+     },
+     {
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index bb0086c3e1849d0309a143f875f8983a0620b596..28c9dd65e1713846a36c385f935896108f077856 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -41,7 +41,9 @@ import { parseGuardCommand } from "./guard-command-grammar.mjs";
+ import { commandIsGitPush } from "../lib/git-cmd.mjs";
+ import { classifyGhCommand } from "../lib/gh-cmd.mjs";
+ import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
+-import { evaluateNativeImplementationAdmission, NATIVE_IMPLEMENTATION_SCOPE_SCHEMA } from "../lib/agy-native-implementation-admission.mjs";
++import {
++  decodeNativeInvokeArgs, evaluateNativeChildCall, evaluateNativeGoldfishParentCall, isNativeCodeWriterType, nativeBrainWriteRefusal,
++} from "../lib/agy-native-goldfish.mjs";
+ import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
+@@ -232,7 +234,8 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
+   // Case 1: Antigravity toolCall envelope
+   if (rawEnvelope.toolCall) {
+     const name = String(rawEnvelope.toolCall.name ?? "");
+-    const args = rawEnvelope.toolCall.args ?? {};
++    // M1: the measured invoke_subagent args may arrive JSON-string-encoded (Model as the string "flash" with its quotes).
++    const args = name === "invoke_subagent" ? decodeNativeInvokeArgs(rawEnvelope.toolCall.args ?? {}) : (rawEnvelope.toolCall.args ?? {});
+     if (name === "run_command") {
+       const command = String(args.CommandLine ?? args.command ?? "");
+       return {
+@@ -406,13 +409,6 @@ export function foreignAntigravityExportReason({ input, command, projectRoot, to
+   return `AGY-EXPORT-FOREIGN-CONVERSATION: an Antigravity transcript export may name only this conversation; pass --session-id ${host.conversationId} and --exclude-session ${host.conversationId}.`;
+ }
+ 
+-function isNativeImplementationSubagent(entry) {
+-  const type = typeof entry?.TypeName === "string" && entry.TypeName.startsWith("pipeline-core:")
+-    ? entry.TypeName.slice("pipeline-core:".length)
+-    : entry?.TypeName;
+-  return type === "goldfish-implementor" || type === "goldfish-mechanic";
+-}
+-
+ // PO decision D87 (kept) and D96 (2026-10-22: reading outside the repository is allowed except for credentials): the
+ // credential-root decision is NOT restated here, and neither is any outside-the-project rule. It is the one the Claude native
+ // Read lane and the shell-read grammar already use -- readToolScopeVerdict (lib/guard/read-scope.mjs)
+@@ -584,21 +580,20 @@ export async function runAntigravityPreToolGuard(rawInput) {
+   if (input?.toolCall?.name === "invoke_subagent" && normalized.nativeShapeError) {
+     deny(`BLOCKED (Antigravity dispatch preflight): ${normalized.nativeShapeError}: use only the declared TypeName/Role/Prompt/Model/Workspace flat fields or the Subagents batch field.`);
+   }
++  // G20-8 B: a hook call from a native CHILD is bound to its parent through the descriptor the host wrote and its resolved model is
++  // checked (lib/agy-native-goldfish.mjs); every other check below still governs the child's call unchanged (M2/M7/M9).
++  const nativeChild = evaluateNativeChildCall(input);
++  if (!nativeChild.ok) deny(`BLOCKED (Antigravity native child): ${nativeChild.reason}`);
++  // The host owns its brain and config directories; an agent write there would forge a child's identity or message.
++  const brainRefusal = ["Edit", "Write", "Bash"].includes(normalized.toolName)
++    ? nativeBrainWriteRefusal({ filePath: normalized.filePath, command: normalized.command }) : null;
++  if (brainRefusal !== null) deny(`BLOCKED (Antigravity native child): ${brainRefusal}`);
+   if (input?.toolCall?.name === "invoke_subagent"
+-    && normalized.nativeSubagents?.some(isNativeImplementationSubagent)) {
+-    // Deny by default. A native implementation call is admitted only under a stored, valid session consent whose SIGNED scope grants the
+-    // native route and the Model aliases (lib/agy-native-implementation-admission.mjs). The hook payload's session id is the one
+-    // unmeasured assumption; nothing is written.
+-    let admissionRoot = null;
+-    try {
+-      const rawRoot = Array.isArray(input?.workspacePaths) && input.workspacePaths.length > 0 ? input.workspacePaths[0]
+-        : (typeof input?.cwd === "string" && input.cwd.trim() !== "" ? input.cwd : process.cwd());
+-      admissionRoot = realpathSync(resolve(rawRoot));
+-    } catch { admissionRoot = null; }
+-    const admission = evaluateNativeImplementationAdmission({
+-      root: admissionRoot, hookSessionId: nativeHookSessionId(input, {}), subagents: normalized.nativeSubagents,
+-    });
+-    if (!admission.ok) deny(`BLOCKED (Antigravity dispatch preflight): AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE: native invoke_subagent cannot prove the required live session and consent binding for goldfish-implementor or goldfish-mechanic, so it is not a route for implementation. The one sanctioned entry is scripts/elephant-implementation-dispatch.mjs (argv: dispatch --root <repo> --request <role-dispatch-request.json under the repo> --result-path <new relative file> --session-id <id> --descriptor-sha256 <sha256>), which is documented as the Codex-to-Antigravity route; launched from an Antigravity-hosted Elephant it has not been shown to return (the first greenfield run lost about 22 minutes to a child that never answered). Make at most ONE attempt, do not retry a launched job, and if it does not return authored-commit-recorded stop and ask the PO how implementation is to be dispatched. Do not write the implementation yourself unless the PO decides so. Read-only roles (critic, readiness-reviewer, plan-verifier, consult-advisor) are the native route: references/antigravity-native-dispatch.md. Native admission check: ${admission.code}: ${admission.reason}. A native implementation call is admitted only under a stored session consent whose signed scope carries a nativeImplementation grant (schema ${NATIVE_IMPLEMENTATION_SCOPE_SCHEMA}) for the role and the Model alias; the hook payload's session id is the one assumption that has not been measured on a real Antigravity host.`);
++    && normalized.nativeSubagents?.some((entry) => isNativeCodeWriterType(entry?.TypeName))) {
++    // A native Goldfish is admitted like a Claude Agent call: guard-dispatch judges the generated briefing, the selected model and the
++    // write-capable carrier below, with NO per-dispatch PO consent. What is left here is the shared-tree rule while M4b is unmeasured.
++    const parentCall = evaluateNativeGoldfishParentCall(input, normalized.nativeSubagents);
++    if (!parentCall.ok) deny(`BLOCKED (Antigravity dispatch preflight): ${parentCall.reason}`);
+   }
+ 
+   // --- Antigravity Hardening Layer: Enforced Read-Only Critic ---
+@@ -910,7 +905,8 @@ export async function runAntigravityPreToolGuard(rawInput) {
+   // keeps its more useful diagnosis; a structurally valid but unprepared launch fails here.
+   const nativeContainsPipelineRole = input?.toolCall?.name === "invoke_subagent"
+     && Array.isArray(normalized.nativeSubagents)
+-    && normalized.nativeSubagents.some((entry) => isShippedPipelineAgentType(entry?.TypeName));
++    // A code-writing Goldfish is admitted by the generated-briefing route above (guard-dispatch), not by a prepared one-shot artifact.
++    && normalized.nativeSubagents.some((entry) => isShippedPipelineAgentType(entry?.TypeName) && !isNativeCodeWriterType(entry?.TypeName));
+   if (denials.length === 0 && nativeContainsPipelineRole) {
+     const nativeVerdict = verifyAntigravityNativeDispatch({
+       root: projectRoot,
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index feb01298c21db03422dd7c0b898d1d7afbab91a5..8744e75236e02b498861141fd74049523dc6d065 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -886,14 +886,13 @@ check("Antigravity native implementation dispatch is refused even when candidate
+   }];
+   prepareNative(root, nativeSubagents);
+   const res = decision(run({ tool_use_id: "agy-native-implementation-refused", toolCall: { name: "invoke_subagent", args: { model: AGY_TOOL_LAYER_MODEL, Subagents: nativeSubagents } } }, root));
++  // QG-04 restatement in place (candidate 20, G20-8 B, AC-108): this case pinned the consent refusal AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE.
++  // Under the measured native route (lib/agy-native-goldfish.mjs) a goldfish call needs no consent: it is judged by the same guard-dispatch admission
++  // as a Claude Agent call. This fixture's prompt is a hand-written template, not a generated briefing, so the call is STILL refused, now by that
++  // admission, and the refusal must not name a missing consent, the Codex-to-Antigravity route or "ask the PO how implementation is to be dispatched".
+   assert.equal(res.decision, "deny");
+-  assert.match(res.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/);
+-  // 17: the refusal is honest about the route it names (Codex-to-Antigravity, unproven from an AGY-hosted Elephant) and tells the Elephant to stop and ask.
+-  assert.match(res.reason, /elephant-implementation-dispatch\.mjs \(argv: dispatch --root/u);
+-  assert.match(res.reason, /Codex-to-Antigravity route/u);
+-  assert.match(res.reason, /at most ONE attempt/u);
+-  assert.match(res.reason, /ask the PO/u);
+-  assert.match(res.reason, /Read-only roles \(critic, readiness-reviewer, plan-verifier, consult-advisor\)/u);
++  assert.doesNotMatch(res.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE|nativeImplementation|Codex-to-Antigravity route/u);
++  assert.match(res.reason, /BLOCKED/u);
+   rmSync(root, { recursive: true, force: true });
+ });
+ 
+@@ -918,16 +917,15 @@ check("Antigravity native implementation dispatch names the admission check: no
+   }];
+   prepareNative(root, nativeSubagents);
+   const call = { name: "invoke_subagent", args: { model: AGY_TOOL_LAYER_MODEL, Subagents: nativeSubagents } };
++  // QG-04 restatement in place (candidate 20, G20-8 B, AC-108): the session-identity and stored-consent causes (AGY-NATIVE-SESSION-UNIDENTIFIED,
++  // -SESSION-UNKNOWN) belong to the consent route this call no longer takes; whether the hook names a session or the session is known no longer changes
++  // the verdict. Both calls are refused by the generated-briefing admission (hand-written prompt), and neither refusal may name the consent route.
+   const noSession = decision(run({ tool_use_id: "agy-native-impl-nosession", toolCall: call }, root));
+   assert.equal(noSession.decision, "deny");
+-  assert.match(noSession.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/u);
+-  assert.match(noSession.reason, /Native admission check: AGY-NATIVE-SESSION-UNIDENTIFIED/u);
+-  assert.match(noSession.reason, /pipeline\.agy-native-implementation-scope\.v1/u);
+-  assert.match(noSession.reason, /not been measured on a real Antigravity host/u);
++  assert.doesNotMatch(noSession.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE|Native admission check|pipeline\.agy-native-implementation-scope\.v1/u);
+   const unknown = decision(run({ tool_use_id: "agy-native-impl-unknown", session_id: "fixture-session-1", toolCall: call }, root));
+   assert.equal(unknown.decision, "deny");
+-  assert.match(unknown.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/u);
+-  assert.match(unknown.reason, /Native admission check: AGY-NATIVE-SESSION-UNKNOWN/u);
++  assert.doesNotMatch(unknown.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE|Native admission check/u);
+   rmSync(root, { recursive: true, force: true });
+ });
+ 
+@@ -1796,13 +1794,17 @@ check("Antigravity pretool guard clears stale handoffs on every shell call it ad
+ 
+ check("Antigravity start hint never creates .git before Git initialization", () => {
+   const root = uninitializedTempRoot();
++  // C20 G20-33: the optional hint is delivered once per session through a marker in the machine plane (<home>/.agent-pipeline/run).
++  // Each run gets its own home, so a marker left by an earlier run for the fixed session id "fresh" cannot suppress the hint, and the
++  // test never writes into the real home. The assertions are unchanged.
++  const home = uninitializedTempRoot();
+   try {
+     const input = JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: "fresh" });
+-    const result = spawnSync(process.execPath, [startHint], { cwd: root, input, encoding: "utf8", timeout: 8_000 });
++    const result = spawnSync(process.execPath, [startHint], { cwd: root, input, encoding: "utf8", timeout: 8_000, env: { ...process.env, HOME: home, USERPROFILE: home } });
+     assert.equal(result.status, 0, result.stderr);
+     assert.equal(existsSync(join(root, ".git")), false, "the pre-init hint must not manufacture a Git control directory");
+     assert.match(result.stdout, /Agent Pipeline is available as an optional project workflow/u);
+-  } finally { rmSync(root, { recursive: true, force: true }); }
++  } finally { rmSync(root, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }); }
+ });
+ 
+ // 5. Broadened inline-execution containment (D6)
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 3c2e1bb669e8f18be76134200a786d30ef2a034c..a310a1c2bdf2ff3021533341fa3f03c8cd167cf5 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -977,7 +977,7 @@ if (isDirectInvocation(import.meta.url)) {
+     }
+     itemGovernanceRequired=governed.status==='required';
+     const unsupported = governed.status === "required" && productive.some(({ dispatch }) =>
+-      !["direct", "codex"].includes(dispatch.transport)
++      !["direct", "codex", "antigravity"].includes(dispatch.transport)
+       || !parseNativeGoldfishBriefing(dispatch.prompt).ok);
+     if (governed.status === "refused" || unsupported) {
+       // PF-47: a queue-preparation refusal carries its own reason (and, where one exists, an exact repair);
+diff --git a/plugins/pipeline-core/lib/agy-native-goldfish.mjs b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..32aa212071463dee6a97d859007a20e543750889
+--- /dev/null
++++ b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+@@ -0,0 +1,164 @@
++// SPDX-License-Identifier: SUL-1.0
++// Native Antigravity Goldfish dispatch (candidate 20, G20-8 B): an Antigravity-hosted Elephant dispatches goldfish-implementor,
++// goldfish-mechanic and goldfish-deep through the host's own `invoke_subagent`, admitted like a Claude Agent call (generated briefing,
++// selected model, write-capable carrier -- all judged by hooks/guard-dispatch.mjs) with NO per-dispatch PO consent. What the Claude route
++// gets from the runner, this module gets from what the host WRITES (specs/sprint-alfred-epic/evidence/held-patches/
++// w252-agy-native-subagent-measurement.md; every fact below is measured there):
++//
++//   * the hook payload has exactly eight keys, a child has its own conversationId and NO parent field;
++//   * the host writes <brain root>/<parentId>/.system_generated/subagents/<childId>.json = { conversationId, subagentDescriptor {typeName,
++//     role}, state, spawnStepIndex, workspaceUris }; the brain root is the parent directory of the payload's artifactDirectoryPath. A child
++//     is BOUND when exactly one parent directory holds a descriptor named after its id;
++//   * the alias (Model) is only in the parent's call; every child call carries the RESOLVED modelName, and flash and pro resolved to the
++//     SAME model on the measured host, so the child's modelName is compared with the model the dispatch selection resolved for its role
++//     (the registry's Antigravity cell for that duty), never with the alias;
++//   * invoke_subagent args are FLAT (TypeName, Role, Prompt, Model, Workspace) and may be JSON-string-encoded ("\"flash\"").
++//
++// NOT measured, so not assumed (see the M-items of the w255 notes): Workspace branch/share in a git workspace, the descriptor state a
++// finished child carries, the exact spelling of modelName. Code-writing children therefore run serialized through the shared tree: one
++// alive at a time, Workspace absent or inherit. That rule is the ONE switch AGY_NATIVE_SERIALIZE_CODE_WRITERS; flipping it lifts the
++// workspace, one-per-call and one-alive refusals together once M4b has been measured.
++
++import { existsSync, readdirSync, readFileSync } from "node:fs";
++import { basename, dirname, join } from "node:path";
++
++import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
++
++export const AGY_NATIVE_SERIALIZE_CODE_WRITERS = true;
++export const AGY_NATIVE_ALIVE_STATE = "SUBAGENT_STATE_ALIVE";
++const DUTY_OF = Object.freeze({ "goldfish-implementor": "implement", "goldfish-mechanic": "mechanic", "goldfish-deep": "deep" });
++const SAFE_ID = /^[A-Za-z0-9._-]{1,128}$/u;
++const PROTECTED_HOST_PATH = [
++  /[\\/]\.gemini[\\/]antigravity-cli(?:[\\/]|$)/iu,
++  /[\\/]\.gemini[\\/]config(?:[\\/]|$)/iu,
++  /[\\/]\.system_generated(?:[\\/]|$)/u,
++];
++
++export const bareNativeType = (value) => (typeof value === "string" && value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value);
++export const isNativeCodeWriterType = (value) => Object.hasOwn(DUTY_OF, bareNativeType(value) ?? "");
++const normalizeModel = (value) => String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9.]+/gu, "-").replace(/^-+|-+$/gu, "");
++
++/** One level of JSON string encoding, as the greenfield transcript shows it (Model as the string `"flash"` with its quotes). */
++export function decodeNativeInvokeArgs(args) {
++  if (args === null || typeof args !== "object" || Array.isArray(args)) return args;
++  const decoded = {};
++  for (const [key, value] of Object.entries(args)) {
++    let next = value;
++    if (typeof value === "string" && value.length >= 2 && value.startsWith("\"")) {
++      try { const parsed = JSON.parse(value); if (typeof parsed === "string") next = parsed; } catch { /* keep the raw string */ }
++    }
++    decoded[key] = next;
++  }
++  return decoded;
++}
++
++function brainContext(input) {
++  const conversationId = input?.conversationId;
++  const artifact = input?.artifactDirectoryPath;
++  if (typeof conversationId !== "string" || !SAFE_ID.test(conversationId) || typeof artifact !== "string" || artifact.trim() === "") return null;
++  return { conversationId, brainRoot: dirname(artifact) };
++}
++
++const subagentDirectory = (brainRoot, parentId) => join(brainRoot, parentId, ".system_generated", "subagents");
++
++function readDescriptor(path, childId) {
++  try {
++    const record = JSON.parse(readFileSync(path, "utf8"));
++    const typeName = record?.subagentDescriptor?.typeName;
++    if (record?.conversationId !== childId || typeof typeName !== "string" || typeName === "") return null;
++    return { typeName: bareNativeType(typeName), role: record.subagentDescriptor.role, state: record.state, spawnStepIndex: record.spawnStepIndex };
++  } catch { return null; }
++}
++
++/** Resolve a hook payload to "a child of session P of type T" from the descriptor the host wrote, or say it is not a child. */
++export function bindNativeChild(input) {
++  const context = brainContext(input);
++  if (context === null) return { status: "not-a-child" };
++  let parents;
++  try { parents = readdirSync(context.brainRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory() && SAFE_ID.test(entry.name)); }
++  catch { return { status: "not-a-child" }; }
++  const matches = [];
++  for (const parent of parents) {
++    const path = join(subagentDirectory(context.brainRoot, parent.name), `${context.conversationId}.json`);
++    if (existsSync(path)) matches.push({ parentConversationId: parent.name, path });
++  }
++  if (matches.length === 0) return { status: "not-a-child" };
++  if (matches.length > 1) return { status: "ambiguous", parents: matches.map((match) => match.parentConversationId) };
++  const descriptor = readDescriptor(matches[0].path, context.conversationId);
++  if (descriptor === null) return { status: "invalid", parentConversationId: matches[0].parentConversationId };
++  return { status: "child", childConversationId: context.conversationId, parentConversationId: matches[0].parentConversationId, ...descriptor };
++}
++
++/** The model the dispatch selection resolved for a role: the registry's Antigravity cell for its duty. Null = no opinion (route source unreadable). */
++export function expectedNativeModel(type, routeSource = registeredFunctionalTaskRoutes()) {
++  const duty = DUTY_OF[bareNativeType(type)];
++  if (!duty || !routeSource?.ok || !Array.isArray(routeSource.taskRoutes)) return null;
++  const route = routeSource.taskRoutes.find((entry) => entry.runner === "antigravity" && entry.taskRoute === `duty.${duty}`);
++  const value = route?.selector?.value ?? route?.cell?.selector?.value;
++  return typeof value === "string" && value !== "" ? { duty, value } : null;
++}
++
++const deny = (code, reason) => ({ ok: false, code, reason: `${code}: ${reason}` });
++
++/** A hook call from a native child: attribute it to its parent and check the model it actually resolved to (goldfish roles only). */
++export function evaluateNativeChildCall(input, { routeSource } = {}) {
++  const bound = bindNativeChild(input);
++  if (bound.status === "not-a-child") return { ok: true, attributed: null };
++  if (bound.status === "ambiguous") {
++    return deny("AGY-NATIVE-CHILD-BINDING-AMBIGUOUS", `more than one session directory (${bound.parents.join(", ")}) holds a descriptor for this conversation, so it cannot be bound to one parent. Repair: stop this child with manage_subagents (kill) and dispatch it again from the parent.`);
++  }
++  if (bound.status === "invalid") {
++    return deny("AGY-NATIVE-CHILD-DESCRIPTOR-INVALID", `the host descriptor for this conversation under parent ${bound.parentConversationId} is unreadable or names another conversation. Repair: stop this child with manage_subagents (kill) and dispatch it again from the parent.`);
++  }
++  const attributed = {
++    parentConversationId: bound.parentConversationId, childConversationId: bound.childConversationId,
++    typeName: bound.typeName, role: bound.role, spawnStepIndex: bound.spawnStepIndex,
++  };
++  if (!isNativeCodeWriterType(bound.typeName)) return { ok: true, attributed };
++  const expected = expectedNativeModel(bound.typeName, routeSource);
++  if (expected === null) return { ok: true, attributed, modelCheck: "no-opinion" };
++  if (normalizeModel(input?.modelName) !== normalizeModel(expected.value)) {
++    return deny("AGY-NATIVE-CHILD-MODEL-MISMATCH", `child ${bound.typeName} (parent ${bound.parentConversationId}) resolved to model ${JSON.stringify(input?.modelName ?? null)}, but the dispatch selection for it (duty.${expected.duty}, Antigravity cell) is ${JSON.stringify(expected.value)}. The host maps the aliases flash and pro to models of its own and they may be the same model, so the alias in the parent call does not select the model. Repair: stop this child with manage_subagents (kill) and dispatch it again with a Model alias that resolves to ${JSON.stringify(expected.value)}; if no alias does on this host, stop and report that to the PO (the PO can set the registry's Antigravity cell for duty.${expected.duty} in config/runner-profiles-v3.json to the model the host really resolves). Do not implement in the parent session instead.`);
++  }
++  return { ok: true, attributed };
++}
++
++/** The parent's invoke_subagent call that names a code-writing Goldfish: shared-tree serialization while M4b is unmeasured. */
++export function evaluateNativeGoldfishParentCall(input, nativeSubagents) {
++  const entries = Array.isArray(nativeSubagents) ? nativeSubagents : [];
++  const writers = entries.filter((entry) => isNativeCodeWriterType(entry?.TypeName));
++  if (writers.length === 0) return { ok: true, codeWriter: false };
++  if (!AGY_NATIVE_SERIALIZE_CODE_WRITERS) return { ok: true, codeWriter: true };
++  if (writers.length > 1 || entries.length > 1) {
++    return deny("AGY-NATIVE-CODE-WRITER-ONE-PER-CALL", "a code-writing Goldfish shares the working tree, so it is dispatched alone in its own invoke_subagent call. Repair: issue one call per code-writing child, the next one only after the previous child's completion message has arrived.");
++  }
++  const [writer] = writers;
++  if (writer.Workspace !== undefined && writer.Workspace !== "inherit") {
++    return deny("AGY-NATIVE-WORKSPACE-UNMEASURED", `Workspace ${JSON.stringify(writer.Workspace)} for a code-writing child is not measured in a git workspace (follow-up M4b), so it is not admitted. Repair: omit Workspace or pass "inherit" (the child writes the shared tree, one at a time).`);
++  }
++  const context = brainContext(input);
++  if (context === null) {
++    return deny("AGY-NATIVE-PARENT-UNIDENTIFIED", "the hook payload names no conversationId or artifactDirectoryPath, so the live children of this session cannot be counted. Repair: this is not the measured Antigravity hook payload; dispatch from a current Antigravity session.");
++  }
++  let files = [];
++  try { files = readdirSync(subagentDirectory(context.brainRoot, context.conversationId)).filter((name) => name.endsWith(".json")); } catch { files = []; }
++  for (const name of files) {
++    const childId = basename(name, ".json");
++    const descriptor = readDescriptor(join(subagentDirectory(context.brainRoot, context.conversationId), name), childId);
++    if (descriptor !== null && descriptor.state === AGY_NATIVE_ALIVE_STATE && isNativeCodeWriterType(descriptor.typeName)) {
++      return deny("AGY-NATIVE-CODE-WRITER-ALIVE", `code-writing child ${descriptor.typeName} (${childId}) is still alive in this session and shares the working tree. Repair: wait for the first child's message (it arrives in this same turn, at the next model invocation), then dispatch the next one; read-only roles may run beside it.`);
++    }
++  }
++  return { ok: true, codeWriter: true, parentConversationId: context.conversationId };
++}
++
++/** The host owns its brain and config directories; an agent write there would forge a child's identity or message. */
++export function nativeBrainWriteRefusal({ filePath, command } = {}) {
++  const refusal = `AGY-NATIVE-BRAIN-WRITE: the Antigravity brain and config directories are written by the host only (subagent descriptors, messages, credentials); a file written there would forge a child's identity or a completion message. Repair: write inside the project workspace (scratch/ for temporary files); to stop a child use manage_subagents.`;
++  if (typeof filePath === "string" && PROTECTED_HOST_PATH.some((pattern) => pattern.test(filePath))) return refusal;
++  if (typeof command === "string" && PROTECTED_HOST_PATH.some((pattern) => pattern.test(command))) {
++    const readOnly = /^\s*(?:cat|ls|rg|grep|head|tail|wc|stat|file|find|pwd)\b/u.test(command) && !/>|\btee\b|-delete\b|-exec\b/u.test(command);
++    if (!readOnly) return refusal;
++  }
++  return null;
++}
+diff --git a/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs b/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
+index df7e011e04b7bcffae4dad5134166d32701df794..27471be252a9cb3120fb32d375a7ebb9b920afbc 100644
+--- a/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
++++ b/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
+@@ -204,11 +204,17 @@ test("17: the AGY dispatch reference names the route per role, the implementatio
+   assert.match(text, /## Which route a role takes on Antigravity/u);
+   assert.match(text, /`critic`, `readiness-reviewer`, `plan-verifier`, `consult-advisor` \(read-only\)/u);
+   assert.match(text, /A runner-native type such as `research` is not a Pipeline role and is refused \(`DISPATCH-WRITE-CARRIER-REQUIRED`\)/u);
+-  assert.match(text, /`goldfish-mechanic`, `goldfish-deep` \| not available/u);
++  // QG-04 restatement in place (candidate 20, G20-8 B, AC-108): the measured host (w252 notes, M5/M6/M1) contradicts the two statements this
++  // case pinned. (1) goldfish-mechanic and goldfish-deep are no longer "not available": all three Goldfish roles take the native route.
++  // (2) "end the parent turn" was an unmeasured safe form; the completion message arrives in the SAME parent turn. The legacy
++  // Codex-to-Antigravity route text it pinned stays asserted unchanged.
++  assert.match(text, /`goldfish-implementor`, `goldfish-mechanic`, `goldfish-deep` \| native `invoke_subagent`/u);
++  assert.doesNotMatch(text, /`goldfish-mechanic`, `goldfish-deep` \| not available/u);
+   assert.match(text, /elephant-implementation-dispatch\.mjs dispatch --root <repository-root> --request/u);
+   assert.match(text, /documented as the Codex-to-Antigravity route/u);
+   assert.match(text, /Make at most one attempt and never retry a launched job/u);
+-  assert.match(text, /end the parent turn without further tool calls/u);
++  assert.match(text, /completion message is delivered in the SAME parent turn/u);
++  assert.doesNotMatch(text, /end the parent turn without further tool calls/u);
+   assert.doesNotMatch(text, /do not start another `agy` process/u, "the old sentence contradicted the implementation route");
+ });
+ 
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..dbe3d2cd758b3d5a5b42ba9c0d132262481b4457
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+@@ -0,0 +1,201 @@
++// SPDX-License-Identifier: SUL-1.0
++// Pin: pipeline.antigravity-native-goldfish-dispatch (AC-108, candidate 20 finding G20-8 B and G20-22).
++// An Antigravity-hosted Elephant dispatches goldfish-implementor / -mechanic / -deep through the host's native `invoke_subagent` like a
++// Claude Elephant does through the Agent tool: no per-dispatch PO consent, the child's hook calls bound to the parent through the
++// host-written descriptor, the child's RESOLVED model checked, one code-writing child alive at a time.
++//
++// Every payload below replays the shape MEASURED on a real Antigravity host (specs/sprint-alfred-epic/evidence/held-patches/
++// w252-agy-native-subagent-measurement.md): flat invoke_subagent args (no Subagents array), args that may be JSON-string-encoded, the
++// eight-key hook payload, no parent field, and the descriptor <brain>/<parentId>/.system_generated/subagents/<childId>.json.
++// No model is called and no agy process is started.
++//
++// Before the change: the guard refused every native goldfish call without a signed consent (AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE),
++// had no module reading the descriptor, no resolved-model check and no code-writer serialization, and did not decode a quoted Model.
++import assert from "node:assert/strict";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import { test } from "node:test";
++import { fileURLToPath } from "node:url";
++import { spawnSync } from "node:child_process";
++
++import { normalizeAntigravityToolInput } from "../../hooks/antigravity-pretool-guard.mjs";
++import { registeredFunctionalTaskRoutes } from "../model-role-route-source.mjs";
++
++const libDir = dirname(dirname(fileURLToPath(import.meta.url)));
++const adapter = join(libDir, "..", "hooks", "antigravity-pretool-guard.mjs");
++const loadModule = () => import("../agy-native-goldfish.mjs");
++
++const PARENT = "11111111-aaaa-4aaa-8aaa-000000000001";
++const CHILD = "22222222-bbbb-4bbb-8bbb-000000000002";
++const OTHER_CHILD = "33333333-cccc-4ccc-8ccc-000000000003";
++
++function brainFixture() {
++  const base = mkdtempSync(join(tmpdir(), "agy-native-goldfish-"));
++  const brain = join(base, "brain");
++  const workspace = join(base, "workspace");
++  mkdirSync(join(brain, PARENT, ".system_generated", "subagents"), { recursive: true });
++  mkdirSync(join(brain, CHILD), { recursive: true });
++  mkdirSync(join(workspace, ".agent-pipeline"), { recursive: true });
++  mkdirSync(join(workspace, ".claude"), { recursive: true });
++  writeFileSync(join(workspace, ".claude", "pipeline.json"), JSON.stringify({ project: "test", verify: "node verify.mjs" }));
++  writeFileSync(join(workspace, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
++    schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-10-02T00:00:00.000Z",
++  }));
++  return { base, brain, workspace };
++}
++
++function descriptor(fx, childId, typeName, state = "SUBAGENT_STATE_ALIVE", parent = PARENT) {
++  mkdirSync(join(fx.brain, parent, ".system_generated", "subagents"), { recursive: true });
++  writeFileSync(join(fx.brain, parent, ".system_generated", "subagents", `${childId}.json`), JSON.stringify({
++    conversationId: childId,
++    subagentDescriptor: { typeName, role: "Goldfish" },
++    state,
++    spawnStepIndex: 7,
++    workspaceUris: [`file://${fx.workspace}`],
++  }));
++}
++
++// The eight measured keys and nothing else.
++function payload(fx, { conversationId, toolCall, modelName = "parent-model", lastUserInput = "do it" }) {
++  return {
++    artifactDirectoryPath: join(fx.brain, conversationId),
++    conversationId,
++    lastUserInput,
++    modelName,
++    stepIdx: 12,
++    toolCall,
++    transcriptPath: join(fx.brain, conversationId, "transcript.jsonl"),
++    workspacePaths: [fx.workspace],
++  };
++}
++
++// Flat args; Model is the JSON-STRING-encoded value the greenfield transcript shows ("flash" with its quotes).
++const flatCall = (TypeName, extra = {}) => ({
++  name: "invoke_subagent",
++  args: { TypeName, Role: "Goldfish", Prompt: "briefing text", Model: JSON.stringify("flash"), ...extra },
++});
++
++const selectedModel = (duty) => {
++  const routes = registeredFunctionalTaskRoutes();
++  const route = routes.taskRoutes.find((entry) => entry.runner === "antigravity" && entry.taskRoute === `duty.${duty}`);
++  return route.selector?.value ?? route.cell.selector.value;
++};
++
++function runAdapter(fx, input) {
++  return spawnSync(process.execPath, [adapter], {
++    cwd: fx.workspace,
++    env: { ...process.env, CLAUDE_PROJECT_DIR: fx.workspace },
++    encoding: "utf8",
++    input: JSON.stringify(input),
++    timeout: 20_000,
++  });
++}
++
++test("a flat invoke_subagent call with a quoted Model is read as the alias and the goldfish call needs no consent", async () => {
++  const fx = brainFixture();
++  try {
++    const normalized = normalizeAntigravityToolInput({ toolCall: flatCall("pipeline-core:goldfish-implementor") });
++    assert.equal(normalized.nativeCallShape, "flat");
++    assert.equal(normalized.nativeSubagents[0].Model, "flash", "one level of JSON string encoding is decoded");
++    const { evaluateNativeGoldfishParentCall } = await loadModule();
++    const verdict = evaluateNativeGoldfishParentCall(
++      payload(fx, { conversationId: PARENT, toolCall: flatCall("pipeline-core:goldfish-implementor") }), normalized.nativeSubagents);
++    assert.equal(verdict.ok, true, JSON.stringify(verdict));
++    // The adapter must no longer name a missing signed consent as the cause of a refusal.
++    const res = runAdapter(fx, payload(fx, { conversationId: PARENT, toolCall: flatCall("pipeline-core:goldfish-implementor") }));
++    assert.doesNotMatch(`${res.stdout}${res.stderr}`, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE|AGY-NATIVE-SCOPE-NOT-GRANTED/u);
++  } finally { rmSync(fx.base, { recursive: true, force: true }); }
++});
++
++test("a child hook call is bound to its parent through the host-written descriptor and attributed with the same TypeName", async () => {
++  const fx = brainFixture();
++  try {
++    descriptor(fx, CHILD, "goldfish-implementor");
++    const { bindNativeChild, evaluateNativeChildCall } = await loadModule();
++    const childInput = payload(fx, {
++      conversationId: CHILD, lastUserInput: "", modelName: selectedModel("implement"),
++      toolCall: { name: "view_file", args: { Path: join(fx.workspace, "x.txt") } },
++    });
++    const bound = bindNativeChild(childInput);
++    assert.equal(bound.status, "child");
++    assert.equal(bound.parentConversationId, PARENT);
++    assert.equal(bound.typeName, "goldfish-implementor");
++    assert.equal(bound.typeName, flatCall("goldfish-implementor").args.TypeName);
++    const verdict = evaluateNativeChildCall(childInput);
++    assert.equal(verdict.ok, true, JSON.stringify(verdict));
++    assert.equal(verdict.attributed.parentConversationId, PARENT);
++    // The parent session itself is not a child, and a session no parent names is not one either.
++    assert.equal(bindNativeChild(payload(fx, { conversationId: PARENT, toolCall: { name: "view_file", args: {} } })).status, "not-a-child");
++    // Two parents naming one child is ambiguous and refused, never guessed.
++    mkdirSync(join(fx.brain, "44444444-dddd-4ddd-8ddd-000000000004"), { recursive: true });
++    descriptor(fx, CHILD, "goldfish-implementor", "SUBAGENT_STATE_ALIVE", "44444444-dddd-4ddd-8ddd-000000000004");
++    assert.equal(bindNativeChild(childInput).status, "ambiguous");
++    assert.equal(evaluateNativeChildCall(childInput).ok, false);
++  } finally { rmSync(fx.base, { recursive: true, force: true }); }
++});
++
++test("a child whose resolved modelName differs from the selected model is refused with a typed code that names the repair", async () => {
++  const fx = brainFixture();
++  try {
++    descriptor(fx, CHILD, "goldfish-implementor");
++    const { evaluateNativeChildCall } = await loadModule();
++    const childCall = { name: "view_file", args: { Path: join(fx.workspace, "x.txt") } };
++    const wrong = payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: "some-other-model", toolCall: childCall });
++    const verdict = evaluateNativeChildCall(wrong);
++    assert.equal(verdict.ok, false);
++    assert.equal(verdict.code, "AGY-NATIVE-CHILD-MODEL-MISMATCH");
++    assert.ok(verdict.reason.includes("some-other-model") && verdict.reason.includes(selectedModel("implement")), verdict.reason);
++    assert.match(verdict.reason, /repair/iu);
++    // The adapter denies the child's call, verbatim and typed.
++    const res = runAdapter(fx, wrong);
++    assert.equal(res.status, 2, `${res.stdout}${res.stderr}`);
++    assert.match(res.stdout, /AGY-NATIVE-CHILD-MODEL-MISMATCH/u);
++    const right = payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: selectedModel("implement"), toolCall: childCall });
++    assert.equal(evaluateNativeChildCall(right).ok, true);
++  } finally { rmSync(fx.base, { recursive: true, force: true }); }
++});
++
++test("a second code-writing child while one is alive is refused with the serialize repair; read-only roles and finished children do not block", async () => {
++  const fx = brainFixture();
++  try {
++    const { evaluateNativeGoldfishParentCall } = await loadModule();
++    const parentCall = (TypeName, extra) => ({ conversationId: PARENT, toolCall: flatCall(TypeName, extra) });
++    const entry = (TypeName, extra = {}) => ({ TypeName, Role: "Goldfish", Prompt: "p", Model: "flash", ...extra });
++    descriptor(fx, CHILD, "goldfish-implementor");
++    const second = evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")), [entry("goldfish-mechanic")]);
++    assert.equal(second.ok, false);
++    assert.equal(second.code, "AGY-NATIVE-CODE-WRITER-ALIVE");
++    assert.match(second.reason, /wait for the first child's (completion )?message/u);
++    // A read-only role may run beside it.
++    assert.equal(evaluateNativeGoldfishParentCall(payload(fx, parentCall("critic")), [entry("critic", { Model: "pro" })]).ok, true);
++    // A finished child no longer counts.
++    descriptor(fx, CHILD, "goldfish-implementor", "SUBAGENT_STATE_COMPLETED");
++    assert.equal(evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")), [entry("goldfish-mechanic")]).ok, true);
++    // Two code writers in one call, and an isolation request that is not measured, are refused too.
++    assert.equal(evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")),
++      [entry("goldfish-mechanic"), entry("goldfish-implementor")]).ok, false);
++    const branch = evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")), [entry("goldfish-mechanic", { Workspace: "branch" })]);
++    assert.equal(branch.ok, false);
++    assert.equal(branch.code, "AGY-NATIVE-WORKSPACE-UNMEASURED");
++    assert.equal(evaluateNativeGoldfishParentCall(payload(fx, parentCall("goldfish-mechanic")), [entry("goldfish-mechanic", { Workspace: "inherit" })]).ok, true);
++  } finally { rmSync(fx.base, { recursive: true, force: true }); }
++});
++
++test("an agent write under the Antigravity brain or config directory is refused", async () => {
++  const fx = brainFixture();
++  try {
++    const { nativeBrainWriteRefusal } = await loadModule();
++    const descriptorPath = join(fx.brain, PARENT, ".system_generated", "subagents", `${OTHER_CHILD}.json`);
++    assert.match(nativeBrainWriteRefusal({ filePath: descriptorPath, command: "" }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u);
++    assert.match(nativeBrainWriteRefusal({ filePath: "/home/u/.gemini/antigravity-cli/brain/x/y.json", command: "" }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u);
++    assert.equal(nativeBrainWriteRefusal({ filePath: join(fx.workspace, "src", "a.mjs"), command: "" }), null);
++    assert.match(nativeBrainWriteRefusal({ filePath: null, command: `echo {} > ${descriptorPath}` }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u);
++    assert.equal(nativeBrainWriteRefusal({ filePath: null, command: `cat ${descriptorPath}` }), null);
++    const res = runAdapter(fx, payload(fx, {
++      conversationId: PARENT, toolCall: { name: "write_to_file", args: { TargetFile: descriptorPath, CodeContent: "{}" } },
++    }));
++    assert.equal(res.status, 2, `${res.stdout}${res.stderr}`);
++    assert.match(res.stdout, /AGY-NATIVE-BRAIN-WRITE/u);
++  } finally { rmSync(fx.base, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+index cdeb9311915f0894d04b3d465dab2ea5ebc6385b..2e6ab0540cb978018513f39d7e7b82d01ae6b39c 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+@@ -11,52 +11,54 @@ the existing Workflow/worktree route.
+ | Role | Route | Notes |
+ |---|---|---|
+ | `critic`, `readiness-reviewer`, `plan-verifier`, `consult-advisor` (read-only) | this reference: prepare, then native `invoke_subagent` | Name the shipped Pipeline role as the `TypeName`. A runner-native type such as `research` is not a Pipeline role and is refused (`DISPATCH-WRITE-CARRIER-REQUIRED`): it carries no read-only guarantee. |
+-| `goldfish-implementor` | native `invoke_subagent` is refused (`AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE`) unless a signed grant admits it (see "Native implementation admission") | Otherwise the one sanctioned entry is `scripts/elephant-implementation-dispatch.mjs` (below). It is documented as the Codex-to-Antigravity route; launched from an Antigravity-hosted Elephant it has not been shown to return. |
+-| `goldfish-mechanic`, `goldfish-deep` | not available | The V3 registry marks both `unavailable` on Antigravity; only the implementor is opt-in. |
+-
+-`dispatch-briefing.mjs` builds the Claude and Codex briefing block. An
+-Antigravity dispatch does not use it (a Gemini model id is refused there with
+-a note saying so); the implementation route reads a
+-`pipeline.role-dispatch-request.v1` packet (`transport: "antigravity"`,
+-`resultDestination: { kind: "return" }`) and takes provider, model, effort and
+-scope from its own V3 route and the stored session consent.
+-
+-### Implementation from an Antigravity-hosted Elephant
+-
+-`dispatch-briefing.mjs build|probe` supports `--runner antigravity` (model id = a native alias `flash_lite`, `flash` or `pro` of the registry route). Deliver the generated briefing as the packet Prompt of the prepare request; the guard does not yet require it.
++| `goldfish-implementor`, `goldfish-mechanic`, `goldfish-deep` | native `invoke_subagent`, admitted like a Claude `Agent` call: no prepare step, no PO consent, no signature (see "Native Goldfish dispatch") | `scripts/elephant-implementation-dispatch.mjs` (below) is the Codex-to-Antigravity route and is no longer the Antigravity-hosted Elephant's way to implement. |
++
++`dispatch-briefing.mjs build|probe --runner antigravity` builds the Goldfish briefing (the model id is a native alias, `flash_lite`, `flash`
++or `pro`, of the registry route; a Gemini model id is refused there). A read-only role is also described by a
++`pipeline.role-dispatch-request.v1` packet (`transport: "antigravity"`, `resultDestination: { kind: "return" }`) for the prepare step
++below; a code-writing Goldfish takes its provider, model and scope from the generated briefing and the registry route alone.
++
++### Native Goldfish dispatch (measured, candidate 20 G20-8 B)
++
++Measured shape of the host tool (`w252-agy-native-subagent-measurement.md`): `invoke_subagent` takes FLAT arguments, `TypeName`, `Role`
++and `Prompt` required, `Model` one of `inherit|flash_lite|flash|pro`, `Workspace` one of `inherit|branch|share`; there is no `Subagents`
++array. In a hook payload the arguments may be JSON-string-encoded (`Model` arrives as the string `"flash"` with its quotes); the guard
++decodes one level. Build the call from the briefing the generator produced (`dispatch-briefing.mjs build --runner antigravity`, a native
++alias as the model id) and set `Model` to the alias the dispatch selection names for the role.
++
++- **Admission** is the one Claude uses: the generated briefing route, the selected model and the write-capable carrier are judged by
++  `guard-dispatch`. There is no per-dispatch PO consent and no signature, and no prepare step for these three roles (the prepared
++  one-shot artifact stays the route of the read-only roles above).
++- **Parent binding.** Every child hook call carries its own `conversationId` and no parent field. The host writes
++  `<brain root>/<parentConversationId>/.system_generated/subagents/<childConversationId>.json`
++  (`{conversationId, subagentDescriptor{typeName, role}, state, spawnStepIndex, workspaceUris}`); the brain root is the parent directory
++  of the payload's `artifactDirectoryPath`. A child is bound when exactly one parent directory holds a descriptor named after it
++  (`lib/agy-native-goldfish.mjs`). The guard refuses agent writes under the Antigravity brain and config directories
++  (`AGY-NATIVE-BRAIN-WRITE`).
++- **Model.** The alias exists only in the parent call; every child call carries the RESOLVED `modelName`, and `flash` and `pro` resolved to the
++  same model on the measured host. The guard compares the child's `modelName` with the model the dispatch selection resolved for its role
++  (the registry's Antigravity cell for that duty), never with the alias, and refuses a mismatch with `AGY-NATIVE-CHILD-MODEL-MISMATCH`
++  naming both values and the repair.
++- **Serialization.** `Workspace` `branch`/`share` in a git workspace is NOT measured (M4b). A code-writing child is therefore dispatched
++  alone in its own call (`AGY-NATIVE-CODE-WRITER-ONE-PER-CALL`), with `Workspace` absent or `inherit` (`AGY-NATIVE-WORKSPACE-UNMEASURED`),
++  and only while no other code-writing child of the session is alive (`AGY-NATIVE-CODE-WRITER-ALIVE`: wait for the first child's
++  message, then dispatch the next). Read-only roles may run in parallel. The rule is the single switch
++  `AGY_NATIVE_SERIALIZE_CODE_WRITERS` in `lib/agy-native-goldfish.mjs`.
++- **Delivery.** The child runs in the background and its completion message arrives in the SAME parent turn, at the next model
++  invocation, as a `<SYSTEM_MESSAGE>`; the parent does not need to end its turn.
++- **Hand-back and commit.** Hooks govern the child unchanged: its writes, shell and commits pass the same PreToolUse guard and a denial
++  reaches it verbatim. Commits use the existing Goldfish host-commit route; if the Antigravity completion does not trigger it, run
++  the agent-run `scripts/goldfish-host-commit-recover.mjs` plan/apply route after the child reported. There is no Antigravity-only commit
++  mechanism and no in-session implementation by the Elephant as a sanctioned route.
++
++### Legacy route (Codex-to-Antigravity)
+ 
+ ```text
+ node <loaded-plugin-root>/scripts/elephant-implementation-dispatch.mjs dispatch --root <repository-root> --request <role-dispatch-request.json under the root> --result-path <new relative output file> --session-id <session id> --descriptor-sha256 <descriptor sha256>
+ ```
+ 
+-Make at most one attempt and never retry a launched job. The receipt carries an
+-`advisory` (`AGY-HOSTED-ELEPHANT-UNPROVEN`) when the caller is an Antigravity
+-session. If the status is anything but `authored-commit-recorded`, stop and ask
+-the PO how implementation is to be dispatched; do not write the implementation
+-yourself unless the PO decides so. The child gets no stdin and is killed after
+-its bounded timeout.
+-
+-### Native implementation admission
+-
+-Deny by default. A native call naming `goldfish-implementor` or `goldfish-mechanic`
+-is admitted only when the hook payload names a session, that session has a live
+-owner and a valid stored v1 session consent, and the consent's SIGNED subject
+-scope carries `nativeImplementation` for the role and the call's `Model` alias.
+-A model-family (v2) consent is refused. The refusal appends `Native admission
+-check: <code>` naming the first failing step (`AGY-NATIVE-SESSION-UNIDENTIFIED`,
+-`-SESSION-UNKNOWN`, the session owner or consent code, `-CONSENT-FAMILY-UNSUPPORTED`,
+-`-SCOPE-NOT-GRANTED`, `AGY-CONSENT-ROLE-MISMATCH`, `-MODEL-NOT-GRANTED`).
+-
+-Consent subject scope example (the consent ceremony takes the subject as an external JSON file):
+-
+-```json
+-{ "scope": { "nativeImplementation": { "schema": "pipeline.agy-native-implementation-scope.v1", "models": ["flash"] } } }
+-```
+-
+-`models` is a non-empty subset of `flash_lite`, `flash`, `pro`; the subject's `roles` must list the implementation role.
+-
+-UNMEASURED ASSUMPTION: that the Antigravity hook payload's session id identifies the PARENT session has not been measured against a real
+-Antigravity run; nothing here claims the admission works in a real run.
++It is documented as the Codex-to-Antigravity route, takes a signed session consent, and is not how an Antigravity-hosted Elephant
++implements. Make at most one attempt and never retry a launched job. The child gets no stdin and is killed after its bounded timeout.
+ 
+ Read-only carriers are named in the `DISPATCH-WRITE-CARRIER-REQUIRED` refusal: `pipeline-core:critic`, `readiness-reviewer`, `plan-verifier`,
+ `consult-advisor`. Prepare the call first with the command below. One example packet (field list: `schema`, `dispatchId`, `transport`, `role`,
+@@ -91,13 +93,11 @@ artifact; the immediate PreTool check consumes it, rechecks those bindings,
+ and rejects replay, expiry, candidate movement, packet staleness, mutation,
+ and partial or reordered mixed arrays.
+ 
+-After a read-only role was dispatched with `invoke_subagent`, end the parent
+-turn without further tool calls. Observed in the first greenfield run: the
+-Critic's message stayed under `.system_generated/messages/undelivered/` and the
+-subagent never ran while the parent kept working in the same turn; the review
+-was then finalized in the main context, which is not an independent review.
+-The runner's delivery rule itself is not verified here, so treat ending the
+-turn as the safe form. Read the result in the next turn, from the files the
++A subagent dispatched with `invoke_subagent` runs in the background and in parallel with its siblings, and its completion message is
++delivered in the SAME parent turn, at the next model invocation, as a `<SYSTEM_MESSAGE>` (measured, M5/M6): the parent need not end
++its turn. An earlier reading of the first greenfield run, that the Critic's message stayed under
++`.system_generated/messages/undelivered/` while the parent kept working, is contradicted by that measurement; do not finalize the
++review in the main context, which is not an independent review. Read the result from the completion message and from the files the
+ Critic or reviewer wrote.
+ 
+ A Goldfish makes no parallel file writes in one turn until the hook race is
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 29a0a49f7b62238ee8250e0acbfcf1ff086efa84..2c2f58131d2aef40d7c2634e62675657e7bbb75a 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -111,7 +111,7 @@ Owner: `docs/push-release-flow.md`.
+ 
+ | Topic | Claude | Codex | Antigravity |
+ | --- | --- | --- | --- |
+-| Dispatch carrier | `Agent` / `Task`, functional `agentType` | `spawn_agent`, `nativeAgentType: "worker"` | `antigravity-native-dispatch-prepare.mjs`, then `invoke_subagent`; implementation is not native |
++| Dispatch carrier | `Agent` / `Task`, functional `agentType` | `spawn_agent`, `nativeAgentType: "worker"` | `invoke_subagent` (flat args); read-only roles after `antigravity-native-dispatch-prepare.mjs`, Goldfish roles from the generated briefing, no consent |
+ | Mechanic and deep tiers | available | see `config/runner-profiles-v3.json` | `unavailable` there |
+ | Tool budget | per-agent counter; a grant raises it | nothing counts it (the briefing says so) | nothing counts it (the briefing says so) |
+ | Dispatch record model | host-observed | declared, labelled unobserved | see `references/antigravity-native-dispatch.md` |

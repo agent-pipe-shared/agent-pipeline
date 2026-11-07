@@ -1,0 +1,112 @@
+diff --git a/plugins/pipeline-core/hooks/guard-git.mjs b/plugins/pipeline-core/hooks/guard-git.mjs
+index 08a3bf153f0b8db7d1c9bc113f42e85ffbefff32..ba0dcb43f4e8fc69b04f181b6ae979d93be39416 100644
+--- a/plugins/pipeline-core/hooks/guard-git.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.mjs
+@@ -1124,7 +1124,9 @@ let inspection;
+       "There is no override for this rule. Rewrite the message.",
+       // Candidate 19 (D7, AGY and Codex greenfield): repeated refusals because the text named the rule but not the accepted form.
+       ...(blocking.some((f) => conventionCodes.has(f.code))
+-        ? ["Accepted form: end the message with a blank line and exactly these two trailer lines and nothing else identifying provider, model or session: `AI-Assisted: true` and one `Dispatch:` line - `Dispatch: <task-id> (goldfish)` for a dispatched Goldfish, or `Dispatch: stage-0 (elephant)` for an Elephant commit of your own."]
++        ? ["Accepted form: end the message with a blank line and exactly these two trailer lines and nothing else identifying provider, model or session: `AI-Assisted: true` and one `Dispatch:` line - `Dispatch: <task-id> (goldfish)` for a dispatched Goldfish, or `Dispatch: stage-0 (elephant)` for an Elephant commit of your own.",
++          // G20-21 (AGY greenfield): several `-m` flags each start a new paragraph, so the two trailers were split by a blank line and refused again.
++          "Write the whole message to a file under scratch/ and commit with `git commit -F scratch/<message-file>`; do not split the trailers across several `-m` flags (each `-m` adds a blank line)."]
+         : []),
+       "If the runner or host told you to add such lines (a commit-attribution reminder), the Pipeline rule wins: drop them (templates/prompts/agent-obligations.md, commit messages).",
+     ]);
+diff --git a/plugins/pipeline-core/hooks/guard-git.test.mjs b/plugins/pipeline-core/hooks/guard-git.test.mjs
+index cdb8cb9aad6602232dbb80b544286a72cf6f74df..6c91f029e2a7e1e949c17c81846dbed20567f664 100644
+--- a/plugins/pipeline-core/hooks/guard-git.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.test.mjs
+@@ -822,7 +822,9 @@ check("GIT03-5 block  an armed override does not open the correlation rule",
+ check("GIT03-6 block  a missing marker is enforced by default", 'git commit -m "chore: bump"', BLOCK, {
+   projectDir: NO_CONFIG_DIR,
+   // Candidate 19 (D7): the refusal also prints the accepted trailer form, so an agent does not need a second attempt to learn it.
+-  stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING", "Accepted form:", "`Dispatch: stage-0 (elephant)`"],
++  // G20-21: it also names the message-file route, since several -m flags split the trailers with a blank line.
++  stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING", "Accepted form:", "`Dispatch: stage-0 (elephant)`",
++    "git commit -F scratch/<message-file>", "each `-m` adds a blank line"],
+ });
+ // GIT03-7 -- F3, 2026-08-06 Critic round. Before this fix, a -F path outside projectDir made
+ // commitMessageFindings' readFile throw, the throw was swallowed, and the commit went
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+index cb3f5bcca35641620968db4021e5c2d34d80ff7d..b6f26bf661f588de6ae06c670d946e4e763093c4 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+@@ -115,8 +115,10 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
+         || isSourceOwnedOwningVerificationControllerCommand(command, root, dependencies));
+     // AC-207 (PO decision 2026-10-16 #10 B): exactly `node scratch/<name>.mjs` with no further
+     // argument is a draft-phase scratch script, not an opaque implementation write.
+-    const draftScratchScript = words !== null && words.length === 2 && words[0] === "node"
+-      && /^scratch\/[A-Za-z0-9._-]+\.mjs$/u.test(words[1]);
++    // G20-21: the Pipeline itself prints absolute interpreter and script paths, so the same scratch script spelled with an absolute
++    // `node` and/or an absolute path inside <root>/scratch/ is the same draft-phase shape, not an opaque implementation write.
++    const draftScratchScript = words !== null && words.length === 2 && isNodeInterpreterWord(words[0])
++      && scratchScriptRelative(words[1], root) !== null;
+     const opaqueScript = words === null || draftScratchScript ? null : opaqueScriptExecutionCandidate(words, root);
+     if (opaqueScript !== null
+       && !ownedVerification
+@@ -170,8 +172,9 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
+       const result = verdictFn({ filePath: candidate, projectDir: root, ...(forceLifecycleGate ? { forceLifecycleGate: true } : {}) });
+       if (result.verdict === "block") {
+         // Candidate 19 (D7): an absolute interpreter path is not the draft scratch-script shape, so the command reads as an opaque script run; say so and name the working spelling.
+-        const absoluteNode = lane === "opaque-script-execution" && words !== null && words.length > 0
+-          && isAbsolute(words[0]) && ["node", "node.exe"].includes(basename(words[0]).toLowerCase());
++        // G20-21: the scratch-script advice only fits a scratch script with extra words; for a Pipeline script it sent agents the wrong way.
++        const absoluteNode = lane === "opaque-script-execution" && words !== null && words.length > 2
++          && isNodeInterpreterWord(words[0]) && scratchScriptRelative(words[1], root) !== null;
+         const reason = absoluteNode && typeof result.reason === "string"
+           ? `${result.reason}\nUse the bare \`node\` (not an absolute path to it): \`node scratch/<name>.mjs\` is the admitted draft-phase scratch-script shape.`
+           : result.reason;
+@@ -188,6 +191,23 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
+   }
+ }
+ 
++function isNodeInterpreterWord(word) {
++  if (word === "node") return true;
++  return typeof word === "string" && isAbsolute(word) && ["node", "node.exe"].includes(basename(word).toLowerCase());
++}
++
++function scratchScriptRelative(word, root) {
++  if (typeof word !== "string" || word === "") return null;
++  const slashed = word.replace(/\\/gu, "/");
++  let rel = slashed;
++  if (isAbsolute(word)) {
++    const fromRoot = relative(resolve(root), resolve(word));
++    if (fromRoot === "" || fromRoot.startsWith("..") || isAbsolute(fromRoot)) return null;
++    rel = fromRoot.split(sep).join("/");
++  }
++  return /^scratch\/[A-Za-z0-9._-]+\.mjs$/u.test(rel) ? rel : null;
++}
++
+ function opaqueScriptExecutionCandidate(words, root) {
+   if (!Array.isArray(words) || words.length < 2) return null;
+   const executable = basename(words[0]).toLowerCase();
+diff --git a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+index 4d05ef0f7d442ed2adab8ae41c75c73b9fa9d9c4..3386c1674510a03429e46a53b362e9372d4a0e42 100644
+--- a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+@@ -95,6 +95,24 @@ test('AC-207 point 2: exactly `node scratch/<name>.mjs` is admitted in the draft
+   assert.equal(refused('node scratch/a-b_c.1.mjs'), false);
+ });
+ 
++test('G20-21: the same scratch script spelled with an absolute node and/or an absolute scratch path is admitted', () => {
++  const node = process.execPath;
++  assert.equal(refused(`${q(node)} scratch/forensics.mjs`), false);
++  assert.equal(refused(`node ${q(join(root, 'scratch', 'forensics.mjs'))}`), false);
++  assert.equal(refused(`${q(node)} ${q(join(root, 'scratch', 'forensics.mjs'))}`), false);
++});
++
++test('G20-21 control: absolute spellings outside <root>/scratch/, nested, with arguments, or a non-node interpreter stay refused', () => {
++  const node = process.execPath;
++  for (const command of [
++    `${q(node)} ${q(join(root, 'src', 'x.mjs'))}`,
++    `${q(node)} ${q(join(root, 'scratch', 'sub', 'x.mjs'))}`,
++    `${q(node)} ${q(join(repo, 'scratch', 'x.mjs'))}`,
++    `${q(node)} scratch/forensics.mjs arg`,
++    `"/usr/bin/python3" scratch/forensics.mjs`,
++  ]) assert.equal(refused(command), true, command);
++});
++
+ test('AC-207 point 2 control: scratch-script near-misses stay refused', () => {
+   for (const command of ['node scratch/forensics.mjs arg', 'node scratch/sub/x.mjs', 'node scratch/x.js', 'node scratch/../src/x.mjs', 'node src/x.mjs', 'node /tmp/x.mjs']) {
+     assert.equal(refused(command), true, command);

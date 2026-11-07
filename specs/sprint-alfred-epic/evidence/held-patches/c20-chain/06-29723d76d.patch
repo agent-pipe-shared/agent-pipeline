@@ -1,0 +1,43 @@
+diff --git a/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+index 36cfef60f30a00a9873d110492bcdf2f30d7d1e8..e535da1d55c3f1433685d3802f276673a0ce3ec6 100644
+--- a/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
++++ b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+@@ -19,7 +19,10 @@ const CHANGE_NAMES = { A: "added", M: "modified", D: "deleted", T: "type-changed
+ // The layout session-critic-finalizer.mjs writes: specs/<segment>/evidence/critic/<packetId>/..., and the root form evidence/critic/....
+ // Also the two immutable files the course registration (register-feature-package.mjs) writes beside that directory,
+ // `critic-lineage-<sha256>.json` and `critic-delta-request-<sha256>.json`: they carry the prior round's verdict metadata (PF-98).
+-const RETAINED_PATTERN = /^(?:specs\/[^/]+\/)?evidence\/(?:critic\/[^/]+(?:\/[^/]+)*|critic-(?:lineage|delta-request)-[0-9a-f]{64}\.json)$/u;
++// C20 w252 (G20-11, Codex greenfield): the reader-review skill retains its reports under specs/<feature-id>/evidence/reader-review/<phase>/<round>.md
++// (skills/reader-review/SKILL.md, lib/doc-reader-plan-scope.mjs). They are another review's retained results, not source; listed as source they made
++// the first independent Critic stop on a briefing violation before any substantive review.
++const RETAINED_PATTERN = /^(?:specs\/[^/]+\/)?evidence\/(?:critic\/[^/]+(?:\/[^/]+)*|critic-(?:lineage|delta-request)-[0-9a-f]{64}\.json|reader-review\/[^/]+(?:\/[^/]+)*)$/u;
+ 
+ export class CriticCorrectionInputBindingsError extends Error {
+   constructor(code, detail) {
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 1a9c1105827e1145d6952c8692163212e9709107..53aaca6dfce1b030b50ddc5dd6471ba4149e8b79 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -1248,6 +1248,22 @@ test("CCI (2b) the lineage and delta-request files the course registration write
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++test("CCI (2d) C20 w252 (G20-11): the reader-review skill's retained reports are retained prior results; look-alikes stay source", () => {
++  const fx = cciFixture();
++  const retained = ["specs/feat-x/evidence/reader-review/phase-one/2.md", "specs/feat-x/evidence/reader-review/phase-two/2.md"];
++  const lookalikes = ["specs/feat-x/evidence/reader-review.md", "specs/feat-x/notes/reader-review/phase-one/1.md", "specs/feat-x/evidence/reader-reviews/phase-one/1.md", "docs/reader-review/phase-one/1.md"];
++  try {
++    for (const path of retained) cciWrite(fx.root, path, "reader report\n");
++    for (const path of lookalikes) cciWrite(fx.root, path, "not a retained reader report\n");
++    cciWrite(fx.root, "src/a.txt", "changed\n");
++    const head = commit(fx.root, "reader review evidence");
++    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head });
++    assert.deepEqual(doc.exclusions.map((e) => e.path), retained);
++    for (const entry of doc.exclusions) assert.equal(entry.role, "retained prior result");
++    assert.deepEqual(doc.sourcePaths, [...lookalikes, "src/a.txt"].sort());
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ // D213: the calibration names, positively, the files that quote earlier Critic findings (the finding-disposition record role).
+ const cciCalibration = (root, extra) => cciWrite(root, "project/pipeline.json", `${JSON.stringify({ project: "fixture", handover: "docs/state.md", ...extra })}\n`);
+ test("CCI (2c) files named by the calibration finding-record list are finding-disposition records; a file never declares itself and look-alikes stay source (D213)", () => {

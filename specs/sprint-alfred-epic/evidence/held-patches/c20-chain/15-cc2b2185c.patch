@@ -1,0 +1,47 @@
+diff --git a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+index 29e8c13c9c5aa254a7ab091f69841005cf0ddd63..6ecdb931d8f95eeb8e29c80fcf0798d76b186d60 100644
+--- a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
++++ b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+@@ -116,7 +116,8 @@ test("AC1: submit-plan never emits a content-acknowledgement stop on a clean pla
+   // Restated 2026-11-02 (candidate 18, C18-2, QG-04, own hunk; intent kept: a clean submission emits no stop and no acknowledgement request):
+   // a project without a verify command now gets one informational line naming configure-verify (a warning, the submission continues). The
+   // fixture has no verify command, so exactly that line may appear; every other stderr byte is still refused.
+-  const noVerifyCommand = /^Warning: submit-plan: the project verify command is missing\. [^\n]*configure-verify[^\n]*$/mu;
++  // G20-19: the line now names the admitted `set-phase ... --verify-command` route instead of configure-verify.
++  const noVerifyCommand = /^Warning: submit-plan: the project verify command is missing\. [^\n]*set-phase --phase implementation --verify-command[^\n]*$/mu;
+   assert.equal(result.err.replace(noVerifyCommand, "").trim(), "");
+   assert.ok(!result.out.includes("pipeline.submit-plan-stop.v1"));
+   assert.ok(!result.out.includes("PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING"));
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 110265d4cffd5c301deb756da225b7c982e0f9ec..a646856b9cc310013918b2d11b8363ae197e458e 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11909,7 +11909,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       // C18-2: a null/placeholder verify command is otherwise found late (VEP-NO-COMMAND at the first Verify); warn while it is cheap, never refuse.
+       const submitVerifyStatus = readCalibrationVerifyStatus(dir);
+       if (submitVerifyStatus.status !== "configured") {
+-        console.error(`Warning: submit-plan: the project verify command is ${submitVerifyStatus.status === "missing" ? "missing" : "still the seeded placeholder"}. Set it before implementation with: node <plugin-root>/scripts/pipeline-state.mjs configure-verify --verify-command <project verify command> (never edit project/pipeline.json directly; GS-10 refuses it). The submission continues.`);
++        // G20-19 (Claude greenfield): this line used to name `configure-verify`, which the lifecycle guard refuses while the plan awaits
++        // approval; the agent tried it and was blocked. The admitted route sets it together with the phase change after approval.
++        console.error(`Warning: submit-plan: the project verify command is ${submitVerifyStatus.status === "missing" ? "missing" : "still the seeded placeholder"}. Set it when implementation starts, in the same step: node <plugin-root>/scripts/pipeline-state.mjs set-phase --phase implementation --verify-command "<project verify command>" (never edit project/pipeline.json directly; GS-10 refuses it). Nothing to do before approval. The submission continues.`);
+       }
+       const profileSha256 = sha256CanonicalJson(profile.value);
+       const expectedPlanSha256 = authority.value.planSha256;
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 8f40daa90cc0c6afcacf04600acb5c619c4f6bc0..6d1cd4e94c21a0fcddb749cc5f0a2d23beaaf50b 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -1463,8 +1463,11 @@ for (const scenario of ["missing-head", "malformed-criterion", "missing-source",
+   writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({ project: featureId, verify: null }, null, 2)}\n`);
+   const submitted = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+   assert.equal(submitted.result, 0, `a null verify command must warn, not refuse submit-plan: ${submitted.lines.join(" ")}`);
+-  assert.ok(submitted.lines.some((line) => line.includes("configure-verify --verify-command <project verify command>")),
+-    `submit-plan must name the sanctioned configure-verify route: ${submitted.lines.join(" ")}`);
++  // Restated 2026-11-07 (candidate 20, G20-19, QG-04): the named route must be one the lifecycle guard admits at that point;
++  // configure-verify was refused while awaiting approval. Same strictness: the exact admitted command is named.
++  assert.ok(submitted.lines.some((line) => line.includes("set-phase --phase implementation --verify-command \"<project verify command>\"")),
++    `submit-plan must name the admitted set-phase verify route: ${submitted.lines.join(" ")}`);
++  assert.ok(!submitted.lines.some((line) => line.includes("configure-verify")), "the refused route is no longer named");
+ }
+ 
+ // D165-S4 (AC-127): submit-plan refuses a brownfield architecture hurdle BEFORE

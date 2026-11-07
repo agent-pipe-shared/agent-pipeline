@@ -1,0 +1,955 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 5226c982a82f4a29ef5663cc3178f8682c04e3dc..ec65106006659cd6621e201b7b254ffc5e8e7b6d 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -604,6 +604,8 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/lib/spec-journey-coverage.mjs`,
+ `plugins/pipeline-core/lib/answered-intake-values.mjs`,
+ `plugins/pipeline-core/lib/signed-proof-wait.mjs`,
++`plugins/pipeline-core/lib/critic-source-return.mjs`,
++`plugins/pipeline-core/lib/critic-acknowledgement.mjs`,
+ `plugins/pipeline-core/lib/critic-diagnostic-producer.mjs`,
+ `plugins/pipeline-core/lib/critic-generic-batch.mjs`,
+ `plugins/pipeline-core/lib/critic-verify-readiness.mjs`,
+diff --git a/docs/human-authorization-inventory.md b/docs/human-authorization-inventory.md
+index 342e4785cde7c4c1c8dcf7d2d88aeb22d339471d..38f0355ec81796b9a1bbb46bca40c59824304592 100644
+--- a/docs/human-authorization-inventory.md
++++ b/docs/human-authorization-inventory.md
+@@ -44,7 +44,8 @@ exact candidate commit+tree.
+ | Governance fork disposition <!-- inventory-id: governance-fork-disposition --> | Disposing of a forked-subagent scope-creep finding | `governance-fork-disposition` | Same shared contract | `plugins/pipeline-core/scripts/po-human-approval.mjs` (`runForkDispositionApproval`, ~L426-484) |
+ | Interruption promotion <!-- inventory-id: interruption-promotion --> | Approving the promotion of an interruption-telemetry candidate; the signed subject binds the candidate and the promotion subject digest | `interruption-promotion` | Same shared contract; reachable via the direct `prepare-critical`/`approve-critical`/`verify-critical`/`authorize-critical` command family (`CRITICAL_COMMAND_KINDS`) | `plugins/pipeline-core/lib/interruption-promotion.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/scripts/po-human-approval.mjs` |
+ | Residual Critic findings acceptance <!-- inventory-id: accept-residual-critic-findings --> | Accepting the minor findings left open after a failed Critic round (a major finding only when the acceptance names the reason class `uncorrectable-past-authorship`, which is part of the signed subject); the finding list and severities are computed by the Pipeline from the consumed Critic receipt, the signed or attributed record binds the candidate commit, tree, receipt and that list, and a blocker can never be accepted | `accept-residual-critic-findings` | Same shared contract; reachable via the direct `prepare-critical`/`authorize-critical` command family (`CRITICAL_COMMAND_KINDS`), in the configured `gates.push_approval` mode | `plugins/pipeline-core/lib/critical-action-authorization.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/scripts/po-human-approval.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-residual-acceptance`) |
+-| Critical action (generic H-AC ceremony) <!-- inventory-id: critical-action-family --> | The ADR-0061-ported "authorize-critical" flow: an agent-prepared request over one of the `CRITICAL_ACTION_KINDS` (`push`, `deploy`, `publication`, `release-preflight`, `governance-fork-disposition`, `feature-package-reconcile`, `interruption-promotion`, `accept-residual-critic-findings`), authorized externally | `critical-action` (outer intent) wrapping the actual action `kind` + `subjectSha256` in the signed subject | Same shared contract | `plugins/pipeline-core/lib/critical-action-approval-request.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs` (`criticalApprovalRequest`, ~L223-249) |
++| Caller-authored Critic acknowledgement <!-- inventory-id: acknowledge-caller-authored-critic --> | The close-gate bridge (G20-39, PO 2026-11-07): on a runner that issues no Critic Source-return record, a Critic verdict finalized as `caller-authored-fallback` admits a rigor >= 1 or high-risk feature close only after the PO acknowledges it for exactly that packet, consumed receipt digest, candidate commit and tree; the label stays on the receipt, and an acknowledgement of any other packet or candidate never admits | `acknowledge-caller-authored-critic` | Same shared contract; reachable via the direct `prepare-critical`/`authorize-critical` command family (`CRITICAL_COMMAND_KINDS`), in the configured `gates.push_approval` mode | `plugins/pipeline-core/lib/critical-action-authorization.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/lib/critic-acknowledgement.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-critic-acknowledgement`), `plugins/pipeline-core/scripts/close-coordinator.mjs` |
++| Critical action (generic H-AC ceremony) <!-- inventory-id: critical-action-family --> | The ADR-0061-ported "authorize-critical" flow: an agent-prepared request over one of the `CRITICAL_ACTION_KINDS` (`push`, `deploy`, `publication`, `release-preflight`, `governance-fork-disposition`, `feature-package-reconcile`, `interruption-promotion`, `accept-residual-critic-findings`, `acknowledge-caller-authored-critic`), authorized externally | `critical-action` (outer intent) wrapping the actual action `kind` + `subjectSha256` in the signed subject | Same shared contract | `plugins/pipeline-core/lib/critical-action-approval-request.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs` (`criticalApprovalRequest`, ~L223-249) |
+ | Guard Maintenance Window (GMW) install/lift <!-- inventory-id: guard-maintenance-window --> | Time-boxed PO-signed exception letting a self-protecting guard rule (GS-6, protected test paths) honor an additional allow-path | `guard-lift` | Same shared contract, trust-anchor default `project/critical-human-proof.json`; signed via `po-human-approval.mjs sign-intent` against a bare intent digest | `plugins/pipeline-core/lib/guard-maintenance-window.mjs`, `guard-maintenance-window.mjs install`; ADR-0058; `docs/guard-maintenance-window-threat-model.md`, `docs/po-human-approval.md` §"Signing a bare intent digest" |
+ | Human Guard Override (HGO), signed route <!-- inventory-id: human-guard-override-signature --> | Signed admission past a PreToolUse guard denial for one exact request/plan pair, via `guard-human-override.mjs plan`/`prepare-authorization`/`emit-signature-digest`/`authorize-by-signature` | `guard-override` | Same shared contract (default trust anchor same file); the `activate`/chat route also exists alongside this signed one (ADR-0059 Decision 1) | `plugins/pipeline-core/lib/human-guard-override.mjs` (~L1796-1825), `plugins/pipeline-core/scripts/guard-human-override.mjs` |
+ | Threat model approval (Cyborg CYB-4) <!-- inventory-id: threat-model-approval --> | PO decision on a threat-model boundary (`approved`/other) | `threat-model` | Same shared contract — the original adapter this whole contract generalized from | `plugins/pipeline-core/lib/threat-model.mjs`, `lib/threat-model-approval-request.mjs` |
+@@ -132,6 +133,7 @@ new approval gates.
+ | `governance-fork-disposition` | `legacy-renderer` | — |
+ | `interruption-promotion` | `legacy-renderer` | — |
+ | `accept-residual-critic-findings` | `legacy-renderer` | — |
++| `acknowledge-caller-authored-critic` | `legacy-renderer` | — |
+ | `critical-action-family` | `abstract-family` | — |
+ | `guard-maintenance-window` | `legacy-renderer` | — |
+ | `human-guard-override-signature` | `legacy-renderer` | — |
+diff --git a/harness/scripts/check-auth-gate-inventory-drift.test.mjs b/harness/scripts/check-auth-gate-inventory-drift.test.mjs
+index 3abb049d887be78da873f2ce0c2d7299194b807e..3fc1e02d7fb9c3a2ae4eb97509ee9277ea06b861 100644
+--- a/harness/scripts/check-auth-gate-inventory-drift.test.mjs
++++ b/harness/scripts/check-auth-gate-inventory-drift.test.mjs
+@@ -281,7 +281,8 @@ test("shipped terminal catalog is immutable and covers unique inventory disposit
+   const catalog = loadHumanTerminalActionCatalog();
+   assert.equal(Object.isFrozen(catalog), true);
+   assert.equal(Object.isFrozen(catalog.entries), true);
+-  assert.equal(catalog.entries.length, 21);
++  // G20-39 (PO 2026-11-07): one deliberate new entry, acknowledge-caller-authored-critic (legacy-renderer), restated from 21 (QG-04).
++  assert.equal(catalog.entries.length, 22);
+   assert.equal(new Set(catalog.entries.map((entry) => entry.id)).size, catalog.entries.length);
+   assert.equal(new Set(catalog.entries.map((entry) => entry.inventoryId)).size, catalog.entries.length);
+   assert.deepEqual(registeredHumanTerminalActionBuilderIds(), [
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index 74569a6059eea064afb41e65a78435af1d591613..60e5220b5ee61330c3deb511b0f4df02364c6f36 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -7,7 +7,8 @@ import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
+-import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
++import { finalizeNativeGoldfishHostReturn, readSubagentHandbackMessage, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
++import { issueCriticSourceReturn } from "../lib/critic-source-return.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+@@ -179,6 +180,19 @@ function nativeGoldfishHookBaseMessage(result) {
+   return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree and recover explicitly if Git may have changed.${describeFailureDetail(result.detail)}`;
+ }
+ 
++/** G20-39: the self-describing line a Critic subagent stop prints (stderr; a stop hook's stdout is read as a decision). */
++export function criticSourceReturnMessage(outcome) {
++  const finalizeAs = "the verdict then finalizes as caller-authored-fallback, which the feature close admits only at rigor 0 and low risk (repair: a PO acknowledgement of the caller-authored Critic for this packet and candidate)";
++  switch (outcome?.status) {
++    case "issued": return `Critic Source return issued for packet ${outcome.packetId}: finalize reads it from the private control area and labels the verdict source-issued-origin when the verdict file is the returned JSON verbatim.`;
++    case "already-issued": return `Critic Source return not issued: packet ${outcome.packetId} already holds one; it is never overwritten.`;
++    case "no-verdict": return `Critic Source return not issued: the Critic's final message carries no schema-shaped verdict JSON (return it as the whole message or as the last fenced json block); ${finalizeAs}.`;
++    case "no-open-packet": return `Critic Source return not issued: no claimed, admitted, unresulted session packet of this runner is open; ${finalizeAs}.`;
++    case "ambiguous": return `Critic Source return not issued: ${outcome.count} session packets of this runner are open and the stop names none of them; release the stale ones (session-critic-finalizer.mjs release) and finalize; ${finalizeAs}.`;
++    default: return `Critic Source return not issued (the private control area could not be read); ${finalizeAs}.`;
++  }
++}
++
+ if (isDirectInvocation(import.meta.url)) {
+   const runnerIndex = process.argv.indexOf("--runner");
+   const runner = runnerIndex >= 0 ? process.argv[runnerIndex + 1] : null;
+@@ -192,6 +206,18 @@ if (isDirectInvocation(import.meta.url)) {
+   process.once("exit", () => admissionProgress("exit"));
+   // T6-A: bind this Claude hook process to its own hook-observed session owner.
+   if (runner === "claude") enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
++  // G20-39: the Critic subagent's stop issues the Critic Source return record (this hook, never the calling agent). Any other stop, and
++  // any fault here, continues below exactly as before; this branch never blocks the stop and prints nothing on stdout.
++  if (input.hook_event_name === "SubagentStop") {
++    try {
++      const criticStop = issueCriticSourceReturn({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), runner, input,
++        readHandbackFn: runner === "claude" ? readSubagentHandbackMessage : null });
++      if (criticStop.status !== "not-applicable") {
++        process.stderr.write(`${criticSourceReturnMessage(criticStop)}\n`);
++        process.exit(0);
++      }
++    } catch { /* fall through to the Goldfish route, which treats a non-Goldfish stop as not applicable */ }
++  }
+   let result;
+   try {
+     result = finalizeNativeGoldfishHostReturn({ runner,
+diff --git a/plugins/pipeline-core/lib/critic-acknowledgement.mjs b/plugins/pipeline-core/lib/critic-acknowledgement.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..2fd970eac7451d287a5c114c13b334e575bb3677
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-acknowledgement.mjs
+@@ -0,0 +1,36 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * G20-39 (candidate 20, AC-108): the PO acknowledgement of a caller-authored Critic, the bridge for a runner that issues no Source return record.
++ *
++ * At rigor >= 1 or high risk the close gate (scripts/close-coordinator.mjs `assertCriticIndependenceForClose`) refuses a verdict finalized as
++ * `caller-authored-fallback` (C19-D2b). This kind is the one runnable repair: a PO approval, recorded through the existing human-approval route
++ * (`pipeline-state.mjs approve-critic-acknowledgement`, signature or chat per `gates.human_approval`, modelled on `feature-package-reconcile`),
++ * bound to exactly one consumed Critic packet and the candidate it reviewed. It is never generic and never inferred: another packet, another
++ * receipt or another candidate does not match. The close record keeps the label `caller-authored-fallback` together with this reference.
++ */
++import { canonicalJson, sha256 } from "./critic-packet-preflight-read.mjs";
++import { readPrivateApprovals } from "./critical-action-authorization.mjs";
++
++export const CRITIC_ACKNOWLEDGEMENT_KIND = "acknowledge-caller-authored-critic";
++const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
++
++/** The signed / attributed subject: the packet, the digest of its consumed receipt and the label being acknowledged. */
++export function criticAcknowledgementSubject({ packetId, receipt }) {
++  return { packetId, criticReceiptSha256: sha256(canonicalJson(receipt)), independence: receipt?.independence ?? null };
++}
++
++/**
++ * The acknowledgement recorded for exactly this consumed receipt, as a bounded reference, or null. The record is read from the private
++ * approval store; its proof was verified and consumed when it was recorded.
++ */
++export function findCriticAcknowledgement({ gitCommonDir, packetId, receipt }) {
++  const subject = criticAcknowledgementSubject({ packetId, receipt });
++  for (const envelope of readPrivateApprovals(gitCommonDir, CRITIC_ACKNOWLEDGEMENT_KIND).reverse()) {
++    const approval = envelope.approval;
++    if (!object(approval) || approval.packetId !== subject.packetId || approval.criticReceiptSha256 !== subject.criticReceiptSha256
++      || approval.forCommit !== receipt?.candidate?.commit || approval.forTree !== receipt?.candidate?.tree) continue;
++    return Object.freeze({ kind: CRITIC_ACKNOWLEDGEMENT_KIND, packetId, criticReceiptSha256: subject.criticReceiptSha256, approvedBy: approval.approvedBy,
++      approvedAt: approval.approvedAt, mode: object(approval.criticalProof) ? "signature" : "chat-attributed-unattested", proofSha256: approval.criticalProof?.proofSha256 ?? null });
++  }
++  return null;
++}
+diff --git a/plugins/pipeline-core/lib/critic-packet-preflight-read.mjs b/plugins/pipeline-core/lib/critic-packet-preflight-read.mjs
+index f9164baf192bd70662e120e889673989cee45c0d..39e5c85c5e8f4647277f7251a0a13fe7c656fc1b 100644
+--- a/plugins/pipeline-core/lib/critic-packet-preflight-read.mjs
++++ b/plugins/pipeline-core/lib/critic-packet-preflight-read.mjs
+@@ -20,6 +20,8 @@ export const SESSION_ADMISSION_SCHEMA = "pipeline.session-critic-admission.v1";
+ export const SAFE_ID = /^[a-z0-9][a-z0-9._-]{1,79}$/;
+ export const PACKET_ID = /^[a-f0-9]{32}$/;
+ export const SHA256 = /^[a-f0-9]{64}$/;
++// The window in which a claimed session review may still complete; shared with the Critic Source return producer (lib/critic-source-return.mjs).
++export const SESSION_REVIEW_TTL_SECONDS = 24 * 60 * 60;
+ export const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+ const SESSION_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
+ const SIGNED_IMPORT_ANCHOR_SCHEMA = "pipeline.signed-quality-import-review-anchor.v1";
+diff --git a/plugins/pipeline-core/lib/critic-source-return.mjs b/plugins/pipeline-core/lib/critic-source-return.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..4265caf0b5bc4907e4189457f6af2bac588636a2
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-source-return.mjs
+@@ -0,0 +1,104 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * G20-39 (candidate 20, AC-108): the producer and the reader of the Critic Source return record (`pipeline.session-critic-source-return.v1`).
++ *
++ * The record is what lets a verdict finalize as `source-issued-origin` instead of `caller-authored-fallback`
++ * (scripts/session-critic-finalizer.mjs `originGate`), and the close gate (scripts/close-coordinator.mjs
++ * `assertCriticIndependenceForClose`) admits that label at any rigor. It is issued by the Critic subagent's STOP hook, never by the calling agent:
++ * the hook sees the stop of an agent whose runner-reported `agent_type` is the Critic, reads the verdict that agent returned
++ * (`last_assistant_message`, else the child's own last SubagentHandback), and binds it to the one admitted, claimed, not yet resulted session packet of that
++ * runner. Every bound value comes from the private packet and its admission (packetId, packetDigest, claimant, sessionId) or from the returned verdict
++ * (verdictSha256); nothing is taken from the launching prompt or from a value the calling agent supplies. Zero or several open packets issue nothing.
++ *
++ * Storage: `<common-dir>/agent-pipeline/critic-packets/<packetId>/source-return.json`, mode 0600, created exclusively (a second stop never overwrites).
++ * Antigravity has no producer in this slice: its subagent stop event is still being measured. Imports only the packet read half and the schema checker.
++ */
++import { closeSync, existsSync, openSync, readFileSync, readdirSync, writeSync } from "node:fs";
++import { join } from "node:path";
++import { PACKET_ID, SESSION_REVIEW_TTL_SECONDS, canonicalJson, currentState, packetContext, readJson, sha256 } from "./critic-packet-preflight-read.mjs";
++import { validateAgainstSchema } from "./schema-lite.mjs";
++
++export const CRITIC_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return.v1";
++export const CRITIC_SOURCE_RETURN_FILE = "source-return.json";
++const VERDICT_SCHEMA = JSON.parse(readFileSync(new URL("../scripts/critic-verdict.schema.json", import.meta.url), "utf8"));
++const MAX_PACKETS = 4096;
++const RUNNERS = new Set(["claude", "codex"]);
++
++const normalizedAgentType = (value) => typeof value !== "string" ? null : value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
++
++/** The verdict a Critic returned: its whole message, else the content of the LAST fenced block, as a schema-shaped object; otherwise null. */
++export function extractCriticVerdict(text) {
++  if (typeof text !== "string" || text.length === 0 || text.length > 4 * 1024 * 1024) return null;
++  const candidates = [text.trim()];
++  const blocks = [...text.matchAll(/```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```/gu)];
++  if (blocks.length > 0) candidates.push(blocks.at(-1)[1]);
++  for (const candidate of candidates) {
++    let value;
++    try { value = JSON.parse(candidate); } catch { continue; }
++    if (value !== null && typeof value === "object" && !Array.isArray(value) && validateAgainstSchema(value, VERDICT_SCHEMA).valid) return value;
++  }
++  return null;
++}
++
++/** Packets of this runner that are claimed, admitted, within the review window and carry no result: the only ones a Critic stop can answer. */
++function openAdmittedPackets(controlRoot, runner, nowMs) {
++  const open = [];
++  const names = readdirSync(controlRoot);
++  if (names.length > MAX_PACKETS) return null;
++  for (const packetId of names.filter((name) => PACKET_ID.test(name))) {
++    try {
++      const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
++      const state = currentState(packetDir, packet);
++      const binding = packet.request?.sessionBinding;
++      if (state.phase !== "claimed" || state.revision !== 2 || binding === undefined || packet.route?.runner !== runner) continue;
++      const packetDigest = sha256(canonicalJson(packet));
++      const admission = readJson(join(packetDir, "session-admission.json"), "CPP-SESSION-ADMISSION");
++      const claim = readJson(join(packetDir, "claim.json"), "CPP-CLAIM-READ");
++      const claimedAtMs = Date.parse(claim?.timestamp);
++      if (admission?.packetId !== packetId || admission.packetDigest !== packetDigest || admission.sessionId !== binding.sessionId
++        || claim?.packetDigest !== packetDigest || !Number.isFinite(claimedAtMs)
++        || nowMs < claimedAtMs || nowMs > claimedAtMs + SESSION_REVIEW_TTL_SECONDS * 1000) continue;
++      if (existsSync(join(packetDir, CRITIC_SOURCE_RETURN_FILE))) { open.push({ packetId, issued: true }); continue; }
++      open.push({ packetId, packetDir, packetDigest, sessionId: binding.sessionId, claimant: { runner: packet.route.runner, adapter: packet.route.adapter },
++        issuedAtMs: nowMs, expiresAtMs: claimedAtMs + SESSION_REVIEW_TTL_SECONDS * 1000 });
++    } catch { /* an unreadable or foreign entry is never a match */ }
++  }
++  return open;
++}
++
++/**
++ * Issue the Source return record for a Critic subagent stop, or answer why none was issued. Never throws, never blocks the stop.
++ * @param {{ commonDir: string, runner: "claude"|"codex", input: object, nowMs?: number, readHandbackFn?: (input: object) => ({ok: boolean, message?: string}) }} request
++ */
++export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date.now(), readHandbackFn = null } = {}) {
++  try {
++    if (!RUNNERS.has(runner) || input?.hook_event_name !== "SubagentStop" || normalizedAgentType(input.agent_type) !== "critic") return { status: "not-applicable" };
++    if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
++    let verdict = extractCriticVerdict(input.last_assistant_message);
++    if (verdict === null && typeof readHandbackFn === "function") {
++      const handback = readHandbackFn(input);
++      if (handback?.ok === true) verdict = extractCriticVerdict(handback.message);
++    }
++    if (verdict === null) return { status: "no-verdict" };
++    const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
++    if (!existsSync(controlRoot)) return { status: "no-open-packet" };
++    const open = openAdmittedPackets(controlRoot, runner, nowMs);
++    if (open === null) return { status: "unavailable" };
++    if (open.length === 0) return { status: "no-open-packet" };
++    if (open.length > 1) return { status: "ambiguous", count: open.length };
++    const [target] = open;
++    if (target.issued === true) return { status: "already-issued", packetId: target.packetId };
++    const record = { schema: CRITIC_SOURCE_RETURN_SCHEMA, issuer: "source", packetId: target.packetId, packetDigest: target.packetDigest, claimant: target.claimant,
++      sessionId: target.sessionId, verdictSha256: sha256(canonicalJson(verdict)), issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs };
++    const fd = openSync(join(target.packetDir, CRITIC_SOURCE_RETURN_FILE), "wx", 0o600);
++    try { writeSync(fd, canonicalJson(record)); } finally { closeSync(fd); }
++    return { status: "issued", packetId: target.packetId };
++  } catch { return { status: "unavailable" }; }
++}
++
++/** The issued record of a packet exactly as stored (so a present-but-wrong record reaches the finalizer's binding check), or null when none exists. */
++export function readCriticSourceReturn({ controlRoot, packetId } = {}) {
++  if (typeof controlRoot !== "string" || !PACKET_ID.test(packetId ?? "")) return null;
++  const path = join(controlRoot, packetId, CRITIC_SOURCE_RETURN_FILE);
++  return existsSync(path) ? readJson(path, "SCF-ORIGINAL-SOURCE-RECORD") : null;
++}
+diff --git a/plugins/pipeline-core/lib/critical-action-approval-request.mjs b/plugins/pipeline-core/lib/critical-action-approval-request.mjs
+index 0657759fc0a4ff549d073c54fd99e63b62a019da..852c717937c13418d1c51266ad177361ab2d6234 100644
+--- a/plugins/pipeline-core/lib/critical-action-approval-request.mjs
++++ b/plugins/pipeline-core/lib/critical-action-approval-request.mjs
+@@ -22,7 +22,7 @@ export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action
+ // `actionValid`, which `scripts/pipeline-state.mjs`'s reconcile approval wrapper needs.
+ export const CRITICAL_ACTION_KINDS = Object.freeze([
+   "push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion",
+-  "accept-residual-critic-findings",
++  "accept-residual-critic-findings", "acknowledge-caller-authored-critic",
+ ]);
+ 
+ const SHA = /^[a-f0-9]{64}$/u;
+diff --git a/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs b/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
+index b1da840cb1f408e8e5a67f9cf568509cc9257ed1..3c2accb07282d7e279c408bec8dbec007d467de3 100644
+--- a/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
++++ b/plugins/pipeline-core/lib/critical-action-approval-request.test.mjs
+@@ -45,7 +45,8 @@ check("subject digest changes with target", () => assert.notEqual(subjectSha256,
+ // changes nothing about how push/deploy/publication/release-preflight are treated. d02409a8a adds a seventh
+ // (interruption-promotion, a signature-only kind consumed by po-human-approval.mjs).
+ check("CRITICAL_ACTION_KINDS holds the documented seven members in order", () => {
+-  assert.deepEqual(CRITICAL_ACTION_KINDS, ["push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion", "accept-residual-critic-findings"]);
++  // G20-39 (PO 2026-11-07): acknowledge-caller-authored-critic is a deliberate new kind (the close-gate bridge); restated in place (QG-04).
++  assert.deepEqual(CRITICAL_ACTION_KINDS, ["push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic"]);
+ });
+ check("a release-preflight request round-trips end to end, and cross-kind substitution stays refused", () => {
+   const rpSubject = { schema: "pipeline.release-preflight-consent-subject.v1", version: "1.2.3", base: { commit: "c".repeat(40), tree: "d".repeat(40) }, lifecycle: { featureId: "cyb-4", manifestPath: "lifecycle.json", manifestSha256: "e".repeat(64) }, retentionPolicySha256: "f".repeat(64) };
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization.mjs b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+index c28ba773da54ca896e37164f9117dd297cf7e805..9c27d107e10a66bf0956e48ed97d86df84a18800 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+@@ -195,7 +195,9 @@ export const CRITICAL_APPROVAL_STORE_SCHEMA = "pipeline.critical-approval-record
+ export const AGENT_RESULT_ONLY_RECONCILE_BASIS = "agent-result-only-reconcile-no-po-proof";
+ export const CRITICAL_APPROVAL_CONSUMPTION_SCHEMA = "pipeline.critical-approval-consumption.v1";
+ /** kind -> the tracked-state slot the legacy record lived in (readers still see it under that name). */
+-const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-package-reconcile": "featurePackageReconcileApproval" });
++const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-package-reconcile": "featurePackageReconcileApproval",
++  // G20-39: the PO acknowledgement of a caller-authored Critic (lib/critic-acknowledgement.mjs); read per packet, not through the slot overlay.
++  "acknowledge-caller-authored-critic": "criticAcknowledgement" });
+ 
+ export function criticalApprovalStoreRoot(gitCommonDir) {
+   return join(resolve(gitCommonDir), "agent-pipeline", "critical-approvals");
+@@ -302,6 +304,22 @@ export function readLastPrivateApproval(gitCommonDir, kind) {
+   return null;
+ }
+ 
++/** Every valid private approval record of `kind`, oldest first; an absent or unreadable store reads as none. */
++export function readPrivateApprovals(gitCommonDir, kind) {
++  const found = [];
++  try {
++    if (typeof gitCommonDir !== "string" || !Object.hasOwn(CRITICAL_APPROVAL_SLOTS, kind)) return found;
++    const dir = join(criticalApprovalStoreRoot(gitCommonDir), "approvals", kind);
++    for (const name of readdirSync(dir).filter((entry) => entry.endsWith(".json") && !entry.startsWith(".")).sort()) {
++      const envelope = readJsonFile(join(dir, name));
++      if (approvalEnvelopeValid(kind, envelope)) found.push(envelope);
++    }
++  } catch {
++    // an absent or unreadable store is "nothing private"
++  }
++  return found;
++}
++
+ /** Every private consumption entry, in the legacy ledger's `{ proofSha256, kind, consumedAt }` shape. */
+ export function readPrivateCriticalConsumption(gitCommonDir) {
+   const entries = [];
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 610c92b9cb1d36b3210ce822df38c8f136c8d858..f9240c83430c6367dda58b6ef046d123c3717611 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -823,6 +823,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // signed-proof wait every PO signing step (design approval, push approval, override, bootstrap acknowledgement) names.
+   "plugins/pipeline-core/lib/answered-intake-values.mjs",
+   "plugins/pipeline-core/lib/signed-proof-wait.mjs",
++  // C20 G20-39 (GMWKC01): the Critic Source-return producer the finalizer reads (session-critic-finalizer.mjs) and the PO
++  // acknowledgement of a caller-authored Critic the close gate and pipeline-state read. Their first-party imports
++  // (critic-packet-preflight-read.mjs, schema-lite.mjs, critical-action-authorization.mjs) are already listed.
++  "plugins/pipeline-core/lib/critic-source-return.mjs",
++  "plugins/pipeline-core/lib/critic-acknowledgement.mjs",
+   "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs",
+   "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+   "plugins/pipeline-core/lib/critic-verify-readiness.mjs",
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 4e6b36ec50a873cee1049303145f1e1979ac2c27..cdb1826115a0756b274e03f7dda596fcdc55f2e6 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -112,7 +112,7 @@ function readSubagentStopPending({ commonDir, input }) {
+ const SUBAGENT_HANDBACK_TOOL = "SubagentHandback";
+ const SUBAGENT_HANDBACK_MAX_BYTES = 8 * 1024 * 1024;
+ const SUBAGENT_HANDBACK_UNSAFE = "NGHR-CLAUDE-STOP-HANDBACK-UNSAFE";
+-function readSubagentHandbackMessage(input) {
++export function readSubagentHandbackMessage(input) {
+   const unsafe = { ok: false, code: SUBAGENT_HANDBACK_UNSAFE };
+   const none = { ok: false, code: "NGHR-CLAUDE-STOP-NO-HANDBACK" };
+   const transcriptPath = input.transcript_path;
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 81c5884f3cdf0512894ca522ac7e9832860d02b9..4278957179b81273ebdab9e5234489a6ffb7e9dd 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -86,10 +86,16 @@ const INVENTORY = Object.freeze([
+  * Critic round has failed, so it is a recovery act off the happy path, not a third per-feature decision. The happy path
+  * (Critic passes) still needs exactly the plan approval and the push approval; the third-class and extra-ceremony mirrors
+  * below stay red-checked.
++ *
++ * `approve-critic-acknowledgement` (G20-39, PO decision 2026-11-07 "Producer + Brücke") is the PO's acknowledgement of a
++ * caller-authored Critic verdict, the bridge for a runner that issues no Critic Source-return record. On Claude and Codex the
++ * Critic subagent's stop issues that record, so the happy path never meets it. HONEST LIMIT: on Antigravity no producer exists
++ * yet (its subagent stop event is being measured, M4c/M14), so there a rigor >= 1 feature close meets it as a third per-feature
++ * PO interaction until a producer lands; recorded on the PO list, not hidden by this classification.
+  */
+ const OFF_HAPPY_PATH_VERBS = Object.freeze([
+   "approve-deploy", "publication-approve", "rebind-approval", "retire-enrollment", "activate-enrollment",
+-  "approve-residual-acceptance",
++  "approve-residual-acceptance", "approve-critic-acknowledgement",
+   "po-authority-rebind-plan", "po-authority-rebind-apply", "po-authority-acknowledge-plan",
+   "po-authority-acknowledge-apply", "po-authority-decision-plan", "po-authority-decision-select",
+   "po-authority-decision-apply", "seal-plan-approval", "continuity-result-rebind-plan",
+diff --git a/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs b/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs
+index 64a4d058d2eb117ae902357d7bea3fab33197de5..4def3984aa8ddcf99a2f8082a774abac9030bc2f 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs
+@@ -13,6 +13,8 @@ import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";imp
+ import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
+ import { finishFeature } from "./finish-feature.mjs";
+ import { readConsumedCandidateReceipt } from "../lib/critic-packet-preflight-read.mjs";
++import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
++import { writeCriticalApproval } from "../lib/critical-action-authorization.mjs";
+ 
+ const ROOT = process.cwd();
+ const CLI = new URL("./close-coordinator.mjs", import.meta.url).pathname;
+@@ -149,7 +151,37 @@ test("D2b a caller-authored Critic verdict is refused CLOSE-CRITIC-CALLER-AUTHOR
+   const f = fixture(t, { origin: "fallback" });
+   const refused = planPrepared(f, 2);
+   assert.equal(refused.code, "CLOSE-CRITIC-CALLER-AUTHORED");
+-  assert.match(refused.message ?? JSON.stringify(refused), new RegExp(`${"1".repeat(32)}[\\s\\S]*rigor 1[\\s\\S]*without the fallback`, "iu"));
++  // Restated 2026-11-07 (G20-39, QG-04, same strictness): the old repair ("finalize WITHOUT the fallback") was not runnable, because finalizing
++  // without the flag is exactly what produces the fallback label. The refusal now names the one runnable repair, the PO acknowledgement command.
++  assert.match(refused.message ?? JSON.stringify(refused), new RegExp(`${"1".repeat(32)}[\\s\\S]*rigor 1[\\s\\S]*approve-critic-acknowledgement --by <name> --critic-packet ${"1".repeat(32)}`, "iu"));
++  assert.equal(existsSync(join(f.root, "audit-bundles")), false);
++});
++// G20-39 (AC-108): the acknowledgement is recorded the way the command records it (same private store, same record shape); the command itself is walked in close-path-e2e.
++function acknowledge(f, overrides = {}, packetId = "1".repeat(32)) {
++  const { receipt } = readConsumedCandidateReceipt({ controlRoot: join(f.root, ".git", "agent-pipeline", "critic-packets"), packetId });
++  const subject = criticAcknowledgementSubject({ packetId, receipt });
++  const approval = { approvedBy: "Fixture PO", approvedAt: "2026-11-07T10:00:00.000Z", forCommit: receipt.candidate.commit, forTree: receipt.candidate.tree, packetId,
++    criticReceiptSha256: subject.criticReceiptSha256, independence: subject.independence, criticalProof: null, ...overrides };
++  assert.equal(writeCriticalApproval({ gitCommonDir: join(f.root, ".git"), kind: CRITIC_ACKNOWLEDGEMENT_KIND, approval }).ok, true);
++}
++test("G20-39 an acknowledged caller-authored Critic admits the identical close at rigor 1, and the receipt keeps the caller-authored label", t => {
++  const f = fixture(t, { origin: "fallback" });
++  assert.equal(planPrepared(f, 2).code, "CLOSE-CRITIC-CALLER-AUTHORED");
++  acknowledge(f);
++  const plan = invoke(f.root, ["plan-transition", "--root", f.root, "--lifecycle", "close-audit", "--actor", "PO", "--phase", "feature-close-prepared", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", "evidence/close-request.json", "--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", f.lifecycle.receipt.id]);
++  invokeAction(f.root, plan.nextAction);
++  const { receipt } = readConsumedCandidateReceipt({ controlRoot: join(f.root, ".git", "agent-pipeline", "critic-packets"), packetId: "1".repeat(32) });
++  assert.equal(receipt.independence, "caller-authored-fallback");
++  assert.equal(existsSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), true);
++});
++test("G20-39 an acknowledgement for another packet, another receipt or another candidate never admits the close; nothing is built", t => {
++  const f = fixture(t, { origin: "fallback" });
++  acknowledge(f, { packetId: "2".repeat(32) });
++  acknowledge(f, { criticReceiptSha256: "e".repeat(64) });
++  acknowledge(f, { forCommit: "d".repeat(40) });
++  acknowledge(f, { forTree: "c".repeat(40) });
++  const refused = planPrepared(f, 2);
++  assert.equal(refused.code, "CLOSE-CRITIC-CALLER-AUTHORED");
+   assert.equal(existsSync(join(f.root, "audit-bundles")), false);
+ });
+ test("D2b a Source-issued Critic verdict closes at rigor 1 and its consumed receipt says so", t => {
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 22478a06dc8d72ee6058dc4c5b20902cc9c700ae..adbfb6eeb531e8ef2a7ab939641e2c65521be8cf 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -27,6 +27,7 @@ import { writeCriticDispositionAddendumObject } from "./dispatch-record-write.mj
+ import { CRITIC_EVIDENCE_SCHEMA } from "../lib/critic-skip-decision.mjs";
+ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
+ import { canonicalJson as criticPacketCanonicalJson, readConsumedCandidateReceipt } from "../lib/critic-packet-preflight-read.mjs";
++import { findCriticAcknowledgement } from "../lib/critic-acknowledgement.mjs";
+ import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
+ import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import {
+@@ -317,8 +318,8 @@ function auditLifecycleReadback({ root, common, request, auditPlan }) {
+   } catch (error) {
+     fail(error?.code ?? "CLOSE-CRITIC-VERIFY-UNAVAILABLE", `feature close requires the exact private Critic/Verify lifecycle receipt (${error?.message ?? "unavailable"})`);
+   }
+-  assertCriticIndependenceForClose({ root, common, lifecycle });
+-  return { evidence, lifecycle };
++  const criticIndependence = assertCriticIndependenceForClose({ root, common, lifecycle });
++  return { evidence, lifecycle, criticIndependence };
+ }
+ /**
+  * C19-D2b (PO 2026-11-03): a Critic verdict the calling agent authored itself (finalizer fallback) satisfies the close gate only at
+@@ -329,9 +330,10 @@ function auditLifecycleReadback({ root, common, request, auditPlan }) {
+ function assertCriticIndependenceForClose({ root, common, lifecycle }) {
+   const packetId = lifecycle.receipt?.critic?.packetId;
+   let independence;
+-  try { independence = readConsumedCandidateReceipt({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId }).receipt?.independence; }
++  let receipt;
++  try { receipt = readConsumedCandidateReceipt({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId }).receipt; independence = receipt?.independence; }
+   catch (error) { fail("CLOSE-CRITIC-CALLER-AUTHORED", `the consumed Critic receipt of packet ${packetId} could not be read to classify its independence (${error?.code ?? "unreadable"}); repair: restore the consumed receipt or run the Critic review as a fresh native session and finalize without the fallback`); }
+-  if (independence !== "caller-authored-fallback") return;
++  if (independence !== "caller-authored-fallback") return Object.freeze({ independence: independence ?? null, acknowledgement: null });
+   let rigor = null;
+   try {
+     const state = stateSnapshot(root).state;
+@@ -343,8 +345,12 @@ function assertCriticIndependenceForClose({ root, common, lifecycle }) {
+     }
+   } catch { /* unreadable rigor refuses below */ }
+   const highRisk = walkDispatchRecords(root).records.some(({ record }) => record?.criticRequired?.trigger?.riskClass === "high" || record?.criticRequired?.trigger?.riskFlag === true);
+-  if (rigor === 0 && !highRisk) return;
+-  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk; repair: run the Critic review as a fresh native session and finalize WITHOUT the fallback`);
++  if (rigor === 0 && !highRisk) return Object.freeze({ independence, acknowledgement: null });
++  // G20-39: the one runnable bridge. A PO acknowledgement of exactly this packet, receipt and candidate (recorded through the human-approval
++  // route) admits the identical close; the label stays caller-authored-fallback and travels with the acknowledgement reference.
++  const acknowledgement = findCriticAcknowledgement({ gitCommonDir: common, packetId, receipt });
++  if (acknowledgement !== null) return Object.freeze({ independence, acknowledgement });
++  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk; repair: record the PO acknowledgement of this caller-authored Critic for exactly this packet and its candidate with node <plugin-root>/scripts/pipeline-state.mjs approve-critic-acknowledgement --by <name> --critic-packet ${packetId} (in signature mode also --proof-request/--proof-authority/--proof from the signing step), then run the identical close command again; a runner whose Critic subagent stop issues the Source return record needs no acknowledgement`);
+ }
+ function startPlan(values) {
+   const root = physicalRoot(values.root);
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 5467591c5a5c7b8245b4eeb8e058071352d302e5..367336fa6c7b152c82a5ea7a89cf300655e44434 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -288,25 +288,6 @@ test("G20-35: the close path from implementation to release preflight is walked
+       const finalizer = (verb, request) => {
+         mkdirSync(join(fx.root, "scratch"), { recursive: true });
+         writeJson(join(fx.root, "scratch", `${verb}-request.json`), request);
+-        if (verb === "finalize") {
+-          // w266 finding 1: since G20-24 every finalize without a Source return record is labelled caller-authored-fallback, and the close
+-          // gate (close-coordinator.mjs assertCriticIndependenceForClose) refuses that label at rigor >= 1 or high risk. No runner issues a
+-          // Source return record (the CLI's reader is unavailableOriginalSourceReader), so on today's product no rigor >= 1 close is reachable.
+-          // The walk stands in for the missing producer through the finalizer's own dependency, exactly as session-critic-finalizer.test.mjs
+-          // does, run in-process under the runner identity's markers; the close gate itself is NOT weakened.
+-          const savedEnv = { ...process.env };
+-          for (const key of Object.keys(process.env)) delete process.env[key];
+-          Object.assign(process.env, walkEnv);
+-          let outcome;
+-          try {
+-            outcome = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", `scratch/${verb}-request.json`], {
+-              readOriginalSourceReturnFn: (query) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: query.packetId, packetDigest: query.packetDigest,
+-                claimant: query.claimant, sessionId: query.sessionId, verdictSha256: query.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60_000 }),
+-            });
+-          } finally { for (const key of Object.keys(process.env)) delete process.env[key]; Object.assign(process.env, savedEnv); }
+-          assert.equal(outcome.exitCode, 0, `${identity.runner}: in-process finalize: ${JSON.stringify(outcome.output).slice(0, 600)}`);
+-          return { status: 0, stdout: JSON.stringify(outcome.output), stderr: "" };
+-        }
+         return step(log, `${identity.runner}: critic ${verb}`, process.execPath,
+           [script("session-critic-finalizer.mjs"), verb, "--root", fx.root, "--request", `scratch/${verb}-request.json`], { cwd: fx.root });
+       };
+@@ -320,8 +301,23 @@ test("G20-35: the close path from implementation to release preflight is walked
+       };
+       const admitted = json(finalizer("admit", finalizeRequest));
+       assert.equal(admitted.packetId, packetId);
+-      writeJson(join(fx.root, "evidence", "critic-verdict.json"), { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent",
+-        trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true });
++      const criticVerdict = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent",
++        trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true };
++      writeJson(join(fx.root, "evidence", "critic-verdict.json"), criticVerdict);
++      if (identity.runner !== "antigravity") {
++        // G20-39: the Critic subagent's stop is what issues the Source return record, never the calling agent. The stop hook runs as the runner runs
++        // it (a child process fed the stop payload on stdin) with the Critic's final message carrying the verdict; the CLI finalize below then reads
++        // the record from the private control area and the close gate admits it at rigor >= 1.
++        const stop = spawnSync(process.execPath, [fileURLToPath(new URL("../hooks/native-goldfish-host.mjs", import.meta.url)), "--runner", identity.runner],
++          { input: JSON.stringify({ hook_event_name: "SubagentStop", session_id: RUNNER_MARKERS[identity.runner].CLAUDE_CODE_SESSION_ID ?? RUNNER_MARKERS[identity.runner].CODEX_THREAD_ID,
++            agent_id: `critic-${identity.runner}-1`, agent_type: "pipeline-core:critic", cwd: fx.root, stop_hook_active: false,
++            last_assistant_message: `Review finished; notes are in the notes file.\n\n\`\`\`json\n${JSON.stringify(criticVerdict, null, 2)}\n\`\`\`\n` }),
++          cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 60_000 });
++        assert.equal(stop.status, 0, `${identity.runner}: the Critic stop hook never blocks: ${stop.stderr}`);
++        assert.equal(stop.stdout, "", `${identity.runner}: a stop hook's stdout is read as a decision and stays empty`);
++        assert.match(stop.stderr, /Critic Source return issued for packet/u, `${identity.runner}: ${stop.stderr}`);
++        assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", packetId, "source-return.json")), true);
++      }
+       const finalized = json(finalizer("finalize", finalizeRequest));
+       assert.equal(finalized.status, "completed", `${identity.runner}: the Critic return is consumed and read back identically`);
+       assert.equal(finalized.receipt.session.id, `${identity.runner}-critic-1`);
+@@ -425,6 +421,24 @@ test("G20-35: the close path from implementation to release preflight is walked
+       assert.equal(lifecycleIds.length, 1, `${identity.runner}: exactly one Critic/Verify lifecycle receipt: ${lifecycleIds}`);
+       writeJson(join(fx.root, "evidence", "audit-request.json"), { schema: "pipeline.feature-close-audit-request.v1", manifestPath: MANIFEST, coreVersion: "0.7.0",
+         packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: lifecycleIds[0] });
++      if (identity.runner === "antigravity") {
++        // G20-39 bridge: this identity has no Source return producer (its subagent stop event is still being measured), so its Critic finalized as
++        // caller-authored-fallback and the close gate refuses it at rigor >= 1. The refusal names ONE runnable repair, the PO acknowledgement of exactly this
++        // packet and candidate, recorded through the human-approval route (the fixture selects chat); then the IDENTICAL close command is admitted.
++        const closeArgs = ["plan-transition", "--root", fx.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "feature-close-prepared", "--audit-request", "evidence/audit-request.json",
++          "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"];
++        const refusedClose = step(log, `${identity.runner}: close without the acknowledgement`, process.execPath, [script("close-coordinator.mjs"), ...closeArgs], { cwd: fx.root, expectedStatus: 2 });
++        assert.equal(json(refusedClose).code, "CLOSE-CRITIC-CALLER-AUTHORED", refusedClose.stdout);
++        assert.match(refusedClose.stdout, new RegExp(`approve-critic-acknowledgement --by <name> --critic-packet ${packetId}`, "u"));
++        const wrongPacket = step(log, `${identity.runner}: acknowledgement of a packet that does not exist`, process.execPath,
++          [script("pipeline-state.mjs"), "approve-critic-acknowledgement", "--by", "Fixture PO", "--critic-packet", "2".repeat(32)], { cwd: fx.root, expectedStatus: 2 });
++        assert.match(wrongPacket.stderr, /refused/u);
++        const stillRefused = step(log, `${identity.runner}: close after an acknowledgement of another packet`, process.execPath, [script("close-coordinator.mjs"), ...closeArgs], { cwd: fx.root, expectedStatus: 2 });
++        assert.equal(json(stillRefused).code, "CLOSE-CRITIC-CALLER-AUTHORED");
++        const acknowledged = step(log, `${identity.runner}: approve-critic-acknowledgement (the command the refusal named)`, process.execPath,
++          [script("pipeline-state.mjs"), "approve-critic-acknowledgement", "--by", "Fixture PO", "--critic-packet", packetId], { cwd: fx.root });
++        assert.match(acknowledged.stdout, /acknowledged/u);
++      }
+       const prepared = transition("feature-close-prepared", ["--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]);
+       assert.equal(prepared.phase, "feature-close-prepared");
+       assert.ok(prepared.nextAction.argv.includes("--continuity-close-request"), `the returned close-feature action keeps the Continuity flag: ${JSON.stringify(prepared.nextAction.argv.slice(1))}`);
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+index ef1333691459c44fcd494cd6da8fa285a2ab6ca6..4ddcd0dd613c946bcbae7a55676a46a0ddfcde90 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+@@ -16,7 +16,7 @@ import { CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA, deriveCriticPacketGovernance, va
+ import { validateCriticLineagePacketAdmission } from "../lib/critic-review-lineage.mjs";
+ import { createLocalDispatchEvidenceBinding, evaluateReviewAdmission, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
+ import { createDiagnosticBundle, materializeDiagnosticBundle, revalidateDiagnosticBundle } from "../lib/critic-diagnostic-packet.mjs";
+-import { PACKET_SCHEMA, RECORD_SCHEMA, SESSION_ADMISSION_SCHEMA, SAFE_ID, PACKET_ID, SHA256, OID, CriticPacketError, fail, isObject, exactKeys, canonicalJson, sha256, inside, assertRealPrivateDir, assertNoSymlinkPath, readJson, normalizeSessionBinding, bindingsFor, recordBody, normalizeCoordinatorOnly, packetContext, currentState, normalizedPacketView } from "../lib/critic-packet-preflight-read.mjs";
++import { PACKET_SCHEMA, RECORD_SCHEMA, SESSION_ADMISSION_SCHEMA, SESSION_REVIEW_TTL_SECONDS, SAFE_ID, PACKET_ID, SHA256, OID, CriticPacketError, fail, isObject, exactKeys, canonicalJson, sha256, inside, assertRealPrivateDir, assertNoSymlinkPath, readJson, normalizeSessionBinding, bindingsFor, recordBody, normalizeCoordinatorOnly, packetContext, currentState, normalizedPacketView } from "../lib/critic-packet-preflight-read.mjs";
+ export { PACKET_SCHEMA, STATE_SCHEMA, RECORD_SCHEMA, SESSION_PACKET_BINDING_SCHEMA, SESSION_ADMISSION_SCHEMA, CriticPacketError, canonicalJson, sha256, normalizedPacketView, packetDigestMatches, readConsumedCandidateReceipt, readConsumedCandidateResult, readConsumedSessionAdmission } from "../lib/critic-packet-preflight-read.mjs";
+ 
+ /**
+@@ -30,7 +30,7 @@ export { PACKET_SCHEMA, STATE_SCHEMA, RECORD_SCHEMA, SESSION_PACKET_BINDING_SCHE
+ 
+ 
+ export const PACKET_TTL_SECONDS = 900;
+-export const SESSION_REVIEW_TTL_SECONDS = 24 * 60 * 60;
++export { SESSION_REVIEW_TTL_SECONDS };
+ export const PACKET_DIFF_PATH = ".git/agent-pipeline-review.diff";
+ export const PACKET_FILES = Object.freeze([
+   "packet.json", "state.json", "claim.json", "export-native.json", "export-fallback.json",
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index c5e3f731b96768f33a6c81c36b34dd1985bfc3e5..001f2f16992a50455f309c3909750b2d4f67ccd3 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -446,6 +446,7 @@ import {
+   writeCriticalApproval,
+ } from "../lib/critical-action-authorization.mjs";
+ import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
++import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+ import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
+ import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+ import {parse} from 'node:path';
+@@ -777,7 +778,7 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
+   "inspect", "update-public-handover", "rebind-approval",
+   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "prepare-seal", "seal-plan-approval",
+   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
+-  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance",
++  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance", "approve-critic-acknowledgement",
+   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
+   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
+   "po-authority-acknowledge-plan", "po-authority-acknowledge-apply",
+@@ -4820,7 +4821,7 @@ function localPushScratchArtifacts(dir, flags) {
+  * `publication`/`governance-fork-disposition` are deliberately NOT in this set, so their
+  * behaviour is byte-identical to before this addition.
+  */
+-const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings"]);
++const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings", CRITIC_ACKNOWLEDGEMENT_KIND]);
+ 
+ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
+   // The cryptographic proof may be stood down for this kind — by `gates.push_approval:
+@@ -9813,6 +9814,70 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+   return 0;
+ }
+ 
++// G20-39 (candidate 20): a PO acknowledgement of a caller-authored Critic for exactly one consumed packet and the candidate it reviewed. This is the
++// bridge for a runner that issues no Source return record; the close gate names this command as its one runnable repair. Recorded through the same
++// human-approval route as `feature-package-reconcile` (signature or chat per `gates.human_approval`), into the private approval store, never inferred.
++function runApproveCriticAcknowledgement({ dir, rest, base, now, deps }) {
++  const kind = CRITIC_ACKNOWLEDGEMENT_KIND;
++  const refuse = (code) => { console.error(`Error: approve-critic-acknowledgement refused (${code}).`); return 2; };
++  const configured = criticalProofWaiverFor(dir, kind);
++  if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
++  const waived = configured.waived === true;
++  const parsed = parseExactFlags(rest, new Set(waived ? ["by", "critic-packet"] : ["by", "critic-packet", "proof-request", "proof-authority", "proof"]));
++  const flags = parsed.value ?? {};
++  if (!parsed.ok || isBlank(flags.by) || isBlank(flags["critic-packet"])) {
++    console.error("Error: approve-critic-acknowledgement requires --by and --critic-packet and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.");
++    return 2;
++  }
++  const common = resolveCriticalApprovalCommonDir(dir);
++  if (common === null) return refuse("CRITICAL-APPROVAL-STORE-UNAVAILABLE");
++  const packetId = flags["critic-packet"];
++  let receipt;
++  try { receipt = (deps.readConsumedCandidateReceiptFn ?? readConsumedCandidateReceipt)({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId }).receipt; }
++  catch (error) { return refuse(typeof error?.code === "string" ? error.code : "CRITIC-PACKET-UNREADABLE"); }
++  if (typeof receipt?.candidate?.commit !== "string" || typeof receipt.candidate.tree !== "string") return refuse("CRITIC-PACKET-UNREADABLE");
++  // Nothing to acknowledge unless the consumed verdict really carries the caller-authored label; a Source-issued verdict needs no bridge.
++  if (receipt.independence !== "caller-authored-fallback") return refuse("CRITIC-ACK-NOT-CALLER-AUTHORED");
++  // The acknowledgement is bound to the candidate the Critic reviewed, never to the checkout's current HEAD.
++  const candidate = { commit: receipt.candidate.commit, tree: receipt.candidate.tree };
++  const subject = criticAcknowledgementSubject({ packetId, receipt });
++  console.error([`PO ACKNOWLEDGEMENT OF A CALLER-AUTHORED CRITIC -- the verdict of this packet was authored by the calling agent, not issued by a Critic subagent's stop:`,
++    `  packet: ${packetId}`, `  candidate: ${candidate.commit}`, `  critic receipt: ${subject.criticReceiptSha256}`,
++    "  this acknowledgement covers exactly this packet and candidate; the close record keeps the label caller-authored-fallback next to it."].join("\n"));
++  const approvedAt = now();
++  if (!waived && (isBlank(flags["proof-request"]) || isBlank(flags["proof-authority"]) || isBlank(flags.proof))) {
++    // Signature mode without a proof is not a dead end: the signing command for exactly this subject is rendered (never run), and the PO's own terminal signs it.
++    try {
++      const root = realpathSync(resolve(dir));
++      const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
++      const expiresAt = new Date((Date.parse(approvedAt) || Date.now()) + 3_600_000).toISOString();
++      const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId: base.activeFeature?.id, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt });
++      console.log(JSON.stringify({ schema: "pipeline.critic-acknowledgement-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
++        signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
++        acknowledgeCommand: { executable: process.execPath, argv: [fileURLToPath(import.meta.url), "approve-critic-acknowledgement", "--by", "<po-name>", "--critic-packet", packetId, "--proof-request", "<proof-request>", "--proof-authority", "<proof-authority>", "--proof", "<proof>"],
++          note: "run after the PO signed: --by is the PO's own name; the three proof paths are printed by the signing step" } }));
++    } catch { /* the refusal below still names the missing flags */ }
++    return refuse("CRITICAL-PROOF-FLAGS-PROOF-REQUIRED");
++  }
++  const verified = verifyCriticalHumanProof({ dir, state: base, kind, candidate, subject, flags, now: approvedAt, required: true });
++  if (!verified.ok) return refuse(verified.code);
++  const priorConsumption = base.criticalProofConsumption;
++  if (priorConsumption !== undefined && (!Array.isArray(priorConsumption) || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) return refuse("CRITICAL-PROOF-CONSUMPTION-INVALID");
++  if (verified.proof !== null && ((Array.isArray(priorConsumption) ? priorConsumption : []).some((entry) => entry.proofSha256 === verified.proof.proofSha256)
++    || isCriticalProofConsumedPrivately(common, verified.proof.proofSha256))) return refuse("CRITICAL-PROOF-REPLAY");
++  const approval = { approvedBy: flags.by, approvedAt, forCommit: candidate.commit, forTree: candidate.tree, packetId, criticReceiptSha256: subject.criticReceiptSha256,
++    independence: subject.independence, criticalProof: verified.proof };
++  if (waived) {
++    // Chat mode is always an attributed, unattested approval carrying the live waiver source (mirrors the reconcile and residual records).
++    approval.criticalProofWaiver = { ...(verified.waived ?? {}), kind, mode: "chat-attributed-unattested" };
++    approval.humanApproval = chatAttributionRecord({ kind, by: flags.by });
++  } else if (verified.waived !== undefined) approval.criticalProofWaiver = verified.waived;
++  const stored = writeCriticalApproval({ gitCommonDir: common, kind, approval, consumedAt: approvedAt });
++  if (!stored.ok) return refuse(stored.code);
++  console.log(`Caller-authored Critic acknowledged by "${flags.by}" for packet ${packetId} and commit ${candidate.commit} (critic receipt ${subject.criticReceiptSha256}); run the identical close command again.`);
++  return 0;
++}
++
+ function runFeaturePackageWriteCommand(sub, argv, deps) {
+   if (sub === "feature-package-apply") return runFeaturePackageApplyCommand(argv, deps);
+   if (sub === "feature-package-reconcile") {
+@@ -13872,6 +13937,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+ 
+     case "approve-residual-acceptance":
+       return runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps });
++    case "approve-critic-acknowledgement":
++      return runApproveCriticAcknowledgement({ dir, rest, base, now, deps });
+ 
+     case "approve-deploy": {
+       // ADR-0055: a waived kind STAYS in requiredKinds, so `has("deploy")` is not the
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index e3f7f3ea2c3610401fd899c48d558dc746cc6360..5242a7fe36356eb9aecc75672e254f5438e851b5 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -1062,7 +1062,7 @@ function suggestSubcommand(input, candidates) {
+  * governance-fork-disposition-style verification bypass concern either.
+  */
+ const RESIDUAL_ACCEPTANCE_KIND = "accept-residual-critic-findings";
+-const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND]);
++const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND, "acknowledge-caller-authored-critic"]);
+ const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
+ const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+ 
+@@ -2069,7 +2069,7 @@ export function authorizeCriticalPushCommand({
+  * The kinds the `authorize-critical` terminal command takes a bare `--subject-sha256` for (the USAGE list above).
+  * Residual-acceptance and the governance/interruption kinds have their own subject builders and are not rendered here.
+  */
+-export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile"]);
++export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile", "acknowledge-caller-authored-critic"]);
+ 
+ /**
+  * N30 (D210): the kind-parametric sibling of `authorizeCriticalPushCommand`. The push builder is the `kind: "push"`
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index 6bbf99e938e506017c258ce6750359f15d7e07c7..3ea5ac93c2f6118457c6de178d1ba38221cb5031 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -2396,7 +2396,21 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
+     // clean-candidate check instead of the Usage refusal), so asserting Usage for it is a premise the source
+     // no longer holds. This file holds NO positive-path test for interruption-promotion: that is a coverage
+     // gap, reported and not built here. `accept-residual-critic-findings` (D190) is excluded for the same reason and has its own positive-path tests at the end of this file. Every other kind keeps the Usage assertion.
+-    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings"].includes(entry))) {
++    // `acknowledge-caller-authored-critic` (G20-39, PO decision 2026-11-07 "Producer + Brücke") was added to CRITICAL_COMMAND_KINDS
++    // deliberately, so a signature-mode PO can sign the close-gate acknowledgement; excluded here (QG-04) and pinned positively below:
++    // prepare-critical composes it instead of refusing with Usage.
++    {
++      let usage = false;
++      try {
++        runHumanApproval([
++          "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
++          "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
++          "--kind", "acknowledge-caller-authored-critic", "--subject-sha256", "a".repeat(64), "--expires-at", FAR_FUTURE,
++        ], {});
++      } catch (error) { usage = /Usage:/u.test(String(error?.message ?? error)); }
++      assert.equal(usage, false, "prepare-critical composes acknowledge-caller-authored-critic (G20-39)");
++    }
++    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings", "acknowledge-caller-authored-critic"].includes(entry))) {
+       assert.throws(() => runHumanApproval([
+         "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+         "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index 30592f393d084f56c989253f667a248858528d3e..f9b61ee4432fa072aa148c4ee3a2808afac08247 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -13,6 +13,7 @@ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { reserveFeatureCriticReviewUnitOwnership, republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore, inspectFeatureCourseTakeover, supersedeFeatureCourseTakeover, readCriticReviewUnit } from "../lib/critic-generic-batch.mjs";
+ import { releaseCriticPacket } from "../lib/critic-packet-release.mjs";
++import { readCriticSourceReturn } from "../lib/critic-source-return.mjs";
+ import { GOVERNANCE_REVIEW_SOURCE_SCHEMA, buildGovernanceReviewAction, buildGovernanceReviewRetry, preflightGovernanceReviewActionOutput, writeGovernanceReviewAction } from "../lib/governance-review-action.mjs";
+ import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+@@ -125,14 +126,15 @@ const EVENT_KEYS = Object.freeze(["eventOutPath", "featureId"]);
+ const SCF_REQUEST_SHAPE = "the request is a closed JSON file that does not match; session-critic-finalizer.mjs --help lists its exact keys";
+ 
+ // Cut A: a record the Source issued when the fresh session returned upgrades the verdict to source-issued-origin.
+-// No runner produces one yet; since G20-24 (PO 2026-11-07) a missing record finalizes under the weaker
++// The Critic subagent's stop hook issues it (G20-39); where none exists (Antigravity) a missing record, since G20-24 (PO 2026-11-07), finalizes under the weaker
+ // caller-authored label instead of refusing, and a record that is present must still bind exactly.
+ const ORIGINAL_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return.v1";
+ const ORIGINAL_SOURCE_RETURN_KEYS = Object.freeze(["schema", "issuer", "packetId", "packetDigest", "claimant", "sessionId", "verdictSha256", "issuedAtMs", "expiresAtMs"]);
+-function unavailableOriginalSourceReader() { fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE"); }
+-function originGate(query, options, deps) {
++// G20-39: the default reader is the private control area. The Critic subagent's stop hook (hooks/native-goldfish-host.mjs ->
++// lib/critic-source-return.mjs) issues the record there; a missing record reads as null, a present one is returned as stored.
++function originGate(query, options, deps, controlRoot) {
+   let record = null;
+-  try { record = (deps.readOriginalSourceReturnFn ?? unavailableOriginalSourceReader)(query); } catch { record = null; }
++  try { record = (deps.readOriginalSourceReturnFn ?? ((q) => readCriticSourceReturn({ controlRoot, packetId: q.packetId })))(query); } catch { record = null; }
+   // G20-24 (PO decision 2026-11-07): no runner issues a Source return record, so requiring one made the normal finalize path
+   // unreachable (SCF-ORIGINAL-SOURCE-UNAVAILABLE on every runner). Without a record the verdict is finalized with the honest
+   // caller-authored label; a record that IS present must still bind exactly (below). The option is kept for compatibility only.
+@@ -674,7 +676,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
+   let event = null;
+   const independence = originGate({ packetId, packetDigest: prepared.packetDigest,
+     claimant: { runner: options.route?.runner, adapter: options.route?.adapter },
+-    sessionId: id, verdictSha256: sha256(canonicalJson(assertVerdict(options.verdict))) }, options, deps);
++    sessionId: id, verdictSha256: sha256(canonicalJson(assertVerdict(options.verdict))) }, options, deps, controlRoot);
+   const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict, independence: independence.independence });
+   validateResult(result, prepared.packet, prepared.packetDigest);
+   const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 95d6b4867d401b9d2af9a466d4dd8ead053e07c2..950310fd3b36974df5695d99fb759b9414debfe4 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -1836,6 +1836,118 @@ test("Cut A (6) CLI finalize without an origin completes under the caller-author
+   } finally { cleanup(fx); }
+ });
+ 
++// G20-39 (candidate 20, AC-108): the Critic subagent's stop issues the Source return record into the private control area, and the
++// finalizer's CLI reads it there. Criterion-bound cases, written before the producer existed.
++const SOURCE_RETURN_FILE = "source-return.json";
++const verdictDigest = (value) => createHash("sha256").update(canonicalJson(value)).digest("hex");
++function admitViaCli(fx) {
++  const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx));
++  assert.equal(runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]).exitCode, 0);
++  const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
++  const packetId = "6".repeat(32);
++  const { admission } = inspectClaimedSessionAdmission({ controlRoot, packetId });
++  return { requestPath, controlRoot, packetId, admission };
++}
++function writeSourceReturn(admitted, overrides = {}, verdictValue = verdict()) {
++  const record = { schema: ORIGIN_SCHEMA, issuer: "source", packetId: admitted.packetId, packetDigest: admitted.admission.packetDigest,
++    claimant: { runner: "codex", adapter: "session-functional-equivalent" }, sessionId: admitted.admission.sessionId, verdictSha256: verdictDigest(verdictValue),
++    issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60_000, ...overrides };
++  writeFileSync(join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE), `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 });
++  return record;
++}
++const stopInput = (text, overrides = {}) => ({ hook_event_name: "SubagentStop", session_id: "33333333-aaaa-bbbb-cccc-444444444444", agent_type: "critic",
++  last_assistant_message: text, stop_hook_active: false, cwd: "/work", ...overrides });
++const criticReturn = (value = verdict()) => `Report written to the notes file.\n\n\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\`\n`;
++
++test("G20-39 (a) the CLI finalize reads the Source return record from the private control area and finalizes source-issued-origin", () => {
++  const fx = fixture();
++  try {
++    const admitted = admitViaCli(fx);
++    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
++    writeSourceReturn(admitted);
++    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
++    assert.equal(result.exitCode, 0, JSON.stringify(result.output));
++    assert.equal(result.output.status, "completed");
++    assert.equal(result.output.independence, "source-issued-origin");
++    assert.equal(result.output.origin, "source");
++    assert.equal(result.output.receipt.independence, "source-issued-origin");
++  } finally { cleanup(fx); }
++});
++
++test("G20-39 (b) a record in the control area that does not bind the returned verdict, the packet or the session is refused, never relabelled", () => {
++  for (const overrides of [{ verdictSha256: "d".repeat(64) }, { packetDigest: "c".repeat(64) }, { sessionId: "another-session-1" }, { issuer: "caller" }, { expiresAtMs: Date.now() - 1 }]) {
++    const fx = fixture();
++    try {
++      const admitted = admitViaCli(fx);
++      writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
++      writeSourceReturn(admitted, overrides);
++      const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
++      assert.equal(result.exitCode, 2, JSON.stringify(overrides));
++      assert.equal(result.output.code, ORIGIN_BINDING, JSON.stringify(overrides));
++    } finally { cleanup(fx); }
++  }
++});
++
++test("G20-39 (c) the Critic stop hook issues the record bound to the claimed packet and to the returned verdict; finalize then reads it", async () => {
++  const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
++  const fx = fixture();
++  try {
++    const admitted = admitViaCli(fx);
++    const issued = issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn()) });
++    assert.equal(issued.status, "issued", JSON.stringify(issued));
++    assert.equal(issued.packetId, admitted.packetId);
++    const record = JSON.parse(readFileSync(join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE), "utf8"));
++    assert.deepEqual(Object.keys(record).sort(), ["claimant", "expiresAtMs", "issuedAtMs", "issuer", "packetDigest", "packetId", "schema", "sessionId", "verdictSha256"]);
++    assert.equal(record.packetDigest, admitted.admission.packetDigest);
++    assert.equal(record.sessionId, admitted.admission.sessionId);
++    assert.deepEqual(record.claimant, { runner: "codex", adapter: "session-functional-equivalent" });
++    assert.equal(record.verdictSha256, verdictDigest(verdict()));
++    assert.ok(record.expiresAtMs > record.issuedAtMs);
++    // The coordinator copies the Critic's returned JSON verbatim: the identical close finalizes source-issued.
++    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
++    assert.equal(runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]).output.independence, "source-issued-origin");
++  } finally { cleanup(fx); }
++});
++
++test("G20-39 (d) a verdict that differs from the one the Critic returned finalizes to a refusal; a second stop never overwrites the record", async () => {
++  const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
++  const fx = fixture();
++  try {
++    const admitted = admitViaCli(fx);
++    assert.equal(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn()) }).status, "issued");
++    const again = issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(verdict({ pass: false, findings: [] }))) });
++    assert.notEqual(again.status, "issued");
++    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict({ deliberately_not_flagged: ["scope", "added by the caller"] }))}\n`);
++    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
++    assert.equal(result.exitCode, 2);
++    assert.equal(result.output.code, ORIGIN_BINDING);
++  } finally { cleanup(fx); }
++});
++
++test("G20-39 (e) an unmarked or non-Critic stop, a stop without a schema-shaped verdict, and a stop of another runner are a silent no-op that writes nothing", async () => {
++  const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
++  const fx = fixture();
++  try {
++    const admitted = admitViaCli(fx);
++    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
++    const attempts = [
++      { runner: "codex", input: stopInput(criticReturn(), { agent_type: "goldfish-implementor" }) },
++      { runner: "codex", input: stopInput(criticReturn(), { agent_type: undefined }) },
++      { runner: "codex", input: stopInput("The review is finished; no machine-readable verdict was returned.") },
++      { runner: "codex", input: stopInput(criticReturn({ pass: true })) },
++      { runner: "claude", input: stopInput(criticReturn()) },
++      { runner: "codex", input: stopInput(criticReturn(), { hook_event_name: "PostToolUse" }) },
++    ];
++    for (const attempt of attempts) {
++      const outcome = issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), ...attempt });
++      assert.notEqual(outcome.status, "issued", JSON.stringify(outcome));
++      assert.equal(existsSync(target), false);
++    }
++    // The namespaced agent type of a plugin Critic is the Critic.
++    assert.equal(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(), { agent_type: "pipeline-core:critic" }) }).status, "issued");
++  } finally { cleanup(fx); }
++});
++
+ const FALLBACK_FLAG = "--allow-caller-authored-fallback";
+ 
+ test("Cut A follow-up (1) CLI finalize without the flag and without a Source record reports the same result as with the flag", () => {
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index 49cea72642ded697422c2710b772d7eef376ba04..a392d52a6ba3936243aeec1fff815aa770dded8e 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -81,6 +81,7 @@ session; it need not exist for `admit`, but must exist for `finalize`.
+ `source-complete/event-unavailable` and an identical-only retry. Any malformed
+ argv, request, or verdict exits 2 with a closed
+ `pipeline.session-critic-finalization-error.v1` object.
++The Critic returns its verdict JSON as its whole final message or as the LAST fenced `json` block of it; the Critic's stop hook reads it there and issues the Source return record for the one open admitted packet, so `finalize` labels the verdict `source-issued-origin`. Write that JSON verbatim (same key order) to `verdictPath`. Without a record (a runner whose stop issues none, or several open packets) `finalize` labels it `caller-authored-fallback`, which the feature close refuses at rigor >= 1 or high risk; the repair it names is `pipeline-state.mjs approve-critic-acknowledgement --by <name> --critic-packet <packetId>` (the PO's acknowledgement of exactly that packet and candidate; in signature mode the command prints the signing step), then the identical close command.
+ A rejected prelaunch admission is a coordinator defect, not Critic work: do
+ not spawn a child or substitute prose/evidence. A returned verdict without
+ the exact prelaunch admission cannot mint a passing receipt.
+diff --git a/plugins/pipeline-core/templates/human-terminal-actions/catalog.json b/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
+index 956953ba8f6ea53a2f4d54f60c283eb4f4455667..39342a10f6324b1a802624baabf4ed4a67f651e2 100644
+--- a/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
++++ b/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
+@@ -464,6 +464,26 @@
+       "runners": null,
+       "platforms": null
+     },
++    {
++      "id": "acknowledge-caller-authored-critic",
++      "inventoryId": "acknowledge-caller-authored-critic",
++      "revision": 1,
++      "purpose": "Record the caller-authored Critic acknowledgement terminal-template disposition",
++      "audience": "user",
++      "disposition": "legacy-renderer",
++      "templateId": null,
++      "builderId": null,
++      "producerRefs": [
++        "plugins/pipeline-core/scripts/pipeline-state.mjs#approve-critic-acknowledgement"
++      ],
++      "boundary": null,
++      "mutation": null,
++      "requiresPoApproval": null,
++      "slots": null,
++      "expectedReadback": null,
++      "runners": null,
++      "platforms": null
++    },
+     {
+       "id": "critical-action-family",
+       "inventoryId": "critical-action-family",

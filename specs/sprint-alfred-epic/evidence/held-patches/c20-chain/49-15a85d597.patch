@@ -1,0 +1,435 @@
+diff --git a/plugins/pipeline-core/hooks.json b/plugins/pipeline-core/hooks.json
+index 8ab0e0556e1f3f0b487d7c9ff6ce8feb08bb3703..da70167fe8d07f18d3547b0ac9133116874bb83f 100644
+--- a/plugins/pipeline-core/hooks.json
++++ b/plugins/pipeline-core/hooks.json
+@@ -3,7 +3,7 @@
+     "enabled": true,
+     "PreToolUse": [
+       {
+-        "matcher": "run_command|write_to_file|replace_file_content|write_file|edit_file|read_file|invoke_subagent",
++        "matcher": "run_command|write_to_file|replace_file_content|write_file|edit_file|read_file|invoke_subagent|send_message",
+         "hooks": [
+           {
+             "type": "command",
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index aa38c8ff05b14ee15f057e66eacc9989a6d9e021..036ced328db0e82a65e93ab8760063179cc33e1c 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -5,7 +5,7 @@
+ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+ import { existsSync, read, readFileSync, realpathSync, rmSync } from "node:fs";
+-import { isAbsolute, join, relative, resolve, sep } from "node:path";
++import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+@@ -42,9 +42,11 @@ import { commandIsGitPush } from "../lib/git-cmd.mjs";
+ import { classifyGhCommand } from "../lib/gh-cmd.mjs";
+ import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
+ import {
+-  decodeNativeInvokeArgs, evaluateNativeChildCall, evaluateNativeGoldfishParentCall, isNativeCodeWriterType, nativeBrainWriteRefusal,
++  bareNativeType, decodeNativeInvokeArgs, evaluateNativeChildCall, evaluateNativeGoldfishParentCall, isNativeCodeWriterType, nativeBrainWriteRefusal,
+   nativeChildWriteRefusal, projectNativeChildInput, resolveNativeChildGovernance,
+ } from "../lib/agy-native-goldfish.mjs";
++import { issueCriticSourceReturnFromMessage } from "../lib/critic-source-return.mjs";
++import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
+@@ -567,6 +569,32 @@ export function inspectScratchShellScript(command, projectRoot, {
+   }
+ }
+ 
++const isCriticName = (value) => typeof value === "string" && bareNativeType(value).trim().toLowerCase() === "critic";
++
++/**
++ * G20-41 (AC-108): the Critic CHILD's final `send_message` to its parent issues the Source return record. The child is recognised only through facts the
++ * runner wrote: its own conversationId in the payload (and an artifact directory of that same name), the host's descriptor under the PARENT's brain
++ * directory (`attributed`, from evaluateNativeChildCall) naming the Critic by type or role, and a Recipient equal to the parent the DESCRIPTOR names --
++ * never a value the Message supplies beyond the verdict itself. Anything else is `not-applicable` (a silent no-op). Never throws and never decides the tool call;
++ * the hook fires twice per call (child worktree cwd, main repository cwd) and the record is created exclusively, so the second firing is `already-issued`.
++ * @returns {{ status: string, packetId?: string }}
++ */
++export function issueAntigravityCriticReturn(input, attributed, { nowMs = Date.now() } = {}) {
++  try {
++    if (input?.toolCall?.name !== "send_message" || attributed === null || typeof attributed !== "object") return { status: "not-applicable" };
++    if (!isCriticName(attributed.typeName) && !isCriticName(attributed.role)) return { status: "not-applicable" };
++    const args = decodeNativeInvokeArgs(input.toolCall.args ?? {});
++    if (typeof args?.Recipient !== "string" || args.Recipient !== attributed.parentConversationId || typeof args.Message !== "string") return { status: "not-applicable" };
++    if (typeof input.artifactDirectoryPath !== "string" || basename(input.artifactDirectoryPath) !== attributed.childConversationId) return { status: "not-applicable" };
++    // The packet lives in the repository's common git directory; every workspace of the child (its worktree, then the main repository) resolves to the same one.
++    const workspaces = (Array.isArray(input.workspacePaths) ? input.workspacePaths : []).filter((value) => typeof value === "string" && value.trim() !== "");
++    let commonDir = null;
++    for (const workspace of workspaces) { commonDir = resolveGitCommonDir(workspace); if (commonDir !== null) break; }
++    if (commonDir === null) return { status: "unavailable" };
++    return issueCriticSourceReturnFromMessage({ commonDir, runner: "antigravity", text: args.Message, nowMs });
++  } catch { return { status: "unavailable" }; }
++}
++
+ export async function runAntigravityPreToolGuard(rawInput) {
+   // M4b: a native child in a branch worktree names the worktree FIRST in workspacePaths. The worktree is outside the project and carries no
+   // governance marker, so every check below would see an ungoverned directory and allow the call (measured: even `git push origin main`).
+@@ -602,6 +630,12 @@ export async function runAntigravityPreToolGuard(rawInput) {
+   // checked (lib/agy-native-goldfish.mjs); every other check below still governs the child's call unchanged (M2/M7/M9).
+   const nativeChild = evaluateNativeChildCall(input);
+   if (!nativeChild.ok) deny(`BLOCKED (Antigravity native child): ${nativeChild.reason}`);
++  // G20-41: the Critic child's final send_message to its parent issues the Source return record. This never decides the call; the write is the
++  // only effect and one diagnostic line says what became of it when it was applicable.
++  if (input?.toolCall?.name === "send_message") {
++    const criticReturn = issueAntigravityCriticReturn(input, nativeChild.attributed);
++    if (criticReturn.status !== "not-applicable") diagnostic("critic-source-return", { status: criticReturn.status, packetId: criticReturn.packetId });
++  }
+   // The host owns its brain and config directories; an agent write there would forge a child's identity or message.
+   const brainRefusal = ["Edit", "Write", "Bash"].includes(normalized.toolName)
+     ? nativeBrainWriteRefusal({ filePath: normalized.filePath, command: normalized.command }) : null;
+diff --git a/plugins/pipeline-core/lib/critic-source-return.mjs b/plugins/pipeline-core/lib/critic-source-return.mjs
+index 4265caf0b5bc4907e4189457f6af2bac588636a2..e11ae82d2544b09aceecd98a89cce3d9c7862000 100644
+--- a/plugins/pipeline-core/lib/critic-source-return.mjs
++++ b/plugins/pipeline-core/lib/critic-source-return.mjs
+@@ -11,7 +11,9 @@
+  * (verdictSha256); nothing is taken from the launching prompt or from a value the calling agent supplies. Zero or several open packets issue nothing.
+  *
+  * Storage: `<common-dir>/agent-pipeline/critic-packets/<packetId>/source-return.json`, mode 0600, created exclusively (a second stop never overwrites).
+- * Antigravity has no producer in this slice: its subagent stop event is still being measured. Imports only the packet read half and the schema checker.
++ * Claude and Codex issue it from the subagent STOP hook. Antigravity (G20-41) issues it from its PreToolUse hook when the Critic child sends its final
++ * `send_message` to its parent (hooks/antigravity-pretool-guard.mjs recognises the child; whether a stop event fires for an Antigravity child is not
++ * measured and nothing is built on it). Imports only the packet read half and the schema checker.
+  */
+ import { closeSync, existsSync, openSync, readFileSync, readdirSync, writeSync } from "node:fs";
+ import { join } from "node:path";
+@@ -22,7 +24,8 @@ export const CRITIC_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-retur
+ export const CRITIC_SOURCE_RETURN_FILE = "source-return.json";
+ const VERDICT_SCHEMA = JSON.parse(readFileSync(new URL("../scripts/critic-verdict.schema.json", import.meta.url), "utf8"));
+ const MAX_PACKETS = 4096;
+-const RUNNERS = new Set(["claude", "codex"]);
++const RUNNERS = new Set(["claude", "codex"]); // the runners whose subagent STOP event issues the record
++const MESSAGE_RUNNERS = new Set(["antigravity"]); // the runners whose Critic child's final message to its parent issues it (G20-41)
+ 
+ const normalizedAgentType = (value) => typeof value !== "string" ? null : value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
+ 
+@@ -79,23 +82,41 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
+       const handback = readHandbackFn(input);
+       if (handback?.ok === true) verdict = extractCriticVerdict(handback.message);
+     }
+-    if (verdict === null) return { status: "no-verdict" };
+-    const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
+-    if (!existsSync(controlRoot)) return { status: "no-open-packet" };
+-    const open = openAdmittedPackets(controlRoot, runner, nowMs);
+-    if (open === null) return { status: "unavailable" };
+-    if (open.length === 0) return { status: "no-open-packet" };
+-    if (open.length > 1) return { status: "ambiguous", count: open.length };
+-    const [target] = open;
+-    if (target.issued === true) return { status: "already-issued", packetId: target.packetId };
+-    const record = { schema: CRITIC_SOURCE_RETURN_SCHEMA, issuer: "source", packetId: target.packetId, packetDigest: target.packetDigest, claimant: target.claimant,
+-      sessionId: target.sessionId, verdictSha256: sha256(canonicalJson(verdict)), issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs };
+-    const fd = openSync(join(target.packetDir, CRITIC_SOURCE_RETURN_FILE), "wx", 0o600);
+-    try { writeSync(fd, canonicalJson(record)); } finally { closeSync(fd); }
+-    return { status: "issued", packetId: target.packetId };
++    return issueForVerdict({ commonDir, runner, verdict, nowMs });
+   } catch { return { status: "unavailable" }; }
+ }
+ 
++/**
++ * G20-41: the Antigravity producer. The caller (hooks/antigravity-pretool-guard.mjs) has already recognised the Critic child's final `send_message`
++ * to its parent from runner-written facts; this takes only the message text and issues the record exactly like the stop path. Never throws.
++ * @param {{ commonDir: string, runner: "antigravity", text: string, nowMs?: number }} request
++ */
++export function issueCriticSourceReturnFromMessage({ commonDir, runner, text, nowMs = Date.now() } = {}) {
++  try {
++    if (!MESSAGE_RUNNERS.has(runner)) return { status: "not-applicable" };
++    if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
++    return issueForVerdict({ commonDir, runner, verdict: extractCriticVerdict(text), nowMs });
++  } catch { return { status: "unavailable" }; }
++}
++
++/** The shared half: bind the returned verdict to the one open admitted packet of this runner and write the record exclusively. */
++function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
++  if (verdict === null) return { status: "no-verdict" };
++  const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
++  if (!existsSync(controlRoot)) return { status: "no-open-packet" };
++  const open = openAdmittedPackets(controlRoot, runner, nowMs);
++  if (open === null) return { status: "unavailable" };
++  if (open.length === 0) return { status: "no-open-packet" };
++  if (open.length > 1) return { status: "ambiguous", count: open.length };
++  const [target] = open;
++  if (target.issued === true) return { status: "already-issued", packetId: target.packetId };
++  const record = { schema: CRITIC_SOURCE_RETURN_SCHEMA, issuer: "source", packetId: target.packetId, packetDigest: target.packetDigest, claimant: target.claimant,
++    sessionId: target.sessionId, verdictSha256: sha256(canonicalJson(verdict)), issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs };
++  const fd = openSync(join(target.packetDir, CRITIC_SOURCE_RETURN_FILE), "wx", 0o600);
++  try { writeSync(fd, canonicalJson(record)); } finally { closeSync(fd); }
++  return { status: "issued", packetId: target.packetId };
++}
++
+ /** The issued record of a packet exactly as stored (so a present-but-wrong record reaches the finalizer's binding check), or null when none exists. */
+ export function readCriticSourceReturn({ controlRoot, packetId } = {}) {
+   if (typeof controlRoot !== "string" || !PACKET_ID.test(packetId ?? "")) return null;
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 4278957179b81273ebdab9e5234489a6ffb7e9dd..f054ea29ccac7a7b2bf25d37e5c46ff6b5772b2b 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -89,9 +89,11 @@ const INVENTORY = Object.freeze([
+  *
+  * `approve-critic-acknowledgement` (G20-39, PO decision 2026-11-07 "Producer + Brücke") is the PO's acknowledgement of a
+  * caller-authored Critic verdict, the bridge for a runner that issues no Critic Source-return record. On Claude and Codex the
+- * Critic subagent's stop issues that record, so the happy path never meets it. HONEST LIMIT: on Antigravity no producer exists
+- * yet (its subagent stop event is being measured, M4c/M14), so there a rigor >= 1 feature close meets it as a third per-feature
+- * PO interaction until a producer lands; recorded on the PO list, not hidden by this classification.
++ * Critic subagent's stop issues that record, and on Antigravity (G20-41, measured M4c) the Critic child's final `send_message` to its
++ * parent issues it from the PreToolUse hook, so the happy path never meets it on any of the three runners. HONEST LIMIT: it is still
++ * met as a third per-feature PO interaction by a Critic round whose runner issued no record (a stop or message the hook did not
++ * recognise, a Critic that returned no schema-shaped verdict, several open packets of one runner, a killed or failed child); the
++ * limit is that the Antigravity route is proven by fixtures shaped like the measured payload, not by a genuine installed host run.
+  */
+ const OFF_HAPPY_PATH_VERBS = Object.freeze([
+   "approve-deploy", "publication-approve", "rebind-approval", "retire-enrollment", "activate-enrollment",
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 367336fa6c7b152c82a5ea7a89cf300655e44434..5950cf308900e3da0981c7e590814c32728b7f25 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -19,8 +19,9 @@
+  * feature course, the audit route (Verify evidence registered under specs/<feature>/evidence/, package to verifying and completed, audit request,
+  * feature-close-prepared with --audit-request and --critic-verify-lifecycle), the close to closed-local, the Critic-bound push Verify, push-prepare
+  * `ready`, the push guard (blocked before approve-push, admitted after, bound to its destination), and the release preflight, which is the
+- * Pipeline's own publication gate and refuses a consumer fixture precisely (RPC-INPUT, no record written). One fixture stand-in is declared at
+- * the finalize call: the Source return record that no runner issues yet (w266 finding 1).
++ * Pipeline's own publication gate and refuses a consumer fixture precisely (RPC-INPUT, no record written). No stand-in remains at the finalize
++ * call: the Critic Source return record is issued by the runner's own hook on every identity (G20-39 stop hook for Claude and Codex, G20-41
++ * PreToolUse hook on the Critic child's send_message for Antigravity); a fourth, shorter walk keeps the PO acknowledgement bridge for a stop that issued nothing.
+  */
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+@@ -233,8 +234,17 @@ const scannerEnv = {
+ const scannerSpawn = (cmd, args, opts) => spawnSync(cmd, args, { ...opts, shell: false });
+ const assessScannerFixture = (path) => (typeof path === "string" && path.startsWith(SCANNER_DIR) ? { ok: true, path } : { ok: false, status: "untrusted_path" });
+ 
+-test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 300_000 }, async () => {
+-  for (const identity of RUNNER_IDENTITIES) {
++// G20-41: how the Critic Source return record is issued on each walk. Claude and Codex: the subagent STOP hook (G20-39). Antigravity: its PreToolUse hook
++// on the Critic child's final send_message to its parent (G20-41). "none": a runner stop that issued nothing; that walk keeps the PO acknowledgement
++// bridge (G20-39) and ends at the admitted close preparation.
++const ANTIGRAVITY_IDENTITY = RUNNER_IDENTITIES.find((entry) => entry.runner === "antigravity");
++const WALKS = Object.freeze([
++  ...RUNNER_IDENTITIES.map((identity) => Object.freeze({ identity, criticReturn: identity === ANTIGRAVITY_IDENTITY ? "send-message" : "stop-hook" })),
++  Object.freeze({ identity: ANTIGRAVITY_IDENTITY, criticReturn: "none" }),
++]);
++
++test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 600_000 }, async () => {
++  for (const { identity, criticReturn } of WALKS) {
+     const log = [];
+     const fx = consumerFixture(log, identity);
+     walkEnv = runnerEnv(identity.runner, fx.root);
+@@ -304,7 +314,7 @@ test("G20-35: the close path from implementation to release preflight is walked
+       const criticVerdict = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent",
+         trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true };
+       writeJson(join(fx.root, "evidence", "critic-verdict.json"), criticVerdict);
+-      if (identity.runner !== "antigravity") {
++      if (criticReturn === "stop-hook") {
+         // G20-39: the Critic subagent's stop is what issues the Source return record, never the calling agent. The stop hook runs as the runner runs
+         // it (a child process fed the stop payload on stdin) with the Critic's final message carrying the verdict; the CLI finalize below then reads
+         // the record from the private control area and the close gate admits it at rigor >= 1.
+@@ -317,9 +327,39 @@ test("G20-35: the close path from implementation to release preflight is walked
+         assert.equal(stop.stdout, "", `${identity.runner}: a stop hook's stdout is read as a decision and stays empty`);
+         assert.match(stop.stderr, /Critic Source return issued for packet/u, `${identity.runner}: ${stop.stderr}`);
+         assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", packetId, "source-return.json")), true);
++      } else if (criticReturn === "send-message") {
++        // G20-41: the Critic CHILD ends by sending its verdict to its parent conversation (measured, M4c). The real PreToolUse hook runs as a child process
++        // fed a payload shaped like the measured one: the child's own conversationId, artifactDirectoryPath = <brain>/<child id>, modelName, stepIdx,
++        // toolCall {name, args {Message, Recipient}}, transcriptPath, workspacePaths; the host-written descriptor sits under the PARENT's brain directory.
++        const parentId = "7d1f0c52-2b7e-4a39-9f0e-3a5c1b8d2e41";
++        const childId = "c3a9e6b4-51d8-4f27-8a60-0e9b7d4c1f25";
++        const brain = join(fx.parent, "brain");
++        mkdirSync(join(brain, parentId, ".system_generated", "subagents"), { recursive: true });
++        mkdirSync(join(brain, childId), { recursive: true });
++        writeJson(join(brain, parentId, ".system_generated", "subagents", `${childId}.json`), { conversationId: childId,
++          subagentDescriptor: { typeName: "critic", role: "critic" }, state: "SUBAGENT_STATE_ALIVE", spawnStepIndex: 3, workspaceUris: [] });
++        const sendMessage = JSON.stringify({ conversationId: childId, artifactDirectoryPath: join(brain, childId), modelName: "gemini-3-pro", stepIdx: 9,
++          toolCall: { name: "send_message", args: { Message: `Review finished; notes are in the notes file.\n\n\`\`\`json\n${JSON.stringify(criticVerdict, null, 2)}\n\`\`\`\n`, Recipient: parentId } },
++          transcriptPath: join(brain, childId, "transcript.jsonl"), workspacePaths: [fx.root, fx.root] });
++        const fire = () => spawnSync(process.execPath, [fileURLToPath(new URL("../hooks/antigravity-pretool-guard.mjs", import.meta.url))],
++          { input: sendMessage, cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 60_000 });
++        const recordPath = join(fx.root, ".git", "agent-pipeline", "critic-packets", packetId, "source-return.json");
++        const first = fire();
++        assert.equal(first.status, 0, `${identity.runner}: the hook never blocks the Critic's final message: ${first.stderr}`);
++        assert.equal(first.stdout.trim(), JSON.stringify({ decision: "allow" }));
++        assert.match(first.stderr, /code=critic-source-return status="issued"/u, `${identity.runner}: ${first.stderr}`);
++        assert.equal(existsSync(recordPath), true);
++        const issuedBytes = readFileSync(recordPath, "utf8");
++        // The hook fires twice per tool call (the child worktree cwd, then the main repository cwd): the second firing finds the record and changes nothing.
++        const second = fire();
++        assert.equal(second.status, 0, second.stderr);
++        assert.equal(second.stdout.trim(), JSON.stringify({ decision: "allow" }));
++        assert.match(second.stderr, /status="already-issued"/u, second.stderr);
++        assert.equal(readFileSync(recordPath, "utf8"), issuedBytes);
+       }
+       const finalized = json(finalizer("finalize", finalizeRequest));
+       assert.equal(finalized.status, "completed", `${identity.runner}: the Critic return is consumed and read back identically`);
++      assert.equal(finalized.independence, criticReturn === "none" ? "caller-authored-fallback" : "source-issued-origin", `${identity.runner}: ${criticReturn}`);
+       assert.equal(finalized.receipt.session.id, `${identity.runner}-critic-1`);
+       writeFileSync(join(fx.root, "evidence", "critic-report.md"), "# Critic report\n\nNo findings.\n");
+       const exported = json(finalizer("export", {
+@@ -421,9 +461,9 @@ test("G20-35: the close path from implementation to release preflight is walked
+       assert.equal(lifecycleIds.length, 1, `${identity.runner}: exactly one Critic/Verify lifecycle receipt: ${lifecycleIds}`);
+       writeJson(join(fx.root, "evidence", "audit-request.json"), { schema: "pipeline.feature-close-audit-request.v1", manifestPath: MANIFEST, coreVersion: "0.7.0",
+         packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: lifecycleIds[0] });
+-      if (identity.runner === "antigravity") {
+-        // G20-39 bridge: this identity has no Source return producer (its subagent stop event is still being measured), so its Critic finalized as
+-        // caller-authored-fallback and the close gate refuses it at rigor >= 1. The refusal names ONE runnable repair, the PO acknowledgement of exactly this
++      if (criticReturn === "none") {
++        // G20-39 bridge, kept (G20-41): a runner stop that issued no Source return record finalizes as caller-authored-fallback and the close gate
++        // refuses it at rigor >= 1. The refusal names ONE runnable repair, the PO acknowledgement of exactly this
+         // packet and candidate, recorded through the human-approval route (the fixture selects chat); then the IDENTICAL close command is admitted.
+         const closeArgs = ["plan-transition", "--root", fx.root, "--lifecycle", lifecycle, "--actor", "PO", "--phase", "feature-close-prepared", "--audit-request", "evidence/audit-request.json",
+           "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"];
+@@ -441,6 +481,9 @@ test("G20-35: the close path from implementation to release preflight is walked
+       }
+       const prepared = transition("feature-close-prepared", ["--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]);
+       assert.equal(prepared.phase, "feature-close-prepared");
++      // Without a record the acknowledgement walk ends here: the identical close command above was admitted only after it. The rest of the close
++      // (identical on every route) is walked by the three issuing identities.
++      if (criticReturn === "none") continue;
+       assert.ok(prepared.nextAction.argv.includes("--continuity-close-request"), `the returned close-feature action keeps the Continuity flag: ${JSON.stringify(prepared.nextAction.argv.slice(1))}`);
+       // The State writer prints a plain sentence, not JSON.
+       const closed = step(log, `${identity.runner}: close-feature (State writer action returned by the coordinator)`, prepared.nextAction.executable, prepared.nextAction.argv, { cwd: fx.root });
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 950310fd3b36974df5695d99fb759b9414debfe4..d36eee50622b56bfc1ee79fe324e631e02b3476a 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -1948,6 +1948,124 @@ test("G20-39 (e) an unmarked or non-Critic stop, a stop without a schema-shaped
+   } finally { cleanup(fx); }
+ });
+ 
++// G20-41 (candidate 20, AC-108): on Antigravity the Critic CHILD's final `send_message` to its parent conversation issues the same record.
++// Criterion-bound cases, written before the producer existed. The child is recognised only through runner-written facts: its own conversationId,
++// the descriptor the host wrote under the PARENT's brain directory, and the Recipient; payloads are shaped like the M4c measurement.
++const AGY_PARENT = "7d1f0c52-2b7e-4a39-9f0e-3a5c1b8d2e41";
++const AGY_CHILD = "c3a9e6b4-51d8-4f27-8a60-0e9b7d4c1f25";
++function agyBrain({ typeName = "critic", role = "critic", childId = AGY_CHILD, parentId = AGY_PARENT, withDescriptor = true } = {}) {
++  const brain = mkdtempSync(join(tmpdir(), "agy-brain-"));
++  const subagents = join(brain, parentId, ".system_generated", "subagents");
++  mkdirSync(subagents, { recursive: true });
++  mkdirSync(join(brain, childId), { recursive: true });
++  if (withDescriptor) {
++    writeFileSync(join(subagents, `${childId}.json`), `${JSON.stringify({ conversationId: childId, subagentDescriptor: { typeName, role },
++      state: "SUBAGENT_STATE_ALIVE", spawnStepIndex: 3, workspaceUris: [] }, null, 2)}\n`);
++  }
++  return brain;
++}
++function agySendMessage(fx, brain, { message = criticReturn(), recipient = AGY_PARENT, name = "send_message", childId = AGY_CHILD, artifact = null } = {}) {
++  return { conversationId: childId, artifactDirectoryPath: artifact ?? join(brain, childId), modelName: "gemini-3-pro", stepIdx: 9,
++    toolCall: { name, args: { Message: message, Recipient: recipient } }, transcriptPath: join(brain, childId, "transcript.jsonl"), workspacePaths: [fx.root, fx.root] };
++}
++const AGY_ROUTE = { routeId: "session-critic", runner: "antigravity", adapter: "session-functional-equivalent", provider: "google", modelTier: "higher-capability", effortTier: "xhigh" };
++function admitAntigravity(fx) {
++  const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx, { route: AGY_ROUTE }));
++  const admitted = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]);
++  assert.equal(admitted.exitCode, 0, JSON.stringify(admitted.output));
++  const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
++  const packetId = "6".repeat(32);
++  return { requestPath, controlRoot, packetId, admission: inspectClaimedSessionAdmission({ controlRoot, packetId }).admission };
++}
++async function agyIssue(input) {
++  const { evaluateNativeChildCall } = await import("../lib/agy-native-goldfish.mjs");
++  const { issueAntigravityCriticReturn } = await import("../hooks/antigravity-pretool-guard.mjs");
++  return issueAntigravityCriticReturn(input, evaluateNativeChildCall(input).attributed);
++}
++
++test("G20-41 (a) the Critic child's send_message to its parent issues the record bound to the claimed packet and the returned verdict; finalize then reads it", async () => {
++  const fx = fixture();
++  const brain = agyBrain();
++  try {
++    const admitted = admitAntigravity(fx);
++    const issued = await agyIssue(agySendMessage(fx, brain));
++    assert.equal(issued.status, "issued", JSON.stringify(issued));
++    assert.equal(issued.packetId, admitted.packetId);
++    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
++    const record = JSON.parse(readFileSync(target, "utf8"));
++    assert.equal(record.schema, ORIGIN_SCHEMA);
++    assert.equal(record.issuer, "source");
++    assert.equal(record.packetDigest, admitted.admission.packetDigest);
++    assert.equal(record.sessionId, admitted.admission.sessionId);
++    assert.deepEqual(record.claimant, { runner: "antigravity", adapter: "session-functional-equivalent" });
++    assert.equal(record.verdictSha256, verdictDigest(verdict()));
++    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
++    const finalized = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
++    assert.equal(finalized.exitCode, 0, JSON.stringify(finalized.output));
++    assert.equal(finalized.output.independence, "source-issued-origin");
++    // The hook fires twice per tool call (child worktree cwd, then the main repository cwd): the second firing finds the record and changes nothing.
++    const bytes = readFileSync(target, "utf8");
++    const again = await agyIssue(agySendMessage(fx, brain));
++    assert.notEqual(again.status, "issued", JSON.stringify(again));
++    assert.equal(readFileSync(target, "utf8"), bytes);
++  } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
++});
++
++test("G20-41 (b) a send_message that the runner-written facts do not identify as the Critic child's final message to its parent is a silent no-op that writes nothing", async () => {
++  const fx = fixture();
++  const goldfishBrain = agyBrain({ typeName: "goldfish-implementor", role: "implementer" });
++  const criticBrain = agyBrain();
++  const bareBrain = agyBrain({ withDescriptor: false });
++  try {
++    const admitted = admitAntigravity(fx);
++    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
++    const attempts = [
++      ["a Recipient that is not the parent", agySendMessage(fx, criticBrain, { recipient: "00000000-0000-4000-8000-000000000000" })],
++      ["no Recipient", { ...agySendMessage(fx, criticBrain), toolCall: { name: "send_message", args: { Message: criticReturn() } } }],
++      ["a non-Critic child", agySendMessage(fx, goldfishBrain)],
++      ["a conversation with no host descriptor (the parent itself)", agySendMessage(fx, bareBrain, { childId: AGY_PARENT })],
++      ["a conversation whose descriptor the host did not write", agySendMessage(fx, bareBrain)],
++      ["an artifact directory of another conversation", agySendMessage(fx, criticBrain, { artifact: join(criticBrain, AGY_PARENT) })],
++      ["another tool", agySendMessage(fx, criticBrain, { name: "view_file" })],
++      ["a message without a schema-shaped verdict", agySendMessage(fx, criticBrain, { message: "The review is finished; no machine-readable verdict was returned." })],
++      ["a verdict-shaped object that is not a verdict", agySendMessage(fx, criticBrain, { message: criticReturn({ pass: true }) })],
++    ];
++    for (const [label, input] of attempts) {
++      const outcome = await agyIssue(input);
++      assert.notEqual(outcome.status, "issued", `${label}: ${JSON.stringify(outcome)}`);
++      assert.equal(existsSync(target), false, label);
++    }
++  } finally { for (const dir of [goldfishBrain, criticBrain, bareBrain]) rmSync(dir, { recursive: true, force: true }); cleanup(fx); }
++});
++
++test("G20-41 (d) the Critic is named by the descriptor's type or its role, exactly (the plugin namespace is stripped); a name that merely contains the word is not the Critic", async () => {
++  for (const [descriptor, expected] of [
++    [{ typeName: "pipeline-core:critic", role: "reviewer" }, "issued"],
++    [{ typeName: "general", role: "critic" }, "issued"],
++    [{ typeName: "critic-helper", role: "scribe" }, "no-critic"],
++  ]) {
++    const fx = fixture();
++    const brain = agyBrain(descriptor);
++    try {
++      admitAntigravity(fx);
++      const outcome = await agyIssue(agySendMessage(fx, brain));
++      if (expected === "issued") assert.equal(outcome.status, "issued", JSON.stringify([descriptor, outcome]));
++      else assert.notEqual(outcome.status, "issued", JSON.stringify([descriptor, outcome]));
++    } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
++  }
++});
++
++test("G20-41 (c) a packet of another runner is never answered by an Antigravity child", async () => {
++  const fx = fixture();
++  const brain = agyBrain();
++  try {
++    const admitted = admitViaCli(fx); // the fixture route is codex
++    const outcome = await agyIssue(agySendMessage(fx, brain));
++    assert.notEqual(outcome.status, "issued", JSON.stringify(outcome));
++    assert.equal(existsSync(join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE)), false);
++  } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
++});
++
+ const FALLBACK_FLAG = "--allow-caller-authored-fallback";
+ 
+ test("Cut A follow-up (1) CLI finalize without the flag and without a Source record reports the same result as with the flag", () => {
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index a392d52a6ba3936243aeec1fff815aa770dded8e..0c1c3add6a17ce02fae343e8b5f06d0410ac04f3 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -81,7 +81,7 @@ session; it need not exist for `admit`, but must exist for `finalize`.
+ `source-complete/event-unavailable` and an identical-only retry. Any malformed
+ argv, request, or verdict exits 2 with a closed
+ `pipeline.session-critic-finalization-error.v1` object.
+-The Critic returns its verdict JSON as its whole final message or as the LAST fenced `json` block of it; the Critic's stop hook reads it there and issues the Source return record for the one open admitted packet, so `finalize` labels the verdict `source-issued-origin`. Write that JSON verbatim (same key order) to `verdictPath`. Without a record (a runner whose stop issues none, or several open packets) `finalize` labels it `caller-authored-fallback`, which the feature close refuses at rigor >= 1 or high risk; the repair it names is `pipeline-state.mjs approve-critic-acknowledgement --by <name> --critic-packet <packetId>` (the PO's acknowledgement of exactly that packet and candidate; in signature mode the command prints the signing step), then the identical close command.
++The Critic returns its verdict JSON as its whole final message or as the LAST fenced `json` block of it; the Critic's stop hook (Claude, Codex) reads it there and issues the Source return record for the one open admitted packet, so `finalize` labels the verdict `source-issued-origin`. On Antigravity the Critic child ends by calling `send_message` to its parent conversation with that JSON as the `Message`; the PreToolUse hook issues the same record from it (the child is recognised from the host's own subagent descriptor, never from the message), so the acknowledgement below is not the normal route there either. Write that JSON verbatim (same key order) to `verdictPath`. Without a record (a stop or message that issued none, no schema-shaped verdict in it, or several open packets) `finalize` labels it `caller-authored-fallback`, which the feature close refuses at rigor >= 1 or high risk; the repair it names is `pipeline-state.mjs approve-critic-acknowledgement --by <name> --critic-packet <packetId>` (the PO's acknowledgement of exactly that packet and candidate; in signature mode the command prints the signing step), then the identical close command.
+ A rejected prelaunch admission is a coordinator defect, not Critic work: do
+ not spawn a child or substitute prose/evidence. A returned verdict without
+ the exact prelaunch admission cannot mint a passing receipt.

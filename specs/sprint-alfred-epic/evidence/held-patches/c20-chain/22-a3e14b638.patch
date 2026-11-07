@@ -1,0 +1,39 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-start-hint.mjs b/plugins/pipeline-core/hooks/antigravity-start-hint.mjs
+index 3ade7b0415b04646887a46e626fc2a7a280a1592..8e3052cc381d6196efcc636a4f4320e69ec0ad49 100644
+--- a/plugins/pipeline-core/hooks/antigravity-start-hint.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-start-hint.mjs
+@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+ import { dirname, isAbsolute, join, resolve } from 'node:path';
+ import { machinePlaneFilePath } from '../lib/machine-plane.mjs';
+ import { fileURLToPath } from 'node:url';
+-import { sessionStartDecision } from './codex-session-start-hint.mjs';
++import { intakeVerbatimContextLines, sessionStartDecision } from './codex-session-start-hint.mjs';
+ import { armAntigravityBootstrapSession } from './antigravity-bootstrap-lock.mjs';
+ import { resolvePluginManifestVersion } from '../scripts/pipeline-start-preflight.mjs';
+ import { nativeHookSessionId } from '../lib/native-hook-failure-memory.mjs';
+@@ -164,7 +164,11 @@ function main() {
+     // barrier; repeated ready inference hooks do not re-arm the session.
+     const armed = armAntigravityBootstrapSession(sessionDir, version);
+     if (armed?.status === 'already-armed') {
+-      process.stdout.write(JSON.stringify({ injectSteps: [{ ephemeralMessage: AGY_SESSION_CONTINUATION_NOTE(sessionId) }] }) + '\n');
++      // The answered intake values and the verbatim material input stay on every turn (whether Antigravity keeps an
++      // ephemeral step of an earlier turn in context is not measured; dropping them would turn into re-asking, G20-30).
++      // Only the bootstrap instruction is replaced.
++      const continuation = [AGY_SESSION_CONTINUATION_NOTE(sessionId), ...intakeVerbatimContextLines(rootDir)].join(' ');
++      process.stdout.write(JSON.stringify({ injectSteps: [{ ephemeralMessage: continuation }] }) + '\n');
+       return;
+     }
+   } catch (e) {
+diff --git a/plugins/pipeline-core/hooks/codex-session-start-hint.mjs b/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
+index d00aa0db7732a4d9dedf09cd8e6313c5f445aadb..27285c6633b47dd196ede7720aef736048bc21c9 100644
+--- a/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
++++ b/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
+@@ -59,7 +59,7 @@ function priorTranscriptRecoveryLine(root, sessionId, runner) {
+ 
+ // The intake checkpoint is the lossless, private authority store. Its material input is
+ // independent of a resume card and is therefore surfaced on every governed SessionStart.
+-function intakeVerbatimContextLines(root) {
++export function intakeVerbatimContextLines(root) {
+   // The private checkpoint is Git-owned state. A governed fixture or project without
+   // Git cannot have one, so avoid asking its resolver to discover private storage.
+   if (!existsSync(join(root, ".git"))) return [];

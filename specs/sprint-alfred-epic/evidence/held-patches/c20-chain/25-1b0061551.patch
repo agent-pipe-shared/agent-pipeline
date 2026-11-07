@@ -1,0 +1,707 @@
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.mjs b/plugins/pipeline-core/lib/close-quality-readback.mjs
+index ac21d47181d6a2bdff57e48b8f067ba4948e1d6d..449f7ced3d30cf2c17758bed4e39c30dce373e59 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.mjs
+@@ -14,6 +14,7 @@
+ // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
+ 
+ import { createHash } from "node:crypto";
++import { elementsOfCompletedScan, formatSecurityCloseStatus } from "./security-close-status.mjs";
+ 
+ export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
+ export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness"]);
+@@ -22,6 +23,7 @@ export const AUDIT_INDEX_SCHEMA = "pipeline.close-audit-package-index.v1";
+ 
+ export const SECURITY_ENVELOPE_PATH = "evidence/security-latest.v2.json";
+ export const SECURITY_VERDICT_PATH = "evidence/security-latest.v2.verdict.json";
++const SECURITY_SCAN_PATH = "evidence/security-latest.json";
+ const ADR_DIR = "docs/adr";
+ const DECISION_IMPACTS = new Set(["architecture-decision-added", "architecture-decision-superseded"]);
+ const NO_DECISION_IMPACTS = new Set(["architecture-conforms", "architecture-summary-updated", "no-architecture-impact"]);
+@@ -39,7 +41,18 @@ function securityRow(readers) {
+   const envelope = call(readers.exists, SECURITY_ENVELOPE_PATH);
+   const verdict = call(readers.exists, SECURITY_VERDICT_PATH);
+   if (!envelope.ok || !verdict.ok) return unknown(id, remedy);
+-  return envelope.value === true && verdict.value === true ? row(id, "present", SECURITY_ENVELOPE_PATH) : row(id, "missing", null, remedy);
++  if (envelope.value !== true || verdict.value !== true) return row(id, "missing", null, remedy);
++  // G20-25: "present" only says the evidence files exist, never that every scanner ran. When the scan result is readable the evidence
++  // text carries the four-state reading of each element (the closed row shape has no field for it), so a skipped scanner never reads
++  // like a passed scan; when it is not readable the evidence stays the bare path (the readback never claims what it cannot read).
++  const scan = call(readers.readBytes, SECURITY_SCAN_PATH);
++  if (scan.ok) {
++    try {
++      const states = formatSecurityCloseStatus(elementsOfCompletedScan(JSON.parse(Buffer.from(scan.value).toString("utf8")).scanners)).map((line) => line.split(" -- ")[0]);
++      return row(id, "present", `${SECURITY_ENVELOPE_PATH} (${states.join("; ")})`);
++    } catch { /* unreadable scan result: fall through to the bare path */ }
++  }
++  return row(id, "present", SECURITY_ENVELOPE_PATH);
+ }
+ 
+ function adrRow(readers) {
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.test.mjs b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+index 6a7394a8bf3b196fd82308ac86c898407c3b2756..cd1516533285739aee2cff268c8fa30bd516d10f 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.test.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.test.mjs
+@@ -43,6 +43,16 @@ test("AC-239 security-scan: present with the envelope path, missing with the sca
+   assert.equal(unknown.status, "unknown");
+ });
+ 
++test("G20-25 security-scan: a readable scan result puts the four-state reading in the evidence, never a bare present for a skipped scanner", () => {
++  const scan = JSON.stringify({ scanners: [{ tool: "gitleaks", status: "SKIPPED", classification: "binary_missing" }, { tool: "semgrep", status: "PASS", classification: "success" }] });
++  const row = rows(full({ readBytes: (p) => { if (p !== "evidence/security-latest.json") throw new Error("unexpected"); return Buffer.from(scan); } }))["security-scan"];
++  assert.equal(row.status, "present");
++  assert.match(row.evidence, /gitleaks: not executed/u);
++  assert.match(row.evidence, /semgrep: passed/u);
++  assert.match(row.evidence, /osv-scanner: not applicable/u);
++  assert.equal(rows(full({ readBytes: () => Buffer.from("not json") }))["security-scan"].evidence, SEC); // unreadable result: the bare path
++});
++
+ test("AC-239 adr-decision: present, not-applicable when no decision qualifies, missing when claimed but absent, unknown without a signal", () => {
+   assert.equal(rows(full())["adr-decision"].status, "present");
+   assert.equal(rows(full({ architectureImpact: () => "no-architecture-impact" }))["adr-decision"].status, "not-applicable");
+diff --git a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..801806e12b31e1604d20137f081b2cfab8b3ce21
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+@@ -0,0 +1,212 @@
++// SPDX-License-Identifier: SUL-1.0
++// Regression pin for Candidate 20 finding G20-25 (PO decision 2026-11-07, "hart je Kalibrierung"; Codex greenfield report P0
++// "fehlende Abschlusskette"), criterion AC-108.
++//
++// Acceptance, written from the criterion and the PO decision, not from the code:
++//   C1 a project calibrated critical whose scanner did not execute is blocked at the close/push completeness check with a typed
++//      refusal that names the scanner and the one command that installs or runs it;
++//   C2 a project calibrated standard stays admitted, but the status reads "not executed", never "passed";
++//   C3 a clean run reads "passed" (standard and critical alike, no refusal);
++//   C4 a finding reads "failed";
++//   C5 every human-facing status line uses the four-state vocabulary only: passed, failed, not executed, not applicable; a scanner
++//      the calibration does not configure is "not applicable", a configured one without a run is "not executed" (also with no
++//      evidence at all);
++//   C6 security-scan.mjs accepts --out-dir under scratch/ for an analysis run and refuses any other target without writing.
++// The scanner observation is injected as evidence files (no scanner is spawned, nothing is downloaded).
++import test, { after } from "node:test";
++import assert from "node:assert/strict";
++import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import { spawnSync } from "node:child_process";
++import { checkSecurityCompleteness } from "../security-completeness-gate.mjs";
++import {
++  SECURITY_STATES, isCriticalStakes, readCalibrationStakes, securityCloseElements, formatSecurityCloseStatus,
++} from "../security-close-status.mjs";
++
++const here = dirname(fileURLToPath(import.meta.url));
++const scanScript = resolve(here, "../../scripts/security-scan.mjs");
++const HEAD = "a".repeat(40);
++const TREE = "b".repeat(40);
++const dirs = [];
++after(() => { for (const dir of dirs) rmSync(dir, { recursive: true, force: true }); });
++
++const project = (stakes) => {
++  const dir = mkdtempSync(join(tmpdir(), "sec-close-pin-"));
++  dirs.push(dir);
++  if (stakes !== undefined) writeJson(dir, "project/pipeline.json", { project: "pin", stakes });
++  return dir;
++};
++function writeJson(dir, rel, value) {
++  mkdirSync(dirname(join(dir, rel)), { recursive: true });
++  writeFileSync(join(dir, rel), JSON.stringify(value));
++}
++const capability = ({ capabilityId, tool, status, classification, findings = [] }) => ({
++  capabilityId, tool: { name: tool, version: null }, rulePack: { ref: `${tool}-default`, digest: null }, status, classification, findings,
++  coverage: { subject: "candidate-tree", exclusions: [], ignored: [], unsupportedScope: [], truncation: { truncated: false, scannedFileCount: null, totalEligibleFileCount: null }, dataAge: { ageSeconds: 0, snapshotAt: null } },
++  reason: status === "SKIPPED" ? "gitleaks was not found" : null,
++});
++// One required-or-optional capability, as the real scan writes it. `optional` keeps the existing verdict non-blocking, so only the
++// calibration decides the outcome of a scanner that did not run.
++function evidence(dir, { status, classification, outcome, blocking = false, optional = true, findings = [] }) {
++  writeJson(dir, "evidence/security-latest.v2.json", {
++    schema: "pipeline.security-evidence.v2",
++    policy: { configurationSha256: "e".repeat(64) },
++    input: { commit: HEAD, tree: TREE, inputSha256: "f".repeat(64) },
++    environment: { platform: process.platform, nodeVersion: process.version },
++    capabilities: [capability({ capabilityId: "cap.secrets", tool: "gitleaks", status, classification, findings })],
++  });
++  writeJson(dir, "evidence/security-latest.v2.verdict.json", {
++    schema: "pipeline.security-verdict.v2", producedFrom: "pipeline.security-evidence.v2", exitAuthority: "v1-blocking-logic", note: "fixture", v1ExitCode: 0,
++    plan: { required: optional ? [] : ["cap.secrets"], optional: optional ? ["cap.secrets"] : [], planDigest: "g".repeat(64), source: "fixture", resolvedPolicyDigest: "h".repeat(64) },
++    capabilityOutcomes: { "cap.secrets": outcome },
++    verdict: { blocking, offendingCapabilities: blocking ? [{ capabilityId: "cap.secrets", outcome }] : [] },
++    controls: [],
++  });
++}
++const skipped = (dir) => evidence(dir, { status: "SKIPPED", classification: "binary_missing", outcome: "not-applicable" });
++const scanners = (...entries) => entries.map(([tool, status, classification = "success"]) => ({ tool, status, classification }));
++
++test("C1 critical calibration + a scanner that did not execute is a typed block naming the scanner and the one command", () => {
++  const dir = project("critical");
++  skipped(dir);
++  const failures = checkSecurityCompleteness({ projectDir: dir, commit: HEAD, tree: TREE });
++  assert.equal(failures.length, 1, failures.join("\n"));
++  assert.match(failures[0], /SEC-CLOSE-SCANNER-NOT-EXECUTED/u);
++  assert.match(failures[0], /gitleaks/u);
++  assert.match(failures[0], /node <plugin-root>\/scripts\/security-scan\.mjs/u);
++});
++
++test("C1b the calibration vocabulary: critical, high and their German spellings are critical; standard, absent and unknown are not", () => {
++  for (const value of ["critical", "Critical", "kritisch", "high", "hoch", "hoch (Guardrail-Quelle aller Projekte)"]) assert.equal(isCriticalStakes(value), true, value);
++  for (const value of ["standard", "low", "", undefined, null, 7, "whatever"]) assert.equal(isCriticalStakes(value), false, String(value));
++  assert.equal(readCalibrationStakes(project("critical")), "critical");
++  assert.equal(readCalibrationStakes(project()), null);
++});
++
++test("C2 standard calibration stays admitted, and the status reads not executed (never passed)", () => {
++  const dir = project("standard");
++  skipped(dir);
++  assert.deepEqual(checkSecurityCompleteness({ projectDir: dir, commit: HEAD, tree: TREE }), []);
++  const text = formatSecurityCloseStatus(securityCloseElements({ scanners: scanners(["gitleaks", "SKIPPED", "binary_missing"]) })).join("\n");
++  assert.match(text, /gitleaks: not executed/u);
++  assert.doesNotMatch(text, /gitleaks: (passed|ok)/iu);
++});
++
++test("C3 a clean run reads passed and is admitted under both calibrations", () => {
++  for (const stakes of ["standard", "critical"]) {
++    const dir = project(stakes);
++    evidence(dir, { status: "PASS", classification: "success", outcome: "pass" });
++    assert.deepEqual(checkSecurityCompleteness({ projectDir: dir, commit: HEAD, tree: TREE }), [], stakes);
++  }
++  const elements = securityCloseElements({ scanners: scanners(["gitleaks", "PASS"]) });
++  assert.equal(elements.find((e) => e.element === "gitleaks").state, "passed");
++});
++
++test("C4 a finding reads failed", () => {
++  const elements = securityCloseElements({ scanners: scanners(["gitleaks", "FINDINGS", "findings"]) });
++  assert.equal(elements.find((e) => e.element === "gitleaks").state, "failed");
++  const dir = project("standard");
++  evidence(dir, { status: "FINDINGS", classification: "findings", outcome: "findings", blocking: true, optional: false });
++  assert.equal(checkSecurityCompleteness({ projectDir: dir, commit: HEAD, tree: TREE }).length, 1);
++});
++
++test("C5 four states only; unconfigured is not applicable, configured without a run is not executed, no evidence at all is not executed", () => {
++  assert.deepEqual([...SECURITY_STATES], ["passed", "failed", "not executed", "not applicable"]);
++  const elements = securityCloseElements({
++    scanners: scanners(["gitleaks", "PASS"], ["osv-scanner", "SKIPPED", "success"], ["semgrep", "ERROR", "scanner_error"], ["license-check", "SKIPPED", "success"]),
++  });
++  const state = Object.fromEntries(elements.map((e) => [e.element, e.state]));
++  assert.deepEqual(state, { gitleaks: "passed", "osv-scanner": "not applicable", semgrep: "not executed", "license-check": "not applicable" });
++  const none = securityCloseElements({ scanners: null, enabled: { semgrep: false } });
++  assert.deepEqual(Object.fromEntries(none.map((e) => [e.element, e.state])), { gitleaks: "not executed", "osv-scanner": "not executed", semgrep: "not applicable", "license-check": "not executed" });
++  for (const line of formatSecurityCloseStatus(none)) assert.match(line, /: (passed|failed|not executed|not applicable)\b/u);
++});
++
++// C7 (added with the close-script edit; extends C1/C2/C5 to the real close.pre entry point, no case above was changed).
++const closeScript = resolve(here, "../../scripts/check-close-security-completeness.mjs");
++function closeFixture({ gate, stakes }) {
++  const dir = project();
++  const git = (...args) => spawnSync("git", ["-C", dir, ...args], { encoding: "utf8" });
++  git("init", "-q");
++  git("config", "user.name", "Fixture Author");
++  git("config", "user.email", "fixture@example.invalid");
++  writeJson(dir, "change.json", { base: true });
++  if (gate) { mkdirSync(join(dir, ".claude"), { recursive: true }); writeFileSync(join(dir, ".claude/pipeline.yaml"), `schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: ${gate}\n    type: automated\n`); }
++  if (stakes) writeJson(dir, ".claude/pipeline.json", { project: "pin", stakes });
++  git("add", ".");
++  git("commit", "-q", "-m", "base");
++  const commit = git("rev-parse", "HEAD").stdout.trim();
++  const tree = git("rev-parse", "HEAD^{tree}").stdout.trim();
++  return { dir, commit, tree };
++}
++function closeEvidence(dir, commit, tree) {
++  evidence(dir, { status: "SKIPPED", classification: "binary_missing", outcome: "not-applicable" });
++  const envelopePath = join(dir, "evidence/security-latest.v2.json");
++  const envelope = JSON.parse(readFileSync(envelopePath, "utf8"));
++  envelope.input.commit = commit;
++  envelope.input.tree = tree;
++  writeFileSync(envelopePath, JSON.stringify(envelope));
++  writeJson(dir, "evidence/security-latest.json", { scanners: [{ tool: "gitleaks", status: "SKIPPED", classification: "binary_missing", reason: "gitleaks was not found" }] });
++}
++const runClose = (dir) => spawnSync(process.execPath, [closeScript], { cwd: dir, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: dir } });
++
++test("C7 the close.pre entry point: standard prints not executed and never GREEN, critical exits 2, an unconfigured gate says not applicable", () => {
++  const standard = closeFixture({ gate: "blocking", stakes: "standard" });
++  closeEvidence(standard.dir, standard.commit, standard.tree);
++  const admitted = runClose(standard.dir);
++  assert.equal(admitted.status, 0, admitted.stderr);
++  assert.match(admitted.stdout, /gitleaks: not executed/u);
++  assert.match(admitted.stdout, /NOT COMPLETE/u);
++  assert.doesNotMatch(admitted.stdout, /GREEN/u);
++
++  const critical = closeFixture({ gate: "blocking", stakes: "critical" });
++  closeEvidence(critical.dir, critical.commit, critical.tree);
++  const refused = runClose(critical.dir);
++  assert.equal(refused.status, 2);
++  assert.match(refused.stderr, /SEC-CLOSE-SCANNER-NOT-EXECUTED/u);
++
++  const unconfigured = closeFixture({});
++  const skippedRun = runClose(unconfigured.dir);
++  assert.equal(skippedRun.status, 0);
++  assert.match(skippedRun.stdout, /not applicable/u);
++});
++
++// C8 (the normal delivery path): the Verify "security" check runs the configured scan. The scanner observation is injected as an
++// environment without any scanner (empty PATH, HOME in the fixture): no scanner binary is found, nothing is downloaded.
++test("C8 the Verify security check runs the scan: standard admits and reports, critical refuses the scanner that did not execute, no gate is not applicable", async () => {
++  const { runSecurityCloseCheck } = await import("../../scripts/consumer-verify-check.mjs");
++  const run = (root) => {
++    const lines = [];
++    const log = console.log; const error = console.error;
++    console.log = (...a) => lines.push(a.join(" ")); console.error = (...a) => lines.push(a.join(" "));
++    try { return { code: runSecurityCloseCheck(root, { PATH: "", Path: "", HOME: root }), text: lines.join("\n") }; } finally { console.log = log; console.error = error; }
++  };
++  const gateFile = "schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: blocking\n    type: automated\n";
++  const make = (stakes, gate = true) => {
++    const root = project(stakes);
++    if (gate) { mkdirSync(join(root, ".claude"), { recursive: true }); writeFileSync(join(root, ".claude/pipeline.yaml"), gateFile); }
++    return root;
++  };
++  assert.deepEqual([run(make("standard", false)).code, /not applicable/u.test(run(make("standard", false)).text)], [0, true]);
++  const standard = make("standard");
++  assert.equal(run(standard).code, 0);
++  assert.ok(existsSync(join(standard, "evidence", "security-latest.json")), "the Verify path actually ran the scan and wrote its evidence");
++  const critical = run(make("critical"));
++  assert.equal(critical.code, 1);
++  assert.match(critical.text, /SEC-CLOSE-SCANNER-NOT-EXECUTED/u);
++});
++
++test("C6 security-scan.mjs --out-dir under scratch/ writes there; any other target is refused and writes nothing", () => {
++  const root = project();
++  mkdirSync(join(root, "scratch"), { recursive: true });
++  const ok = spawnSync(process.execPath, [scanScript, "--root", root, "--out-dir", "scratch/analysis"], { encoding: "utf8", timeout: 50_000 });
++  assert.ok(existsSync(join(root, "scratch", "analysis", "evidence", "security-latest.json")), `${ok.stdout}\n${ok.stderr}`);
++  assert.equal(existsSync(join(root, "evidence", "security-latest.json")), false, "an analysis run must not write the root evidence/");
++  const refused = spawnSync(process.execPath, [scanScript, "--root", root, "--out-dir", "evidence"], { encoding: "utf8", timeout: 50_000 });
++  assert.equal(refused.status, 1);
++  assert.match(refused.stderr, /scratch/u);
++  assert.equal(existsSync(join(root, "evidence")), false);
++  assert.deepEqual(readdirSync(root).sort(), ["project", "scratch"].filter((name) => existsSync(join(root, name))).sort());
++});
+diff --git a/plugins/pipeline-core/lib/security-close-status.mjs b/plugins/pipeline-core/lib/security-close-status.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..de416cdcb11567aee1bbb04579e2bc4da9f559cd
+--- /dev/null
++++ b/plugins/pipeline-core/lib/security-close-status.mjs
+@@ -0,0 +1,107 @@
++// SPDX-License-Identifier: SUL-1.0
++// The security close chain's status vocabulary and its calibration rule (Candidate 20, G20-25, AC-108).
++//
++// Every security element reads with exactly one of four states, in every human-facing line:
++//   passed          the scanner ran and found nothing;
++//   failed          the scanner ran and reported findings;
++//   not executed    the project configures the scanner, but it did not run (absent, rejected as untrusted, or errored);
++//   not applicable  the calibration or the project gives it nothing to scan (not configured, or no package sources).
++// A skipped or errored scanner is never "passed" and never an unqualified "ok" line.
++//
++// The calibration rule is one field: `stakes` of the project calibration (project/pipeline.json, else .claude/pipeline.json).
++// A critical calibration (critical/high, or the German kritisch/hoch) turns a scanner that did not execute into a typed refusal;
++// any other value, or an absent field, keeps today's behaviour (admitted, status "not executed"). Pure and offline: no scanner is spawned.
++import { existsSync, readFileSync } from "node:fs";
++import { join } from "node:path";
++
++export const SECURITY_STATES = Object.freeze(["passed", "failed", "not executed", "not applicable"]);
++export const SECURITY_ELEMENTS = Object.freeze(["gitleaks", "osv-scanner", "semgrep", "license-check"]);
++export const SECURITY_RUN_COMMAND = "node <plugin-root>/scripts/security-scan.mjs";
++export const SECURITY_PREFLIGHT_COMMAND = "node <plugin-root>/scripts/toolchain-preflight.mjs";
++export const SCANNER_NOT_EXECUTED_CODE = "SEC-CLOSE-SCANNER-NOT-EXECUTED";
++
++/**
++ * Normalizes one scanner entry's {status, classification} into a reader-facing label: "passed", "findings", "not-configured",
++ * "tool-unavailable", "not-applicable", or "error" (null for an unrecognised status). Purely additive next to `status`/`classification`.
++ * Before this label, "classification: success" meant three different things (a real clean scan, a project with no policy configured, and
++ * a project with nothing of that kind to scan); that is the ambiguity "an empty rule set must never read like a successful deep scan"
++ * names. Moved here from security-scan.mjs so the scan and the close chain share one mapping.
++ */
++export function deriveReportStatus({ tool, status, classification }) {
++  if (status === "PASS") return "passed";
++  if (status === "FINDINGS") return "findings";
++  if (status === "ERROR") return "error";
++  if (status !== "SKIPPED") return null;
++  // license-check has no binary at all (isInstalled() always reports installed); every one of its SKIPPED results means "this project
++  // configured no policy/declaration" -- there is no other SKIPPED shape it can produce.
++  if (tool === "license-check") return "not-configured";
++  // osv-scanner's ONE non-binary_missing SKIPPED shape is its own "no package sources in project" honest signal (classification
++  // "success") -- a project state, not a broken tool.
++  if (tool === "osv-scanner" && classification === "success") return "not-applicable";
++  // Every other SKIPPED shape for a binary-backed scanner means the tool itself could not be used: absent from PATH/trusted locations
++  // ("binary_missing") or rejected as untrusted. No working scan happened, and it is not the project's own "nothing to scan" signal.
++  return "tool-unavailable";
++}
++
++/** The four-state reading of one scanner entry {tool, status, classification, reason?}. */
++export function securityScannerState(entry) {
++  const label = entry?.reportStatus ?? deriveReportStatus(entry ?? {});
++  if (label === "passed") return "passed";
++  if (label === "findings") return "failed";
++  if (label === "not-configured" || label === "not-applicable") return "not applicable";
++  return "not executed"; // tool-unavailable, error, or an unrecognised status: the scanner did not complete a scan
++}
++
++/** True for a critical calibration: the first word of `stakes` is critical/high/kritisch/hoch. Absent or unknown is not critical. */
++export function isCriticalStakes(stakes) {
++  if (typeof stakes !== "string") return false;
++  const word = stakes.trim().toLowerCase().split(/[^a-zäöüß]+/u)[0];
++  return word === "critical" || word === "high" || word === "kritisch" || word === "hoch";
++}
++
++/** The raw `stakes` of the project calibration under `projectDir`, or null when it is absent, unreadable or not a string. */
++export function readCalibrationStakes(projectDir) {
++  for (const rel of ["project/pipeline.json", ".claude/pipeline.json"]) {
++    const path = join(projectDir, rel);
++    if (!existsSync(path)) continue;
++    try {
++      const stakes = JSON.parse(readFileSync(path, "utf8"))?.stakes;
++      return typeof stakes === "string" ? stakes : null;
++    } catch {
++      return null;
++    }
++  }
++  return null;
++}
++
++/**
++ * One {element, state, reason} per security element. `scanners` is the scan evidence's scanner list (or null when there is none);
++ * `enabled` maps an element to false when the calibration does not configure it. An element without an entry is "not applicable"
++ * when not configured and "not executed" when configured -- no evidence never reads like a passed scan.
++ */
++export function securityCloseElements({ scanners = null, enabled = {} } = {}) {
++  const list = Array.isArray(scanners) ? scanners : [];
++  return SECURITY_ELEMENTS.map((element) => {
++    const entry = list.find((s) => s?.tool === element);
++    if (entry) return { element, state: securityScannerState(entry), reason: entry.reason ?? null };
++    if (enabled?.[element] === false) return { element, state: "not applicable", reason: "not configured for this project" };
++    return { element, state: "not executed", reason: "no scan evidence for this scanner" };
++  });
++}
++
++/** The elements of a scan that completed: it lists every scanner the project enables, so an element missing from it is not configured. */
++export function elementsOfCompletedScan(scanners) {
++  const list = Array.isArray(scanners) ? scanners : [];
++  const enabled = Object.fromEntries(SECURITY_ELEMENTS.filter((e) => !list.some((s) => s?.tool === e)).map((e) => [e, false]));
++  return securityCloseElements({ scanners: list, enabled });
++}
++
++export function formatSecurityCloseStatus(elements) {
++  return elements.map(({ element, state, reason }) => `${element}: ${state}${reason ? ` -- ${reason}` : ""}`);
++}
++
++/** The typed refusal of a critical calibration for a scanner that did not execute: names the scanner and the commands that repair it. */
++export function scannerNotExecutedRefusal(element, where = "the security evidence") {
++  return `${SCANNER_NOT_EXECUTED_CODE}: ${element} did not execute (${where}) and this project is calibrated critical (stakes in the project calibration). `
++    + `Install ${element} (platform guidance: ${SECURITY_PREFLIGHT_COMMAND}), then run: ${SECURITY_RUN_COMMAND}`;
++}
+diff --git a/plugins/pipeline-core/lib/security-completeness-gate.mjs b/plugins/pipeline-core/lib/security-completeness-gate.mjs
+index 7c3e821b65809352fd9ea95ebe59371c10e93f9f..e1466db73108fe8f6e4a963c0d514de9dd810528 100644
+--- a/plugins/pipeline-core/lib/security-completeness-gate.mjs
++++ b/plugins/pipeline-core/lib/security-completeness-gate.mjs
+@@ -82,6 +82,7 @@ import { join } from "node:path";
+ 
+ import { evaluateAllCapabilities, aggregateVerdict, validateSecurityEvidenceV2 } from "./security-evidence-evaluator.mjs";
+ import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes, freshnessCodeSuffix } from "./evidence-freshness-codes.mjs";
++import { isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal, securityScannerState } from "./security-close-status.mjs";
+ 
+ const DEFAULT_ENVELOPE_PATH = "evidence/security-latest.v2.json";
+ const DEFAULT_VERDICT_PATH = "evidence/security-latest.v2.verdict.json";
+@@ -307,5 +308,15 @@ export function checkSecurityCompleteness({
+       );
+     }
+   }
++  // G20-25: a critical calibration is hard -- a scanner that did not execute blocks even where the plan marks it optional. Any other
++  // calibration keeps the verdict above as the whole decision (its status line still reads "not executed", see security-close-status.mjs).
++  if (isCriticalStakes(readCalibrationStakes(projectDir))) {
++    for (const c of envelope.capabilities) {
++      const element = c?.tool?.name;
++      if (securityScannerState({ tool: element, status: c?.status, classification: c?.classification }) === "not executed") {
++        failures.push(scannerNotExecutedRefusal(element, envelopePath));
++      }
++    }
++  }
+   return failures;
+ }
+diff --git a/plugins/pipeline-core/scripts/check-close-security-completeness.mjs b/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
+index 5fbb0c0d8f6e856d1acccb897044020441a39e59..b7510bb72a34136c4271c260ececcc208d4527a2 100644
+--- a/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
++++ b/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
+@@ -35,6 +35,12 @@
+  * VERIFY: node plugins/pipeline-core/scripts/check-close-security-completeness.test.mjs
+  */
+ import { spawnSync } from "node:child_process";
++import { readFileSync } from "node:fs";
++import { join } from "node:path";
++
++import {
++  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, securityCloseElements,
++} from "../lib/security-close-status.mjs";
+ 
+ import { loadManifest, gateConfig } from "../lib/manifest.mjs";
+ import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
+@@ -65,18 +71,32 @@ export function checkCloseSecurityCompleteness(root) {
+   const tree = headTree.status === 0 ? headTree.stdout.trim() : null;
+ 
+   const failures = checkSecurityCompleteness({ projectDir: root, commit, tree, subjectLabel: "the sealed HEAD commit" });
+-  return { skipped: false, commit, failures };
++  // G20-25: the four-state status of every security element, read from the scan evidence the completeness check just bound.
++  let scanners = null;
++  try { scanners = JSON.parse(readFileSync(join(root, "evidence", "security-latest.json"), "utf8")).scanners; } catch { /* no readable scan evidence: every configured element reads "not executed" */ }
++  const enabled = Object.fromEntries(SECURITY_ELEMENTS.map((key) => [key, manifestResult.manifest?.security?.scanners?.[key]?.enabled ?? true]));
++  return { skipped: false, commit, failures, elements: securityCloseElements({ scanners, enabled }) };
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) {
+   const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+   const result = checkCloseSecurityCompleteness(root);
+-  if (!result.skipped) {
+-    if (result.failures.length > 0) {
+-      for (const failure of result.failures) console.error(`CLOSE SECURITY COMPLETENESS FAILED: ${failure}`);
+-      process.exit(2);
+-    }
+-    console.log(`CLOSE SECURITY COMPLETENESS GREEN: HEAD ${result.commit} is bound and complete.`);
++  if (result.skipped) {
++    // Nothing configured is "not applicable", said out loud: a silent exit 0 here read like a passed security check.
++    const hint = isCriticalStakes(readCalibrationStakes(root))
++      ? " This project is calibrated critical: configure the security gate (gates.security mode: blocking) in the project manifest."
++      : "";
++    console.log(`CLOSE SECURITY CHAIN: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off).${hint}`);
++    process.exit(0);
++  }
++  for (const line of formatSecurityCloseStatus(result.elements)) console.log(`  ${line}`);
++  if (result.failures.length > 0) {
++    for (const failure of result.failures) console.error(`CLOSE SECURITY COMPLETENESS FAILED: ${failure}`);
++    process.exit(2);
+   }
++  const notExecuted = result.elements.filter((e) => e.state === "not executed").map((e) => e.element);
++  console.log(notExecuted.length === 0
++    ? `CLOSE SECURITY COMPLETENESS GREEN: HEAD ${result.commit} is bound and complete.`
++    : `CLOSE SECURITY COMPLETENESS ADMITTED, NOT COMPLETE: HEAD ${result.commit} is bound; not executed: ${notExecuted.join(", ")} (this calibration is not critical, so it does not block). Run: ${SECURITY_RUN_COMMAND}`);
+   process.exit(0);
+ }
+diff --git a/plugins/pipeline-core/scripts/consumer-verify-check.mjs b/plugins/pipeline-core/scripts/consumer-verify-check.mjs
+index bc2f54027560fd6897a6937f3485dd87f35a2be2..7ca5c2d27cb338be78c14a402ba0cbbfda43d459 100644
+--- a/plugins/pipeline-core/scripts/consumer-verify-check.mjs
++++ b/plugins/pipeline-core/scripts/consumer-verify-check.mjs
+@@ -1,15 +1,37 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ import { readFileSync } from "node:fs";
++import { join } from "node:path";
++import { fileURLToPath } from "node:url";
+ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
++import { elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal } from "../lib/security-close-status.mjs";
+ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { readProjectCalibrationIdentity } from "../lib/project-calibration-identity.mjs";
+-import { loadManifest } from "../lib/manifest.mjs";
++import { gateConfig, loadManifest } from "../lib/manifest.mjs";
+ import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
+ import { inspectConsumerBaseline } from "../lib/consumer-baseline-verify.mjs";
+ import { readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
+ 
++// G20-25: the normal delivery path runs the configured scanners (before this, no Verify suite called any, so the configured security
++// gate never executed). A calibration without the gate is "not applicable"; a critical calibration refuses a scanner that did not execute.
++export function runSecurityCloseCheck(root, env = process.env) {
++  const loaded = loadManifest(root);
++  const gate = gateConfig(loaded.manifest, "security");
++  if (loaded.status === "absent" || !gate || gate.mode === "off") {
++    console.log("security close chain: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off)");
++    return 0;
++  }
++  const scan = spawnSync(process.execPath, [fileURLToPath(new URL("./security-scan.mjs", import.meta.url)), "--root", root, "--scan-mode", "snapshot"], { cwd: root, stdio: "inherit", env });
++  if (scan.status !== 0 && scan.status !== 1) return 1; // 1 is the scan's own warn-mode exit, which the gate mode already decided
++  if (!isCriticalStakes(readCalibrationStakes(root))) return 0;
++  let scanners = null;
++  try { scanners = JSON.parse(readFileSync(join(root, "evidence", "security-latest.json"), "utf8")).scanners; } catch { /* unreadable evidence: every configured element is not executed */ }
++  const notExecuted = elementsOfCompletedScan(scanners).filter((entry) => entry.state === "not executed");
++  for (const entry of notExecuted) console.error(scannerNotExecutedRefusal(entry.element, "this Verify run"));
++  return notExecuted.length === 0 ? 0 : 1;
++}
++
+ export function runConsumerVerifyCheck(check, commandId = null) {
+   const root = process.cwd();
+   try {
+@@ -35,6 +57,7 @@ export function runConsumerVerifyCheck(check, commandId = null) {
+       console.log(JSON.stringify(result));
+       return result.status === "passed" ? 0 : 1;
+     }
++    if (check === "security") return runSecurityCloseCheck(root);
+     if (check === "configured-command") {
+       const configuration = readConsumerVerifyConfiguration(root);
+       const commands = [...configuration.baseline, ...configuration.areas.flatMap((area) => area.commands)];
+diff --git a/plugins/pipeline-core/scripts/security-scan.mjs b/plugins/pipeline-core/scripts/security-scan.mjs
+index d041ec2f5f617b17c74675b507d5e63a4742d25d..cc74460354675949cd6653e4872291e1d45f9b7d 100644
+--- a/plugins/pipeline-core/scripts/security-scan.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.mjs
+@@ -111,6 +111,7 @@ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ // SHARED absent-key default both consumers use) -- see that function's own doc comment for
+ // why "blocking" was chosen and why it moved rather than staying duplicated here.
+ import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
++import { deriveReportStatus, elementsOfCompletedScan, formatSecurityCloseStatus } from "../lib/security-close-status.mjs";
+ import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
+ import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
+ 
+@@ -548,48 +549,8 @@ function scannerEntry(adapter, result, executableSha256 = null) {
+   return entry;
+ }
+ 
+-/**
+- * NVA-B-SCANNER (backlog: scanner-bootstrap-is-not-self-sufficient-for-a-fresh-project,
+- * Direction 2): normalizes every per-scanner entry's existing {status, classification} pair
+- * into one of five reader-facing labels -- "passed", "findings", "not-configured",
+- * "tool-unavailable", "not-applicable" -- plus "error" for the (already unambiguous) ERROR
+- * status, added for completeness. PURELY ADDITIVE: this never replaces `status`/
+- * `classification`, and every existing consumer that matches on those two fields directly
+- * (e.g. `observedApplicabilityInputs` below, which checks
+- * `sca.classification === "success"` + a reason prefix) keeps doing so unchanged.
+- *
+- * WHY THIS EXISTS: before this field, "classification: success" was reused for three
+- * genuinely different meanings -- a real completed clean scan (status PASS), a project that
+- * configured no policy at all (license-check SKIPPED), and a project with nothing of that
+- * kind to scan (osv-scanner SKIPPED "no package sources") -- all indistinguishable without
+- * reading the free-text `reason` string. That is exactly the ambiguity the backlog item
+- * names: "an empty rule set must never read like a successful deep scan".
+- *
+- * Applied to every entry in the `scanners` array AFTER the run loop below, regardless of
+- * which code path built it (adapter-run entries via `scannerEntry()` above, or the
+- * hand-built authorityBlocked/candidate_snapshot/execution_environment/
+- * manifest_config_invalid/catch-block entries elsewhere in this file) -- so no entry shape
+- * is silently left unlabeled.
+- */
+-function deriveReportStatus({ tool, status, classification }) {
+-  if (status === "PASS") return "passed";
+-  if (status === "FINDINGS") return "findings";
+-  if (status === "ERROR") return "error";
+-  if (status !== "SKIPPED") return null;
+-  // license-check has no binary at all (isInstalled() always reports installed); every one
+-  // of its SKIPPED results means "this project configured no policy/declaration" (see its own
+-  // header comment) -- there is no other SKIPPED shape it can produce.
+-  if (tool === "license-check") return "not-configured";
+-  // osv-scanner's ONE non-binary_missing SKIPPED shape is its own "no package sources in
+-  // project" honest signal (classification "success") -- a project state, not a broken tool.
+-  if (tool === "osv-scanner" && classification === "success") return "not-applicable";
+-  // Every other SKIPPED shape for a binary-backed scanner means the tool itself could not be
+-  // used -- absent from PATH/trusted locations (classification "binary_missing") or rejected
+-  // as untrusted by assessTrustedExecutablePath/resolveTrustedSystemExecutable (any other
+-  // classification string those may report). Both read the same to a project: no working
+-  // scan happened, and it is not this project's own "nothing to scan here" signal.
+-  return "tool-unavailable";
+-}
++// NVA-B-SCANNER's `deriveReportStatus` (the reader-facing label of every scanner entry, applied to all entries after the run loop below)
++// lives in ../lib/security-close-status.mjs since G20-25, so the scan and the close chain share one mapping.
+ 
+ // =============================================================================================
+ // CYB-2E -- additive `pipeline.security-evidence.v2` emission (EXIT-NEUTRAL; Option B / D9).
+@@ -904,6 +865,9 @@ export async function runSecurityScan({
+   // "snapshot" scans HEAD's committed bytes from a disposable detached worktree and leaves
+   // the caller's dirty tree untouched; the evidence still binds HEAD's commit and tree.
+   scanMode = "shared-tree",
++  // G20-25: an analysis run writes its evidence under this directory (already checked to lie under <root>/scratch/ by the CLI)
++  // instead of the project's evidence/, so a reviewer can run the scan without touching the delivery evidence.
++  evidenceOutDir = null,
+ } = {}) {
+   const assessPath = assessTrustedExecutablePathOverride ?? assessTrustedExecutablePath;
+   const resolveSystemExec = resolveTrustedSystemExecutableOverride ?? resolveTrustedSystemExecutable;
+@@ -1088,7 +1052,7 @@ export async function runSecurityScan({
+   };
+   const evidence = { ...evidenceCore, payloadSha256: sha256(canonicalJson(evidenceCore)) };
+ 
+-  const evidenceRoot = resolveEvidenceRoot(rootDir);
++  const evidenceRoot = evidenceOutDir ?? resolveEvidenceRoot(rootDir);
+   const evidenceDir = join(evidenceRoot, "evidence");
+   mkdirSync(evidenceDir, { recursive: true });
+   writeFileSync(join(evidenceDir, "security-latest.json"), JSON.stringify(evidence, null, 2) + "\n");
+@@ -1186,6 +1150,10 @@ function printSummary(evidence) {
+   for (const s of evidence.scanners) {
+     console.log(formatScannerLine(s));
+   }
++  // G20-25: the four-state close status (passed / failed / not executed / not applicable), so a scanner that did not run never
++  // reads like a passed scan next to a "policy exit 0".
++  console.log("Security close status:");
++  for (const line of formatSecurityCloseStatus(elementsOfCompletedScan(evidence.scanners))) console.log(`  ${line}`);
+   const verdict = deriveSummaryVerdict(evidence);
+   const policyNote = evidence.exitCode === 0 && verdict !== "CLEAN" ? ` (policy exit ${evidence.exitCode})` : "";
+   if (evidence.candidate?.destination === "local-only") {
+@@ -1212,6 +1180,9 @@ function parseArgs(argv) {
+       if (opts.scanMode !== "snapshot" && opts.scanMode !== "shared-tree") {
+         throw new Error(`--scan-mode must be "snapshot" or "shared-tree", got: ${opts.scanMode}`);
+       }
++    } else if (a === "--out-dir") {
++      opts.outDir = argv[++i];
++      if (!opts.outDir || opts.outDir.startsWith("-")) throw new Error("--out-dir requires a directory under scratch/");
+     } else if (a === "--remote") {
+       opts.remoteName = argv[++i];
+       if (!opts.remoteName || opts.remoteName.startsWith("-")) throw new Error("--remote requires a configured remote name");
+@@ -1242,16 +1213,31 @@ export async function main(argv = process.argv.slice(2)) {
+     return;
+   }
+ 
++  let outDir = null;
++  if (opts.outDir !== undefined) {
++    // An analysis run: lexically strictly beneath <root>/scratch/ (no "..", no absolute escape); refused before anything is written.
++    const scratchRoot = join(rootDir, "scratch");
++    outDir = resolve(rootDir, opts.outDir);
++    if (!outDir.startsWith(scratchRoot + sep)) {
++      process.stderr.write(`error: --out-dir must be a directory under scratch/ of the root (${scratchRoot}); got: ${opts.outDir}. `
++        + "Omit --out-dir to write the delivery evidence to evidence/.\n");
++      process.exitCode = 1;
++      return;
++    }
++  }
++
+   const { evidence, exitCode, evidenceV2, verdictV2 } = await runSecurityScan({
+     rootDir,
+     timeoutMs: opts.timeoutMs,
+     remoteName: opts.remoteName ?? null,
+     ...(opts.scanMode ? { scanMode: opts.scanMode } : {}),
++    ...(outDir ? { evidenceOutDir: outDir } : {}),
+   });
+   printSummary(evidence);
+-  console.log(`Evidence written: ${join(rootDir, "evidence", "security-latest.json")}`);
++  const evidenceBase = outDir ?? rootDir;
++  console.log(`Evidence written: ${join(evidenceBase, "evidence", "security-latest.json")}`);
+   if (evidenceV2) {
+-    console.log(`v2 evidence written: ${join(rootDir, "evidence", "security-latest.v2.json")}`);
++    console.log(`v2 evidence written: ${join(evidenceBase, "evidence", "security-latest.v2.json")}`);
+     const b = verdictV2?.verdict;
+     console.log(
+       `v2 policy-complete verdict (reporting-only, does NOT affect exit ${exitCode}): ` +
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+index e4bf8866be34f0f7d4d250d627ee53bcbfea68f6..fb0c8b8fd70539347824d05e85f705a7396468ab 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+@@ -490,6 +490,9 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+     { name: "baseline-manifest", file, args: [CONSUMER_VERIFY_DISPATCHER, "manifest", attempt] },
+     { name: "baseline-repository", file, args: [CONSUMER_VERIFY_DISPATCHER, "repository-baseline"] },
+     { name: "baseline-verify-contract", file, args: [CONSUMER_VERIFY_DISPATCHER, "contract"] },
++    // G20-25: the configured security scanners run in the normal delivery path (not applicable when the project configures no gate).
++    // The attempt token makes the scan always re-run: a cached result for an unchanged tree would hide a scanner that is now missing.
++    { name: "baseline-security", file, args: [CONSUMER_VERIFY_DISPATCHER, "security", attempt] },
+   ];
+   const configuredBaselineSuites = configuration.baseline.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) }));
+   const configuredAreaSuites = configuration.areas.flatMap((area) => area.commands.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) })));
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+index c3f60bf555a60de2408e7c8fea4070a6bf059a01..50a8737a9a272ddc002743b3bcde3b6d78d48351 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+@@ -193,10 +193,12 @@ test("a passing verify produces a consumable artifact bound to the exact commit
+     assert.deepEqual(result.evidence.verifyRun, createPublicVerifyRunEvidence({
+       ...result.evidence.verifyRun,
+       resumePlanSha256: JSON.parse(readFileSync(join(root, ".git/agent-pipeline/verify/runs", result.evidence.verifyRun.runId, "resume-plan.json"), "utf8")).planSha256,
+-      registeredSuiteCount: 5, terminalReceiptCount: 5, terminalStatus: "passed",
++      // Restated in place (QG-04, G20-25): the standard baseline gained the "baseline-security" suite, so one more suite is registered and
++      // receipted (5 -> 6); nothing is weakened, the exact suite list below pins the new member.
++      registeredSuiteCount: 6, terminalReceiptCount: 6, terminalStatus: "passed",
+       receiptReuse: "allowed",
+     }));
+-    assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-repository", "baseline-verify-contract", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
++    assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-repository", "baseline-verify-contract", "baseline-security", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
+     assert.equal(result.evidence.coverage, "project-calibrated");
+     assert.equal(result.evidence.selection.mode, "candidate");
+     const onDisk = JSON.parse(readFileSync(join(root, "evidence", "verify.json"), "utf8"));
+@@ -692,7 +694,7 @@ test("real product assertions stay fresh while eligible baselines resume with du
+     assert.deepEqual(second.evidence.steps.filter((s) => s.reused).map((s) => s.name), ["baseline-calibration", "baseline-repository", "baseline-verify-contract"]);
+     const runs = join(root, ".git/agent-pipeline/verify/runs");
+     const run = join(runs, second.evidence.verifyRun.runId);
+-    assert.equal(readdirSync(join(run, "receipts")).length, 5);
++    assert.equal(readdirSync(join(run, "receipts")).length, 6); // restated in place (QG-04, G20-25): 5 -> 6 with the "baseline-security" suite
+     assert.match(readFileSync(join(run, "progress.jsonl"), "utf8"), /"state":"reused"/u);
+     assert.match(readFileSync(join(run, "logs", `${verifySuiteArtifactName("baseline-manifest")}.log`), "utf8"), /"status":"absent"/u);
+     writeFileSync(join(root, ".git/fail-product"), "fail");

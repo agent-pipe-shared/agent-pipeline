@@ -1,0 +1,64 @@
+diff --git a/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs b/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs
+index eaa3dbb12d552bf9fbed5bda759e3b109f3d480d..d82f9c780e0940ffecde75a8509d928ffebf74ad 100644
+--- a/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs
++++ b/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs
+@@ -162,7 +162,13 @@ function parseArgs(args) {
+     hostHookSessionId: agy ? args[7] : null };
+ }
+ 
+-if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
++// G20-14: the CLI body runs in a function, never as a top-level await. The
++// Antigravity branch imports model-role-bootstrap.mjs, whose import graph cycles
++// back into this module (via session-critic-finalizer.mjs and
++// codex-critic-session-route.mjs). A top-level await here left this module
++// unevaluated, the cycle waited on it, and Node exited 13 (unsettled top-level
++// await) before any output.
++async function runCli() {
+   try {
+     const input = parseArgs(process.argv.slice(2));
+     if (input.runner === "antigravity") {
+@@ -190,3 +196,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
+     }
+   } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 64; }
+ }
++
++if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
++  void runCli();
++}
+diff --git a/plugins/pipeline-core/scripts/model-role-dispatch-select.test.mjs b/plugins/pipeline-core/scripts/model-role-dispatch-select.test.mjs
+index 6fe9e8ee5d7dee7b1a1f47eaeddaefba020962c7..fa291e0c713a8220fbc4f47d9b07215fe0f4dff3 100644
+--- a/plugins/pipeline-core/scripts/model-role-dispatch-select.test.mjs
++++ b/plugins/pipeline-core/scripts/model-role-dispatch-select.test.mjs
+@@ -7,6 +7,8 @@ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+ import { devNull } from "node:os";
++import { spawnSync } from "node:child_process";
++import { fileURLToPath } from "node:url";
+ 
+ const cases = [];
+ function test(name, run) { cases.push({ id: `MDS${String(cases.length + 1).padStart(2, "0")}`, name, run }); }
+@@ -253,7 +255,22 @@ test("family selection script-level identity transport failure stays unavailable
+   assert.equal(Object.hasOwn(result, "v3Route"), false);
+ });
+ 
+-assert.equal(cases.length, 10);
++test("G20-14: the Antigravity CLI branch settles and prints one JSON result instead of exiting 13", () => {
++  const script = fileURLToPath(new URL("./model-role-dispatch-select.mjs", import.meta.url));
++  const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
++  const run = spawnSync(process.execPath, [script, "--repo-root", repoRoot, "--runner", "antigravity",
++    "--task-route", "duty.implement", "--host-session-id", "g20-14-probe"],
++  { encoding: "utf8", timeout: 60_000 });
++  assert.notEqual(run.status, 13, run.stderr);
++  assert.doesNotMatch(run.stderr, /unsettled top-level await/u);
++  const lines = run.stdout.trim().split("\n");
++  assert.equal(lines.length, 1, run.stdout);
++  const parsed = JSON.parse(lines[0]);
++  assert.equal(parsed.runner, "antigravity");
++  assert.equal(parsed.taskRoute, "duty.implement");
++});
++
++assert.equal(cases.length, 11);
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

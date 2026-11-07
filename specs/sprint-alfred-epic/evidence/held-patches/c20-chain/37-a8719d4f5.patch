@@ -1,0 +1,181 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 6da14f5450790378ce9ed4405e45135f8eae68c9..abf4eb98dbe82e8096601a73d6cb62dcc5440f03 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -599,6 +599,9 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs`,
+ `plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs`,
+ `plugins/pipeline-core/lib/critic-accepted-contract.mjs`,
++`plugins/pipeline-core/lib/path-spelling.mjs`,
++`plugins/pipeline-core/lib/security-close-status.mjs`,
++`plugins/pipeline-core/lib/spec-journey-coverage.mjs`,
+ `plugins/pipeline-core/lib/critic-diagnostic-producer.mjs`,
+ `plugins/pipeline-core/lib/critic-generic-batch.mjs`,
+ `plugins/pipeline-core/lib/critic-verify-readiness.mjs`,
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 3a23bb821951c945b92758d75c59d14c3dd993b0..61d25651a43fa86febb2599c55edf654d1087cc8 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -812,6 +812,13 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+   "plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+   "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
++  // C20 (GMWKC01): three leaf modules the candidate-20 chain made kernel imports. path-spelling.mjs (the separator sweep: five
++  // guard/ modules spell paths through it), security-close-status.mjs (G20-25: security-completeness-gate.mjs reads the four
++  // close states from it) and spec-journey-coverage.mjs (G20-27: plan-handoff-readiness.mjs reads the per-criterion journey
++  // coverage from it; its one first-party import, critic-accepted-contract.mjs, is listed above). None imports further first-party code.
++  "plugins/pipeline-core/lib/path-spelling.mjs",
++  "plugins/pipeline-core/lib/security-close-status.mjs",
++  "plugins/pipeline-core/lib/spec-journey-coverage.mjs",
+   "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs",
+   "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+   "plugins/pipeline-core/lib/critic-verify-readiness.mjs",
+diff --git a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+index e033f6bca70c756ef7d6a7f38adefa0d3de61cd8..b1ff0bea96e6827efed19c089de1808dc1351407 100644
+--- a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
++++ b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+@@ -185,7 +185,7 @@ test("C7 the close.pre entry point: standard prints not executed and never GREEN
+ // C8 (the normal delivery path): the Verify "security" check runs the configured scan. The scanner observation is injected as an
+ // environment without any scanner (empty PATH, HOME in the fixture): no scanner binary is found, nothing is downloaded.
+ test("C8 the Verify security check runs the scan: standard admits and reports, critical refuses the scanner that did not execute, no gate is not applicable", async () => {
+-  const { runSecurityCloseCheck } = await import("../../scripts/consumer-verify-check.mjs");
++  const { runSecurityCloseCheck } = await import("../../scripts/security-close-check.mjs"); // QG-04: same function, moved to its own dispatcher (GMWKC01)
+   const run = (root) => {
+     const lines = [];
+     const log = console.log; const error = console.error;
+@@ -231,7 +231,7 @@ const MODE_OFF = `${HEADER}gates:\n  dev-plan:\n    mode: blocking\n    type: hu
+ function put(dir, rel, text) { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), text); }
+ function verifyCheck(root) {
+   return (async () => {
+-    const { runSecurityCloseCheck } = await import("../../scripts/consumer-verify-check.mjs");
++    const { runSecurityCloseCheck } = await import("../../scripts/security-close-check.mjs"); // QG-04: same function, moved to its own dispatcher (GMWKC01)
+     const lines = [];
+     const log = console.log; const error = console.error;
+     console.log = (...a) => lines.push(a.join(" ")); console.error = (...a) => lines.push(a.join(" "));
+diff --git a/plugins/pipeline-core/scripts/consumer-verify-check.mjs b/plugins/pipeline-core/scripts/consumer-verify-check.mjs
+index b8d935bd13291691f18199909b334d99ce1bc723..c31850b8a3a5e938778ba798cf291709b4b01e20 100644
+--- a/plugins/pipeline-core/scripts/consumer-verify-check.mjs
++++ b/plugins/pipeline-core/scripts/consumer-verify-check.mjs
+@@ -1,39 +1,17 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ import { readFileSync } from "node:fs";
+-import { join } from "node:path";
+-import { fileURLToPath } from "node:url";
+ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+-import { elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal, securityGateNotConfiguredRefusal } from "../lib/security-close-status.mjs";
+ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { readProjectCalibrationIdentity } from "../lib/project-calibration-identity.mjs";
+-import { gateConfig, loadManifest } from "../lib/manifest.mjs";
++import { loadManifest } from "../lib/manifest.mjs";
+ import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
+ import { inspectConsumerBaseline } from "../lib/consumer-baseline-verify.mjs";
+ import { readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
+ 
+-// G20-25: the normal delivery path runs the configured scanners (before this, no Verify suite called any, so the configured security
+-// gate never executed). A calibration without the gate is "not applicable"; a critical calibration refuses a scanner that did not execute.
+-export function runSecurityCloseCheck(root, env = process.env) {
+-  const loaded = loadManifest(root);
+-  const gate = gateConfig(loaded.manifest, "security");
+-  if (loaded.status === "absent" || !gate || gate.mode === "off") {
+-    const refusal = securityGateNotConfiguredRefusal(root, "this Verify run");
+-    if (refusal) { console.error(refusal); return 1; }
+-    console.log("security close chain: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off)");
+-    return 0;
+-  }
+-  const scan = spawnSync(process.execPath, [fileURLToPath(new URL("./security-scan.mjs", import.meta.url)), "--root", root, "--scan-mode", "snapshot"], { cwd: root, stdio: "inherit", env });
+-  if (scan.status !== 0 && scan.status !== 1) return 1; // 1 is the scan's own warn-mode exit, which the gate mode already decided
+-  if (!isCriticalStakes(readCalibrationStakes(root))) return 0;
+-  let scanners = null;
+-  try { scanners = JSON.parse(readFileSync(join(root, "evidence", "security-latest.json"), "utf8")).scanners; } catch { /* unreadable evidence: every configured element is not executed */ }
+-  const notExecuted = elementsOfCompletedScan(scanners).filter((entry) => entry.state === "not executed");
+-  for (const entry of notExecuted) console.error(scannerNotExecutedRefusal(entry.element, "this Verify run"));
+-  return notExecuted.length === 0 ? 0 : 1;
+-}
+-
++// G20-25: the baseline-security suite has its own dispatcher, scripts/security-close-check.mjs (not imported here: this file is a
++// never-liftable kernel path and the scanner tree must stay outside the kernel closure, GMWKC01).
+ export function runConsumerVerifyCheck(check, commandId = null) {
+   const root = process.cwd();
+   try {
+@@ -59,7 +37,6 @@ export function runConsumerVerifyCheck(check, commandId = null) {
+       console.log(JSON.stringify(result));
+       return result.status === "passed" ? 0 : 1;
+     }
+-    if (check === "security") return runSecurityCloseCheck(root);
+     if (check === "configured-command") {
+       const configuration = readConsumerVerifyConfiguration(root);
+       const commands = [...configuration.baseline, ...configuration.areas.flatMap((area) => area.commands)];
+diff --git a/plugins/pipeline-core/scripts/security-close-check.mjs b/plugins/pipeline-core/scripts/security-close-check.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef86be12ddf80fbed76ccea3f9e2d3e4c4423378
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/security-close-check.mjs
+@@ -0,0 +1,43 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++// G20-25: the consumer Verify dispatcher for the baseline-security suite. It runs the configured scanners in the normal delivery
++// path (before G20-25 no Verify suite called any, so the configured security gate never executed). A calibration without the gate
++// is "not applicable" unless its stakes are critical, which refuses with the repair that configures the gate; a critical calibration
++// refuses a scanner that did not execute.
++//
++// It is its own dispatcher, not a branch of consumer-verify-check.mjs: that file is a never-liftable guard kernel path, and the
++// security scan pulls in the whole scanner tree (adapters, evaluators, diagnostics). verify-evidence-producer.mjs hands this
++// module's URL to the consumer adapter, which imports it by URL, so no kernel file imports or spawns the scanner tree (GMWKC01).
++import { readFileSync } from "node:fs";
++import { join } from "node:path";
++import { fileURLToPath } from "node:url";
++import { spawnSync } from "node:child_process";
++import { elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal, securityGateNotConfiguredRefusal } from "../lib/security-close-status.mjs";
++import { gateConfig, loadManifest } from "../lib/manifest.mjs";
++
++export const SECURITY_SCAN_SCRIPT = fileURLToPath(new URL("./security-scan.mjs", import.meta.url));
++
++export function runSecurityCloseCheck(root, env = process.env) {
++  const loaded = loadManifest(root);
++  const gate = gateConfig(loaded.manifest, "security");
++  if (loaded.status === "absent" || !gate || gate.mode === "off") {
++    const refusal = securityGateNotConfiguredRefusal(root, "this Verify run");
++    if (refusal) { console.error(refusal); return 1; }
++    console.log("security close chain: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off)");
++    return 0;
++  }
++  const scan = spawnSync(process.execPath, [SECURITY_SCAN_SCRIPT, "--root", root, "--scan-mode", "snapshot"], { cwd: root, stdio: "inherit", env });
++  if (scan.status !== 0 && scan.status !== 1) return 1; // 1 is the scan's own warn-mode exit, which the gate mode already decided
++  if (!isCriticalStakes(readCalibrationStakes(root))) return 0;
++  let scanners = null;
++  try { scanners = JSON.parse(readFileSync(join(root, "evidence", "security-latest.json"), "utf8")).scanners; } catch { /* unreadable evidence: every configured element is not executed */ }
++  const notExecuted = elementsOfCompletedScan(scanners).filter((entry) => entry.state === "not executed");
++  for (const entry of notExecuted) console.error(scannerNotExecutedRefusal(entry.element, "this Verify run"));
++  return notExecuted.length === 0 ? 0 : 1;
++}
++
++// The consumer adapter contract (lib/consumer-verify.mjs CONSUMER_VERIFY_ADAPTER): `runConsumerVerifyCheck(check, ...args)`.
++export function runConsumerVerifyCheck(check) {
++  if (check !== "security") { console.error(`unknown security Verify check: ${check}`); return 1; }
++  try { return runSecurityCloseCheck(process.cwd()); } catch (error) { console.error(error.message); return 1; }
++}
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+index fb0c8b8fd70539347824d05e85f705a7396468ab..cb17fa788ad435e9fed865bc1e6bcba36e85b292 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+@@ -87,6 +87,8 @@ import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
+ import { planVerifySelection } from "../lib/verify-selection.mjs";
+ import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISPATCHER, prepareConsumerVerify, readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
+ import { assessPushHookBackstop as realAssessPushHookBackstop } from "./check-clone-provisioning.mjs";
++// G20-25: the baseline-security suite's dispatcher, handed to the consumer adapter by URL (no import edge into the scanner tree).
++const SECURITY_CLOSE_DISPATCHER = new URL("./security-close-check.mjs", import.meta.url).href;
+ import { prepareCommitWorktreeDependencies } from "../lib/commit-worktree-dependencies.mjs";
+ import {
+   GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA,
+@@ -492,7 +494,8 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
+     { name: "baseline-verify-contract", file, args: [CONSUMER_VERIFY_DISPATCHER, "contract"] },
+     // G20-25: the configured security scanners run in the normal delivery path (not applicable when the project configures no gate).
+     // The attempt token makes the scan always re-run: a cached result for an unchanged tree would hide a scanner that is now missing.
+-    { name: "baseline-security", file, args: [CONSUMER_VERIFY_DISPATCHER, "security", attempt] },
++    // Its own dispatcher (scripts/security-close-check.mjs), never a branch of the kernel file consumer-verify-check.mjs (GMWKC01).
++    { name: "baseline-security", file, args: [SECURITY_CLOSE_DISPATCHER, "security", attempt] },
+   ];
+   const configuredBaselineSuites = configuration.baseline.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) }));
+   const configuredAreaSuites = configuration.areas.flatMap((area) => area.commands.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) })));

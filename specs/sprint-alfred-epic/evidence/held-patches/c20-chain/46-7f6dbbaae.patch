@@ -1,0 +1,41 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 6f9a1dfdb6693b9b73184664fd3844a89bf406d4..5023f694081e3e863fbe2b72addf6f1c813f7f6b 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -993,13 +993,15 @@ export function createAdmissionCheckpoint(deadline){
+     }
+   };
+ }
+-/** E4: the retry budget of the pre-launch publish. With an admission deadline it is what remains of it (capped at 60 s, the
+- * deadline checkpoints still refuse GUARD-DISPATCH-SLOW past it); without one, the 10 s default of the queue writers. Only a
+- * held lock met before the boundary callback ran is retried, exactly as retryWhileSessionAuthorityLockHeld does. */
++/** E4: the retry budget of the pre-launch publish. With an admission deadline it is what remains of it (the deadline checkpoints
++ * still refuse GUARD-DISPATCH-SLOW past it); without one, the 10 s default of the queue writers. Only a held lock met before the
++ * boundary callback ran is retried, exactly as retryWhileSessionAuthorityLockHeld does.
++ * G20-40: the former 60 s cap counted from the FIRST attempt, so one slow lock-free attempt (a 64 s prescan, measured) used it up and a
++ * sibling launch's held lock was refused with half the admission budget left; the window is now the whole remaining admission budget. */
+ export function retryPublishWhileLockHeld(attempt,admissionDeadline=null,options={}){
+   const now=typeof options.now==='function'?options.now:(typeof admissionDeadline?.now==='function'?admissionDeadline.now:Date.now);
+   const remaining=admissionDeadline&&typeof admissionDeadline==='object'&&Number.isFinite(admissionDeadline.budgetMs)&&Number.isFinite(admissionDeadline.startMs)
+-    ?Math.max(0,Math.min(60000,admissionDeadline.budgetMs-(now()-admissionDeadline.startMs)))
++    ?Math.max(0,admissionDeadline.budgetMs-(now()-admissionDeadline.startMs))
+     :10000;
+   return retryWhileSessionAuthorityLockHeld(attempt,{budgetMs:remaining,now,...(typeof options.sleep==='function'?{sleep:options.sleep}:{})});
+ }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 47a479f65d7daf156678c60e13a61fce0708bf38..f6ca10a0bc7b3e9512e51a8e463fce124620ac51 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1819,6 +1819,12 @@ const cases = [
+     let calls=0;
+     const ok=retryPublishWhileLockHeld(()=>{calls+=1;if(calls<3)throw held();return {ok:true};},{startMs:0,budgetMs:295000,now},{sleep,now});
+     assert.deepEqual([ok,calls],[{ok:true},3]);
++    // G20-40 (measured 2026-11-07): a sibling launch of the same reply held the lock while this admission's own attempt spent 64 s in its
++    // lock-free prescan; a retry window fixed at 60 s from the first attempt had already expired, so the launch refused SDC-LOCK-HELD
++    // with 150 s of its admission budget left. The window is what remains of the admission deadline, however long one attempt takes.
++    clock=0;calls=0;
++    const slow=retryPublishWhileLockHeld(()=>{calls+=1;if(calls===1){clock+=64000;throw held();}return {ok:true};},{startMs:0,budgetMs:295000,now},{sleep,now});
++    assert.deepEqual([slow,calls],[{ok:true},2]);
+     // The budget is what remains of the admission deadline: with 100 ms left the held lock is refused, typed, after the wait.
+     clock=0;calls=0;
+     assert.throws(()=>retryPublishWhileLockHeld(()=>{calls+=1;throw held();},{startMs:0,budgetMs:100,now},{sleep,now}),error=>error.code==='SDC-LOCK-HELD');

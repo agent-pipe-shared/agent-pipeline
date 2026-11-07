@@ -1,0 +1,774 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index abf4eb98dbe82e8096601a73d6cb62dcc5440f03..5226c982a82f4a29ef5663cc3178f8682c04e3dc 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -602,6 +602,8 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/lib/path-spelling.mjs`,
+ `plugins/pipeline-core/lib/security-close-status.mjs`,
+ `plugins/pipeline-core/lib/spec-journey-coverage.mjs`,
++`plugins/pipeline-core/lib/answered-intake-values.mjs`,
++`plugins/pipeline-core/lib/signed-proof-wait.mjs`,
+ `plugins/pipeline-core/lib/critic-diagnostic-producer.mjs`,
+ `plugins/pipeline-core/lib/critic-generic-batch.mjs`,
+ `plugins/pipeline-core/lib/critic-verify-readiness.mjs`,
+diff --git a/plugins/pipeline-core/lib/answered-intake-values.mjs b/plugins/pipeline-core/lib/answered-intake-values.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..901edfeb3ca050701b8566fc103cdf3c790db6bd
+--- /dev/null
++++ b/plugins/pipeline-core/lib/answered-intake-values.mjs
+@@ -0,0 +1,77 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C20 G20-30 (AC-108): the one typed readback of every intake value the PO has already answered, and the typed refusal to ask one
++ * of them again. Nothing here stores an answer: each key is read from the place it already lives (the private intake checkpoint,
++ * project/pipeline.json), and the readback names that place so a restarted session finds the answer instead of asking.
++ *
++ * Keys: gitAuthor, language, profile (intake checkpoint `values`), designAnswers (the checkpoint's bundled design-question round,
++ * including its explicit no-open-questions disposition), verifyCommand (project/pipeline.json once it is no longer the placeholder).
++ * Product questions (designAnswers) and technical settings (the rest) stay separate keys.
++ */
++import { readOnboardingIntakeCheckpoint } from "./onboarding-continuity.mjs";
++import { intakeGitAuthor } from "./project-onboarding-v3-author-identity.mjs";
++import { checkVerifyContractConfigured } from "../scripts/push-gate-satisfiability.mjs";
++
++export const ANSWERED_VALUES_SCHEMA = "pipeline.answered-intake-values.v1";
++export const REASK_REFUSED_CODE = "INTAKE-REASK-REFUSED";
++export const ANSWERED_KEYS = Object.freeze(["gitAuthor", "language", "profile", "designAnswers", "verifyCommand"]);
++
++/** The collect-input input names that ask each key (every asking site in lib/project-onboarding-v3.mjs). */
++const KEY_OF_INPUT = Object.freeze({
++  gitAuthorName: "gitAuthor", gitAuthorEmail: "gitAuthor", language: "language", profile: "profile",
++  answersJson: "designAnswers", verifyCommand: "verifyCommand",
++});
++
++const unanswered = () => ({ answered: false, source: null });
++const answeredAt = (source, value) => ({ answered: true, source, ...(value === undefined ? {} : { value }) });
++
++/** Reads every key; an unreadable store answers nothing (an answer is never guessed), so the question stays askable. */
++export function readAnsweredIntakeValues({ rootDir, deps = {} } = {}) {
++  const result = Object.fromEntries(ANSWERED_KEYS.map((key) => [key, unanswered()]));
++  let checkpoint = null;
++  try { checkpoint = (deps.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)({ rootDir }); } catch { checkpoint = null; }
++  if (checkpoint?.status === "present") {
++    const values = checkpoint.value?.values ?? {};
++    const author = intakeGitAuthor(checkpoint);
++    if (author !== null) result.gitAuthor = answeredAt("intake-checkpoint:values.gitAuthor", author);
++    for (const key of ["language", "profile"]) {
++      if (typeof values[key] === "string" && values[key] !== "") result[key] = answeredAt(`intake-checkpoint:values.${key}`, values[key]);
++    }
++    if (Array.isArray(checkpoint.value?.designQuestions)) result.designAnswers = answeredAt("intake-checkpoint:designQuestions");
++  }
++  try {
++    // `ok` alone is also true for the baseline-only placeholder; only a real configured command is an answer.
++    if ((deps.checkVerifyContractConfigured ?? checkVerifyContractConfigured)(rootDir)?.status === "configured") {
++      result.verifyCommand = answeredAt("project/pipeline.json:verify");
++    }
++  } catch { /* an unreadable calibration answers nothing */ }
++  return result;
++}
++
++/** `{ ok: true }` when the key may be asked; otherwise the typed refusal naming where the answer lives. */
++export function refuseReask(answered, key) {
++  const entry = answered?.[key];
++  if (entry?.answered !== true) return { ok: true };
++  return {
++    ok: false, code: REASK_REFUSED_CODE, key, answerLives: entry.source,
++    repair: `do not ask ${key} again: it is already answered and lives in ${entry.source}; read it from answeredValues.${key} (node <plugin-root>/scripts/resume-hint.mjs inspect --root <this project>) and use it`,
++  };
++}
++
++/** Every answered key a set of collect-input actions (primary `input`/`inputs`) would ask again, once per key and action. */
++export function reaskViolations(actions, answered) {
++  const found = [];
++  for (const action of actions ?? []) {
++    if (action === null || typeof action !== "object") continue;
++    const names = [action.input?.name, ...(Array.isArray(action.inputs) ? action.inputs.map((input) => input?.name) : [])];
++    const keys = new Set();
++    for (const name of names) {
++      const key = KEY_OF_INPUT[name];
++      if (key === undefined || keys.has(key)) continue;
++      keys.add(key);
++      const refusal = refuseReask(answered, key);
++      if (!refusal.ok) found.push({ ...refusal, input: name });
++    }
++  }
++  return found;
++}
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 61d25651a43fa86febb2599c55edf654d1087cc8..610c92b9cb1d36b3210ce822df38c8f136c8d858 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -819,6 +819,10 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/path-spelling.mjs",
+   "plugins/pipeline-core/lib/security-close-status.mjs",
+   "plugins/pipeline-core/lib/spec-journey-coverage.mjs",
++  // C20 G20-30 (GMWKC01): the answered-value readback the onboarding asks consult before asking again, and the bounded
++  // signed-proof wait every PO signing step (design approval, push approval, override, bootstrap acknowledgement) names.
++  "plugins/pipeline-core/lib/answered-intake-values.mjs",
++  "plugins/pipeline-core/lib/signed-proof-wait.mjs",
+   "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs",
+   "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+   "plugins/pipeline-core/lib/critic-verify-readiness.mjs",
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index b63cc33d56408957786cd7bd4a79ff39923387eb..235ee0a7629187df4d40bcf42e88d3f867779b8a 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -391,7 +391,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
+     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
+ }
+ 
+-import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT } from "./constants.mjs";
++import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT, PROOF_WAIT_SCRIPT } from "./constants.mjs";
+ 
+ // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
+ // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
+@@ -615,7 +615,20 @@ function sanctionedSessionAuthorityRepairReadArgs(args, root) {
+   return false;
+ }
+ 
++// C20 G20-30: scripts/proof-wait.mjs observes one named proof file (read-only, never prints it, never verifies it). Exact argv only:
++// `--root <root> --proof <scratch/<name>proof<name>.json | /abs/proof-<64 hex>.json> [--timeout <1-600>]`, no dot segment, no backslash.
++function sanctionedProofWaitArgs(args, root) {
++  if (args[0] !== "--root" || args[1] !== root || args[2] !== "--proof" || typeof args[3] !== "string") return false;
++  const proof = args[3];
++  if (proof.length > 400 || /[\u0000-\u001f\u007f\\]/u.test(proof) || proof.split("/").some((part) => part === "." || part === "..")) return false;
++  const shaped = proof.startsWith("/") ? /\/proof-[a-f0-9]{64}\.json$/u.test(proof) : /^scratch\/[A-Za-z0-9._-]*proof[A-Za-z0-9._-]*\.json$/u.test(proof);
++  if (!shaped) return false;
++  if (args.length === 4) return true;
++  return args.length === 6 && args[4] === "--timeout" && /^(?:[1-9][0-9]{0,2})$/u.test(args[5] ?? "") && Number(args[5]) <= 600;
++}
++
+ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
++  if (script === PROOF_WAIT_SCRIPT) return sanctionedProofWaitArgs(args, root);
+   if (script === SESSION_AUTHORITY_REPAIR_SCRIPT) return sanctionedSessionAuthorityRepairReadArgs(args, root);
+   if (script === HOST_COMMIT_RECOVER_SCRIPT) return sanctionedHostCommitRecoverArgs(args, root);
+   if (script === AGY_NATIVE_INTEGRATE_SCRIPT) return sanctionedAgyNativeIntegrateArgs(args, root);
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index 1c3fdb1e91d51f199edeb7dc58d0675e11b1ac54..22c944d4798e4dcd269bcd0e0fe9546650464e5d 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -222,6 +222,8 @@ export const AGY_NATIVE_INTEGRATE_SCRIPT = fileURLToPath(new URL("../../scripts/
+ // `session-authority-repair.mjs inspect` (or `wait`) as the diagnosis, and in a draft feature the devplan lane refused exactly
+ // that command as an opaque script. Its read-only verbs are admitted by an exact grammar in command-catalogue.mjs.
+ export const SESSION_AUTHORITY_REPAIR_SCRIPT = fileURLToPath(new URL("../../scripts/session-authority-repair.mjs", import.meta.url));
++// C20 G20-30: the agent's bounded, read-only wait for the PO's signed proof file (admitted by an exact grammar in command-catalogue.mjs).
++export const PROOF_WAIT_SCRIPT = fileURLToPath(new URL("../../scripts/proof-wait.mjs", import.meta.url));
+ 
+ export const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/design-course-session.mjs", import.meta.url));
+ 
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index 3ad15c3b1a5135513432f8921804a3d47cf5d65d..a2be2fbea128049ee7986c817b39767ca2a60090 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -25,6 +25,7 @@ import {
+ } from "node:fs";
+ import { hostname, uptime } from "node:os";
+ import { observeWindowsProcessIdentity } from "./windows-process-identity.mjs";
++import { awaitSignatureFields } from "./signed-proof-wait.mjs";
+ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+ import { spawnSync } from "node:child_process";
+ 
+@@ -4410,6 +4411,8 @@ export function prepareHumanGuardOverrideForSignature({
+     },
+     operatorCommandCount: 1,
+     proofPath,
++    // G20-30: the agent's own bounded wait on that one proof file (the PO reports nothing back); only when a proof path exists.
++    ...(proofPath === null ? {} : awaitSignatureFields({ root: planned.root, proofPath })),
+     authorizeBySignatureCommand: proofPath === null ? null : {
+       executable: process.execPath,
+       argv: [
+diff --git a/plugins/pipeline-core/lib/human-guard-override.test.mjs b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+index 2b9a7eec41a76e9d33c354d18d8a3bd436605c44..669e5469b68623524380104496ac826dfa32dffc 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.test.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+@@ -881,6 +881,17 @@ test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() resolves the exact m
+         humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
+       });
+       assert.equal(signing.intentSha256, armed.intent.sha256, "the published index must key the independently rebuilt intent digest");
++      // C20 G20-30: without a resolvable key directory there is no proof path and so no wait; with one, the result carries the agent's own
++      // bounded wait on exactly that proof file and states that the PO reports nothing back.
++      assert.equal(signing.waitAction, undefined);
++      const keyDirectory = join(dirname(root), "po-key-dir-fixture");
++      const withDirectory = prepareHumanGuardOverrideForSignature({
++        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: armed.recorded.requestSha256, scriptPath: armed.scriptPath,
++        humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"), proofDirectory: keyDirectory,
++      });
++      assert.equal(withDirectory.proofPath, join(keyDirectory, `proof-${armed.intent.sha256}.json`));
++      assert.equal(withDirectory.reportBackRequired, false);
++      assert.deepEqual(withDirectory.waitAction.argv.slice(1, 5), ["--root", withDirectory.root, "--proof", withDirectory.proofPath]);
+     }
+ 
+     const resolvedSecond = describeHumanGuardOverrideSelection({
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 15f3968a7593d7079ead8224a087013bf14ab548..81c5884f3cdf0512894ca522ac7e9832860d02b9 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -44,6 +44,8 @@ import * as planHandoffModule from "../plan-handoff-readiness.mjs";
+ // Namespace import: a missing export fails its own case with a typed message instead of aborting the loading of this whole file.
+ const { inspectPlanDeliveryHandoff, PLAN_HANDOFF_CODES, planHandoffRefusal } = planHandoffModule;
+ import { applyProjectOnboardingV3, inspectProjectOnboardingV3, planProjectOnboardingLifecycleV4, planProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
++// Namespace import: a missing export fails its own case with a typed message instead of aborting the loading of this whole file.
++import * as planHandoffModuleOnboarding from "../project-onboarding-v3.mjs";
+ import { fakeDeps as machineDeps } from "../project-onboarding-v3.test.mjs";
+ import { nativeContractFixtureParent } from "../test-item-approved-course-fixture.mjs";
+ import { NEUTRAL_MANIFEST } from "../project-authority.mjs";
+@@ -348,6 +350,49 @@ test("AC-264: the default-mode present-plan hands the PO exactly one sign-intent
+   assert.doesNotMatch(f.presentOut, /HGO-|no recorded request resolves|guard[- ]override/iu, "the present-plan output carries no guard-override code or warning");
+ });
+ 
++// ---------------------------------------------------------------------------------------------------------------------
++// C20 G20-30 (Codex greenfield P2, AC-108): the signing step names the exact proof path and a bounded, sanctioned wait, so
++// the agent imports the PO's signature itself instead of asking the PO to report back; a missing proof after the bound gives
++// one clear recovery. These cases are appended to this registered pin (they reuse its signed design-approval fixture).
++// ---------------------------------------------------------------------------------------------------------------------
++const PROOF_WAIT_SCRIPT = join(PLUGIN, "scripts", "proof-wait.mjs");
++function inspectNextAction(root) {
++  const lines = [], realLog = console.log;
++  console.log = (...args) => { lines.push(args.map(String).join(" ")); };
++  try { assert.equal(run(["inspect"], { dir: root, now: () => DESIGN_AT }), 0); } finally { console.log = realLog; }
++  return JSON.parse(lines.join("\n")).nextAction;
++}
++function waitForProofCli(root, proofRel, seconds = 1) {
++  const child = spawnSync(process.execPath, [PROOF_WAIT_SCRIPT, "--root", root, "--proof", proofRel, "--timeout", String(seconds)], { encoding: "utf8", timeout: 60000 });
++  return { status: child.status, out: child.stdout.trim() === "" ? null : JSON.parse(child.stdout), stderr: child.stderr };
++}
++
++test("G20-30: the design approval's signing step names the exact proof path and a bounded wait; a missing proof after the bound gives one recovery", () => {
++  const f = designPresentation();
++  const proofRel = f.requestRel.replace("request-", "proof-");
++  const action = inspectNextAction(f.root);
++  assert.ok(action.argv.includes("sign-intent"), "the pending step is the PO's one signing command");
++  assert.equal(action.proofPath, proofRel, "the signing step names the exact proof file the signature will land in");
++  assert.equal(action.reportBackRequired, false, "the PO is never asked to report back after signing");
++  assert.equal(action.waitAction.argv[0], PROOF_WAIT_SCRIPT);
++  assert.deepEqual(action.waitAction.argv.slice(1, 5), ["--root", f.root, "--proof", proofRel]);
++  assert.equal(action.waitAction.mutation, false);
++  assert.match(f.presentOut, /proof-wait\.mjs/u, "present-plan names the wait beside the one sign command");
++  // One readback: present-plan and inspect show the same single wait command, never two spellings of the next step.
++  const waitLines = f.presentOut.split(/\r?\n/u).filter((line) => /proof-wait\.mjs/u.test(line));
++  assert.equal(waitLines.length, 1);
++  assert.ok(waitLines[0].endsWith([action.waitAction.executable, ...action.waitAction.argv].join(" ")), "present-plan prints exactly inspect's waitAction");
++  assert.doesNotMatch(f.presentOut, /tell me|let me know|report back|reply when/iu);
++  const waited = waitForProofCli(f.root, proofRel, 1);
++  assert.equal(waited.status, 2, waited.stderr);
++  assert.equal(waited.out.code, "PROOF-WAIT-TIMEOUT");
++  assert.match(waited.out.repair, /sign-intent/u, "the one recovery is the signing command itself, then the same wait again");
++  assert.match(waited.out.repair, /proof-wait\.mjs/u);
++  const refusedPath = waitForProofCli(f.root, "../outside.json", 1);
++  assert.equal(refusedPath.status, 2);
++  assert.equal(refusedPath.out.code, "PROOF-WAIT-ARGS", "a proof reference outside scratch/ is refused by type");
++});
++
+ test("AC-264: signing through that command discloses the design purpose: no HGO- code, no unresolved-request fallback, no typed confirmation", () => {
+   const f = designPresentation();
+   const withPassphrase = (args) => (args[0] === "pkeyutl" && args.includes("-sign") ? [...args, "-passin", "env:PIPELINE_SYNTHETIC_FIXTURE_PASSPHRASE"] : args);
+@@ -369,6 +414,24 @@ test("AC-264: signing through that command discloses the design purpose: no HGO-
+   assert.doesNotMatch(disclosure, /no recorded request resolves|purpose unavailable/u, "the unresolved-request fallback is never shown for a design approval");
+ });
+ 
++test("G20-30: the proof is awaited and imported by the agent after the PO signs, with no reply from the PO", () => {
++  const f = designPresentation();
++  const proofRel = f.requestRel.replace("request-", "proof-");
++  assert.ok(existsSync(join(f.root, proofRel)), "the signature landed in the named proof file");
++  const waited = waitForProofCli(f.root, proofRel, 5);
++  assert.equal(waited.status, 0, waited.stderr);
++  assert.equal(waited.out.status, "proof-present");
++  assert.equal(waited.out.proofPath, proofRel);
++  const action = inspectNextAction(f.root);
++  assert.equal(action.kind, "command");
++  assert.deepEqual(action.argv.slice(1), ["approve-plan", "--design-approval-request", f.requestRel]);
++  assert.equal(action.requiresConfirmation, false, "the import is the agent's own step, not a PO question");
++  assert.equal(action.input, undefined);
++  const imported = run(["approve-plan", "--design-approval-request", f.requestRel], { dir: f.root, now: () => DESIGN_AT });
++  assert.equal(imported, 0, "the signed proof is imported by the agent's own command");
++  assert.equal(readState(f.root).state.planApproved, true);
++});
++
+ test("RED mirror: the bare --intent-sha256 form (no resolvable request) discloses the guard-override fallback this pin forbids", () => {
+   const fallback = compactSigningDisclosure({ intentSha256: "a".repeat(64), record: null }).join("\n");
+   assert.match(fallback, /no recorded request resolves for this digest/u);
+@@ -601,6 +664,101 @@ test("AC-264 added (D64): the next session does not ask again for an answer the
+   assert.equal(asked.includes("gitAuthorName") || asked.includes("gitAuthorEmail"), false, `the Git author held by the record is not asked again: ${asked.join(",")}`);
+ });
+ 
++// C20 G20-30 (AC-108): one typed readback of every answered intake key, and a typed refusal to ask one of them again.
++test("G20-30: an answered intake key is read back with where it lives after a restart, and asking it again is refused by type", async () => {
++  const mod = await import("../answered-intake-values.mjs");
++  const root = codexOnboardedRoot();
++  applyOnboardingIntakeConsent({ rootDir: root, granted: true, ...intakeAnswers, text: "Build a local keyboard game.\n", activate: true });
++  // A restart is a new process: the readback below comes from a fresh child, not from this process's memory.
++  const reader = pathToFileURL(resolve(PLUGIN, "lib", "answered-intake-values.mjs")).href;
++  const script = `import { readAnsweredIntakeValues } from ${JSON.stringify(reader)};process.stdout.write(JSON.stringify(readAnsweredIntakeValues({ rootDir: ${JSON.stringify(root)} })));`;
++  const child = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8", timeout: 60000 });
++  assert.equal(child.status, 0, child.stderr);
++  const answered = JSON.parse(child.stdout);
++  for (const key of ["language", "profile", "gitAuthor"]) {
++    assert.equal(answered[key].answered, true, key);
++    assert.match(answered[key].source, /^intake-checkpoint:values\./u, `${key} names the storage it lives in`);
++  }
++  assert.equal(answered.language.value, "de");
++  assert.equal(answered.designAnswers.answered, false, "the design round is not answered yet");
++  assert.equal(answered.verifyCommand.answered, false, "the verify command is still the placeholder");
++  const refused = mod.refuseReask(answered, "language");
++  assert.equal(refused.ok, false);
++  assert.equal(refused.code, "INTAKE-REASK-REFUSED");
++  assert.equal(refused.key, "language");
++  assert.equal(refused.answerLives, answered.language.source);
++  assert.match(refused.repair, /answeredValues|resume-hint\.mjs inspect/u, "the refusal names the readback that holds the answer");
++  assert.equal(mod.refuseReask(answered, "designAnswers").ok, true, "an unanswered key may be asked");
++  const ask = { kind: "collect-input", inputs: [{ name: "language" }, { name: "profile" }, { name: "projectDescription" }, { name: "gitAuthorEmail" }] };
++  assert.deepEqual(mod.reaskViolations([ask], answered).map((entry) => entry.key), ["language", "profile", "gitAuthor"]);
++  // The real asks of a restarted session contain none of them.
++  const inspected = inspectProjectOnboardingV3({ rootDir: root, deps: machineDeps, runner: "codex" });
++  assert.deepEqual(mod.reaskViolations([inspected.nextAction, ...(inspected.nextAction?.pendingAsks ?? [])], answered), []);
++  // The session start reads the same typed readback (resume-hint inspect), so the next session finds the keys before it asks.
++  const hint = spawnSync(process.execPath, [join(PLUGIN, "scripts", "resume-hint.mjs"), "inspect", "--root", root], { encoding: "utf8", timeout: 60000 });
++  assert.equal(hint.status, 0, hint.stderr);
++  const hinted = JSON.parse(hint.stdout);
++  assert.equal(hinted.answeredValues.language.answered, true);
++  assert.equal(hinted.answeredValues.language.source, answered.language.source);
++});
++
++test("G20-30: the proof wait is admitted by exact argv only, and only for the plugin's own script", async () => {
++  const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
++  const root = join(DESIGN_REPO_ROOT, "scratch", ".proof-wait-fixture");
++  const digest = "a".repeat(64);
++  const wait = (...args) => `node ${PROOF_WAIT_SCRIPT} ${args.join(" ")}`;
++  const admitted = [
++    wait("--root", root, "--proof", `scratch/design-approval-proof-${digest}.json`),
++    wait("--root", root, "--proof", `scratch/design-approval-proof-${digest}.json`, "--timeout", "120"),
++    wait("--root", root, "--proof", `/keys/dir/proof-${digest}.json`, "--timeout", "600"),
++  ];
++  for (const command of admitted) assert.equal(isSanctionedLifecycleCommand(command, root), true, command);
++  const refused = {
++    "other root": wait("--root", join(root, "other"), "--proof", `scratch/x-proof-${digest}.json`),
++    "dot segment": wait("--root", root, "--proof", "scratch/../x-proof.json"),
++    "not a proof name": wait("--root", root, "--proof", "scratch/notes.json"),
++    "outside scratch": wait("--root", root, "--proof", "project/x-proof.json"),
++    "absolute without digest name": wait("--root", root, "--proof", "/keys/dir/proof.json"),
++    "timeout over bound": wait("--root", root, "--proof", `scratch/x-proof.json`, "--timeout", "601"),
++    "extra flag": wait("--root", root, "--proof", `scratch/x-proof.json`, "--verbose", "1"),
++    "repository copy": `node ${join(root, "scripts/proof-wait.mjs")} --root ${root} --proof scratch/x-proof.json`,
++  };
++  for (const [label, command] of Object.entries(refused)) assert.equal(isSanctionedLifecycleCommand(command, root), false, label);
++});
++
++// The runtime refusal: the last step of the onboarding envelope refuses (by type, never silently drops) an ask of an answered key.
++test("G20-30: the onboarding envelope refuses, by type, an ask for a key the intake record already answers", () => {
++  const { withReaskRefusals } = planHandoffModuleOnboarding;
++  assert.equal(typeof withReaskRefusals, "function", "the envelope exports its runtime re-ask check");
++  const answeredRecord = { status: "present", value: { values: { language: "de", profile: "feature", gitAuthor: null }, designQuestions: null } };
++  const fs = { readOnboardingIntakeCheckpoint: () => answeredRecord, spawnSync: () => ({ status: 1 }) };
++  const base = { root: "/nonexistent-reask-fixture", repository: { mode: "local" } };
++  const asking = { ...base, nextAction: { kind: "collect-input", inputs: [{ name: "language" }, { name: "projectDescription" }], pendingAsks: [{ kind: "collect-input", inputs: [{ name: "profile" }] }] } };
++  const refused = withReaskRefusals(asking, fs);
++  assert.deepEqual(refused.nextAction.reaskRefusals.map((entry) => [entry.code, entry.key, entry.answerLives]),
++    [["INTAKE-REASK-REFUSED", "language", "intake-checkpoint:values.language"], ["INTAKE-REASK-REFUSED", "profile", "intake-checkpoint:values.profile"]]);
++  assert.deepEqual(refused.nextAction.inputs, asking.nextAction.inputs, "the ask itself is kept, never silently dropped");
++  const clean = { ...base, nextAction: { kind: "collect-input", inputs: [{ name: "projectDescription" }] } };
++  assert.equal(withReaskRefusals(clean, fs), clean, "an envelope that asks nothing answered is returned unchanged");
++  assert.equal(withReaskRefusals({ ...asking, repository: { mode: "host" } }, fs).nextAction.reaskRefusals, undefined);
++});
++
++test("G20-30: a design-question round and a verify command that were answered are read back as answered", async () => {
++  const mod = await import("../answered-intake-values.mjs");
++  const root = codexOnboardedRoot();
++  applyOnboardingIntakeConsent({ rootDir: root, granted: true, ...intakeAnswers, text: "Build a local keyboard game.\n", activate: true });
++  const { applyOnboardingIntakeDesignQuestions } = await import("../onboarding-continuity.mjs");
++  applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: { disposition: "no-open-questions" }, activate: true });
++  const answered = mod.readAnsweredIntakeValues({ rootDir: root });
++  assert.equal(answered.designAnswers.answered, true);
++  assert.match(answered.designAnswers.source, /^intake-checkpoint:designQuestions/u);
++  const asked = mod.reaskViolations([{ kind: "collect-input", input: { name: "answersJson" } }], answered);
++  assert.deepEqual(asked.map((entry) => entry.key), ["designAnswers"]);
++  const configured = mod.readAnsweredIntakeValues({ rootDir: root, deps: { checkVerifyContractConfigured: () => ({ ok: true, status: "configured" }) } });
++  assert.equal(configured.verifyCommand.answered, true);
++  assert.equal(configured.verifyCommand.source, "project/pipeline.json:verify");
++});
++
+ test("E: per-runner end-to-end greenfield scenario (Claude Windows, Codex, Antigravity) reaches a pushed branch with exactly two PO proofs and zero guard overrides",
+   { skip: "E-HOLD pipeline.three-runner-happy-path-with-two-po-approvals: needs genuine installed host runs per runner (native/installed host evidence); not producible in-repo" },
+   () => {});
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 1f7e4da4b3e85f6b82a5b15d3641830d72c628c6..760bf5fceb6578d22ff77426e2ed4a31136c2fce 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -131,6 +131,8 @@ import { readMachinePlane } from "./machine-plane.mjs";
+ import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
+ import { recordGovernanceEnrollmentAfterOnboarding, readGovernanceEnrollmentRetirement, prepareGovernanceEnrollmentBeforeIntake, governanceEnrollmentRecoveryAction, observeGovernanceScope, planGovernanceScopeDecision, applyGovernanceScopeDecision } from "./governance-scope.mjs";
+ import { observeOnboardingEnrollmentHistory } from "./onboarding-continuity.mjs";
++import { readAnsweredIntakeValues, reaskViolations } from "./answered-intake-values.mjs";
++import { awaitSignatureFields } from "./signed-proof-wait.mjs";
+ 
+ // Wave 4 onboarding coordinator, step 6 (design SSa.4/SSe; NVA-W5-COORD-STEP6-1).
+ // The three new v4Inspection statuses a genuinely fresh repo now settles into
+@@ -3388,6 +3390,8 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signat
+         invocation: "user-copy-only",
+         guidance: `You are signing the reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) together with its specification (${spec.path}, sha256 ${spec.sha256}). This one detached signature authorizes binding those exact design documents and the subsequent design-to-implementation transition; it does not authorize a remote push or any later scope change. action.copyCommand resolves the configured local approval directory itself without printing its private path and is the only human command: after its proof is written, the agent performs the binding readback. Run that copy-safe command in your actual terminal, not a hand-transcribed variant. Do not edit an acknowledgement marker manually.`,
+         action: { ...action, command: rendered.command, copyCommand: rendered.copyCommand },
++        // G20-30: the exact proof path and the agent's own bounded wait; the PO reports nothing back after signing.
++        ...(typeof signatureObservation.proofPath === "string" ? awaitSignatureFields({ root, proofPath: signatureObservation.proofPath }) : {}),
+         expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
+       };
+     }
+@@ -7708,7 +7712,22 @@ function withPendingProjectAttributesGapAsk(observed, fs) {
+ // instead. Byte-for-byte the same composition the two call sites spelled out
+ // before this refactor -- a pure extraction, not a behavior change.
+ function withAllPendingOnboardingAsksAttached(observed, fs) {
+-  return withPendingAsksSurfacedOnNextAction(withPendingProjectAttributesGapAsk(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(observed, fs), fs)), fs), fs), fs), fs);
++  return withReaskRefusals(withPendingAsksSurfacedOnNextAction(withPendingProjectAttributesGapAsk(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(observed, fs), fs)), fs), fs), fs), fs), fs);
++}
++
++// C20 G20-30: the last step of the envelope. An ask whose key is already answered (lib/answered-intake-values.mjs) is refused by type,
++// never dropped silently: the nextAction keeps its shape and gains `reaskRefusals`, each naming the key, where the answer lives and the repair.
++export function withReaskRefusals(observed, fs) {
++  if (observed.repository?.mode !== "local" || observed.nextAction == null) return observed;
++  const nextAction = observed.nextAction;
++  let violations;
++  try {
++    const answered = readAnsweredIntakeValues({ rootDir: observed.root, deps: {
++      readOnboardingIntakeCheckpoint: (args) => (fs.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)({ ...args, repositoryCapability: observed.repository.mode, spawn: fs.spawnSync }),
++    } });
++    violations = reaskViolations([nextAction, ...(nextAction.pendingAsks ?? [])], answered);
++  } catch { return observed; }
++  return violations.length === 0 ? observed : { ...observed, nextAction: { ...nextAction, reaskRefusals: violations } };
+ }
+ 
+ // Sibling of `withAllPendingOnboardingAsksAttached()` immediately above, for
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index fcefa32ea4bba4a6be6303e8e7b013c47a2eed65..ddf96986fe76885f3d1e7527e3c53d6453fa24b6 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -6083,6 +6083,13 @@ test("the seeded security gate refuses a push with missing security evidence and
+     });
+     assert.equal(approved.code, 0, approved.stderr);
+ 
++    // QG-04 restatement (C20 G20-25): the normal Verify now runs the configured security gate itself (suite baseline-security),
++    // so the push-mode Verify above already wrote the security evidence. That is asserted here as the new duty; the evidence is
++    // then removed (evidence/ is ignored, the tree stays clean) so the original duty below stays isolated: with the push bucket
++    // satisfied, the security bucket alone refuses missing evidence, and the shipped scan command admits the push again.
++    assert.equal(existsSync(join(path, "evidence", "security-latest.json")), true, "the push-mode Verify ran the configured security gate (G20-25)");
++    for (const name of ["security-latest.json", "security-latest.v2.json", "security-latest.v2.verdict.json"]) rmSync(join(path, "evidence", name), { force: true });
++
+     // The push bucket is fully satisfied now. Only the security bucket can still refuse.
+     const stillRefused = attemptPush();
+     assert.equal(stillRefused.status, 2, "the push gate is satisfied, but the security gate alone must still refuse");
+@@ -6185,6 +6192,8 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
+       ["./security-completeness-gate.mjs", ["plugins", "pipeline-core", "lib", "security-completeness-gate.mjs"]],
+       // QG-04 restatement (C19 D4b/E3): the completeness gate now takes the shared freshness verdict, so its local import closure grew by this module (no local imports of its own).
+       ["./evidence-freshness-codes.mjs", ["plugins", "pipeline-core", "lib", "evidence-freshness-codes.mjs"]],
++      // QG-04 restatement (C20 G20-25): the completeness gate and security-scan.mjs read the four close states from this module (no local imports of its own).
++      ["./security-close-status.mjs", ["plugins", "pipeline-core", "lib", "security-close-status.mjs"]],
+       ["./security-evidence-evaluator.mjs", ["plugins", "pipeline-core", "lib", "security-evidence-evaluator.mjs"]],
+       ["./security-capability-plan-builder.mjs", ["plugins", "pipeline-core", "lib", "security-capability-plan-builder.mjs"]],
+       ["./security-policy-resolver.mjs", ["plugins", "pipeline-core", "lib", "security-policy-resolver.mjs"]],
+diff --git a/plugins/pipeline-core/lib/signed-proof-wait.mjs b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..cfd5f1929e5e5f592244a284d9128ede7697d921
+--- /dev/null
++++ b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+@@ -0,0 +1,111 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C20 G20-30 (AC-108): after the PO runs the one signing command, the agent waits for the named proof file itself (a bounded poll,
++ * the same shape as session-authority-repair.mjs `wait`) and then runs the existing import step; the PO is never asked to report back.
++ * The wait only observes that a well-formed proof file exists. It never verifies a signature (the import step does), never prints the
++ * file, and reads only the one path the signing step named.
++ *
++ * A proof reference is exactly one of: `scratch/<name>.json` below the project root (sign-intent --request writes its sibling proof
++ * there), or an absolute path whose file name is `proof-<64 hex>.json` (the guard-override signature writes it into the key directory).
++ */
++import { lstatSync, readFileSync, realpathSync } from "node:fs";
++import { basename, dirname, isAbsolute, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++
++export const PROOF_WAIT_SCHEMA = "pipeline.signed-proof-wait.v1";
++export const PROOF_WAIT_DEFAULT_SECONDS = 120;
++export const PROOF_WAIT_MAX_SECONDS = 600;
++export const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
++export const PROOF_WAIT_SCRIPT = fileURLToPath(new URL("../scripts/proof-wait.mjs", import.meta.url));
++const PO_HUMAN_APPROVAL_SCRIPT = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
++const SCRATCH_PROOF = /^scratch\/[A-Za-z0-9._-]*proof[A-Za-z0-9._-]*\.json$/u;
++const KEY_DIRECTORY_PROOF = /^proof-([a-f0-9]{64})\.json$/u;
++
++/** `"scratch"` or `"key-directory"` for a well-formed reference, otherwise null. No dot segment and no backslash is ever admitted. */
++export function proofReferenceKind(reference) {
++  if (typeof reference !== "string" || reference === "" || reference.length > 400 || /[\u0000-\u001f\u007f\\]/u.test(reference)) return null;
++  if (reference.split("/").some((part) => part === "." || part === "..")) return null;
++  if (isAbsolute(reference)) return KEY_DIRECTORY_PROOF.test(basename(reference)) ? "key-directory" : null;
++  return SCRATCH_PROOF.test(reference) ? "scratch" : null;
++}
++
++/** `present` (a regular, well-formed proof file), `absent`, or `invalid` (something else sits at the path). */
++export function observeProofFile(root, reference) {
++  const kind = proofReferenceKind(reference);
++  if (kind === null) return { state: "invalid", reason: "not a proof reference" };
++  const target = kind === "scratch" ? resolve(root, reference) : reference;
++  let stat;
++  try { stat = lstatSync(target); } catch (error) { return error?.code === "ENOENT" ? { state: "absent" } : { state: "invalid", reason: "unreadable" }; }
++  if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 1 || stat.size > 1024 * 1024) return { state: "invalid", reason: "not a plain proof file" };
++  if (kind === "scratch") {
++    try { if (dirname(realpathSync(target)) !== realpathSync(join(root, "scratch"))) return { state: "invalid", reason: "outside scratch/" }; } catch { return { state: "invalid", reason: "unreadable" }; }
++  }
++  try {
++    const proof = JSON.parse(readFileSync(target, "utf8"));
++    return proof?.schema === PROOF_SCHEMA ? { state: "present" } : { state: "invalid", reason: "not a po-approval proof" };
++  } catch { return { state: "invalid", reason: "not JSON" }; }
++}
++
++const quote = (part) => (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(part) ? part : JSON.stringify(part));
++export const commandText = ({ executable, argv }) => [executable, ...argv].map(quote).join(" ");
++const text = commandText;
++
++/** The exact bounded wait for a proof reference. */
++export function proofWaitCommand(root, proof, seconds = PROOF_WAIT_DEFAULT_SECONDS) {
++  return { executable: process.execPath, argv: [PROOF_WAIT_SCRIPT, "--root", root, "--proof", proof, "--timeout", String(seconds)] };
++}
++
++/** The PO's one signing command for a proof reference, derived by the naming convention sign-intent itself writes under. */
++export function signCommandForProof(root, proof) {
++  const kind = proofReferenceKind(proof);
++  if (kind === "scratch") {
++    const name = basename(proof);
++    if (!name.includes("proof-")) return null;
++    return { executable: process.execPath, argv: [PO_HUMAN_APPROVAL_SCRIPT, "sign-intent", "--repo-root", root, "--request", `scratch/${name.replace("proof-", "request-")}`] };
++  }
++  if (kind === "key-directory") {
++    return { executable: process.execPath, argv: [PO_HUMAN_APPROVAL_SCRIPT, "sign-intent", "--repo-root", root, "--intent-sha256", KEY_DIRECTORY_PROOF.exec(basename(proof))[1]] };
++  }
++  return null;
++}
++
++/**
++ * The fields every signing step carries beside its sign command (one builder for all of them): the exact proof path, the bounded
++ * wait the agent runs itself, and the explicit statement that the PO reports nothing back.
++ */
++export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEFAULT_SECONDS }) {
++  const wait = proofWaitCommand(root, proofPath, seconds);
++  return {
++    proofPath,
++    reportBackRequired: false,
++    waitAction: {
++      kind: "command", ...wait, mutation: false, requiresConfirmation: false,
++      expected: { schema: PROOF_WAIT_SCHEMA, statuses: ["proof-present"] },
++    },
++    afterSigning: `Do not ask the PO to report back. After handing over the one signing command, run waitAction (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback.`,
++  };
++}
++
++const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
++
++/** A bounded poll. Result: `{ status: "proof-present" }` or a typed `refused` whose single `repair` is the recovery. */
++export function waitForSignedProof({ root, proof, timeoutSeconds = PROOF_WAIT_DEFAULT_SECONDS, now = Date.now, pause = sleep, observe = observeProofFile }) {
++  if (proofReferenceKind(proof) === null) {
++    return { status: "refused", code: "PROOF-WAIT-ARGS", reason: "--proof must be scratch/<name>.json below the project, or an absolute proof-<64 hex>.json written by sign-intent", repair: "pass the proofPath the signing step printed, unchanged" };
++  }
++  const deadline = now() + timeoutSeconds * 1000;
++  let last;
++  for (;;) {
++    last = observe(root, proof);
++    if (last.state === "present") return { status: "proof-present", proofPath: proof };
++    if (now() >= deadline) break;
++    pause(Math.min(500, Math.max(1, deadline - now())));
++  }
++  const sign = signCommandForProof(root, proof);
++  const again = text(proofWaitCommand(root, proof, timeoutSeconds));
++  return last.state === "invalid"
++    ? { status: "refused", code: "PROOF-WAIT-INVALID", proofPath: proof, reason: `a file sits at ${proof} but it is not a signed proof (${last.reason})`,
++      repair: `${sign === null ? "sign again" : `have the PO run the one signing command again: ${text(sign)}`}; then run ${again}` }
++    : { status: "refused", code: "PROOF-WAIT-TIMEOUT", proofPath: proof, reason: `no signed proof appeared at ${proof} within ${timeoutSeconds}s`,
++      repair: `${sign === null ? "the signing step has not been run" : `ask the PO once to run exactly this signing command: ${text(sign)}`}; then run ${again}` };
++}
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 5d5297b960f5dd777f2b890baa3fa6b909803196..7864bd86f613645aa34204eff2ca07217923af79 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -395,6 +395,7 @@ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
+ import { inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
+ import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
++import { awaitSignatureFields, commandText as proofCommandText, proofWaitCommand } from "../lib/signed-proof-wait.mjs";
+ import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+@@ -4384,7 +4385,9 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+       const observed = observeDesignApprovalRequest({ dir, presentation, submission, deps, signature: mode?.mode === "signature" });
+       if (!observed.ok) {
+         if (observed.code !== "DAB-APPROVAL-PROOF-INVALID") return { kind: "repair-required", code: observed.code, mutation: false, requiresConfirmation: false, guidance: "Recheck sources and use present-plan --review-receipt." };
+-        return { kind: "command", ...boundedCopySafeCommand({ executable: process.execPath, argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "sign-intent", "--repo-root", resolve(dir), "--request", resolve(dir, presentation.designApprovalRequestPath)], forceCopyCommand: true }), invocation: "user-copy-only", executionBoundary: "human-terminal", mutation: true, requiresConfirmation: true };
++        return { kind: "command", ...boundedCopySafeCommand({ executable: process.execPath, argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "sign-intent", "--repo-root", resolve(dir), "--request", resolve(dir, presentation.designApprovalRequestPath)], forceCopyCommand: true }), invocation: "user-copy-only", executionBoundary: "human-terminal", mutation: true, requiresConfirmation: true,
++          // G20-30: the exact proof path and the agent's own bounded wait; the PO reports nothing back after signing.
++          ...awaitSignatureFields({ root: resolve(dir), proofPath: presentation.designApprovalRequestPath.replace("request-", "proof-") }) };
+       }
+       if (mode?.mode === "signature") return { kind: "command", executable: process.execPath, argv: [script, "approve-plan", "--design-approval-request", presentation.designApprovalRequestPath], mutation: true, requiresConfirmation: false };
+       if (mode?.mode !== "chat") return { kind: "repair-required", code: "DAB-APPROVAL-MODE-UNAVAILABLE", mutation: false, requiresConfirmation: false };
+@@ -12212,6 +12215,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+           executable: process.execPath,
+           argv: [fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "sign-intent", "--repo-root", resolve(dir), "--request", resolve(dir, approvalRequestPath)] }).text);
+         else console.log(`Next: approve-plan --by <name> --design-approval-request ${approvalRequestPath}`);
++        // G20-30: the agent waits for the signature itself; the PO is not asked to report back.
++        if (mode?.mode === "signature") console.log(`Agent, after handing over the signing command above (the PO reports nothing back): ${proofCommandText(proofWaitCommand(resolve(dir), approvalRequestPath.replace("request-", "proof-")))}`);
+         console.log("The request is pending only; it does not approve the package or unlock implementation.");
+       } else {
+         console.log('Next: run `approve-plan --by <name>` once the PO has confirmed \'approved\'.');
+diff --git a/plugins/pipeline-core/scripts/proof-wait.mjs b/plugins/pipeline-core/scripts/proof-wait.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..33e485c90e7bfbb2d284c2f8ac6c967c109f7301
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/proof-wait.mjs
+@@ -0,0 +1,43 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++//
++// proof-wait.mjs --root <project> --proof <scratch/<name>.json | /abs/proof-<64 hex>.json> [--timeout <1-600, default 120>]
++//
++// C20 G20-30 (AC-108): the agent's own bounded wait for the PO's signature. A signing step names the exact proof path; after the PO
++// runs the one signing command the agent runs this, and it returns as soon as that file exists as a well-formed signed proof, so the
++// PO is never asked to "tell me when you have signed". Read-only: it observes one file, never verifies a signature (the import step
++// does that), never prints the file. Prints one JSON `pipeline.signed-proof-wait.v1`. Exit 0: proof-present. Exit 2: refused, with a
++// typed code (PROOF-WAIT-ARGS | PROOF-WAIT-ROOT | PROOF-WAIT-TIMEOUT | PROOF-WAIT-INVALID) and the one recovery in `repair`.
++import { realpathSync, statSync } from "node:fs";
++import { resolve } from "node:path";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { PROOF_WAIT_DEFAULT_SECONDS, PROOF_WAIT_MAX_SECONDS, PROOF_WAIT_SCHEMA, waitForSignedProof } from "../lib/signed-proof-wait.mjs";
++
++function parse(argv) {
++  const flags = {};
++  for (let index = 0; index < argv.length; index += 2) {
++    const name = argv[index]?.startsWith("--") ? argv[index].slice(2) : null;
++    const value = argv[index + 1];
++    if (!["root", "proof", "timeout"].includes(name) || typeof value !== "string" || value === "" || value.startsWith("--") || Object.hasOwn(flags, name)) {
++      return { error: `unexpected argument ${String(argv[index]).slice(0, 40)}` };
++    }
++    flags[name] = value;
++  }
++  if (!flags.root || !flags.proof) return { error: "--root and --proof are required" };
++  const timeout = flags.timeout === undefined ? PROOF_WAIT_DEFAULT_SECONDS : Number(flags.timeout);
++  if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > PROOF_WAIT_MAX_SECONDS) return { error: `--timeout needs whole seconds from 1 to ${PROOF_WAIT_MAX_SECONDS}` };
++  return { flags: { ...flags, timeout } };
++}
++
++export function runProofWait(argv, out = (line) => process.stdout.write(line), deps = {}) {
++  const emit = (value, code) => { out(`${JSON.stringify({ schema: PROOF_WAIT_SCHEMA, ...value })}\n`); return code; };
++  const parsed = parse(argv);
++  if (parsed.error) return emit({ status: "refused", code: "PROOF-WAIT-ARGS", reason: parsed.error, repair: "pass the proofPath the signing step printed as --proof, with the project as --root" }, 2);
++  let root;
++  try { root = realpathSync(resolve(parsed.flags.root)); if (!statSync(root).isDirectory()) throw new Error("not a directory"); }
++  catch { return emit({ status: "refused", code: "PROOF-WAIT-ROOT", reason: "--root is not a directory", repair: "pass the project root the signing step printed" }, 2); }
++  const result = waitForSignedProof({ root, proof: parsed.flags.proof, timeoutSeconds: parsed.flags.timeout, ...deps });
++  return emit(result, result.status === "proof-present" ? 0 : 2);
++}
++
++if (isDirectInvocation(import.meta.url)) process.exitCode = runProofWait(process.argv.slice(2));
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 6f1377bd724734131803b20d6e059d8265926ca6..05e17c05f126e0bd11e90bf02ec3c9eb002b7c8c 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -40,6 +40,7 @@
+ import { spawnSync } from "node:child_process";
+ import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+ import { dirname, join, relative, resolve, sep } from "node:path";
++import { awaitSignatureFields } from "../lib/signed-proof-wait.mjs";
+ import { fileURLToPath } from "node:url";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+@@ -999,10 +1000,21 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+   });
+ 
+   report.subjectSha256 = subjectSha256;
++  // G20-30: the signature lands in the scratch mirror this report already names; the agent waits for that one file itself
++  // (the PO reports nothing back) and then runs the approve-push line below.
++  const proofRelative = relative(dir, artifacts.proof).split(sep).join("/");
++  const awaitFields = /^scratch\//u.test(proofRelative) ? awaitSignatureFields({ root: resolve(dir), proofPath: proofRelative }) : null;
++  if (awaitFields !== null) report.awaitSignature = awaitFields;
+   return {
+     ok: true,
+     report,
+     lines: withProfileNote({
++      // Lines stay within the 72-column bound; the exact argv is the report's awaitSignature.waitAction (one readback, no second spelling).
++      awaitProof: awaitFields === null ? null : [
++        "Agent, after the human line above (the PO reports nothing back):",
++        "run report.awaitSignature.waitAction (proof-wait.mjs), then",
++        "the approve-push line below.",
++      ].join("\n"),
+       authorize: [
+         "Human signature: authorizes only this prepared remote push.",
+     "The configured approval directory is resolved automatically.",
+@@ -1021,6 +1033,7 @@ export function printReport(result, io = {}) {
+   write(`${JSON.stringify(result.report, null, 2)}\n`);
+   if (result.lines) {
+     writeError(`${result.lines.authorize.join("\n")}\n\n`);
++    if (result.lines.awaitProof) writeError(`${result.lines.awaitProof}\n\n`);
+     writeError(`${result.lines.approvePush.join("\n")}\n\n`);
+     writeError(`${result.lines.gitPush}\n`);
+     if (result.lines.profileNote) writeError(`${result.lines.profileNote}\n`);
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index e21dd0b341c951baae1fdb152be5f3b119aeef31..0bf38f35524888322db2d4f46db98757072c632e 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -804,6 +804,26 @@ test("A18-M2 pushPrepareReport names materialize-push-threat-model when prepare-
+   assert.doesNotMatch(other.report.checks.find(entry => entry.id === "subject-hash").remedy, /materialize-push-threat-model/u, "an unrelated refusal keeps its own remedy");
+ });
+ 
++// C20 G20-30: the signature lands in the scratch mirror the report names; the agent waits for that one file itself (the PO reports nothing back).
++test("G20-30 pushPrepareReport: the signing step names the scratch proof and the agent's own bounded wait", () => {
++  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({
++    criticalPushScratchArtifactPaths: () => ({
++      request: `${FIXTURE_DIR}/scratch/critical-push-request-0123456789ab.json`,
++      proof: `${FIXTURE_DIR}/scratch/critical-push-proof-0123456789ab.json`,
++      authority: `${FIXTURE_DIR}/scratch/critical-push-authority-0123456789ab.json`,
++      signer: `${FIXTURE_DIR}/scratch/critical-push-signer-0123456789ab.json`,
++    }),
++  }));
++  assert.equal(result.report.ready, true);
++  const wait = result.report.awaitSignature;
++  assert.equal(wait.proofPath, "scratch/critical-push-proof-0123456789ab.json");
++  assert.equal(wait.reportBackRequired, false);
++  assert.ok(wait.waitAction.argv[0].endsWith("proof-wait.mjs"));
++  assert.deepEqual(wait.waitAction.argv.slice(1, 5), ["--root", FIXTURE_DIR, "--proof", wait.proofPath]);
++  assert.match(result.lines.awaitProof, /report\.awaitSignature\.waitAction \(proof-wait\.mjs\)/u);
++  assert.doesNotMatch(result.lines.awaitProof, /tell me|let me know|report back to/iu);
++});
++
+ test("pushPrepareReport: all preconditions met -> ready:true, all three commands rendered", () => {
+   const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps());
+   assert.equal(result.ok, true);
+diff --git a/plugins/pipeline-core/scripts/resume-hint.mjs b/plugins/pipeline-core/scripts/resume-hint.mjs
+index a12cea6aef0b6cd246b002bfb093d2af08382612..c45b63f87b47655666197585a73b71678944d59e 100644
+--- a/plugins/pipeline-core/scripts/resume-hint.mjs
++++ b/plugins/pipeline-core/scripts/resume-hint.mjs
+@@ -11,6 +11,8 @@ import {
+   readOnboardingIntakeCheckpoint, readOnboardingIntakeMaterialInput,
+ } from "../lib/onboarding-continuity.mjs";
+ 
++import { readAnsweredIntakeValues } from "../lib/answered-intake-values.mjs";
++
+ function value(args, flag) { const index = args.indexOf(flag); return index < 0 ? null : args[index + 1] ?? null; }
+ function basis(args) {
+   const featureId = value(args, "--feature-id"); const planSha256 = value(args, "--plan-sha256"); const specSha256 = value(args, "--spec-sha256");
+@@ -110,7 +112,9 @@ function main() {
+     // so `inspect` can never drift from what capture actually persisted), or null when no
+     // digest record is available -- absent card, no git directory yet, or a corrupt record.
+     const digestRecord = readResumeHintCardDigest({ rootDir });
+-    return { ...hint, intakeCheckpoint, cardDigest: digestRecord ? digestRecord.cardDigest : null };
++    // C20 G20-30: the one typed readback of every already-answered key (gitAuthor, language, profile, designAnswers, verifyCommand)
++    // and where each answer lives; a question whose key is answered here is never asked again (lib/answered-intake-values.mjs).
++    return { ...hint, intakeCheckpoint, answeredValues: readAnsweredIntakeValues({ rootDir }), cardDigest: digestRecord ? digestRecord.cardDigest : null };
+   }
+   if (command === "discard") return discardResumeHint({ rootDir });
+   const cardFile = value(args, "--card-file");
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/resume-hint.md b/plugins/pipeline-core/skills/pipeline-start/references/resume-hint.md
+index 5f5d928833490b7acd8356055a8a77f860163adc..d67457076191b0eab01627dce85f914f7ca8d6a5 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/resume-hint.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/resume-hint.md
+@@ -39,7 +39,9 @@ only immediately before the first commit, never sooner.
+ 
+ When `resume-hint.mjs inspect` reports material-input chunks or answered
+ values at the start of the next session, read them in that same turn and use
+-them; never re-ask answered values. A failed or skipped read must be surfaced.
++them; never re-ask answered values. `inspect` also returns `answeredValues`: for each of gitAuthor, language,
++profile, designAnswers and verifyCommand whether it is answered and where the answer lives; an answered key is
++never asked again (`INTAKE-REASK-REFUSED` names the place). A failed or skipped read must be surfaced.
+ This remains a consumption duty, never a readiness precondition.
+ 
+ On resumed intake, checkpoint-origin material chunks are the original

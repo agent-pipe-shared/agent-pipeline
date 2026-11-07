@@ -1,0 +1,868 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-start-hint.mjs b/plugins/pipeline-core/hooks/antigravity-start-hint.mjs
+index 4cf48e7756be924a9f995d14d6cfb47a05305c26..3ade7b0415b04646887a46e626fc2a7a280a1592 100644
+--- a/plugins/pipeline-core/hooks/antigravity-start-hint.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-start-hint.mjs
+@@ -1,7 +1,8 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+-import { isAbsolute, join, resolve } from 'node:path';
++import { dirname, isAbsolute, join, resolve } from 'node:path';
++import { machinePlaneFilePath } from '../lib/machine-plane.mjs';
+ import { fileURLToPath } from 'node:url';
+ import { sessionStartDecision } from './codex-session-start-hint.mjs';
+ import { armAntigravityBootstrapSession } from './antigravity-bootstrap-lock.mjs';
+@@ -40,6 +41,37 @@ function reportFailure(code, error) {
+   }) + '\n');
+ }
+ 
++/**
++ * C20 (greenfield Antigravity run, measured 2026-11-07): `invocationNum` restarts at 0/1 on EVERY turn -- each PO reply and
++ * each delivered subagent message starts a new execution -- so this hook re-sent the full "run pipeline-start" context 21
++ * times in one session and the agent re-bootstrapped repeatedly; in a repository that never opted in, the optional onboarding
++ * offer was likewise repeated every turn. The full context is now delivered once per native session; later turns of a
++ * governed session get one short line that forbids a re-bootstrap (pipeline-start SKILL.md: a bootstrap is session-bound).
++ */
++export const AGY_SESSION_CONTINUATION_NOTE = (sessionId) =>
++  `Agent Pipeline: this Antigravity session (${sessionId}) was already bootstrapped. Do not re-run pipeline-start for a new `
++  + "turn, a PO reply or a delivered subagent message; continue the active work. Re-run it only after a restart, a context "
++  + "clear, or a typed recovery that names it.";
++
++/**
++ * Once-per-session marker for the OPTIONAL onboarding hint of a repository that never opted in. It lives in the machine plane
++ * (`<home>/.agent-pipeline/run/agy-start-hint/`), never in that repository. Any failure answers "not yet delivered", so the
++ * hint stays visible rather than silently lost.
++ */
++export function claimOptionalHintDelivery(sessionId, dependencies = {}) {
++  if (typeof sessionId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/u.test(sessionId)) return false;
++  try {
++    const plane = (dependencies.machinePlaneFilePathFn ?? machinePlaneFilePath)();
++    if (typeof plane !== 'string') return false;
++    const dir = join(dirname(plane), 'run', 'agy-start-hint');
++    mkdirSync(dir, { recursive: true });
++    writeFileSync(join(dir, `${sessionId}.delivered`), '1\n', { flag: 'wx' });
++    return false;
++  } catch (error) {
++    return error?.code === 'EEXIST';
++  }
++}
++
+ export function antigravityRepositoryRoot(input) {
+   const candidate = Array.isArray(input?.workspacePaths) ? input.workspacePaths[0] : null;
+   return typeof candidate === 'string' && isAbsolute(candidate) ? resolve(candidate) : null;
+@@ -86,7 +118,7 @@ function main() {
+     // arbitrary Git repository. An optional onboarding hint must not arm a
+     // mandatory implementation block before the repository opts in.
+     if (!decision.governed) {
+-      if (!decision.context) { process.stdout.write('{}\n'); return; }
++      if (!decision.context || claimOptionalHintDelivery(sessionId)) { process.stdout.write('{}\n'); return; }
+       process.stdout.write(JSON.stringify({
+         injectSteps: [{ ephemeralMessage: decision.context }],
+       }) + '\n');
+@@ -130,7 +162,11 @@ function main() {
+     // Keep the hook-authored proof lock for preflight and a separate one-shot
+     // barrier for the guard. An allowed bootstrap read consumes only the
+     // barrier; repeated ready inference hooks do not re-arm the session.
+-    armAntigravityBootstrapSession(sessionDir, version);
++    const armed = armAntigravityBootstrapSession(sessionDir, version);
++    if (armed?.status === 'already-armed') {
++      process.stdout.write(JSON.stringify({ injectSteps: [{ ephemeralMessage: AGY_SESSION_CONTINUATION_NOTE(sessionId) }] }) + '\n');
++      return;
++    }
+   } catch (e) {
+     reportFailure('bootstrap-lock-not-written', e);
+     return;
+diff --git a/plugins/pipeline-core/hooks/antigravity-start-hint.test.mjs b/plugins/pipeline-core/hooks/antigravity-start-hint.test.mjs
+index 790d9b3ac574516fb424753832fc3fcd400c67f2..d206653ac9db5f6ed9204a6ae846585ec641c656 100644
+--- a/plugins/pipeline-core/hooks/antigravity-start-hint.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-start-hint.test.mjs
+@@ -45,16 +45,64 @@ test("antigravity-start-hint: missing workspace paths fail-closed", () => {
+   assert.match(res.stderr, /AGY-REPOSITORY-CONTEXT-UNAVAILABLE/);
+ });
+ 
++// The optional-hint delivery marker lives in the machine plane; every fixture gets its own home so no run touches the real one.
++function fixtureEnv() {
++  const home = testTemp("agy-start-hint-home-");
++  return { home, env: { ...process.env, HOME: home, USERPROFILE: home } };
++}
++
+ test("antigravity-start-hint: absolute ungoverned workspace remains an onboarding hint without creating Git", () => {
+   const root = testTemp("agy-start-hint-");
++  const { home, env } = fixtureEnv();
+   try {
+     const input = { invocationNum: 1, workspacePaths: [root], conversationId: "fixture" };
+-    const res = spawnSync("node", [HOOK], { input: JSON.stringify(input), encoding: "utf8" });
++    const res = spawnSync("node", [HOOK], { input: JSON.stringify(input), encoding: "utf8", env });
+     assert.equal(res.status, 0, res.stderr);
+     const output = JSON.parse(res.stdout);
+     assert.equal(typeof output.injectSteps?.[0]?.ephemeralMessage, "string");
+     assert.match(output.injectSteps[0].ephemeralMessage, /pipeline-start|Pipeline/u);
+     assert.equal(existsSync(join(root, ".git")), false, "an onboarding hint must not manufacture a Git control directory");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++    rmSync(home, { recursive: true, force: true });
++  }
++});
++
++test("C20 agy: the optional onboarding offer is delivered once per session, not on every turn", () => {
++  const root = initializedRoot();
++  const { home, env } = fixtureEnv();
++  try {
++    const run = (session) => spawnSync(process.execPath, [HOOK], {
++      input: JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: session }), encoding: "utf8", env,
++    });
++    const first = run("optional-once");
++    assert.equal(first.status, 0, first.stderr);
++    assert.match(first.stdout, /optional project workflow/u);
++    const second = run("optional-once");
++    assert.equal(second.status, 0, second.stderr);
++    assert.equal(second.stdout.trim(), "{}", "a later turn of the same session repeats no offer");
++    const otherSession = run("optional-other");
++    assert.match(otherSession.stdout, /optional project workflow/u, "a new session gets the offer again");
++    assert.equal(existsSync(join(root, ".git", "agent-pipeline")), false, "the marker never lands in a repository that did not opt in");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++    rmSync(home, { recursive: true, force: true });
++  }
++});
++
++test("C20 agy: a later turn of a bootstrapped session gets the no-re-bootstrap note instead of the full start context", () => {
++  const root = initializedRoot();
++  try {
++    markGoverned(root);
++    const run = () => spawnSync(process.execPath, [HOOK], {
++      input: JSON.stringify({ invocationNum: 0, workspacePaths: [root], conversationId: "agy-turns" }), encoding: "utf8",
++    });
++    const first = JSON.parse(run().stdout).injectSteps[0].ephemeralMessage;
++    assert.match(first, /--runner antigravity --host-session-id/u);
++    const later = JSON.parse(run().stdout).injectSteps[0].ephemeralMessage;
++    assert.match(later, /already bootstrapped/u);
++    assert.match(later, /Do not re-run pipeline-start/u);
++    assert.doesNotMatch(later, /--host-session-id/u, "the full start context is not repeated");
+   } finally {
+     rmSync(root, { recursive: true, force: true });
+   }
+@@ -134,16 +182,18 @@ test("antigravity-start-hint: path-shaped conversationId cannot create a bootstr
+ 
+ test("antigravity-start-hint: initialized but ungoverned Git root remains optional", () => {
+   const root = initializedRoot();
++  const { home, env } = fixtureEnv();
+   try {
+     const session = "optional-git";
+     const start = spawnSync(process.execPath, [HOOK], {
+       input: JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: session }),
+-      encoding: "utf8",
++      encoding: "utf8", env,
+     });
+     assert.equal(start.status, 0, start.stderr);
+     assert.match(start.stdout, /optional project workflow/u);
+     assert.equal(existsSync(join(root, ".git", "agent-pipeline", "run", `session-${session}`)), false);
+   } finally {
+     rmSync(root, { recursive: true, force: true });
++    rmSync(home, { recursive: true, force: true });
+   }
+ });
+diff --git a/plugins/pipeline-core/hooks/guard-git.mjs b/plugins/pipeline-core/hooks/guard-git.mjs
+index ba0dcb43f4e8fc69b04f181b6ae979d93be39416..1e59136785ca6cd844ee76e161b8da5f937d437c 100644
+--- a/plugins/pipeline-core/hooks/guard-git.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.mjs
+@@ -289,6 +289,7 @@ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { appendGuardOverrideLedgerEntry, guardOverrideLedger, readGuardOverrideLedgerEntries } from "../lib/guard-override-ledger.mjs";
+ import { UNION_BLOCKERS, RAW_BLOCKERS, PRENORM_BLOCKERS, dangerousGitFindings } from "./git-dangerous-policy.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
++import { msysToWindows, relativeUnderRoot, sameNativePath } from "../lib/path-spelling.mjs";
+ 
+ 
+ // The plugin root this guard is itself running from -- same self-location resolution
+@@ -524,7 +525,12 @@ function overrideTarget() {
+     for (const match of segment.matchAll(/(?:^|\s)-C\s+((?:"[^"]*"|'[^']*'|[^\s;&|])+)/gu)) {
+       const raw = match[1];
+       const value = (raw.startsWith("\"") && raw.endsWith("\"")) || (raw.startsWith("'") && raw.endsWith("'")) ? raw.slice(1, -1) : raw;
+-      try { roots.add(realpathSync(resolve(coordinator, value))); } catch { return { ok: false }; }
++      // C20 separator sweep: a native spelling of the coordinator root (MSYS, drive-letter case) is that root.
++      const physical = process.platform === "win32" ? msysToWindows(value) : value;
++      try {
++        const real = realpathSync(resolve(coordinator, physical));
++        roots.add(sameNativePath(real, coordinator) ? coordinator : real);
++      } catch { return { ok: false }; }
+     }
+   }
+   if (roots.size !== 1 || !roots.has(coordinator)) return { ok: false };
+@@ -1059,8 +1065,11 @@ let inspection;
+         const out = String(toplevel.stdout ?? "").trim();
+         if (out) commitRoot = resolve(out);
+       }
+-      const absolute = resolve(commitCwd, path);
+-      if (!absolute.startsWith(`${commitRoot}${sep}`) && absolute !== commitRoot) {
++      // C20 separator sweep: an MSYS (`/d/...`) or other-drive-letter-case spelling of a file inside the project is inside
++      // it (lib/path-spelling.mjs); every other location stays "outside the project".
++      const absolute = resolve(commitCwd, process.platform === "win32" ? msysToWindows(path) : path);
++      if (!absolute.startsWith(`${commitRoot}${sep}`) && absolute !== commitRoot
++        && relativeUnderRoot(absolute, commitRoot) === null) {
+         throw new Error("outside the project");
+       }
+       return readFileSync(absolute, "utf8");
+@@ -1167,7 +1176,10 @@ if (inspection.message !== null) {
+  * fails every `backlog/`-prefixed check below instead of silently stopping at the root the way
+  * a filesystem `path.resolve` would.
+  */
+-function normalizePathspecLexically(token) {
++function normalizePathspecLexically(rawToken, platform = process.platform) {
++  // C20 separator sweep: Git for Windows accepts `\` in a pathspec; split it like `/` there so `backlog\items\x.md` cannot
++  // skip the backlog checks below. POSIX keeps `\` as an ordinary file-name character.
++  const token = platform === "win32" ? rawToken.replace(/\\/gu, "/") : rawToken;
+   const isAbsolute = token.startsWith("/");
+   const out = [];
+   for (const segment of token.split("/")) {
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 3584c70e7157d7abf9023ac0b0d49561e12445ba..938286807281e3ab131d9b2e85f9245aaf5f3c0c 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -13,6 +13,7 @@ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-pref
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+ import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
++import { isNodeInterpreterWord, samePathSpelling } from "../path-spelling.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+ import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
+ 
+@@ -341,7 +342,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
+     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
+ }
+ 
+-import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT } from "./constants.mjs";
++import { MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT } from "./constants.mjs";
+ 
+ // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
+ // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
+@@ -481,7 +482,6 @@ function sanctionedPhoenixRevisionArgs(args, root) {
+ // W7 D197: the plugin's OWN routine-repair verb. The closed D194 list must stay reachable exactly when the lifecycle is not ready, so
+ // its argv shapes are admitted here by exact match (never by prefix or basename): `list`, or `run <kind> --root <this root>
+ // --reason <non-empty one-line value>` plus the kind's own flags, each flag at most once, in any order.
+-const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../../scripts/routine-repair.mjs", import.meta.url));
+ const ROUTINE_REPAIR_KINDS = new Set(["heal", "stop-failure-aside", "settled-pending-aside", "move-aside", "slice-cancel"]);
+ const ROUTINE_REPAIR_CANCEL_CLASSES = new Set(["budget", "integrated-elsewhere"]);
+ function sanctionedRoutineRepairArgs(args, root) {
+@@ -518,7 +518,6 @@ function sanctionedRoutineRepairArgs(args, root) {
+ // Admitted as exact argv shapes bound to this root: `plan --root <root>` or `apply --root <root> ... --expect-sha256 <64 hex>`, with
+ // optional --dispatch-id (once) and repeated --allowed-path / --path (repository-relative or absolute, no dot segment).
+ // The script validates its own inputs and refuses with a typed code; `--expect-sha256` is required for apply and refused for plan.
+-const HOST_COMMIT_RECOVER_SCRIPT = fileURLToPath(new URL("../../scripts/goldfish-host-commit-recover.mjs", import.meta.url));
+ const HOST_COMMIT_RECOVER_DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u; // briefed ids are upper case (e.g. C18-1B-...)
+ function sanctionedHostCommitRecoverArgs(args, root) {
+   if ((args[0] !== "plan" && args[0] !== "apply") || !exactRoot(args, root, 1)) return false;
+@@ -843,7 +842,7 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
+  * returns null without an inspection. The set of matching commands is unchanged.
+  */
+ const NODE_BASENAMES = new Set(["node", "node.exe"]);
+-const isNodeName = (path) => NODE_BASENAMES.has(basename(String(path)).toLowerCase());
++const isNodeName = (path) => NODE_BASENAMES.has(basename(String(path).replace(/\\/gu, "/")).toLowerCase());
+ /**
+  * C20 w252 (greenfield G20-1): the observed action names the Node of the process that inspected (`process.execPath`), and the guard
+  * inspects inside the hook, whose Node can differ from the one the agent's shell resolves (a runner sandbox and a version manager
+@@ -855,26 +854,35 @@ const isNodeName = (path) => NODE_BASENAMES.has(basename(String(path)).toLowerCa
+ export function sameNodeInterpreter(word, executable, root, dependencies = {}) {
+   if (word === executable) return true;
+   if (typeof word !== "string" || typeof executable !== "string" || !isNodeName(executable)) return false;
+-  if (word === "node") return true;
+-  if (!(win32.isAbsolute(word) || posix.isAbsolute(word)) || !isNodeName(word)) return false;
+-  try {
+-    const real = (dependencies.realpathFn ?? realpathSync)(word);
+-    let realRoot;
+-    try { realRoot = (dependencies.realpathFn ?? realpathSync)(root); } catch { realRoot = resolve(root); }
+-    const rel = relative(realRoot, real);
+-    if (rel === "" || !(rel.startsWith("..") || isAbsolute(rel))) return false;
+-    const stat = (dependencies.lstatFn ?? lstatSync)(real);
+-    return stat.isFile() && (process.platform === "win32" || (stat.mode & 0o111) !== 0);
+-  } catch {
+-    return false;
+-  }
++  // C20 separator sweep: the shared rule (lib/path-spelling.mjs) also admits node.exe on win32 and any separator /
++  // drive-letter-case / MSYS spelling of the observed executable itself.
++  return isNodeInterpreterWord(word, {
++    root,
++    platform: dependencies.platform ?? process.platform,
++    trustedNode: executable,
++    realpathFn: dependencies.realpathFn,
++    lstatFn: dependencies.lstatFn,
++  });
++}
++
++/**
++ * C20 separator sweep: an observed argv word is matched exactly, except that an ABSOLUTE expected path may be typed in any
++ * equivalent spelling on win32/darwin (lib/path-spelling.mjs). Flags, digests and relative values stay byte-exact.
++ */
++export function sameObservedArgvWord(word, expected, dependencies = {}) {
++  if (word === expected) return true;
++  if (typeof word !== "string" || typeof expected !== "string") return false;
++  const platform = dependencies.platform ?? process.platform;
++  if (platform !== "win32" && platform !== "darwin") return false;
++  if (!(win32.isAbsolute(expected) || posix.isAbsolute(expected))) return false;
++  return samePathSpelling(word, expected, { platform, lstatFn: dependencies.lstatFn });
+ }
+ 
+ export function observedOnboardingCommandMatch(command, root, dependencies = {}) {
+   const words = simpleWords(command, root);
+   if (!words) return null;
+   const abs = (word) => win32.isAbsolute(word) || posix.isAbsolute(word);
+-  if (words.length < 2 || !(words[0] === "node" || abs(words[0])) || !abs(words[1])) return null;
++  if (words.length < 2 || !(isNodeName(words[0]) || abs(words[0])) || !abs(words[1])) return null;
+   let observed;
+   try {
+     observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
+@@ -899,7 +907,7 @@ export function observedOnboardingCommandMatch(command, root, dependencies = {})
+     || typeof action.requiresConfirmation !== "boolean"
+     || words.length !== action.argv.length + 1
+     || !sameNodeInterpreter(words[0], action.executable, root, dependencies)
+-    || action.argv.some((value, index) => words[index + 1] !== value)) return null;
++    || action.argv.some((value, index) => !sameObservedArgvWord(words[index + 1], value, dependencies))) return null;
+   return {observed, action};
+ }
+ 
+@@ -978,8 +986,8 @@ export function isExactObservedInstalledPluginAttestationAction(command, root, d
+     && expected.schema === "pipeline.installed-plugin-attestation-host-result.v1"
+     && expected.status === "written"
+     && words.length === action.argv.length + 1
+-    && words[0] === action.executable
+-    && action.argv.every((value, index) => words[index + 1] === value);
++    && sameNodeInterpreter(words[0], action.executable, root, dependencies)
++    && action.argv.every((value, index) => sameObservedArgvWord(words[index + 1], value, dependencies));
+ }
+ 
+ /**
+@@ -1031,8 +1039,8 @@ export function isExactObservedRunnerPermissionsRepairAction(command, root, depe
+     && Array.isArray(expected.statuses) && expected.statuses.length === 2
+     && expected.statuses[0] === "ready" && expected.statuses[1] === "no-op"
+     && words.length === action.argv.length + 1
+-    && words[0] === action.executable
+-    && action.argv.every((value, index) => words[index + 1] === value);
++    && sameNodeInterpreter(words[0], action.executable, root, dependencies)
++    && action.argv.every((value, index) => sameObservedArgvWord(words[index + 1], value, dependencies));
+ }
+ 
+ export function isExactObservedRunnerPermissionsPlannerAction(command, root, dependencies = {}) {
+@@ -1083,8 +1091,8 @@ export function isExactObservedRunnerPermissionsPlannerAction(command, root, dep
+     && ["drifted", "pending-runtime-initialization", "unavailable"].includes(observed?.runnerPermissions?.status)
+     && observedPlannerAction
+     && words.length === action.argv.length + 1
+-    && words[0] === action.executable
+-    && action.argv.every((value, index) => words[index + 1] === value);
++    && sameNodeInterpreter(words[0], action.executable, root, dependencies)
++    && action.argv.every((value, index) => sameObservedArgvWord(words[index + 1], value, dependencies));
+ }
+ 
+ /**
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index 5b76a8fcfba4db05fa9594a80391c2be610e4829..a7ca317e013e9d4623c7970945d8b06ea225c54a 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -204,6 +204,10 @@ export const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../../scripts
+ export const PHOENIX_AUTHORITY_REVISION_SCRIPT = fileURLToPath(new URL("../../scripts/phoenix-authority-revision.mjs", import.meta.url));
+ export const ARCHITECTURE_MEASURE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-measure.mjs", import.meta.url));
+ export const ARCHITECTURE_FITNESS_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-fitness.mjs", import.meta.url));
++// C20 separator sweep (S2): moved here from command-catalogue.mjs so canonicalSanctionedScript (which only knows the `*_SCRIPT`
++// exports of this module) resolves every separator / drive-letter-case / MSYS spelling of them, like every other sanctioned script.
++export const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../../scripts/routine-repair.mjs", import.meta.url));
++export const HOST_COMMIT_RECOVER_SCRIPT = fileURLToPath(new URL("../../scripts/goldfish-host-commit-recover.mjs", import.meta.url));
+ 
+ export const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/design-course-session.mjs", import.meta.url));
+ 
+diff --git a/plugins/pipeline-core/lib/guard/gate-strength-lane.mjs b/plugins/pipeline-core/lib/guard/gate-strength-lane.mjs
+index 1931867ebe02418042544838c831849af69987d5..cf6be31aed4c33893c65d8420edd14c338b3ac57 100644
+--- a/plugins/pipeline-core/lib/guard/gate-strength-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/gate-strength-lane.mjs
+@@ -11,6 +11,7 @@ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PLUGIN_ROOT } from "./constants.mjs
+ import { isPathWithinRealpathedRoot } from "./path-containment.mjs";
+ import { isReadOnlyDiagnosticCommand, simpleWords } from "./shell-grammar.mjs";
+ import { verdict } from "./verdict.mjs";
++import { isNodeInterpreterWord } from "../path-spelling.mjs";
+ 
+ /**
+  * GS-1..GS-6 refuse an Edit or a Write. A shell command is neither.
+@@ -287,8 +288,8 @@ export function signedQualityPackageCommandAdmission(command, root, dependencies
+   const words = simpleWords(command, root, nativeWin32 ? { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM } : {});
+   if (!words || words.length !== 7) return false;
+   if (nativeWin32 && command.includes("\\") && !win32CanonicalWordRendering(command, words)) return false;
+-  const directNode = nativeWin32 ? ["node", "node.exe"] : ["node"];
+-  if (![...directNode, dependencies.processExecPath ?? process.execPath].includes(words[0])) return false;
++  // C20 separator sweep: the shared interpreter predicate (lib/path-spelling.mjs, the G20-1 rule).
++  if (!isNodeInterpreterWord(words[0], { root, platform: nativeWin32 ? "win32" : (dependencies.platform ?? process.platform), trustedNode: dependencies.processExecPath ?? process.execPath })) return false;
+   try {
+     const pluginRoot = realpathSync(PLUGIN_ROOT);
+     const script = join(pluginRoot, "scripts", "quality-package-materializer.mjs");
+@@ -313,9 +314,7 @@ function gateStrengthShellReadOnlyScriptExemption(command, root, dependencies =
+   const words = simpleWords(command, root);
+   if (!words || words.length < 2) return false;
+   const platform = dependencies.platform ?? process.platform;
+-  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
+-  const trustedNode = dependencies.processExecPath ?? process.execPath;
+-  if (![...directNode, trustedNode].includes(words[0])) return false;
++  if (!isNodeInterpreterWord(words[0], { root, platform, trustedNode: dependencies.processExecPath ?? process.execPath })) return false;
+   const scriptArg = words[1];
+   if (typeof scriptArg !== "string" || scriptArg === "" || scriptArg.startsWith("-")) return false;
+   const realpath = dependencies.realpathSyncFn ?? realpathSync;
+diff --git a/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs b/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs
+index 78ceaa767d5aa88689ce7560e0fa4e25c5ae8379..784c93d7b703db362d3fc3f8c5a5652ac69a6a10 100644
+--- a/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs
++++ b/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs
+@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
+ import { join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+-import { isExactObservedOnboardingNextAction, observedOnboardingCommandMatch, sameNodeInterpreter } from "./command-catalogue.mjs";
++import { isExactObservedOnboardingNextAction, observedOnboardingCommandMatch, sameNodeInterpreter, sameObservedArgvWord } from "./command-catalogue.mjs";
+ import { devPlanShellRefusalHit } from "./devplan-shell-lane.mjs";
+ import { simpleWords } from "./shell-grammar.mjs";
+ 
+@@ -186,3 +186,22 @@ test("C20 w252 (G20-1): the repair the hook's inspection returns is admitted whe
+   assert.equal(observedOnboardingCommandMatch(commandFor([realNodeElsewhere, ...action.argv]), root, counting(nonNode)), null);
+   assert.equal(sameNodeInterpreter(join(repository, "scratch", "node"), GUARD_NODE, repository, { realpathFn: (p) => p, lstatFn: () => ({ isFile: () => true, mode: 0o755 }) }), false, "a node inside the root is refused even when it is an executable file");
+ });
++
++test("C20 separator sweep: on win32 node.exe and any spelling of the observed Node are that Node; absolute argv paths match in any native spelling", () => {
++  const win = { platform: "win32" };
++  const observedNode = "C:\\Program Files\\nodejs\\node.exe";
++  const winRoot = "D:\\Dev\\App";
++  for (const word of ["node", "node.exe", "NODE.EXE", "C:/Program Files/nodejs/node.exe", "c:\\program files\\nodejs\\node.exe", "/c/Program Files/nodejs/node.exe"]) {
++    assert.equal(sameNodeInterpreter(word, observedNode, winRoot, win), true, word);
++  }
++  assert.equal(sameNodeInterpreter("node.exe", observedNode, winRoot, { platform: "linux" }), false, "node.exe is no interpreter word on Linux");
++  assert.equal(sameNodeInterpreter("C:/Program Files/nodejs/python.exe", observedNode, winRoot, win), false);
++  // argv: an absolute expected path in another native spelling matches; flags, digests and relative values stay exact
++  assert.equal(sameObservedArgvWord("d:/dev/app", winRoot, win), true);
++  assert.equal(sameObservedArgvWord("/d/Dev/App/scripts/x.mjs", "D:\\Dev\\App\\scripts\\x.mjs", win), true);
++  assert.equal(sameObservedArgvWord("D:/Dev/AppOther", winRoot, win), false);
++  assert.equal(sameObservedArgvWord("--ROOT", "--root", win), false);
++  assert.equal(sameObservedArgvWord("ABCDEF", "abcdef", win), false, "a digest is never case-folded");
++  assert.equal(sameObservedArgvWord("scratch\\x.json", "scratch/x.json", win), false, "a relative value stays byte-exact");
++  assert.equal(sameObservedArgvWord("/home/u/app/", "/home/u/app", { platform: "linux" }), false, "Linux stays byte-exact");
++});
+diff --git a/plugins/pipeline-core/lib/guard/po-commands.mjs b/plugins/pipeline-core/lib/guard/po-commands.mjs
+index a0c9b5b4017b36baecf61df8fa0e185418e87eba..e4a7bb44667558e4da178e72fc25be97bec3ae30 100644
+--- a/plugins/pipeline-core/lib/guard/po-commands.mjs
++++ b/plugins/pipeline-core/lib/guard/po-commands.mjs
+@@ -11,6 +11,7 @@ import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM,
+ import { commandPath, isShellExternalPathToken, pathInside, pipelineSourceRoot } from "./path-containment.mjs";
+ import { isBoundedCatPipeline, isBoundedGitPipeline, isBoundedGrepPipeline, isBoundedReadOnlyAndChain, isReadOnlyDiagnosticCommand, isReadOnlyDiagnosticCommandWithTrailingStderrRedirect, simpleWords } from "./shell-grammar.mjs";
+ import { verdict } from "./verdict.mjs";
++import { sameNativePath } from "../path-spelling.mjs";
+ import { hasExternalOutputRedirect, isNullDeviceStderrRedirect } from "./read-scope.mjs";
+ 
+ // Signing parity (AC-262): one shared source for the "who acts next" sentences, so the Codex and
+@@ -27,10 +28,14 @@ export function externalPoSigningOnly() {
+   );
+ }
+ 
++// C20 separator sweep: the script word and `--repo-root` are compared through the shared native-path equivalence
++// (lib/path-spelling.mjs: exact on Linux; separator / drive-letter case / MSYS on win32; NFC and measured case on darwin).
++// For the human-signing detection below this makes the protection catch every spelling, not only the canonical one.
+ function poApprovalArgs(command, root, scriptPath) {
+   const words = simpleWords(command, root);
+-  if (!words || words.length < 3 || resolve(root, words[1]) !== scriptPath) return null;
+-  return words.slice(2);
++  if (!words || words.length < 3) return null;
++  if (!sameNativePath(words[1], scriptPath) && !sameNativePath(resolve(root, words[1]), scriptPath)) return null;
++  return words.slice(2).map((value) => (sameNativePath(value, root) ? root : value));
+ }
+ 
+ function externalApprovalDirectory(args, root, index) {
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index eccf7dc09916bddae36ea7ff35d784c458cf44ab..0ae9cc6b30313e838567099e0f237d481d56b6ad 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -12,6 +12,7 @@ import { GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT, HEX, START_PREFLIGHT_SCRIPT, VALID_RU
+ import { isRealpathedWithinBoundary, pathInside } from "./path-containment.mjs";
+ import * as SANCTIONED_CONSTANTS from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
++import { isNodeInterpreterWord, relativeUnderRoot, sameNativePath } from "../path-spelling.mjs";
+ 
+ export function sanctionedSessionCriticFinalizerArgs(args, root) {
+   const exactProjectRoot = exactRoot(args, root, 1)
+@@ -305,7 +306,8 @@ export function isNarrowRepositoryRecoveryCommand(command, root) {
+   index += 1;
+   if (words[index] === "-C") {
+     const target = words[index + 1];
+-    if (typeof target !== "string" || resolve(root, target) !== root) return false;
++    // C20 separator sweep (S3/S4): any native spelling of the root (MSYS, drive-letter case, separator) is the root.
++    if (typeof target !== "string" || !(sameNativePath(target, root) || sameNativePath(resolve(root, target), root))) return false;
+     index += 2;
+   }
+   return words[index] === "rebase"
+@@ -760,33 +762,23 @@ export function sanctionedHumanOverrideArgs(args, root) {
+  * (an agent cannot plant its own "node" in the repository). Bare `node` from PATH is already admitted, so this widens no authority:
+  * every script/argv rule below still applies unchanged.
+  */
+-function foreignNodeInterpreter(word, root, options = {}) {
+-  if (typeof word !== "string" || typeof root !== "string" || root === "") return false;
+-  const isAbs = /^[A-Za-z]:[\\/]/u.test(word) || word.startsWith("/") || word.startsWith("\\\\");
+-  if (!isAbs || !["node", "node.exe"].includes(basename(word.replace(/\\/gu, "/")).toLowerCase())) return false;
+-  try {
+-    const realpathFn = options.realpathFn ?? realpathSync;
+-    const real = realpathFn(word);
+-    let realRoot;
+-    try { realRoot = realpathFn(root); } catch { realRoot = resolve(root); }
+-    const inside = (options.platform ?? process.platform) === "win32"
+-      ? (real.toLowerCase() === realRoot.toLowerCase() || real.toLowerCase().startsWith(`${realRoot.toLowerCase().replace(/[\\/]+$/u, "")}\\`))
+-      : (real === realRoot || real.startsWith(`${realRoot.replace(/\/+$/u, "")}/`));
+-    if (inside) return false;
+-    const stat = (options.lstatFn ?? lstatSync)(real);
+-    return stat.isFile() && ((options.platform ?? process.platform) === "win32" || (stat.mode & 0o111) !== 0);
+-  } catch {
+-    return false;
+-  }
++// C20 separator sweep: the interpreter rule lives in lib/path-spelling.mjs (isNodeInterpreterWord) so every lane shares it;
++// it also admits any separator / drive-letter-case / MSYS spelling of the trusted interpreter itself.
++export function sanctionedNodeInterpreter(word, root, options = {}) {
++  return isNodeInterpreterWord(word, {
++    root,
++    platform: options.platform ?? process.platform,
++    trustedNode: options.processExecPath ?? process.execPath,
++    realpathFn: options.realpathFn,
++    lstatFn: options.lstatFn,
++  });
+ }
+ 
+ export function resolveSanctionedScriptInvocation(command, root, options = {}) {
+   const words = simpleWords(command, root, options);
+   const platform = options.platform ?? process.platform;
+-  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
+-  const trustedNode = options.processExecPath ?? process.execPath;
+   if (!words || words.length < 2) return null;
+-  if (![...directNode, trustedNode].includes(words[0]) && !foreignNodeInterpreter(words[0], root, options)) return null;
++  if (!sanctionedNodeInterpreter(words[0], root, options)) return null;
+   const [script, ...args] = words.slice(1);
+   // Windows accepts either separator spelling of this one trusted script identity.
+   // Keep every other script lexical and preserve case, roots, segments and argv.
+@@ -794,7 +786,7 @@ export function resolveSanctionedScriptInvocation(command, root, options = {}) {
+   // matched by physical identity, so forward-slash, backslash, MSYS (/d/...) and
+   // repository-relative spellings of the SAME file resolve to the canonical spelling
+   // (case-folded on win32). A different file, or any spelling with a "." / ".." segment, stays lexical.
+-  return { script: literalPluginRootPreflight(script, platform, options) ?? canonicalSanctionedScript(script, root, platform) ?? script, args: canonicalRootSpelling(args, root, platform) };
++  return { script: literalPluginRootPreflight(script, platform, options) ?? canonicalSanctionedScript(script, root, platform) ?? script, args: canonicalRootSpelling(args, root, platform, options) };
+ }
+ 
+ /**
+@@ -806,17 +798,19 @@ export function resolveSanctionedScriptInvocation(command, root, options = {}) {
+  * spelling BEFORE the matchers run, so every matcher keeps its strict comparison. Only win32 (a case-insensitive, separator-agnostic
+  * file system) is touched; a path with a dot segment, any other directory, or a prefix of the root is never rewritten.
+  */
+-export function canonicalRootSpelling(args, root, platform) {
+-  if (platform !== "win32" || typeof root !== "string" || root === "") return args;
+-  const flat = (value) => value.replace(/^\/([A-Za-z])\/(?=.)/u, (_m, drive) => `${drive.toUpperCase()}:/`).replace(/\\/gu, "/").replace(/\/+$/u, "").toLowerCase();
+-  const authorRoot = join(root, "plugins", "pipeline-core");
+-  const rootKey = flat(root);
+-  const authorKey = flat(authorRoot);
++// C20 separator sweep (S1): an absolute argument BELOW the root (`--request`, `--card-file`, `--root <root>/plugins/...`) is
++// rewritten too, through the shared helper. win32 and darwin only: on Linux every spelling difference is a real difference.
++// The guard compares this canonical copy; the shell still runs the typed text (S5), so a script that compares its own
++// `--root` must accept the same equivalence (path-spelling.mjs) itself.
++export function canonicalRootSpelling(args, root, platform, options = {}) {
++  if ((platform !== "win32" && platform !== "darwin") || typeof root !== "string" || root === "") return args;
++  const spelling = { platform, lstatFn: options.lstatFn };
+   return args.map((value) => {
+-    if (typeof value !== "string" || value === root || value === authorRoot || /[\x00-\x1f\x7f]/u.test(value)) return value;
+-    if (value.split(/[\\/]/u).some((part) => part === "." || part === "..")) return value;
+-    const key = flat(value);
+-    return key === rootKey ? root : key === authorKey ? authorRoot : value;
++    if (typeof value !== "string" || value === root || /[\x00-\x1f\x7f]/u.test(value)) return value;
++    // Rebuilt with the same `join` every matcher uses for its expected value (`join(root, "plugins", "pipeline-core")`, ...),
++    // so the canonical copy is byte-identical to what the matcher computes on this host.
++    const rel = relativeUnderRoot(value, root, spelling);
++    return rel === null ? value : rel === "" ? root : join(root, ...rel.split("/"));
+   });
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/guard/write-scope.mjs b/plugins/pipeline-core/lib/guard/write-scope.mjs
+index 0ed75c8afcc7dc43780b4d67f44aba4b5164aee5..e71a31015626de044c378190a9610a3de2e3d413 100644
+--- a/plugins/pipeline-core/lib/guard/write-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/write-scope.mjs
+@@ -9,6 +9,7 @@ import { writeTargetPath } from "../tool-write-target.mjs";
+ import { ONBOARDING_CONSENT_MARK_SCRIPT, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH, PARTIAL_LIFECYCLE_SCRATCH_DIR, RESTART_RESUME_HINT_INPUT_PATH, RESUME_HINT_SCRIPT, WRITE_TOOLS } from "./constants.mjs";
+ import { isPathWithinRealpathedRoot, isProjectWritePath } from "./path-containment.mjs";
+ import { simpleWords } from "./shell-grammar.mjs";
++import { isNodeInterpreterWord, sameNativePath } from "../path-spelling.mjs";
+ import { verdict } from "./verdict.mjs";
+ 
+ // ALFRED-QP3 (W0-4 F-2): the lane admits EXACTLY these three first path segments -- backlog, docs AND scratch -- and no
+@@ -415,32 +416,38 @@ export function restartResumeHintNearMissWrite(input, root) {
+ // that admits it. It was not, and the two disagreed: the bootstrap skill described a
+ // free `--card-file <json>` while this admits one fixed path, so the §6 duty was
+ // unsatisfiable in the pre-restart state that imposes it (measured 2026-08-09).
+-export function isRestartResumeHintCapture(command, root, options = {}) {
++// C20 separator sweep: these two lanes bypass resolveSanctionedScriptInvocation (an import of it here would close a module
++// cycle), so they apply the same shared rules directly: the interpreter predicate and the native path equivalence of
++// lib/path-spelling.mjs (exact on Linux; separator / drive-letter case / MSYS on win32; NFC and measured case on darwin).
++function restartResumeHintWords(command, root, options) {
+   const words = simpleWords(command, root, options);
+-  const platform = options.platform ?? process.platform;
+-  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
+-  const trustedNode = options.processExecPath ?? process.execPath;
+-  if (!words || ![...directNode, trustedNode].includes(words[0])) return false;
+-  const [script, ...args] = words.slice(1);
+-  return script === RESUME_HINT_SCRIPT
+-    && args[0] === "capture"
+-    && args[1] === "--root" && args[2] === root
+-    && args[3] === "--card-file" && args[4] === join(root, RESTART_RESUME_HINT_INPUT_PATH)
++  if (!words || words.length < 2) return null;
++  const spelling = { platform: options.platform ?? process.platform, lstatFn: options.lstatFn };
++  const interpreter = isNodeInterpreterWord(words[0], {
++    ...spelling, root, trustedNode: options.processExecPath ?? process.execPath, realpathFn: options.realpathFn,
++  });
++  if (!interpreter || !sameNativePath(words[1], RESUME_HINT_SCRIPT, spelling)) return null;
++  return { args: words.slice(2), same: (typed, canonical) => sameNativePath(typed, canonical, spelling) };
++}
++
++export function isRestartResumeHintCapture(command, root, options = {}) {
++  const match = restartResumeHintWords(command, root, options);
++  if (!match) return false;
++  const { args, same } = match;
++  return args[0] === "capture"
++    && args[1] === "--root" && same(args[2], root)
++    && args[3] === "--card-file" && same(args[4], join(root, RESTART_RESUME_HINT_INPUT_PATH))
+     && args[5] === "--consume-card" && args.length === 6;
+ }
+ 
+ // Reading the captured handover is the required step immediately after
+ // capture. This exact root-bound shape is passive and cannot change state.
+ export function isRestartResumeHintInspect(command, root, options = {}) {
+-  const words = simpleWords(command, root, options);
+-  const platform = options.platform ?? process.platform;
+-  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
+-  const trustedNode = options.processExecPath ?? process.execPath;
+-  if (!words || ![...directNode, trustedNode].includes(words[0])) return false;
+-  const [script, ...args] = words.slice(1);
+-  return script === RESUME_HINT_SCRIPT
+-    && args[0] === "inspect"
+-    && args[1] === "--root" && args[2] === root
++  const match = restartResumeHintWords(command, root, options);
++  if (!match) return false;
++  const { args, same } = match;
++  return args[0] === "inspect"
++    && args[1] === "--root" && same(args[2], root)
+     && args.length === 3;
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/path-spelling.mjs b/plugins/pipeline-core/lib/path-spelling.mjs
+index 5724bdb29085d406410c642da9a370fbd8120fba..1de56ca4f309924932e563b6864ceb21c43823bc 100644
+--- a/plugins/pipeline-core/lib/path-spelling.mjs
++++ b/plugins/pipeline-core/lib/path-spelling.mjs
+@@ -87,6 +87,28 @@ export function samePathSpelling(a, b, options = {}) {
+     && caseInsensitiveVolume(left, options) && caseInsensitiveVolume(right, options);
+ }
+ 
++/**
++ * The guard-side comparison for an agent-typed path: byte equality everywhere, plus the spelling equivalence above only where
++ * the host file system makes two spellings name one file (win32, darwin). On Linux a different spelling stays different, so
++ * no admission widens there.
++ */
++export function sameNativePath(typed, canonical, options = {}) {
++  if (typed === canonical && typeof typed === "string") return true;
++  const platform = platformOf(options);
++  return (platform === "win32" || platform === "darwin") && samePathSpelling(typed, canonical, options);
++}
++
++/**
++ * S5 (the guard admits a canonical copy, but the shell runs the typed text): a script that requires its `--root` to be the
++ * exact native real path maps an equivalent spelling of the current working directory -- where the agent's shell runs it --
++ * to that directory's own spelling. Any other value is returned unchanged, so every later exactness check still applies.
++ */
++export function typedRootSpelling(typed, options = {}) {
++  if (typeof typed !== "string") return typed;
++  const cwd = options.cwd ?? process.cwd();
++  return typed !== cwd && sameNativePath(typed, cwd, options) ? cwd : typed;
++}
++
+ /**
+  * The `/`-separated path of `value` relative to `root` when `value` is the root ("") or below it in any equivalent spelling;
+  * otherwise null. A relative `value` is not resolved here (it is the caller's spelling of a relative path) and returns null.
+diff --git a/plugins/pipeline-core/lib/path-spelling.test.mjs b/plugins/pipeline-core/lib/path-spelling.test.mjs
+index 8146e8a4d3d253061fb296f6900bfc58555b82dd..88abe35414a27becc366da57a294d78952eb9d4d 100644
+--- a/plugins/pipeline-core/lib/path-spelling.test.mjs
++++ b/plugins/pipeline-core/lib/path-spelling.test.mjs
+@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+-import { canonicalUnderRoot, caseInsensitiveVolume, isNodeInterpreterWord, msysToWindows, pathSpellingKey, relativeUnderRoot, samePathSpelling } from "./path-spelling.mjs";
++import { canonicalUnderRoot, caseInsensitiveVolume, isNodeInterpreterWord, msysToWindows, pathSpellingKey, relativeUnderRoot, sameNativePath, samePathSpelling, typedRootSpelling } from "./path-spelling.mjs";
+ 
+ const win = { platform: "win32" };
+ const mac = { platform: "darwin" };
+@@ -68,6 +68,15 @@ test("relativeUnderRoot and canonicalUnderRoot rewrite any spelling under the ro
+   assert.equal(canonicalUnderRoot("/home/u/other/x.json", "/home/u/app", linux), "/home/u/other/x.json");
+ });
+ 
++test("sameNativePath widens only on win32/darwin; typedRootSpelling maps only the working directory", () => {
++  assert.equal(sameNativePath("D:/Dev/App", "D:\\Dev\\App", win), true);
++  assert.equal(sameNativePath("/home/u/app/", "/home/u/app", linux), false, "Linux stays byte-exact");
++  assert.equal(sameNativePath("/home/u/app", "/home/u/app", linux), true);
++  assert.equal(typedRootSpelling("/d/Dev/App", { ...win, cwd: "D:\\Dev\\App" }), "D:\\Dev\\App");
++  assert.equal(typedRootSpelling("D:/Dev/Other", { ...win, cwd: "D:\\Dev\\App" }), "D:/Dev/Other");
++  assert.equal(typedRootSpelling("/home/u/app/", { ...linux, cwd: "/home/u/app" }), "/home/u/app/");
++});
++
+ test("isNodeInterpreterWord: bare node, node.exe on win32, any spelling of the trusted node, a real node outside the root", () => {
+   const outside = mkdtempSync(join(tmpdir(), "path-spelling-node-"));
+   const root = mkdtempSync(join(tmpdir(), "path-spelling-root-"));
+diff --git a/plugins/pipeline-core/lib/root-argument.mjs b/plugins/pipeline-core/lib/root-argument.mjs
+index 541c320ec0a134b29d170da34112e43f644e10ed..aee69be50e81a27b13091c7193a93fb4c750351d 100644
+--- a/plugins/pipeline-core/lib/root-argument.mjs
++++ b/plugins/pipeline-core/lib/root-argument.mjs
+@@ -7,17 +7,27 @@
+  * with forward slashes (`C:/work/repo`, which every runner host and most shells accept) was refused although it names
+  * the same directory. The strictness is meant to reject `..`, symlinks and relative paths, not the separator.
+  *
+- * `normalizeRootArgument` changes ONLY the separator spelling and ONLY on win32; on every other platform the value is
+- * returned byte for byte, so the strict checks that follow keep their meaning. It never touches `..`, case, links
+- * or trailing separators: those stay refusals.
++ * `normalizeRootArgument`:
++ * - C20 separator sweep (S5): a value that names the CURRENT WORKING DIRECTORY in an equivalent native spelling
++ *   (lib/path-spelling.mjs: win32 separator / drive-letter case / MSYS `/d/...` / trailing separator; darwin NFC and a
++ *   measured case-insensitive volume) becomes that directory's own spelling. The agent's shell runs the script from the
++ *   project root, so this is exactly the spelling every strict check below expects.
++ * - otherwise, on win32 only, the separator spelling (and an MSYS drive prefix) is normalised to backslashes;
++ * - on every other platform any other value is returned byte for byte. It never resolves `..` or links: those stay
++ *   refusals of the strict checks that follow.
+  */
++import { msysToWindows, typedRootSpelling } from "./path-spelling.mjs";
+ 
+ /**
+  * @param {unknown} value the raw argument
+  * @param {string} [platform] injectable for tests; defaults to the running platform
+- * @returns {unknown} the same value, or the win32 spelling with backslashes
++ * @param {{cwd?: string, lstatFn?: Function}} [options] injectable working directory / volume probe for tests
++ * @returns {unknown} the same value, the current directory's own spelling, or the win32 spelling with backslashes
+  */
+-export function normalizeRootArgument(value, platform = process.platform) {
+-  if (typeof value !== "string" || platform !== "win32") return value;
+-  return value.replaceAll("/", "\\");
++export function normalizeRootArgument(value, platform = process.platform, options = {}) {
++  if (typeof value !== "string") return value;
++  const cwdSpelling = typedRootSpelling(value, { platform, cwd: options.cwd, lstatFn: options.lstatFn });
++  if (cwdSpelling !== value) return cwdSpelling;
++  if (platform !== "win32") return value;
++  return msysToWindows(value).replaceAll("/", "\\");
+ }
+diff --git a/plugins/pipeline-core/lib/root-argument.test.mjs b/plugins/pipeline-core/lib/root-argument.test.mjs
+index edd5f9e272e66e4a368a446a88385d3d9569d1d7..9e68125b5b2220332f22168ec652b97d9caa518b 100644
+--- a/plugins/pipeline-core/lib/root-argument.test.mjs
++++ b/plugins/pipeline-core/lib/root-argument.test.mjs
+@@ -23,8 +23,24 @@ test("every other platform and every non-string value is returned unchanged", ()
+   assert.equal(normalizeRootArgument(7, "win32"), 7);
+ });
+ 
++test("C20 separator sweep: an equivalent spelling of the current directory becomes that directory's own spelling", () => {
++  const cwd = "D:\\Dev\\App";
++  for (const typed of ["D:/Dev/App", "d:/dev/app", "/d/Dev/App", "D:\\Dev\\App\\", "d:\\DEV\\app"]) {
++    assert.equal(normalizeRootArgument(typed, "win32", { cwd }), cwd, typed);
++  }
++  // another directory keeps the separator-only rule; MSYS is now understood there too
++  assert.equal(normalizeRootArgument("/d/Dev/Other", "win32", { cwd }), "D:\\Dev\\Other");
++  assert.equal(normalizeRootArgument("D:/Dev/App/../App", "win32", { cwd }), "D:\\Dev\\App\\..\\App", "a dot segment is never mapped");
++  // darwin: an NFD spelling of the NFC working directory is that directory; Linux stays byte-exact
++  const nfc = "/Users/po/Übung".normalize("NFC");
++  assert.equal(normalizeRootArgument(nfc.normalize("NFD"), "darwin", { cwd: nfc }), nfc);
++  assert.equal(normalizeRootArgument("/home/u/app/", "linux", { cwd: "/home/u/app" }), "/home/u/app/");
++});
++
+ test("the strict root entries normalise the argument before comparing it", () => {
+   for (const [file, needle] of [
++    ["scripts/doc-reader-course.mjs", "const root=normalizeRootArgument(argv[2]),storePath=argv[4];"],
++    ["scripts/governance-scope-diagnose.mjs", "const rootDir=normalizeRootArgument(argv[1]);"],
+     ["scripts/dispatch-recovery.mjs", 'parsed.options["--root"] = normalizeRootArgument(parsed.options["--root"]);'],
+     ["scripts/continuity-owner-route.mjs", "const root = normalizeRootArgument(rawRoot);"],
+     ["scripts/continuity-owner-route.mjs", "const orphanRoot = normalizeRootArgument(argv[2]);"],
+diff --git a/plugins/pipeline-core/scripts/clean-candidate-run.mjs b/plugins/pipeline-core/scripts/clean-candidate-run.mjs
+index 6062cdf9bcb0f4a7e658d55ba0a1796fcd425c13..8f5ba53c14fb95cf51ecef724b74c0d6ffafda1a 100644
+--- a/plugins/pipeline-core/scripts/clean-candidate-run.mjs
++++ b/plugins/pipeline-core/scripts/clean-candidate-run.mjs
+@@ -61,6 +61,7 @@ import {
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
+ import { parseArgs as parsePushInitArgs } from "./push-init.mjs";
++import { isNodeInterpreterWord, sameNativePath } from "../lib/path-spelling.mjs";
+ 
+ const USAGE = `Usage:
+   clean-candidate-run.mjs --repo <checkout> --oid <candidate-ref> [--purpose <label>] [--runner claude|codex] -- <command> [args...]
+@@ -173,12 +174,13 @@ function hasExactlyOneRootArg(command) {
+  * checkout to the newly-created detached candidate.
+  */
+ function preparePushInitCommand(command, repo, worktreePath) {
+-  if (!(["node", process.execPath].includes(command[0])) || !isAbsolute(command[1] ?? "") || basename(command[1]) !== "push-init.mjs") return null;
++  // C20 separator sweep: the shared interpreter predicate (node.exe, any spelling of this Node, a real Node outside the repo).
++  if (!isNodeInterpreterWord(command[0], { root: repo }) || !isAbsolute(command[1] ?? "") || basename(command[1]) !== "push-init.mjs") return null;
+   const parsed = parsePushInitArgs(command.slice(2));
+   if (parsed.error || parsed.help || !hasExactlyOneRootArg(command)) {
+     fail("CCR-PUSH-INIT-ARGV", "push-init handoff requires one valid, non-help push-init argv with exactly one --root");
+   }
+-  if (resolve(parsed.root) !== repo) {
++  if (!sameNativePath(resolve(parsed.root), repo) && !sameNativePath(parsed.root, repo)) {
+     fail("CCR-PUSH-INIT-ROOT", "push-init handoff may only replace an exact --root naming the primary checkout");
+   }
+   const remapped = command.map((value, index) => command[index - 1] === "--root" ? worktreePath : value);
+diff --git a/plugins/pipeline-core/scripts/doc-reader-course.mjs b/plugins/pipeline-core/scripts/doc-reader-course.mjs
+index bb6806500fcbec9c6bd63161ab8b54313e047e11..4614d5e050bfc4850db5b3ac359d19814b402a04 100644
+--- a/plugins/pipeline-core/scripts/doc-reader-course.mjs
++++ b/plugins/pipeline-core/scripts/doc-reader-course.mjs
+@@ -7,13 +7,16 @@ import {fileURLToPath} from 'node:url';
+ import {transitionReaderCourse} from '../lib/doc-reader-course.mjs';
+ import {parseStrictJson} from '../lib/governance-event.mjs';
+ import {createReaderCourseDefaultDependencies} from '../lib/doc-reader-default-observers.mjs';
++import {normalizeRootArgument} from '../lib/root-argument.mjs';
++// C20 separator sweep (S5): the root and an absolute --request below it accept every native spelling (lib/path-spelling.mjs).
++import {canonicalUnderRoot} from '../lib/path-spelling.mjs';
+ const operations=new Set(['create','reserve-stage','observe-attempt','recover','complete-stage','begin-batch','record-correction','close-batch','justify-third','close-course']);
+ /** Defaults observe public method evidence; this CLI never launches a host. */
+ export async function runDocReaderCourse(argv,{stdout=process.stdout,deps={}}={}){
+  try{
+   const inspect=argv[0]==='inspect';if(!(inspect||operations.has(argv[0]))||argv.length!==(inspect?7:9)||argv[1]!=='--repo'||argv[3]!=='--store'||argv[5]!== (inspect?'--course-id':'--request')||(!inspect&&argv[7]!=='--request-sha256'))return 2;
+-  const root=argv[2],storePath=argv[4];if(!isAbsolute(root)||resolve(root)!==root||realpathSync(root)!==root||!lstatSync(root).isDirectory()||typeof storePath!=='string'||!storePath.endsWith('/course-state.json')||/[\\:\x00-\x1f\x7f]/u.test(storePath)||storePath.split('/').some(p=>!p||p==='.'||p==='..'||p.startsWith('.')))return 2;
+-  let request;if(inspect){if(!/^[a-z0-9][a-z0-9-]{0,62}$/u.test(argv[6]))return 2;request={courseId:argv[6]};}else{const path=argv[6];if(!isAbsolute(path)||resolve(path)!==path||!path.startsWith(root+sep)||!/^[a-f0-9]{64}$/u.test(argv[8]))return 2;let at=root;for(const part of path.slice(root.length+1).split(sep)){if(!part||part==='.'||part==='..')return 2;at=resolve(at,part);const st=lstatSync(at);if(st.isSymbolicLink()||realpathSync(at)!==at)return 2;}const st=lstatSync(path);if(!st.isFile()||st.nlink!==1||st.size>262144)return 2;const bytes=readFileSync(path);if(createHash('sha256').update(bytes).digest('hex')!==argv[8])return 2;request=JSON.parse(JSON.stringify(parseStrictJson(new TextDecoder('utf-8',{fatal:true}).decode(bytes))));}
++  const root=normalizeRootArgument(argv[2]),storePath=argv[4];if(!isAbsolute(root)||resolve(root)!==root||realpathSync(root)!==root||!lstatSync(root).isDirectory()||typeof storePath!=='string'||!storePath.endsWith('/course-state.json')||/[\\:\x00-\x1f\x7f]/u.test(storePath)||storePath.split('/').some(p=>!p||p==='.'||p==='..'||p.startsWith('.')))return 2;
++  let request;if(inspect){if(!/^[a-z0-9][a-z0-9-]{0,62}$/u.test(argv[6]))return 2;request={courseId:argv[6]};}else{const path=['win32','darwin'].includes(process.platform)?canonicalUnderRoot(argv[6],root):argv[6];if(!isAbsolute(path)||resolve(path)!==path||!path.startsWith(root+sep)||!/^[a-f0-9]{64}$/u.test(argv[8]))return 2;let at=root;for(const part of path.slice(root.length+1).split(sep)){if(!part||part==='.'||part==='..')return 2;at=resolve(at,part);const st=lstatSync(at);if(st.isSymbolicLink()||realpathSync(at)!==at)return 2;}const st=lstatSync(path);if(!st.isFile()||st.nlink!==1||st.size>262144)return 2;const bytes=readFileSync(path);if(createHash('sha256').update(bytes).digest('hex')!==argv[8])return 2;request=JSON.parse(JSON.stringify(parseStrictJson(new TextDecoder('utf-8',{fatal:true}).decode(bytes))));}
+   const result=await transitionReaderCourse({root,storePath,operation:argv[0],request},{...createReaderCourseDefaultDependencies({root}),...deps});stdout.write(`${JSON.stringify(result)}\n`);return result.ok?0:1;
+  }catch{return 2;}
+ }
+diff --git a/plugins/pipeline-core/scripts/governance-scope-diagnose.mjs b/plugins/pipeline-core/scripts/governance-scope-diagnose.mjs
+index 78d5bed5b21bbbafb596429cfa57729329fbc8dc..eeae950c8fb4f353deb243f050a4b9d1a42157f3 100644
+--- a/plugins/pipeline-core/scripts/governance-scope-diagnose.mjs
++++ b/plugins/pipeline-core/scripts/governance-scope-diagnose.mjs
+@@ -6,10 +6,11 @@ import {isAbsolute,resolve} from 'node:path';
+ import {fileURLToPath} from 'node:url';
+ import {observeGovernanceScope,governanceScopeFailureDiagnostic} from '../lib/governance-scope.mjs';
+ import {isDirectInvocation} from '../lib/entrypoint.mjs';
++import {normalizeRootArgument} from '../lib/root-argument.mjs';
+ const exact=(v,keys)=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).sort().join('|')===[...keys].sort().join('|');
+ export function parseGovernanceScopeDiagnosticArgs(argv,{realpathSyncFn=realpathSync,lstatSyncFn=lstatSync}={}){
+   if(!Array.isArray(argv)||argv.length!==2||argv[0]!=='--root')return {ok:false,code:'GSD-ARGS'};
+-  const rootDir=argv[1];
++  const rootDir=normalizeRootArgument(argv[1]);
+   try{if(typeof rootDir!=='string'||!isAbsolute(rootDir)||resolve(rootDir)!==rootDir||/[\x00-\x1f\x7f]/u.test(rootDir))return {ok:false,code:'GSD-ROOT'};
+     const st=lstatSyncFn(rootDir);if(!st.isDirectory()||st.isSymbolicLink()||realpathSyncFn(rootDir)!==rootDir)return {ok:false,code:'GSD-ROOT'};
+     return {ok:true,rootDir};
+diff --git a/plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs b/plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs
+index ae3a93e312c26278359c3d54f3c4e3a9218de23e..1866fe628917ac1d6b07f172f35dc4ccce386964 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs
++++ b/plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs
+@@ -172,6 +172,21 @@ assert.match(core, /`intent` is one string; the other three are \*\*arrays\*\* o
+     false,
+     "a freely chosen card path is refused before a restart",
+   );
++  // C20 separator sweep: on native Windows the same fixed capture is admitted in every native spelling of the root and
++  // the card path (forward slash, drive-letter case, MSYS) and with node.exe; another card path stays refused, and Linux
++  // keeps the byte-exact rule.
++  const winRoot = "D:\\Dev\\App";
++  const script = join(pluginRoot, "scripts", "resume-hint.mjs");
++  const win = { platform: "win32" };
++  for (const [interpreter, rootSpelling, card] of [
++    ["node", "D:/Dev/App", "D:/Dev/App/project/.resume-hint-input.json"],
++    ["node.exe", "/d/Dev/App", "'d:\\dev\\app\\project\\.resume-hint-input.json'"],
++  ]) {
++    assert.equal(guard.isRestartResumeHintCapture(`${interpreter} ${script} capture --root ${rootSpelling} --card-file ${card} --consume-card`, winRoot, win), true, `${rootSpelling} ${card}`);
++  }
++  assert.equal(guard.isRestartResumeHintCapture(`node ${script} capture --root D:/Dev/App --card-file D:/Dev/App/scratch/card.json --consume-card`, winRoot, win), false);
++  assert.equal(guard.isRestartResumeHintInspect(`node.exe ${script} inspect --root d:/dev/app`, winRoot, win), true);
++  assert.equal(guard.isRestartResumeHintInspect(`node ${script} inspect --root ${projectRoot}/`, projectRoot, { platform: "linux" }), false);
+ }
+ {
+   const { buildResumeHint, validateResumeHint } = await import("../../lib/resume-hint.mjs");
