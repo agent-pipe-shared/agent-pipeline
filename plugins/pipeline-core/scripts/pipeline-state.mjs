@@ -461,6 +461,7 @@ import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnr
 import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
 import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
 import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
+import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
 import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
 import { rebindApproval } from "../lib/rebind-approval.mjs";
 import { designWorkflowAdvisorExceptionBinding, readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
@@ -11859,7 +11860,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       }
       let submitDesignDraft = null;
       if (["epic", "feature"].includes(profileName)) {
-        const designDraft = inspectArchitectureDesignDraft({ rootDir: dir,
+        const designDraft = (deps.architectureDesignDraft ?? inspectArchitectureDesignDraft)({ rootDir: dir,
           planPath: authority.value.planPath, expectedPlanSha256: authority.value.planSha256 });
         if (!designDraft.ok) {
           // Candidate 19 (Q7): the inspection already carries the invalid field and what it expects; the message dropped them.
@@ -11869,6 +11870,16 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           return 2;
         }
         submitDesignDraft = designDraft;
+        // G20-15 (AGY greenfield): an invalid ADR sidecar (for example a missing `date`, or `null` for an optional field) was first
+        // found by `set-phase implementation`, after the PO had signed, and forced reopen-design plus a second signature. The same
+        // structural check runs here, before anything is recorded or signed.
+        const submitDecisions = (deps.architectureDecisionAuthoringSources ?? inspectArchitectureDecisionAuthoringSources)({
+          rootDir: dir, area: "project", now: new Date(now()).toISOString() });
+        if (submitDecisions.status === "blocked") {
+          const listed = (submitDecisions.findings ?? []).map((item) => `${item.code}${item.path ? ` ${item.path}` : ""}`).join("; ");
+          console.error(`Error: submit-plan blocked by ${submitDecisions.code} (${listed || "no detail"}); fix each named ADR sidecar now (node <plugin-root>/scripts/architecture-baseline.mjs --validate docs/adr/<name>.json validates one), so the signed approval never has to be reopened for it. No submission or signature request was recorded.`);
+          return 2;
+        }
       }
       // D165 D4: when no design package applies, a brownfield architecture hurdle
       // (missing map, open debt, adoption, ...) would only surface at set-phase

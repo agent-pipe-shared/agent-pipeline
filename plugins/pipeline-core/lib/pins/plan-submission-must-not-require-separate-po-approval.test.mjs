@@ -260,6 +260,34 @@ test("AC2: incomplete feature package - submit-plan under the feature profile re
   assert.equal(readState(f.root).planSubmission, undefined);
 });
 
+test("G20-15: an invalid ADR sidecar refuses submit-plan before the PO signs, names the sidecar, and records nothing", () => {
+  const f = fixture("pin-adr-sidecar");
+  const designDeps = { ...f.deps, architectureDesignDraft: () => ({ ok: true, required: true, status: "draft" }) };
+  mkdirSync(join(f.root, "docs", "adr"), { recursive: true });
+  const markdown = Buffer.from("# ADR 0001\nLocal storage.\n", "utf8");
+  writeFileSync(join(f.root, "docs/adr/0001-storage.md"), markdown);
+  // The AGY greenfield shape: no `date`, and `null` for the optional fields.
+  writeFileSync(join(f.root, "docs/adr/0001-storage.json"), JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "0001",
+    title: "Storage", status: "proposed", scope: "project", digest: sha256Hex(markdown), supersedes: null, exception: null }));
+  const before = readFileSync(statePath(f.root), "utf8");
+  const refused = capture(submitArgs("feature"), designDeps);
+  assert.equal(refused.status, 2, refused.err);
+  assert.match(refused.err, /submit-plan blocked by ARCH-DECISION-EFFECTIVE-UNRESOLVED \(decision-sidecar-invalid-or-drifted docs\/adr\/0001-storage\.json\)/u);
+  assert.match(refused.err, /No submission or signature request was recorded\./u);
+  assert.equal(readFileSync(statePath(f.root), "utf8"), before, "nothing is recorded");
+});
+
+test("G20-15 control: a feature submission with no ADR sidecar problem is not refused by the sidecar check", () => {
+  const f = fixture("pin-adr-clean");
+  let called = 0;
+  const designDeps = { ...f.deps, architectureDesignDraft: () => ({ ok: true, required: true, status: "draft" }),
+    architectureDecisionAuthoringSources: (input) => { called += 1; assert.equal(input.area, "project");
+      return { status: "ready", code: "ARCH-DECISION-EFFECTIVE-READY", findings: [] }; } };
+  const result = capture(submitArgs("feature"), designDeps);
+  assert.equal(called, 1);
+  assert.doesNotMatch(result.err, /ARCH-DECISION-EFFECTIVE-UNRESOLVED/u);
+});
+
 test("AC2: a plan still carrying framing placeholder text cannot be submitted", () => {
   const f = fixture("pin-framing");
   writeFileSync(join(f.root, f.planPath), "# PRD\n\n## Why\n<Problem/benefit/trigger; how success is measured.>\n");
