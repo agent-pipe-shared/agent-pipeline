@@ -1,0 +1,157 @@
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+index 2598d5e12f39f6923aa48f1b0f5c26bfaaa8039d..fb49ec4baba9551410a9297fef53a22be1103eda 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+@@ -457,6 +457,12 @@ test("M4b: the Elephant takes over a finished child's branch with plan then appl
+     const recovered = recover.plan({ verb: "plan", root: fx.workspace, dispatchId: "C20-G208B-AGY-ISOLATION", allowed: ["src/a.mjs"], paths: [], expect: null, briefing: null, handback: null });
+     assert.equal(recovered.status, "ready", JSON.stringify(recovered));
+     assert.deepEqual(recovered.paths, ["src/a.mjs"]);
++    // The take-over leaves a record of what the branch delivered; the commit route compares the tree with it.
++    const commonDir = join(fx.workspace, ".git");
++    assert.equal(integrate.integratedResultCovers({ root: fx.workspace, commonDir, paths: ["src/a.mjs"] }), true);
++    writeFileSync(join(fx.workspace, "src", "a.mjs"), "export const a = 2;\n");
++    assert.equal(integrate.integratedResultCovers({ root: fx.workspace, commonDir, paths: ["src/a.mjs"] }), false, "changed after the take-over");
++    assert.equal(integrate.integratedResultCovers({ root: fx.workspace, commonDir, paths: ["src/other.mjs"] }), false, "a path the branch never delivered");
+   } finally { rmSync(fx.base, { recursive: true, force: true }); }
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/agy-native-integrate.mjs b/plugins/pipeline-core/scripts/agy-native-integrate.mjs
+index 1ba96a009c957cc9a839fa48a7f6c70a9fe4cec7..1af0eacf30577704dbb868e2baef5c84fcbf813a 100644
+--- a/plugins/pipeline-core/scripts/agy-native-integrate.mjs
++++ b/plugins/pipeline-core/scripts/agy-native-integrate.mjs
+@@ -16,11 +16,14 @@
+  */
+ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+-import { realpathSync } from "node:fs";
+-import { posix, resolve, isAbsolute, relative } from "node:path";
++import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
++import { join, posix, resolve, isAbsolute, relative } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ 
+ export const PLAN_SCHEMA = "pipeline.agy-native-integrate-plan.v1";
++export const INTEGRATED_SCHEMA = "pipeline.agy-native-integrated.v1";
++const integratedDirectory = (commonDir) => join(commonDir, "agent-pipeline", "run", "agy-native-integrated");
+ const SELF = fileURLToPath(import.meta.url);
+ const RECOVER = fileURLToPath(new URL("./goldfish-host-commit-recover.mjs", import.meta.url));
+ const BRANCH = /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u;
+@@ -121,6 +124,43 @@ export function plan(options) {
+     next: ["node", SELF, "apply", "--root", root, "--branch", options.branch, ...allowed.flatMap((p) => ["--allowed-path", p]), "--expect-sha256", planSha256].map(shellWord).join(" ") };
+ }
+ 
++/**
++ * What the child's branch delivered, per path: the blob at its tip, null for a deletion. Written before the working tree changes, so a failed
++ * write leaves nothing applied; an apply that fails afterwards leaves a record no working tree matches. The commit route requires a match.
++ */
++function recordIntegration(planned) {
++  const commonDir = resolveGitCommonDir(planned.root);
++  if (!commonDir) throw new Error("the git common directory is not resolvable");
++  const blobs = {};
++  for (const path of planned.paths) {
++    const blob = git(planned.root, ["rev-parse", "--verify", "--quiet", `${planned.tip}:${path}`]);
++    blobs[path] = blob.ok ? blob.out.trim() : null;
++  }
++  const directory = integratedDirectory(commonDir);
++  mkdirSync(directory, { recursive: true });
++  writeFileSync(join(directory, `${planned.tip}.json`), `${JSON.stringify({ schema: INTEGRATED_SCHEMA, branch: planned.branch, tip: planned.tip, base: planned.base, blobs }, null, 2)}\n`, "utf8");
++}
++
++/** True when one taken-over child branch delivered exactly the working-tree content of every path. Unreadable records never match. */
++export function integratedResultCovers({ root, commonDir, paths }) {
++  let names;
++  try { names = readdirSync(integratedDirectory(commonDir)); } catch { return false; }
++  return names.filter((name) => /^[a-f0-9]{40,64}\.json$/u.test(name)).some((name) => {
++    let blobs;
++    try {
++      const record = JSON.parse(readFileSync(join(integratedDirectory(commonDir), name), "utf8"));
++      if (record?.schema !== INTEGRATED_SCHEMA || record.blobs === null || typeof record.blobs !== "object") return false;
++      blobs = record.blobs;
++    } catch { return false; }
++    return paths.every((path) => {
++      if (!Object.hasOwn(blobs, path)) return false;
++      if (blobs[path] === null) return !existsSync(join(root, path));
++      const current = git(root, ["hash-object", "--", path]);
++      return current.ok && current.out.trim() === blobs[path];
++    });
++  });
++}
++
+ export function apply(options) {
+   if (!options.expect || !/^[a-f0-9]{64}$/u.test(options.expect)) {
+     return { schema: PLAN_SCHEMA, status: "refused", code: "AGYI-EXPECT-SHA256-REQUIRED", paths: [],
+@@ -132,6 +172,10 @@ export function apply(options) {
+     return { ...planned, status: "refused", code: "AGYI-PLAN-DIGEST-MISMATCH", paths: [],
+       refusals: [refuse("AGYI-PLAN-DIGEST-MISMATCH", "HEAD, the branch or the change moved since plan", `run plan again and use its new planSha256: ${["node", SELF, "plan", "--root", planned.root, "--branch", planned.branch, ...options.allowed.flatMap((p) => ["--allowed-path", p])].map(shellWord).join(" ")}`)] };
+   }
++  try { recordIntegration(planned); } catch (error) {
++    return { ...planned, status: "refused", code: "AGYI-RECORD-FAILED", paths: [],
++      refusals: [refuse("AGYI-RECORD-FAILED", `the take-over record could not be written (${error?.code ?? error?.name ?? "Error"})`, "nothing was written to the working tree; repair the git directory's permissions and plan again")] };
++  }
+   const patch = git(planned.root, ["diff", "--binary", "--full-index", "--no-renames", planned.base, planned.tip]);
+   const applied = patch.ok ? git(planned.root, ["apply", "-"], patch.out) : { ok: false, err: patch.err };
+   if (!applied.ok) {
+diff --git a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
+index 984c4c662c44678d513f15c13cfcb0d14b043084..e0a29bf3141b31f482a95cad7437e475c5d81dd8 100644
+--- a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.mjs
+@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ import { readNativeGoldfishStopFailure } from "../hooks/native-goldfish-host.mjs";
+ import { attestedInputPath, readAttestedBriefingBlock, runAttestedRequest } from "./dispatch-record-write.mjs";
++import { integratedResultCovers } from "./agy-native-integrate.mjs";
+ 
+ export const PLAN_SCHEMA = "pipeline.goldfish-host-commit-recover-plan.v1";
+ const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u;
+@@ -268,6 +269,12 @@ export function plan(options) {
+       if (paths.length === 0) refusals.push(refuse("GHCR-NO-CHANGES", "none of the briefed allowed paths has a change in the tree", "nothing to land; check whether the result was already committed"));
+     }
+   }
++  // On Antigravity a code-writing child commits on its own branch and agy-native-integrate carries the result here. Without that take-over the
++  // tree holds what the session wrote itself, and the record would attest a Goldfish that never ran (AGY greenfield 2026-11-08).
++  if (inputs && inputs.block.runner === "antigravity" && paths.length > 0 && !integratedResultCovers({ root, commonDir, paths })) {
++    refusals.push(refuse("GHCR-NO-NATIVE-RESULT", "these paths do not hold what a taken-over Antigravity child branch delivered, so no Goldfish result exists to land",
++      "run the dispatch and take its branch over with scripts/agy-native-integrate.mjs plan|apply, leaving the result unchanged. If the host refuses the dispatch, follow references/antigravity-native-dispatch.md; the slice is not written in this session"));
++  }
+   if (candidateCommit && candidateCommit !== headSha) refusals.push(refuse("GHCR-HEAD-MOVED", "HEAD differs from the pending binding's candidateCommit", `restore HEAD to ${candidateCommit} or land the result by the ordinary commit route`));
+   const staged = git(root, ["diff", "--cached", "--name-only"]);
+   if (!staged.ok || staged.out.trim() !== "") {
+diff --git a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
+index 4df9c5ca149896f1f1986654a90549710885d892..fdbe4a80ff91b1c2d3122f29d9a6aabac46226b7 100644
+--- a/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-host-commit-recover.test.mjs
+@@ -123,6 +123,34 @@ test("GHCR-CAUSE plan: the stop-failure pointer carries the recorded reason and
+   } finally { cleanup(bare.root); }
+ });
+ 
++test("GHCR-NO-NATIVE-RESULT: an Antigravity briefing lands only what a taken-over child branch delivered", () => {
++  const { root, head } = fixture({ pending: false, stop: false });
++  try {
++    const briefing = (runner) => `<!-- pipeline-native-goldfish-host-commit: fixture\n${JSON.stringify({
++      dispatchId: DISPATCH, runner, agentType: "goldfish-implementor", model: "fixture-model", effort: "medium", rulesetSha: "abc1234", candidateCommit: head,
++      allowedPaths: ["allowed/x.txt"], criticDecision: { schema: "pipeline.critic-required-decision.v1" } })}\n-->\n`;
++    mkdirSync(join(root, "scratch"), { recursive: true });
++    writeFileSync(join(root, "scratch", "handback.txt"), "the Goldfish returned this\n");
++    const planFor = (runner) => {
++      writeFileSync(join(root, "scratch", "briefing.md"), briefing(runner));
++      return run(root, "plan", "--briefing", "scratch/briefing.md", "--handback", "scratch/handback.txt").json;
++    };
++    assert.equal(planFor("claude").status, "ready", "the check is Antigravity only");
++    const refused = planFor("antigravity");
++    assert.equal(refused.code, "GHCR-NO-NATIVE-RESULT", JSON.stringify(refused));
++    assert.match(refused.refusals[0].next, /agy-native-integrate\.mjs plan\|apply/u);
++
++    const directory = join(root, ".git", "agent-pipeline", "run", "agy-native-integrated");
++    mkdirSync(directory, { recursive: true });
++    const tip = "a".repeat(40);
++    writeFileSync(join(directory, `${tip}.json`), `${JSON.stringify({ schema: "pipeline.agy-native-integrated.v1", branch: "subagent-x", tip, base: head,
++      blobs: { "allowed/x.txt": git(root, "hash-object", "--", "allowed/x.txt") } })}\n`);
++    assert.equal(planFor("antigravity").status, "ready", "the tree holds exactly what the branch delivered");
++    writeFileSync(join(root, "allowed", "x.txt"), "edited after the take-over\n");
++    assert.equal(planFor("antigravity").code, "GHCR-NO-NATIVE-RESULT", "an edit after the take-over is not the child's result");
++  } finally { cleanup(root); }
++});
++
+ test("plan without a stop-failure record is ready with stopFailure null and says the stop left no diagnostic", () => {
+   const { root } = fixture({ stop: false });
+   try {

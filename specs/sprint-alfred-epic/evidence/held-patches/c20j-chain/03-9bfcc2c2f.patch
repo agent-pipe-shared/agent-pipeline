@@ -1,0 +1,36 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+index dbf96acdc3402be893f31172ca65f9633462fe2e..7bfccede411257a1fe5f45515e3886272c24a5d3 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+@@ -4593,6 +4593,10 @@ check("recapture-design-input: a bound design input holding an address is regene
+   assert.equal(spawnSync("git", ["add", "--", relativePath], { cwd: root, encoding: "utf8", shell: false }).status, 0);
+   assert.equal(scanChangedContent(root, { scopes: ["staged"] }).ok, false, "the state this repairs: the commit check refuses the bound file");
+ 
++  const onboardingStatus = () => JSON.parse(spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url)), "inspect", "--root", root], {
++    cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root },
++  }).stdout).status;
++  const statusBefore = onboardingStatus();
+   const planned = recaptureCommand(root, "recapture-design-input");
+   assert.equal(planned.status, 0, planned.stderr);
+   assert.equal(planned.stdout.includes(address), false, "a plan never prints the content");
+@@ -4604,6 +4608,7 @@ check("recapture-design-input: a bound design input holding an address is regene
+   const applied = recaptureCommand(root, "recapture-design-input", "--plan-sha256", plan.planSha256);
+   assert.equal(applied.status, 0, applied.stderr);
+   assert.match(applied.stdout, /Next: commit .* on its own, then run submit-plan/u);
++  assert.equal(onboardingStatus(), statusBefore, "the onboarding reader treats the recorded recapture as the same project state");
+   assert.equal(readFileSync(path, "utf8"), seed.redacted);
+   assert.equal(spawnSync("git", ["add", "--", relativePath], { cwd: root, encoding: "utf8", shell: false }).status, 0);
+   assert.deepEqual(scanChangedContent(root, { scopes: ["staged"] }), { ok: true, findings: [] }, "the file can now be committed");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 161ef81b1239754768b2e4951c7a1e323f9c7710..9543e3018c01aa559c01d44fede4c4b58750354a 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -13525,7 +13525,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         const result = applyDesignInputRecapture({ rootDir: dir, expectedPlanSha256: rest[1] });
+         if (result.mutated) removeSealPlanFile(dir);
+         console.log(JSON.stringify(result, null, 2));
+-        console.log(`Next: commit ${result.designInputPath} on its own, then run submit-plan if the plan is not submitted, prepare-seal and present-plan. The PRD, the Spec and their reviews stay unchanged; their Source lines keep the earlier digest, and the private history records the step from it to the new one.`);
++        console.log(`Next: commit ${result.designInputPath} on its own, then run submit-plan if the plan is not submitted, prepare-seal with the same --review-receipt paths as before, and present-plan. The PRD, the Spec and their reviews stay unchanged; their Source lines keep the earlier digest, and the private history records the step from it to the new one.`);
+         return 0;
+       } catch (error) {
+         if (error instanceof OnboardingContinuityKickoffError) return refused(error.code, error.message);

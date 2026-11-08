@@ -1,0 +1,626 @@
+diff --git a/plugins/pipeline-core/lib/architecture-prospective-materialization.mjs b/plugins/pipeline-core/lib/architecture-prospective-materialization.mjs
+index 5a4e2443b4f110f607dad50c7b4d7f15c59b5cee..13a59d42f7553617138086bf4996b98f2165a969 100644
+--- a/plugins/pipeline-core/lib/architecture-prospective-materialization.mjs
++++ b/plugins/pipeline-core/lib/architecture-prospective-materialization.mjs
+@@ -12,7 +12,7 @@ const pathOK = value => typeof value === 'string' && value.length <= 240
+   && /^[A-Za-z0-9][A-Za-z0-9._/-]*$/u.test(value)
+   && value.split('/').every(part => part && !part.startsWith('.'));
+ const refOK = value => own(value, ['path', 'sha256']) && pathOK(value.path) && /^[a-f0-9]{64}$/u.test(value.sha256);
+-function need(value, code) { if (!value) throw new Error(`DDB-PROSPECTIVE-${code}`); }
++function need(value, code, path = null) { if (!value) throw Object.assign(new Error(`DDB-PROSPECTIVE-${code}`), path === null ? {} : { path }); }
+ export const prospectiveJson = json;
+ /** A draft that still carries a create-adr template line has not been written yet; signing it would freeze a placeholder. */
+ export const PLACEHOLDER_LINE = /^REPLACE:/mu;
+@@ -45,10 +45,10 @@ export function derivePredecessorSidecar({ supersedes, historic, proposed, prior
+  * The reader supplies its normal physical custody checks; this function never
+  * accepts a synthetic authority handle or reads an optional caller location. */
+ export function inspectProspectiveArchitectureManifest({ manifest, sources, read, existing }) {
+-  need(refOK(manifest) && sources.companions.some(ref => ref.path === manifest.path && ref.sha256 === manifest.sha256), 'COMPANION-REQUIRED');
++  need(refOK(manifest) && sources.companions.some(ref => ref.path === manifest.path && ref.sha256 === manifest.sha256), 'COMPANION-REQUIRED', typeof manifest?.path === 'string' ? manifest.path : null);
+   const files = [], paths = new Set(), targets = [], decisions = [];
+   const get = ref => {
+-    need(refOK(ref) && sources.companions.some(source => source.path === ref.path && source.sha256 === ref.sha256), 'INPUT-COMPANION-REQUIRED');
++    need(refOK(ref) && sources.companions.some(source => source.path === ref.path && source.sha256 === ref.sha256), 'INPUT-COMPANION-REQUIRED', typeof ref?.path === 'string' ? ref.path : null);
+     const file = read(ref.path); need(file.sha256 === ref.sha256, 'INPUT-DRIFT'); files.push(file); return file;
+   };
+   const manifestFile = get(manifest), value = parseStrictJson(manifestFile.bytes);
+diff --git a/plugins/pipeline-core/lib/design-decision-bindings.mjs b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+index bbf722a95cf5a6376fbff96e126c3d293650b584..022f68d1067184520a05046dddcf171725a8efed 100644
+--- a/plugins/pipeline-core/lib/design-decision-bindings.mjs
++++ b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+@@ -271,7 +271,16 @@ export function inspectDesignDecisionBindingsDraft({ rootDir, sources } = {}) {
+   try { const { files, binding, modelRequest, ...result } = subset(rootPath(rootDir), sources); return result; }
+   catch (error) { return refusal(error); }
+ }
+-function refusal(error) { return fail(error?.message?.startsWith('DDB-') ? error.message : 'DDB-SOURCE-UNAVAILABLE'); }
++function refusal(error) {
++  const result = fail(error?.message?.startsWith('DDB-') ? error.message : 'DDB-SOURCE-UNAVAILABLE');
++  return typeof error?.path === 'string' ? { ...result, path: error.path } : result;
++}
++/** The two facts the signed approval is later verified against and that can already be read before it exists: a registered trust anchor
++ * and every bound source in the candidate commit. The same owners as verifyBasis, so the entry gate cannot disagree with them. */
++export function inspectDesignApprovalPreconditions({ rootDir, sources, candidate } = {}) {
++  try { const root = rootPath(rootDir); trust(root); candidateProvenance(root, candidate, sources); return { ok: true }; }
++  catch (error) { return refusal(error); }
++}
+ function reopen(root, files) {
+   requireValue(files.every(file => { const after = physical(root, file.path, file.bytes.length, file.internal === true);
+     return after.identity === file.identity && after.bytes.equals(file.bytes); }), 'DDB-PHYSICAL-DRIFT');
+diff --git a/plugins/pipeline-core/lib/implementation-entry-gate.mjs b/plugins/pipeline-core/lib/implementation-entry-gate.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..616ebdd73845af5bb00f7d6439605b6acf80310c
+--- /dev/null
++++ b/plugins/pipeline-core/lib/implementation-entry-gate.mjs
+@@ -0,0 +1,103 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * One entry gate in front of the implementation phase.
++ *
++ * Every greenfield run on every runner lost its happy path the same way: the checks in front of the PO's signature were a subset of the
++ * checks behind it, each refusal named only the first fault, and the fault surfaced after the signature, so the design was reopened and
++ * signed again. This module is the collector: a caller hands it the real readers as named checks, it runs ALL of them, a reader that
++ * throws becomes a finding instead of hiding the rest, and the result lists every open point at once with its repair.
++ *
++ * It decides nothing itself and grants nothing: `ready` only means no check reported a finding. The readers stay where they are, so the
++ * same code answers before the signature and at `set-phase implementation`.
++ */
++
++export const IMPLEMENTATION_ENTRY_GATE_SCHEMA = "pipeline.implementation-entry-gate.v1";
++
++const STAGES = new Set(["before-signature", "before-implementation"]);
++
++/** One finding in its closed shape. `text` is a complete refusal sentence a reader already renders, kept verbatim. */
++function finding(check, item) {
++  return Object.freeze({
++    check,
++    code: typeof item.code === "string" && item.code !== "" ? item.code : "ENTRY-GATE-UNSPECIFIED",
++    path: typeof item.path === "string" && item.path !== "" ? item.path : null,
++    message: typeof item.message === "string" && item.message !== "" ? item.message : null,
++    repair: typeof item.repair === "string" && item.repair !== "" ? item.repair : null,
++    text: typeof item.text === "string" && item.text !== "" ? item.text : null,
++  });
++}
++
++/**
++ * Run every check. A check returns null/undefined (nothing open), one finding, or an array of findings.
++ * @param {{stage: string, checks: {id: string, run: Function}[]}} input
++ */
++export function runImplementationEntryGate({ stage, checks } = {}) {
++  if (!STAGES.has(stage) || !Array.isArray(checks)) throw new TypeError("runImplementationEntryGate needs a known stage and a list of checks");
++  const findings = [];
++  for (const { id, run } of checks) {
++    let produced;
++    try {
++      produced = run();
++    } catch {
++      findings.push(finding(id, { code: "ENTRY-GATE-CHECK-UNAVAILABLE", message: `the ${id} check could not run`, repair: "Run the same command again; if this stays, treat the check as failed and do not ask for a signature." }));
++      continue;
++    }
++    for (const item of Array.isArray(produced) ? produced : [produced]) {
++      if (item !== null && item !== undefined) findings.push(finding(id, item));
++    }
++  }
++  return Object.freeze({ schema: IMPLEMENTATION_ENTRY_GATE_SCHEMA, stage, status: findings.length === 0 ? "ready" : "blocked", findings: Object.freeze(findings) });
++}
++
++const COMMIT_THEN_REPEAT = "Commit it, then run this command again. A reviewed file that changed needs a new review receipt for the committed bytes.";
++const REPEAT_REVIEW = "Run the design review for the current committed bytes (a delta round passes --previous <receipt>), then pass the new receipt with --review-receipt. Never re-stamp an old report over changed files.";
++
++/** The repair for a known code. Agent work, repository-relative, and never a reopen-design for something a draft can still fix. */
++const REPAIRS = new Map([
++  ["DCC-REVIEW-RECEIPT-MISSING", "Pass one or two receipts: present-plan --by <name> --review-receipt <repo-relative-json-path>. A receipt comes from design-review-receipt.mjs create, never by hand."],
++  ["DCC-REVIEW-RECEIPT-BINDING", REPEAT_REVIEW],
++  ["DCC-REVIEW-DELTA-CHAIN", "Create the later receipt with --previous <the earlier receipt>, then pass both in order."],
++  ["DCC-REVIEW-ROUND-EXCEEDED", "At most two review rounds bind one approval: keep the initial receipt and the last delta receipt."],
++  ["DCC-PATH-UNSAFE", "The bound path must be a regular repository file; restore it or remove it from the receipt's companions."],
++  ["DCC-PATH-IGNORED", "A bound file must be committed, so it cannot live under a git-ignored directory: move it into the feature folder specs/<feature>/, update the reference, commit, and create the receipt again."],
++  ["DCC-PATH-UNTRACKED", `Stage this file. ${COMMIT_THEN_REPEAT}`],
++  ["DCC-PATH-MODIFIED", COMMIT_THEN_REPEAT],
++  ["DCC-PRD-DIGEST-DRIFT", "The PRD changed after submit-plan. Commit it and run submit-plan again."],
++  ["DCC-SPEC-DIGEST-DRIFT", "The Spec changed after submit-plan. Update the marker line in the PRD, commit both, and run submit-plan again."],
++  ["DCC-PRD-MARKER-MISSING", "Add one line <!-- technical-spec-sha256: <sha256 of spec.md> --> to the PRD, commit, and run submit-plan again."],
++  ["DCC-PRD-MARKER-DUPLICATE", "Keep exactly one <!-- technical-spec-sha256: ... --> line in the PRD, commit, and run submit-plan again."],
++  ["DCC-PRD-MARKER-STALE", "Set the <!-- technical-spec-sha256: ... --> line in the PRD to the expected digest, commit, and run submit-plan again."],
++  ["DCC-COMPANION-UNBOUND", "Create the review receipt again with --companion <this path>."],
++  ["DCC-REGISTER-INVALID", "Repair the requirement map or traceability file named here, commit it, and review the result."],
++  ["DCC-ID-DUPLICATE", "Give each requirement id one row, commit, and review the result."],
++  ["DCC-COUNT-MISMATCH", "Bring the requirement count and the rows into agreement, commit, and review the result."],
++  ["DDB-PROSPECTIVE-COMPANION-REQUIRED", "The prospective architecture manifest must be a companion of the review receipt: create the receipt again with --companion <this path>."],
++  ["DDB-PROSPECTIVE-INPUT-COMPANION-REQUIRED", "Every file the prospective architecture manifest reads must be a companion of the review receipt: create the receipt again with --companion <this path>."],
++  ["DDB-PROSPECTIVE-PLACEHOLDER-REMAINS", "An ADR draft still has REPLACE: lines: write its Markdown, run create-adr.mjs --root <root> --slug <slug> --refresh, run bind-adr-proposals.mjs again, then commit and redo the design review."],
++  ["DDB-TRUST-UNAVAILABLE", "No signing key is registered for this repository, so a signature could not be verified after it is given. The PO registers one once with po-human-approval.mjs setup."],
++  ["DDB-CANDIDATE-SOURCE-MODE", "A bound file is not in the current commit. Commit it, then run this command again."],
++  ["DDB-CANDIDATE-SOURCE-DRIFT", "A bound file differs from the current commit. Commit it, then run this command again."],
++  ["DDB-WHOLE-DESIGN-SIGNATURE-REQUIRED", "This package carries decision bindings, and those are approved only by signature: set gates.human_approval to signature, or remove the bindings block."],
++]);
++
++export function entryGateRepair(code) {
++  if (typeof code !== "string") return null;
++  return REPAIRS.get(code) ?? null;
++}
++
++function renderFinding(verb, item) {
++  if (item.text !== null) return item.text;
++  const where = item.path === null ? "" : ` ${item.path}`;
++  const said = item.message === null ? "" : `: ${item.message.replace(/\.$/u, "")}`;
++  const repair = item.repair === null ? "" : ` Repair: ${item.repair}`;
++  return `${verb} refused (${item.code})${where}${said}.${repair}`;
++}
++
++/** The refusal an agent reads: every open point, numbered, in one output. A single point reads as one ordinary refusal. */
++export function renderImplementationEntryGate({ verb, result, recorded = "Nothing was recorded and no signature was requested." }) {
++  const count = result.findings.length;
++  if (count === 1) return `Error: ${renderFinding(verb, result.findings[0])} ${recorded}`;
++  const lines = [`Error: ${verb} refused: ${count} open points. ${recorded} All of them are listed here, so fix them together and run the command once more:`];
++  result.findings.forEach((item, index) => lines.push(`${index + 1}. ${renderFinding(verb, item)}`));
++  return lines.join("\n");
++}
+diff --git a/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs b/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs
+index f1498d66c184b9853982bc30deab7b83bc56d686..6918e699755c59ce03a21b49e1a05da174d423a8 100644
+--- a/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs
++++ b/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs
+@@ -220,7 +220,9 @@ async function routeFixture(t, { ignored = null } = {}) {
+     const out = [], err = [];
+     console.log = (...values) => out.push(values.map(String).join(" "));
+     console.error = console.warn = (...values) => err.push(values.map(String).join(" "));
+-    try { return { status: run(argv, { dir: primary, now: () => GATE_NOW, ...deps }), stdout: out.join("\n"), stderr: err.join("\n") }; }
++    // The entry gate reads the PO gate and the architecture entry again at present-plan, through the same fixture route as submit-plan.
++    try { return { status: run(argv, { dir: primary, now: () => GATE_NOW, poGateAuthority: () => authority, poGateProfile: () => profile,
++      architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }), ...deps }), stdout: out.join("\n"), stderr: err.join("\n") }; }
+     finally { Object.assign(console, saved); }
+   };
+   const submitted = drive(["submit-plan", "--by", "coordinator", "--profile", "feature"],
+@@ -260,6 +262,69 @@ test("[AC-113 present-plan ignored bound path] control: with every bound path tr
+   assert.match(presented.stdout, /Exact PO request: scratch\/design-approval-request-/u);
+ });
+ 
++// PO 2026-11-08: the signature is requested only when nothing behind it can still refuse, and every open point is reported at once.
++test("[entry gate] three independent faults are reported together, with paths and repairs, and no request is written", async (t) => {
++  const fx = await routeFixture(t);
++  put(fx.primary, ROUTE_DESIGN, "# Design changed after the review\n");
++  put(fx.primary, ROUTE_TRACE, "| ID | Evidence |\n| --- | --- |\n| changed | changed |\n");
++  const presented = fx.drive(["present-plan", "--by", "coordinator", "--review-receipt", ROUTE_RECEIPT],
++    { poGateAuthority: () => ({ ok: false, code: "PO-GATE-PRD-SPEC-MISMATCH", reason: "marker differs", repair: "update the marker line" }) });
++  assert.notEqual(presented.status, 0);
++  assert.match(presented.stderr, /present-plan refused: \d+ open points/u, presented.stderr);
++  assert.match(presented.stderr, new RegExp(`present-plan refused \\(DCC-PATH-MODIFIED\\) ${ROUTE_DESIGN}.*Repair: Commit it`, "u"), presented.stderr);
++  assert.match(presented.stderr, new RegExp(`present-plan refused \\(DCC-PATH-MODIFIED\\) ${ROUTE_TRACE}`, "u"), presented.stderr);
++  assert.match(presented.stderr, /present-plan refused \(PO-GATE-PRD-SPEC-MISMATCH\).*marker differs.*Repair: update the marker line/u, presented.stderr);
++  assert.doesNotMatch(presented.stderr, /use present-plan --review-receipt/u, "the receipts were passed; this hint was wrong");
++  assert.deepEqual(fx.requests(), [], "no PO request may exist for a refused presentation");
++  assert.equal(fx.readState().planPresentation, undefined);
++});
++
++test("[entry gate] the PO gate is asked about the signed outcome only in signature mode", async (t) => {
++  for (const [mode, assumed] of [["signature", true], ["chat", false]]) {
++    const fx = await routeFixture(t);
++    const seen = [];
++    const presented = fx.drive(["present-plan", "--by", "coordinator", "--review-receipt", ROUTE_RECEIPT], {
++      readHumanApprovalMode: () => ({ mode, scope: "global" }),
++      poGateAuthority: (request) => { seen.push(request); return { ok: false, code: "PO-GATE-FIXTURE", reason: "fixture" }; },
++    });
++    assert.notEqual(presented.status, 0);
++    assert.equal(seen.length, 1, "the gate asks the PO gate reader exactly once");
++    assert.equal(seen[0].assumeSignedDesignApproval, assumed, `${mode} mode`);
++    assert.match(seen[0].expectedPlanSha256, /^[a-f0-9]{64}$/u);
++  }
++});
++
++test("[entry gate] submit-plan refuses an uncommitted design package and names the paths", async (t) => {
++  const fx = await routeFixture(t);
++  const before = fx.readState().planSubmission;
++  put(fx.primary, "specs/feature/notes.md", "# not committed\n");
++  const submitted = fx.drive(["submit-plan", "--by", "coordinator", "--profile", "feature"]);
++  assert.notEqual(submitted.status, 0);
++  assert.match(submitted.stderr, /PLAN-SUBMIT-UNCOMMITTED.*specs\/feature\/notes\.md/u, submitted.stderr);
++  assert.deepEqual(fx.readState().planSubmission, before, "nothing was recorded");
++});
++
++test("[entry gate] the collector runs every check, turns a throwing reader into a finding, and renders all of them", async () => {
++  const { runImplementationEntryGate, renderImplementationEntryGate } = await import("../implementation-entry-gate.mjs");
++  const ran = [];
++  const result = runImplementationEntryGate({ stage: "before-signature", checks: [
++    { id: "a", run: () => { ran.push("a"); return { code: "A-1", path: "x.md", message: "first.", repair: "fix x" }; } },
++    { id: "b", run: () => { ran.push("b"); throw new Error("reader broke"); } },
++    { id: "c", run: () => { ran.push("c"); return null; } },
++    { id: "d", run: () => { ran.push("d"); return [{ code: "D-1" }, { code: "D-2", text: "verbatim sentence" }]; } },
++  ] });
++  assert.deepEqual(ran, ["a", "b", "c", "d"]);
++  assert.equal(result.status, "blocked");
++  assert.deepEqual(result.findings.map((item) => item.code), ["A-1", "ENTRY-GATE-CHECK-UNAVAILABLE", "D-1", "D-2"]);
++  const text = renderImplementationEntryGate({ verb: "present-plan", result });
++  assert.match(text, /4 open points/u);
++  assert.match(text, /1\. present-plan refused \(A-1\) x\.md: first\. Repair: fix x/u);
++  assert.match(text, /4\. verbatim sentence/u);
++  const clean = runImplementationEntryGate({ stage: "before-implementation", checks: [{ id: "a", run: () => null }] });
++  assert.equal(clean.status, "ready");
++  assert.throws(() => runImplementationEntryGate({ stage: "later", checks: [] }), TypeError);
++});
++
+ // ALF-C-AC113-P3 / AC-113 point 1 -- the tracked-home decision against REAL git. The design-course
+ // inspection derives the producer's --output-prefix; this case runs it on a throwaway repository that
+ // carries the repository's own .gitignore and asks git itself whether a package under that prefix is
+diff --git a/plugins/pipeline-core/lib/po-gate-authority-read.mjs b/plugins/pipeline-core/lib/po-gate-authority-read.mjs
+index 2a757a5b28b80c5aaba7e8601a6ec41f864c38be..d96039db78b7a0a96bff595cab1962a2dc39aabe 100644
+--- a/plugins/pipeline-core/lib/po-gate-authority-read.mjs
++++ b/plugins/pipeline-core/lib/po-gate-authority-read.mjs
+@@ -574,6 +574,7 @@ export function validatePoGateAuthorityForRepository({
+   repoRoot,
+   expectedPlanSha256 = undefined,
+   expectedSpecSha256 = undefined,
++  assumeSignedDesignApproval = false,
+ }, deps = {}) {
+   let topology;
+   try {
+@@ -581,7 +582,7 @@ export function validatePoGateAuthorityForRepository({
+   } catch {
+     return fail("PO-GATE-AUTHORITY-UNAVAILABLE", "Repository topology or authority inputs are unavailable.", PROFILE_REPAIR);
+   }
+-  return validatePoGateAuthority({ ...topology, expectedPlanSha256, expectedSpecSha256, deviceRebind: deps.deviceRebind !== false });
++  return validatePoGateAuthority({ ...topology, expectedPlanSha256, expectedSpecSha256, assumeSignedDesignApproval, deviceRebind: deps.deviceRebind !== false });
+ }
+ 
+ /** The current plan approval of the authoritative State, or null. Read-only. */
+@@ -763,9 +764,16 @@ function activeFeatureState(repoRoot) {
+   const authorityPrdPath = authorityPrd !== null && authorityPrd.startsWith("specs/") && PRD_NAME.test(basename(authorityPrd))
+     ? authorityPrd
+     : null;
+-  return { status: "active", id: active.id, planPath, authorityPrdPath, documentLanguage, signedDesignApproval: signedDesignApprovalOf(state) };
++  return { status: "active", id: active.id, planPath, authorityPrdPath, documentLanguage, signedDesignApproval: signedDesignApprovalOf(state),
++    draftPackage: readAuthoritySeal(state?.continuity?.authority).status === "draft" };
+ }
+ 
++// A draft package binds its PRD and Spec only at the approval, so the marker is still the author's line to update. The general text below
++// names three lifecycle branches and sent agents through about 30 source reads (Codex greenfield 2026-11-08); here the state is known.
++const draftSpecRepair = (planPath, specSha256) => `This package is still a draft, so the marker is yours to update: set the line in ${planPath} to`
++  + ` <!-- technical-spec-sha256: ${specSha256} -->, commit the PRD and spec.md together, then run the command again.`
++  + " No reopen-design and no PO step is needed. Every edit of spec.md needs this one-line update.";
++
+ // The digests the PO signed in a final design approval, or null. A stored approval that is current, unrevoked and made by signature IS the
+ // PO's content acknowledgement of exactly these bytes: the signature ceremony shows the PRD and Spec and binds both digests, and no step
+ // adds a marker line afterwards (it would change the signed bytes). Chat approval stays out: it is an attribution, not a proof.
+@@ -869,7 +877,8 @@ function prdAuthority(repoRoot, active, expectedLanguage, requireAcknowledgement
+     return fail("PO-GATE-PRD-SPEC-MARKER-MISSING", "The active PRD must carry the technical Spec marker exactly once.", SPEC_MARKER_MISSING_REPAIR);
+   }
+   if (specMarkers[0] !== specSha256) {
+-    return fail("PO-GATE-PRD-SPEC-MISMATCH", "The active PRD technical Spec marker must exactly match the neighboring spec.md bytes.", SPEC_REPAIR);
++    return fail("PO-GATE-PRD-SPEC-MISMATCH", `The active PRD technical Spec marker must exactly match the neighboring spec.md bytes (marker ${specMarkers[0]}, spec.md ${specSha256}).`,
++      active.draftPackage ? draftSpecRepair(boundPlanPath, specSha256) : SPEC_REPAIR);
+   }
+   // Additive third precondition, checked only once the mechanical path/
+   // cardinality check and the byte-exact Spec-digest binding above both
+@@ -915,6 +924,7 @@ export function validatePoGateAuthority({
+   expectedPlanSha256 = undefined,
+   expectedSpecSha256 = undefined,
+   deviceRebind = true,
++  assumeSignedDesignApproval = false,
+ }) {
+   const profile = validatePoGateProfileSnapshot({ repoRoot, gitCommonDir, primaryRoot, registeredWorktreeRoots });
+   if (!profile.ok) return profile;
+@@ -945,7 +955,9 @@ export function validatePoGateAuthority({
+   // Passed (not undefined) => ACTIVE approval/rebind validation => the PO
+   // acknowledgement marker must fire. Not passed => passive diagnostic read
+   // (e.g. check-po-gate-authority.mjs) => it must not.
+-  const requireAcknowledgement = expectedPlanSha256 !== undefined || expectedSpecSha256 !== undefined;
++  // The entry gate asks, before the signature is requested, whether the signed approval of exactly these bytes would pass. It only
++  // answers that question: the marker is waived for real only by a stored signed approval (signedDesignApprovalOf).
++  const requireAcknowledgement = (expectedPlanSha256 !== undefined || expectedSpecSha256 !== undefined) && !assumeSignedDesignApproval;
+   const prd = prdAuthority(current, active, expectedDocumentLanguage, requireAcknowledgement);
+   if (!prd.ok) return prd;
+   if (expectedPlanSha256 !== undefined && (!SHA256.test(expectedPlanSha256) || expectedPlanSha256 !== prd.planSha256)) {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 9543e3018c01aa559c01d44fede4c4b58750354a..bd4ae973a819ccc68ff687ace6edbbe36dd768a7 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -393,7 +393,8 @@ import { spawnSync } from "node:child_process";
+ import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
+ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
+-import { inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
++import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
++import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
+ import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+ import { awaitSignatureFields, commandText as proofCommandText, proofWaitCommand } from "../lib/signed-proof-wait.mjs";
+ import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
+@@ -10122,11 +10123,103 @@ function readDesignApprovalInputs(dir, submission, paths) {
+       traceability: trace ? { path: tracePath, bytes: trace.bytes } : null,
+       register: registerFromRequirementTraceability(traceabilityResult, requirementMapPath(submission.specPath)),
+       pathStates, reviewReceipts: summaries.map(entry => entry.summary) });
+-    if (!checked.ok) return { ok: false, code: checked.inconsistencies[0].code, inconsistencies: checked.inconsistencies };
++    if (!checked.ok) {
++      // The entry gate still runs the checks that need the source set, so one dirty file does not hide a second fault.
++      const digestOf = new Map(pathStates.map(entry => [entry.path, entry.sha256]));
++      const draftSources = [submission.planPath, submission.specPath, ...companions].every(path => typeof digestOf.get(path) === "string")
++        ? { prd: { path: submission.planPath, sha256: digestOf.get(submission.planPath) }, spec: { path: submission.specPath, sha256: digestOf.get(submission.specPath) },
++          companions: [...new Set(companions)].sort().map(path => ({ path, sha256: digestOf.get(path) })) } : null;
++      return { ok: false, code: checked.inconsistencies[0].code, inconsistencies: checked.inconsistencies, draftSources };
++    }
+     return { ok: true, receipts, currentSources: checked.sources };
+   } catch { return { ok: false, code: "DCC-INPUT" }; }
+ }
+ 
++/**
++ * The implementation entry gate, in front of the PO's signature. Each check is the reader the same condition meets after the signature;
++ * every one runs, so the PO is asked to sign only when nothing behind the signature can still refuse, and the agent reads all open points at once.
++ */
++function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { handoffRefusal }) {
++  const approvalMode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn });
++  const signature = approvalMode?.mode === "signature";
++  const poGate = deps.poGateAuthority ?? ((request) => checkPoGateAuthority(request, deps));
++  let inputs = null, sealGate = null, designDraft = null, decisionDraft = null;
++  const sources = () => (inputs?.ok ? inputs.currentSources : inputs?.draftSources ?? null);
++  const dcc = (entry) => ({ code: entry.code, path: entry.path, message: entry.expected !== undefined ? `expected ${entry.expected}, found ${entry.observed}` : null, repair: entryGateRepair(entry.code) });
++  const result = runImplementationEntryGate({ stage: "before-signature", checks: [
++    { id: "profile", run: () => {
++      const selection = inspectSelectedPlanProfile(dir, state);
++      return selection.ok ? null : { code: selection.code, message: "the persisted profile sources must agree" };
++    } },
++    // D64: every criterion row the Spec states must be one the dispatch parser locates; an unreadable Spec is typed by the package check below.
++    { id: "spec-criteria", run: () => {
++      const specFile = physicalRebindFile(dir, submitted.specPath);
++      let specText = null;
++      try { specText = specFile ? new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(specFile.bytes) : null; } catch { specText = null; }
++      const criteria = specText === null ? { ok: true } : inspectSpecCriterionRows(specText);
++      return criteria.ok ? null : { code: criteria.code, path: submitted.specPath, message: criteria.message };
++    } },
++    { id: "delivery-handoff", run: () => (handoffRefusal ? { code: "PLAN-HANDOFF-NOT-READY", text: handoffRefusal } : null) },
++    { id: "design-package", run: () => {
++      inputs = readDesignApprovalInputs(dir, submitted, reviewPaths);
++      if (inputs.ok) return null;
++      if (Array.isArray(inputs.inconsistencies)) return inputs.inconsistencies.map(dcc);
++      return { code: inputs.code, message: inputs.message ?? null, repair: entryGateRepair(inputs.code) };
++    } },
++    { id: "decision-bindings", run: () => {
++      if (sources() === null) return null;
++      decisionDraft = inspectDesignDecisionBindingsDraft({ rootDir: dir, sources: sources() });
++      if (decisionDraft.ok) return null;
++      return { code: decisionDraft.code, path: decisionDraft.path ?? null, repair: entryGateRepair(decisionDraft.code) ?? "repair the signed design decision subjects." };
++    } },
++    { id: "signature-verifiability", run: () => {
++      if (!decisionDraft?.ok || decisionDraft.required !== true) return null;
++      if (!signature) return { code: "DDB-WHOLE-DESIGN-SIGNATURE-REQUIRED", repair: entryGateRepair("DDB-WHOLE-DESIGN-SIGNATURE-REQUIRED") };
++      const precondition = inspectDesignApprovalPreconditions({ rootDir: dir, sources: sources(), candidate: designWorkflowGitCandidate(dir, deps) });
++      return precondition.ok ? null : { code: precondition.code, repair: entryGateRepair(precondition.code) };
++    } },
++    // A draft package is presented only with a current, prepared seal plan: its digest becomes part of the binding the PO signs.
++    { id: "seal-plan", run: () => {
++      sealGate = checkPreparedSealPlan(dir, state);
++      if (!sealGate.draft || !sealGate.refusal) return null;
++      const exits = sealGate.refusal.exits?.length > 0 ? ` Exits: ${sealGate.refusal.exits.join(", ")}.` : "";
++      return { code: sealGate.refusal.code, message: sealGate.refusal.reason, repair: `${sealGate.refusal.repair}.${exits}` };
++    } },
++    // The same reader the materialization and set-phase call after the approval. Only the marker a signature replaces is assumed, and only in signature mode.
++    { id: "po-gate", run: () => {
++      const gate = poGate({ repoRoot: dir, expectedPlanSha256: submitted.planSha256, expectedSpecSha256: submitted.specSha256, assumeSignedDesignApproval: signature });
++      return gate?.ok ? null : { code: gate?.code ?? "PO-GATE-AUTHORITY-INVALID", path: submitted.planPath, message: gate?.reason ?? null, repair: gate?.repair ?? null };
++    } },
++    { id: "architecture-design", run: () => {
++      designDraft = (deps.architectureDesignDraft ?? inspectArchitectureDesignDraft)({ rootDir: dir, planPath: submitted.planPath, expectedPlanSha256: submitted.planSha256 });
++      if (designDraft.ok) return null;
++      const field = typeof designDraft.field === "string" ? `field ${designDraft.field}: ${designDraft.expected}${typeof designDraft.rejectedValue === "string" ? `; rejected value ${designDraft.rejectedValue}` : ""}` : null;
++      return { code: designDraft.code, path: designDraft.prdPath ?? submitted.planPath, message: field, repair: "Correct the architecture design block in the PRD, commit it, and run submit-plan again." };
++    } },
++    { id: "adr-sidecars", run: () => {
++      const decisions = (deps.architectureDecisionAuthoringSources ?? inspectArchitectureDecisionAuthoringSources)({ rootDir: dir, area: "project", now: new Date((deps.now ?? (() => new Date().toISOString()))()).toISOString() });
++      if (decisions.status !== "blocked") return null;
++      const named = (decisions.findings ?? []).map((item) => ({ code: item.code ?? decisions.code, path: item.path ?? null, repair: "Fix this ADR sidecar (node <plugin-root>/scripts/architecture-baseline.mjs --validate docs/adr/<name>.json validates one)." }));
++      return named.length > 0 ? named : { code: decisions.code };
++    } },
++    { id: "architecture-entry", run: () => {
++      if (designDraft?.ok && designDraft.required === true) return null;
++      const entry = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({ rootDir: dir, taskScope: submitted.planPath, now: new Date((deps.now ?? (() => new Date().toISOString()))()),
++        deps: { inspectArchitectureDesign: (root, scope) => inspectArchitectureDesign(root, scope, { gitCandidate: deps.gitCandidate, trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath, verifyReadinessExecution: deps.verifyDesignReadinessHostExecution }) } });
++      return entry.status !== "ready" && SUBMIT_PLAN_BROWNFIELD_ARCHITECTURE_CODES.has(entry.code)
++        ? { code: entry.code, message: entry.message, repair: typeof entry.nextAction?.guidance === "string" ? entry.nextAction.guidance : `Next action: ${JSON.stringify(entry.nextAction)}` } : null;
++    } },
++  ] });
++  return { result, inputs, sealGate };
++}
++
++/** Files of the feature folder that git would still have to record. Unreadable git status reports nothing: the package check names it later. */
++function uncommittedDesignPackagePaths(dir, planPath) {
++  const status = spawnSync("git", ["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--", dirname(planPath).replaceAll("\\", "/")], { cwd: dir, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
++  if (status.status !== 0 || status.error) return [];
++  return status.stdout.split("\0").filter(Boolean).map((entry) => entry.slice(3)).sort();
++}
++
+ 
+ function acceptedContractBlob(bytes, length = 40) {
+   const raw = Buffer.from(bytes);
+@@ -11763,13 +11856,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         console.error('Error: set-phase requires --phase <design|implementation>.');
+         return 2;
+       }
+-      if (phase === "implementation") {
+-        const selection = inspectSelectedPlanProfile(dir, base);
+-        if (!selection.ok) {
+-          console.error(`Error: set-phase implementation refused (${selection.code}); persisted profile authority must agree before implementation.`);
+-          return 2;
+-        }
+-      }
++      const entrySelection = phase === "implementation" ? inspectSelectedPlanProfile(dir, base) : { ok: true };
++      const entrySelectionRefusal = entrySelection.ok ? null : `set-phase implementation refused (${entrySelection.code}); persisted profile authority must agree before implementation.`;
+       const lifecycle = derivePlanLifecycle(base);
+       if (!lifecycle.ok || lifecycle.status === null) {
+         console.error(`Error: set-phase rejected invalid lifecycle state (${lifecycle.code}).`);
+@@ -11784,60 +11872,75 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         return 0;
+       }
+       if (lifecycle.status === "implementing" && flags["verify-command"] !== undefined) {
++        if (entrySelectionRefusal !== null) { console.error(`Error: ${entrySelectionRefusal}`); return 2; }
+         // A stopped phase writer may have committed State already. Re-enter the
+         // current configured-command Source route; no old journal supplies State.
+         return runStateSource(["configure-verify","--verify-command",flags["verify-command"]],
+           {...deps,sourceBoundary:stateAuthorityInvocation?.boundary});
+       }
+-      const architecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({
+-        rootDir: dir,
+-        taskScope: base.activeFeature?.planPath ?? null,
+-        now: new Date(now()),
+-        deps: { inspectArchitectureDesign: (root, scope) => inspectArchitectureDesign(root, scope, {
+-          gitCandidate: deps.gitCandidate,
+-          trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
+-          verifyReadinessExecution: deps.verifyDesignReadinessHostExecution,
+-        }) },
+-      });
+-      if (architecture.status !== "ready") {
+-        console.error(`Error: set-phase implementation refused (${architecture.code}); ${architecture.message}`);
+-        console.log(JSON.stringify({ schema: architecture.schema, code: architecture.code, nextAction: architecture.nextAction }));
+-        return 2;
+-      }
+       // NVA-CF-VERIFYDEADLOCK: a requested command uses the guarded calibration
+       // transition under the State writer's validated, lock-held companion step.
+       // Without a command, an already configured or baseline-only contract can
+       // enter implementation; release readiness still checks the latter.
+       const requestedVerifyCommand = flags["verify-command"];
++      if (requestedVerifyCommand !== undefined && classifyVerifyCommand(requestedVerifyCommand) !== "configured") {
++        console.error('Error: --verify-command must be a real, non-blank verification command -- not the plugin\'s UNCONFIGURED_VERIFY placeholder text.');
++        return 2;
++      }
+       let calibrationNeeded = false;
+-      if (requestedVerifyCommand !== undefined) {
+-        if (classifyVerifyCommand(requestedVerifyCommand) !== "configured") {
+-          console.error('Error: --verify-command must be a real, non-blank verification command -- not the plugin\'s UNCONFIGURED_VERIFY placeholder text.');
+-          return 2;
+-        }
+-        // Early read-only diagnosis. The writer rechecks all of this under its
+-        // lock before either companion or State mutation.
+-        const committed = inspectReplayableCalibrationVerifyLayout({rootDir:dir,verifyCommand:requestedVerifyCommand,phaseEntry:true});
+-        if (!["baseline-only","partial-current","configured-current","committed-configured"].includes(committed.status)) {
++      let architecture = null;
++      // The entry gate (PO 2026-11-08): every condition of the implementation phase, all open points in one output, nothing written before it is clear.
++      const implementationEntry = runImplementationEntryGate({ stage: "before-implementation", checks: [
++        { id: "profile", run: () => (entrySelectionRefusal === null ? null : { code: entrySelection.code, text: entrySelectionRefusal }) },
++        { id: "architecture-entry", run: () => {
++          architecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({
++            rootDir: dir,
++            taskScope: base.activeFeature?.planPath ?? null,
++            now: new Date(now()),
++            deps: { inspectArchitectureDesign: (root, scope) => inspectArchitectureDesign(root, scope, {
++              gitCandidate: deps.gitCandidate,
++              trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
++              verifyReadinessExecution: deps.verifyDesignReadinessHostExecution,
++            }) },
++          });
++          return architecture.status === "ready" ? null : { code: architecture.code, text: `set-phase implementation refused (${architecture.code}); ${architecture.message}` };
++        } },
++        { id: "calibration", run: () => {
++          if (requestedVerifyCommand === undefined) {
++            const verifyStatus = readCalibrationVerifyStatus(dir);
++            return new Set(["configured", "baseline-only"]).has(verifyStatus.status) ? null : { code: "VERIFY-COMMAND-UNCONFIGURED",
++              text: `set-phase implementation refused -- project/pipeline.json's verify command is still ${verifyStatus.status === "missing" ? "missing" : "the seeded UNCONFIGURED_VERIFY placeholder"}. Supply the project's real verification command with set-phase --phase implementation --verify-command "<command>" (for example its test suite) before entering implementation.` };
++          }
++          // Early read-only diagnosis. The writer rechecks all of this under its
++          // lock before either companion or State mutation.
++          const committed = inspectReplayableCalibrationVerifyLayout({rootDir:dir,verifyCommand:requestedVerifyCommand,phaseEntry:true});
++          if (["baseline-only","partial-current","configured-current","committed-configured"].includes(committed.status)) {
++            calibrationNeeded = committed.status !== "committed-configured";
++            return null;
++          }
+           // G20-51 (live Claude greenfield 2026-11-07): the preflight reads the accepted delivery contract, so an unregistered
+           // envelope surfaces here as CAC-*. The generic calibration text sent the agent to commit calibration files that were
+           // already committed, twice; name the registration step instead (agent work, no PO step).
+           if (["CAC-REGISTRATION-INVALID","CAC-ENVELOPE-UNAVAILABLE"].includes(committed.code)) {
+             const register = `node ${fileURLToPath(new URL("./register-feature-package.mjs", import.meta.url))} --root ${dir}`;
+-            console.error(`Error: set-phase implementation refused (${committed.code}): the approved plan's accepted delivery contract is not registered in the feature manifest (specs/<feature>/lifecycle.json). State and calibration unchanged.`);
+-            console.error(`Repair (agent, no PO step): run \`${register}\`, commit exactly the commitPaths it prints (alone, in one commit), then rerun this set-phase command unchanged.`);
+-            return 2;
++            return { code: committed.code, text: `set-phase implementation refused (${committed.code}): the approved plan's accepted delivery contract is not registered in the feature manifest (specs/<feature>/lifecycle.json). State and calibration unchanged.\nRepair (agent, no PO step): run \`${register}\`, commit exactly the commitPaths it prints (alone, in one commit), then rerun this set-phase command unchanged.` };
+           }
+-          console.error(`Error: set-phase implementation refused calibration commit preflight (${committed.code ?? committed.status}); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.`);
+-          return 2;
+-        }
+-        calibrationNeeded = committed.status !== "committed-configured";
+-      } else {
+-        const verifyStatus = readCalibrationVerifyStatus(dir);
+-        if (!new Set(["configured", "baseline-only"]).has(verifyStatus.status)) {
+-          console.error(`Error: set-phase implementation refused -- project/pipeline.json's verify command is still ${verifyStatus.status === "missing" ? "missing" : "the seeded UNCONFIGURED_VERIFY placeholder"}. Supply the project's real verification command with set-phase --phase implementation --verify-command "<command>" (for example its test suite) before entering implementation.`);
+-          return 2;
+-        }
++          return { code: committed.code ?? committed.status, text: `set-phase implementation refused calibration commit preflight (${committed.code ?? committed.status}); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.` };
++        } },
++        { id: "model-policy-binding", run: () => {
++          const modelPolicy = inspectApprovedDesignDecisionBindings({ rootDir: dir, area: "model-policy" });
++          return modelPolicy.ok ? null : { code: modelPolicy.code, path: modelPolicy.path ?? null, repair: entryGateRepair(modelPolicy.code) };
++        } },
++        { id: "materialized-architecture-committed", run: () => {
++          if (!existsSync(join(dir, "architecture", "design-materialization.json"))) return null;
++          const open = architectureCommitStep(dir);
++          return open.uncommittedPaths.length === 0 ? null : { code: "ARCHITECTURE-MATERIALIZATION-UNCOMMITTED", message: `uncommitted: ${open.uncommittedPaths.slice(0, 20).join(", ")}`, repair: open.commitStep };
++        } },
++      ] });
++      if (implementationEntry.status !== "ready") {
++        console.error(renderImplementationEntryGate({ verb: "set-phase implementation", result: implementationEntry, recorded: "State and calibration are unchanged." }));
++        if (architecture !== null && architecture.status !== "ready") console.log(JSON.stringify({ schema: architecture.schema, code: architecture.code, nextAction: architecture.nextAction }));
++        return 2;
+       }
+       let preparedCalibration = null;
+       const written = writeState(dir, undefined, base, {
+@@ -12017,7 +12120,10 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       const authority = poGateAuthority({ repoRoot: dir });
+       const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
+       if (!authority?.ok || authority.value?.planPath !== base.activeFeature?.planPath || !profile?.ok) {
+-        console.error(`Error: submit-plan blocked by ${authority?.code ?? profile?.code ?? "PO-GATE-AUTHORITY-INVALID"}.`);
++        // A code alone cost a Codex run about 30 source reads: the reader already states the fault and its one repair.
++        const blocked = authority?.ok === false ? authority : profile?.ok === false ? profile : null;
++        const blockedDetail = `${blocked?.reason ? ` ${blocked.reason}` : ""}${blocked?.repair ? ` Repair: ${blocked.repair}` : ""}`;
++        console.error(`Error: submit-plan blocked by ${authority?.code ?? profile?.code ?? "PO-GATE-AUTHORITY-INVALID"}.${blockedDetail}`);
+         return 2;
+       }
+       // NVA-STAGINGBOLT-1: a plan or spec path still resolving inside the
+@@ -12105,6 +12211,14 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         console.error(`Error: submit-plan refused (${submitSources.code}); ${submitSources.message ?? "restore and validate the authored source before submission."} Zero State mutation.`);
+         return 2;
+       }
++      // After the submission the PRD and Spec are immutable and the commit guard refuses them, so an uncommitted package could only leave through reopen-design.
++      if (["epic", "feature"].includes(profileName)) {
++        const uncommittedPackage = uncommittedDesignPackagePaths(dir, authority.value.planPath);
++        if (uncommittedPackage.length > 0) {
++          console.error(`Error: submit-plan refused (PLAN-SUBMIT-UNCOMMITTED): commit the design package first, because the submitted PRD and Spec can no longer be committed afterwards. Uncommitted: ${uncommittedPackage.slice(0, 20).join(", ")}${uncommittedPackage.length > 20 ? ` and ${uncommittedPackage.length - 20} more` : ""}. Then run this command again. Zero State mutation.`);
++          return 2;
++        }
++      }
+       // C18-2: a null/placeholder verify command is otherwise found late (VEP-NO-COMMAND at the first Verify); warn while it is cheap, never refuse.
+       const submitVerifyStatus = readCalibrationVerifyStatus(dir);
+       if (submitVerifyStatus.status !== "configured") {
+@@ -12338,24 +12452,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       const requiresWorkflowPackage = ["epic", "feature"].includes(submitted?.profile);
+       let approvalRequestPath = null, approvalReview = null;
+       if (requiresWorkflowPackage) {
+-        // D64: every criterion row the Spec states must be one the dispatch parser locates, refused HERE before the PO signs (a Spec with none, or an unready hand-off, is the AC-264 check below); fail-open on an unreadable Spec (typed below).
+-        const specFile = physicalRebindFile(dir, submitted.specPath);
+-        let specText = null;
+-        try { specText = specFile ? new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(specFile.bytes) : null; } catch { specText = null; }
+-        const criteria = specText === null ? { ok: true } : inspectSpecCriterionRows(specText);
+-        if (!criteria.ok) { console.error(`Error: present-plan refused (${criteria.code}); ${criteria.message}`); return 2; }
+-        const presentHandoff = planHandoffRefusal("present-plan", inspectPlanDeliveryHandoff({ rootDir: dir, specPath: submitted.specPath, expectedSpecSha256: submitted.specSha256 })); if (presentHandoff) { console.error(presentHandoff); return 2; }
+-        const inputs = readDesignApprovalInputs(dir, submitted, reviewPaths);
+-        if (!inputs.ok) { console.error(`Error: present-plan refused (${inputs.code}); use present-plan --review-receipt.`); return 2; }
+-        const decisionDraft = inspectDesignDecisionBindingsDraft({rootDir:dir,sources:inputs.currentSources});
+-        if (!decisionDraft.ok) {
+-          // C20 G20-23 (b): the one refusal with a concrete repair of its own (an ADR draft the agent has not written yet).
+-          const placeholder = decisionDraft.code === "DDB-PROSPECTIVE-PLACEHOLDER-REMAINS" ? " An ADR draft still has REPLACE: lines: write its Markdown, run create-adr.mjs --root <root> --slug <slug> --refresh, run bind-adr-proposals.mjs again, then commit and redo the design review." : "";
+-          console.error(`Error: present-plan refused (${decisionDraft.code}); repair the signed design decision subjects.${placeholder}`); return 2;
+-        }
+-        // A draft package is presented only with a current, prepared seal plan: its digest becomes part of the binding the PO signs.
+-        const sealGate = checkPreparedSealPlan(dir, base);
+-        if (sealGate.draft && sealGate.refusal) { printSealRefusal("present-plan", sealGate.refusal); return 2; }
++        // The entry gate: every condition the signature will later meet, all at once, before a request exists (PO 2026-11-08: no reopen-design in the happy path).
++        const presentHandoff = planHandoffRefusal("present-plan", inspectPlanDeliveryHandoff({ rootDir: dir, specPath: submitted.specPath, expectedSpecSha256: submitted.specSha256 }));
++        const entry = beforeSignatureEntryGate(dir, base, submitted, reviewPaths, deps, { handoffRefusal: presentHandoff });
++        if (entry.result.status !== "ready") { console.error(renderImplementationEntryGate({ verb: "present-plan", result: entry.result })); return 2; }
++        const { inputs, sealGate } = entry;
+         const binding = createDesignApprovalBinding({ featureId: submitted.featureId, receipts: inputs.receipts, currentSources: inputs.currentSources,
+           ...(sealGate.draft ? { sealPlanSha256: sealGate.plan.planSha256 } : {}) });
+         if (!binding.ok) { console.error(binding.code); return 2; }
+@@ -12875,7 +12976,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       const aggregateArchitecture=inspectApprovedDesignDecisionBindings({rootDir:dir,area:'architecture'});
+       const aggregateModel=inspectApprovedDesignDecisionBindings({rootDir:dir,area:'model-policy'});
+       if(!aggregateArchitecture.ok || !aggregateModel.ok) {
+-        console.error(`Plan approval was committed, but aggregate design binding recheck is incomplete (${aggregateArchitecture.code ?? aggregateModel.code ?? 'DDB-RECHECK'}); no aggregate authority is inferred.`);
++        const recheckCode = aggregateArchitecture.code ?? aggregateModel.code ?? 'DDB-RECHECK';
++        console.error(`Plan approval was committed, but aggregate design binding recheck is incomplete (${recheckCode}); no aggregate authority is inferred.`);
++        console.error(`This is NOT a successful approval yet: materialize-architecture and set-phase implementation will refuse until it is repaired. Repair: ${entryGateRepair(recheckCode) ?? `run check-po-gate-authority.mjs --root <root> for the cause of ${recheckCode}`}. Do not continue to set-phase before that.`);
+       } else if(aggregateModel.required) {
+         const modelDecision=readApprovedDesignDecisionBindingsHandle(aggregateModel.handle);
+         if(!modelDecision.ok) console.error(`Plan approval was committed, but model-policy recheck failed (${modelDecision.code}); model authority is unavailable.`);

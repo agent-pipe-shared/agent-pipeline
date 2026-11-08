@@ -1,0 +1,175 @@
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index a5ade8bd6de01af8bbe427aefe56fce78f9d4c2f..17fb7bdfcb63f6664799d7ffd45750be47af711d 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -35,7 +35,7 @@ import { readState, run } from "../../scripts/pipeline-state.mjs";
+ import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
+ import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../critical-action-approval-request.mjs";
+-import { awaitSignatureFields } from "../signed-proof-wait.mjs";
++import { awaitSignatureFields, commandText } from "../signed-proof-wait.mjs";
+ import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
+ import { createGovernanceScopeController } from "../governance-scope.mjs";
+ import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
+@@ -852,11 +852,14 @@ test("G20-76: --subject is a closed flag; a malformed or repeated value is PROOF
+ test("G20-76: awaitSignatureFields adds --subject after --timeout only when it is given, and says the wait ends only for that subject", () => {
+   const subject = g2076Subject("refs/heads/new");
+   const plain = awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json" });
+-  assert.deepEqual(plain.waitAction.argv.slice(1), ["--root", "/p", "--proof", "scratch/critical-push-proof-0123456789ab.json", "--timeout", "120"], "no subject: the argv is unchanged");
++  assert.deepEqual(plain.waitAction.argv.slice(1), ["--root", "/p", "--proof", "scratch/critical-push-proof-0123456789ab.json", "--timeout", "570"], "no subject: the argv is unchanged");
+   assert.doesNotMatch(plain.afterSigning, /subject/iu);
++  assert.match(plain.afterSigning, /PROOF-WAIT-TIMEOUT only means[\s\S]*never that it happens automatically/u);
++  assert.equal(commandText({ executable: "C:\\Program Files\\nodejs\\node.exe", argv: ["x.mjs"] }, "win32").startsWith("& \""), true, "PowerShell needs the call operator before a quoted executable");
++  assert.equal(commandText({ executable: "node", argv: ["x.mjs"] }, "win32"), "node x.mjs");
+   const bound = awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json", subjectSha256: subject });
+   assert.deepEqual(bound.waitAction.argv.slice(1, 5), ["--root", "/p", "--proof", "scratch/critical-push-proof-0123456789ab.json"], "the first four argv entries keep their place");
+-  assert.deepEqual(bound.waitAction.argv.slice(5), ["--timeout", "120", "--subject", subject]);
++  assert.deepEqual(bound.waitAction.argv.slice(5), ["--timeout", "570", "--subject", subject]);
+   assert.match(bound.afterSigning, /only for the expected subject/u);
+   assert.throws(() => awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json", subjectSha256: "nope" }), /subject/iu);
+ });
+diff --git a/plugins/pipeline-core/lib/signed-proof-wait.mjs b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+index 6c292fd5d6d8ddf6d7c86de9da8a67e48bf8888d..ec93f68ba17d1a25f9aea4deb216e4f26f98ded3 100644
+--- a/plugins/pipeline-core/lib/signed-proof-wait.mjs
++++ b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+@@ -20,7 +20,8 @@ import { fileURLToPath } from "node:url";
+ import { CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA } from "./critical-action-approval-request.mjs";
+ 
+ export const PROOF_WAIT_SCHEMA = "pipeline.signed-proof-wait.v1";
+-export const PROOF_WAIT_DEFAULT_SECONDS = 120;
++// Greenfields 2026-11-08: 120 s ended every wait before a human had signed (8 and 39 minutes measured). Below the 600 s cap of a foreground shell call.
++export const PROOF_WAIT_DEFAULT_SECONDS = 570;
+ export const PROOF_WAIT_MAX_SECONDS = 600;
+ export const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
+ export const PROOF_WAIT_SCRIPT = fileURLToPath(new URL("../scripts/proof-wait.mjs", import.meta.url));
+@@ -81,7 +82,11 @@ export function observeProofFile(root, reference, subjectSha256 = null) {
+ }
+ 
+ const quote = (part) => (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(part) ? part : JSON.stringify(part));
+-export const commandText = ({ executable, argv }) => [executable, ...argv].map(quote).join(" ");
++/** PowerShell runs a quoted executable only behind its call operator (Claude greenfield 2026-11-08: the repair text could not be pasted). */
++export const commandText = ({ executable, argv }, platform = process.platform) => {
++  const rendered = [executable, ...argv].map(quote).join(" ");
++  return platform === "win32" && rendered.startsWith('"') ? `& ${rendered}` : rendered;
++};
+ const text = commandText;
+ 
+ /** The exact bounded wait for a proof reference; `--subject` (G20-76) follows `--timeout` and appears only when a subject is given. */
+@@ -117,7 +122,7 @@ export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEF
+       kind: "command", ...wait, mutation: false, requiresConfirmation: false,
+       expected: { schema: PROOF_WAIT_SCHEMA, statuses: ["proof-present"] },
+     },
+-    afterSigning: `Do not ask the PO to report back. After handing over the one signing command, run waitAction (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback.`
++    afterSigning: `Do not ask the PO to report back. After handing over the one signing command, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again. Tell the PO which command to run, never that it happens automatically.`
+       + (subjectSha256 === null ? "" : ` The wait ends only for the expected subject ${subjectSha256}: an older signature's file at that path does not end it.`),
+   };
+ }
+diff --git a/plugins/pipeline-core/scripts/check-protected-delta.mjs b/plugins/pipeline-core/scripts/check-protected-delta.mjs
+index 1ff5883ec4ab97fcbb74d13a4334e2cd6768a2cc..b97291183770c4624e89bc1b67ab0b841ac864f7 100644
+--- a/plugins/pipeline-core/scripts/check-protected-delta.mjs
++++ b/plugins/pipeline-core/scripts/check-protected-delta.mjs
+@@ -3,6 +3,7 @@
+ /** Candidate-time protected-surface delta detector (Sprint Alfred A3 / #101). */
+ import { execFileSync } from "node:child_process";
+ import { resolve } from "node:path";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { protectedBaselineReadback, protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
+ 
+ function git(rootDir, args) {
+@@ -57,7 +58,7 @@ function parse(argv) {
+ function printHelp() {
+   console.log("Usage: check-protected-delta.mjs [--root <dir>] [--base <git-ref>] [--candidate <git-ref>] [--format text|json]");
+ }
+-if (import.meta.url === `file://${process.argv[1]}`) {
++if (isDirectInvocation(import.meta.url)) {
+   try {
+     const options = parse(process.argv.slice(2));
+     if (!options) { printHelp(); process.exit(0); }
+diff --git a/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs b/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs
+index d82f9c780e0940ffecde75a8509d928ffebf74ad..82054de69b6d3a535f97128fa56f1caa5b8611a5 100644
+--- a/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs
++++ b/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs
+@@ -102,7 +102,11 @@ export function selectModelRoleForTask({ rootDir, runner, taskRoute,
+       : parts.length === 2 && parts[0] === "duty"
+         ? registry.duties?.[parts[1]]?.[runner] : null
+     : null;
+-  if (!cell || cell.state === "unavailable") return fail("MODEL-ROLE-SELECT-ROUTE-UNAVAILABLE");
++  // Codex greenfield 2026-11-08: the refusal named no valid route, so the agent guessed. The admitted task routes of this runner come with it.
++  if (!cell || cell.state === "unavailable") {
++    const availableTaskRoutes = Object.entries(registry.duties ?? {}).filter(([, cells]) => cells?.[runner] && cells[runner].state !== "unavailable").map(([duty]) => `duty.${duty}`).sort();
++    return { ...fail("MODEL-ROLE-SELECT-ROUTE-UNAVAILABLE"), availableTaskRoutes };
++  }
+   // V3 is the authorized non-blocking fallback. Return its exact selector and
+   // effort with every optional-selection failure so dispatch construction can
+   // use the fallback directly instead of silently inheriting or guessing.
+diff --git a/plugins/pipeline-core/scripts/model-role-dispatch-select.test.mjs b/plugins/pipeline-core/scripts/model-role-dispatch-select.test.mjs
+index fa291e0c713a8220fbc4f47d9b07215fe0f4dff3..915c5726018e4c7bc7fe3d81d002965de2fee0a3 100644
+--- a/plugins/pipeline-core/scripts/model-role-dispatch-select.test.mjs
++++ b/plugins/pipeline-core/scripts/model-role-dispatch-select.test.mjs
+@@ -178,6 +178,7 @@ test("a defective optional role source keeps an independently valid V3 route usa
+   assert.equal(absentProjection.status, "legacy-v3");
+   assert.equal(selectModelRoleForTask({ ...base, routeSource: broken,
+     taskRoute: "duty.unknown" }).code, "MODEL-ROLE-SELECT-ROUTE-UNAVAILABLE");
++  assert.ok(selectModelRoleForTask({ ...base, routeSource: broken, taskRoute: "duty.unknown" }).availableTaskRoutes.includes("duty.implement"), "the refusal lists the routes that exist");
+   assert.equal(selectModelRoleForTask({ ...base, routeSource: broken,
+     readRegistry: () => ({ ...loadRunnerProfilesV3Registry(), duties: {} }) }).code,
+   "MODEL-ROLE-SELECT-SOURCE");
+diff --git a/plugins/pipeline-core/scripts/onboarding-consent-mark.mjs b/plugins/pipeline-core/scripts/onboarding-consent-mark.mjs
+index bf6ef8e6785f4665afb33d962e5951ec31e01391..ab9e8865687f606d51d15ff02a23156774f12782 100644
+--- a/plugins/pipeline-core/scripts/onboarding-consent-mark.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-consent-mark.mjs
+@@ -12,6 +12,7 @@ import {
+ } from "node:fs";
+ import { dirname, join, resolve } from "node:path";
+ import { randomBytes } from "node:crypto";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ 
+ import {
+   ONBOARDING_CONSENT_COVERED_STEPS,
+@@ -83,7 +84,7 @@ function parseArgs(argv) {
+   return values;
+ }
+ 
+-if (import.meta.url === `file://${process.argv[1]}`) {
++if (isDirectInvocation(import.meta.url)) {
+   try {
+     const args = parseArgs(process.argv.slice(2));
+     const result = recordOnboardingConsent(args.root, args["session-id"], args.answer, undefined, args.quote);
+diff --git a/plugins/pipeline-core/scripts/push-batch-executor.mjs b/plugins/pipeline-core/scripts/push-batch-executor.mjs
+index d7091a0a6b3214032853d595636ca67ba247cc86..0ab371f3e8a726f0f40b1ea9728c26d3fb4b7cc6 100644
+--- a/plugins/pipeline-core/scripts/push-batch-executor.mjs
++++ b/plugins/pipeline-core/scripts/push-batch-executor.mjs
+@@ -6,6 +6,7 @@ import { appendFileSync, mkdirSync, readFileSync, realpathSync, renameSync, writ
+ import { execFileSync } from "node:child_process";
+ import { isAbsolute, join, relative, resolve, sep } from "node:path";
+ 
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
+ import { validateGovernanceExportOutbox } from "../lib/governance-export-outbox.mjs";
+ import { executePushBatch } from "../lib/push-batch-execution.mjs";
+@@ -56,4 +57,4 @@ export async function run(argv = process.argv.slice(2)) {
+   });
+   return result;
+ }
+-if (import.meta.url === `file://${process.argv[1]}`) { run().then((result) => process.stdout.write(`${JSON.stringify(result)}\n`)).catch((error) => { process.stderr.write(`PUSH-BATCH-EXECUTOR-FAILED: ${error.code ?? "PBE"}: ${error.message}\n`); process.exitCode = 2; }); }
++if (isDirectInvocation(import.meta.url)) { run().then((result) => process.stdout.write(`${JSON.stringify(result)}\n`)).catch((error) => { process.stderr.write(`PUSH-BATCH-EXECUTOR-FAILED: ${error.code ?? "PBE"}: ${error.message}\n`); process.exitCode = 2; }); }
+diff --git a/plugins/pipeline-core/scripts/selected-sandbox-launch.mjs b/plugins/pipeline-core/scripts/selected-sandbox-launch.mjs
+index cac4bb35a197884fb30f94aaa42361eb768470c7..1e6aa34bd308ea50e82ba0a4bcdd8c4bdc44bf0b 100644
+--- a/plugins/pipeline-core/scripts/selected-sandbox-launch.mjs
++++ b/plugins/pipeline-core/scripts/selected-sandbox-launch.mjs
+@@ -27,6 +27,7 @@ import { createHash, randomBytes } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+ import { readFileSync, realpathSync, writeFileSync } from "node:fs";
+ import { fileURLToPath } from "node:url";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ 
+ import {
+   canonicalJson,
+@@ -250,6 +251,6 @@ async function main() {
+   process.exitCode = result.outcome === "available-attested" || result.outcome === "transient-unavailable" || result.outcome === "terminal-unavailable" ? 0 : 1;
+ }
+ 
+-if (import.meta.url === `file://${process.argv[1]}`) {
++if (isDirectInvocation(import.meta.url)) {
+   await main();
+ }

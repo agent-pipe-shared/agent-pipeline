@@ -1,0 +1,159 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 7414fa22eaae98c29b2a3f552bff4ccdee027c60..9dd72d806be5c849864379f455d2db1da68f9c30 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -261,7 +261,8 @@ export function generatedBriefingAdmission(prompt, generatorCommand = "node <plu
+   const repair = `repair: write the package (${BRIEFING_PACKAGE_SCHEMA}), run \`${generatorCommand} build --package <package.json> --out scratch/briefing-<dispatch-id>.md\`, and dispatch that file's text unchanged`;
+   if (prompt.includes("<!-- pipeline-briefing-generator:")) {
+     const verified = verifyGeneratedBriefing(prompt);
+-    if (!verified.ok) return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; ${repair}` };
++    // Antigravity greenfield 2026-11-08: a missing final newline cost a 13 KB retype; the digest covers it.
++    if (!verified.ok) return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it (a dropped final newline counts: the text must end with the file's own newline); ${repair}` };
+     // G20-48: the D78 rule is runner-neutral, so an Antigravity binding is parsed too.
+     const parsed = parseNativeGoldfishBriefing(prompt, { runners: DISPATCH_ADMISSION_BRIEFING_RUNNERS });
+     if (requireGenerated && (!parsed.ok || parsed.binding.itemDelivery === undefined)) {
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+index e59bd48c9529c6bdf8fa2d6671714f7e9b1094b9..3c51d13b78ddeae6bf2df6236a3b0b6ece9a3fc4 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+@@ -78,7 +78,7 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
+       return { ok: false, skipped: null, findings: [{
+         code: model === undefined || model === null || model === "" || model === "inherit"
+           ? "DISPATCH-MODEL-MISSING" : "DISPATCH-MODEL-UNROUTED",
+-        message: `Antigravity Subagents[].Model must be explicitly set to "flash_lite", "flash", or "pro" for each entry; "inherit" and omitted values inherit the session model. Re-issue the same invoke_subagent call with each entry's Model set explicitly.`,
++        message: `Antigravity Subagents[].Model must be explicitly set to "flash_lite", "flash", or "pro" for each entry; "inherit" and omitted values inherit the session model. ${expected.length > 0 ? `The configured route for ${type} selects ${expected.map((value) => `"${value}"`).join(" or ")}. ` : ""}Re-issue the same invoke_subagent call with each entry's Model set explicitly.`,
+       }] };
+     }
+     if (expected.length === 0) {
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+index a55629f5a9210024b2c8c0c97e387d2bfc007a59..329626f492b8c1c20a3c6d2e201ea0b2d2c66b6b 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+@@ -150,6 +150,7 @@ test("DME13 G20-43 the Goldfish roles pass Model flash and the Critic passes no
+     assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: "flash", routeSource: source }).ok, true, subagentType);
+     assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: "pro", routeSource: source }).findings[0].code, "DISPATCH-MODEL-DUTY-MISMATCH", subagentType);
+     assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: undefined, routeSource: source }).findings[0].code, "DISPATCH-MODEL-MISSING", subagentType);
++    assert.match(evaluateDispatchModel({ runner: "antigravity", subagentType, model: undefined, routeSource: source }).findings[0].message, /configured route for pipeline-core:goldfish-[a-z]+ selects "flash"/u, subagentType);
+   }
+   for (const subagentType of ["critic", "pipeline-core:critic"]) {
+     for (const model of [undefined, "", "inherit"]) {
+diff --git a/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs b/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
+index e43fc4a31448a7d223c07fe8811fa5219cacafa6..44700d5bbf91d9cd58e92651136979fb392b9f77 100644
+--- a/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
++++ b/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
+@@ -327,6 +327,25 @@ test("R-AC-05/R-AC-06: the journaled offer omits the four mandatory classes and
+   }
+ });
+ 
++test("a dispatch the agent can correct itself gets a typed correction, never the external-operator route", () => {
++  const root = fixture();
++  try {
++    const reason = (code) => `BLOCKED (guard-dispatch, plugin pipeline-core): ${code}: the dispatch was refused.`;
++    const plan = (denials) => recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Read", toolInput: { file_path: CANARY }, denials, nowMs: NOW, appendCommandOffer: verifiedAppend([]) });
++    const model = plan([{ guard: "guard-dispatch.mjs", reason: reason("DISPATCH-NO-MODEL") }]);
++    assert.deepEqual([model.status, model.code, model.nextAction.kind], ["narrower-recovery-required", "HGO-DISPATCH-CORRECTION-REQUIRED", "typed-recovery"]);
++    assert.match(model.nextAction.action.requiredChange, /correct the dispatch/u);
++    const digest = plan([{ guard: "guard-dispatch.mjs", reason: reason("DBG-GENERATED-DIGEST-MISMATCH") }]);
++    assert.equal(digest.code, "HGO-DISPATCH-CORRECTION-REQUIRED");
++    assert.match(digest.nextAction.action.requiredChange, /rebuild the briefing[\s\S]*final newline/u);
++    // A set that is not purely dispatch refusals keeps its existing route.
++    const mixed = plan([{ guard: "guard-dispatch.mjs", reason: reason("DISPATCH-NO-MODEL") }, { guard: "guard-other.mjs", reason: "BLOCKED: refused." }]);
++    assert.deepEqual([mixed.status, mixed.code], ["external-operator-required", "HGO-EXTERNAL-ADAPTER-BOUNDARY"]);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
+ test("the three non-external route statuses keep their exact current shape and journal nothing", () => {
+   const root = fixture();
+   try {
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index a2be2fbea128049ee7986c817b39767ca2a60090..7ffe23af2822bbc419d789a3a7924b2a185574a8 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -1776,6 +1776,18 @@ function pushRecoveryTarget(command, depth = 0) {
+   return { kind: "branch", remote, destination };
+ }
+ 
++// Antigravity greenfield 2026-11-08: a dispatch the agent could correct itself was sent to an "external operator". Only a set made up
++// entirely of dispatch refusals qualifies; anything else keeps its existing route. The text is closed and carries nothing from the denial.
++function dispatchCorrectionRequired(denials) {
++  if (!Array.isArray(denials) || denials.length === 0) return null;
++  const codes = denials.map((denial) => (String(denial?.guard) === "guard-dispatch.mjs"
++    ? String(denial?.reason ?? "").match(/\b(?:DISPATCH|DBG-GENERATED)-[A-Z0-9-]+\b/u)?.[0] ?? null : null));
++  if (codes.includes(null)) return null;
++  return codes.some((code) => code.startsWith("DBG-GENERATED-"))
++    ? "rebuild the briefing with dispatch-briefing.mjs build at the current commit and pass the file's text unchanged, including its final newline"
++    : "correct the dispatch as the refusal above states and issue it again";
++}
++
+ function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
+   const { root = null, pluginRoot = null, repository = null } = context;
+   const command = String(toolInput?.command ?? "");
+@@ -1933,6 +1945,17 @@ function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
+       },
+     };
+   }
++  const dispatchCorrection = dispatchCorrectionRequired(context.denials);
++  if (dispatchCorrection !== null) {
++    return {
++      status: "narrower-recovery-required",
++      code: "HGO-DISPATCH-CORRECTION-REQUIRED",
++      nextAction: {
++        kind: "typed-recovery",
++        action: { toolName, toolInputSha256: sha(toolInput), requiredChange: dispatchCorrection, repositoryRoot: root },
++      },
++    };
++  }
+   return {
+     status: "external-operator-required",
+     code: "HGO-EXTERNAL-ADAPTER-BOUNDARY",
+@@ -3874,6 +3897,7 @@ export function recordHumanGuardDenial({
+       root: repo.root,
+       pluginRoot,
+       repository,
++      denials,
+     });
+     // Only a route that really hands a human a command needs a journaled offer first (R-AC-08: the offer exists BEFORE a command is
+     // handed over). A route that carries no command (a read the adapter cannot attest, sensitive input, a file outside the project)
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 0efe3c07852d99e808884e33e1c650f36c04881b..cfde7605377d2782aca58088df8eb0b7bd1402af 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -249,6 +249,15 @@ function defaultAntigravityRoute(taskRoute) {
+   try { return antigravityNativeTierForTaskRoute(taskRoute); } catch { return null; }
+ }
+ 
++/** The concrete model id the registry names for an Antigravity duty, or null. The briefing states it because the alias alone names no model (MP-05). */
++function defaultAntigravityRouteModel(taskRoute) {
++  try {
++    const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "antigravity");
++    const value = scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute)?.selector?.value : null;
++    return typeof value === "string" ? value : null;
++  } catch { return null; }
++}
++
+ /** The Claude task route of a duty (read-only registry projection), or null when the registry yields none. */
+ function defaultClaudeRoute(taskRoute) {
+   try {
+@@ -1123,7 +1132,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     runner === "codex"
+       ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Codex route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`).`
+       : runner === "antigravity"
+-        ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Antigravity native model alias, route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`).`
++        ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Antigravity native model alias, route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`, route model \`${(deps.antigravityRouteModel ?? defaultAntigravityRouteModel)(DUTY_ROUTE_OF_AGENT[agentType]) ?? "not registered"}\`).`
+         : `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; agent definition alias \`${resolved.model}\`${claudeRouteDuty === null ? "" : `; Claude route \`${claudeRouteDuty}\``}).`,
+     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
+     // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 2575ecbcf1ab0abc2dd1f490d2a3acbc3b8212c4..a3e45a66fe07bec47f7b71ee5791ad3a50258b9a 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -2328,6 +2328,7 @@ test("A18-M1C build --runner antigravity renders a verified briefing that names
+   const built = runDispatchBriefing(argv, depsOf(fx));
+   assert.equal(built.ok, true, JSON.stringify(built).slice(0, 500));
+   assert.match(built.text, /"runner":"antigravity"/u);
++  assert.match(built.text, /route model `gemini-[0-9a-z.-]+`/u, "the alias alone names no model, so the admission rule MP-05 needs the registered id");
+   assert.deepEqual(verifyGeneratedBriefing(built.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
+   const optIn = parseNativeGoldfishBriefing(built.text, { runners: ["claude", "codex", "antigravity"] });
+   assert.equal(optIn.ok, true, optIn.code);

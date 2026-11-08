@@ -1,0 +1,131 @@
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.mjs b/plugins/pipeline-core/hooks/guard-devplan.mjs
+index b1bcb34d12e62185a5b12262424bbdd73568a9ae..3a8e9ef45eae0459b6054d2f75784407b9224ec1 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.mjs
+@@ -569,7 +569,7 @@ const lifecycleReason = ledgerAuthorityUnresolved
+   : lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"
+   ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
+   : lifecycle.status === "awaiting-approval"
+-    ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
++    ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`reopen-design --by <name>\`.`
+     : lifecycle.status === "approved"
+       ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
+       : "The feature is still in draft design and has no implementation authority.");
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.test.mjs b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+index c05a0fb9a1e2ea1c0ca83ea3227e0a59234aa559..2ea2a946c22e1b27ade12b1f1ab93eb7279f9a54 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+@@ -618,7 +618,7 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
+   writeState(dir, AWAITING_AUTHORITY_STATE);
+   check("DP26 block  awaiting-approval exact PRD authority", "Edit", AUTHORITY_PLAN_PATH, BLOCK, {
+     projectDir: dir,
+-    stderrIncludes: ["awaiting-approval", "immutable"],
++    stderrIncludes: ["awaiting-approval", "immutable", "cancel-submitted-plan --by <name> --submission-sha256 ", "Only an already signed design goes through"],
+   });
+   check("DP26b block  awaiting-approval exact Spec authority", "Edit", AUTHORITY_SPEC_PATH, BLOCK, {
+     projectDir: dir,
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+index ed3843a48efa604b46e84a7cfaa6bc69d9a97d0d..0f918fc04e81f70d22dc8bd39e99ed99e282612d 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+@@ -571,7 +571,7 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate =
+   const lifecycleReason = lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"
+     ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
+     : lifecycle.status === "awaiting-approval"
+-      ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
++      ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`reopen-design --by <name>\`.`
+       : lifecycle.status === "approved"
+         ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
+         : "The feature is still in draft design and has no implementation authority.");
+@@ -593,6 +593,16 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate =
+ 
+ const STAGED_PATH_MAX_BYTES = 16 * 1024;
+ 
++// The Codex runtime projection onboarding generates. Committing it is what leaves the tree clean, so the
++// commit boundary admits exactly these paths in a draft lifecycle. Deliberately not part of the onboarding
++// scaffold set: that set also opens the Edit/Write and shell lanes, and these files have one writer.
++const GENERATED_CODEX_PROJECTION_PATHS = new Set([
++  ".codex/config.toml",
++  ".codex/agents/implementor.toml",
++  ".codex/agents/critic.toml",
++  ".codex/agents/consult-advisor.toml",
++]);
++
+ function isHookSettingsPath(path) {
+   return typeof path === "string" && /^\.claude\/settings[^/]*\.json$/iu.test(path);
+ }
+@@ -769,6 +779,8 @@ export function evaluateStagedDevPlanPaths({
+       }
+     }
+ 
++    if (GENERATED_CODEX_PROJECTION_PATHS.has(path)) continue;
++
+     let result;
+     try { result = devPlanGateVerdictFn({ filePath: path, projectDir }); }
+     catch { return unavailable("PIPELINE-STAGED-POLICY-FAILED", "the lifecycle policy could not evaluate a staged path"); }
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
+index 4d1b8d7f2adfc523d39b4a5468ec22a2e9e2ab22..d4f2a733d74f32a8f3490aad7a595ce644c7b52d 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
+@@ -50,6 +50,19 @@ test("staged lifecycle policy blocks indirect implementation and package outputs
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++test("the generated Codex projection is committable in a draft lifecycle, and no other path under .codex is", () => {
++  const root = lifecycleFixture();
++  try {
++    const generated = [".codex/config.toml", ".codex/agents/implementor.toml", ".codex/agents/critic.toml", ".codex/agents/consult-advisor.toml"];
++    assert.deepEqual(evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: generated }), { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings: [] });
++    for (const path of [".codex/agents/other.toml", ".codex/hooks.mjs", "sub/.codex/config.toml"]) {
++      const result = evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: [path] });
++      assert.equal(result.code, "PIPELINE-STAGED-LIFECYCLE-BLOCKED", path);
++    }
++    assert.equal(devPlanGateVerdict({ filePath: ".codex/config.toml", projectDir: root }).verdict, "block", "the write lane stays closed");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("staged lifecycle policy adds no independent approval gate after the existing policy allows a source commit", () => {
+   const root = lifecycleFixture();
+   try {
+diff --git a/plugins/pipeline-core/scripts/commit-msg-hook-install.mjs b/plugins/pipeline-core/scripts/commit-msg-hook-install.mjs
+index 29de9298e2b4dd909f8a50f7a766d45bb2db4d8b..f0d1f28c8582a5376dd67af2ae8b434cb3a5039a 100644
+--- a/plugins/pipeline-core/scripts/commit-msg-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/commit-msg-hook-install.mjs
+@@ -149,8 +149,8 @@ import { pathToFileURL } from "node:url";
+ 
+ const PLUGIN_LIB_DIR = ${lib};
+ 
+-function block(lines) {
+-  console.error("BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.");
++function block(lines, headline = "commit message violates GIT-03.") {
++  console.error("BLOCKED (agent-pipeline commit-msg): " + headline);
+   for (const line of lines) console.error(\`  - \${line}\`);
+   console.error("Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.");
+   process.exitCode = 1;
+@@ -303,7 +303,12 @@ async function main() {
+     const findings = Array.isArray(stagedLifecycle?.findings) && stagedLifecycle.findings.length
+       ? stagedLifecycle.findings.map((finding) => String(finding?.code ?? stagedLifecycle?.code ?? "PIPELINE-STAGED-LIFECYCLE-UNAVAILABLE") + (finding?.path ? " (" + finding.path + ")" : ""))
+       : [stagedLifecycle?.code ?? "PIPELINE-STAGED-LIFECYCLE-UNAVAILABLE"];
+-    block(["staged lifecycle policy denied or could not verify this commit: " + findings.join(", ") + "."]);
++    const firstReason = stagedLifecycle?.findings?.find((finding) => typeof finding?.reason === "string")?.reason;
++    block(
++      ["staged lifecycle policy denied or could not verify this commit: " + findings.join(", ") + ".",
++        ...(firstReason ? [firstReason.slice(0, 400)] : [])],
++      "a staged path is not committable in the current lifecycle. The commit message is not the problem.",
++    );
+     return;
+   }
+   // D223: a correction commit on top of a finished Critic round whose lineage is not registered makes that lineage unregisterable.
+diff --git a/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs b/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs
+index f4be96e0d63bdd55082d70c6d0ac748e60e2dcd4..2a5151760fc8a42d195dde3aeed987d818c99ed1 100644
+--- a/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs
++++ b/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs
+@@ -261,6 +261,8 @@ test("commit hook blocks unapproved staged implementation paths but still permit
+   const denied = commitWithStagedMessage("feat: blocked implementation\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+   assert.notEqual(denied.status, 0);
+   assert.match(denied.stderr, /GUARD-DEVPLAN-LIFECYCLE/);
++  assert.match(denied.stderr, /not committable in the current lifecycle\. The commit message is not the problem/);
++  assert.doesNotMatch(denied.stderr, /violates GIT-03/);
+ 
+   assert.equal(git("reset", "-q").status, 0);
+   assert.equal(git("add", ".claude/pipeline.yaml", ".claude/pipeline-state.json", "docs/notes.md").status, 0);

@@ -1,0 +1,13 @@
+diff --git a/harness/scripts/verify.mjs b/harness/scripts/verify.mjs
+index 2ad4e7ccf96d9e959228cf446783ce364c744aa1..c39052e7883afe9a6ace1d577caeb40a291e3fb4 100644
+--- a/harness/scripts/verify.mjs
++++ b/harness/scripts/verify.mjs
+@@ -269,7 +269,7 @@ const TEST_SUITES = [
+   { name: "main-session-route-tests", file: join(libDir, "main-session-route.test.mjs") },
+   { name: "model-role-session-tests", file: join(libDir, "model-role-session.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 39 }, (_, index) => `MRS${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+   { name: "model-role-dispatch-tests", file: join(libDir, "model-role-dispatch.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 3 }, (_, index) => `MRD${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+-  { name: "model-role-dispatch-select-tests", file: join(pluginScriptsDir, "model-role-dispatch-select.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["MDS01", "MDS02", "MDS03", "MDS04", "MDS05", "MDS06", "MDS07", "MDS08", "MDS09", "MDS10"], maxBytes: 65_536 } },
++  { name: "model-role-dispatch-select-tests", file: join(pluginScriptsDir, "model-role-dispatch-select.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["MDS01", "MDS02", "MDS03", "MDS04", "MDS05", "MDS06", "MDS07", "MDS08", "MDS09", "MDS10", "MDS11"], maxBytes: 65_536 } },
+   { name: "model-role-approved-policy-tests", file: join(libDir, "model-role-approved-policy.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 5 }, (_, index) => `MRP${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+   { name: "model-role-bootstrap-tests", file: join(pluginScriptsDir, "model-role-bootstrap.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 19 }, (_, index) => `MRB${String(index + 1).padStart(2, "0")}`), maxBytes: 131_072 } },
+   { name: "model-role-host-observations-tests", file: join(libDir, "model-role-host-observations.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 7 }, (_, index) => `MRO${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },

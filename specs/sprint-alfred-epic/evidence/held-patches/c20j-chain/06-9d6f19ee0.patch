@@ -1,0 +1,179 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index 0ac5daf939ab77be024630596c259c2ab2ec33c9..e9c8198de1cd53e9b55405d202c4a3ce7e4aff69 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -7734,7 +7734,7 @@ function buildOnboardingIntakeGeneratePlan({
+ // An early, typed hint -- never a gate -- that a generated text holds what the pre-commit hook
+ // (scripts/check-private-identifiers.mjs) will refuse. It reuses that detector's exports and
+ // reports category and target names only, never the matched value. Any failure is silent.
+-function intakePrivateIdentifierFindings({ root, targets, spawn, patterns }) {
++export function intakePrivateIdentifierFindings({ root, targets, spawn, patterns }) {
+   let active = patterns;
+   if (!active) {
+     const configured = spawn("git", ["config", "--get", "user.email"], { cwd: root, encoding: "utf8", shell: false });
+diff --git a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+index 67764c4f62163fb1f7977d0f294a4c7cfe170305..6f1b270f017245b33dd4add0603eb63ca9eb630c 100644
+--- a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+@@ -665,6 +665,32 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+       assert.equal(predecessor.date, "2026-01-01", "the predecessor keeps its own date and scope; only the status changes");
+     });
+ 
++    it("7.13a the binding step refuses a git-ignored selection and one holding a private identifier before anything is written, and names the repair", () => {
++      const root = makeRoot();
++      assert.equal(spawnSync("git", ["-C", root, "init", "-q"], { encoding: "utf8" }).status, 0);
++      assert.equal(spawnSync("git", ["-C", root, "config", "user.email", "owner@corp.example"], { encoding: "utf8" }).status, 0);
++      fs.mkdirSync(path.join(root, "specs"), { recursive: true });
++      fs.mkdirSync(path.join(root, "scratch"), { recursive: true });
++      fs.writeFileSync(path.join(root, ".gitignore"), "scratch/\n");
++      fs.writeFileSync(path.join(root, "specs", "design.md"), "# Design\n");
++      assert.equal(create(root, "--slug", "store", "--title", "Use a store", "--date", "2026-11-07").status, 0);
++      fs.writeFileSync(path.join(root, "docs", "adr", "draft-store.md"), filled("Use a store"));
++      ok(CREATE_ADR, "--root", root, "--slug", "store", "--refresh");
++      const base = ["--root", root, "--feature", "e2e", "--carrier", "specs/design.md", "--draft", "store"];
++      const carrier = fs.readFileSync(path.join(root, "specs", "design.md"));
++      fs.writeFileSync(path.join(root, "scratch", "po-selection.json"), `${JSON.stringify(SELECTION)}\n`);
++      const ignored = run(BIND, ...base, "--selection", "scratch/po-selection.json");
++      assert.notEqual(ignored.status, 0);
++      assert.match(ignored.stderr, /git-ignored[\s\S]*specs\/po-selection\.json/u);
++      const held = { attributedTo: "PO chat selection 2026-11-08", selections: [{ topic: "owner", text: "Mail owner@corp.example about every release." }] };
++      fs.writeFileSync(path.join(root, "specs", "po-selection.json"), `${JSON.stringify(held)}\n`);
++      const identifier = run(BIND, ...base, "--selection", "specs/po-selection.json");
++      assert.notEqual(identifier.status, 0);
++      assert.match(identifier.stderr, /private identifier[\s\S]*Replace the identifier/u);
++      assert.doesNotMatch(identifier.stderr, /owner@corp/u, "the refusal names the category, never the value");
++      assert.ok(fs.readFileSync(path.join(root, "specs", "design.md")).equals(carrier), "the carrier is untouched");
++    });
++
+     it("7.14 the binding step refuses without the PO's own selection, with a REPLACE: placeholder or with a malformed selection, names the repair and leaves nothing behind", () => {
+       const root = makeRoot();
+       assert.equal(spawnSync("git", ["-C", root, "init", "-q"], { encoding: "utf8" }).status, 0);
+diff --git a/plugins/pipeline-core/scripts/bind-adr-proposals.mjs b/plugins/pipeline-core/scripts/bind-adr-proposals.mjs
+index f92d82fa3bfe326177f2ad7d7c814c129b2def60..91a60cad879d9d7e8c922e91982e9eca8865f93f 100644
+--- a/plugins/pipeline-core/scripts/bind-adr-proposals.mjs
++++ b/plugins/pipeline-core/scripts/bind-adr-proposals.mjs
+@@ -21,6 +21,7 @@
+  * come only from --selection, a file the PO's reply was saved into; the script validates and copies it, it never invents or edits it.
+  * Nothing is written unless the whole result passed the consumer's own manifest check; a refused request leaves no file behind.
+  */
++import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from "node:fs";
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+@@ -31,6 +32,7 @@ import {
+   inspectProspectiveArchitectureManifest, prospectiveJson,
+ } from "../lib/architecture-prospective-materialization.mjs";
+ import { parseDesignDecisionBindings } from "../lib/design-decision-bindings.mjs";
++import { intakePrivateIdentifierFindings } from "../lib/onboarding-continuity.mjs";
+ import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
+ import { nextFreeNumber } from "./create-adr.mjs";
+ 
+@@ -147,7 +149,16 @@ function bind(root, values, slugs) {
+   let existingBinding;
+   try { existingBinding = parseDesignDecisionBindings(carrier.bytes); }
+   catch (error) { return refuse(`${carrierPath} holds a malformed pipeline-design-decision-bindings block (${error.message}); repair or remove that block, then run this command again`); }
++  // Claude greenfield 2026-11-08: a selection under the git-ignored scratch/ became a bound companion nobody could commit; two reopens and three receipts.
++  if (spawnSync("git", ["-C", root, "check-ignore", "-q", "--", selectionPath], { encoding: "utf8", shell: false }).status === 0) {
++    refuse(`${selectionPath} is git-ignored, but the PO's selection is bound into the signed package and has to be committed. Move it next to the design file (${dirname(carrierPath) === "." ? "" : `${dirname(carrierPath)}/`}po-selection.json), then run this command again with that path as --selection.`);
++  }
+   const selection = readSelection(root, selectionPath);
++  // Antigravity greenfield 2026-11-08: the PO's reply held an address, the pre-commit hook refused it after the binding. Refused here, before any file exists.
++  let identifiers = [];
++  try { identifiers = intakePrivateIdentifierFindings({ root, targets: { selection: { path: selectionPath, content: selection.file.text } }, spawn: spawnSync }); }
++  catch { identifiers = []; }
++  if (identifiers.length > 0) refuse(`${selectionPath} holds a private identifier (${identifiers[0].categories.join(", ")}), and the pre-commit hook would refuse the bound copy. Replace the identifier with a neutral word such as [address], keep the rest of the PO's words, then run this command again.`);
+   for (const item of selection.selections) {
+     if (item.adr !== undefined && !slugs.includes(item.adr)) refuse(`${selectionPath}: a selection names the draft ${JSON.stringify(item.adr)}, which is not among the --draft slugs (${slugs.join(", ")})`);
+   }
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index e674ebf8d86012cab11ffb00c2c9a866b0f9e8fc..26c523e625903bbf7f86df811e86663821af97e9 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -30,7 +30,7 @@
+  */
+ 
+ import { createHash } from "node:crypto";
+-import { lstatSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
++import { lstatSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+ import { dirname, join, sep } from "node:path";
+ 
+ import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal } from "../lib/design-review-receipt.mjs";
+@@ -129,6 +129,20 @@ function resolveOutput(repoReal, outPath) {
+ 
+ const sha256Of = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ 
++/** A sibling receipt that binds this report to other PRD or Spec bytes, or null. Unreadable siblings are not receipts and are skipped. */
++function priorReceiptOfReport(repoReal, outPath, reportSha256, sources) {
++  const directory = dirname(outPath) === "." ? "" : `${dirname(outPath)}/`;
++  let names;
++  try { names = readdirSync(join(repoReal, ...directory.split("/").filter(Boolean))); } catch { return null; }
++  for (const name of names.filter((entry) => entry.endsWith(".json")).sort()) {
++    let parsed;
++    try { parsed = JSON.parse(readFileSync(join(repoReal, ...directory.split("/").filter(Boolean), name), "utf8")); } catch { continue; }
++    if (typeof parsed?.report?.sha256 !== "string" || parsed.report.sha256 !== reportSha256 || typeof parsed?.sources?.prd?.sha256 !== "string") continue;
++    if (parsed.sources.prd.sha256 !== sources.prd.sha256 || parsed.sources.spec?.sha256 !== sources.spec.sha256) return `${directory}${name}`;
++  }
++  return null;
++}
++
+ /**
+  * Produce a receipt from files on disk and write it with exclusive create.
+  * `deps.now` exists for tests; no command-line flag reaches them.
+@@ -218,6 +232,13 @@ export function createReceiptFromDisk(input, deps = {}) {
+     previous = { path: previousPath, bytes: previousRead.bytes };
+   }
+ 
++  // Antigravity greenfield 2026-11-08: the old report was stamped onto a changed PRD, labelled round 1, and the second signature bound it.
++  // A receipt says a review read these bytes, so a report already bound to other bytes in this folder cannot be bound again.
++  const reused = priorReceiptOfReport(repoReal, request.outPath, sha256Of(reportRead.bytes), sources);
++  if (reused !== null) {
++    return refuse("DRC-REPORT-REUSED", `the report ${request.reportPath} is already bound to different PRD or Spec bytes by ${reused}. A report describes what its review read: run the review again for the current bytes, write a new report, and pass the earlier receipt with --previous for a delta round.`);
++  }
++
+   const runner = detectRunner(env);
+   if (runner === null) return refuse("DRC-NO-RUNNER", "no runner signal in the environment (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT=antigravity, CODEX_SESSION_ID or CODEX_THREAD_ID); the reviewer runner is never supplied by hand");
+   // The old `reviewer.model` field is kept for existing readers and carries the honest value: the observation, else unknown.
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+index ea467b4ebbe2168d49a9e6bdee813b4c247a2858..bdef6fd410035e9286de55bbdf0769830e5b51a9 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.test.mjs
+@@ -199,6 +199,25 @@ test("DRC-OUT-EXISTS names a new --out path as the way forward and keeps the exi
+   assert.equal(readFileSync(join(repo, RECEIPT1), "utf8"), "do not touch\n");
+ }));
+ 
++// Antigravity greenfield 2026-11-08: an old report was stamped onto a changed PRD and bound by the second signature.
++test("a report already bound to other PRD or Spec bytes is refused, names the earlier receipt and writes nothing", withRepo((repo) => {
++  assert.equal(createReceiptFromDisk(request(repo), { env: CLAUDE, now }).ok, true);
++  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v2\n");
++  const result = createReceiptFromDisk(request(repo, { outPath: RECEIPT2 }), { env: CLAUDE, now });
++  assert.deepEqual([result.ok, result.code], [false, "DRC-REPORT-REUSED"]);
++  assert.match(result.message, /design-review-1\.receipt\.json/u);
++  assert.match(result.message, /run the review again/u);
++  assert.equal(existsSync(join(repo, RECEIPT2)), false);
++}));
++
++test("control: the same report over the same bytes and a new report over changed bytes are both still accepted", withRepo((repo) => {
++  assert.equal(createReceiptFromDisk(request(repo), { env: CLAUDE, now }).ok, true);
++  assert.equal(createReceiptFromDisk(request(repo, { outPath: RECEIPT2 }), { env: CLAUDE, now }).ok, true);
++  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v2\n");
++  const third = "specs/feat-x/review/design-review-3.receipt.json";
++  assert.equal(createReceiptFromDisk(request(repo, { reportPath: REPORT2, outPath: third }), { env: CLAUDE, now }).ok, true);
++}));
++
+ test("an output whose directory does not exist is refused, never created", withRepo((repo) => {
+   const result = createReceiptFromDisk(request(repo, { outPath: "specs/feat-x/other/receipt.json" }), { env: CLAUDE, now });
+   assert.equal(result.code, "DRC-OUT-PARENT-MISSING");
+diff --git a/plugins/pipeline-core/skills/architecture-decision/SKILL.md b/plugins/pipeline-core/skills/architecture-decision/SKILL.md
+index 7df99ec5d0f2f96811ef4fd1f91de9bf131f117c..cf705e5a783a8f1f61e6176d453c5c561fe7b75b 100644
+--- a/plugins/pipeline-core/skills/architecture-decision/SKILL.md
++++ b/plugins/pipeline-core/skills/architecture-decision/SKILL.md
+@@ -91,7 +91,8 @@ node <plugin-root>/scripts/create-adr.mjs --root "$PWD" --slug <slug> --title "<
+   ```bash
+   node <plugin-root>/scripts/bind-adr-proposals.mjs --root "$PWD" --feature <feature-id> --carrier <design-companion>.md --selection <po-selection>.json --draft <slug> [--draft <slug>...]
+   ```
+-  `--selection` is a JSON file holding the PO's own selection, saved verbatim from the PO's reply:
++  `--selection` is a JSON file next to the design file in the feature folder (it is committed with the package, so never under the
++  git-ignored `scratch/`), holding the PO's own selection, saved verbatim from the PO's reply except that a private identifier is replaced:
+   `{"attributedTo": "PO chat selection <date>", "selections": [{"topic": "...", "text": "<the PO's words>", "adr": "<optional slug>"}]}`.
+   The step copies it and never writes or edits it, so do not invent selection text; if the PO has not chosen yet, ask first. It
+   refuses a draft that still has `REPLACE:` lines or a stale digest and names the repair. On success it writes the manifest and one

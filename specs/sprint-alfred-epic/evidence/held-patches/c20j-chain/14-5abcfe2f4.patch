@@ -1,0 +1,235 @@
+diff --git a/plugins/pipeline-core/lib/answered-intake-values.mjs b/plugins/pipeline-core/lib/answered-intake-values.mjs
+index 901edfeb3ca050701b8566fc103cdf3c790db6bd..2f345f425b9e9f4e932a95c9e019939901146509 100644
+--- a/plugins/pipeline-core/lib/answered-intake-values.mjs
++++ b/plugins/pipeline-core/lib/answered-intake-values.mjs
+@@ -10,6 +10,7 @@
+  */
+ import { readOnboardingIntakeCheckpoint } from "./onboarding-continuity.mjs";
+ import { intakeGitAuthor } from "./project-onboarding-v3-author-identity.mjs";
++import { heldIdentityChoice } from "./pipeline-actor-assignment.mjs";
+ import { checkVerifyContractConfigured } from "../scripts/push-gate-satisfiability.mjs";
+ 
+ export const ANSWERED_VALUES_SCHEMA = "pipeline.answered-intake-values.v1";
+@@ -39,6 +40,13 @@ export function readAnsweredIntakeValues({ rootDir, deps = {} } = {}) {
+     }
+     if (Array.isArray(checkpoint.value?.designQuestions)) result.designAnswers = answeredAt("intake-checkpoint:designQuestions");
+   }
++  if (result.gitAuthor.answered !== true) {
++    // The author given in the first onboarding answers lives in the root-bound receipt; the checkpoint can stay null (all three greenfields, 2026-11-08).
++    try {
++      const held = (deps.heldIdentityChoice ?? heldIdentityChoice)(rootDir)?.gitAuthor ?? null;
++      if (held !== null) result.gitAuthor = answeredAt("initial-answers-receipt:gitAuthor", held);
++    } catch { /* an unreadable receipt answers nothing */ }
++  }
+   try {
+     // `ok` alone is also true for the baseline-only placeholder; only a real configured command is an answer.
+     if ((deps.checkVerifyContractConfigured ?? checkVerifyContractConfigured)(rootDir)?.status === "configured") {
+diff --git a/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs b/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
+index 0136cbbec5dabf5e900f02f9b872e73698c2ab03..e3ea671d2c90e69dca8e4ab00757513adeb57172 100644
+--- a/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
++++ b/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
+@@ -355,6 +355,9 @@ test("a commit message refusal offers no override, and a mixed set keeps its exi
+     assert.deepEqual([refused.status, refused.code, refused.nextAction.kind], ["non-liftable-recovery-required", "GIT-03-MESSAGE-REFUSED", "repair-required"]);
+     assert.match(refused.nextAction.reason, /does not offer an override/u);
+     assert.notEqual(plan([git03, { guard: "guard-other.mjs", reason: "BLOCKED: refused." }]).code, "GIT-03-MESSAGE-REFUSED");
++    const receipt = plan([{ guard: "guard-gate-strength.mjs", reason: "BLOCKED (guard-gate-strength): DRR-HAND-WRITTEN: This write would leave a design review receipt." }]);
++    assert.deepEqual([receipt.status, receipt.code, receipt.nextAction.kind], ["non-liftable-recovery-required", "DRR-HAND-WRITTEN", "repair-required"]);
++    assert.match(receipt.nextAction.reason, /does not offer an override/u);
+   } finally {
+     rmSync(root, { recursive: true, force: true });
+   }
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 1d7ae67a457e216b519ea6b54f9dcf4a2005f6be..b3f29b0067c56fcfd0d97dd2ccea2550251220e4 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -669,8 +669,8 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
+   if (script === MODEL_ROLE_DISPATCH_SELECT_SCRIPT) return sanctionedModelRoleDispatchSelectArgs(args, root);
+   // Read-only by construction: each prints a verdict and writes nothing. No other flag (the detector's --patterns-file included) is admitted.
+-  if (script === RUNNER_CAPABILITIES_SCRIPT) return args.length === 0 || (args.length === 2 && args[0] === "--runner" && VALID_RUNNERS.has(args[1]));
+-  if (script === CHECK_PRIVATE_IDENTIFIERS_SCRIPT || script === CHECK_PO_GATE_AUTHORITY_SCRIPT) return args.length === 0 || (args.length === 2 && exactRoot(args, root, 0));
++  if (script === RUNNER_CAPABILITIES_SCRIPT) return args.length === 2 && args[0] === "--runner" && VALID_RUNNERS.has(args[1]);
++  if (script === CHECK_PRIVATE_IDENTIFIERS_SCRIPT || script === CHECK_PO_GATE_AUTHORITY_SCRIPT) return args.length === 2 && exactRoot(args, root, 0);
+   if (script === DESIGN_REVIEW_RECEIPT_SCRIPT) return sanctionedDesignReviewReceiptArgs(args, root);
+   if (script === REGISTER_FEATURE_PACKAGE_SCRIPT) return sanctionedRegisterFeaturePackageArgs(args, root);
+   if (script === ARCHITECTURE_BASELINE_SCRIPT) return sanctionedArchitectureBaselineArgs(args, root);
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index e8c397e7e444f4a6bdf9e4a001440271fe80a558..54c8a5b064749c72dddc41bd75e3744cc8b4d499 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -1554,6 +1554,17 @@ export function classifyNonLiftableGuardDenials(denials) {
+       nextAction: { kind: "repair-required", reason: "Rewrite the commit message as the refusal states and commit again. This refusal does not offer an override." },
+     };
+   }
++  // Antigravity greenfield 2026-11-08: the producer command is the sanctioned route, so a capability would only land a receipt that is not evidence.
++  if (denials.every(denial => /\bDRR-HAND-WRITTEN:/u.test(String(denial?.reason ?? "")))) {
++    return {
++      status: "non-liftable-recovery-required",
++      code: "DRR-HAND-WRITTEN",
++      cause: denials.map(denial => String(denial.reason)).join("\n"),
++      recoveryGuidance: [],
++      coDenialSummary: null,
++      nextAction: { kind: "repair-required", reason: "Produce the receipt with the producer command the refusal names. This refusal does not offer an override." },
++    };
++  }
+   if (!humanOnly && !diagnosticOnly) return null;
+   return {
+     status: "non-liftable-recovery-required",
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 2f8bca737280768f3ad046f08da1d2685eca01b6..e1ac33d5d88c8773efbf182d06abae04ecc1844b 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -738,10 +738,11 @@ test("C20j the three read-only diagnostics are admitted in their closed shapes,
+     const capabilities = join(scriptsDir, "runner-capabilities.mjs");
+     const detector = join(scriptsDir, "check-private-identifiers.mjs");
+     const authority = join(scriptsDir, "check-po-gate-authority.mjs");
+-    bothAdmit(scriptAction(capabilities), f, "capabilities bare");
++    // Zero arguments stays refused: the OBLIGROUTE-1 sweep (guard-lifecycle-ready.test.mjs) keeps that shape to its two named scripts.
++    bothRefuse(scriptAction(capabilities), f, "capabilities bare");
+     bothAdmit(scriptAction(capabilities, "--runner", "antigravity"), f, "capabilities runner");
+     for (const script of [detector, authority]) {
+-      bothAdmit(scriptAction(script), f, "bare");
++      bothRefuse(scriptAction(script), f, "bare");
+       bothAdmit(scriptAction(script, "--root", f.root), f, "exact root");
+       bothRefuse(scriptAction(script, "--root", join(f.root, "..")), f, "foreign root");
+       bothRefuse(scriptAction(script, "--root", f.root, "extra"), f, "extra positional");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 9aa2ac385f81a0903af9473a26111fe36b51bfcc..9d668b47d4fdec69cbd0f2064bf825d4f364de73 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -395,6 +395,7 @@ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
+ import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
+ import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
++import { readPipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
+ import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+ import { awaitSignatureFields, commandText as proofCommandText, proofWaitCommand } from "../lib/signed-proof-wait.mjs";
+ import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
+@@ -4155,7 +4156,13 @@ function inspectSelectedPlanProfile(dir, state) {
+ }
+ 
+ function resolveDraftPlanSubmissionDefaults(dir, deps = {}) {
+-  const by = resolveLocalGitUserName(dir, deps);
++  // A label the PO assigned for this verb is attribution they already gave; asking again was the Antigravity greenfield's EL-36 collision.
++  let actorLabel = null;
++  try {
++    const actor = readPipelineActorAssignment(dir);
++    if (actor?.scopes.includes("submit-plan")) actorLabel = actor.label;
++  } catch { actorLabel = null; }
++  const by = actorLabel ?? resolveLocalGitUserName(dir, deps);
+   let profile = null;
+   try {
+     const state = readState(dir);
+@@ -4431,7 +4438,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+           guidance: "Run present-plan --review-receipt with the explicit tracked review receipt (at most two), and --by the presenter. No design course or dispatch is required."
+             // Late binding step 5: a draft package (PRD release scope) is sealed by the approval, so its plan is prepared first.
+             + (readAuthoritySeal(state?.continuity?.authority).status === "draft"
+-              ? " This package is an unsealed draft: run prepare-seal --review-receipt with the same receipt(s) BEFORE present-plan (the approval seals the PRD and the Spec); reopen-design stays available at any time."
++              ? " This package is an unsealed draft: run prepare-seal with no arguments BEFORE present-plan (the approval seals the PRD and the Spec; the review receipts go to present-plan). Before the PO has signed, cancel-submitted-plan is the way back."
+               : "") };
+       }
+       const mode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn });
+@@ -13626,7 +13633,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         const result = applyDesignInputRecapture({ rootDir: dir, expectedPlanSha256: rest[1] });
+         if (result.mutated) removeSealPlanFile(dir);
+         console.log(JSON.stringify(result, null, 2));
+-        console.log(`Next: commit ${result.designInputPath} on its own, then run submit-plan if the plan is not submitted, prepare-seal with the same --review-receipt paths as before, and present-plan. The PRD, the Spec and their reviews stay unchanged; their Source lines keep the earlier digest, and the private history records the step from it to the new one.`);
++        console.log(`Next: commit ${result.designInputPath} on its own, then run submit-plan if the plan is not submitted, prepare-seal with no arguments, and present-plan with the same --review-receipt paths as before. The PRD, the Spec and their reviews stay unchanged; their Source lines keep the earlier digest, and the private history records the step from it to the new one.`);
+         return 0;
+       } catch (error) {
+         if (error instanceof OnboardingContinuityKickoffError) return refused(error.code, error.message);
+@@ -14706,6 +14713,10 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
+       "`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <ref> --proof-request <file> --proof-authority <file> --proof <file>` " +
+       `from ${dir}; the step-by-step flow is docs/push-release-flow.md. To check that the registry itself is healthy: ${repairInspect}${elapsedText}`;
+   }
++  // A short file-access conflict on Windows leaves nothing for inspect to name (claude greenfield 2026-11-08: inspect answered next: []).
++  if (error?.reason === "WIN-AUTH-OPEN") {
++    return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported. Repair: run ${repairInspect}. When its next list is empty this was a short file-access conflict: repeat the same command once. If it is refused again, the windowsAuthorityReadiness.causes field of the preflight names the folder.${elapsedText}`;
++  }
+   return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported. Repair: ${repairInspect} names the cause and the command that clears it.${elapsedText}`;
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index b7e3a9f4cb6268858233edde727f1bc579feeb33..be27c684fdbe6a448a144df81ca3b1f3e1389d0f 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -605,6 +605,9 @@ const cases = [
+     const typed = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-HELD", reason: "state-operation-in-flight" }, { elapsedMs: 12 });
+     assert.ok(typed.includes("State authority route unavailable (SDC-AUTHORITY-HELD: state-operation-in-flight); no success is reported."), typed);
+     assert.ok(typed.endsWith(" Elapsed: 12 ms."), typed);
++    const windows = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-UNAVAILABLE", reason: "WIN-AUTH-OPEN" }, { elapsedMs: 1 });
++    assert.match(windows, /next list is empty this was a short file-access conflict: repeat the same command once/u, windows);
++    assert.doesNotMatch(windows, /names the cause and the command that clears it/u, windows);
+   } },
+   { id: "SAS02", name: "SAD diag (2) an error without code and reason keeps the default code alone in the parenthesis and names its class, message and at most two bare frames after it", run: () => {
+     const untyped = describeStateAuthorityRefusal(new TypeError("boom"), { elapsedMs: 5 });
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index f89d3725329e053a8e420fe8013eb7673ef419f5..4e9529ad2aca27de2eded655b0a3b2b62dd13afc 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -78,7 +78,7 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
+      code and repair and leaves no state), and only after exit 0 and `status: "prepared"` call `spawn_agent` with exactly the printed `spawn_agent.agent_type` (`worker`) and `spawn_agent.message`, keeping the
+      `pipeline-core:goldfish-implementor` (or `-mechanic`) role, within the printed `bindWindowSeconds`. Preparing the same briefing again is safe. A `worker` started without a prepared dispatch gets a SubagentStart notice that its work will not be integrated.
+    - **Antigravity**: `antigravity-native-dispatch-prepare.mjs prepare --root <repository-root> --request <native-dispatch-request.json>`; only after exit 0 and
+-     `status: "prepared"` call `invoke_subagent` with `invocation.Subagents` unchanged. A native implementation consent is not available: read
++     `status: "prepared"` call `invoke_subagent` with the fields of the returned `invocation` unchanged (the host takes flat arguments, one child per call). A native implementation consent is not available: read
+      `references/antigravity-native-dispatch.md` before the first dispatch and ask the PO when the sanctioned route does not return an authored commit.
+ 4. Commit what the dispatch produced under the host-commit rules of its runner; never hand-build a record the writer refuses (the refusal names its repair).
+    On Claude the host commit of a background Goldfish lands at its SubagentStop. Its hand-back message can arrive before that commit, its completion
+@@ -146,7 +146,7 @@ Owner: `docs/push-release-flow.md`, section "Releasing a consumer project". A co
+ | Observation boundary | tool-level only: the guard judges the runner's own tool calls, and an admitted `node` script can still read outside the repository; not an operating-system boundary | tool-level only where the same guard runs; what a spawned worker's own scripts read outside the repository is not measured | tool-level only on the calls the prepare step admits; what a `node` script reads outside the repository is not measured |
+ 
+ A row that is missing here has no source in this repository; ask the PO instead of assuming it. The same table is machine-readable
+-(one source, checked against this one): `runner-capabilities.mjs [--runner <claude|codex|antigravity>]`.
++(one source, checked against this one): `runner-capabilities.mjs --runner <claude|codex|antigravity>`.
+ 
+ ## Gaps this guide does not close
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+index 9012181731cea7b72391666a00e12128e7939838..2da12857bf6dfa770964d65083b1bc446e56f10a 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+@@ -129,8 +129,8 @@ afterwards.
+   before binding.
+ - `spec.md` — a first-draft Spec with the same `Source:` line, needing EARS
+   acceptance criteria (each user-facing one with its `Journeys:` and `Asserts:`
+-  clauses, see `templates/spec.md` §5) and implementation detail authored before binding.
+-  Its plan is sliced vertical first (`templates/spec.md` §2, *Slice order*): one thin
++  clauses; the plan hand-off refuses a Spec without them, `PLR-HANDOFF-NO-JOURNEY`) and
++  implementation detail authored before binding. Its plan is sliced vertical first: one thin
+   end-to-end path for the most important journey before any horizontal layer.
+ 
+ Use the accepted criterion table header `| # | Criterion | Evidence |` and a
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+index 6f7cb14980572911db372862a489fe103bbe7875..fe92908fbc6cf25aabc77f290753d99d8d069da3 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+@@ -12,11 +12,11 @@ A genuinely pristine repository's `v4Inspection` status is no longer
+ always routes instead to `intake-required`, `intake-design-questions-
+ required`, or `bootstrap-binding-required` (`kickoff-required` survives only
+ as an unreachable-in-practice safety net for a drifted state the design does
+-not otherwise describe). If the observed status is one of those three, load
+-`references/intake-generate-design.md` instead — that is the coordinator
+-flow a fresh repository now actually routes toward; it hands off into the
+-same promotion transaction this file documents below, so read this file
+-first, then that one. A repository already mid-kickoff under the old model
++not otherwise describe). If the observed status is one of those three, read
++this file once for the PO questions and the quality bar, then continue in
++`references/intake-generate-design.md` and do not come back here from it.
++That is the coordinator flow a fresh repository now actually routes toward;
++it hands off into the same promotion transaction this file documents below. A repository already mid-kickoff under the old model
+ (`kickoff apply` already ran, `kickoff promote` has not) never reaches that
+ branch at all — its continuity is already valid, so it keeps following the
+ rest of this file untouched.
+@@ -257,9 +257,9 @@ linked source evidence, architecture, component responsibilities,
+ interfaces/state/data, operational constraints, test/verification approach,
+ and PRD-to-Spec traceability. Every user-facing acceptance criterion in the Spec
+ names its journeys and state transitions and the actual effect asserted
+-(`Journeys:` and `Asserts:` clauses, template `templates/spec.md` §5); the plan
++(`Journeys:` and `Asserts:` clauses); the plan
+ hand-off refuses a Spec that does not (`PLR-HANDOFF-NO-JOURNEY`). The Spec's plan
+-is sliced vertical first (`templates/spec.md` §2, *Slice order*): one thin
++is sliced vertical first: one thin
+ end-to-end path for the most important journey, then widened journey by journey,
+ never all of one horizontal layer before the next. Favor thorough, comprehensive coverage of the
+ material input over brevity — a short initial goal is not a reason for a

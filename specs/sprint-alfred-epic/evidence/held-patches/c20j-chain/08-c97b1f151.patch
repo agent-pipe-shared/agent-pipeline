@@ -1,0 +1,195 @@
+diff --git a/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs b/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
+index 44700d5bbf91d9cd58e92651136979fb392b9f77..0136cbbec5dabf5e900f02f9b872e73698c2ab03 100644
+--- a/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
++++ b/plugins/pipeline-core/lib/guard-handoff-offer.test.mjs
+@@ -346,6 +346,20 @@ test("a dispatch the agent can correct itself gets a typed correction, never the
+   }
+ });
+ 
++test("a commit message refusal offers no override, and a mixed set keeps its existing route", () => {
++  const root = fixture();
++  try {
++    const git03 = { guard: "guard-git.mjs", reason: "BLOCKED (git-guard GIT-03, plugin pipeline-core): this commit message carries a session URL." };
++    const plan = (denials) => recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Read", toolInput: { file_path: CANARY }, denials, nowMs: NOW, appendCommandOffer: verifiedAppend([]) });
++    const refused = plan([git03]);
++    assert.deepEqual([refused.status, refused.code, refused.nextAction.kind], ["non-liftable-recovery-required", "GIT-03-MESSAGE-REFUSED", "repair-required"]);
++    assert.match(refused.nextAction.reason, /does not offer an override/u);
++    assert.notEqual(plan([git03, { guard: "guard-other.mjs", reason: "BLOCKED: refused." }]).code, "GIT-03-MESSAGE-REFUSED");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
+ test("the three non-external route statuses keep their exact current shape and journal nothing", () => {
+   const root = fixture();
+   try {
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 0461e69398bea865b3f58cf69340dcf8512c4778..1d7ae67a457e216b519ea6b54f9dcf4a2005f6be 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, BIND_ADR_PROPOSALS_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { RUNNER_CAPABILITIES_SCRIPT, CHECK_PRIVATE_IDENTIFIERS_SCRIPT, CHECK_PO_GATE_AUTHORITY_SCRIPT, ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, BIND_ADR_PROPOSALS_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { isNodeInterpreterWord, samePathSpelling } from "../path-spelling.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+@@ -668,6 +668,9 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
+   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
+   if (script === MODEL_ROLE_DISPATCH_SELECT_SCRIPT) return sanctionedModelRoleDispatchSelectArgs(args, root);
++  // Read-only by construction: each prints a verdict and writes nothing. No other flag (the detector's --patterns-file included) is admitted.
++  if (script === RUNNER_CAPABILITIES_SCRIPT) return args.length === 0 || (args.length === 2 && args[0] === "--runner" && VALID_RUNNERS.has(args[1]));
++  if (script === CHECK_PRIVATE_IDENTIFIERS_SCRIPT || script === CHECK_PO_GATE_AUTHORITY_SCRIPT) return args.length === 0 || (args.length === 2 && exactRoot(args, root, 0));
+   if (script === DESIGN_REVIEW_RECEIPT_SCRIPT) return sanctionedDesignReviewReceiptArgs(args, root);
+   if (script === REGISTER_FEATURE_PACKAGE_SCRIPT) return sanctionedRegisterFeaturePackageArgs(args, root);
+   if (script === ARCHITECTURE_BASELINE_SCRIPT) return sanctionedArchitectureBaselineArgs(args, root);
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index 6313c11d40058c6657d7018e07ab6e9b0ec15267..684d8b4d77738f6c4cd5fad53b02e3e9660a9740 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -226,6 +226,10 @@ export const AGY_NATIVE_INTEGRATE_SCRIPT = fileURLToPath(new URL("../../scripts/
+ export const SESSION_AUTHORITY_REPAIR_SCRIPT = fileURLToPath(new URL("../../scripts/session-authority-repair.mjs", import.meta.url));
+ // C20 G20-30: the agent's bounded, read-only wait for the PO's signed proof file (admitted by an exact grammar in command-catalogue.mjs).
+ export const PROOF_WAIT_SCRIPT = fileURLToPath(new URL("../../scripts/proof-wait.mjs", import.meta.url));
++// Greenfields 2026-11-08: three read-only diagnostics ran into the opaque-script lane and offered a signature (admitted by exact grammar in command-catalogue.mjs).
++export const RUNNER_CAPABILITIES_SCRIPT = fileURLToPath(new URL("../../scripts/runner-capabilities.mjs", import.meta.url));
++export const CHECK_PRIVATE_IDENTIFIERS_SCRIPT = fileURLToPath(new URL("../../scripts/check-private-identifiers.mjs", import.meta.url));
++export const CHECK_PO_GATE_AUTHORITY_SCRIPT = fileURLToPath(new URL("../../scripts/check-po-gate-authority.mjs", import.meta.url));
+ 
+ export const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/design-course-session.mjs", import.meta.url));
+ 
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+index 41765657c81b3a224641c79c0092b54000072d7a..d878543d048684d6e7b52a08f2c770edd4645cb0 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+@@ -175,9 +175,13 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
+         // G20-21: the scratch-script advice only fits a scratch script with extra words; for a Pipeline script it sent agents the wrong way.
+         const absoluteNode = lane === "opaque-script-execution" && words !== null && words.length > 2
+           && isNodeInterpreterWord(words[0]) && scratchScriptRelative(words[1], root) !== null;
+-        const reason = absoluteNode && typeof result.reason === "string"
+-          ? `${result.reason}\nUse the bare \`node\` (not an absolute path to it): \`node scratch/<name>.mjs\` is the admitted draft-phase scratch-script shape.`
++        // Codex greenfield 2026-11-08: the placeholder read like a real file and sent the agent looking for it.
++        const named = typeof result.reason === "string"
++          ? result.reason.replace("File: .pipeline-opaque-execution", "File: none (the command runs inline code or a script outside this project, which this gate cannot inspect)")
+           : result.reason;
++        const reason = absoluteNode && typeof named === "string"
++          ? `${named}\nUse the bare \`node\` (not an absolute path to it): \`node scratch/<name>.mjs\` is the admitted draft-phase scratch-script shape.`
++          : named;
+         return { ...result, ...(reason === undefined ? {} : { reason }), candidate, lane };
+       }
+       // D117 / BI: the first advisory is remembered, a later block still wins, and one command yields ONE advisory.
+@@ -309,7 +313,7 @@ export function devPlanShellBlocked(hit, overrideGuidance) {
+     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+       + `${DEVPLAN_SHELL_DENIAL_CODE}: ${hit.reason}\n`
+       + `Detected as a shell write to a dev-plan-gated path (lane: ${hit.lane}).\n`
+-      + "Why: an implementing Goldfish MUST NOT write implementation before the plan is approved "
++      + "Why: implementation is written only once the approved design has entered the implementation phase "
+       + "(roles/goldfish.md GF-04-adjacent discipline, enforced here as a technical gate). This "
+       + "gate is authority-bearing (guardrails/global.md GL-09) -- so which write tool you reach "
+       + "for cannot decide whether it applies.\n"
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index 7ffe23af2822bbc419d789a3a7924b2a185574a8..e8c397e7e444f4a6bdf9e4a001440271fe80a558 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -1543,6 +1543,17 @@ export function classifyNonLiftableGuardDenials(denials) {
+     : null);
+   const humanOnly = codes.includes("PO-DISCARD-HUMAN-ONLY");
+   const diagnosticOnly = codes.every(code => code === "GUARD-READ-COMMAND-UNSUPPORTED" || code === "GUARD-READ-TARGET-MISSING");
++  // Antigravity greenfield 2026-11-08: GIT-03 says "no override for this rule" and an override block followed it. The message is the repair.
++  if (denials.every(denial => String(denial?.guard) === "guard-git.mjs" && String(denial?.reason ?? "").startsWith("BLOCKED (git-guard GIT-03, plugin pipeline-core):"))) {
++    return {
++      status: "non-liftable-recovery-required",
++      code: "GIT-03-MESSAGE-REFUSED",
++      cause: denials.map(denial => String(denial.reason)).join("\n"),
++      recoveryGuidance: [],
++      coDenialSummary: null,
++      nextAction: { kind: "repair-required", reason: "Rewrite the commit message as the refusal states and commit again. This refusal does not offer an override." },
++    };
++  }
+   if (!humanOnly && !diagnosticOnly) return null;
+   return {
+     status: "non-liftable-recovery-required",
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 6baa88d1c9823a918c24b226058b39c0d4c2c438..2f8bca737280768f3ad046f08da1d2685eca01b6 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -733,6 +733,25 @@ test("C20 w257 security-gate-configure: exactly `--root <this root>` is admitted
+   });
+ });
+ 
++test("C20j the three read-only diagnostics are admitted in their closed shapes, every near-miss is not", () => {
++  withFixture("feature", f => {
++    const capabilities = join(scriptsDir, "runner-capabilities.mjs");
++    const detector = join(scriptsDir, "check-private-identifiers.mjs");
++    const authority = join(scriptsDir, "check-po-gate-authority.mjs");
++    bothAdmit(scriptAction(capabilities), f, "capabilities bare");
++    bothAdmit(scriptAction(capabilities, "--runner", "antigravity"), f, "capabilities runner");
++    for (const script of [detector, authority]) {
++      bothAdmit(scriptAction(script), f, "bare");
++      bothAdmit(scriptAction(script, "--root", f.root), f, "exact root");
++      bothRefuse(scriptAction(script, "--root", join(f.root, "..")), f, "foreign root");
++      bothRefuse(scriptAction(script, "--root", f.root, "extra"), f, "extra positional");
++    }
++    bothRefuse(scriptAction(detector, "--patterns-file", "x.json"), f, "patterns file");
++    bothRefuse(scriptAction(capabilities, "--runner", "other"), f, "unknown runner");
++    bothRefuse(scriptAction(capabilities, "--write"), f, "unknown flag");
++  });
++});
++
+ // ---- C20 w260 (G20-29): `durable-evidence.mjs`, the repair every AUDIT-* finding names, in its two closed shapes ----
+ test("C20 w260 durable-evidence: exactly `sync|check --root <this root>` is admitted, every near-miss is not", () => {
+   withFixture("feature", f => {
+diff --git a/plugins/pipeline-core/scripts/check-po-gate-authority.mjs b/plugins/pipeline-core/scripts/check-po-gate-authority.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..ac81c67b06ce19885500923b218933e0c71437d7
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/check-po-gate-authority.mjs
+@@ -0,0 +1,32 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++
++/**
++ * Read-only check of the repository-scoped PO gate authority, shipped with the plugin so a consumer can run it.
++ * Usage: check-po-gate-authority.mjs [--root <repository>]
++ * Exit 0 and one line when the authority is valid; exit 2 and `<code>: <reason> <repair>` otherwise. Writes nothing.
++ */
++import { resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import { validatePoGateAuthorityForRepository } from "../lib/po-gate-authority.mjs";
++
++export function main(argv = process.argv.slice(2), out = process.stdout, err = process.stderr) {
++  if (!(argv.length === 0 || (argv.length === 2 && argv[0] === "--root"))) {
++    err.write("usage: check-po-gate-authority.mjs [--root <repository>]\n");
++    return 2;
++  }
++  try {
++    const result = validatePoGateAuthorityForRepository({ repoRoot: argv.length === 2 ? resolve(argv[1]) : process.cwd() });
++    if (!result.ok) {
++      err.write(`${result.code}: ${result.reason} ${result.repair}\n`);
++      return 2;
++    }
++    out.write(`PO gate authority valid: ${result.value.humanFacing}; ${result.value.planPath ?? "no active feature"}\n`);
++    return 0;
++  } catch {
++    err.write("PO-GATE-AUTHORITY-UNAVAILABLE: Repository topology or authority inputs are unavailable; run sanctioned setup from the primary checkout.\n");
++    return 2;
++  }
++}
++
++if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main();
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 5ce3ac855edb19a7f3a2ffdd79c80efc117405c6..9aa2ac385f81a0903af9473a26111fe36b51bfcc 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -12976,7 +12976,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       if(!aggregateArchitecture.ok || !aggregateModel.ok) {
+         const recheckCode = aggregateArchitecture.code ?? aggregateModel.code ?? 'DDB-RECHECK';
+         console.error(`Plan approval was committed, but aggregate design binding recheck is incomplete (${recheckCode}); no aggregate authority is inferred.`);
+-        console.error(`This is NOT a successful approval yet: materialize-architecture and set-phase implementation will refuse until it is repaired. Repair: ${entryGateRepair(recheckCode) ?? `run check-po-gate-authority.mjs --root <root> for the cause of ${recheckCode}`}. Do not continue to set-phase before that.`);
++        console.error(`This is NOT a successful approval yet: materialize-architecture and set-phase implementation will refuse until it is repaired. Repair: ${entryGateRepair(recheckCode) ?? `run node <plugin-root>/scripts/check-po-gate-authority.mjs --root <root> for the cause of ${recheckCode}`}. Do not continue to set-phase before that.`);
+       } else if(aggregateModel.required) {
+         const modelDecision=readApprovedDesignDecisionBindingsHandle(aggregateModel.handle);
+         if(!modelDecision.ok) console.error(`Plan approval was committed, but model-policy recheck failed (${modelDecision.code}); model authority is unavailable.`);
