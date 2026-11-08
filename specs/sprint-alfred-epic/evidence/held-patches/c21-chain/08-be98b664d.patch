@@ -1,0 +1,159 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index da1f862b60cc627d2ed6a8f30dc0e7df7d4db286..1e3aa880c29616915018fc5cb1f89f21e5e2dd5f 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -313,6 +313,8 @@ below assumes it holds and is written to catch a change that would break it.
+   never-liftable Source root. Its direct first-party import
+   `scripts/publication-gate-evidence.mjs` is also never liftable. GMWKC01 walks
+   their import closure; the other direct dependencies were already protected.
++- The implementation entry gate of candidate 20j adds `lib/implementation-entry-gate.mjs`:
++  `scripts/pipeline-state.mjs` imports it, so GMWKC01 walks it too.
+ - The 2026-09-20 Alfred candidate architecture adoption, design advisory, and rigor closure adds:
+   `lib/advisory-receipt.mjs`, `lib/architecture-adoption-authority.mjs`,
+   `lib/architecture-adoption-orientation.mjs`, `lib/architecture-design.mjs`,
+diff --git a/harness/scripts/check-consumer-safe-paths.mjs b/harness/scripts/check-consumer-safe-paths.mjs
+index 308a02781d277325728f38bd44625a2a242a546d..f1d45be8237f67dfb26aa9e8bf006c76fe519054 100644
+--- a/harness/scripts/check-consumer-safe-paths.mjs
++++ b/harness/scripts/check-consumer-safe-paths.mjs
+@@ -650,8 +650,8 @@ export const ALLOWLIST = Object.freeze([
+   // (generate-vendored-canon.mjs UNIVERSAL_STANDALONE_FILES); its two harness/ mentions
+   // (§7, English and its German reference-translation counterpart) are inherited unchanged
+   // from the source, same class as the pre-existing VENDORED_CANON_ALLOWLIST entries above.
+-  { file: "plugins/pipeline-core/docs/operating-model.md", match: "harness/scripts/check-po-gate-authority.mjs`; user-facing", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // L350 (EN)
+-  { file: "plugins/pipeline-core/docs/operating-model.md", match: "harness/scripts/check-po-gate-authority.mjs`; Nutzertexte", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // L696 (DE reference translation)
++  { file: "plugins/pipeline-core/docs/operating-model.md", match: "`node harness/scripts/check-po-gate-authority.mjs`;", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // EN, the sentence was rewrapped
++  { file: "plugins/pipeline-core/docs/operating-model.md", match: "a hosted project has no `harness/`", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // EN, second mention
+   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "SOURCE_READER_CHECKER_PATH = \"harness/scripts/check-doc-reader-binding.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
+   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/verify.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
+   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/check-doc-contracts.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 20606b7d62549c92f22cf0070c06c5d805ee1245..3051ae7cbcc3eb67f622c70c50b538e1d14d30b0 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -190,7 +190,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["claude-task-output-read-scope-tests","plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs","top-level-assertions",20],
+     ["claude-task-output-scope-posttool-tests","plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs","top-level-assertions",9],
+     ["clone-hook-readiness-rollback-tests","plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs","top-level-assertions",86],
+-    ["close-path-e2e-tests","plugins/pipeline-core/scripts/close-path-e2e.test.mjs","node-test-single",98], // cand. 20b (QG-04: extension only): the legacy-process-only row of candidate 20 step 54, measured 86; 87 after G20-54 (the fixture asserts materialize-architecture registered the package); 89 after the two set-phase output assertions (package step named, "below" only when the tiers follow)
++    ["close-path-e2e-tests","plugins/pipeline-core/scripts/close-path-e2e.test.mjs","node-test-single",99], // cand. 21 (QG-04: restated, measured): 98->99, the briefing-binds-HEAD line; cand. 20b (QG-04: extension only): the legacy-process-only row of candidate 20 step 54, measured 86; 87 after G20-54 (the fixture asserts materialize-architecture registered the package); 89 after the two set-phase output assertions (package step named, "below" only when the tiers follow)
+     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
+     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+@@ -267,7 +267,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["schema-lite-alternatives-tests","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs","top-level-assertions",49],
+     ["scratch-package-staging-tests","plugins/pipeline-core/lib/scratch-package-staging.test.mjs","top-level-assertions",42],
+     ["security-scan-large-inventory-tests","plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs","node-test-single",4],
+-    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",324], // cand. 19g (QG-04: extension only): 295->319, the four cross-process memo cases SAS21-SAS24; cand. 19h w235: 319->324, SAS25 (byte-less observations persisted)
++    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",326], // cand. 21 (QG-04: restated, measured): 324->326, two cases added in 20j; cand. 19g (QG-04: extension only): 295->319, the four cross-process memo cases SAS21-SAS24; cand. 19h w235: 319->324, SAS25 (byte-less observations persisted)
+     ["shared-pool-bounds-tests","plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","top-level-assertions",4],
+     ["shared-pool-occupancy-tests","plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","top-level-assertions",19],
+     ["shell-grammar-capability-placement-tests","harness/scripts/shell-grammar-capability-placement.test.mjs","top-level-assertions",21],
+diff --git a/plugins/pipeline-core/lib/architecture-design-test-fixture.mjs b/plugins/pipeline-core/lib/architecture-design-test-fixture.mjs
+index 8af3737732f16a111fdc171ba4404c3e636cd566..16afe1c6c23c5a1b790961ac32ee2f5d01065248 100644
+--- a/plugins/pipeline-core/lib/architecture-design-test-fixture.mjs
++++ b/plugins/pipeline-core/lib/architecture-design-test-fixture.mjs
+@@ -186,7 +186,9 @@ export function materializeArchitectureDesignFixture({
+   // commits a protected proof-policy mutation.  The physical design artifacts
+   // still get a real candidate commit, while the actual signature is verified
+   // against the temporary policy bytes for this isolated fixture.
+-  git(root, ["add", "--", "architecture", ...(createdAgentEntry ? ["AGENTS.md"] : []), ...(sourceAlreadyTracked ? [] : [sourcePath]), planPath]);
++  git(root, ["add", "--", "architecture", ...(createdAgentEntry ? ["AGENTS.md"] : []), ...(sourceAlreadyTracked ? [] : [sourcePath]), planPath,
++    // submit-plan refuses an uncommitted Spec (PLAN-SUBMIT-UNCOMMITTED), and the fixture has just authored one.
++    ...(admitSpecCriterion ? [`${dirname(planPath)}/spec.md`] : [])]);
+   commitIfStaged(root, "test fixture architecture design");
+ 
+   const scope = decisionScope ?? [
+diff --git a/plugins/pipeline-core/lib/critic-split.mjs b/plugins/pipeline-core/lib/critic-split.mjs
+index c414675859982a4835f224aa21a19eb6881f6155..33aa330222c46ec537180256281955f39dc81031 100644
+--- a/plugins/pipeline-core/lib/critic-split.mjs
++++ b/plugins/pipeline-core/lib/critic-split.mjs
+@@ -83,7 +83,7 @@ function matchLength(pattern, file) {
+ 
+ /**
+  * The changed paths a Critic must never read: exactly the exclusions of the range's correction-input bindings (project-state record, finding-disposition record, retained prior
+- * result; harness/review-protocol.md §2.2). A path is here only because the derivation bound it.
++ * result; review protocol §2.2). A path is here only because the derivation bound it.
+  * The preflight has already judged this derivation, so a failure here excludes nothing and the path stays visible to its Critic.
+  */
+ function boundExclusions(root, base, candidate) {
+@@ -98,7 +98,7 @@ function boundExclusions(root, base, candidate) {
+ }
+ 
+ /**
+- * The one directory exception of harness/review-protocol.md §2.2, for split rounds only: delivery records (run evidence of a feature, backlog notes) are left out of the parts,
++ * The one directory exception of the review protocol §2.2, for split rounds only: delivery records (run evidence of a feature, backlog notes) are left out of the parts,
+  * a file with a script extension in those folders stays review source. Keep this list and that section identical.
+  */
+ const DELIVERY_RECORD_PATH = /^(?:specs\/[^/]+\/evidence\/|backlog\/(?:items|evidence|dispatch-specs)\/)/u;
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 2e8772cdd8dfa2ea4fd07430e3ecbf734970bc38..f79aabc588f3bce0f419ef6f69cbbb6afd049e7e 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -130,6 +130,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+   "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+   "project/critical-human-proof.json",
++  // Candidate 20j: pipeline-state.mjs imports the implementation entry gate.
++  "plugins/pipeline-core/lib/implementation-entry-gate.mjs",
+   // F2 (NVA-A7FIX-1): the two modules THIS file itself imports and calls
+   // (createPoApprovalIntent above; readCriticalHumanProofPolicy/
+   // verifyAgainstTrustAnchors above) to actually verify a window and every
+diff --git a/plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs b/plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs
+index 86defcf67dd6bc03154833a05ad2c52362a8e06b..535382a3534ff40df049a714d3c1ffaa9297d0b4 100644
+--- a/plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs
++++ b/plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs
+@@ -55,7 +55,9 @@ for (const runner of RUNNERS) {
+       const firstAskMarker = JSON.stringify(parsed.pendingAsks[0].applyAction ?? parsed.pendingAsks[0].input);
+       assert.equal(stdout.split(firstAskMarker).length - 1, 1, `${runner}: first ask serialized more than once`);
+     } else {
+-      assert.ok(["collect-input", "ready", "external-operator"].includes(parsed.outcome), `${runner}: unexpected ${parsed.outcome}`);
++      // Restated 2026-11-08 (QG-04, candidate 21): on Antigravity onboarding that created the repository stops for a restart before the first asks.
++      const expectedOutcomes = runner === "antigravity" ? ["collect-input", "ready", "external-operator", "runner-restart-required"] : ["collect-input", "ready", "external-operator"];
++      assert.ok(expectedOutcomes.includes(parsed.outcome), `${runner}: unexpected ${parsed.outcome}`);
+     }
+   });
+ }
+diff --git a/plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs b/plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs
+index 81ae0a0a8f2e3bb22b4255604f06b7349b0a5aea..e5b44cb30f23160c1d3c89d36b348775ba9ce304 100644
+--- a/plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs
++++ b/plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs
+@@ -277,7 +277,8 @@ test('(v) a design revision on the replacement route is one delta receipt and on
+ test('(v-doc) the documented revision route is mechanical agent work and names no Advisor course',()=>{
+  const doc=readFileSync(new URL('../../skills/pipeline-start/references/design-course.md',import.meta.url),'utf8');
+  assert.match(doc,/mechanical agent work, not another PO permission/u);
+- assert.match(doc,/correct the\s+sources with `reopen-design`, `submit-plan`, `present-plan`/u);
++ // Restated 2026-11-08 (QG-04, candidate 21): 20j made a correction before submit-plan an ordinary edit; reopen-design stays for a submitted package.
++ assert.match(doc,/correct the\s+sources now\. Before `submit-plan` this is an ordinary edit and commit;\s+`reopen-design` exists only for a package that was already submitted/u);
+  assert.match(doc,/There is no\s+mandatory initial Advisor course/u);
+  const state=readFileSync(new URL('../../scripts/pipeline-state.mjs',import.meta.url),'utf8');
+  assert.match(state,/present-plan accepts only --by <name> and --review-receipt <repo-relative-json-path>/u,'present-plan takes no dispatch, course or override argument');
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index f5b06e42ec02b72fb4566260f8621a871507552f..a8c5aaa6e150a1d98e9ee37f9e95270807f5d2d1 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -715,7 +715,7 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
+     ...(taskIdResolution === null ? [] : [`taskId: ${taskIdResolution.reason}.`]),
+     ...(course ? [] : ["This review is no feature package, so it needs a registered generic batch: run session-critic-finalizer.mjs register-batch first and copy its batchRef and memberSha256 into review.genericBatchRef."]),
+     ...(promptLines === null ? [] : ["The Critic route is Opus: put criticDispatchPromptLines into the Critic dispatch prompt (MP-07), or the dispatch policy refuses it."]),
+-    ...(split === null ? [] : [`SPLIT: this range has ${split.changedFileCount} changed files, above the bound of ${split.maxChangedFiles} one Critic can read, so it is split (split.entries, ${split.entries.length} entries, plan ${split.plan.status}; bound exclusions and the delivery records named in harness/review-protocol.md §2.2 are in no entry). Dispatch one Critic per split entry from the template, each with its entry's reviewerInput, its entry's batchScopeLine as the Batch scope (MP-07) line${promptLines === null ? "" : " (in place of criticDispatchPromptLines[0]; keep the rationale line)"} and the instruction to begin trajectory_evidence with its scopeMarker; run each entry's Critic once (a second run for an entry makes finalize refuse the round). Save split as a JSON file under scratch/, then merge the returned verdicts: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-split-merge.mjs --root <repo> --split <split file> --child <entryId>=<verdict file> (one per entry) --out <merged verdict file>; admit binds the split, finalize takes the merged verdict as verdictPath and labels it source-issued only when every child returned through the Critic stop.`]),
++    ...(split === null ? [] : [`SPLIT: this range has ${split.changedFileCount} changed files, above the bound of ${split.maxChangedFiles} one Critic can read, so it is split (split.entries, ${split.entries.length} entries, plan ${split.plan.status}; bound exclusions and the delivery records named in the review protocol §2.2 are in no entry). Dispatch one Critic per split entry from the template, each with its entry's reviewerInput, its entry's batchScopeLine as the Batch scope (MP-07) line${promptLines === null ? "" : " (in place of criticDispatchPromptLines[0]; keep the rationale line)"} and the instruction to begin trajectory_evidence with its scopeMarker; run each entry's Critic once (a second run for an entry makes finalize refuse the round). Save split as a JSON file under scratch/, then merge the returned verdicts: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-split-merge.mjs --root <repo> --split <split file> --child <entryId>=<verdict file> (one per entry) --out <merged verdict file>; admit binds the split, finalize takes the merged verdict as verdictPath and labels it source-issued only when every child returned through the Critic stop.`]),
+   ].join(" ");
+   return { ...result, admitRequest: request, admitCommand: ["node", ADMIT_SCRIPT, "admit", "--root", input.root, "--request", ADMIT_REQUEST_FILE], nextStep,
+     ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(split === null ? {} : { split }) };
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/resume-hint.md b/plugins/pipeline-core/skills/pipeline-start/references/resume-hint.md
+index d67457076191b0eab01627dce85f914f7ca8d6a5..c7f052d2c4aedc681bf3307bcafb7b388b88b586 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/resume-hint.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/resume-hint.md
+@@ -5,6 +5,12 @@ session cut or Compact after kickoff, or when `resume-hint.mjs inspect` reports
+ an available card. This is a capture and consumption duty, never a new
+ readiness gate.
+ 
++A short goal with no further material input needs no card. Interpret user intent
++rather than keywords: an intended restart or session cut captures the card;
++changed scope or constraints refresh it; canonised or revoked information is
++discarded. When no restart follows a capture, use the card as context for the
++current kickoff or planning step.
++
+ The pre-restart guard admits exactly one command shape: card at
+ `<root>/project/.resume-hint-input.json`, `--consume-card`, no extra flags.
+ Write the card first. A ready session may use any `--card-file <json>`.

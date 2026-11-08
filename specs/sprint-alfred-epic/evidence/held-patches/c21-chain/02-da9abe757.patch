@@ -1,0 +1,56 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 5b5e13233e89cf58f1b2ce5e3658ae78770bd31b..ea6327cfb6d4cde8e0c7d2becfb53778e56fef85 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -12,6 +12,7 @@ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+ import { RUNNER_CAPABILITIES_SCRIPT, CHECK_PRIVATE_IDENTIFIERS_SCRIPT, CHECK_PO_GATE_AUTHORITY_SCRIPT, ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, BIND_ADR_PROPOSALS_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { MODULE_SLICE_PROPOSAL_SCRIPT } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { isNodeInterpreterWord, samePathSpelling } from "../path-spelling.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+@@ -671,6 +672,8 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === MODEL_ROLE_DISPATCH_SELECT_SCRIPT) return sanctionedModelRoleDispatchSelectArgs(args, root);
+   // Read-only by construction: each prints a verdict and writes nothing. No other flag (the detector's --patterns-file included) is admitted.
+   if (script === RUNNER_CAPABILITIES_SCRIPT) return args.length === 2 && args[0] === "--runner" && VALID_RUNNERS.has(args[1]);
++  // The PRD path only: the script prints the slice proposal and writes nothing. Its optional --root is not admitted, the project root is the current directory.
++  if (script === MODULE_SLICE_PROPOSAL_SCRIPT) return args.length === 2 && args[0] === "--prd" && /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*\.md$/u.test(args[1] ?? "") && !args[1].split("/").includes("..");
+   if (script === CHECK_PRIVATE_IDENTIFIERS_SCRIPT || script === CHECK_PO_GATE_AUTHORITY_SCRIPT) return args.length === 2 && exactRoot(args, root, 0);
+   if (script === DESIGN_REVIEW_RECEIPT_SCRIPT) return sanctionedDesignReviewReceiptArgs(args, root);
+   if (script === REGISTER_FEATURE_PACKAGE_SCRIPT) return sanctionedRegisterFeaturePackageArgs(args, root);
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index 684d8b4d77738f6c4cd5fad53b02e3e9660a9740..3a1e9c347c8b408705941276489f94a70db3cbbd 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -230,6 +230,8 @@ export const PROOF_WAIT_SCRIPT = fileURLToPath(new URL("../../scripts/proof-wait
+ export const RUNNER_CAPABILITIES_SCRIPT = fileURLToPath(new URL("../../scripts/runner-capabilities.mjs", import.meta.url));
+ export const CHECK_PRIVATE_IDENTIFIERS_SCRIPT = fileURLToPath(new URL("../../scripts/check-private-identifiers.mjs", import.meta.url));
+ export const CHECK_PO_GATE_AUTHORITY_SCRIPT = fileURLToPath(new URL("../../scripts/check-po-gate-authority.mjs", import.meta.url));
++// Live Antigravity greenfield 2026-11-08: the documented read-only slice proposal was refused in draft as an opaque script (admitted by exact grammar in command-catalogue.mjs).
++export const MODULE_SLICE_PROPOSAL_SCRIPT = fileURLToPath(new URL("../../scripts/module-slice-proposal.mjs", import.meta.url));
+ 
+ export const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/design-course-session.mjs", import.meta.url));
+ 
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+index d16cfb9a141c2735d55c3912756760528d093682..d58cf464fa76c4167bbc92194256f29a9e901927 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+@@ -172,4 +172,17 @@ test("G7: malformed and foreign forms remain refused through actual draft lifecy
+     }
+   } finally { fx.cleanup(); }
+ });
++
++// Live Antigravity greenfield 2026-11-08: the slice proposal happy-path.md describes as read-only was refused in draft.
++const sliceProposal = join(scripts, "module-slice-proposal.mjs");
++test("C20K: module-slice-proposal --prd <path> passes the actual draft lifecycle admission", () => {
++  const fx = draftFixture();
++  try { assert.deepEqual(fx.run(`node ${sliceProposal} --prd specs/g7/prd.md`), { exitCode: 0, stderr: "" }); }
++  finally { fx.cleanup(); }
++});
++test("C20K: module-slice-proposal stays refused for any other argv shape", () => {
++  for (const tail of ["", "--prd", "--prd /etc/passwd.md", "--prd ../outside.md", "--prd specs/../../outside.md", "--prd specs/g7/prd.sh", "--prd specs/g7/prd.md --root /tmp", "--root /tmp --prd specs/g7/prd.md"]) {
++    assert.equal(admitted(`node ${sliceProposal} ${tail}`.trim()), false, tail);
++  }
++});
+ registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

@@ -1,0 +1,272 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 0bbb05475..4f7d7f101 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -13256,3 +13256,63 @@ test("D197/D203 a producer still reconcile-refused after heal (native-authority-
+     assert.ok(!refusedCalls.includes("move-aside"));
+   } finally { rmSync(repo, { recursive: true, force: true }); }
+ });
++
++// C21 (AC-108, live findings 12 and 16 of the three greenfield runs on 20j): the recursive listing a worker reaches for first is admitted under the
++// same path scope as the one-level listing, in the native Glob tool and in the shell, and the shell listings of a project directory that does not
++// exist yet (a greenfield tree) are an existence probe like the one-file reads of G20-67.
++test("C21 Glob <directory>/**/* and a <directory>/**/* pattern are admitted under the one-level listing's scope; the project root, hidden directories and wider wildcards stay refused", () => {
++  const path = qp4HiddenFixture();
++  const outside = qp4Fixture();
++  try {
++    const tool = (input) => qp4Verdict({ tool_name: "Glob", tool_input: input }, path);
++    qp4WithoutAppDataRoots(() => {
++      for (const input of [
++        { pattern: "**/*", path: join(path, "src") }, { pattern: "**/*", path: qp4Fwd(join(path, "src", "sub")) }, { pattern: "src/**/*", path },
++        { pattern: "docs/**/*", path }, { pattern: "src/sub/**/*", path }, { pattern: "**/*", path: join(path, "shallow") }, { pattern: "*", path: join(path, "src") },
++      ]) assert.equal(tool(input).exitCode, 0, JSON.stringify(input));
++      for (const input of [
++        { pattern: "**/*", path }, { pattern: "**/*" }, { pattern: "**", path }, { pattern: "*", path }, { pattern: "**", path: join(path, "src") },
++        { pattern: "**/*", path: join(path, ".git") }, { pattern: ".git/**/*", path }, { pattern: "**/*", path: join(path, ".claude") },
++        { pattern: "**/*", path: join(path, "nest") }, { pattern: "nest/**/*", path }, { pattern: "top/**/*", path }, { pattern: "deep/**/*", path },
++        { pattern: "src/**", path }, { pattern: "**/src/*", path }, { pattern: "src/*/**/*", path }, { pattern: "src/**/*/*", path }, { pattern: "**/**/*", path },
++        { pattern: "../**/*", path }, { pattern: "src/../nest/**/*", path }, { pattern: "/**/*", path }, { pattern: "src\\**\\*", path }, { pattern: "**/*", path: outside },
++        { pattern: "**/*", path: join(outside, "scratch") }, { pattern: "scratch/**/*", path: outside }, { pattern: "**/*", path: join(outside, "vault") },
++      ]) {
++        const r = tool(input);
++        assert.equal(r.exitCode, 2, JSON.stringify(input));
++        assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
++      }
++      assert.match(tool({ pattern: "**/*", path }).text, /<directory>\/\*\*\/\*/u, "the refusal names the admitted recursive form");
++    });
++  } finally {
++    rmSync(path, { recursive: true, force: true });
++    rmSync(outside, { recursive: true, force: true });
++  }
++});
++
++test("C21 a shell listing or rg --files of a project directory that does not exist yet is an existence probe; credentials, hidden and outside paths keep refusing", () => {
++  const path = qp4Fixture();
++  try {
++    qp4WithoutAppDataRoots(() => {
++      const shell = (command) => qp4Verdict(bash(command), path);
++      for (const command of [
++        "ls -R scratch scratch/sub scratch/missing-dir", "ls -la scratch/missing-dir", "ls scratch/missing-dir", "ls -lah scratch/missing-dir/deeper",
++        "rg --files scratch/missing-dir", "rg --files scratch/missing-dir scratch", "rg --files scratch scratch/missing-dir", "rg --files -g '*.md' scratch/missing-dir scratch",
++        // The existing listings the findings name stay admitted.
++        "ls -R scratch scratch/sub", "ls -1 scratch", "rg --files scratch scratch/sub",
++        // A names-only `ls vault` is admitted at the base, so the existence probe of a missing child under it follows the same rule (it reads nothing).
++        "ls vault/missing",
++      ]) {
++        const r = shell(command);
++        assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
++      }
++      for (const command of [
++        "ls -R vault", "ls -R vault/missing", "ls -R .git/missing", "ls scratch/id_rsa", "ls ../missing-dir", "rg --files vault", "rg --files .git/missing", "rg --files ../missing-dir",
++        "ls -R scratch/missing-dir > out.txt", "ls -R scratch/missing-dir; rm -r scratch", "rg --files scratch/missing-dir > out.txt", "rg --files --pre cat scratch/missing-dir",
++      ]) {
++        const r = shell(command);
++        assert.equal(r.exitCode, 2, command);
++      }
++    });
++  } finally { rmSync(path, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/lib/guard/grammar-denials.mjs b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+index 284e64c73..bb68843d9 100644
+--- a/plugins/pipeline-core/lib/guard/grammar-denials.mjs
++++ b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+@@ -135,6 +135,12 @@ export const ADMITTED_GRAMMAR_SHAPES = [
+       + "allowlist (echo; \"mkdir -p\" under scratch/ or .claude/worktrees/)",
+     example: "rg -n needle probe.txt && rg -n needle probe.txt",
+   },
++  {
++    // C21 (AC-108): the listing and context forms a worker tries first; the paths are judged by the same scope as every other read.
++    spelling: "listing and context forms of those commands: \"rg --files <dir>...\"; a context flag \"-A N\" / \"-B N\" / \"-C N\" (grep: N of 1..3 digits, separate or attached "
++      + "as -C5; rg: N up to 500, separate); \"ls\" with -l -a -R -1 -h (or combined, e.g. -la) over contained paths; a listed directory that does not exist yet is not an error",
++    example: "grep -n -C 5 needle probe.txt",
++  },
+   {
+     // Codex greenfield 2026-11-08: a regular expression ending in $ inside double quotes was refused with no hint why.
+     spelling: "a search pattern holding a dollar sign or a backtick stands in single quotes, since double quotes would let the shell expand it",
+diff --git a/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs b/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs
+index 8f72b430c..c9f8f1aad 100644
+--- a/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs
++++ b/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs
+@@ -34,3 +34,37 @@ test("bounded max-count grep admits an exact passive file and retains denials",
+     assert.equal(admitted("grep -m 1 needle $(touch scan.txt)"), false);
+   } finally { rmSync(base, { recursive: true, force: true }); }
+ });
++
++// C21 (AC-108, live findings 12 and 16): `grep -n -C 5 <word> <file>` cost every Antigravity worker two refused calls. The context flags -A, -B and -C
++// are display only (they print neighbouring lines of an operand the checks already admitted), so a bounded number is admitted in the separate and the
++// attached spelling; nothing else about the closed grep grammar moves.
++test("C21 grep context flags -A -B -C take a 1..3 digit number (separate or attached) on an exact passive file; every other form stays refused", () => {
++  const base = mkdtempSync(join(tmpdir(), "c21-grep-"));
++  const root = join(base, "project");
++  try {
++    mkdirSync(root);
++    mkdirSync(join(root, ".aws"));
++    writeFileSync(join(root, "scan.txt"), "needle\nneedle\n");
++    writeFileSync(join(base, "outside.txt"), "needle\n");
++    writeFileSync(join(root, ".aws", "credentials"), "synthetic fixture\n");
++    const admitted = (command) => isReadOnlyDiagnosticCommand(command, root);
++    for (const command of [
++      "grep -n -C 5 needle scan.txt", "grep -C5 needle scan.txt", "grep -n -C5 needle scan.txt", "grep -A 2 needle scan.txt", "grep -B3 needle scan.txt",
++      "grep -n -A 2 -B 3 needle scan.txt", "grep -A2 -B3 -n needle scan.txt", "grep -m 1 -C 2 needle scan.txt", "grep -C 999 needle scan.txt",
++      "grep -C 0 needle scan.txt", "grep -n -C 5 -- needle scan.txt", "grep -n -C 5 needle scan.txt | head -20", "grep -n -C 5 needle scan.txt | grep -n x",
++    ]) assert.equal(admitted(command), true, command);
++    const guard = evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command: "grep -n -C 5 needle scan.txt" } }, {
++      projectDir: root,
++      observeGovernanceScopeFn: () => ({ requiresEnforcement: true }),
++      requireProjectOnboardingReadyFn() { throw new Error("passive read must not invoke lifecycle admission"); },
++    });
++    assert.equal(guard.exitCode, 0, guard.stderr);
++    for (const command of [
++      "grep -C 1000 needle scan.txt", "grep -C -1 needle scan.txt", "grep -C x needle scan.txt", "grep -C needle scan.txt", "grep -C", "grep -C 5 -C 6 needle scan.txt",
++      "grep -C5 -C5 needle scan.txt", "grep -A 2 -A 3 needle scan.txt", "grep -C 05x needle scan.txt", "grep -nC5 needle scan.txt", "grep -C 5 needle .aws/credentials",
++      "grep -C 5 needle scan.txt > output.txt", "grep -C 5 needle $(touch scan.txt)", "grep -C 5 -f scan.txt scan.txt",
++      "grep -C 5 --include '*.txt' needle scan.txt", "grep --context 5 needle scan.txt", "grep --context=5 needle scan.txt", "grep -C 5 --pre cat needle scan.txt",
++      "grep -C 5 needle", "grep -C 5 needle scan.txt | tee out.txt",
++    ]) assert.equal(admitted(command), false, command);
++  } finally { rmSync(base, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index 05cc2c689..4454f3f5e 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -565,11 +565,24 @@ function qp4InRootWildcardListing(raw, selector, root, extraRoots) {
+     || isAbsolute(selector) || win32.isAbsolute(selector)) return false;
+   const parts = selector.split("/");
+   if (!parts.every((part) => part !== "" && !part.startsWith("."))) return false;
+-  if (parts[parts.length - 1] !== "*" || parts.slice(0, -1).some((part) => /[?*]/u.test(part))) return false;
+-  const directory = parts.length === 1 ? raw : join(raw, ...parts.slice(0, -1));
++  // C21 (AC-108): `<literal directories>/**/*` lists the entry names of the whole subtree of one such directory. It is judged by exactly the same checks
++  // (the whole-tree secret screen, the hidden-directory walk with its entry and depth bounds); the only addition is that the recursive form never names
++  // the project root itself, which always holds hidden directories. `**` anywhere else, a second wildcard segment and a trailing `**` alone stay refused.
++  const recursive = parts.length >= 2 && parts[parts.length - 2] === "**" && parts[parts.length - 1] === "*";
++  const literal = parts.slice(0, recursive ? -2 : -1);
++  if ((!recursive && parts[parts.length - 1] !== "*") || literal.some((part) => /[?*]/u.test(part))) return false;
++  const directory = literal.length === 0 ? raw : join(raw, ...literal);
++  if (recursive && qp4IsProjectRoot(directory, root)) return false;
+   return qp4InRootDirectory(directory, root, extraRoots) && qp4NoHiddenDirectoryAtOrBelow(passiveCandidate(directory, root), root);
+ }
+ 
++function qp4IsProjectRoot(raw, root) {
++  try {
++    const candidate = passiveCandidate(raw, root);
++    return resolve(candidate) === resolve(root) || realpathSync(candidate) === realpathSync(resolve(root));
++  } catch { return false; }
++}
++
+ // R2-1: bounded, fail-closed subtree walk. True ONLY when no directory at or below `directory` has a name starting with "." -- every directory entry is
+ // resolved to its physical path (links and junctions are followed), which must stay inside the physical project root and carry no dot-named segment
+ // relative to it. Any read error (including a dangling or looping link), an entry that cannot be classified, more than QP4_WALK_MAX_ENTRIES entries or a
+@@ -704,7 +717,8 @@ export function missingSingleReadTargetOperand(parsed) {
+ // Label selection only, by asking the grammar itself: the missing path is the fault when putting an existing in-root
+ // stand-in (its nearest existing directory, else a file in it) in place of every missing operand makes the grammar admit
+ // the command. The rg/grep pattern (the first operand) is never replaced, so a bad pattern is never reported as a path.
+-const QP4_MISSING_DIAGNOSED = new Set(["rg", "grep", "cat", "wc", "stat", "file", "head", "tail"]);
++// C21 (AC-108): `ls` joins the set (a listing of a directory a greenfield project does not have yet read nothing and failed with a flag-or-spelling text).
++const QP4_MISSING_DIAGNOSED = new Set(["rg", "grep", "cat", "wc", "stat", "file", "head", "tail", "ls"]);
+ const shellWord = (word) => `'${String(word).replaceAll("'", "'\\''")}'`;
+ 
+ function existingInRootStandIns(raw, root) {
+@@ -726,7 +740,9 @@ function existsDirectory(path) {
+ function missingOperandIsTheOnlyFault(name, executable, argv, root) {
+   if (!QP4_MISSING_DIAGNOSED.has(name)) return false;
+   const endOfOptions = argv.indexOf("--");
+-  let patternSeen = !["rg", "grep"].includes(name);
++  // C21: `rg --files` takes no pattern, so its first operand is a path (it was skipped as the pattern, and a missing first directory stayed refused).
++  const listsFiles = name === "rg" && (endOfOptions === -1 ? argv : argv.slice(0, endOfOptions)).includes("--files");
++  let patternSeen = !["rg", "grep"].includes(name) || listsFiles;
+   const missing = [];
+   argv.forEach((token, index) => {
+     if (typeof token !== "string" || ((endOfOptions === -1 || index < endOfOptions) && token.startsWith("-"))) return;
+@@ -828,7 +844,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
+   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
+     + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
+     + (toolName === "Glob"
+-      ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or is <directory>/*; a bare ** or * over the project root is not, because the root holds hidden directories.\n"
++      ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or lists one non-hidden project directory: <directory>/* or <directory>/**/* (a subtree), either with path set to that directory and the pattern * or **/*, or with the directory inside the pattern; a bare ** or * over the project root is not, because the root holds hidden directories.\n"
+       : ""));
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index 7392795ef..cf623fc22 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -891,12 +891,25 @@ export function isSafeExactPassiveFile(raw, root, extraRoots = []) {
+   catch { return false; }
+ }
+ 
++const GREP_CONTEXT_FLAG = /^-([ABC])([0-9]{1,3})?$/u;
++
+ function isSafeExactGrepArgs(args, root, extraRoots = []) {
+   const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename", "-o", "--only-matching"]); // TR-B-F (T74): match-output spellings; the operand loop below is unchanged.
+   let index = 0;
+   let maxCountSeen = false;
+-  while (flags.has(args[index]) || args[index] === "-m" || args[index] === "--max-count") {
++  const contextSeen = new Set();
++  while (flags.has(args[index]) || args[index] === "-m" || args[index] === "--max-count" || GREP_CONTEXT_FLAG.test(args[index] ?? "")) {
+     if (flags.has(args[index])) { index += 1; continue; }
++    // C21 (AC-108): -A, -B and -C only print neighbouring lines of an operand the checks below already admit. One bounded value (1..3 digits) each, in the
++    // separate (`-C 5`) or the attached (`-C5`) spelling; a repeated letter, a clustered flag (`-nC5`) and the long spellings stay refused.
++    const context = GREP_CONTEXT_FLAG.exec(args[index] ?? "");
++    if (context !== null) {
++      const value = context[2] ?? args[index + 1];
++      if (contextSeen.has(context[1]) || !/^[0-9]{1,3}$/u.test(value ?? "")) return false;
++      contextSeen.add(context[1]);
++      index += context[2] === undefined ? 2 : 1;
++      continue;
++    }
+     if (maxCountSeen || !/^[1-9][0-9]{0,2}$/u.test(args[index + 1] ?? "")
+       || Number(args[index + 1]) > 500) return false;
+     maxCountSeen = true;
+diff --git a/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs b/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
+index 71175512b..6ebf0488d 100644
+--- a/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
++++ b/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
+@@ -46,6 +46,9 @@ const SHAPE_DISPOSITION = [
+   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
+   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
+   { bashOnly: "the dialect admits one literal command per call (the one literal $env: assignment folded into it is the single exception)" },
++  // C21 (AC-108): the table example is a grep context read; grep and ls are not PowerShell commands and stay refused there. The read-only rg forms of the
++  // same row (rg --files, rg -C N) are admitted by the dialect like Bash (E7); the C21 case below asserts both halves.
++  { bashOnly: "grep and ls are not PowerShell commands (the rg forms of the row are admitted by the dialect, E7)" },
+   { bashOnly: "a dollar sign is refused outright in the dialect, quoted or not, because PowerShell expands it" },
+ ];
+ 
+@@ -59,6 +62,21 @@ test("every shape of the Bash grammar table has a disposition, and a Bash-only s
+   });
+ }));
+ 
++// C21 (AC-108): the listing and context forms a worker tries first are named in the printed grammar, every printed example is admitted by Bash, and the
++// PowerShell dialect gives the verdict it always gave (it admits a read-only rg like Bash, and none of grep or ls, which are not PowerShell commands).
++test("C21 the printed grammar names rg --files, the grep and rg context flags and the ls listing flags; each printed example is admitted by Bash and judged by PowerShell as before", () => withRoot(({ root, ps }) => {
++  const printed = denials.GRAMMAR_DENIAL_REMEDY.join("\n");
++  for (const needle of ["rg --files", "-A N", "-B N", "-C N", "\"ls\" with -l -a -R -1 -h"]) assert.ok(printed.includes(needle), `the grammar text names ${needle}`);
++  const listing = ADMITTED_GRAMMAR_SHAPES.filter((shape) => /rg --files/u.test(shape.spelling));
++  assert.ok(listing.length >= 1, "a shape row names the listing and context forms");
++  for (const shape of listing) assert.equal(isReadOnlyDiagnosticCommand(shape.example, root), true, shape.example);
++  for (const command of ["grep -n -C 5 needle probe.txt", "grep -C5 needle probe.txt", "ls -la docs", "ls -R docs", "rg --files docs", "rg -n -C 2 needle probe.txt"]) {
++    assert.equal(isReadOnlyDiagnosticCommand(command, root), true, `Bash admits ${command}`);
++  }
++  for (const command of ["grep -n -C 5 needle probe.txt", "ls -la docs", "ls -R docs"]) assert.equal(ps(command).exitCode, 2, `PowerShell keeps refusing ${command}`);
++  for (const command of ["rg --files docs", "rg -n -C 2 needle probe.txt"]) assert.equal(ps(command).exitCode, 0, `PowerShell admits the read-only rg ${command}`);
++}));
++
+ test("read-only git observations get the Bash verdict in the PowerShell dialect, mutating git stays refused", () => withRoot(({ root, ps }) => {
+   const mustBeAdmitted = ["git status", "git status --short", "git log", "git log -n 5 --oneline", "git diff --stat", "git diff", "git show HEAD",
+     "git rev-parse HEAD", "git ls-files", "git describe", "git for-each-ref", "git branch --show-current", "git tag --list", "git remote -v", "git stash list"];
+@@ -143,11 +161,15 @@ test("a native read of a project directory that is not a protected root states w
+   assert.match(grep.stderr, /not a protected root/u, grep.stderr);
+   assert.match(grep.stderr, /Glob/u);
+   assert.match(grep.stderr, /exact file/u);
+-  const glob = run("Glob", { pattern: "**/*", path: join(root, "project") });
++  // QG-04 restated in place (C21, AC-108): `**/*` over a contained, non-hidden SUBDIRECTORY is now admitted (the one-level `*` always was), so this case no
++  // longer refuses it. The refusal whose text it reads is the same listing over the project root, which holds hidden directories and stays refused; the
++  // subdirectory form is asserted admitted on the line after the refusal's own assertions.
++  const glob = run("Glob", { pattern: "**/*", path: root });
+   assert.equal(glob.exitCode, 2);
+   assert.match(glob.stderr, /GUARD-READ-TARGET:/u);
+   assert.match(glob.stderr, /literal non-credential extension/u, glob.stderr);
+   assert.match(glob.stderr, /Protected roots:/u);
++  assert.equal(run("Glob", { pattern: "**/*", path: join(root, "project") }).exitCode, 0);
+   assert.equal(run("Grep", { pattern: "x", path: join(root, "project", "pipeline.json") }).exitCode, 0);
+   assert.equal(run("Glob", { pattern: "*.json", path: join(root, "project") }).exitCode, 0);
+   // the PowerShell read refusal says the same, and the project-relative directory read itself is admitted

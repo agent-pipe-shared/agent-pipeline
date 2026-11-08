@@ -1,0 +1,258 @@
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+index b98bb1ebfec9cfb0f4ee61e3d3be6a94df9724ca..b5e9ba4eae4863bb9e1d514c2a1879d9edd14b57 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+@@ -161,29 +161,37 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
+       }
+     }
+   }
++  const stateCause = windowsPrivateStateCause({ projectRoot, exists, assessPrivateRoot });
++  if (stateCause !== null) causes.push(stateCause);
++  return { schema: WINDOWS_AUTHORITY_READINESS_SCHEMA, status: causes.length ? 'unavailable' : 'ready', causes };
++}
++
++/**
++ * The private state folder check alone (one native call, the full assessment is one per path). The onboarding driver runs it in the first question round,
++ * so the one manual step stands next to the other questions instead of stopping the run later. Null when the folder is absent or secure.
++ */
++export function windowsPrivateStateCause({ projectRoot, exists = existsSync, assessPrivateRoot = assessWindowsPrivateRoot } = {}) {
+   const stateRoot = win32.join(projectRoot, 'project');
+-  if (exists(stateRoot)) {
+-    let verdict;
+-    try { verdict = assessPrivateRoot(stateRoot); } catch { verdict = null; }
+-    const status = verdict?.status;
+-    if (status === 'insecure') {
+-      const quoted = stateRoot.includes('"');
+-      causes.push({ pathClass: 'private-state', reason: 'WIN-AUTH-PRIVATE-ROOT', path: stateRoot, nextAction: {
+-        kind: 'operator-review', mutation: false,
+-        summary: 'The private state folder carries access rights inherited from above the repository. Remove the inherited grants, keep full control for the current user, then rerun readiness.',
+-        inspection: ['Confirm the folder is a physical non-reparse directory inside the project.', 'Read its access list and find the entries inherited from a parent folder.'],
+-        repairPreview: { folder: stateRoot,
+-          commands: quoted ? [] : [
+-            { shell: 'powershell', command: `icacls "${stateRoot}" /inheritance:r /grant:r "$(whoami):(OI)(CI)F"` },
+-            { shell: 'cmd', command: `icacls "${stateRoot}" /inheritance:r /grant:r "%USERNAME%:(OI)(CI)F"` },
+-          ],
+-          reason: 'inherited grants from above the repository are removed, the current user keeps full control, files created later inherit the narrow rights',
+-          afterwards: 'The next preflight reads the folder back and continues only when it is secure.' },
+-      } });
+-    } else if (status !== 'secure') {
+-      causes.push({ pathClass: 'private-state', reason: 'WIN-AUTH-OBSERVATION-UNAVAILABLE', path: stateRoot,
+-        nextAction: guidance('private-state', 'WIN-AUTH-OBSERVATION-UNAVAILABLE') });
+-    }
++  if (!exists(stateRoot)) return null;
++  let verdict;
++  try { verdict = assessPrivateRoot(stateRoot); } catch { verdict = null; }
++  const status = verdict?.status;
++  if (status === 'secure') return null;
++  if (status !== 'insecure') {
++    return { pathClass: 'private-state', reason: 'WIN-AUTH-OBSERVATION-UNAVAILABLE', path: stateRoot,
++      nextAction: guidance('private-state', 'WIN-AUTH-OBSERVATION-UNAVAILABLE') };
+   }
+-  return { schema: WINDOWS_AUTHORITY_READINESS_SCHEMA, status: causes.length ? 'unavailable' : 'ready', causes };
++  const quoted = stateRoot.includes('"');
++  return { pathClass: 'private-state', reason: 'WIN-AUTH-PRIVATE-ROOT', path: stateRoot, nextAction: {
++    kind: 'operator-review', mutation: false,
++    summary: 'The private state folder carries access rights inherited from above the repository. Remove the inherited grants, keep full control for the current user, then rerun readiness.',
++    inspection: ['Confirm the folder is a physical non-reparse directory inside the project.', 'Read its access list and find the entries inherited from a parent folder.'],
++    repairPreview: { folder: stateRoot,
++      commands: quoted ? [] : [
++        { shell: 'powershell', command: `icacls "${stateRoot}" /inheritance:r /grant:r "$(whoami):(OI)(CI)F"` },
++        { shell: 'cmd', command: `icacls "${stateRoot}" /inheritance:r /grant:r "%USERNAME%:(OI)(CI)F"` },
++      ],
++      reason: 'inherited grants from above the repository are removed, the current user keeps full control, files created later inherit the narrow rights',
++      afterwards: 'The next preflight reads the folder back and continues only when it is secure.' },
++  } };
+ }
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.mjs b/plugins/pipeline-core/scripts/onboarding-init.mjs
+index 5700082a9dc8ce6f8ab4ffd7f0e06f53e3b2eb94..3211aa086d37ecd808996ed7e74e78ea6d073922 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.mjs
+@@ -116,6 +116,7 @@ import { printOnboardingInitResult } from "../lib/onboarding-driver-output.mjs";
+ import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
+ import { existsSync as actorExistsSync } from "node:fs";
+ import { heldIdentityChoice, normalizePipelineActorAssignment, writePipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
++import { windowsPrivateStateCause } from "../lib/windows-authority-readiness.mjs";
+ import { beginInitialAnswersJournal, completeInitialAnswersJournal } from "../lib/onboarding-initial-answers-transaction.mjs";
+ import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
+ import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+@@ -1423,10 +1424,53 @@ function normalizeOnboardingDriverOutput(output, root) {
+  * whatever machine-plane state happens to live under the real caller's `$HOME`
+  * (backlog: 2026-08-28-a-verify-gate-suite-reads-real-machine-state-through-a-subprocess).
+  */
++const FIRST_ROUND_OUTCOMES = ["pending-asks", "collect-input"];
++
++// PO decision 2026-11-08: Antigravity only sees a repository that existed when the session started, so `Workspace: "branch"` would fail at the first code
++// worker, after the design sign-off. When this driver call created the repository, the run stops here and names the restart, before the first question round.
++function antigravityRestartStop(result, root, hadRepository, exists) {
++  if (hadRepository || result.runner !== "antigravity" || !FIRST_ROUND_OUTCOMES.includes(result.outcome) || !exists(join(root, ".git"))) return null;
++  return {
++    schema: SCHEMA, runner: result.runner, root, outcome: "runner-restart-required",
++    stepCap: result.stepCap, stepsExecuted: result.stepsExecuted, steps: result.steps,
++    restart: {
++      reason: "This onboarding created the project's Git repository, and Antigravity only recognizes a repository that existed when the session started. Without a restart the first code worker would be refused.",
++      humanAction: "Close Antigravity, open it again on this folder and start the session the normal way. The onboarding continues from the state on disk; no answer is lost, because no question has been asked yet.",
++      agentGuidance: "Run the consent record action first if you hold one, tell the human exactly this restart, then stop. Do not ask the onboarding questions in this session; they come after the restart.",
++    },
++    final: null,
++  };
++}
++
++// PO decision 2026-11-08: the Windows rights step can only be done by the human, so it stands next to the other first-round questions instead of stopping the run later.
++function withWindowsRightsAsk(result, root, platform, privateStateCause) {
++  if (platform !== "win32" || !FIRST_ROUND_OUTCOMES.includes(result.outcome)) return result;
++  let cause = null;
++  try { cause = privateStateCause({ projectRoot: root }); } catch { return result; }
++  if (cause?.reason !== "WIN-AUTH-PRIVATE-ROOT") return result;
++  const ask = {
++    kind: "operator-step", name: "windowsPrivateStateRights", path: cause.path,
++    summary: cause.nextAction.summary, commands: cause.nextAction.repairPreview.commands,
++    guidance: "Show this step together with the other questions of this round. The human runs the one command for their shell in their own terminal; the agent never runs it. Afterwards run the same driver command again; the step disappears once the folder is secure.",
++  };
++  const extend = (action) => (Array.isArray(action?.pendingAsks) ? { ...action, pendingAsks: [...action.pendingAsks, ask] } : action);
++  return {
++    ...result,
++    pendingAsks: [...(Array.isArray(result.pendingAsks) ? result.pendingAsks : []), ask],
++    ...(result.collectInput ? { collectInput: extend(result.collectInput) } : {}),
++    ...(result.final?.nextAction ? { final: { ...result.final, nextAction: extend(result.final.nextAction) } } : {}),
++  };
++}
++
+ export function driveOnboardingInit(options = {}) {
+-  const result = driveOnboardingInitCore(options);
+-  if (!result || typeof result !== "object" || !options?.rootDir) return result;
++  const { exists = actorExistsSync, platform = process.platform, privateStateCause = windowsPrivateStateCause } = options;
++  const hadRepository = options?.rootDir ? exists(join(resolve(options.rootDir), ".git")) : true;
++  const core = driveOnboardingInitCore(options);
++  if (!core || typeof core !== "object" || !options?.rootDir) return core;
+   const root = resolve(options.rootDir);
++  const restart = antigravityRestartStop(core, root, hadRepository, exists);
++  if (restart !== null) return restart;
++  const result = withWindowsRightsAsk(core, root, platform, privateStateCause);
+   for (const repositoryCapability of ["local", "host-managed"]) {
+     let choice = null;
+     try { choice = heldIdentityChoice(root, repositoryCapability); } catch { choice = null; }
+@@ -1865,6 +1909,7 @@ export function main(args = process.argv.slice(2), {
+     || result.outcome === "collect-input"
+     || result.outcome === "external-operator"
+     || result.outcome === "pending-asks"
++    || result.outcome === "runner-restart-required"
+     || ((initialAnswers !== null || bootstrap !== null) && result.outcome === "unsupported-next-action") ? 0 : 1;
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.test.mjs b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+index 57b6b992126cee6b081784195a32540e695c54b7..51e0de6ebb823210e82731a1ce04b82dad2713fb 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.test.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+@@ -303,7 +303,12 @@ function checkConvergenceCell(selectedCell) {
+         roots.push(root);
+         const label = `${runner}/${machine.name}`;
+         const env = withConflictingAmbientRunner(machine.env, runner);
+-        const first = driveOnboardingInit({ rootDir: root, runner, env });
++        let first = driveOnboardingInit({ rootDir: root, runner, env });
++        // PO decision 2026-11-08: on Antigravity the call that creates the repository ends in the restart, and the first question round follows it.
++        if (runner === "antigravity") {
++          assert.equal(first.outcome, "runner-restart-required", `${label}: ${JSON.stringify(first)}`);
++          first = driveOnboardingInit({ rootDir: root, runner, env });
++        }
+ 
+         assert.equal(first.schema, SCHEMA, label);
+         // G15 / D210 (restates: Codex stopped on a separate consent collect-input): every runner's first stop
+@@ -356,6 +361,55 @@ test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh
+   if (!MATRIX_CELL) await runMatrix("convergence");
+ });
+ 
++test("Antigravity: the driver call that creates the repository names the restart before any question; a repository that already existed does not", () => {
++  const root = freshRoot();
++  const existing = freshRoot();
++  const home = freshHome();
++  try {
++    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "antigravity");
++    const first = driveOnboardingInit({ rootDir: root, runner: "antigravity", env });
++    assert.equal(first.outcome, "runner-restart-required", JSON.stringify(first));
++    assert.equal(first.pendingAsks, undefined, "no question is asked before the restart");
++    assert.match(first.restart.humanAction, /Close Antigravity/u);
++    assert.match(first.restart.agentGuidance, /consent record action/u);
++    assert.equal(existsSync(join(root, ".git")), true);
++    assert.equal(driveOnboardingInit({ rootDir: root, runner: "antigravity", env }).outcome, "pending-asks", "the same command after the restart reaches the first question round");
++    spawnSync("git", ["init", "--initial-branch=main"], { cwd: existing, encoding: "utf8" });
++    assert.notEqual(driveOnboardingInit({ rootDir: existing, runner: "antigravity", env }).outcome, "runner-restart-required");
++  } finally {
++    for (const dir of [root, existing, home]) rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("Windows rights step: an insecure state folder stands beside the first-round questions, a secure one and other platforms add nothing", () => {
++  const root = freshRoot();
++  const home = freshHome();
++  try {
++    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "claude");
++    let calls = 0;
++    const insecure = () => {
++      calls += 1;
++      return { reason: "WIN-AUTH-PRIVATE-ROOT", path: "D:\\work\\project", nextAction: { summary: "narrow the rights", repairPreview: { commands: [{ shell: "cmd", command: "icacls x" }] } } };
++    };
++    const onWindows = driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "win32", privateStateCause: insecure });
++    assert.equal(onWindows.outcome, "pending-asks", JSON.stringify(onWindows));
++    const ask = onWindows.pendingAsks.at(-1);
++    assert.equal(ask.name, "windowsPrivateStateRights");
++    assert.equal(ask.path, "D:\\work\\project");
++    assert.deepEqual(ask.commands, [{ shell: "cmd", command: "icacls x" }]);
++    assert.match(ask.guidance, /the agent never runs it/u);
++    assert.equal(onWindows.final.nextAction.pendingAsks.at(-1).name, "windowsPrivateStateRights", "the printed form keeps one copy only when both copies agree");
++    const secure = driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "win32", privateStateCause: () => null });
++    assert.equal(secure.pendingAsks.some((entry) => entry.name === "windowsPrivateStateRights"), false);
++    const before = calls;
++    const linux = driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "linux", privateStateCause: insecure });
++    assert.equal(calls, before, "other platforms never run the probe");
++    assert.equal(linux.pendingAsks.some((entry) => entry.name === "windowsPrivateStateRights"), false);
++  } finally {
++    for (const dir of [root, home]) rmSync(dir, { recursive: true, force: true });
++  }
++});
++
+ test("initial answer CLI refuses absent or invalid language before any source or receipt write", () => {
+   const root = freshRoot();
+   const home = freshHome();
+@@ -1421,6 +1475,7 @@ test("a new-key post-setup failure replays the same public action from its bound
+   const destination = join(home, "recoverable-new-authority");
+   const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
+   try {
++    assert.equal(driveOnboardingInit({ rootDir: root, runner: "antigravity", env }).outcome, "runner-restart-required");
+     assert.equal(driveOnboardingInit({ rootDir: root, runner: "antigravity", env }).outcome, "pending-asks");
+     const policyPath = join(root, "project", "critical-human-proof.json");
+     const policyPreimage = readFileSync(policyPath, "utf8");
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+index f1e8963c6ca17424b442242767cc2371dd465cc8..3bfa98c24c1a9262235381263658fa580906b84c 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+@@ -54,7 +54,7 @@ transport only. Do not `define_subagent` a Pipeline role yourself; `dispatch-bri
+   (`AGY-NATIVE-WORKTREE-UNCOMMITTED`, repair: commit first; untracked files are not checked, but the child sees none of them). Several code
+   writers may run in parallel, in one call or several; there is no one-per-call and no alive-count rule, because a finished child's descriptor
+   stays `SUBAGENT_STATE_ALIVE`. Read-only roles are unaffected.
+-- **When the host refuses `Workspace: "branch"` (measured, greenfield 2026-11-08).** The message says the language server did not detect a
++- **When the host refuses `Workspace: "branch"` (measured, greenfield 2026-11-08).** Onboarding normally prevents this with its restart stop right after it creates the repository. The message says the language server did not detect a
+   repository: the folder became a git repository after this Antigravity session started, and the host keeps that view for the session. Do not
+   retry the same call and do not write the slice yourself, which is not a sanctioned route. Ask the PO once to restart Antigravity on this folder,
+   run the bootstrap, and dispatch again; the project state is on disk and nothing is lost.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+index 66a378408de534ed1477e401515c9a7b9f2de3f7..292464c1878e35c6a48a4a3f50d23beeab4461c9 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+@@ -86,3 +86,17 @@ including a SID based single directory ACL preview where applicable. The
+ operator may instead relocate the project into a private user profile path.
+ No action in this diagnostic writes an ACL. Rerun preflight after a reviewed
+ repair; a WSL fixture cannot certify native Windows custody.
++
++The onboarding driver checks the `project/` folder already in the first question
++round. When its rights are inherited from above the repository, `pendingAsks`
++carries a `windowsPrivateStateRights` step with the commands. Show it with the
++other questions. The human runs it, the agent never does.
++
++## Antigravity restart after the repository was created
++
++Driver outcome `runner-restart-required` means this onboarding created the
++project's Git repository. Antigravity only recognizes a repository that existed
++when the session started, so the first code worker would be refused. Run a held
++consent record action, tell the human the restart in `restart.humanAction`, and
++stop. The questions come after the restart, and the same driver command continues
++from the state on disk.

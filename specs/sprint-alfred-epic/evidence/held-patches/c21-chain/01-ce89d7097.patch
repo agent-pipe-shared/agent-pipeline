@@ -1,0 +1,55 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 6aedd8d3677cfa111c006bbbeedb53cf6d6fa514..0bbb0547550c825156cf75e071902533c93fdafc 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -8695,7 +8695,19 @@ test("DEVPLANSHELL-5: indirect script/package writes and the hook-disable settin
+     const powershellInspect = `& '${onboardingNode}' '${stateScript}' inspect`;
+     const powershellInspectResult = devPlanShellRun(path, powershellInspect, "PowerShell");
+     assert.equal(powershellInspectResult.exitCode, 0, `${powershellInspect}: ${powershellInspectResult.stderr}`);
++    // Live Windows run: the bare spelling of the same call must pass as well, an email in an answer flag included.
++    const bareConsent = `node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email 'ops@example.test' --activate`;
++    const bareConsentResult = devPlanShellRun(path, bareConsent, "PowerShell");
++    assert.equal(bareConsentResult.exitCode, 0, `${bareConsent}: ${bareConsentResult.stderr}`);
++    const unquotedEmail = `node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email ops@example.test --activate`;
++    assert.equal(devPlanShellRun(path, unquotedEmail, "PowerShell").exitCode, 0, unquotedEmail);
+     for (const rejected of [
++      `${bareConsent}; Remove-Item game.js`,
++      `${bareConsent} & Remove-Item game.js`,
++      `node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email $env:EMAIL --activate`,
++      `node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email @values --activate`,
++      `node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email (Remove-Item game.js) --activate`,
++      `& '${onboardingNode}' '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email (Remove-Item game.js) --activate`,
+       `${powershellConsent}; Remove-Item game.js`,
+       `& '${onboardingNode}' '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email $env:EMAIL --activate`,
+       `& @node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email 'ops@example.test' --activate`,
+diff --git a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+index b8eae0de65a64902ab21e069d5b5c18fc2323150..adc8f9c7b4d023baf535cd8d766035165b2047c1 100644
+--- a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
++++ b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+@@ -53,10 +53,13 @@ function powerShellScratchPath(target, root, dependencies, allowScratchRoot = fa
+ // that one prefix when the remainder parses as a single literal Node invocation that the
+ // existing closed lifecycle argv validator already recognizes. This does not admit PowerShell
+ // composition, variables, splatting, or a general-purpose call operator.
++// The bare `node <script> ...` spelling gets the same check, so a literal email in an answer flag does not depend on which spelling the agent chose (live
++// Windows run: the bare form was refused for its `@`, the same argv passed in Bash). PowerShell evaluates an unquoted (...) argument, so one is refused outright.
+ export function sanctionedPowerShellNodeCall(command, root) {
+-  if (typeof command !== "string" || !/^\s*&\s+/u.test(command)) return false;
++  if (typeof command !== "string") return false;
+   const body = command.replace(/^\s*&\s+/u, "");
+   if (/[\r\n;$`|<>]/u.test(body)) return false;
++  if (/[()]/u.test(body.replace(/'[^']*'|"[^"]*"/gu, ""))) return false;
+   const parsed = parseGuardCommand(body, root, { platform: "win32" });
+   if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+     || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+diff --git a/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs b/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
+index 2ca2d5aa3360ade3f23a6e70962a09ec6425f623..71175512bd67da2a52b22ee0f96ca120211724e7 100644
+--- a/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
++++ b/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
+@@ -46,6 +46,7 @@ const SHAPE_DISPOSITION = [
+   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
+   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
+   { bashOnly: "the dialect admits one literal command per call (the one literal $env: assignment folded into it is the single exception)" },
++  { bashOnly: "a dollar sign is refused outright in the dialect, quoted or not, because PowerShell expands it" },
+ ];
+ 
+ test("every shape of the Bash grammar table has a disposition, and a Bash-only shape is refused by the PowerShell dialect", () => withRoot(({ root, ps }) => {

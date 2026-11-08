@@ -1,0 +1,32 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 73b6dd7871a0f762682323750c7a4259a2f5c543..3e0e17d85b3ce1b12179804d4063ed28c2d4001e 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -3301,7 +3301,7 @@ function intakeDesignQuestionsAction(root, runner) {
+     input: { name: "answersJson", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 65_536, singleLine: false, rejectNul: true },
+     mutation: false,
+     requiresConfirmation: false,
+-    guidance: `ask the PO the ONE bundled round of design questions this project still needs answered. If there are genuinely no open design questions, ask for an explicit affirmative no-open-questions disposition. Replace exactly ${INTAKE_DESIGN_ANSWERS_PLACEHOLDER} in applyAction.argv with either the JSON array of {question, answer} objects or {"disposition":"no-open-questions"} as one argv data element. Never invent an answer, reconstruct the command, or ask a second round. If the answers contain a newline or exceed a few KB, write the same JSON to scratch/design-answers.json and execute fileApplyAction (the --answers-file route) instead of applyAction.`,
++    guidance: `ask the PO the ONE bundled round of design questions this project still needs answered. If there are genuinely no open design questions, ask for an explicit affirmative no-open-questions disposition. Write either the JSON array of {question, answer} objects or {"disposition":"no-open-questions"} to scratch/design-answers.json and execute fileApplyAction (the --answers-file route): this is the default, because a shell command carrying answers with parentheses, a dollar sign or a backtick is refused as a possible hidden push. Only a runner that executes applyAction.argv directly, without a shell, may instead replace exactly ${INTAKE_DESIGN_ANSWERS_PLACEHOLDER} in applyAction.argv with the same JSON as one argv data element. Never invent an answer, reconstruct the command, or ask a second round.`,
+     applyAction: commandAction(
+       [ONBOARDING_SCRIPT, "intake-design-questions-apply", "--root", root, "--answers-json", INTAKE_DESIGN_ANSWERS_PLACEHOLDER, "--activate", "--runner", runner],
+       true, true, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA, ["applied"],
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+index 36f7fc459056f236b2d3480fff9e906ec865e28d..a90337bc32b773c6937b15b443cca30bc8f93bc1 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+@@ -63,9 +63,11 @@ project root. Exactly one of `--text` / `--text-file` is accepted per call.
+ 
+ **Answers from a file.** `intake-design-questions-apply` and its `-replace`
+ variant take the bundled answers either inline (`--answers-json`) or from a
+-file (`--answers-file <repo-relative path>`), never both. Write a long or
+-multi-line answers array to a file under `scratch/` first and pass that path,
+-for the same reason as `--text-file`. The optional `--answers-file-sha256
++file (`--answers-file <repo-relative path>`), never both. The file is the
++default route: write the answers to `scratch/design-answers.json` and run the
++returned `fileApplyAction`. A shell command carrying answers with parentheses,
++a dollar sign or a backtick is refused as a possible hidden push, and a
++multi-line array fails for the same reason as `--text-file`. The optional `--answers-file-sha256
+ <64 lowercase hex>` refuses the call unless it equals the SHA-256 of the file's
+ raw bytes; it is accepted only together with `--answers-file`. The file route
+ follows the same rules as the inline one, including "exactly ONE bundled round".

@@ -1,0 +1,295 @@
+diff --git a/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs b/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
+index 5b65ce45a6018c32f1d8ea8c769cfd415aca423d..9b8e81d62c4b5606eb1501d7d1dd1b83559bd658 100644
+--- a/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
++++ b/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
+@@ -22,6 +22,7 @@ import { observeCurrentPlanApprovalForCalibration, readState, run, statePath } f
+ import { compileDecisionSummary } from "../../scripts/architecture-baseline.mjs";
+ import { applyInstall } from "../../scripts/pre-commit-hook-install.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
++import { finishedCommitMessageFindings } from "../commit-message-policy.mjs";
+ import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
+ import { validateFeaturePackage } from "../feature-package-topology.mjs";
+ import { createGovernanceScopeController } from "../governance-scope.mjs";
+@@ -231,14 +232,24 @@ function configure(root, env, command = COMMAND) {
+ }
+ 
+ // Parses the two printed route lines; they are executed verbatim (no re-derivation of the paths or message).
+-function printedRoute(logs) {
++// Restated 2026-11-08 (QG-04, candidate 21): the printed -m line could not pass GIT-03 live, so the route is a printed message and
++// `git commit -F`. The message is written exactly as printed and must pass the same finished-message policy the guard applies.
++function printedRoute(logs, root) {
+   const add = logs.find((line) => line.startsWith("git add -- "));
+-  const commit = logs.find((line) => line.startsWith("git commit -m "));
++  const commit = logs.find((line) => line.startsWith("git commit -F "));
+   assert.ok(add, `the output must print a git add line:\n${logs.join("\n")}`);
+   assert.ok(commit, `the output must print a git commit line:\n${logs.join("\n")}`);
+-  const message = /^git commit -m "([^"]+)"$/u.exec(commit);
+-  assert.ok(message, `the printed commit line is one plain -m "<message>" spelling: ${commit}`);
+-  return { addArgs: ["add", "--", ...add.slice("git add -- ".length).split(" ")], commitArgs: ["commit", "-m", message[1]], add };
++  const file = commit.slice("git commit -F ".length);
++  const start = logs.indexOf("--- message ---");
++  const end = logs.indexOf("--- end ---");
++  assert.ok(start >= 0 && end > start, `the output must print the commit message:\n${logs.join("\n")}`);
++  const message = `${logs.slice(start + 1, end).join("\n")}\n`;
++  assert.deepEqual(finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings, [], "the printed message passes GIT-03");
++  if (root !== undefined) {
++    mkdirSync(join(root, dirname(file)), { recursive: true });
++    writeFileSync(join(root, file), message);
++  }
++  return { addArgs: ["add", "--", ...add.slice("git add -- ".length).split(" ")], commitArgs: ["commit", "-F", file], add };
+ }
+ 
+ test("the printed route names exactly the two calibration twins and the normal commit", () => {
+@@ -250,7 +261,7 @@ test("the printed route names exactly the two calibration twins and the normal c
+ test("the printed git add / git commit lines land through the installed hook (State tracked in HEAD)", () => {
+   const { root, git, env, head } = fixture({ stateTracked: true });
+   const before = head();
+-  const route = printedRoute(configure(root, env));
++  const route = printedRoute(configure(root, env), root);
+   assert.equal(git(...route.addArgs).status, 0);
+   const committed = git(...route.commitArgs);
+   assert.equal(committed.status, 0, committed.stderr);
+@@ -266,7 +277,7 @@ test("the printed git add / git commit lines land through the installed hook (St
+ test("the printed route also lands when the private State is untracked, as the output recommends", () => {
+   const { root, git, env, head } = fixture({ stateTracked: false });
+   const before = head();
+-  const route = printedRoute(configure(root, env));
++  const route = printedRoute(configure(root, env), root);
+   assert.equal(git(...route.addArgs).status, 0);
+   const committed = git(...route.commitArgs);
+   assert.equal(committed.status, 0, committed.stderr);
+@@ -330,7 +341,7 @@ test("refusal: a different staged set (an extra file beside the twins), private
+ test("G20-46: set-phase --verify-command prints the walkable route and it lands (private State untracked)", () => {
+   const { root, git, phaseLogs, head } = fixture({ stateTracked: false, verifyAtPhase: true });
+   const before = head();
+-  const route = printedRoute(phaseLogs);
++  const route = printedRoute(phaseLogs, root);
+   assert.deepEqual(route.addArgs.slice(2).sort(), [".claude/pipeline.json", "project/pipeline.json"]);
+   assert.ok(phaseLogs.some((line) => /no PO step/u.test(line)), `the route is named as an agent step:\n${phaseLogs.join("\n")}`);
+   assert.equal(git(...route.addArgs).status, 0);
+@@ -371,7 +382,7 @@ test("G20-51: materialize-architecture registers the feature package itself and
+ test("G20-46: an extra staged path beside the twins names the agent repair, no signature, and the repair lands", () => {
+   const ctx = { ...fixture({ stateTracked: false, verifyAtPhase: true }) };
+   ctx.before = ctx.head();
+-  const route = printedRoute(ctx.phaseLogs);
++  const route = printedRoute(ctx.phaseLogs, ctx.root);
+   writeFileSync(join(ctx.root, "extra.txt"), "extra\n");
+   assert.equal(ctx.git(...route.addArgs, "extra.txt").status, 0);
+   const first = ctx.git(...route.commitArgs);
+diff --git a/plugins/pipeline-core/lib/writer-commit-capability.mjs b/plugins/pipeline-core/lib/writer-commit-capability.mjs
+index c892dfb5f81d9b419600db1afa8b61aa262f3216..65b4a2b1a7c72628328261a69cca87c11c1690da 100644
+--- a/plugins/pipeline-core/lib/writer-commit-capability.mjs
++++ b/plugins/pipeline-core/lib/writer-commit-capability.mjs
+@@ -29,6 +29,7 @@ import { loadProtectedTestPathRules, protectedTestPathRuleFor, writerCommitMac,
+ 
+ const SHA256 = /^[a-f0-9]{64}$/u;
+ const KEY_FILE = "mac.key";
++const WRITER_MESSAGE_FILE = "scratch/commit-msg/writer-output.txt";
+ const MAX_SNAPSHOT_FILE_BYTES = 16 * 1024 * 1024;
+ const sha256Of = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ 
+@@ -45,7 +46,12 @@ const commitSubject = (writer) => `chore(pipeline): commit the ${String(writer).
+ /** The exact commit that publishes `paths`, as the next step a writer prints. */
+ export function writerCommitSteps(paths, message) {
+   const list = paths.map(quoted).join(" ");
+-  return [`git add -- ${list}`, `git commit -m "${message}" -- ${list}`];
++  // GIT-03 needs both trailers in the final block, and the push guard refuses parentheses on a command line, so the route is a message file.
++  return [
++    `git add -- ${list}`,
++    `Write this to ${WRITER_MESSAGE_FILE}: the line "${message}", a blank line, then the two lines "AI-Assisted: true" and "Dispatch: stage-0 (elephant)".`,
++    `git commit -F ${WRITER_MESSAGE_FILE} -- ${list}`,
++  ];
+ }
+ 
+ function repoRootOf(rootDir, spawn) {
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 50d3dad83600754d0a96c9c794f45aedd924682a..8655119032dfca39ba254fcaf4f4322fde5b435d 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -195,6 +195,7 @@ function consumerFixture(log, identity) {
+   // G20-54 (candidate 20b): set-phase names the package step, and points at the verification tiers "below" only when they follow.
+   assert.match(setPhaseLogs, /moved approved -> implementing/u, setPhaseLogs.slice(0, 600));
+   assert.equal(/verification tiers below/u.test(setPhaseLogs), /commit the verification tiers ALONE/u.test(setPhaseLogs), setPhaseLogs.slice(0, 600));
++  assert.match(setPhaseLogs, /the briefing binds HEAD/u); // live Codex run: a commit after the briefing stopped the worker
+   assert.ok(current().rigorHistory.some((row) => (row.body ?? row).boundary === "plan-submission"), "the plan-submission rigor row exists (recorded by submit-plan)");
+   // A fixture signature for a critical action, made the way the PO's terminal makes it (Ed25519 over the approval intent digest) with the
+   // test key whose public digest is the policy's trust anchor. No real key exists or is needed.
+diff --git a/plugins/pipeline-core/scripts/create-adr.mjs b/plugins/pipeline-core/scripts/create-adr.mjs
+index 7609303d4efd288fc4dba257b73ec208586c1d60..94a1c897a8cabfe6e14ad88fcc0543ff3ec577fc 100644
+--- a/plugins/pipeline-core/scripts/create-adr.mjs
++++ b/plugins/pipeline-core/scripts/create-adr.mjs
+@@ -162,7 +162,7 @@ function createProposal(root, values) {
+   }
+   return { ok: true, id, schema: record.schema, status: "proposed", digest: record.digest, markdown: `docs/adr/${id}.md`, sidecar: `docs/adr/${id}.json`,
+     nextFreeNumber: free, acceptedIdAfterApproval: `${free}-${slug}`,
+-    next: "Replace each REPLACE: line in the Markdown, run this script again with --refresh (without --slug it updates every draft) to recompute the digest once after the last edit, then bind the proposal in the design package; it becomes `accepted` only through the PO's design approval and `pipeline-state.mjs materialize-architecture`. The number is a preview: bind-adr-proposals.mjs assigns the final numbers in --draft order." };
++    next: "Finish the bootstrap binding first: while readiness is bootstrap-binding-required an edit of this draft is refused (GUARD-LIFECYCLE-NOT-READY). Then replace each REPLACE: line in the Markdown, run this script again with --refresh (without --slug it updates every draft) to recompute the digest once after the last edit, then bind the proposal in the design package; it becomes `accepted` only through the PO's design approval and `pipeline-state.mjs materialize-architecture`. The number is a preview: bind-adr-proposals.mjs assigns the final numbers in --draft order." };
+ }
+ 
+ export function main(argv = process.argv.slice(2)) {
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 91e5e2f9dc079544c5e0d78e2f79723f12fbc8e5..d560699c35c1d31670d274ce19a6087c8bbee428 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -318,7 +318,7 @@ test("P3: one command takes the active feature from the approved candidate to th
+     const tracked = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/tracked-close.json"), "utf8"));
+     assert.equal(tracked.schema, "pipeline.close-tracked-effects.v1"); assert.equal(tracked.resultSha256, f.resultSha); assert.equal(tracked.pipelineStateSha256, sha256Of(readFileSync(join(f.root, STATE_PATH))));
+     assert.ok(result.commit.paths.includes(STATE_PATH) && result.commit.paths.includes("specs/feature-abc/evidence/audit-request.json") && result.commit.paths.includes("specs/feature-abc/evidence/tracked-close.json"), result.commit.paths.join());
+-    assert.match(result.commit.steps[0], /^git add -- /u); assert.match(result.commit.steps[1], /^git commit -m "chore\(close\): close feature feature-abc/u);
++    assert.match(result.commit.steps[0], /^git add -- /u); assert.match(result.commit.steps[1], /chore\(close\): close feature feature-abc/u); /* restated 2026-11-08 (QG-04, candidate 21): the printed -m form could not pass GIT-03, the step is now a message file */ assert.match(result.commit.steps[2], /^git commit -F scratch\/commit-msg\/writer-output\.txt -- /u);
+     assert.ok(result.resumeLifecycleId, "the next call resumes this lifecycle"); assert.match(result.next, /--resume-lifecycle-id/u);
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 80bbfa91cbc37cb2d4fd0c24cb8ada0918fff8c7..afe39f525780003867f0f4e4da3a1f688cf249d0 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -646,6 +646,20 @@ const RECOVERY_BRIDGE_DECISION_KEYS = [
+   "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "approvedBy", "approvedAt", "expiresAt", "status",
+ ];
+ 
++// Live Claude run on 20j: the printed one-line commit could not succeed. GIT-03 needs both trailers in the final block, and a
++// command line holding the parentheses of the Dispatch trailer is refused by the push guard, so the route is a message file.
++const VERIFICATION_TIER_MESSAGE_FILE = "scratch/commit-msg/verification-tiers.txt";
++function printVerificationTierCommit() {
++  console.log(`Write this commit message to ${VERIFICATION_TIER_MESSAGE_FILE}, exactly the lines between the markers:`);
++  console.log("--- message ---");
++  console.log("chore: configure project verification");
++  console.log("");
++  console.log("AI-Assisted: true");
++  console.log("Dispatch: stage-0 (elephant)");
++  console.log("--- end ---");
++  console.log(`git commit -F ${VERIFICATION_TIER_MESSAGE_FILE}`);
++}
++
+ function recoveryBridgeBindingKeys(value) {
+   const legacy = !Object.hasOwn(value ?? {}, "poApproval");
+   return [
+@@ -12013,9 +12027,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       if (calibrationCommitPaths !== null && calibrationCommitPaths.length > 0) {
+         console.log("Next (agent, no PO step): commit the verification tiers ALONE, as the next commit, before staging anything else:");
+         console.log(`git add -- ${calibrationCommitPaths.join(" ")}`);
+-        console.log('git commit -m "chore: configure project verification"');
++        printVerificationTierCommit();
+         console.log("Stage no other path with them (docs/state.md included): the hook admits exactly this set against the approved plan; commit the other files in a separate commit afterwards.");
+       }
++      // Live Codex run on 20j: docs/state.md was committed after the briefing was built, HEAD moved and the worker stopped.
++      console.log("Before building a dispatch briefing, commit everything of this entry, docs/state.md included: the briefing binds HEAD, and a later commit stops the worker.");
+       const decisionSummary = summarizePlanningDecisionApplicability(architecture.artifacts?.decisionApplicability);
+       if (decisionSummary !== null) console.log(`Architecture decisions: ${JSON.stringify(decisionSummary)}`);
+       return 0;
+@@ -12099,7 +12115,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       console.log("Verify command configured for the established implementation lifecycle.");
+       console.log("Commit exactly the selected verification tiers through the normal hooks:");
+       console.log(`git add -- ${commitReady.paths.join(" ")}`);
+-      console.log('git commit -m "chore: configure project verification"');
++      printVerificationTierCommit();
+       console.log("Keep the private State untracked; the normal hook rechecks this exact transition at commit time.");
+       return 0;
+     }
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+index 0a7fb03f2145d3c9df9e04dfa0a65e352d6323fa..0e8782fb8de1555df56b96b681eb8dee91c1639d 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+@@ -1164,7 +1164,7 @@ async function main() {
+       process.stderr.write([
+         "BLOCKED (agent-pipeline pre-commit hook): the verification tiers " + readyPaths.join(", ") + " are admitted without any human step, but only as their own commit; " + otherStaged.length + " other path(s) are staged with them.",
+         "Repair (agent, no PO step): git restore --staged -- " + otherStaged.join(" "),
+-        "then: git commit -m \\"chore: configure project verification\\"   (exactly " + readyPaths.join(" ") + " staged)",
++        "then commit with git commit -F and a message file under scratch/: subject chore: configure project verification, a blank line, then the trailer lines AI-Assisted: true and Dispatch: stage-0 (elephant)   (exactly " + readyPaths.join(" ") + " staged)",
+         "then stage and commit the other path(s) in a separate commit. No human-guard-override signature is needed for this.",
+       ].join("\\n") + "\\n");
+       process.exitCode = 1;
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 8bdef6819badc50ed2da263c87aee4bd9c5161d9..1bbaddc75c31efa002248fb8e1df75023b40a215 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -19,7 +19,7 @@ Resolve the plugin root, then run exactly:
+ 
+ `node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"`
+ 
+-Accept only schema `pipeline.start-preflight.v1`, status `ready`,
++A dispatched Goldfish appends `--role goldfish`. Accept only schema `pipeline.start-preflight.v1`, status `ready`,
+ `pipeline-governance-inactive`, `plugin-refresh-required`, `windows-authority-unavailable`, the hook statuses or the hard recovery status below, absolute matching `pluginRoot`, valid
+ version/source/boundary/handoff, and a read-only `nextAction` when ready.
+ Goldfish/Critic validate but never execute onboarding; Elephant executes the
+@@ -205,11 +205,9 @@ recommendation.
+    what is refused:
+    `node <plugin-root>/scripts/resume-hint.mjs capture --root <root> --card-file <root>/project/.resume-hint-input.json --consume-card`.
+    Write the card to that exact path first. Elsewhere (a ready session) any
+-   `--card-file <json>` works. A short goal with no further
+-   material input needs no card. Read back `resume-hint.mjs inspect` after a
++   `--card-file <json>` works. Read back `resume-hint.mjs inspect` after a
+    successful capture and state that the `available` card will be used in the
+-   next session; when no restart follows, use it as context for the current
+-   kickoff or planning step instead.
++   next session.
+    At the start of the NEXT session, when `resume-hint.mjs inspect` reports
+    status `available`, the agent MUST read `project/resume-hint.json`'s
+    content in that same turn and incorporate its `intent`, `constraints`,
+@@ -222,10 +220,7 @@ recommendation.
+    Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
+    their shapes differ: `intent` is one string; the other three are **arrays** of
+    short strings, at most 4, 4 and 3 entries. Every entry is a distilled
+-   statement, never a transcript. Interpret user intent
+-   rather than keywords: an intended restart/session cut captures it; changed
+-   scope or constraints refresh it; canonised or revoked information is
+-   discarded. At bootstrap, `resume-hint.mjs inspect` is passive context only:
++   statement, never a transcript. At bootstrap, `resume-hint.mjs inspect` is passive context only:
+    `absent`, `challenged-stale`, or `ignored-invalid` never changes readiness,
+    actions, authority, approval, close state, or exit status. Do not capture
+    raw transcripts, commands, approvals, lifecycle instructions, host paths,
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 4e9529ad2aca27de2eded655b0a3b2b62dd13afc..89c8396aef11fa2b525dfb25992bd2201bda8481 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -56,7 +56,7 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
+ 
+ ## 2. Implementation (one dispatch per task, from the template)
+ 
+-1. Select the model route: `model-role-dispatch-select.mjs --repo-root <absolute-repo> --runner <claude|codex|antigravity> --task-route <registered-route>`;
++1. Select the model route: `model-role-dispatch-select.mjs --repo-root <absolute-repo> --runner <claude|codex|antigravity> --task-route <registered-route>` (a Goldfish implementation uses `duty.implement`, deep work `duty.deep`; a refusal lists all routes);
+    Antigravity adds `--host-session-id <id from this session's native hook>`.
+ 2. Generate the binding: `dispatch-briefing.mjs binding --root <root> --dispatch-id <id> --item <slug> --criterion AC-<n> --agent-type <type> --model-id <model> --check <node test> --path <...>`
+    and put its `skeleton` (or `block`) first in the briefing filled from `templates/prompts/goldfish-task.md`. A directory in `--path` ends with `/`.
+@@ -76,7 +76,7 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
+    - **Codex**: Codex runs no PreToolUse hook for `spawn_agent`, so the governed admission is run by hand first. Write the briefing (`dispatch-briefing.mjs build --package <package.json> --out scratch/<briefing>.md`),
+      run `codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing scratch/<briefing>.md` (it performs the guard's admission: route record, governed queue row, pending state; a refusal carries the guard's
+      code and repair and leaves no state), and only after exit 0 and `status: "prepared"` call `spawn_agent` with exactly the printed `spawn_agent.agent_type` (`worker`) and `spawn_agent.message`, keeping the
+-     `pipeline-core:goldfish-implementor` (or `-mechanic`) role, within the printed `bindWindowSeconds`. Preparing the same briefing again is safe. A `worker` started without a prepared dispatch gets a SubagentStart notice that its work will not be integrated.
++     `pipeline-core:goldfish-implementor` (or `-mechanic`) role, within the printed `bindWindowSeconds`. Preparing the same briefing again is safe. A `worker` started without a prepared dispatch gets a SubagentStart notice that its work will not be integrated. Wait with `wait_agent` and `timeout_ms: 300000`: a worker runs for minutes and every shorter poll costs a turn.
+    - **Antigravity**: `antigravity-native-dispatch-prepare.mjs prepare --root <repository-root> --request <native-dispatch-request.json>`; only after exit 0 and
+      `status: "prepared"` call `invoke_subagent` with the fields of the returned `invocation` unchanged (the host takes flat arguments, one child per call). A native implementation consent is not available: read
+      `references/antigravity-native-dispatch.md` before the first dispatch and ask the PO when the sanctioned route does not return an authored commit.
+diff --git a/plugins/pipeline-core/templates/prompts/goldfish-task.md b/plugins/pipeline-core/templates/prompts/goldfish-task.md
+index a2a92e187f4aa89f0718871c4225a3b20c67837b..dec15a8db11b576aba8d1b070e696fdf25e7daf1 100644
+--- a/plugins/pipeline-core/templates/prompts/goldfish-task.md
++++ b/plugins/pipeline-core/templates/prompts/goldfish-task.md
+@@ -263,8 +263,9 @@ report that no grant was found.
+ 
+ At an actual session start or runtime re-entry, invoke
+ `pipeline-core:pipeline-start` and complete its required reading/preflight
+-sequence before the first Edit, Write or NotebookEdit. A role without the Skill
+-tool instead runs `node "<plugin-root>/scripts/pipeline-start-preflight.mjs" --role goldfish`
++sequence before the first Edit, Write or NotebookEdit. A worker without the Skill
++tool, also one that reads the skill as a file (Codex, Antigravity), instead runs
++`node "<plugin-root>/scripts/pipeline-start-preflight.mjs" --role goldfish`, never the bare form,
+ once as a plain command (nothing else appended), so the readback withholds every
+ Coordinator action from this role; exit 2 with `hook-refresh-required`
+ is a soft host status, so continue. Use only the sanctioned
+diff --git a/templates/prompts/goldfish-task.md b/templates/prompts/goldfish-task.md
+index a2a92e187f4aa89f0718871c4225a3b20c67837b..dec15a8db11b576aba8d1b070e696fdf25e7daf1 100644
+--- a/templates/prompts/goldfish-task.md
++++ b/templates/prompts/goldfish-task.md
+@@ -263,8 +263,9 @@ report that no grant was found.
+ 
+ At an actual session start or runtime re-entry, invoke
+ `pipeline-core:pipeline-start` and complete its required reading/preflight
+-sequence before the first Edit, Write or NotebookEdit. A role without the Skill
+-tool instead runs `node "<plugin-root>/scripts/pipeline-start-preflight.mjs" --role goldfish`
++sequence before the first Edit, Write or NotebookEdit. A worker without the Skill
++tool, also one that reads the skill as a file (Codex, Antigravity), instead runs
++`node "<plugin-root>/scripts/pipeline-start-preflight.mjs" --role goldfish`, never the bare form,
+ once as a plain command (nothing else appended), so the readback withholds every
+ Coordinator action from this role; exit 2 with `hook-refresh-required`
+ is a soft host status, so continue. Use only the sanctioned
