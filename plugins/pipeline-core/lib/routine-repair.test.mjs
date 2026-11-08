@@ -324,6 +324,33 @@ test("heal also moves orphaned authority records when no pending state is settle
   assert.deepEqual(readdirSync(commitDir(ap)), []);
 }));
 
+// Live 2026-11-08 (Codex greenfield): a Codex agent association names its pending file. Heal retired the pending file of the integrated first
+// worker and left the association, so the host state reader refused every further dispatch with native-authority-agent-unresolved, and neither
+// heal nor move-aside cleared it. The association leaves with the pending file, and one already stranded leaves on the next heal.
+test("C21: heal retires the Codex agent association of a retired pending state and one already stranded, and keeps a live or unreadable one", () => withRepo((root, ap) => {
+  const association = (seed, pendingFile) => {
+    const name = `agent-codex-${hex(seed, 64)}.json`;
+    writeFileSync(join(commitDir(ap), name), JSON.stringify({ runner: "codex", pendingFile }));
+    return name;
+  };
+  const settled = writeNamedPending(ap, "D-S");
+  const live = writeNamedPending(ap, "D-L");
+  const ofSettled = association("1", settled.name);
+  const ofLive = association("2", live.name);
+  const stranded = association("3", `pending-codex-${hex("9", 64)}.json`);
+  const unreadable = `agent-codex-${hex("4", 64)}.json`;
+  writeFileSync(join(commitDir(ap), unreadable), "{ not json");
+  const { exit, result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, { spawn: stub(inspectRows(rowOf(settled, "integrated"), rowOf(live, null))).spawn, ...SETTLED_DEPS });
+  assert.equal(exit, 0, JSON.stringify(result));
+  const left = readdirSync(commitDir(ap)).sort();
+  for (const name of [settled.name, ofSettled, stranded]) assert.ok(!left.includes(name), `${name} left`);
+  for (const name of [live.name, ofLive, unreadable]) assert.ok(left.includes(name), `${name} moved`);
+  assert.deepEqual(result.settledPending.retiredOrphanAuthority.map((row) => row.name).sort(), [ofSettled, stranded].sort());
+  assert.deepEqual(result.settledPending.keptOrphanAuthority.map((row) => row.name), [unreadable], "an unreadable association is kept, never guessed");
+  const aside = files(join(ap, "session-authority-abandoned"));
+  for (const name of [ofSettled, stranded]) assert.ok(aside.some((file) => file.endsWith(`-settled-pending/${name}`)), `${name} retained aside`);
+}));
+
 test("settled-pending-aside is refused without a reason and when inspect does not report", () => withRepo((root) => {
   assert.equal(runRoutineRepair({ kind: "settled-pending-aside", root }, { spawn: stub(emptyInspect).spawn }).result.code, "RR-REASON-REQUIRED");
   const failing = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: () => ({ status: 1, stdout: "", stderr: "x" }) });

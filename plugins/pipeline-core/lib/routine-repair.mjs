@@ -116,8 +116,9 @@ export function planSettledPending({ pendingDir, reservations }) {
 }
 
 /**
- * Read-only: the authority records whose pendingSha256 names no pending file of the directory, the exact condition under which the
- * host state reader refuses (native-authority-orphan-prefix). A record that cannot be read or carries no sha256 is kept, never guessed.
+ * Read-only: the authority records whose pendingSha256 names no pending file of the directory, and the Codex agent associations whose
+ * pendingFile is gone, the exact conditions under which the host state reader refuses (native-authority-orphan-prefix,
+ * native-authority-agent-unresolved). A record that cannot be read or carries no reference is kept, never guessed.
  */
 export function planOrphanAuthority({ pendingDir }) {
   const retire = [], kept = [];
@@ -134,6 +135,17 @@ export function planOrphanAuthority({ pendingDir }) {
       const sha = JSON.parse(readFileSync(join(pendingDir, name), "utf8"))?.pendingSha256;
       if (typeof sha !== "string" || !/^[a-f0-9]{64}$/u.test(sha)) { kept.push({ name, reason: "no pendingSha256" }); continue; }
       if (!pendingHashes.has(sha)) retire.push({ name, pendingSha256: sha });
+    } catch (error) { kept.push({ name, reason: `cannot be checked: ${short(error)}` }); }
+  }
+  // A Codex agent association names its pending file, and the reader refuses one whose file is gone (native-authority-agent-unresolved).
+  // Live 2026-11-08: heal retired the pending file of an integrated worker, left this record, and no later dispatch could start.
+  for (const name of names.filter((entry) => /^agent-codex-[a-f0-9]{64}\.json$/u.test(entry)).sort()) {
+    try {
+      if (lstatSync(join(pendingDir, name)).isSymbolicLink()) { kept.push({ name, reason: "a symlink is never moved" }); continue; }
+      const association = JSON.parse(readFileSync(join(pendingDir, name), "utf8"));
+      const pendingFile = association?.pendingFile;
+      if (typeof pendingFile !== "string" || !PENDING_NAME.test(pendingFile)) { kept.push({ name, reason: "no pendingFile" }); continue; }
+      if (!names.includes(pendingFile)) retire.push({ name, pendingFile });
     } catch (error) { kept.push({ name, reason: `cannot be checked: ${short(error)}` }); }
   }
   return { retire, kept };
