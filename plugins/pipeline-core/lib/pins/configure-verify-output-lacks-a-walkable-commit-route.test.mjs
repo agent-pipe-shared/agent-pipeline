@@ -62,7 +62,7 @@ const architecture = { schema: "pipeline.architecture-design.v1", repositoryKind
 
 let counter = 0;
 // One fixture per case: the profile receipt fingerprint is bound to this exact repository path.
-function fixture({ stateTracked }) {
+function fixture({ stateTracked, verifyAtPhase = false }) {
   const parent = join(WORK, `fx-${counter += 1}`);
   mkdirSync(parent, { recursive: true });
   const root = join(parent, "repo");
@@ -89,6 +89,7 @@ function fixture({ stateTracked }) {
     let status;
     try { status = run(argv, { dir: root, now: () => AT }); } finally { Object.assign(console, old); }
     assert.equal(status, 0, `SETUP ${argv[0]}: ${logs.join("\n")}`);
+    return logs;
   };
 
   write("README.md", "Synthetic walkable-route fixture\n");
@@ -175,7 +176,10 @@ function fixture({ stateTracked }) {
   writeJson("specs/e2e/lifecycle.json", { schema: "pipeline.feature-package.v1", feature: { id: FEATURE, rigor: 2 }, state: "approved", artifacts: [artifact("prd", PLAN, true, "mutable", "active"), artifact("spec", SPEC, true, "mutable", "active"), artifact("acceptance", "specs/e2e/acceptance.md", true, "mutable", "active"), artifact("result", "specs/e2e/result.md", true, "mutable", "active"), artifact("candidate-evidence", approved.planApproval.acceptedContract.path, false, "immutable", "retain")], candidate: structuredClone(request.approvalIntent.value.candidate), supersedes: null });
   const packageRead = validateFeaturePackage(root, "specs/e2e/lifecycle.json");
   assert.ok(packageRead.ok, `SETUP registered package: ${JSON.stringify(packageRead.findings)}`);
-  lifecycle(["set-phase", "--phase", "implementation"]);
+  // C20 G20-46: the happy path sets the verify command in the same set-phase step (submit-plan names that route).
+  const phaseLogs = lifecycle(verifyAtPhase
+    ? ["set-phase", "--phase", "implementation", "--verify-command", COMMAND]
+    : ["set-phase", "--phase", "implementation"]);
   assert.equal(derivePlanLifecycle(readCurrent()).status, "implementing");
   const stateRelative = statePath(root).slice(root.length + 1).replaceAll("\\", "/");
   if (stateTracked) {
@@ -192,7 +196,7 @@ function fixture({ stateTracked }) {
   assert.equal(observed.status, "eligible", `SETUP genuine default approval reader: ${JSON.stringify(observed)} (win32 private-path verdict: ${privatePath})`);
   const install = applyInstall({ rootDir: root, ...PLUGIN_DIRS });
   assert.equal(install.status, "installed", JSON.stringify(install));
-  return { root, git, env, head: () => git("rev-parse", "HEAD").stdout.trim() };
+  return { root, git, env, phaseLogs, head: () => git("rev-parse", "HEAD").stdout.trim() };
 }
 
 // Runs the real configure-verify and returns the printed lines.
@@ -306,6 +310,41 @@ test("refusal: a different staged set (an extra file beside the twins), private 
   assert.equal(ctx.git(...route.addArgs, "extra.txt").status, 0);
   refused(ctx, "extra staged file, State untracked");
   assert.equal(existsSync(join(ctx.root, "extra.txt")), true);
+});
+
+// C20 G20-46 (live Antigravity greenfield 2026-11-07): set-phase --verify-command wrote the twins and printed no commit
+// step; the agent staged docs/state.md with them, the exact-set route was lost and the generic refusal sent the PO into a
+// human-guard-override signature. set-phase now prints the walkable route, and executing it verbatim lands.
+test("G20-46: set-phase --verify-command prints the walkable route and it lands (private State untracked)", () => {
+  const { root, git, phaseLogs, head } = fixture({ stateTracked: false, verifyAtPhase: true });
+  const before = head();
+  const route = printedRoute(phaseLogs);
+  assert.deepEqual(route.addArgs.slice(2).sort(), [".claude/pipeline.json", "project/pipeline.json"]);
+  assert.ok(phaseLogs.some((line) => /no PO step/u.test(line)), `the route is named as an agent step:\n${phaseLogs.join("\n")}`);
+  assert.equal(git(...route.addArgs).status, 0);
+  const committed = git(...route.commitArgs);
+  assert.equal(committed.status, 0, committed.stderr);
+  assert.notEqual(head(), before, "the commit landed");
+});
+
+// C20 G20-46: the same extra-path refusal now names the agent repair, never the override/signature course, and the
+// named repair executed verbatim lands the twins; the exact-set rule itself is unchanged (still a refusal first).
+test("G20-46: an extra staged path beside the twins names the agent repair, no signature, and the repair lands", () => {
+  const ctx = { ...fixture({ stateTracked: false, verifyAtPhase: true }) };
+  ctx.before = ctx.head();
+  const route = printedRoute(ctx.phaseLogs);
+  writeFileSync(join(ctx.root, "extra.txt"), "extra\n");
+  assert.equal(ctx.git(...route.addArgs, "extra.txt").status, 0);
+  const first = ctx.git(...route.commitArgs);
+  assert.notEqual(first.status, 0, "the exact-set rule still refuses the mixed commit");
+  assert.equal(ctx.head(), ctx.before);
+  assert.match(first.stderr, /Repair \(agent, no PO step\): git restore --staged -- extra\.txt/u);
+  assert.doesNotMatch(first.stderr, /human-guard-override capability|HUMAN OPERATOR ONLY|sign-intent/u);
+  assert.equal(ctx.git("restore", "--staged", "--", "extra.txt").status, 0);
+  const second = ctx.git(...route.commitArgs);
+  assert.equal(second.status, 0, second.stderr);
+  assert.equal(ctx.git("diff", "--name-only", ctx.before, "HEAD").stdout.trim().split(/\r?\n/u).sort().join(","), ".claude/pipeline.json,project/pipeline.json");
+  assert.equal(existsSync(join(ctx.root, "extra.txt")), true, "the other file is untouched for its own commit");
 });
 
 // The same refusal for the legacy TRACKED State. Measured RED live on win32 before the hook was tightened (ALF-C-R1H

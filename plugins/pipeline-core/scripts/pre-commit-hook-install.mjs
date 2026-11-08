@@ -1121,6 +1121,34 @@ async function main() {
 
   if (findings.length === 0) return;
 
+  // C20 G20-46: the calibration tiers of a ready set-phase/configure-verify transition are admitted only as their own commit
+  // (the exact-set rule above stays). When they are the ONLY protected findings, other paths are staged with them and that
+  // transition is ready, the repair is to commit them alone -- never a human override signature (a live run spent one).
+  const calibrationOnly = findings.every((finding) => VERIFY_CALIBRATION_PATHS.includes(finding.path)
+    && (finding.id === "GS-10" || finding.id === "GS-11"));
+  const otherStaged = paths.filter((path) => !VERIFY_CALIBRATION_PATHS.includes(path));
+  if (calibrationOnly && otherStaged.length > 0) {
+    let readyPaths = null;
+    try {
+      const fs = await import("node:fs");
+      const calibration = JSON.parse(fs.readFileSync(resolve(projectRoot, VERIFY_CALIBRATION_PATHS[0]), "utf8"));
+      const { inspectCurrentCalibrationVerifyReady } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "calibration-verify-commit-transition.mjs")).href);
+      const ready = inspectCurrentCalibrationVerifyReady({ rootDir: projectRoot, verifyCommand: calibration?.verify });
+      if (ready?.ok === true && Array.isArray(ready.paths) && findings.every((finding) => ready.paths.includes(finding.path))) readyPaths = ready.paths;
+    } catch { readyPaths = null; }
+    if (readyPaths !== null) {
+      // Not block(): its footer hands the commit to a human operator, and this refusal has an agent repair.
+      process.stderr.write([
+        "BLOCKED (agent-pipeline pre-commit hook): the verification tiers " + readyPaths.join(", ") + " are admitted without any human step, but only as their own commit; " + otherStaged.length + " other path(s) are staged with them.",
+        "Repair (agent, no PO step): git restore --staged -- " + otherStaged.join(" "),
+        "then: git commit -m \\"chore: configure project verification\\"   (exactly " + readyPaths.join(" ") + " staged)",
+        "then stage and commit the other path(s) in a separate commit. No human-guard-override signature is needed for this.",
+      ].join("\\n") + "\\n");
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   // AC-258: before refusing, consume an armed commit-scoped capability (admit once) or seed /
   // re-print the signing course. Any fault inside degrades to the plain refusal below.
   let override = { admit: false, lines: [] };

@@ -11808,15 +11808,27 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: set-phase implementation requires an exact approved submission (${written.code}).`);
         return 2;
       }
+      let calibrationCommitPaths = null;
       if (calibrationNeeded) {
         const ready = completeCalibrationVerifyCommitTransition({ preparedHandle: preparedCalibration });
         if (!ready?.ok || ready.code !== "CVCT-COMMIT-READY") {
           console.error(`Error: implementation State and calibration were written, but the commit-ready transition failed (${ready?.code ?? "CVCT-COMPLETE-UNAVAILABLE"}); inspect State and both calibration tiers. No configured commit is claimed.`);
           return 2;
         }
+        calibrationCommitPaths = Array.isArray(ready.paths) ? ready.paths : null;
       }
       syncNextActionDocs(dir, written.transition.state);
       console.log('Phase set: "implementation"; lifecycle="implementing".');
+      // C20 G20-46: the verify command now sits in the protected calibration tiers (GS-10/GS-11). The pre-commit hook admits
+      // them without any human step ONLY as their own commit: the staged set must be exactly these paths. A live Antigravity
+      // run staged docs/state.md with them, lost the route silently and spent a PO override signature. Name the step here,
+      // in the same walkable shape configure-verify prints (pinned by configure-verify-output-lacks-a-walkable-commit-route).
+      if (calibrationCommitPaths !== null && calibrationCommitPaths.length > 0) {
+        console.log("Next (agent, no PO step): commit the verification tiers ALONE, as the next commit, before staging anything else:");
+        console.log(`git add -- ${calibrationCommitPaths.join(" ")}`);
+        console.log('git commit -m "chore: configure project verification"');
+        console.log("Stage no other path with them (docs/state.md included): the hook admits exactly this set against the approved plan; commit the other files in a separate commit afterwards.");
+      }
       const decisionSummary = summarizePlanningDecisionApplicability(architecture.artifacts?.decisionApplicability);
       if (decisionSummary !== null) console.log(`Architecture decisions: ${JSON.stringify(decisionSummary)}`);
       return 0;
