@@ -1,0 +1,64 @@
+diff --git a/plugins/pipeline-core/scripts/check-clone-provisioning.mjs b/plugins/pipeline-core/scripts/check-clone-provisioning.mjs
+index 70489df09572d94d9e7144ef04fdfb84362deaa4..a5297ff06a778f93e5da3a898ae52c14a9a96402 100644
+--- a/plugins/pipeline-core/scripts/check-clone-provisioning.mjs
++++ b/plugins/pipeline-core/scripts/check-clone-provisioning.mjs
+@@ -18,6 +18,13 @@ import { planInstall as planCommitMsgHookInstall } from "./commit-msg-hook-insta
+ 
+ export const CLONE_PROVISIONING_REPORT_SCHEMA = "pipeline.clone-provisioning-report.v1";
+ 
++// C20b G20-53: the receipt repair names the agent-admitted repair route (its plan returns the exact apply action);
++// the source-checkout publisher is refused to an agent and does not exist in a consumer project.
++const PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("./po-gate-profile-repair.mjs", import.meta.url));
++function profileReceiptRepairAction(root) {
++  return `node "${PROFILE_REPAIR_SCRIPT}" plan --root "${root}"`;
++}
++
+ /** The hooks readiness GATES on. Single source for assessment and the clone apply step. */
+ export const MANDATORY_HOOK_IDS = Object.freeze(["pre-commit-hook", "commit-msg-hook"]);
+ /** AC-116 / PO decision 13: hooks the clone apply step installs but readiness never gates on (the pre-push backstop). */
+@@ -151,7 +158,7 @@ export function checkCloneProvisioning(rootDir = process.cwd(), options = {}) {
+       status: "provisioning-required",
+       checks: [
+         ...HOOK_SPECS.map((spec) => ({ id: spec.id, status: "unresolved", path: `hooks/${spec.name}`, repairAction: "git init" })),
+-        { id: "po-profile-receipt", status: "absent", path: "agent-pipeline/po-gate/profile-receipt.json", repairAction: "node setup.mjs --publish-po-profile" },
++        { id: "po-profile-receipt", status: "absent", path: "agent-pipeline/po-gate/profile-receipt.json", repairAction: profileReceiptRepairAction(resolvedRoot) },
+         { id: "private-state-directory", status: "absent", path: "agent-pipeline", repairAction: "mkdir -p .git/agent-pipeline" },
+       ],
+     };
+@@ -169,7 +176,7 @@ export function checkCloneProvisioning(rootDir = process.cwd(), options = {}) {
+       id: "po-profile-receipt",
+       status: "absent",
+       path: receiptPath,
+-      repairAction: "node setup.mjs --publish-po-profile",
++      repairAction: profileReceiptRepairAction(resolvedRoot),
+     });
+   } else {
+     let valid = false;
+@@ -190,7 +197,7 @@ export function checkCloneProvisioning(rootDir = process.cwd(), options = {}) {
+       id: "po-profile-receipt",
+       status: valid ? "present" : "invalid",
+       path: receiptPath,
+-      repairAction: valid ? null : "node setup.mjs --publish-po-profile",
++      repairAction: valid ? null : profileReceiptRepairAction(resolvedRoot),
+     });
+   }
+ 
+diff --git a/plugins/pipeline-core/scripts/check-clone-provisioning.test.mjs b/plugins/pipeline-core/scripts/check-clone-provisioning.test.mjs
+index 97cf0830676feab570608177f8fd9721baf84f14..e532b90d6f9947d6d2ea8b2d7886ce56012b200e 100644
+--- a/plugins/pipeline-core/scripts/check-clone-provisioning.test.mjs
++++ b/plugins/pipeline-core/scripts/check-clone-provisioning.test.mjs
+@@ -21,6 +21,14 @@ test("checkCloneProvisioning handles non-git root cleanly", () => {
+   assert.ok(report.checks.every((c) => c.status === "unresolved" || c.status === "absent"));
+ });
+ 
++test("G20-53: the profile receipt repair names the agent-admitted repair plan for this root, never the source publisher", () => {
++  const report = checkCloneProvisioning("/tmp");
++  const receipt = report.checks.find((check) => check.id === "po-profile-receipt");
++  assert.match(receipt.repairAction, /po-gate-profile-repair\.mjs" plan --root "/u);
++  assert.ok(receipt.repairAction.endsWith(`--root "${"/tmp"}"`), receipt.repairAction);
++  assert.doesNotMatch(receipt.repairAction, /setup\.mjs/u);
++});
++
+ test("hook projection preserves ownership and makes only managed plans current", () => {
+   const spec = (status) => ({ id: "fixture-hook", name: "fixture", installer: "fixture.mjs", planInstall: () => ({ status, hookPath: "/repo/hooks/fixture", detail: "fixture detail" }) });
+   assert.equal(projectHookProvisioning({ spec: spec("ready"), rootDir: "/repo" }).status, "install");
