@@ -406,9 +406,22 @@ the Pipeline's own source release above is unchanged. It is the LAST step of the
 3. The PO approves the release once, through the `release-preflight` critical kind in the configured approval mode. In `chat` mode the run itself
    records the approval; in `signature` mode the command stops with `RPC-CONSUMER-PO-APPROVAL` and prints the PO's exact signing command for
    this subject, then runs again with `--proof-request`/`--proof`.
-4. The agent runs the two `nextActions` the command prints: `git tag -a v<VERSION> -m "version tag" <commit>` and
+4. The agent runs the `nextActions` the command prints: `git tag -a v<VERSION> -m "version tag" <commit>` and
    `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
    (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above.
+   **The approval proofs reach the remote audit bundle (C20E-AP).** The push approval signs the commit that carries
+   `audit-bundles/<feature>/<candidate>/`, and the release approval comes later, so neither proof can sit inside that commit. When the feature has a
+   bundle, the same command therefore also adds, as NEW files only, the public proof objects of the push approval and of the release approval to that
+   bundle's `proofs/` directory (numbering continues after the bundle's own proofs) plus one list, `proofs/follow-up.json`, that binds them by digest to the
+   approved commit and to the bundle's candidate. `manifest.json` and `README.md` stay byte for byte, so the bundle's own `audit-bundle.mjs verify` still
+   passes and now also checks the follow-up (`AB-FOLLOWUP`, `AB-DIGEST`, `AB-PROOF-INTENT`, `AB-PROOF-SIGNATURE`). Never a private key: a `chat` or waiver
+   approval is carried as an attribution record (kind, mode, time) and never as a proof. The command arms the commit of exactly those files (G20-66) and
+   prints it between the tag and the pushes: `nextActions` becomes the tag, the commit step, `git push origin HEAD:refs/heads/main`, then the tag push.
+   `hooks/guard-push.mjs` admits that branch push without a second approval ONLY for exactly one commit on top of the release-approved commit
+   (`authorizeAuditProofFollowUp`): the approved commit is the published tip of the destination, carries its recorded push approval and the annotated release
+   tag, and the commit's diff only ADDS regular files under that one bundle's `proofs/` (each a public proof object or the list). Any other path, a changed
+   existing file, a second commit, a merge or an unpublished parent falls through to the full gate unchanged. A project without a bundle sees the `auditProofFollowUp`
+   status `no-bundle` and the tag steps alone.
 
 ### Source reader binding (Agent Pipeline source checkout only)
 

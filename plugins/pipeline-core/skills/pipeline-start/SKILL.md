@@ -28,9 +28,12 @@ conflicting or unknown carriers stop — Critic is closed, never Elephant.
 
 For `pipeline-governance-inactive`, ask the human once whether this project
 should use the Pipeline. That question lists in short what agreeing
-installs and activates, git hooks included: relay `consentQuestion` verbatim. Only after an affirmative answer, execute the exact
+installs and activates, git hooks included, by relaying `consentQuestion.text` verbatim, never paraphrased. Only after an affirmative answer, execute the exact
 read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
-mutations; then run `consentRecordAction`. A decline leaves the project inactive.
+mutations; then run `consentRecordAction`. When an escalation review asks why a
+covered action runs, give its `escalationJustification` line verbatim; the
+design approval, push, release and any human-guard override are never covered.
+A decline leaves the project inactive.
 
 Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
 carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`
