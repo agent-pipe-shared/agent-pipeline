@@ -75,9 +75,13 @@ const RECEIPT_KEYS = [
 // primary's bytes, so a linked worktree must not be able to publish it.
 // PF-33: the consumer route names the absolute script, so it runs as printed.
 const PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
-export const PROFILE_REPAIR = "Run node setup.mjs --publish-po-profile from the canonical primary checkout, then retry."
-  + ` In a consumer project, run node ${PROFILE_REPAIR_SCRIPT} plan --root <primary checkout>, then apply --activate`
-  + " against that project's own primary checkout; add --human-facing <de|en> to set or correct the operator-facing language.";
+// C20b G20-53: the agent-admitted plan/apply route comes first, with the exact apply arguments; the guard refuses
+// the source-checkout publisher to an agent, so naming it first sent every session on a detour. It stays as the
+// human alternative.
+export const PROFILE_REPAIR = `Run node ${PROFILE_REPAIR_SCRIPT} plan --root <primary checkout>, then`
+  + ` node ${PROFILE_REPAIR_SCRIPT} apply --root <primary checkout> --plan-sha256 <planSha256 from plan> --activate,`
+  + " then retry; add --human-facing <de|en> to set or correct the operator-facing language."
+  + " Alternative for a human in a source checkout: Run node setup.mjs --publish-po-profile from the canonical primary checkout, then retry.";
 const PRD_REPAIR = "Repair activeFeature.planPath and the active feature directory; do not create child PRDs.";
 // PO-GATE-PRD-SPEC-MISMATCH is a document-binding defect: the PRD's technical
 // Spec marker and the neighboring spec.md bytes disagree, or that spec.md is not
