@@ -67,8 +67,10 @@ for (const [name, attempted, supplied] of controls) check(`draft shell refuses $
   assert.equal(hit?.verdict, 'block');
   assert.equal(hit?.lifecycleStatus, 'draft');
   assert.equal(hit?.lane, 'opaque-script-execution');
-  // Candidate 19 (D7): an absolute interpreter path in the refused command gets the bare-node spelling hint.
-  assert.match(hit?.reason ?? '', /Use the bare `node`/u);
+  // Candidate 19 (D7) restated (QG-04, candidate 20b, FV red): G20-21 narrowed the bare-node hint to a scratch script with extra
+  // words, because for a Pipeline script it sent agents the wrong way. These commands run a Pipeline script, so the refusal must
+  // NOT carry the scratch-script advice (the scratch-script case keeps it in devplan-shell-lane.mjs; not yet pinned by a case).
+  assert.doesNotMatch(hit?.reason ?? '', /Use the bare `node`/u);
 });
 for (const [name, metadata] of [
   ['matching planner marked mutating', { mutation: true, requiresConfirmation: true }],
