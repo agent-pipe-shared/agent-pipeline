@@ -1,0 +1,623 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 302f0461a04809c890a28b2bdb2e9b7ae75cf09f..4d1529000c6406ac51c5a18531c926dfee1556d3 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1846,7 +1846,9 @@
+           "OBC325",
+           "OBC326",
+           "OBC327",
+-          "OBC328"
++          "OBC328",
++          "OBC329",
++          "OBC330"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/plugins/pipeline-core/lib/authority-seal-plan.mjs b/plugins/pipeline-core/lib/authority-seal-plan.mjs
+index b64d8ef74c128b3c4835230ec74c88f1a9e57109..1a5f8eb015660b91dfb3498284f04e4b1998488e 100644
+--- a/plugins/pipeline-core/lib/authority-seal-plan.mjs
++++ b/plugins/pipeline-core/lib/authority-seal-plan.mjs
+@@ -84,9 +84,10 @@ export function sealPaths(draftPaths) {
+   return { prd: draftPaths.prd, spec: draftPaths.spec, designInput: designInputPathOf(draftPaths.spec), result: draftPaths.result ?? null, plan: draftPaths.plan ?? null };
+ }
+ 
+-function reviewFault(review, documents) {
++function reviewFault(review, documents, supersededDesignInputs) {
+   const compare = [["prd", review.prdSha256, documents.prd.sha256], ["spec", review.specSha256, documents.spec.sha256]];
+-  if (review.designInputSha256 !== null && review.designInputSha256 !== undefined) compare.push(["design input", review.designInputSha256, documents.designInput?.sha256 ?? null]);
++  // A review of the exact bytes a recorded recapture replaced read the same design input before its redaction.
++  if (review.designInputSha256 !== null && review.designInputSha256 !== undefined && !supersededDesignInputs.includes(review.designInputSha256)) compare.push(["design input", review.designInputSha256, documents.designInput?.sha256 ?? null]);
+   return compare.filter(([, bound, current]) => bound !== null && bound !== undefined && bound !== current).map(([name]) => name);
+ }
+ 
+@@ -96,7 +97,7 @@ function reviewFault(review, documents) {
+  *   documents: object, designInputCapture: {path:string, sha256:string}|null, reviews: Array<object> }} input
+  */
+ export function buildSealPlan(input) {
+-  const { authority, featureId, revision, profile, documents, designInputCapture, reviews } = input;
++  const { authority, featureId, revision, profile, documents, designInputCapture, reviews, supersededDesignInputs = [] } = input;
+   if (!isRecord(authority) || !inSealScope(profile)) {
+     return refuse("PSP-OUT-OF-SCOPE", "this package has no PRD release to seal at", [], "nothing is needed: the bind at the end of onboarding applies to a package outside the PRD release scope (EL-19)");
+   }
+@@ -105,12 +106,12 @@ export function buildSealPlan(input) {
+   if (seal.status !== "draft") return refuse("PSP-AUTHORITY-INVALID", seal.reason, ["reopen-design"], "reopen the design and register the package paths again");
+   if (!Number.isSafeInteger(revision) || revision < 0) return refuse("PSP-AUTHORITY-INVALID", "the State revision is not readable", ["reopen-design"], "inspect the State");
+   if (designInputCapture !== null && documents.designInput !== null && documents.designInput.sha256 !== designInputCapture.sha256) {
+-    return refuse("PSP-PROVENANCE", `${documents.designInput.path} differs from the bytes captured when the package was promoted`, ["reopen-design"],
+-      "restore design-input.md to the captured bytes, or reopen the design (reopen-design --by <name>) to record a new capture, then run prepare-seal again");
++    return refuse("PSP-PROVENANCE", `${documents.designInput.path} differs from the bytes captured when the package was promoted`, ["recapture-design-input"],
++      "restore design-input.md to the captured bytes and run prepare-seal again; reopen-design records no new capture. When the captured bytes hold a private identifier, restore them first, then run recapture-design-input: it regenerates the file from the private intake and records the new capture");
+   }
+   const stale = [];
+   for (const review of reviews) {
+-    const faults = reviewFault(review, documents);
++    const faults = reviewFault(review, documents, supersededDesignInputs);
+     if (faults.length > 0) stale.push({ kind: review.kind, ref: review.ref, faults });
+   }
+   if (stale.length > 0) {
+@@ -180,7 +181,7 @@ export function unreadableReviewRefusal(ref) {
+ }
+ 
+ export function provenanceUnavailableRefusal(reason) {
+-  return refuse("PSP-PROVENANCE", reason, ["reopen-design"], "restore design-input.md to the captured bytes (or repair the private onboarding history), then run prepare-seal again; reopen-design --by <name> stays available");
++  return refuse("PSP-PROVENANCE", reason, ["recapture-design-input"], "restore design-input.md to the captured bytes (or repair the private onboarding history), then run prepare-seal again; when the captured bytes hold a private identifier, run recapture-design-input after restoring them");
+ }
+ 
+ /** The sealed `continuity.authority`: digests bound, the `sealed` marker removed (a sealed package is a package without the marker). */
+diff --git a/plugins/pipeline-core/lib/authority-seal-plan.test.mjs b/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
+index eee42ef83b9b7904be8f7c01f1bf37b6da7c581e..c9965d695d9160bed26aa872a3227c98c556e397 100644
+--- a/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
++++ b/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
+@@ -80,8 +80,12 @@ test("LB4-2 a stale review is refused by name with the re-request exit; a matchi
+ test("LB4-3 design-input bytes that differ from the capture record are a provenance refusal with the way out", () => {
+   const refused = buildSealPlan(base({ designInputCapture: { path: INPUT, sha256: D("1") } }));
+   assert.equal(refused.code, "PSP-PROVENANCE");
+-  assert.deepEqual(refused.exits, ["reopen-design"]);
++  assert.deepEqual(refused.exits, ["recapture-design-input"]);
++  assert.match(refused.repair, /reopen-design records no new capture/u, "the text no longer offers a route that cannot repair this");
+   assert.equal(buildSealPlan(base({ designInputCapture: null })).ok, true, "no capture record: nothing to compare (documented)");
++  const review = { kind: "readiness", ref: RECEIPT, prdSha256: D("a"), specSha256: D("b"), designInputSha256: D("9") };
++  assert.equal(buildSealPlan(base({ reviews: [review], supersededDesignInputs: [D("9")] })).ok, true, "a review of the exact bytes a recapture replaced stays valid");
++  assert.equal(buildSealPlan(base({ reviews: [review], supersededDesignInputs: [D("8")] })).code, "PSP-STALE-REVIEW", "any other design-input bytes stay stale");
+ });
+ 
+ test("LB4-4 a sealed package, an invalid authority and a package outside the PRD release scope each get their own typed answer", () => {
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+index d04ef89291099478c5ad92f2f1dbed055d2974c0..8a523d8dec39553f8ee8a7fbc9df3e0a7a1f4e07 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+@@ -94,6 +94,8 @@ const recoveries = [
+   ['marker apply', onboardingScript, ['intake-spec-marker-apply', '--root', root, '--plan-sha256', digest, '--activate', '--runner', 'codex'], true, true],
+   ['reopen', script, ['reopen-design', '--by', 'fixture-actor'], true, true],
+   ['reopen dry-run preview', script, ['reopen-design', '--by', 'fixture-actor', '--dry-run'], false, false],
++  ['recapture plan', script, ['recapture-design-input'], false, false],
++  ['recapture apply', script, ['recapture-design-input', '--plan-sha256', digest], true, true],
+ ];
+ for (const [name, entry, argv, mutation, requiresConfirmation] of recoveries) {
+   for (const executable of [process.execPath, '/opt/producer-node/bin/node']) {
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index a35f8608bd7443a0060d9800c2abd74b85c6e1a1..2927ffadbeac56c279bf1c229d96bded75d56cfa 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -452,6 +452,10 @@ export function sanctionedPipelineStateArgs(args, root) {
+     }
+     return true;
+   }
++  // Without flags a read-only plan; with the digest of that plan it regenerates design-input.md from the private intake (draft packages only, the writer refuses the rest).
++  if (args[0] === "recapture-design-input") {
++    return args.length === 1 || (args.length === 3 && args[1] === "--plan-sha256" && /^[a-f0-9]{64}$/u.test(args[2] ?? ""));
++  }
+   // D64: the next action `inspect` renders once a plan is approved. The verb takes no flags and writes one governed template
+   // file (it refuses when that file exists), the same class as materialize-architecture just above.
+   if (args[0] === "materialize-push-threat-model") return args.length === 1;
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index ad00723774322304a3a3e63504c181079075cafc..0ac5daf939ab77be024630596c259c2ab2ec33c9 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -190,6 +190,9 @@ const DEFAULT_SESSION_CLEANUP_SCRIPT = join(HERE, "..", "scripts", "session-clea
+ const STATE_RELATIVE_PATH = NEUTRAL_STATE;
+ const CALIBRATION_RELATIVE_PATH = NEUTRAL_CALIBRATION;
+ const HISTORY_BASENAME = "continuity-history.json";
++const DESIGN_INPUT_RECAPTURE_KIND = "design-input-recapture";
++const DESIGN_INPUT_RECAPTURE_PLAN_SCHEMA = "pipeline.design-input-recapture-plan.v1";
++const DESIGN_INPUT_RECAPTURE_APPLY_SCHEMA = "pipeline.design-input-recapture-apply.v1";
+ const SESSION_CLEANUP_BINDING_BASENAME = "session-cleanup-binding.json";
+ const SESSION_CLEANUP_KEY_BASENAME = "session-cleanup-binding.key";
+ const SESSION_CLEANUP_RELEASE_RECEIPT_BASENAME = "session-cleanup-release-receipt.json";
+@@ -1037,7 +1040,11 @@ export function readPromotionDesignInputCapture(options = {}) {
+   }
+   const entries = Array.isArray(observed.history?.transactions) ? observed.history.transactions : [];
+   const latest = [...entries].reverse().find((entry) => typeof entry.designInputPath === "string" && SHA256_RE.test(entry.designInputSha256 ?? ""));
+-  return latest === undefined ? { status: "absent" } : { status: "present", path: latest.designInputPath, sha256: latest.designInputSha256 };
++  if (latest === undefined) return { status: "absent" };
++  // The exact digests a recorded recapture replaced: a review of those bytes reviewed the same design input before its redaction.
++  const supersededSha256 = entries.filter((entry) => entry.kind === DESIGN_INPUT_RECAPTURE_KIND && entry.designInputPath === latest.designInputPath)
++    .map((entry) => entry.previousDesignInputSha256);
++  return { status: "present", path: latest.designInputPath, sha256: latest.designInputSha256, ...(supersededSha256.length === 0 ? {} : { supersededSha256 }) };
+ }
+ 
+ function validateHistory(value) {
+@@ -1123,13 +1130,25 @@ function validateHistory(value) {
+     // absent-pristine precondition (SSc.3) means the configured handover cannot already exist.
+     && entry.handover.beforeSha256 === null
+     && SHA256_RE.test(entry.handover.afterSha256);
++  // A recapture is a chained successor of the entry before it; it replaces no earlier record. A bootstrap binding stays the only
++  // non-recapture entry of its history.
++  const validRecapture = (entry, previous) => exactKeys(entry, new Set([
++    "kind", "transactionSha256", "previousTransactionSha256", "featureId", "designInputPath", "designInputSha256", "previousDesignInputSha256",
++  ]))
++    && entry.kind === DESIGN_INPUT_RECAPTURE_KIND
++    && SHA256_RE.test(entry.transactionSha256)
++    && entry.previousTransactionSha256 === previous?.transactionSha256
++    && SAFE_FEATURE_ID.test(entry.featureId)
++    && typeof entry.designInputPath === "string" && safePath(entry.designInputPath)
++    && SHA256_RE.test(entry.designInputSha256) && SHA256_RE.test(entry.previousDesignInputSha256)
++    && entry.designInputSha256 !== entry.previousDesignInputSha256;
+   if (!exactKeys(value, new Set(["schema", "transactions"]))
+     || value.schema !== KICKOFF_HISTORY_SCHEMA
+     || !Array.isArray(value.transactions)
+     || value.transactions.length < 1
+     || !(validKickoff(value.transactions[0])
+-      || (value.transactions.length === 1 && validBootstrapBinding(value.transactions[0])))
+-    || !value.transactions.slice(1).every((entry, index) => validPromotion(entry, value.transactions[index]))) {
++      || (value.transactions.slice(1).every((entry) => entry?.kind === DESIGN_INPUT_RECAPTURE_KIND) && validBootstrapBinding(value.transactions[0])))
++    || !value.transactions.slice(1).every((entry, index) => validPromotion(entry, value.transactions[index]) || validRecapture(entry, value.transactions[index]))) {
+     fail("KICKOFF-HISTORY-MALFORMED", "private continuity history is malformed");
+   }
+   return true;
+@@ -1318,8 +1337,12 @@ function observeDetailed({
+       // a sanctioned edit terminal. Every state the lifecycle has NOT released --
+       // which is every state that never reopened its design -- keeps the check.
+       const reopened = promotedDesignReopened(stateObservation);
++      // A recapture moved the provenance on: the seal plan compares the current file with the latest capture (PSP-PROVENANCE), and the
++      // capture it replaced no longer describes the file.
++      const recapturedPaths = new Set(history.transactions.filter((entry) => entry.kind === DESIGN_INPUT_RECAPTURE_KIND).map((entry) => entry.designInputPath));
+       for (const entry of history.transactions.slice(1)) {
+-        if (entry.designInputPath !== undefined && !reopened) {
++        if (entry.kind === DESIGN_INPUT_RECAPTURE_KIND) continue;
++        if (entry.designInputPath !== undefined && !reopened && !recapturedPaths.has(entry.designInputPath)) {
+           const evidence = observeOptionalProjectFile(root, entry.designInputPath, "promotion design input");
+           if (evidence.status !== "present" || evidence.sha256 !== entry.designInputSha256) {
+             fail("KICKOFF-PROMOTION-EVIDENCE-DRIFT", "promotion design input does not match its bound evidence");
+@@ -7711,34 +7734,138 @@ function buildOnboardingIntakeGeneratePlan({
+ // An early, typed hint -- never a gate -- that a generated text holds what the pre-commit hook
+ // (scripts/check-private-identifiers.mjs) will refuse. It reuses that detector's exports and
+ // reports category and target names only, never the matched value. Any failure is silent.
+-function intakePrivateIdentifierWarnings({ root, targets, spawn, patterns }) {
++function intakePrivateIdentifierFindings({ root, targets, spawn, patterns }) {
++  let active = patterns;
++  if (!active) {
++    const configured = spawn("git", ["config", "--get", "user.email"], { cwd: root, encoding: "utf8", shell: false });
++    const email = configured?.status === 0 ? String(configured.stdout).trim() || null : null;
++    const patternFile = join(root, ".git", "agent-pipeline", "private-identity-patterns.json");
++    active = derivePatterns({
++      email, localPatterns: existsSync(patternFile) ? JSON.parse(readFileSync(patternFile, "utf8")) : [],
++    });
++  }
++  const categories = new Set();
++  const matched = [];
++  for (const target of Object.values(targets)) {
++    const found = inspectAddedLines(target.content.split("\n").map((line) => `+${line}`).join("\n"), active);
++    if (found.size === 0) continue;
++    for (const category of found.keys()) categories.add(category);
++    matched.push(basename(target.path));
++  }
++  if (matched.length === 0) return [];
++  return [{
++    code: "INTAKE-PRIVATE-IDENTIFIER",
++    categories: [...categories].sort(),
++    targets: matched,
++    remedy: "Remove the identifier from the answer or from the question text, or record the answer privately, before the apply step; the pre-commit hook refuses the commit otherwise.",
++  }];
++}
++
++// An advisory reader: an unreadable pattern file costs the warning, never the intake.
++function intakePrivateIdentifierWarnings(options) {
++  try { return intakePrivateIdentifierFindings(options); } catch { return []; }
++}
++
++// Greenfield 2026-11-08 (Codex): a design-input.md generated before the projection removed an address was bound, could not be committed,
++// and no route could replace it (the file is immutable evidence, reopen-design records no capture). This is that one route: the new bytes
++// are never authored, they are regenerated from the lossless private intake by the current projection, and the capture they replace stays
++// in the history. It does not touch the PRD, the Spec or their reviews.
++function designInputRecaptureFacts({ rootDir, repositoryCapability, spawn, privateIdentifierPatterns }) {
++  const observed = observeDetailed({ rootDir, repositoryCapability, spawn });
++  if (observed.error !== undefined) fail("DESIGN-INPUT-RECAPTURE-UNAVAILABLE", `the private onboarding history is not readable (${observed.error.code ?? "unknown"})`);
++  const entries = Array.isArray(observed.history?.transactions) ? observed.history.transactions : [];
++  const captured = [...entries].reverse().find((entry) => typeof entry.designInputPath === "string" && SHA256_RE.test(entry.designInputSha256 ?? ""));
++  if (captured === undefined) fail("DESIGN-INPUT-RECAPTURE-NO-CAPTURE", "no design-input capture is recorded for this project");
++  const intake = readOnboardingIntakeCheckpoint({ rootDir: observed.root, repositoryCapability, spawn });
++  const generated = intake.status === "present" ? intake.value.generated : null;
++  if (!isObject(generated)) fail("DESIGN-INPUT-RECAPTURE-NO-INTAKE", "only a design input generated from the private intake can be regenerated; restore the captured bytes instead");
++  const replaced = entries.filter((entry) => entry.kind === DESIGN_INPUT_RECAPTURE_KIND).map((entry) => entry.previousDesignInputSha256);
++  if (![captured.designInputSha256, ...replaced].includes(generated.designInputSha256)) {
++    fail("DESIGN-INPUT-RECAPTURE-NOT-DERIVED", "the captured design input was not generated from this private intake; restore the captured bytes instead");
++  }
++  const content = buildIntakeDesignInputContent(intake.value, readIntakeMaterialInputChunks(intake.paths, intake.value));
++  // Unlike the advisory intake warning, this writes tracked bytes: a detector that cannot run refuses.
++  let warning;
+   try {
+-    let active = patterns;
+-    if (!active) {
+-      const configured = spawn("git", ["config", "--get", "user.email"], { cwd: root, encoding: "utf8", shell: false });
+-      const email = configured?.status === 0 ? String(configured.stdout).trim() || null : null;
+-      const patternFile = join(root, ".git", "agent-pipeline", "private-identity-patterns.json");
+-      active = derivePatterns({
+-        email, localPatterns: existsSync(patternFile) ? JSON.parse(readFileSync(patternFile, "utf8")) : [],
+-      });
+-    }
+-    const categories = new Set();
+-    const matched = [];
+-    for (const target of Object.values(targets)) {
+-      const found = inspectAddedLines(target.content.split("\n").map((line) => `+${line}`).join("\n"), active);
+-      if (found.size === 0) continue;
+-      for (const category of found.keys()) categories.add(category);
+-      matched.push(basename(target.path));
+-    }
+-    if (matched.length === 0) return [];
+-    return [{
+-      code: "INTAKE-PRIVATE-IDENTIFIER",
+-      categories: [...categories].sort(),
+-      targets: matched,
+-      remedy: "Remove the identifier from the answer or from the question text, or record the answer privately, before the apply step; the pre-commit hook refuses the commit otherwise.",
+-    }];
++    [warning] = intakePrivateIdentifierFindings({
++      root: observed.root, targets: { designInput: { path: captured.designInputPath, content } }, spawn, patterns: privateIdentifierPatterns,
++    });
+   } catch {
+-    return [];
++    fail("DESIGN-INPUT-RECAPTURE-SCAN-UNAVAILABLE", "the private-identifier check could not run, so the regenerated file was not accepted");
++  }
++  if (warning !== undefined) {
++    fail("DESIGN-INPUT-RECAPTURE-STILL-PRIVATE", `the regenerated file still holds a private identifier (${warning.categories.join(", ")}); the projection cannot remove it, so nothing was changed`);
++  }
++  const bytes = Buffer.from(content, "utf8");
++  return { root: observed.root, entries, captured, bytes, designInputSha256: sha256(bytes), current: observeOptionalProjectFile(observed.root, captured.designInputPath, "design input") };
++}
++
++function designInputRecapturePlan(facts) {
++  const { captured, entries, designInputSha256, current } = facts;
++  if (designInputSha256 === captured.designInputSha256) fail("DESIGN-INPUT-RECAPTURE-NOT-NEEDED", "the captured design input already is the current projection of the private intake");
++  if (current.status !== "present" || ![captured.designInputSha256, designInputSha256].includes(current.sha256)) {
++    fail("DESIGN-INPUT-RECAPTURE-FILE-DRIFT", `${captured.designInputPath} is neither the captured nor the regenerated bytes; restore the captured bytes first`);
++  }
++  const body = {
++    schema: DESIGN_INPUT_RECAPTURE_PLAN_SCHEMA, featureId: captured.featureId, designInputPath: captured.designInputPath,
++    previousDesignInputSha256: captured.designInputSha256, designInputSha256, previousTransactionSha256: entries.at(-1).transactionSha256,
++  };
++  return { ...body, planSha256: canonicalSha256(body) };
++}
++
++export function planDesignInputRecapture({ rootDir, repositoryCapability = "local", spawn = defaultGitSpawn, privateIdentifierPatterns = null } = {}) {
++  return designInputRecapturePlan(designInputRecaptureFacts({ rootDir, repositoryCapability, spawn, privateIdentifierPatterns }));
++}
++
++export function applyDesignInputRecapture({
++  rootDir, expectedPlanSha256, repositoryCapability = "local", spawn = defaultGitSpawn, privateIdentifierPatterns = null,
++} = {}) {
++  if (!SHA256_RE.test(expectedPlanSha256 ?? "")) fail("DESIGN-INPUT-RECAPTURE-PLAN-DIGEST", "the plan digest is malformed");
++  const root = physicalRoot(rootDir);
++  const privatePaths = resolvePrivate(root, repositoryCapability, { create: false, spawn });
++  const statePath = absoluteProjectPath(root, authorityPaths(root).state, "Pipeline machine state");
++  const token = `design-input-recapture-${expectedPlanSha256.slice(0, 32)}`;
++  const lockOptions = { nowMs: Date.now, lockStaleMs: 30_000 };
++  const stateLock = acquireLock(`${statePath}.lock`, "pipeline.continuity-lock.v0", token, lockOptions);
++  let privateLock;
++  try {
++    privateLock = acquireLock(join(privatePaths.directory, ".kickoff-writer.lock"), "pipeline.codex-onboarding-kickoff-lock.v1", token, lockOptions);
++    const facts = designInputRecaptureFacts({ rootDir: root, repositoryCapability, spawn, privateIdentifierPatterns });
++    const last = facts.entries.at(-1);
++    const report = (status, mutated, entry) => ({
++      schema: DESIGN_INPUT_RECAPTURE_APPLY_SCHEMA, status, mutated, planSha256: expectedPlanSha256, designInputPath: entry.designInputPath,
++      previousDesignInputSha256: entry.previousDesignInputSha256, designInputSha256: entry.designInputSha256,
++    });
++    if (last?.kind === DESIGN_INPUT_RECAPTURE_KIND && last.transactionSha256 === expectedPlanSha256 && facts.current.sha256 === last.designInputSha256) {
++      return report("replayed", false, last);
++    }
++    const plan = designInputRecapturePlan(facts);
++    if (plan.planSha256 !== expectedPlanSha256) fail("DESIGN-INPUT-RECAPTURE-PLAN-STALE", "the project changed after this plan was made; run recapture-design-input again");
++    const entry = {
++      kind: DESIGN_INPUT_RECAPTURE_KIND, transactionSha256: plan.planSha256, previousTransactionSha256: plan.previousTransactionSha256, featureId: plan.featureId,
++      designInputPath: plan.designInputPath, designInputSha256: plan.designInputSha256, previousDesignInputSha256: plan.previousDesignInputSha256,
++    };
++    const history = { schema: KICKOFF_HISTORY_SCHEMA, transactions: [...facts.entries, entry] };
++    validateHistory(history);
++    const suffix = randomUUID().replaceAll("-", "");
++    // The file first: a stop between the two writes leaves the new bytes with the old capture, which the same plan digest finishes.
++    if (facts.current.sha256 !== plan.designInputSha256) {
++      const target = absoluteProjectPath(root, plan.designInputPath, "design input");
++      assertPhysicalChain(root, target);
++      const temporary = join(dirname(target), `.${basename(target)}.recapture-${suffix}.tmp`);
++      writeExclusiveSynced(temporary, facts.bytes, 0o644);
++      renameSync(temporary, target);
++      fsyncDirectory(dirname(target));
++    }
++    const historyPath = join(privatePaths.directory, HISTORY_BASENAME);
++    const historyTemporary = join(dirname(historyPath), `.${HISTORY_BASENAME}.recapture-${suffix}.tmp`);
++    writeExclusiveSynced(historyTemporary, expectedHistoryBytes(history), 0o600);
++    renameSync(historyTemporary, historyPath);
++    fsyncDirectory(dirname(historyPath));
++    return report("applied", true, entry);
++  } finally {
++    if (privateLock) releaseLock(privateLock);
++    releaseLock(stateLock);
+   }
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+index 9af4afdc015f54cf15ee2f7a5072cf90af61b1f0..dbf96acdc3402be893f31172ca65f9633462fe2e 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+@@ -72,6 +72,8 @@ import {
+   planOnboardingKickoff,
+   planOnboardingKickoffPromotion,
+   readPromotionDesignInputCapture,
++  planDesignInputRecapture,
++  applyDesignInputRecapture,
+   planOnboardingKickoffPromotionCleanupRecovery,
+   readOnboardingIntakeCheckpoint,
+   observeOnboardingEnrollmentHistory,
+@@ -4519,13 +4521,15 @@ function finishPositiveAcknowledgementFixture(root, generatePlan) {
+   applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
+ }
+ 
+-function bootstrapBindReadyRoot(name) {
++function bootstrapBindReadyRoot(name, { question = null, address = null } = {}) {
+   const root = readyToGenerateRoot(`bootstrap-bind-${name}`);
++  if (question !== null) applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: [{ question, answer: "Keep it." }], replace: true, activate: true });
++  if (address !== null) assert.equal(spawnSync("git", ["config", "user.email", address], { cwd: root, encoding: "utf8", shell: false }).status, 0);
+   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+   // These five positive binding fixtures require completed design content.
+   // Other helper callers retain their original generated-draft setup.
+-  if (["happy", "replay", "already-bound", "activation", "po-gate"].includes(name)) {
++  if (["happy", "replay", "already-bound", "activation", "po-gate"].includes(name) || name.startsWith("recapture")) {
+     const spec = "# Bootstrap binding specification\n\n## Acceptance criteria\n- AC-01: WHEN a completed package is acknowledged, the system SHALL bind its exact PRD and Spec digests to the active feature.\n- AC-02: WHEN the same binding is applied twice, the system SHALL preserve all stored bytes on replay.\n- AC-03: WHEN activation is absent, the system SHALL refuse binding without publishing authority.\n- AC-04: WHEN binding succeeds, the system SHALL publish authority accepted by the PO gate.\n\n## Architecture\nThe intake checkpoint owns the design paths. The existing acknowledgement writer binds the final documents; the existing promotion writer publishes continuity and profile authority. No new decision is introduced.\n";
+     const prd = "<!-- po-language: en -->\n<!-- technical-spec-sha256: " + generatePlan.targets.spec.afterSha256 + " -->\n# Completed bootstrap binding design\n\n## Goal\nBind the reviewed intake design package to a local active feature so implementation can use its exact authority.\n\n## Scope\nPreserve digest checks, explicit activation, byte-null replay and PO profile validation. Refuse re-planning once continuity is bound.\n\n## Acceptance\nThe specification defines observable binding, replay, activation and authority outcomes. The existing writers own these transitions.\n";
+     writeFileSync(join(root, generatePlan.targets.spec.path), spec);
+@@ -4547,6 +4551,134 @@ function bootstrapBindReadyRoot(name) {
+   return { root, featureId: generatePlan.featureId };
+ }
+ 
++// Greenfield 2026-11-08 (Codex): the package bound before the projection redacted addresses. Rebuilds exactly that state: the file, the
++// history capture and the intake's generated digest all hold the unredacted bytes.
++function writeGeneratedDesignInputDigest(root, designInputSha256) {
++  const intake = readOnboardingIntakeCheckpoint({ rootDir: root });
++  const { contentSha256: _stale, ...unsigned } = intake.value;
++  unsigned.generated = { ...unsigned.generated, designInputSha256 };
++  writeFileSync(intake.paths.checkpoint, `${JSON.stringify({ ...unsigned, contentSha256: sha256CanonicalJson(unsigned) }, null, 2)}\n`, { mode: 0o600 });
++}
++
++function recaptureRoot(name, address = "person.name@example.invalid") {
++  const question = `Keep git author Person <${address}> or change it?`;
++  const { root, featureId } = bootstrapBindReadyRoot(`recapture-${name}`, { question, address });
++  applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: planOnboardingBootstrapBind({ rootDir: root }).planSha256, activate: true });
++  writeFileSync(join(root, ".gitignore"), "scratch/\n");
++  const capture = readPromotionDesignInputCapture({ rootDir: root });
++  assert.equal(capture.status, "present");
++  const path = join(root, capture.path);
++  const redacted = readFileSync(path, "utf8");
++  assert.equal(redacted.includes("[REDACTED EMAIL]"), true);
++  const legacy = redacted.replaceAll("[REDACTED EMAIL]", address);
++  writeFileSync(path, legacy);
++  const legacySha256 = digest(legacy);
++  const historyPath = promotionHistoryPath(root);
++  const history = JSON.parse(readFileSync(historyPath, "utf8"));
++  history.transactions[0].designInputSha256 = legacySha256;
++  writeFileSync(historyPath, `${JSON.stringify(history, null, 2)}\n`, { mode: 0o600 });
++  writeGeneratedDesignInputDigest(root, legacySha256);
++  return { root, featureId, address, relativePath: capture.path, path, legacy, legacySha256, redacted, redactedSha256: digest(redacted), historyPath };
++}
++
++function recaptureCommand(root, ...args) {
++  return spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url)), ...args], {
++    cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root },
++  });
++}
++
++check("recapture-design-input: a bound design input holding an address is regenerated through the real commands, passes the commit check and the seal, and every earlier record stays", () => {
++  const seed = recaptureRoot("chain");
++  const { root, address, relativePath, path, legacySha256, redactedSha256, historyPath } = seed;
++  assert.equal(spawnSync("git", ["add", "--", relativePath], { cwd: root, encoding: "utf8", shell: false }).status, 0);
++  assert.equal(scanChangedContent(root, { scopes: ["staged"] }).ok, false, "the state this repairs: the commit check refuses the bound file");
++
++  const planned = recaptureCommand(root, "recapture-design-input");
++  assert.equal(planned.status, 0, planned.stderr);
++  assert.equal(planned.stdout.includes(address), false, "a plan never prints the content");
++  const plan = JSON.parse(planned.stdout.slice(0, planned.stdout.lastIndexOf("\nNext:")));
++  assert.equal(plan.previousDesignInputSha256, legacySha256);
++  assert.equal(plan.designInputSha256, redactedSha256);
++  assert.equal(readFileSync(path, "utf8"), seed.legacy, "planning writes nothing");
++
++  const applied = recaptureCommand(root, "recapture-design-input", "--plan-sha256", plan.planSha256);
++  assert.equal(applied.status, 0, applied.stderr);
++  assert.match(applied.stdout, /Next: commit .* on its own, then run submit-plan/u);
++  assert.equal(readFileSync(path, "utf8"), seed.redacted);
++  assert.equal(spawnSync("git", ["add", "--", relativePath], { cwd: root, encoding: "utf8", shell: false }).status, 0);
++  assert.deepEqual(scanChangedContent(root, { scopes: ["staged"] }), { ok: true, findings: [] }, "the file can now be committed");
++
++  assert.deepEqual(readPromotionDesignInputCapture({ rootDir: root }), { status: "present", path: relativePath, sha256: redactedSha256, supersededSha256: [legacySha256] });
++  const history = JSON.parse(readFileSync(historyPath, "utf8"));
++  assert.equal(history.transactions.length, 2);
++  assert.equal(history.transactions[0].designInputSha256, legacySha256, "the first capture stays on record");
++  assert.equal(history.transactions[1].kind, "design-input-recapture");
++  assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).value.designQuestions[0].question.includes(address), true, "the private intake stays lossless");
++
++  const seal = recaptureCommand(root, "prepare-seal");
++  assert.equal(seal.status, 0, `${seal.stdout}${seal.stderr}`);
++
++  const historyBytes = readFileSync(historyPath);
++  const replay = recaptureCommand(root, "recapture-design-input", "--plan-sha256", plan.planSha256);
++  assert.equal(replay.status, 0, replay.stderr);
++  assert.match(replay.stdout, /"status": "replayed"/u);
++  assert.deepEqual(readFileSync(historyPath), historyBytes, "a replay writes nothing");
++  const again = recaptureCommand(root, "recapture-design-input");
++  assert.notEqual(again.status, 0);
++  assert.match(again.stderr, /DESIGN-INPUT-RECAPTURE-NOT-NEEDED/u);
++
++  writeFileSync(path, `${seed.redacted}tampered\n`);
++  const tampered = recaptureCommand(root, "prepare-seal");
++  assert.notEqual(tampered.status, 0);
++  assert.match(`${tampered.stdout}${tampered.stderr}`, /PSP-PROVENANCE/u);
++  assert.match(`${tampered.stdout}${tampered.stderr}`, /recapture-design-input/u);
++  assert.equal(`${tampered.stdout}${tampered.stderr}`.includes("reopen-design --by"), false, "the refusal no longer offers a route that cannot repair it");
++});
++
++check("recapture-design-input: a stop between the file and the history finishes with the same plan; anything not derived, not draft, still private or unscannable is refused without a write", () => {
++  const crashed = recaptureRoot("crash");
++  const plan = planDesignInputRecapture({ rootDir: crashed.root });
++  writeFileSync(crashed.path, crashed.redacted);
++  assert.equal(planDesignInputRecapture({ rootDir: crashed.root }).planSha256, plan.planSha256, "the digest survives the file write");
++  assert.equal(applyDesignInputRecapture({ rootDir: crashed.root, expectedPlanSha256: plan.planSha256 }).status, "applied");
++
++  const stale = recaptureRoot("stale");
++  expectKickoffError("DESIGN-INPUT-RECAPTURE-PLAN-STALE", () => applyDesignInputRecapture({ rootDir: stale.root, expectedPlanSha256: "a".repeat(64) }));
++  assert.equal(readFileSync(stale.path, "utf8"), stale.legacy);
++
++  const drifted = recaptureRoot("drift");
++  writeFileSync(drifted.path, `${drifted.legacy}hand edit\n`);
++  expectKickoffError("DESIGN-INPUT-RECAPTURE-FILE-DRIFT", () => planDesignInputRecapture({ rootDir: drifted.root }));
++
++  const foreign = recaptureRoot("foreign");
++  writeGeneratedDesignInputDigest(foreign.root, "b".repeat(64));
++  expectKickoffError("DESIGN-INPUT-RECAPTURE-NOT-DERIVED", () => planDesignInputRecapture({ rootDir: foreign.root }));
++
++  const still = recaptureRoot("still-private");
++  const patterns = derivePatterns({ home: "", username: "", userProfile: "", localPatterns: [{ category: "local-pattern", value: "Keep git author" }] });
++  expectKickoffError("DESIGN-INPUT-RECAPTURE-STILL-PRIVATE", () => planDesignInputRecapture({ rootDir: still.root, privateIdentifierPatterns: patterns }));
++
++  const unscannable = recaptureRoot("unscannable");
++  writeFileSync(join(unscannable.root, ".git", "agent-pipeline", "private-identity-patterns.json"), "{not json");
++  expectKickoffError("DESIGN-INPUT-RECAPTURE-SCAN-UNAVAILABLE", () => planDesignInputRecapture({ rootDir: unscannable.root }));
++
++  const approved = recaptureRoot("not-draft");
++  const statePath = join(approved.root, "project", "pipeline-state.json");
++  const state = JSON.parse(readFileSync(statePath, "utf8"));
++  state.planApproved = true;
++  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
++  const refused = recaptureCommand(approved.root, "recapture-design-input");
++  assert.notEqual(refused.status, 0);
++  assert.equal(`${refused.stdout}${refused.stderr}`.includes("DESIGN-INPUT-RECAPTURE-NOT-DRAFT"), true, refused.stderr);
++  assert.equal(readFileSync(approved.path, "utf8"), approved.legacy);
++
++  const clean = bootstrapBindReadyRoot("recapture-clean");
++  applyOnboardingBootstrapBind({ rootDir: clean.root, expectedPlanSha256: planOnboardingBootstrapBind({ rootDir: clean.root }).planSha256, activate: true });
++  expectKickoffError("DESIGN-INPUT-RECAPTURE-NOT-NEEDED", () => planDesignInputRecapture({ rootDir: clean.root }));
++  const bare = readyToGenerateRoot("recapture-no-capture");
++  expectKickoffError("DESIGN-INPUT-RECAPTURE-NO-CAPTURE", () => planDesignInputRecapture({ rootDir: bare }));
++});
++
+ // NVA-BL-INTAKEBIND-1 (AC-1, reproduce-first): before that fix, a genuinely
+ // fresh, unmodified intake-generated staging PRD (no hand-injected markers)
+ // failed planOnboardingBootstrapBind() with KICKOFF-PROMOTION-PRD-LANGUAGE-
+@@ -5634,7 +5766,7 @@ for (const [label, options] of Object.entries({
+   });
+ }
+ 
+-assert.equal(cases.length, 328,"the complete onboarding continuity corpus must be registered before execution begins");
++assert.equal(cases.length, 330,"the complete onboarding continuity corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index d205b176e71c9410c08cf24d3d13b2943b4398b3..161ef81b1239754768b2e4951c7a1e323f9c7710 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -459,7 +459,7 @@ import {
+   SEAL_PLAN_PATH, advisoryBindingFromAdmission, buildSealPlan, checkSealPlanForApply, provenanceUnavailableRefusal, readSealDocuments,
+   readinessBindingFromSources, sealPaths, sealPlanNotPresentedRefusal, sealedAuthorityFromPlan, unreadableReviewRefusal,
+ } from "../lib/authority-seal-plan.mjs";
+-import { readPromotionDesignInputCapture } from "../lib/onboarding-continuity.mjs";
++import { applyDesignInputRecapture, planDesignInputRecapture, readPromotionDesignInputCapture } from "../lib/onboarding-continuity.mjs";
+ import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRetirementIntakeLock} from '../lib/onboarding-continuity.mjs';
+ import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
+ import {coverOnboardingOutput} from '../lib/onboarding-consent-scope.mjs';
+@@ -779,7 +779,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
+ const PIPELINE_STATE_COMMANDS = Object.freeze([
+   "materialize-architecture", "afk-project",
+   "inspect", "update-public-handover", "rebind-approval",
+-  "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "prepare-seal", "seal-plan-approval",
++  "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "prepare-seal", "recapture-design-input", "seal-plan-approval",
+   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
+   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance", "approve-critic-acknowledgement",
+   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
+@@ -13465,6 +13465,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       const stop = (refusal) => { printSealRefusal("prepare-seal", refusal); return 2; };
+       let documents = null;
+       let designInputCapture = null;
++      let supersededDesignInputs = [];
+       const reviews = [];
+       if (seal.status === "draft" && inSealScope(profile)) {
+         const docs = currentSealDocuments(dir, seal);
+@@ -13472,7 +13473,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         documents = docs.documents;
+         let capture;
+         try { capture = (deps.readDesignInputCapture ?? readPromotionDesignInputCapture)({ rootDir: dir }); } catch { capture = { status: "unavailable" }; }
+-        if (capture?.status === "present") designInputCapture = { path: capture.path, sha256: capture.sha256 };
++        if (capture?.status === "present") { designInputCapture = { path: capture.path, sha256: capture.sha256 }; supersededDesignInputs = capture.supersededSha256 ?? []; }
+         else if (capture?.status === "drift") return stop(provenanceUnavailableRefusal("design-input.md no longer matches the bytes captured when the package was promoted"));
+         else if (capture?.status !== "absent" && documents.designInput !== null) return stop(provenanceUnavailableRefusal("the promotion capture record of design-input.md is not readable"));
+         const designInputPath = documents.designInput?.path ?? null;
+@@ -13491,7 +13492,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         }
+         for (const extra of (deps.reviewBindings?.() ?? [])) reviews.push(extra);
+       }
+-      const built = buildSealPlan({ authority: continuity?.authority, featureId: continuity?.featureId, revision: continuity?.revision, profile, documents, designInputCapture, reviews });
++      const built = buildSealPlan({ authority: continuity?.authority, featureId: continuity?.featureId, revision: continuity?.revision, profile, documents, designInputCapture, reviews, supersededDesignInputs });
+       if (!built.ok) {
+         // A plan file left on a package that is already sealed is inert but orphaned: this command retires it (it never writes State).
+         if (built.code === "PSP-ALREADY-SEALED" && removeSealPlanFile(dir)) console.log("The stray seal plan file (scratch/seal-plan.json) was retired; State was not changed.");
+@@ -13505,6 +13506,33 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       return 0;
+     }
+ 
++    // Regenerates a generated design-input.md that holds a private identifier and records the new capture (draft packages only). Without
++    // flags it prints the plan and writes nothing; with that plan's digest it applies it. State is not written.
++    case "recapture-design-input": {
++      const applying = rest.length === 2 && rest[0] === "--plan-sha256" && /^[a-f0-9]{64}$/u.test(rest[1] ?? "");
++      if (rest.length !== 0 && !applying) { console.error("Error: recapture-design-input accepts no arguments, or --plan-sha256 <digest> from its plan."); return 2; }
++      const refused = (code, reason) => { console.error(`Error: recapture-design-input refused (${code}): ${reason}. Nothing was changed.`); return 2; };
++      if (readAuthoritySeal(base.continuity?.authority).status !== "draft" || base.planApproved === true) {
++        return refused("DESIGN-INPUT-RECAPTURE-NOT-DRAFT", "only an unapproved draft package may have its design input regenerated");
++      }
++      try {
++        if (!applying) {
++          const plan = planDesignInputRecapture({ rootDir: dir });
++          console.log(JSON.stringify(plan, null, 2));
++          console.log(`Next: review the two digests, then run recapture-design-input --plan-sha256 ${plan.planSha256}. Nothing was changed.`);
++          return 0;
++        }
++        const result = applyDesignInputRecapture({ rootDir: dir, expectedPlanSha256: rest[1] });
++        if (result.mutated) removeSealPlanFile(dir);
++        console.log(JSON.stringify(result, null, 2));
++        console.log(`Next: commit ${result.designInputPath} on its own, then run submit-plan if the plan is not submitted, prepare-seal and present-plan. The PRD, the Spec and their reviews stay unchanged; their Source lines keep the earlier digest, and the private history records the step from it to the new one.`);
++        return 0;
++      } catch (error) {
++        if (error instanceof OnboardingContinuityKickoffError) return refused(error.code, error.message);
++        throw error;
++      }
++    }
++
+     case "materialize-push-threat-model": {
+       const parsed = parseExactFlags(rest, new Set());
+       if (!parsed.ok) {
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+index 9e1db1f2533564def41f6aa9b27336b4c662c8c9..6f7cb14980572911db372862a489fe103bbe7875 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+@@ -240,6 +240,15 @@ If the design input materially changes, create a new safely named evidence
+ version and promote/rebind it through the ordinary planning change, rather than
+ rewriting an old evidence file and provoking authority-hash drift.
+ 
++The one exception is privacy. A `design-input.md` generated from the private
++intake that holds a private identifier, and so cannot be committed, is never
++edited by hand: in a draft package run `pipeline-state.mjs
++recapture-design-input`, then the same command with `--plan-sha256 <digest>`
++from its plan. It regenerates the file with the current projection and records
++a new capture beside the old one. `reopen-design` records no capture. The PRD,
++the Spec and their reviews stay as they are, and the changed file appears as an
++unreviewed source delta at the design approval.
++
+ For material input, replace the bootstrap placeholders with a useful PRD and
+ Spec before a normal plan gate. The PRD covers problem/users, outcomes,
+ success measures, scope/non-goals, testable-acceptance requirements,
