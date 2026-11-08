@@ -19,7 +19,7 @@ Resolve the plugin root, then run exactly:
 
 `node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"`
 
-Accept only schema `pipeline.start-preflight.v1`, status `ready`,
+A dispatched Goldfish appends `--role goldfish`. Accept only schema `pipeline.start-preflight.v1`, status `ready`,
 `pipeline-governance-inactive`, `plugin-refresh-required`, `windows-authority-unavailable`, the hook statuses or the hard recovery status below, absolute matching `pluginRoot`, valid
 version/source/boundary/handoff, and a read-only `nextAction` when ready.
 Goldfish/Critic validate but never execute onboarding; Elephant executes the
@@ -205,11 +205,9 @@ recommendation.
    what is refused:
    `node <plugin-root>/scripts/resume-hint.mjs capture --root <root> --card-file <root>/project/.resume-hint-input.json --consume-card`.
    Write the card to that exact path first. Elsewhere (a ready session) any
-   `--card-file <json>` works. A short goal with no further
-   material input needs no card. Read back `resume-hint.mjs inspect` after a
+   `--card-file <json>` works. Read back `resume-hint.mjs inspect` after a
    successful capture and state that the `available` card will be used in the
-   next session; when no restart follows, use it as context for the current
-   kickoff or planning step instead.
+   next session.
    At the start of the NEXT session, when `resume-hint.mjs inspect` reports
    status `available`, the agent MUST read `project/resume-hint.json`'s
    content in that same turn and incorporate its `intent`, `constraints`,
@@ -222,10 +220,7 @@ recommendation.
    Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
    their shapes differ: `intent` is one string; the other three are **arrays** of
    short strings, at most 4, 4 and 3 entries. Every entry is a distilled
-   statement, never a transcript. Interpret user intent
-   rather than keywords: an intended restart/session cut captures it; changed
-   scope or constraints refresh it; canonised or revoked information is
-   discarded. At bootstrap, `resume-hint.mjs inspect` is passive context only:
+   statement, never a transcript. At bootstrap, `resume-hint.mjs inspect` is passive context only:
    `absent`, `challenged-stale`, or `ignored-invalid` never changes readiness,
    actions, authority, approval, close state, or exit status. Do not capture
    raw transcripts, commands, approvals, lifecycle instructions, host paths,

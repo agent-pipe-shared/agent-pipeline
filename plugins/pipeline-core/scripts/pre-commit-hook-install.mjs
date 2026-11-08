@@ -1164,7 +1164,7 @@ async function main() {
       process.stderr.write([
         "BLOCKED (agent-pipeline pre-commit hook): the verification tiers " + readyPaths.join(", ") + " are admitted without any human step, but only as their own commit; " + otherStaged.length + " other path(s) are staged with them.",
         "Repair (agent, no PO step): git restore --staged -- " + otherStaged.join(" "),
-        "then: git commit -m \\"chore: configure project verification\\"   (exactly " + readyPaths.join(" ") + " staged)",
+        "then commit with git commit -F and a message file under scratch/: subject chore: configure project verification, a blank line, then the trailer lines AI-Assisted: true and Dispatch: stage-0 (elephant)   (exactly " + readyPaths.join(" ") + " staged)",
         "then stage and commit the other path(s) in a separate commit. No human-guard-override signature is needed for this.",
       ].join("\\n") + "\\n");
       process.exitCode = 1;

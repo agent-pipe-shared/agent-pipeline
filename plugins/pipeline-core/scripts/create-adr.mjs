@@ -162,7 +162,7 @@ function createProposal(root, values) {
   }
   return { ok: true, id, schema: record.schema, status: "proposed", digest: record.digest, markdown: `docs/adr/${id}.md`, sidecar: `docs/adr/${id}.json`,
     nextFreeNumber: free, acceptedIdAfterApproval: `${free}-${slug}`,
-    next: "Replace each REPLACE: line in the Markdown, run this script again with --refresh (without --slug it updates every draft) to recompute the digest once after the last edit, then bind the proposal in the design package; it becomes `accepted` only through the PO's design approval and `pipeline-state.mjs materialize-architecture`. The number is a preview: bind-adr-proposals.mjs assigns the final numbers in --draft order." };
+    next: "Finish the bootstrap binding first: while readiness is bootstrap-binding-required an edit of this draft is refused (GUARD-LIFECYCLE-NOT-READY). Then replace each REPLACE: line in the Markdown, run this script again with --refresh (without --slug it updates every draft) to recompute the digest once after the last edit, then bind the proposal in the design package; it becomes `accepted` only through the PO's design approval and `pipeline-state.mjs materialize-architecture`. The number is a preview: bind-adr-proposals.mjs assigns the final numbers in --draft order." };
 }
 
 export function main(argv = process.argv.slice(2)) {

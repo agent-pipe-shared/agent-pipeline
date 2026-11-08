@@ -22,6 +22,7 @@ import { observeCurrentPlanApprovalForCalibration, readState, run, statePath } f
 import { compileDecisionSummary } from "../../scripts/architecture-baseline.mjs";
 import { applyInstall } from "../../scripts/pre-commit-hook-install.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
+import { finishedCommitMessageFindings } from "../commit-message-policy.mjs";
 import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
 import { validateFeaturePackage } from "../feature-package-topology.mjs";
 import { createGovernanceScopeController } from "../governance-scope.mjs";
@@ -231,14 +232,24 @@ function configure(root, env, command = COMMAND) {
 }
 
 // Parses the two printed route lines; they are executed verbatim (no re-derivation of the paths or message).
-function printedRoute(logs) {
+// Restated 2026-11-08 (QG-04, candidate 21): the printed -m line could not pass GIT-03 live, so the route is a printed message and
+// `git commit -F`. The message is written exactly as printed and must pass the same finished-message policy the guard applies.
+function printedRoute(logs, root) {
   const add = logs.find((line) => line.startsWith("git add -- "));
-  const commit = logs.find((line) => line.startsWith("git commit -m "));
+  const commit = logs.find((line) => line.startsWith("git commit -F "));
   assert.ok(add, `the output must print a git add line:\n${logs.join("\n")}`);
   assert.ok(commit, `the output must print a git commit line:\n${logs.join("\n")}`);
-  const message = /^git commit -m "([^"]+)"$/u.exec(commit);
-  assert.ok(message, `the printed commit line is one plain -m "<message>" spelling: ${commit}`);
-  return { addArgs: ["add", "--", ...add.slice("git add -- ".length).split(" ")], commitArgs: ["commit", "-m", message[1]], add };
+  const file = commit.slice("git commit -F ".length);
+  const start = logs.indexOf("--- message ---");
+  const end = logs.indexOf("--- end ---");
+  assert.ok(start >= 0 && end > start, `the output must print the commit message:\n${logs.join("\n")}`);
+  const message = `${logs.slice(start + 1, end).join("\n")}\n`;
+  assert.deepEqual(finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings, [], "the printed message passes GIT-03");
+  if (root !== undefined) {
+    mkdirSync(join(root, dirname(file)), { recursive: true });
+    writeFileSync(join(root, file), message);
+  }
+  return { addArgs: ["add", "--", ...add.slice("git add -- ".length).split(" ")], commitArgs: ["commit", "-F", file], add };
 }
 
 test("the printed route names exactly the two calibration twins and the normal commit", () => {
@@ -250,7 +261,7 @@ test("the printed route names exactly the two calibration twins and the normal c
 test("the printed git add / git commit lines land through the installed hook (State tracked in HEAD)", () => {
   const { root, git, env, head } = fixture({ stateTracked: true });
   const before = head();
-  const route = printedRoute(configure(root, env));
+  const route = printedRoute(configure(root, env), root);
   assert.equal(git(...route.addArgs).status, 0);
   const committed = git(...route.commitArgs);
   assert.equal(committed.status, 0, committed.stderr);
@@ -266,7 +277,7 @@ test("the printed git add / git commit lines land through the installed hook (St
 test("the printed route also lands when the private State is untracked, as the output recommends", () => {
   const { root, git, env, head } = fixture({ stateTracked: false });
   const before = head();
-  const route = printedRoute(configure(root, env));
+  const route = printedRoute(configure(root, env), root);
   assert.equal(git(...route.addArgs).status, 0);
   const committed = git(...route.commitArgs);
   assert.equal(committed.status, 0, committed.stderr);
@@ -330,7 +341,7 @@ test("refusal: a different staged set (an extra file beside the twins), private 
 test("G20-46: set-phase --verify-command prints the walkable route and it lands (private State untracked)", () => {
   const { root, git, phaseLogs, head } = fixture({ stateTracked: false, verifyAtPhase: true });
   const before = head();
-  const route = printedRoute(phaseLogs);
+  const route = printedRoute(phaseLogs, root);
   assert.deepEqual(route.addArgs.slice(2).sort(), [".claude/pipeline.json", "project/pipeline.json"]);
   assert.ok(phaseLogs.some((line) => /no PO step/u.test(line)), `the route is named as an agent step:\n${phaseLogs.join("\n")}`);
   assert.equal(git(...route.addArgs).status, 0);
@@ -371,7 +382,7 @@ test("G20-51: materialize-architecture registers the feature package itself and 
 test("G20-46: an extra staged path beside the twins names the agent repair, no signature, and the repair lands", () => {
   const ctx = { ...fixture({ stateTracked: false, verifyAtPhase: true }) };
   ctx.before = ctx.head();
-  const route = printedRoute(ctx.phaseLogs);
+  const route = printedRoute(ctx.phaseLogs, ctx.root);
   writeFileSync(join(ctx.root, "extra.txt"), "extra\n");
   assert.equal(ctx.git(...route.addArgs, "extra.txt").status, 0);
   const first = ctx.git(...route.commitArgs);

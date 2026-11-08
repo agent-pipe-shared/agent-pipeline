@@ -263,8 +263,9 @@ report that no grant was found.
 
 At an actual session start or runtime re-entry, invoke
 `pipeline-core:pipeline-start` and complete its required reading/preflight
-sequence before the first Edit, Write or NotebookEdit. A role without the Skill
-tool instead runs `node "<plugin-root>/scripts/pipeline-start-preflight.mjs" --role goldfish`
+sequence before the first Edit, Write or NotebookEdit. A worker without the Skill
+tool, also one that reads the skill as a file (Codex, Antigravity), instead runs
+`node "<plugin-root>/scripts/pipeline-start-preflight.mjs" --role goldfish`, never the bare form,
 once as a plain command (nothing else appended), so the readback withholds every
 Coordinator action from this role; exit 2 with `hook-refresh-required`
 is a soft host status, so continue. Use only the sanctioned

@@ -646,6 +646,20 @@ const RECOVERY_BRIDGE_DECISION_KEYS = [
   "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "approvedBy", "approvedAt", "expiresAt", "status",
 ];
 
+// Live Claude run on 20j: the printed one-line commit could not succeed. GIT-03 needs both trailers in the final block, and a
+// command line holding the parentheses of the Dispatch trailer is refused by the push guard, so the route is a message file.
+const VERIFICATION_TIER_MESSAGE_FILE = "scratch/commit-msg/verification-tiers.txt";
+function printVerificationTierCommit() {
+  console.log(`Write this commit message to ${VERIFICATION_TIER_MESSAGE_FILE}, exactly the lines between the markers:`);
+  console.log("--- message ---");
+  console.log("chore: configure project verification");
+  console.log("");
+  console.log("AI-Assisted: true");
+  console.log("Dispatch: stage-0 (elephant)");
+  console.log("--- end ---");
+  console.log(`git commit -F ${VERIFICATION_TIER_MESSAGE_FILE}`);
+}
+
 function recoveryBridgeBindingKeys(value) {
   const legacy = !Object.hasOwn(value ?? {}, "poApproval");
   return [
@@ -12013,9 +12027,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       if (calibrationCommitPaths !== null && calibrationCommitPaths.length > 0) {
         console.log("Next (agent, no PO step): commit the verification tiers ALONE, as the next commit, before staging anything else:");
         console.log(`git add -- ${calibrationCommitPaths.join(" ")}`);
-        console.log('git commit -m "chore: configure project verification"');
+        printVerificationTierCommit();
         console.log("Stage no other path with them (docs/state.md included): the hook admits exactly this set against the approved plan; commit the other files in a separate commit afterwards.");
       }
+      // Live Codex run on 20j: docs/state.md was committed after the briefing was built, HEAD moved and the worker stopped.
+      console.log("Before building a dispatch briefing, commit everything of this entry, docs/state.md included: the briefing binds HEAD, and a later commit stops the worker.");
       const decisionSummary = summarizePlanningDecisionApplicability(architecture.artifacts?.decisionApplicability);
       if (decisionSummary !== null) console.log(`Architecture decisions: ${JSON.stringify(decisionSummary)}`);
       return 0;
@@ -12099,7 +12115,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       console.log("Verify command configured for the established implementation lifecycle.");
       console.log("Commit exactly the selected verification tiers through the normal hooks:");
       console.log(`git add -- ${commitReady.paths.join(" ")}`);
-      console.log('git commit -m "chore: configure project verification"');
+      printVerificationTierCommit();
       console.log("Keep the private State untracked; the normal hook rechecks this exact transition at commit time.");
       return 0;
     }

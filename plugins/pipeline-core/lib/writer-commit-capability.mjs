@@ -29,6 +29,7 @@ import { loadProtectedTestPathRules, protectedTestPathRuleFor, writerCommitMac, 
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const KEY_FILE = "mac.key";
+const WRITER_MESSAGE_FILE = "scratch/commit-msg/writer-output.txt";
 const MAX_SNAPSHOT_FILE_BYTES = 16 * 1024 * 1024;
 const sha256Of = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
@@ -45,7 +46,12 @@ const commitSubject = (writer) => `chore(pipeline): commit the ${String(writer).
 /** The exact commit that publishes `paths`, as the next step a writer prints. */
 export function writerCommitSteps(paths, message) {
   const list = paths.map(quoted).join(" ");
-  return [`git add -- ${list}`, `git commit -m "${message}" -- ${list}`];
+  // GIT-03 needs both trailers in the final block, and the push guard refuses parentheses on a command line, so the route is a message file.
+  return [
+    `git add -- ${list}`,
+    `Write this to ${WRITER_MESSAGE_FILE}: the line "${message}", a blank line, then the two lines "AI-Assisted: true" and "Dispatch: stage-0 (elephant)".`,
+    `git commit -F ${WRITER_MESSAGE_FILE} -- ${list}`,
+  ];
 }
 
 function repoRootOf(rootDir, spawn) {

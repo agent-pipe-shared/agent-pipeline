@@ -318,7 +318,7 @@ test("P3: one command takes the active feature from the approved candidate to th
     const tracked = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/tracked-close.json"), "utf8"));
     assert.equal(tracked.schema, "pipeline.close-tracked-effects.v1"); assert.equal(tracked.resultSha256, f.resultSha); assert.equal(tracked.pipelineStateSha256, sha256Of(readFileSync(join(f.root, STATE_PATH))));
     assert.ok(result.commit.paths.includes(STATE_PATH) && result.commit.paths.includes("specs/feature-abc/evidence/audit-request.json") && result.commit.paths.includes("specs/feature-abc/evidence/tracked-close.json"), result.commit.paths.join());
-    assert.match(result.commit.steps[0], /^git add -- /u); assert.match(result.commit.steps[1], /^git commit -m "chore\(close\): close feature feature-abc/u);
+    assert.match(result.commit.steps[0], /^git add -- /u); assert.match(result.commit.steps[1], /chore\(close\): close feature feature-abc/u); /* restated 2026-11-08 (QG-04, candidate 21): the printed -m form could not pass GIT-03, the step is now a message file */ assert.match(result.commit.steps[2], /^git commit -F scratch\/commit-msg\/writer-output\.txt -- /u);
     assert.ok(result.resumeLifecycleId, "the next call resumes this lifecycle"); assert.match(result.next, /--resume-lifecycle-id/u);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
