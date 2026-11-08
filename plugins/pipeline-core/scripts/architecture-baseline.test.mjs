@@ -480,6 +480,18 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       assert.equal(result.acceptedIdAfterApproval, "0008-next");
     });
 
+    it("7.6a create-adr --refresh without a slug updates every draft in one call", () => {
+      const root = makeRoot();
+      assert.equal(create(root, "--slug", "one", "--title", "One", "--date", "2026-11-07").status, 0);
+      assert.equal(create(root, "--slug", "two", "--title", "Two", "--date", "2026-11-07").status, 0);
+      fs.appendFileSync(path.join(root, "docs", "adr", "draft-two.md"), "\nedited\n");
+      const refreshed = JSON.parse(create(root, "--refresh").stdout);
+      assert.deepEqual(refreshed.refreshed.map((entry) => entry.id), ["draft-one", "draft-two"]);
+      assert.deepEqual(refreshed.changed, ["draft-two"]);
+      const record = JSON.parse(fs.readFileSync(path.join(root, "docs", "adr", "draft-two.json"), "utf8"));
+      assert.equal(record.digest, sha(fs.readFileSync(path.join(root, "docs", "adr", "draft-two.md"))));
+    });
+
     it("7.7 create-adr writes a v2 record for named modules, sorted and unique, only when the physical map has them", () => {
       const root = makeRoot();
       makeMap(root, ["alpha", "beta"]);

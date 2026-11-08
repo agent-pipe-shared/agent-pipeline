@@ -84,7 +84,7 @@ export function deriveArchitecturePlanningSurface(rootDir, read = readFileSync) 
   const paths = new Set();
   for (const match of source.matchAll(PLAN_PATH_TOKEN)) {
     const candidate = match[1].replace(/[),.;:\]}`]+$/u, "");
-    if (candidate.length > 0 && !candidate.split("/").some((part) => part === "" || part === "." || part === "..")) paths.add(candidate);
+    if (candidate.length > 0 && !candidate.split("/").some((part) => part === "" || part === "." || part === ".." || part.startsWith("-"))) paths.add(candidate);
   }
   return paths.size > 0 ? { planPath, paths: [...paths].sort() } : null;
 }

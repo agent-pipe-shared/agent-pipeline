@@ -8149,7 +8149,7 @@ function applyOnboardingIntakeGenerateTracked({
 function resolveBootstrapBindInputs({ rootDir, repositoryCapability = "local", spawn = defaultGitSpawn } = {}) {
   const observed = readOnboardingIntakeCheckpoint({ rootDir, repositoryCapability, spawn });
   if (observed.status !== "present") {
-    fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires an existing intake checkpoint");
+    fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires an existing intake checkpoint, and none is readable from here. If onboarding already recorded one, this boundary cannot see it (a sandbox has no access to the private checkpoint): run this same command at the boundary its executionBoundary names. Otherwise complete the intake steps first.");
   }
   const checkpoint = observed.value;
   if (checkpoint.transactionState !== "generated") {

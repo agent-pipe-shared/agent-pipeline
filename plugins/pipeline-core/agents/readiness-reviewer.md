@@ -49,6 +49,8 @@ the design makes such a choice and no module names an ADR path for it in
 and point to the `architecture-decision` skill. This is a question, never a block;
 the close only reports which named ADR paths exist.
 
-Return one concise readiness review with references. The host, not this agent,
+Return one concise readiness review with references. Give every open finding an
+id of upper-case letters and digits such as `DESIGN-REVIEW-3`, and say ready only
+when none is open. The host, not this agent,
 creates the sanitized, dispatch-bound duty and execution receipts; never return
 or persist raw prompts, answers, paths, credentials, or private coordinates.

@@ -1778,6 +1778,8 @@ function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STE
       runner,
       root,
       outcome: "unsupported-next-action",
+      // Codex greenfield 2026-11-08: the designed stop before a restart read like a failure.
+      ...(nextAction?.kind === "restart-process" ? { expectedStop: "This is the designed stop, not a fault: the restart needs an attended terminal. Follow final.nextAction." } : {}),
       stepCap,
       stepsExecuted: steps.length,
       steps,

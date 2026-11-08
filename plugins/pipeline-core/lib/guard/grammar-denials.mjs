@@ -135,6 +135,11 @@ export const ADMITTED_GRAMMAR_SHAPES = [
       + "allowlist (echo; \"mkdir -p\" under scratch/ or .claude/worktrees/)",
     example: "rg -n needle probe.txt && rg -n needle probe.txt",
   },
+  {
+    // Codex greenfield 2026-11-08: a regular expression ending in $ inside double quotes was refused with no hint why.
+    spelling: "a search pattern holding a dollar sign or a backtick stands in single quotes, since double quotes would let the shell expand it",
+    example: "rg -n 'needle$' probe.txt",
+  },
 ];
 
 function grammarShapeLines() {

@@ -1,7 +1,9 @@
 <!-- po-language: de -->
 <!--
 PROMPT/DOC TEMPLATE: PRD — Product Review Document (PO gate) — Agent-Pipeline
-PO-facing language: run `node harness/scripts/check-po-gate-authority.mjs` and use
+PO-facing language: a hosted project has no `harness/` and uses the language
+recorded at onboarding. In the Pipeline's own source checkout, run
+`node harness/scripts/check-po-gate-authority.mjs` and use
 the repository-scoped language it validates from the canonical primary checkout's
 narrow source/runtime projection and common mode-0600 receipt. Branch-local profile
 bytes are not authority. If it reports `en`, replace the marker above accordingly.

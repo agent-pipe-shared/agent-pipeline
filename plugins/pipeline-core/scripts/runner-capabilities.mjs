@@ -3,7 +3,7 @@
 /**
  * Prints the sourced per-runner capability table (config/runner-capabilities.json) as one JSON line, or one runner's column.
  *
- *   node runner-capabilities.mjs [--runner <claude|codex|antigravity>]
+ *   node runner-capabilities.mjs --runner <claude|codex|antigravity>
  *
  * Read-only. The file states only facts another shipped document or script states; a cell without a source says so. It is
  * deliberately not part of the start preflight envelope: that readback is pinned and size-budgeted for all three runners, and
@@ -31,7 +31,7 @@ export function selectRunner(table, runner) {
 export function main(argv = process.argv.slice(2), out = process.stdout) {
   let runner = null;
   if (argv.length === 2 && argv[0] === "--runner") runner = argv[1];
-  else if (argv.length !== 0) { out.write(`${JSON.stringify({ ok: false, code: "RC-USAGE", message: "usage: runner-capabilities.mjs [--runner <claude|codex|antigravity>]" })}\n`); return 2; }
+  else if (argv.length !== 0) { out.write(`${JSON.stringify({ ok: false, code: "RC-USAGE", message: "usage: runner-capabilities.mjs --runner <claude|codex|antigravity>" })}\n`); return 2; }
   try {
     const table = readRunnerCapabilities();
     out.write(`${JSON.stringify(runner === null ? table : selectRunner(table, runner))}\n`);

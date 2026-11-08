@@ -21,6 +21,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-clone-provisioning.mjs";
+import { detectRunner } from "./design-review-receipt.mjs";
 import { applyInstall as applyPreCommit, planInstall as planPreCommit } from "./pre-commit-hook-install.mjs";
 import { applyInstall as applyCommitMsg, planInstall as planCommitMsg } from "./commit-msg-hook-install.mjs";
 import { applyInstall as applyPrePush, planInstall as planPrePush } from "./pre-push-hook-install.mjs";
@@ -51,7 +52,9 @@ function refreshOne(hook, rootDir, dependencies) {
 /** W1: the version of the plugin copy this refresh binds the hooks to (null when its manifest cannot be read). */
 function readBoundPluginVersion() {
   try {
-    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("../.claude-plugin/plugin.json", import.meta.url)), "utf8"));
+    // Antigravity greenfield 2026-11-08: the refresh printed the +claude build next to a preflight that printed +antigravity.
+    const manifestPath = { antigravity: "../plugin.json", codex: "../.codex-plugin/plugin.json" }[detectRunner(process.env)] ?? "../.claude-plugin/plugin.json";
+    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL(manifestPath, import.meta.url)), "utf8"));
     return typeof manifest?.version === "string" ? manifest.version : null;
   } catch { return null; }
 }

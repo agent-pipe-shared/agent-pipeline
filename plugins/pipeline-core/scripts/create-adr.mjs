@@ -7,6 +7,7 @@
  *   create-adr.mjs --root <root> --slug <slug> --title <title> [--scope project|global | --modules <id[,id...]>]
  *                  [--supersedes <adr-id>] [--date YYYY-MM-DD]
  *   create-adr.mjs --root <root> --slug <slug> --refresh
+ *   create-adr.mjs --root <root> --refresh    (every docs/adr/draft-*.md at once)
  *
  * Writes docs/adr/draft-<slug>.md and docs/adr/draft-<slug>.json: a PROPOSAL (status `proposed`, schema
  * pipeline.architecture-decision.v1, or .v2 when module ids are named) whose `digest` is already the SHA-256 of the Markdown bytes.
@@ -94,6 +95,20 @@ function refreshDigest(root, slug) {
   return { ok: true, id, sidecar: `docs/adr/${id}.json`, digest, changed: true };
 }
 
+/** Claude greenfield 2026-11-08: one call per draft cost about thirty calls. `--refresh` without a slug updates every draft at once. */
+function refreshAllDigests(root) {
+  const dir = adrDirectory(root, false);
+  const slugs = pendingDraftSlugs(dir);
+  if (slugs.length === 0) refuse("docs/adr holds no draft-<slug>.md to refresh");
+  const refreshed = slugs.map((slug) => refreshDigest(root, slug));
+  return { ok: true, refreshed, changed: refreshed.filter((entry) => entry.changed).map((entry) => entry.id) };
+}
+
+function pendingDraftSlugs(dir) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).map((name) => /^draft-(.+)\.md$/u.exec(name)?.[1]).filter((slug) => typeof slug === "string" && SLUG.test(slug)).sort();
+}
+
 function createProposal(root, values) {
   const slug = values.get("--slug");
   const title = values.get("--title");
@@ -147,7 +162,7 @@ function createProposal(root, values) {
   }
   return { ok: true, id, schema: record.schema, status: "proposed", digest: record.digest, markdown: `docs/adr/${id}.md`, sidecar: `docs/adr/${id}.json`,
     nextFreeNumber: free, acceptedIdAfterApproval: `${free}-${slug}`,
-    next: "Replace each REPLACE: line in the Markdown, run this script again with --refresh to recompute the digest, then bind the proposal in the design package; it becomes `accepted` only through the PO's design approval and `pipeline-state.mjs materialize-architecture`." };
+    next: "Replace each REPLACE: line in the Markdown, run this script again with --refresh (without --slug it updates every draft) to recompute the digest once after the last edit, then bind the proposal in the design package; it becomes `accepted` only through the PO's design approval and `pipeline-state.mjs materialize-architecture`. The number is a preview: bind-adr-proposals.mjs assigns the final numbers in --draft order." };
 }
 
 export function main(argv = process.argv.slice(2)) {
@@ -161,9 +176,13 @@ export function main(argv = process.argv.slice(2)) {
     }
     const root = resolve(rootValue);
     const slug = values.get("--slug");
-    if (typeof slug !== "string" || !SLUG.test(slug)) refuse("--slug must be 1 to 64 characters of a-z, 0-9 and '-', starting with a letter or digit");
     const refresh = values.has("--refresh");
-    if (refresh && values.size !== 3) refuse("--refresh takes only --root and --slug");
+    if (refresh && values.size === 2) {
+      console.log(JSON.stringify(refreshAllDigests(root), null, 2));
+      return 0;
+    }
+    if (typeof slug !== "string" || !SLUG.test(slug)) refuse("--slug must be 1 to 64 characters of a-z, 0-9 and '-', starting with a letter or digit");
+    if (refresh && values.size !== 3) refuse("--refresh takes only --root and, for one draft, --slug");
     const result = refresh ? refreshDigest(root, slug) : createProposal(root, values);
     console.log(JSON.stringify(result, null, 2));
     return 0;

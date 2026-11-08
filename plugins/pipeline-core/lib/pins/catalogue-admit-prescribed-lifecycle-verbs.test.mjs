@@ -654,7 +654,9 @@ test("C20 w253 create-adr: the create and refresh shapes are admitted, every nea
     bothAdmit(make("--slug", "s", "--title", "T", "--modules", "alpha,beta-2"), f, "create with modules");
     bothAdmit(make("--date", "2026-11-07", "--title", "T", "--slug", "s"), f, "flag order is free");
     bothAdmit(make("--slug", "storage-adapter", "--refresh"), f, "refresh");
+    bothAdmit(make("--refresh"), f, "refresh of every draft");
     for (const [label, action] of [
+      ["refresh of a foreign root", scriptAction(script, "--root", join(f.root, ".."), "--refresh")],
       ["foreign root", scriptAction(script, "--root", join(f.root, ".."), "--slug", "s", "--title", "T")],
       ["relative root", scriptAction(script, "--root", ".", "--slug", "s", "--title", "T")],
       ["no root", scriptAction(script, "--slug", "s", "--title", "T")],

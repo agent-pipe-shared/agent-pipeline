@@ -173,7 +173,7 @@ export function sessionStartDecision(projectDir = process.cwd(), exists = exists
     };
   }
   const message =
-    "Agent Pipeline is available as an optional project workflow, but it is not active in this folder. Ask the user whether they want to install it before any project work.";
+    "Agent Pipeline is available as an optional project workflow, but it is not active in this folder. Run the pipeline-start skill before any project work: its preflight carries the exact question to relay, so the user is asked once and not first in your own words.";
   return {
     governed,
     message,

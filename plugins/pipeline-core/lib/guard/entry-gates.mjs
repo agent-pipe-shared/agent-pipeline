@@ -79,7 +79,8 @@ function activeFeaturePlanningSurface(root, dependencies = {}) {
   const token = /(?:^|[\s`"'([{])((?:(?:\.claude|app|architecture|backlog|bin|config|docs|governance|harness|lib|plugins|policies|project|roles|schemas|scripts|specs|src|templates|test|tests)\/[A-Za-z0-9_@+./-]+)|(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|pipeline-manifest\.schema\.json|pipeline\.user\.schema\.json))/gmu;
   for (const match of source.matchAll(token)) {
     const candidate = match[1].replace(/[),.;:\]}`]+$/u, "");
-    if (candidate.length > 0 && !candidate.split("/").some((part) => part === "" || part === "." || part === "..")) {
+    // Antigravity greenfield 2026-11-08: the German compound `app/`-Ordner became the path app/-Ordner; no path segment starts with a hyphen.
+    if (candidate.length > 0 && !candidate.split("/").some((part) => part === "" || part === "." || part === ".." || part.startsWith("-"))) {
       paths.add(candidate);
     }
   }

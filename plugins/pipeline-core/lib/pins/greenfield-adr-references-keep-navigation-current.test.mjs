@@ -146,6 +146,13 @@ test("negative: mapStale true is stale even when every touched path is a cited A
   assert.equal(checkpoint.stalenessDebt[0].type, STALE);
 });
 
+test("a German compound after a folder name is not a planned path", () => {
+  const read = (path) => (String(path).endsWith("pipeline-state.json")
+    ? JSON.stringify({ activeFeature: { planPath: "specs/one/prd_one.md" } })
+    : "Der kopierbare `app/`-Ordner und app/-Ordner bleiben Text.\nImplement app/index.html.\n");
+  assert.deepEqual(deriveArchitecturePlanningSurface("/project", read).paths, ["app/index.html"]);
+});
+
 test("derived path: the plan's own paths run through architectureTouchedContracts pass class 7, and fail without the references", () => {
   const plan = `# Design\n\nDecision records: \`${ADR_TENANCY}\` and ${ADR_LEDGER}, kept under docs/adr/ (module documentation owns docs/adr/**).\n`
     + `The documentation contract is ${DOC_CONTRACT}.\n`;

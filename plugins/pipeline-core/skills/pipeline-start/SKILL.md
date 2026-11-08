@@ -237,7 +237,7 @@ recommendation.
    answered value. For their exact shapes, screens, and resumed-intake source
    rules, load `references/resume-hint.md` before capture or consumption.
 
-7. **Normal restart is handover-only:** a same-topic restart, context cut, or
+8. **Normal restart is handover-only:** a same-topic restart, context cut, or
    request to save progress is not a block close. Update only the calibrated
    handover and, where needed, the sanitised Resume-Hint, then re-enter with
    this bootstrap. Never invoke `close-block`, `close-feature`, or the close

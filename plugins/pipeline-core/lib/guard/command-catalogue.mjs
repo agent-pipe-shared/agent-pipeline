@@ -335,6 +335,7 @@ const CREATE_ADR_TITLE = (value) => typeof value === "string" && value.length > 
   && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value);
 function sanctionedCreateAdrArgs(args, root) {
   const rooted = { "--root": (value) => value === root, "--slug": (value) => CREATE_ADR_SLUG.test(value) };
+  if (args.includes("--refresh") && !args.includes("--slug")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: { "--root": rooted["--root"] } });
   if (args.includes("--refresh")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: rooted });
   return matchFlagSpec(args, {
     requiredValue: { ...rooted, "--title": CREATE_ADR_TITLE },

@@ -88,7 +88,11 @@ only on the PO's explicit consent. Claude keeps material capture separate (its
 opaque native turn reference arrives with the PO's next turn), so Claude takes
 at most 3 PO turns before the first design draft (merged first round,
 material turn, design questions) and Codex and Antigravity at most 2 (merged
-first round, design questions). The `signature` trust-anchor key ceremony is a
+first round, design questions). Ask the design questions in one round. When the
+PO adopts your recommendations, record each question with the adopted answer:
+`{"disposition":"no-open-questions"}` means no question was open, and an earlier
+answer to something else is neither that nor an ADR selection. The `signature`
+trust-anchor key ceremony is a
 conditional follow-up of the human-approval answer, not one of these turns.
 If the consent command is skipped or fails, the ordinary `intake-required`
 consent action is published again; nothing already answered is asked twice.

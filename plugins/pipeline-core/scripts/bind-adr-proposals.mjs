@@ -94,7 +94,7 @@ function readSelection(root, rel) {
   const file = readRegular(root, rel);
   if (!file) {
     refuse(`${rel} does not exist. It carries the PO's own selection, and this step never writes or edits it: save what the PO chose, in the PO's words, as JSON at that path `
-      + `(shape ${shape}), then run this command again. Without the PO's selection the proposals cannot be bound.`);
+      + `(shape ${shape}), then run this command again. Without the PO's selection the proposals cannot be bound. The words must answer these decisions: an answer given earlier to another question is not a selection, so show the PO each decision with your recommendation and save the reply (a reply that adopts your recommendations is a valid answer).`);
   }
   const value = parseJson(file, `expected ${shape}`);
   const fail = (why) => refuse(`${rel}: ${why}. Expected ${shape}. Fix the file with the PO's actual words, then run this command again.`);

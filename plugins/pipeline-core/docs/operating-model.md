@@ -529,9 +529,10 @@ and evidence remain exactly `po`; omitted configuration renders the default
 `PO`.
 
 `language.human_facing` is the single human-facing language authority in the
-compiled runtime. The PO-gate language projection is checked with
-`node harness/scripts/check-po-gate-authority.mjs`; user-facing copies must not
-invent a competing language or approval form.
+compiled runtime. In the Pipeline's own source checkout, the PO-gate language
+projection is checked with `node harness/scripts/check-po-gate-authority.mjs`;
+a hosted project has no `harness/` and uses the language recorded at onboarding.
+User-facing copies must not invent a competing language or approval form.
 
 ### Local capability reference: availability is not activation
 

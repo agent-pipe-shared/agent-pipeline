@@ -420,7 +420,8 @@ export function deriveMinimumRigor(inputs, policy = null) {
       escalate("feature", "PLANNED_SURFACE_EXCEEDS_THRESHOLD", "Planned file count " + pp.value.length + " exceeds mini threshold " + maxChangedFiles);
     }
     const plannedSet = new Set(pp.value);
-    const expandedPaths = ap.value.filter((p) => !plannedSet.has(p));
+    // Antigravity greenfield 2026-11-08: the design course's own records (ADR drafts, the feature folder) counted as implementation that left the plan.
+    const expandedPaths = ap.value.filter((p) => !plannedSet.has(p) && !p.startsWith("docs/adr/") && !p.startsWith("specs/"));
     if (expandedPaths.length > 0) {
       escalate("feature", "SURFACE_EXPANSION", "Actual surface expanded beyond planned paths: " + expandedPaths.slice(0, 3).join(", "));
     }

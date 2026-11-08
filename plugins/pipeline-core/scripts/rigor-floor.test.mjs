@@ -293,6 +293,19 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
     assert.ok(result.escalationTriggers.includes("SURFACE_EXPANSION"));
   });
 
+  test("7-records. The design course's own records are not surface expansion", () => {
+    const input = {
+      plannedPaths: { value: ["src/app.mjs"], status: "available", sourceContract: "pipeline.plan.v1" },
+      actualPaths: { value: ["src/app.mjs", "docs/adr/draft-store.json", "specs/one/acceptance.md"], status: "available", sourceContract: "git.diff" },
+      protectedTouches: false,
+      contractDeltas: false,
+      reversibility: "high",
+      diffStats: { files: 3, lines: 25 },
+      selectedProfile: "mini"
+    };
+    assert.ok(!deriveMinimumRigor(input, policy).escalationTriggers.includes("SURFACE_EXPANSION"));
+  });
+
   test("7a. A clean worktree cannot hide an over-threshold PO-bound plan surface", () => {
     const input = {
       plannedPaths: { value: ["docs/a.md", "docs/b.md", "docs/c.md", "docs/d.md", "docs/e.md", "docs/f.md"], status: "available", sourceContract: "pipeline.po-bound-plan-surface.v1" },

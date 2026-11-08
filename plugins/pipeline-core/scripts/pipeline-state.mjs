@@ -12579,9 +12579,14 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           // Only an already-open exact replay may retain the persisted audit
           // timestamp.  A successor approval reopened after a prior audit must
           // bind this invocation's timestamp and current authority objects.
-          reopenedAt = observed.activeFeature?.phase === "design" && observed.planApproved === false
-            ? observed.planInvalidation?.invalidatedAt ?? now()
-            : now();
+          // Claude greenfield 2026-11-08: a second reopen of a NEW submission printed the first reopen's time.
+          const prior = observed.planInvalidation;
+          const digestOf = (value) => (value === undefined ? null : sha256CanonicalJson(value));
+          const exactReplay = observed.activeFeature?.phase === "design" && observed.planApproved === false
+            && typeof prior?.invalidatedAt === "string"
+            && prior.invalidatedSubmissionSha256 === digestOf(observed.planSubmission)
+            && prior.invalidatedApprovalSha256 === digestOf(observed.planApproval);
+          reopenedAt = exactReplay ? prior.invalidatedAt : now();
           const transition = reopenPlanDesign({
             state: observed,
             expectedStateSha256: sha256CanonicalJson(observed),
