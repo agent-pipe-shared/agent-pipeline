@@ -186,6 +186,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["claude-task-output-read-scope-tests","plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs","top-level-assertions",20],
     ["claude-task-output-scope-posttool-tests","plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs","top-level-assertions",9],
     ["clone-hook-readiness-rollback-tests","plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs","top-level-assertions",86],
+    ["close-path-e2e-tests","plugins/pipeline-core/scripts/close-path-e2e.test.mjs","node-test-single",86], // cand. 20b (QG-04: extension only): the legacy-process-only row of candidate 20 step 54, measured
     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
@@ -297,7 +298,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length - convertedSinceR8.length);
   assert.equal(classified.length, result.vulnerableCount,
     "all classified Verify registrations must have a completion-registry row");
-  assert.equal(result.registryCount, 392); // cand. 19i w240 (QG-04: extension only): 389 -> 391, the two new required rows of w236 and w237; cand. 19j w244: 391 -> 392, the new required row of w242
+  assert.equal(result.registryCount, 393); // cand. 19i w240 (QG-04: extension only): 389 -> 391, the two new required rows of w236 and w237; cand. 19j w244: 391 -> 392, the new required row of w242; cand. 20b: 392 -> 393, the legacy-process-only row close-path-e2e-tests of candidate 20 step 54
   // Restated 2026-10-22 (QG-04, own commit): the R5 identity set (284, digest below) is unchanged. Suites registered
   // after R5 are excluded by name, and the R5 members that have since adopted the full completion protocol (no longer
   // classified vulnerable; each is asserted `required` below) are re-added from their registry rows, so the digest
@@ -311,6 +312,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     "architecture-prospective-materialization-tests",
     "bootstrap-acknowledgement-mode-tests",
     "clone-hook-readiness-rollback-tests",
+    "close-path-e2e-tests", // cand. 20b: registered in candidate 20 step 54
     "commit-message-policy-administrative-refusal-tests",
     "critic-course-admission-tests",
     "critic-dispatch-preflight-tests",
