@@ -62,7 +62,7 @@ const architecture = { schema: "pipeline.architecture-design.v1", repositoryKind
 
 let counter = 0;
 // One fixture per case: the profile receipt fingerprint is bound to this exact repository path.
-function fixture({ stateTracked, verifyAtPhase = false }) {
+function fixture({ stateTracked, verifyAtPhase = false, registered = true }) {
   const parent = join(WORK, `fx-${counter += 1}`);
   mkdirSync(parent, { recursive: true });
   const root = join(parent, "repo");
@@ -82,12 +82,12 @@ function fixture({ stateTracked, verifyAtPhase = false }) {
   gitOk("config", "core.autocrlf", "false");
   assert.equal(realpathSync(root), root);
   assert.equal(realpathSync(gitOk("rev-parse", "--show-toplevel")), root, "the fixture is its own repository");
-  const lifecycle = (argv) => {
+  const lifecycle = (argv, extraDeps = {}) => {
     const logs = [];
     const old = { log: console.log, error: console.error, warn: console.warn };
     for (const name of Object.keys(old)) console[name] = (...args) => { logs.push(args.map(String).join(" ")); };
     let status;
-    try { status = run(argv, { dir: root, now: () => AT }); } finally { Object.assign(console, old); }
+    try { status = run(argv, { dir: root, now: () => AT, ...extraDeps }); } finally { Object.assign(console, old); }
     assert.equal(status, 0, `SETUP ${argv[0]}: ${logs.join("\n")}`);
     return logs;
   };
@@ -167,10 +167,22 @@ function fixture({ stateTracked, verifyAtPhase = false }) {
   lifecycle(["approve-plan", "--by", "synthetic-po", "--design-approval-request", requestPath]);
   const approved = readCurrent();
   assert.equal(approved.planApproval.schema, "pipeline.plan-approval.v9");
-  lifecycle(["materialize-architecture"]);
+  // C20 G20-51: materialize-architecture registers the feature package itself; `registered: false` replays the pre-fix state
+  // (no registration) to pin the set-phase repair text, `registered: "auto"` returns the materialization output for inspection.
+  const materializeLogs = lifecycle(["materialize-architecture"], registered === false ? { registerFeaturePackageAfterArchitecture: () => null } : {});
+  if (registered === "auto") return { root, materializeLogs, git };
   const compiled = compileDecisionSummary(root, { now: AT });
   assert.equal(compiled.count, 0);
   assert.equal(compiled.authorityStatus, "source-validated");
+  if (!registered) {
+    // C20 G20-51: the package is NOT registered (the step a live Claude Elephant skipped); set-phase must name that repair.
+    const logs = [];
+    const old = { log: console.log, error: console.error, warn: console.warn };
+    for (const name of Object.keys(old)) console[name] = (...args) => { logs.push(args.map(String).join(" ")); };
+    let status;
+    try { status = run(["set-phase", "--phase", "implementation", "--verify-command", COMMAND], { dir: root, now: () => AT }); } finally { Object.assign(console, old); }
+    return { root, phaseStatus: status, phaseLogs: logs };
+  }
   const artifact = (kind, path, authority, mutability, retention) => ({ class: kind, path, sha256: sha256(read(path)), authority, mutability, retention });
   // Synthetic project input, then the actual topology validator registers its real envelope.
   writeJson("specs/e2e/lifecycle.json", { schema: "pipeline.feature-package.v1", feature: { id: FEATURE, rigor: 2 }, state: "approved", artifacts: [artifact("prd", PLAN, true, "mutable", "active"), artifact("spec", SPEC, true, "mutable", "active"), artifact("acceptance", "specs/e2e/acceptance.md", true, "mutable", "active"), artifact("result", "specs/e2e/result.md", true, "mutable", "active"), artifact("candidate-evidence", approved.planApproval.acceptedContract.path, false, "immutable", "retain")], candidate: structuredClone(request.approvalIntent.value.candidate), supersedes: null });
@@ -329,6 +341,33 @@ test("G20-46: set-phase --verify-command prints the walkable route and it lands 
 
 // C20 G20-46: the same extra-path refusal now names the agent repair, never the override/signature course, and the
 // named repair executed verbatim lands the twins; the exact-set rule itself is unchanged (still a refusal first).
+// C20 G20-51 (live Claude greenfield 2026-11-07): set-phase --verify-command before the feature package was registered was refused
+// CAC-REGISTRATION-INVALID with "Commit the baseline calibration through normal hooks", twice; the calibration was already committed.
+test("G20-51: set-phase on an unregistered package names register-feature-package as the agent repair, not a calibration commit", () => {
+  const { phaseStatus, phaseLogs } = fixture({ stateTracked: false, registered: false });
+  const text = phaseLogs.join("\n");
+  assert.equal(phaseStatus, 2, text);
+  assert.match(text, /CAC-REGISTRATION-INVALID/u);
+  assert.match(text, /register-feature-package\.mjs --root /u, text);
+  assert.match(text, /no PO step/u, text);
+  assert.doesNotMatch(text, /Commit the baseline calibration/u, text);
+});
+
+test("G20-51: materialize-architecture registers the feature package itself and names its files in the same commit step", () => {
+  const { root, materializeLogs, git } = fixture({ stateTracked: false, registered: "auto" });
+  const printed = JSON.parse(materializeLogs.find((line) => line.startsWith("{\"schema\":\"pipeline.architecture-design-materialization.v1\"")));
+  assert.equal(printed.status, "materialized");
+  assert.equal(printed.featurePackage?.status, "registered", JSON.stringify(printed.featurePackage));
+  assert.ok(existsSync(join(root, printed.featurePackage.manifestPath)), "the manifest exists");
+  assert.ok(printed.uncommittedPaths.includes(printed.featurePackage.manifestPath), `the commit step names the manifest: ${JSON.stringify(printed.uncommittedPaths)}`);
+  assert.ok(printed.uncommittedPaths.some((path) => path.startsWith("architecture/")), "the architecture stays in the same commit step");
+  // A second, explicit registration (the documented route agy and Codex follow) is a harmless no-op.
+  const again = spawnSync(process.execPath, [join(LIVE_PLUGIN_ROOT, "scripts", "register-feature-package.mjs"), "--root", root], { encoding: "utf8", env: { ...process.env } });
+  assert.equal(again.status, 0, again.stderr);
+  assert.equal(JSON.parse(again.stdout).status, "already-registered");
+  assert.equal(git("status", "--porcelain").status, 0);
+});
+
 test("G20-46: an extra staged path beside the twins names the agent repair, no signature, and the repair lands", () => {
   const ctx = { ...fixture({ stateTracked: false, verifyAtPhase: true }) };
   ctx.before = ctx.head();

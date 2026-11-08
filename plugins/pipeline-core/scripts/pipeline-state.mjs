@@ -903,6 +903,21 @@ export function statePath(dir = projectDir()) {
   return legacy;
 }
 
+/** G20-51: run the unchanged register-feature-package.mjs once after the architecture is materialized; its typed result, compacted. */
+function autoRegisterFeaturePackage(dir) {
+  const script = fileURLToPath(new URL("./register-feature-package.mjs", import.meta.url));
+  const run = spawnSync(process.execPath, [script, "--root", resolve(dir)], { cwd: resolve(dir), encoding: "utf8", shell: false, timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
+  let printed = null;
+  try { printed = JSON.parse(String(run.stdout ?? "").trim()); } catch { printed = null; }
+  if (!printed || typeof printed.status !== "string") {
+    return { status: "unavailable", code: run.error?.code ?? `exit-${run.status}`, commitPaths: [],
+      repair: `node ${script} --root ${resolve(dir)} (then commit the commitPaths it prints)` };
+  }
+  const commitPaths = Array.isArray(printed.commitPaths) ? printed.commitPaths.filter((path) => typeof path === "string") : [];
+  return { status: printed.status, code: printed.code ?? null, manifestPath: printed.manifestPath ?? null, commitPaths,
+    ...(printed.status === "refused" ? { repair: `node ${script} --root ${resolve(dir)} names the missing artifact or conflict (${printed.code ?? "FPR"})` } : {}) };
+}
+
 function stateRelativePath(dir) {
   return relative(resolve(dir), statePath(dir)).split(sep).join("/");
 }
@@ -11681,18 +11696,26 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       if (rest.length !== 0) { console.error("materialize-architecture accepts no arguments"); return 2; }
       const lock = acquireContinuityLock(dir, "architecture-design-materialization");
       if (!lock.ok) { console.error(JSON.stringify(lock)); return 2; }
+      let result;
       try {
-        const result = materializeArchitectureDesign(dir, { lock, gitCandidate: deps.gitCandidate,
+        result = materializeArchitectureDesign(dir, { lock, gitCandidate: deps.gitCandidate,
           trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
           verifyReadinessExecution: deps.verifyDesignReadinessHostExecution });
-        // G20-36: the writer publishes files; while any of them is uncommitted the output names the exact commit step (additive keys).
-        // The prose lives in `commitStep`, never in `nextAction`: `nextAction` is the structured, executable action every guided driver
-        // follows (onboarding-init stopped with unsupported-next-action on a prose value).
-        const commitStep = result.ok && result.status === "materialized" ? architectureCommitStep(dir, result.referencePath ? [result.referencePath] : []) : null;
-        console.log(JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", status: result.status,
-          code: result.code ?? null, receipt: result.receipt ?? null, ...(commitStep?.commitStep ? commitStep : {}) }));
-        return result.ok && result.status === "materialized" ? 0 : 2;
       } finally { releaseContinuityLock(lock); }
+      const materialized = result.ok && result.status === "materialized";
+      // G20-51 (live Claude greenfield 2026-11-07): the feature package registration is the next mandatory agent step after the
+      // approval (set-phase and every item dispatch refuse CAC-REGISTRATION-INVALID without it), and a Claude Elephant skipped it.
+      // It is done here, right after the architecture, through the unchanged registration CLI (a spawn: no new import cycle into this
+      // writer); its files join the same commit step. Never fatal: a refusal is reported (featurePackage) and the explicit
+      // register-feature-package.mjs route stays available; an existing registration answers already-registered.
+      const featurePackage = materialized ? (deps.registerFeaturePackageAfterArchitecture ?? autoRegisterFeaturePackage)(dir) : null;
+      // G20-36: the writer publishes files; while any of them is uncommitted the output names the exact commit step (additive keys).
+      // The prose lives in `commitStep`, never in `nextAction`: `nextAction` is the structured, executable action every guided driver
+      // follows (onboarding-init stopped with unsupported-next-action on a prose value).
+      const commitStep = materialized ? architectureCommitStep(dir, [...(result.referencePath ? [result.referencePath] : []), ...(featurePackage?.commitPaths ?? [])]) : null;
+      console.log(JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", status: result.status,
+        code: result.code ?? null, receipt: result.receipt ?? null, ...(featurePackage ? { featurePackage } : {}), ...(commitStep?.commitStep ? commitStep : {}) }));
+      return materialized ? 0 : 2;
     }
 
     case "set-phase": {
@@ -11757,6 +11780,15 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         // lock before either companion or State mutation.
         const committed = inspectReplayableCalibrationVerifyLayout({rootDir:dir,verifyCommand:requestedVerifyCommand,phaseEntry:true});
         if (!["baseline-only","partial-current","configured-current","committed-configured"].includes(committed.status)) {
+          // G20-51 (live Claude greenfield 2026-11-07): the preflight reads the accepted delivery contract, so an unregistered
+          // envelope surfaces here as CAC-*. The generic calibration text sent the agent to commit calibration files that were
+          // already committed, twice; name the registration step instead (agent work, no PO step).
+          if (["CAC-REGISTRATION-INVALID","CAC-ENVELOPE-UNAVAILABLE"].includes(committed.code)) {
+            const register = `node ${fileURLToPath(new URL("./register-feature-package.mjs", import.meta.url))} --root ${dir}`;
+            console.error(`Error: set-phase implementation refused (${committed.code}): the approved plan's accepted delivery contract is not registered in the feature manifest (specs/<feature>/lifecycle.json). State and calibration unchanged.`);
+            console.error(`Repair (agent, no PO step): run \`${register}\`, commit exactly the commitPaths it prints (alone, in one commit), then rerun this set-phase command unchanged.`);
+            return 2;
+          }
           console.error(`Error: set-phase implementation refused calibration commit preflight (${committed.code ?? committed.status}); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.`);
           return 2;
         }
