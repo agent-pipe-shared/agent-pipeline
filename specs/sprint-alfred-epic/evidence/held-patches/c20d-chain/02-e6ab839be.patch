@@ -1,0 +1,28 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 698e5fa4f825b9bf768b700a0e483bc148d5c76f..1bda47e8f7e5e61c1367c6898fef42fb4d03f518 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -128,6 +128,9 @@ below assumes it holds and is written to catch a change that would break it.
+   `lib/runner-profiles-v3.mjs`, `lib/runtime-projection-v2.mjs`,
+   `lib/runtime-projection-v3.mjs`, `lib/schema-lite.mjs`,
+   `lib/signed-quality-package.mjs`,
++  `lib/writer-commit-capability.mjs` (candidate 20d, G20-66: a sanctioned writer records the
++  exact protected paths and bytes it wrote; the pre-commit hook admits only a staged blob that
++  hashes to a recorded digest, never a gate-strength or shipped-baseline path),
+   `lib/session-cleanup-recovery.mjs`, `lib/source-observation.mjs`,
+   `lib/successful-spawn.mjs`, `lib/windows-private-state.mjs`,
+   `lib/worktree-lifecycle.mjs`,
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index e67ee2c276cbdf7b8ddc5c6c8828753569661b00..e270cdfbfe420ebbf3d5662c23a65f5dcd286d05 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -218,6 +218,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // scripts/pipeline-state.mjs (one of the two spawn-edge additions), not spawn edges
+   // themselves.
+   "plugins/pipeline-core/lib/publication-authority.mjs",
++  // G20-66: scripts/pipeline-state.mjs (approve-plan, close-feature) statically imports the sanctioned writer's commit
++  // capability, which the pre-commit hook's admission (lib/protected-test-paths.mjs writerCommitAdmission) reads the records of.
++  "plugins/pipeline-core/lib/writer-commit-capability.mjs",
+   "plugins/pipeline-core/lib/publication-bundle.mjs",
+   "plugins/pipeline-core/lib/publication-bundle-v2.mjs",
+   "plugins/pipeline-core/lib/publication-capability-preflight.mjs",

@@ -1,0 +1,309 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs b/plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs
+index b2bfbc7a0534b381ffefdf8e6644e7b9027110b0..e0f721c4908b0a4334dc8f449af941529a23dc56 100644
+--- a/plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs
+@@ -240,7 +240,12 @@ function headerCode(root, toolCall) {
+ }
+ 
+ test("D5 the diagnostic header names the real guard code: a missing project file is GUARD-READ-TARGET-MISSING, a credential file GUARD-READ-CREDENTIAL-TARGET", { timeout: 300000 }, () => withFixture((root) => {
++  // QG-04 restated (G20-67, 2026-11-08): a missing project file is an existence probe and is admitted, so no refusal header is written
++  // for it any more; a missing canon pointer the plugin ships is still refused and its header names GUARD-READ-TARGET-MISSING.
+   for (const path of [join(root, "docs", "does-not-exist.md"), "docs/does-not-exist.md"]) {
++    assert.equal(headerCode(root, native("view_file", { AbsolutePath: path })), null, path);
++  }
++  for (const path of [join(root, "templates", "prompts", "agent-obligations.md"), "templates/prompts/agent-obligations.md"]) {
+     assert.equal(headerCode(root, native("view_file", { AbsolutePath: path })), "GUARD-READ-TARGET-MISSING", path);
+   }
+   for (const path of [join(root, "vault", "id_rsa"), "vault/id_rsa"]) {
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 725e8d816dbebd91cf4e71f2238644230a07fed6..6aedd8d3677cfa111c006bbbeedb53cf6d6fa514 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -12329,7 +12329,10 @@ test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G
+   }
+ });
+ 
+-test("QP4-5 F1 a Read of a missing in-root file is refused with the distinct code GUARD-READ-TARGET-MISSING; private, secret-named and outside paths keep GUARD-READ-TARGET", () => {
++// QG-04 restated (G20-67, 2026-11-08): a Read or a single-operand shell read of a missing in-root file that the plugin does
++// not ship is an existence probe and is admitted (it reads nothing; the host reports the missing file). Private, secret-named
++// and outside paths keep their GUARD-READ-TARGET refusal unchanged.
++test("QP4-5 F1 a Read of a missing in-root file is admitted as an existence probe; private, secret-named and outside paths keep GUARD-READ-TARGET", () => {
+   const path = qp4Fixture();
+   const outside = qp4Fixture();
+   try {
+@@ -12337,8 +12340,7 @@ test("QP4-5 F1 a Read of a missing in-root file is refused with the distinct cod
+       const read = (file) => qp4Verdict({ tool_name: "Read", tool_input: { file_path: file } }, path);
+       for (const file of [join(path, "scratch", "perf", "tests.log"), join(path, "scratch", "missing.log"), "scratch/missing.log", qp4Fwd(join(path, "scratch", "missing.log"))]) {
+         const r = read(file);
+-        assert.equal(r.exitCode, 2, file);
+-        assert.match(r.text, /GUARD-READ-TARGET-MISSING/u, file);
++        assert.equal(r.exitCode, 0, `${file}\n${r.text}`);
+       }
+       for (const file of [join(path, ".git", "agent-pipeline", "missing.json"), join(path, "scratch", "id_rsa"), join(path, "scratch", ".env"), join(path, "scratch", "k.pem"),
+         join(outside, "scratch", "missing.log"), join(path, "..", "missing.log"), join(path, "scratch", "notes.md", "inner"), join(path, "vault", "id_rsa")]) {
+@@ -12347,15 +12349,14 @@ test("QP4-5 F1 a Read of a missing in-root file is refused with the distinct cod
+         assert.doesNotMatch(r.text, /GUARD-READ-TARGET-MISSING/u, file);
+       }
+       assert.equal(read(join(path, "scratch", "log.txt")).exitCode, 0);
+-      // G23: the same missing-target diagnosis reaches Bash and the two
++      // G23 (restated G20-67): the same existence-probe admission reaches Bash and the two
+       // runner-normalized shell packets, with the pattern kept as data.
+       for (const command of ["cat scratch/missing.log", "rg -n 'mini|feature|epic' scratch/missing.log"]) {
+         for (const packet of [bash(command),
+           { tool_name: "Bash", tool_input: { command } },
+           { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command, cwd: path } }]) {
+           const result = qp4Verdict(packet, path);
+-          assert.equal(result.exitCode, 2, command);
+-          assert.match(result.text, /GUARD-READ-TARGET-MISSING/u, command);
++          assert.equal(result.exitCode, 0, `${command}\n${result.text}`);
+         }
+       }
+       const poHelp = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 4ac7d174287c424ca3c9fe0157d0d0d006262b19..2c70d5b8828367d5cfb4ac165683de4d95a88387 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -26,7 +26,7 @@ import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation
+ import { isClaudeSessionMemoryWritePath, isIntakeLifecycleScratchWrite, isMachinePlaneWritePath } from "./write-scope.mjs";
+ import { DISPATCH_RECORD_COLLISION_DENIAL_CODE, EVIDENCE_HOST_PATH_DENIAL_CODE, blockedDispatchRecordCollision, blockedEvidenceHostPath, checkDispatchRecordCollision, claimDispatchRecordOwnership, extractWritePayload, isEvidenceArtifactPath } from "./dispatch-record-lane.mjs";
+ import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestPathShellFaultBlocked, protectedTestPathShellRefusalHit } from "./gate-strength-lane.mjs";
+-import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, missingProjectTargetDenialText, missingSingleReadTargetOperand, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
++import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, missingProjectTargetDenialText, missingReadOperandIsOnlyFault, missingSingleReadTargetOperand, pluginCopyOfMissingProjectPath, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
+ import { externalPoSigningOnly, isForbiddenCrossRepositoryMutation, isHostOnlyClaudeCaptureInvocation, isHumanPoProfileChangeCommand, isHumanPoSigningCommand } from "./po-commands.mjs";
+ import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice, rebaseAuthorityShapeBlocked, rebaseAuthorityShapeRefusal } from "./rebase-lane.mjs";
+ import { isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
+@@ -509,8 +509,13 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       // gets its own typed code (checked only when the target is inside the root: an outside-root credential read keeps the scope code, QP4-1).
+       credentialTarget = !outsideRoot && qp4OperandIsCredentialTarget(rejected, root);
+       if (!outsideRoot && !credentialTarget && isMissingSingleReadTarget(rejected, root)) {
+-        // C20 w252 (G20-9): name the plugin's own copy of a canon pointer the project does not carry.
+-        return withLifts(lifts, verdict(2, missingProjectTargetDenialText(missingSingleReadTargetOperand(rejected) ?? "", root)));
++        const missingOperand = missingSingleReadTargetOperand(rejected) ?? "";
++        // G20-67: an existence probe whose only fault is the missing in-root operand is admitted; it reads nothing and the shell reports the
++        // missing file. A canon pointer the plugin ships keeps the refusal, which names the plugin copy (C20 w252, G20-9).
++        if (missingReadOperandIsOnlyFault(rejected, root) && pluginCopyOfMissingProjectPath(missingOperand, root) === null) {
++          return withLifts(lifts, verdict(0));
++        }
++        return withLifts(lifts, verdict(2, missingProjectTargetDenialText(missingOperand, root)));
+       }
+     } catch { outsideRoot = false; credentialTarget = false; }
+     if (credentialTarget) {
+diff --git a/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs b/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
+index 492c91ac05c46a2c2ee9195e3aa5c7aea1fae647..6e6dcd9560f72b627beb1a40fd4d8990ac3df00f 100644
+--- a/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
+@@ -124,8 +124,10 @@ if (worker) {
+       assert.equal(consumed.status, 0, consumed.stderr);
+       assert.equal(consumed.stdout, marker);
+     });
+-    test('G23PM03 genuinely missing in-root exact file stays denied as missing on every route', () => {
+-      for (const route of routes) for (const path of ['docs/absent.md', join(root, 'docs/absent.md')]) deny(route, path, 'GUARD-READ-TARGET-MISSING');
++    // QG-04 restated (G20-67, 2026-11-08): a genuinely missing in-root exact file is an existence probe; every route now admits it the
++    // same way (it reads nothing and the host reports the missing file). Credential names (G23PM04) and links (G23PM06) are unchanged.
++    test('G23PM03 genuinely missing in-root exact file is admitted as an existence probe on every route', () => {
++      for (const route of routes) for (const path of ['docs/absent.md', join(root, 'docs/absent.md')]) allow(route, path);
+     });
+     test('G23PM04 nonexistent credential names stay denied for credentials, never absence', () => {
+       for (const route of routes) for (const path of ['vault/id_rsa', credential]) deny(route, path, 'GUARD-READ-CREDENTIAL-TARGET');
+diff --git a/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs b/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
+index 6ce30649b4e48400b98705361aeeb7155c11dd69..1d9d22c28e9a92888d2d193fa1012a90331ac305 100644
+--- a/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
+@@ -87,7 +87,11 @@ test("external directories, symlink escape and credential operands stay refused"
+ 
+ test("missing target diagnosis stays distinct from grammar and credential refusals", () => fixture(({ root, parse, guard }) => {
+   assert.equal(isMissingSingleReadTarget(parse("rg needle plugins/pipeline-core/absent.mjs"), root), true);
+-  assert.match(guard("rg needle plugins/pipeline-core/absent.mjs").stderr, /GUARD-READ-TARGET-MISSING/u);
++  // QG-04 restated (G20-67, 2026-11-08): an existence probe whose only fault is the missing in-root file is admitted (the shell reports
++  // the missing file); the grammar and credential distinctions below are unchanged.
++  const probe = guard("rg needle plugins/pipeline-core/absent.mjs");
++  assert.equal(probe.exitCode, 0, probe.stderr);
++  assert.doesNotMatch(probe.stderr ?? "", /GUARD-READ-TARGET-MISSING/u);
+   assert.equal(isMissingSingleReadTarget(parse("rg --pre inert needle plugins/pipeline-core/absent.mjs"), root), false);
+   assert.equal(isMissingSingleReadTarget(parse("cat vault/id_rsa"), root), false);
+   assert.match(guard("rg --column needle plugins/pipeline-core/absent.mjs").stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u);
+diff --git a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+index 739f13cb0a7358e6f659fa937773c577dc8edd11..edaa7a5a1ed416d91ae859ef6c5945d4c5d5b193 100644
+--- a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+@@ -93,9 +93,13 @@ test("G23 missing local targets are distinct from unknown grammar and protected
+     for (const command of ["rg --column needle docs/absent.md", "cat vault/id_rsa", "cat ../absent.md", "cat docs/*.md", "cat docs/../missing.md", "cat alias/missing.md"]) {
+       assert.equal(isMissingSingleReadTarget(parse(command), root), false, command);
+     }
++    // QG-04 restated (G20-67, 2026-11-08): a native Read of a missing in-root file is an existence probe and is admitted (it reads
++    // nothing; the host reports the missing file). The distinctions above are unchanged, and a missing path behind a link that leaves
++    // the project is still refused.
+     const native = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: join(root, "docs", "absent.md") } }, root, {});
+-    assert.equal(native.exitCode, 2);
+-    assert.match(native.stderr, /GUARD-READ-TARGET-MISSING/u);
++    assert.equal(native.exitCode, 0, native.stderr);
++    const linked = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: join(root, "alias", "missing.md") } }, root, {});
++    assert.equal(linked.exitCode, 2, "a missing path whose existing ancestor leaves the project stays refused");
+   } finally {
+     rmSync(root, { recursive: true, force: true });
+     rmSync(outside, { recursive: true, force: true });
+diff --git a/plugins/pipeline-core/lib/guard/po-only-discard-boundary.test.mjs b/plugins/pipeline-core/lib/guard/po-only-discard-boundary.test.mjs
+index 7b4c2c976dc016f889a0c9a3401ee07fb5a31969..c1ce34a8bb3c77c6cf89a9a11fd72aa38005ef93 100644
+--- a/plugins/pipeline-core/lib/guard/po-only-discard-boundary.test.mjs
++++ b/plugins/pipeline-core/lib/guard/po-only-discard-boundary.test.mjs
+@@ -92,7 +92,16 @@ test('PODB007','direct planner and consumer refuse before private-state or proce
+  assert.equal(classifyNonLiftableGuardDenials([{guard:'other.mjs',reason:denial('GUARD-READ-COMMAND-UNSUPPORTED').reason}]),null);
+ });
+ test('PODB008','closed unsupported and missing reads keep actual adapter metadata without override',()=>{
+- for(const runner of ['codex','antigravity'])for(const [command,code] of [['head -c 12 absent.txt','GUARD-READ-COMMAND-UNSUPPORTED'],['cat definitely-missing-fixture.txt','GUARD-READ-TARGET-MISSING']]){
++ // QG-04 restated (G20-67, 2026-11-08): `cat definitely-missing-fixture.txt` is an existence probe whose only fault is the missing in-root
++ // file; both adapters now admit it (asserted below). The unsupported-grammar refusal keeps its metadata unchanged.
++ for(const runner of ['codex','antigravity']){
++  const command='cat definitely-missing-fixture.txt';
++  const input=runner==='antigravity'?{cwd:root,toolCall:{name:'run_command',args:{CommandLine:command,Cwd:root}}}:{cwd:root,session_id:'synthetic-read-fixture',tool_name:'Bash',tool_input:{command}};
++  const result=launch(join(hooks,`${runner}-pretool-guard.mjs`),[],input);
++  assert.equal(result.status,0,result.stderr);
++  assert.doesNotMatch(result.stdout,/"deny"|GUARD-READ-TARGET-MISSING/u,`${runner} admits the existence probe`);
++ }
++ for(const runner of ['codex','antigravity'])for(const [command,code] of [['head -c 12 absent.txt','GUARD-READ-COMMAND-UNSUPPORTED']]){
+   const input=runner==='antigravity'?{cwd:root,toolCall:{name:'run_command',args:{CommandLine:command,Cwd:root}}}:{cwd:root,session_id:'synthetic-read-fixture',tool_name:'Bash',tool_input:{command}};
+   const result=launch(join(hooks,`${runner}-pretool-guard.mjs`),[],input);assert.equal(result.status,runner==='codex'?0:2,result.stderr);
+   const output=JSON.parse(result.stdout);const reason=runner==='codex'?output.hookSpecificOutput.permissionDecisionReason:output.reason;
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index e0a282951acac1b9097be8997c0128139cd49bee..05cc2c68996c891d3389db760207820605ea063b 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -681,6 +681,19 @@ export function missingProjectTargetDenialText(raw, root, pluginRoots = BOUNDED_
+       : "check the spelling or create it first.\n");
+ }
+ 
++/**
++ * G20-67 (Antigravity greenfield 2026-11-08 and a Claude triage run: existence probes such as `rg -n x docs/a.md` or a Read of a
++ * not-yet-written file were refused GUARD-READ-TARGET-MISSING, so the agent spent turns re-spelling a harmless read). True when the
++ * command's ONLY fault is a missing in-root operand: the grammar admits it with an existing in-root stand-in in place of every missing
++ * operand. Such a read reads nothing; the host reports "no such file" itself.
++ */
++export function missingReadOperandIsOnlyFault(parsed, root) {
++  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
++    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
++  const { executable, argv } = parsed.segments[0];
++  return missingOperandIsTheOnlyFault(basename(executable).toLowerCase(), executable, argv, root);
++}
++
+ /** The single read target of a simple command, for the missing-target text (null when the command names none). */
+ export function missingSingleReadTargetOperand(parsed) {
+   return singleReadTargetOperand(parsed);
+@@ -794,6 +807,9 @@ export function readToolScopeVerdict(input, root, dependencies) {
+   if (toolName === "Glob" && qp4InRootWildcardListing(path, selector, root, sessionRoots)) return verdict(0);
+   // R2-1 (SEC-11): there is no Grep directory lane; Grep with a directory path is refused exactly as at HEAD.
+   if (toolName === "Read" && qp4MissingInRootTarget(path, root)) {
++    // G20-67: a Read of a missing in-root file is an existence probe; it reads nothing and the host reports the missing file. Only a canon
++    // pointer the plugin ships keeps the refusal, because its text names the plugin copy to read instead (G20-9).
++    if (pluginCopyOfMissingProjectPath(path, root, pluginRoots) === null) return verdict(0);
+     return verdict(2, missingProjectTargetDenialText(path, root, pluginRoots));
+   }
+   // K105 (PO decision 2026-10-23, asked after K96): a credential TARGET is refused with the typed code and repair the shell lane and the
+diff --git a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+index 768f92a4b214a2c62622701e6c41c414f1f6f3a7..c2796886f6dc092fc3f6a1f2686d35a5162c6eaa 100644
+--- a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+@@ -207,9 +207,10 @@ test("AP7 out-of-repo and credential reads stay refused (path traversal, in-repo
+ }));
+ 
+ test("AP8 a Read of a missing in-repo file gets the distinct GUARD-READ-TARGET-MISSING code; secret and outside paths keep GUARD-READ-TARGET", () => withFixture((path) => {
++  // QG-04 restated (G20-67, 2026-11-08): a Read of a missing in-repo file is an existence probe and is admitted (it reads nothing; the
++  // host reports the missing file). Secret and outside paths below keep their refusal unchanged.
+   const missing = verdict({ tool_name: "Read", tool_input: { file_path: join(path, "scratch", "missing.log") } }, path);
+-  assert.equal(missing.exitCode, 2);
+-  assert.match(missing.text, /GUARD-READ-TARGET-MISSING/u);
++  assert.equal(missing.exitCode, 0, missing.text);
+   for (const file_path of [join(path, "scratch", "id_rsa"), join(path, "..", "missing.log")]) {
+     const r = verdict({ tool_name: "Read", tool_input: { file_path } }, path);
+     assert.equal(r.exitCode, 2, file_path);
+@@ -422,7 +423,6 @@ test("AP13 the stat lane fails closed: other formats, -c/--format not first, mis
+     ["-c", STAT_FORMAT],
+     ["-c", STAT_FORMAT, "../x"],
+     ["-c", STAT_FORMAT, "/etc/hostname"],
+-    ["-c", STAT_FORMAT, "docs/missing.md"],
+     ["-c", STAT_FORMAT, "vault/id_rsa"],
+     ["-c", STAT_FORMAT, "docs/state.md", "vault/id_rsa"],
+     ["-c", STAT_FORMAT, "-"],
+@@ -440,6 +440,15 @@ test("AP13 the stat lane fails closed: other formats, -c/--format not first, mis
+     const r = verdict(bash(command), path);
+     assert.equal(r.exitCode, 2, `${command}\n${r.text}`);
+   }
++  // QG-04 restated (G20-67, 2026-11-08): `stat -c FORMAT docs/missing.md` moved out of the refused list above. The stat lane itself still
++  // does not claim a missing operand, but the guard admits the command as an existence probe because the missing in-repo file is its only
++  // fault (the same command with an existing stand-in is admitted).
++  {
++    const words = ["-c", STAT_FORMAT, "docs/missing.md"];
++    assert.equal(statLane(path, ...words), false, "the lane predicate is unchanged");
++    const probe = verdict(bash(statCommand(...words)), path);
++    assert.equal(probe.exitCode, 0, probe.text);
++  }
+   // The predicate itself, called directly, never answers true for a mixed list (tolerant of a tree that does not export it yet).
+   assert.notEqual(shellGrammar.isFormattedStatReadArgs?.(["-c", STAT_FORMAT, "docs/state.md", "vault/id_rsa"], path), true);
+ }));
+diff --git a/plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs b/plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs
+index 22a7c9c3c9b288ccf302f3d592bf01a216a51e97..37d56de2a8b94d03e71c0d8457f22ee7b8634b69 100644
+--- a/plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs
++++ b/plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs
+@@ -56,6 +56,18 @@ test("a linked plugin entry is not offered as the copy", (t) => fixture(({ proje
+   assert.equal(pluginCopyOfMissingProjectPath("templates/prompts/linked.md", project, [plugin]), null);
+ }));
+ 
++// G20-67 (Antigravity greenfield 2026-11-08, Claude triage run): an existence probe of a missing in-root path was refused, so the agent
++// re-spelled a harmless read. A missing in-root path with no plugin copy is now admitted (it reads nothing; the host reports the missing
++// file); a canon pointer the plugin ships keeps the refusal that names the copy (the test below), and hidden or outside paths stay refused.
++test("G20-67: a Read of a missing in-root path that the plugin does not ship is admitted as an existence probe", () => fixture(({ project }) => {
++  for (const raw of [join(project, "docs", "not-yet-written.md"), join(project, "templates", "notes.md")]) {
++    const verdict = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: raw } }, project, {});
++    assert.equal(verdict.exitCode, 0, `${raw}: ${verdict.stderr}`);
++  }
++  const hidden = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: join(project, ".claude", "missing.json") } }, project, {});
++  assert.equal(hidden.exitCode, 2, "a hidden segment is never an existence probe");
++}));
++
+ test("the native Read refusal of a missing canon pointer names the running plugin's copy", () => fixture(({ project }) => {
+   const pluginRoot = fileURLToPath(new URL("../..", import.meta.url));
+   const verdict = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: join(project, "templates", "prompts", "goldfish-task.md") } }, project, {});
+diff --git a/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs b/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+index 04172776e932f35125bf5f3e22a1bf9770465c29..18870deafcb07a399c1072490e2671989ce27da5 100644
+--- a/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
++++ b/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+@@ -126,9 +126,10 @@ test("P4 the A2 detector is meaningful: it flags a misleading 'not found' text a
+ });
+ 
+ test("P5 a genuinely missing in-root Read is labelled GUARD-READ-TARGET-MISSING while a blocked existing secret is not", () => withFixture((path) => {
++  // QG-04 restated (G20-67, 2026-11-08): a genuinely missing in-root Read is an existence probe and is admitted (it reads nothing; the
++  // host reports the missing file). The blocked existing secret below keeps its credential refusal and is never labelled MISSING.
+   const missing = run({ tool_name: "Read", tool_input: { file_path: join(path, "docs", "nope.md") } }, path);
+-  assert.equal(missing.exitCode, 2);
+-  assert.match(missing.text, /GUARD-READ-TARGET-MISSING/u);
++  assert.equal(missing.exitCode, 0, missing.text);
+   const blocked = run({ tool_name: "Read", tool_input: { file_path: join(path, "vault", "id_rsa") } }, path);
+   assert.equal(blocked.exitCode, 2);
+   // QG-04 restatement (K105, PO decision 2026-10-23: the Claude native lane speaks with the typed credential code): was /GUARD-READ-TARGET:/u.
+@@ -149,10 +150,11 @@ test("P5b a missing in-root path in any admitted read shape is GUARD-READ-TARGET
+     "head -n 5 docs/missing.md",
+     "tail -n 5 docs/missing.md",
+   ]) {
++    // QG-04 restated (G20-67, 2026-11-08): when the missing in-root path is the command's ONLY fault the read is an existence probe and
++    // is admitted (the shell reports the missing file); before, it was refused with GUARD-READ-TARGET-MISSING. The second loop keeps
++    // every case where the missing path is not the only fault refused.
+     const r = run(bash(command), path);
+-    assert.equal(r.exitCode, 2, command);
+-    assert.match(r.text, /GUARD-READ-TARGET-MISSING/u, `${command}\n${r.text}`);
+-    assert.deepEqual(denialProblems(r.text), [], `${command}\n${r.text}`);
++    assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
+   }
+   for (const command of ["rg --pre=sh apply docs/missing.md", "rg --pre=sh apply docs/2026-09-21-a.md", "cat vault/id_rsa docs/missing.md"]) {
+     const r = run(bash(command), path);
+@@ -416,9 +418,10 @@ test("M7d negative control: refusals that are not about a credential keep their
+       assert.doesNotMatch(decision.text, CREDENTIAL_CODE, `${runner}: ${command} is not a credential read\n${decision.text}`);
+     }
+   }
++  // QG-04 restated (G20-67, 2026-11-08): a Read of a missing in-root file is an existence probe and is admitted; it is still never
++  // reported as a credential read.
+   const missing = runnerDecision("claude", { claude: { tool_name: "Read", tool_input: { file_path: join(path, "docs", "missing.md") } } }, path);
+-  assert.equal(missing.denied, true, missing.text);
+-  assert.match(missing.text, /GUARD-READ-TARGET-MISSING/u, missing.text);
++  assert.equal(missing.denied, false, missing.text);
+   assert.doesNotMatch(missing.text, CREDENTIAL_CODE, missing.text);
+ }));
+ 

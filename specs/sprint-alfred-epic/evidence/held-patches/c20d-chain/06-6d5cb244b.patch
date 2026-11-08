@@ -1,0 +1,29 @@
+diff --git a/plugins/pipeline-core/lib/audit-bundle.test.mjs b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+index c5f77e7af3babac0776814fce9e17d7e0fd14fb8..63daedbaaeafc049d84cfe70635547d8fe0c95dd 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.test.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+@@ -241,6 +241,24 @@ test("P3 planning refuses a proof that does not verify, or one that carries anyt
+   assert.throws(() => planWith(input, { candidate: CANDIDATE, proofs: [{ kind: "push", proof: { ...good, signatureBase64: Buffer.alloc(64, 1).toString("base64") } }] }), (error) => error.code === "AB-PROOF-INVALID");
+   assert.throws(() => planWith(input, { candidate: CANDIDATE, proofs: [{ kind: "push", proof: { ...good, privateKey: "-----BEGIN PRIVATE KEY-----" } }] }), (error) => error.code === "AB-PROOF-INVALID");
+ });
++test("P3 collection reads the plan approval proof from State and the store envelopes of exactly the candidate commit; anything else is a typed gap or ignored", async () => {
++  const { collectAuditProofs } = await import("./audit-proof-collection.mjs");
++  const { criticalApprovalStoreRoot, CRITICAL_APPROVAL_STORE_SCHEMA } = await import("./critical-action-authorization.mjs");
++  const common = mkdtempSync(join(tmpdir(), "audit-proofs-"));
++  try {
++    const envelope = (kind, forCommit, proof) => ({ schema: CRITICAL_APPROVAL_STORE_SCHEMA, kind, approval: { forCommit, criticalProof: { proof } } });
++    const put = (kind, name, value) => { const directory = join(criticalApprovalStoreRoot(common), "approvals", kind); mkdirSync(directory, { recursive: true }); writeFileSync(join(directory, name), JSON.stringify(value)); };
++    put("push", "a.json", envelope("push", CANDIDATE.commit, signedProof("2".repeat(64))));
++    put("push", "b.json", envelope("push", "f".repeat(40), signedProof("3".repeat(64))));
++    put("feature-package-reconcile", "c.json", envelope("feature-package-reconcile", CANDIDATE.commit, { ...signedProof("4".repeat(64)), signatureBase64: Buffer.alloc(64, 1).toString("base64") }));
++    const state = { planApproval: { designApproval: { mode: "signature", proof: signedProof("1".repeat(64)) } } };
++    const collected = collectAuditProofs({ common, candidate: CANDIDATE, state });
++    assert.deepEqual(collected.proofs.map((entry) => `${entry.kind}:${entry.proof.intentSha256}`), [`plan-approval:${"1".repeat(64)}`, `push:${"2".repeat(64)}`]);
++    assert.deepEqual(collected.gaps.map((gap) => gap.code.split(":")[0]), ["PROOF-NOT-CARRIABLE"]);
++    assert.deepEqual(collectAuditProofs({ common, candidate: CANDIDATE, state: { planApproval: { designApproval: { mode: "chat" } } } }).proofs.map((entry) => entry.kind), ["push"], "a chat-mode approval keeps no proof");
++    assert.deepEqual(collectAuditProofs({}), { proofs: [], gaps: [] });
++  } finally { rmSync(common, { recursive: true, force: true }); }
++});
+ // E-AC-20: export metadata is never source authority -- a bundle whose export metadata is
+ // internally inconsistent with the rest of the bundle (arbitrary digest, unrelated receipt values)
+ // still builds and verifies, because nothing in the trust chain ever reads it.
