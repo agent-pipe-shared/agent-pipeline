@@ -355,6 +355,9 @@ test("a commit message refusal offers no override, and a mixed set keeps its exi
     assert.deepEqual([refused.status, refused.code, refused.nextAction.kind], ["non-liftable-recovery-required", "GIT-03-MESSAGE-REFUSED", "repair-required"]);
     assert.match(refused.nextAction.reason, /does not offer an override/u);
     assert.notEqual(plan([git03, { guard: "guard-other.mjs", reason: "BLOCKED: refused." }]).code, "GIT-03-MESSAGE-REFUSED");
+    const receipt = plan([{ guard: "guard-gate-strength.mjs", reason: "BLOCKED (guard-gate-strength): DRR-HAND-WRITTEN: This write would leave a design review receipt." }]);
+    assert.deepEqual([receipt.status, receipt.code, receipt.nextAction.kind], ["non-liftable-recovery-required", "DRR-HAND-WRITTEN", "repair-required"]);
+    assert.match(receipt.nextAction.reason, /does not offer an override/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

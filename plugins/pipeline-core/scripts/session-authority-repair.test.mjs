@@ -605,6 +605,9 @@ const cases = [
     const typed = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-HELD", reason: "state-operation-in-flight" }, { elapsedMs: 12 });
     assert.ok(typed.includes("State authority route unavailable (SDC-AUTHORITY-HELD: state-operation-in-flight); no success is reported."), typed);
     assert.ok(typed.endsWith(" Elapsed: 12 ms."), typed);
+    const windows = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-UNAVAILABLE", reason: "WIN-AUTH-OPEN" }, { elapsedMs: 1 });
+    assert.match(windows, /next list is empty this was a short file-access conflict: repeat the same command once/u, windows);
+    assert.doesNotMatch(windows, /names the cause and the command that clears it/u, windows);
   } },
   { id: "SAS02", name: "SAD diag (2) an error without code and reason keeps the default code alone in the parenthesis and names its class, message and at most two bare frames after it", run: () => {
     const untyped = describeStateAuthorityRefusal(new TypeError("boom"), { elapsedMs: 5 });

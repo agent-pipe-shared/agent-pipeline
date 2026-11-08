@@ -669,8 +669,8 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
   if (script === MODEL_ROLE_DISPATCH_SELECT_SCRIPT) return sanctionedModelRoleDispatchSelectArgs(args, root);
   // Read-only by construction: each prints a verdict and writes nothing. No other flag (the detector's --patterns-file included) is admitted.
-  if (script === RUNNER_CAPABILITIES_SCRIPT) return args.length === 0 || (args.length === 2 && args[0] === "--runner" && VALID_RUNNERS.has(args[1]));
-  if (script === CHECK_PRIVATE_IDENTIFIERS_SCRIPT || script === CHECK_PO_GATE_AUTHORITY_SCRIPT) return args.length === 0 || (args.length === 2 && exactRoot(args, root, 0));
+  if (script === RUNNER_CAPABILITIES_SCRIPT) return args.length === 2 && args[0] === "--runner" && VALID_RUNNERS.has(args[1]);
+  if (script === CHECK_PRIVATE_IDENTIFIERS_SCRIPT || script === CHECK_PO_GATE_AUTHORITY_SCRIPT) return args.length === 2 && exactRoot(args, root, 0);
   if (script === DESIGN_REVIEW_RECEIPT_SCRIPT) return sanctionedDesignReviewReceiptArgs(args, root);
   if (script === REGISTER_FEATURE_PACKAGE_SCRIPT) return sanctionedRegisterFeaturePackageArgs(args, root);
   if (script === ARCHITECTURE_BASELINE_SCRIPT) return sanctionedArchitectureBaselineArgs(args, root);

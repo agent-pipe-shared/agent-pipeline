@@ -78,7 +78,7 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
      code and repair and leaves no state), and only after exit 0 and `status: "prepared"` call `spawn_agent` with exactly the printed `spawn_agent.agent_type` (`worker`) and `spawn_agent.message`, keeping the
      `pipeline-core:goldfish-implementor` (or `-mechanic`) role, within the printed `bindWindowSeconds`. Preparing the same briefing again is safe. A `worker` started without a prepared dispatch gets a SubagentStart notice that its work will not be integrated.
    - **Antigravity**: `antigravity-native-dispatch-prepare.mjs prepare --root <repository-root> --request <native-dispatch-request.json>`; only after exit 0 and
-     `status: "prepared"` call `invoke_subagent` with `invocation.Subagents` unchanged. A native implementation consent is not available: read
+     `status: "prepared"` call `invoke_subagent` with the fields of the returned `invocation` unchanged (the host takes flat arguments, one child per call). A native implementation consent is not available: read
      `references/antigravity-native-dispatch.md` before the first dispatch and ask the PO when the sanctioned route does not return an authored commit.
 4. Commit what the dispatch produced under the host-commit rules of its runner; never hand-build a record the writer refuses (the refusal names its repair).
    On Claude the host commit of a background Goldfish lands at its SubagentStop. Its hand-back message can arrive before that commit, its completion
@@ -146,7 +146,7 @@ Owner: `docs/push-release-flow.md`, section "Releasing a consumer project". A co
 | Observation boundary | tool-level only: the guard judges the runner's own tool calls, and an admitted `node` script can still read outside the repository; not an operating-system boundary | tool-level only where the same guard runs; what a spawned worker's own scripts read outside the repository is not measured | tool-level only on the calls the prepare step admits; what a `node` script reads outside the repository is not measured |
 
 A row that is missing here has no source in this repository; ask the PO instead of assuming it. The same table is machine-readable
-(one source, checked against this one): `runner-capabilities.mjs [--runner <claude|codex|antigravity>]`.
+(one source, checked against this one): `runner-capabilities.mjs --runner <claude|codex|antigravity>`.
 
 ## Gaps this guide does not close
 

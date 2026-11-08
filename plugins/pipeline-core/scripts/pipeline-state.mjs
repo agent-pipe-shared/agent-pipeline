@@ -395,6 +395,7 @@ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
 import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
 import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
+import { readPipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
 import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { awaitSignatureFields, commandText as proofCommandText, proofWaitCommand } from "../lib/signed-proof-wait.mjs";
 import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
@@ -4155,7 +4156,13 @@ function inspectSelectedPlanProfile(dir, state) {
 }
 
 function resolveDraftPlanSubmissionDefaults(dir, deps = {}) {
-  const by = resolveLocalGitUserName(dir, deps);
+  // A label the PO assigned for this verb is attribution they already gave; asking again was the Antigravity greenfield's EL-36 collision.
+  let actorLabel = null;
+  try {
+    const actor = readPipelineActorAssignment(dir);
+    if (actor?.scopes.includes("submit-plan")) actorLabel = actor.label;
+  } catch { actorLabel = null; }
+  const by = actorLabel ?? resolveLocalGitUserName(dir, deps);
   let profile = null;
   try {
     const state = readState(dir);
@@ -4431,7 +4438,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
           guidance: "Run present-plan --review-receipt with the explicit tracked review receipt (at most two), and --by the presenter. No design course or dispatch is required."
             // Late binding step 5: a draft package (PRD release scope) is sealed by the approval, so its plan is prepared first.
             + (readAuthoritySeal(state?.continuity?.authority).status === "draft"
-              ? " This package is an unsealed draft: run prepare-seal --review-receipt with the same receipt(s) BEFORE present-plan (the approval seals the PRD and the Spec); reopen-design stays available at any time."
+              ? " This package is an unsealed draft: run prepare-seal with no arguments BEFORE present-plan (the approval seals the PRD and the Spec; the review receipts go to present-plan). Before the PO has signed, cancel-submitted-plan is the way back."
               : "") };
       }
       const mode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn });
@@ -13626,7 +13633,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         const result = applyDesignInputRecapture({ rootDir: dir, expectedPlanSha256: rest[1] });
         if (result.mutated) removeSealPlanFile(dir);
         console.log(JSON.stringify(result, null, 2));
-        console.log(`Next: commit ${result.designInputPath} on its own, then run submit-plan if the plan is not submitted, prepare-seal with the same --review-receipt paths as before, and present-plan. The PRD, the Spec and their reviews stay unchanged; their Source lines keep the earlier digest, and the private history records the step from it to the new one.`);
+        console.log(`Next: commit ${result.designInputPath} on its own, then run submit-plan if the plan is not submitted, prepare-seal with no arguments, and present-plan with the same --review-receipt paths as before. The PRD, the Spec and their reviews stay unchanged; their Source lines keep the earlier digest, and the private history records the step from it to the new one.`);
         return 0;
       } catch (error) {
         if (error instanceof OnboardingContinuityKickoffError) return refused(error.code, error.message);
@@ -14705,6 +14712,10 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
       "Repair: approve through the signature route, which stays commit-bound while a catalogue exists: set gates.push_approval to \"signature\" in pipeline.user.yaml, then run " +
       "`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <ref> --proof-request <file> --proof-authority <file> --proof <file>` " +
       `from ${dir}; the step-by-step flow is docs/push-release-flow.md. To check that the registry itself is healthy: ${repairInspect}${elapsedText}`;
+  }
+  // A short file-access conflict on Windows leaves nothing for inspect to name (claude greenfield 2026-11-08: inspect answered next: []).
+  if (error?.reason === "WIN-AUTH-OPEN") {
+    return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported. Repair: run ${repairInspect}. When its next list is empty this was a short file-access conflict: repeat the same command once. If it is refused again, the windowsAuthorityReadiness.causes field of the preflight names the folder.${elapsedText}`;
   }
   return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported. Repair: ${repairInspect} names the cause and the command that clears it.${elapsedText}`;
 }

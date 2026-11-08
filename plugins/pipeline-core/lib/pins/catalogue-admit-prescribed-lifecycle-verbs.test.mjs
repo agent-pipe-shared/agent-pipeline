@@ -738,10 +738,11 @@ test("C20j the three read-only diagnostics are admitted in their closed shapes, 
     const capabilities = join(scriptsDir, "runner-capabilities.mjs");
     const detector = join(scriptsDir, "check-private-identifiers.mjs");
     const authority = join(scriptsDir, "check-po-gate-authority.mjs");
-    bothAdmit(scriptAction(capabilities), f, "capabilities bare");
+    // Zero arguments stays refused: the OBLIGROUTE-1 sweep (guard-lifecycle-ready.test.mjs) keeps that shape to its two named scripts.
+    bothRefuse(scriptAction(capabilities), f, "capabilities bare");
     bothAdmit(scriptAction(capabilities, "--runner", "antigravity"), f, "capabilities runner");
     for (const script of [detector, authority]) {
-      bothAdmit(scriptAction(script), f, "bare");
+      bothRefuse(scriptAction(script), f, "bare");
       bothAdmit(scriptAction(script, "--root", f.root), f, "exact root");
       bothRefuse(scriptAction(script, "--root", join(f.root, "..")), f, "foreign root");
       bothRefuse(scriptAction(script, "--root", f.root, "extra"), f, "extra positional");

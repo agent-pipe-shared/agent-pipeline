@@ -10,6 +10,7 @@
  */
 import { readOnboardingIntakeCheckpoint } from "./onboarding-continuity.mjs";
 import { intakeGitAuthor } from "./project-onboarding-v3-author-identity.mjs";
+import { heldIdentityChoice } from "./pipeline-actor-assignment.mjs";
 import { checkVerifyContractConfigured } from "../scripts/push-gate-satisfiability.mjs";
 
 export const ANSWERED_VALUES_SCHEMA = "pipeline.answered-intake-values.v1";
@@ -38,6 +39,13 @@ export function readAnsweredIntakeValues({ rootDir, deps = {} } = {}) {
       if (typeof values[key] === "string" && values[key] !== "") result[key] = answeredAt(`intake-checkpoint:values.${key}`, values[key]);
     }
     if (Array.isArray(checkpoint.value?.designQuestions)) result.designAnswers = answeredAt("intake-checkpoint:designQuestions");
+  }
+  if (result.gitAuthor.answered !== true) {
+    // The author given in the first onboarding answers lives in the root-bound receipt; the checkpoint can stay null (all three greenfields, 2026-11-08).
+    try {
+      const held = (deps.heldIdentityChoice ?? heldIdentityChoice)(rootDir)?.gitAuthor ?? null;
+      if (held !== null) result.gitAuthor = answeredAt("initial-answers-receipt:gitAuthor", held);
+    } catch { /* an unreadable receipt answers nothing */ }
   }
   try {
     // `ok` alone is also true for the baseline-only placeholder; only a real configured command is an answer.

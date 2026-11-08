@@ -1554,6 +1554,17 @@ export function classifyNonLiftableGuardDenials(denials) {
       nextAction: { kind: "repair-required", reason: "Rewrite the commit message as the refusal states and commit again. This refusal does not offer an override." },
     };
   }
+  // Antigravity greenfield 2026-11-08: the producer command is the sanctioned route, so a capability would only land a receipt that is not evidence.
+  if (denials.every(denial => /\bDRR-HAND-WRITTEN:/u.test(String(denial?.reason ?? "")))) {
+    return {
+      status: "non-liftable-recovery-required",
+      code: "DRR-HAND-WRITTEN",
+      cause: denials.map(denial => String(denial.reason)).join("\n"),
+      recoveryGuidance: [],
+      coDenialSummary: null,
+      nextAction: { kind: "repair-required", reason: "Produce the receipt with the producer command the refusal names. This refusal does not offer an override." },
+    };
+  }
   if (!humanOnly && !diagnosticOnly) return null;
   return {
     status: "non-liftable-recovery-required",

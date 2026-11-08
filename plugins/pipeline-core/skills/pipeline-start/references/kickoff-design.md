@@ -12,11 +12,11 @@ A genuinely pristine repository's `v4Inspection` status is no longer
 always routes instead to `intake-required`, `intake-design-questions-
 required`, or `bootstrap-binding-required` (`kickoff-required` survives only
 as an unreachable-in-practice safety net for a drifted state the design does
-not otherwise describe). If the observed status is one of those three, load
-`references/intake-generate-design.md` instead — that is the coordinator
-flow a fresh repository now actually routes toward; it hands off into the
-same promotion transaction this file documents below, so read this file
-first, then that one. A repository already mid-kickoff under the old model
+not otherwise describe). If the observed status is one of those three, read
+this file once for the PO questions and the quality bar, then continue in
+`references/intake-generate-design.md` and do not come back here from it.
+That is the coordinator flow a fresh repository now actually routes toward;
+it hands off into the same promotion transaction this file documents below. A repository already mid-kickoff under the old model
 (`kickoff apply` already ran, `kickoff promote` has not) never reaches that
 branch at all — its continuity is already valid, so it keeps following the
 rest of this file untouched.
@@ -257,9 +257,9 @@ linked source evidence, architecture, component responsibilities,
 interfaces/state/data, operational constraints, test/verification approach,
 and PRD-to-Spec traceability. Every user-facing acceptance criterion in the Spec
 names its journeys and state transitions and the actual effect asserted
-(`Journeys:` and `Asserts:` clauses, template `templates/spec.md` §5); the plan
+(`Journeys:` and `Asserts:` clauses); the plan
 hand-off refuses a Spec that does not (`PLR-HANDOFF-NO-JOURNEY`). The Spec's plan
-is sliced vertical first (`templates/spec.md` §2, *Slice order*): one thin
+is sliced vertical first: one thin
 end-to-end path for the most important journey, then widened journey by journey,
 never all of one horizontal layer before the next. Favor thorough, comprehensive coverage of the
 material input over brevity — a short initial goal is not a reason for a

@@ -129,8 +129,8 @@ afterwards.
   before binding.
 - `spec.md` — a first-draft Spec with the same `Source:` line, needing EARS
   acceptance criteria (each user-facing one with its `Journeys:` and `Asserts:`
-  clauses, see `templates/spec.md` §5) and implementation detail authored before binding.
-  Its plan is sliced vertical first (`templates/spec.md` §2, *Slice order*): one thin
+  clauses; the plan hand-off refuses a Spec without them, `PLR-HANDOFF-NO-JOURNEY`) and
+  implementation detail authored before binding. Its plan is sliced vertical first: one thin
   end-to-end path for the most important journey before any horizontal layer.
 
 Use the accepted criterion table header `| # | Criterion | Evidence |` and a
