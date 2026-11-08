@@ -21,7 +21,6 @@
  * Run: node plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs
  * Exit: 0 = all cases pass · 1 = at least one case failed (failure list on stdout).
  */
-import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign as cryptoSign } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
@@ -424,11 +423,11 @@ function followUpScenario(prefix, { tag = true, releaseApproval = true, origin =
   const releaseProof = followUpProof("b".repeat(64));
   // the push approval's recorded proof: the guard admits only the very proof the private store holds for it (a proof signed by any other key is refused)
   const recorded = recordedPushIntent === "a".repeat(64) ? pushProof : followUpProof(recordedPushIntent);
-  assert.equal(writeCriticalApproval({ gitCommonDir: common, kind: "push", approval: { forCommit: approved, remote: "origin", destination: "refs/heads/main", approvedAt, criticalProof: { proofSha256: sha256Hex(canonical(recorded)), proof: recorded } } }).ok, true);
+  if (writeCriticalApproval({ gitCommonDir: common, kind: "push", approval: { forCommit: approved, remote: "origin", destination: "refs/heads/main", approvedAt, criticalProof: { proofSha256: sha256Hex(canonical(recorded)), proof: recorded } } }).ok !== true) throw new Error("fixture push approval was not recorded");
   if (releaseApproval) {
     // the digest the private store really holds: sha256 over the canonical proof object (release-preflight-cli.mjs, verified.proofSha256)
     const proofSha256 = sha256Hex(canonical(releaseProof));
-    assert.equal(writeCriticalApproval({ gitCommonDir: common, kind: "release-preflight", approval: { schema: "pipeline.consumer-release-approval.v1", forCommit: approved, version: "1.0.0", tag: "v1.0.0", mode: "signature", criticalProof: { proofSha256 }, approvedAt } }).ok, true);
+    if (writeCriticalApproval({ gitCommonDir: common, kind: "release-preflight", approval: { schema: "pipeline.consumer-release-approval.v1", forCommit: approved, version: "1.0.0", tag: "v1.0.0", mode: "signature", criticalProof: { proofSha256 }, approvedAt } }).ok !== true) throw new Error("fixture release approval was not recorded");
   }
   if (tag) gitAt(dir, "tag", "-a", "v1.0.0", "-m", "version tag", approved);
   if (origin === "published") gitAt(dir, "update-ref", "refs/remotes/origin/main", approved);

@@ -167,6 +167,9 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // VULNERABLE-UNREGISTERED. It now has a `required` row and a policy, is counted here (+1 classified, measured top-level-assertions, 14 sites,
   // registry 388 -> 389) and is excluded from the R5 set below (registered after R5). The sites count of devplan-shell-lane-recovery-tests moves
   // 13 -> 14 (the guard trailer refusal change adds one assertion). Only these numbers change; no assertion is weakened.
+  // Restated 2026-11-08 (candidate 20e, QG-04, extension only): four sites counts were outgrown by their suites, measured on the candidate 20e chain with the
+  // unchanged classifier: close-path-e2e 89->98, critic-dispatch-preflight 409->488, g23-quoted-pipeline-reads 18->19, guard-dispatch-budget-checkpoint 157->169.
+  // Only these four numbers change; names, paths, classifications and the other counts stay as pinned, and no assertion is weakened.
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",36],
@@ -186,12 +189,12 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["claude-task-output-read-scope-tests","plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs","top-level-assertions",20],
     ["claude-task-output-scope-posttool-tests","plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs","top-level-assertions",9],
     ["clone-hook-readiness-rollback-tests","plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs","top-level-assertions",86],
-    ["close-path-e2e-tests","plugins/pipeline-core/scripts/close-path-e2e.test.mjs","node-test-single",89], // cand. 20b (QG-04: extension only): the legacy-process-only row of candidate 20 step 54, measured 86; 87 after G20-54 (the fixture asserts materialize-architecture registered the package); 89 after the two set-phase output assertions (package step named, "below" only when the tiers follow)
+    ["close-path-e2e-tests","plugins/pipeline-core/scripts/close-path-e2e.test.mjs","node-test-single",98], // cand. 20b (QG-04: extension only): the legacy-process-only row of candidate 20 step 54, measured 86; 87 after G20-54 (the fixture asserts materialize-architecture registered the package); 89 after the two set-phase output assertions (package step named, "below" only when the tiers follow)
     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",349],
-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",409], // cand. 20 w252 (QG-04: extension only): G20-11 retained prior result cases, measured
+    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",488], // cand. 20 w252 (QG-04: extension only): G20-11 retained prior result cases, measured
     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",119], // cand. 20 w252 (QG-04: extension only), measured
     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
@@ -213,7 +216,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["fanout-governor-tests","plugins/pipeline-core/lib/fanout-governor.test.mjs","top-level-assertions",273],
     ["fanout-ledger-tests","plugins/pipeline-core/lib/fanout-ledger.test.mjs","top-level-assertions",62],
     ["g17-publication-observation-tests","plugins/pipeline-core/lib/g17-publication-observation.test.mjs","top-level-assertions",31],
-    ["g23-quoted-pipeline-reads-tests","plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs","top-level-assertions",18],
+    ["g23-quoted-pipeline-reads-tests","plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs","top-level-assertions",19],
     ["g23-read-help-tests","plugins/pipeline-core/lib/guard/g23-read-help.test.mjs","top-level-assertions",36],
     ["g29-public-handover-admission-tests","plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs","top-level-assertions",3],
     ["g6-aggregate-native-boundaries-tests","plugins/pipeline-core/hooks/g6-aggregate-native-boundaries.test.mjs","top-level-assertions",6],
@@ -224,7 +227,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["gitleaks-scratch-clones-exclusion-tests","plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs","node-test-single",5],
     ["governance-scope-win32-acl-tests","plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs","top-level-assertions",7],
     ["guard-devplan-design-approval-v7-tests","plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","top-level-assertions",18],
-    ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",157],
+    ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",169],
     ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",25], // W7-R7 (QG-04): 19->25, the restated GDM04/GDM05 (dc8204a28) carry more assertion sites; classifier unchanged
     ["guard-grep-max-count-read-tests","plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs","node-test-single",9],
     ["hardened-private-directory-install-tests","plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs","top-level-assertions",6],
@@ -286,7 +289,9 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // cand. 20 w252 (QG-04, extension only): pipeline-state-approve-announce-tests gained the G20-32 cases (three node:test cases), so the
   // classifier no longer reports it `node-test-single`; it is re-added to the retained R8 identity set from its registry row exactly like
   // antigravity-topology-refresh-host-tests, leaving the pinned 266 and its digest unchanged.
-  const convertedSinceR8 = ["antigravity-topology-refresh-host-tests", "pipeline-state-approve-announce-tests"];
+  // cand. 20e (QG-04, extension only): onboarding-consent-mark-tests gained the G20-45 case (two node:test cases), so the classifier no longer reports it `node-test-single`
+  // (measured: re-adding exactly this row restores the pinned digest); re-added the same way, 266 and the digest stay pinned.
+  const convertedSinceR8 = ["antigravity-topology-refresh-host-tests", "pipeline-state-approve-announce-tests", "onboarding-consent-mark-tests"];
   const retainedIdentities = [
     ...classified.filter((entry) => !addedNames.has(entry[0])).map(([name, path]) => [name, path]),
     ...convertedSinceR8.map((name) => [name, registry.entries.find((entry) => entry.name === name).path]),
@@ -399,7 +404,8 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // Restated 2026-10-28 (QG-04): antigravity-topology-refresh-host-tests adopted the completion protocol and no longer classifies vulnerable;
   // re-added from its registry row like the two before it, so the R5 set (284) and its digest stay unchanged.
   // cand. 20 w252 (QG-04, extension only): pipeline-state-approve-announce-tests converted by the G20-32 cases, re-added like the others.
-  const convertedSinceR5 = ["antigravity-topology-refresh-host-tests","clone-hook-readiness-tests","commit-msg-hook-install-tests","pipeline-state-approve-announce-tests"];
+  // cand. 20e (QG-04, extension only): onboarding-consent-mark-tests converted by the G20-45 cases (a second node:test case), re-added like the others.
+  const convertedSinceR5 = ["antigravity-topology-refresh-host-tests","clone-hook-readiness-tests","commit-msg-hook-install-tests","onboarding-consent-mark-tests","pipeline-state-approve-announce-tests"];
   const retainedR5Identities = [
     ...classified.filter((entry) => entry[0] !== "design-course-command-admission-tests" && !addedAfterR5.has(entry[0])).map(([suite, path]) => [suite, path]),
     ...convertedSinceR5.map((name) => [name, registry.entries.find((entry) => entry.name === name).path]),
