@@ -95,7 +95,8 @@ Candidate 18 was built as held patches from scratch clones (`git clone --shared`
 | `mkclone.mjs <dir> [base-sha]`, `clone-of.mjs <src> <dst>` | a shared clone of the repository (detached at a base) or of another scratch clone |
 | `applyin.mjs <clone> <patch> [flags]` | `git apply` inside a clone, with `--check`, `--3way` or `--reject` |
 | `commit-in.mjs <clone> "<message>"` | commit everything in a clone with a throwaway identity (optional `--rebaseline`) |
-| `test-in.mjs <clone> <test file>... [--name <pattern>] [--full]` | `node --test` in a clone with a private TMPDIR, failing lines and summary only (`--full` prints the first 200 output lines of a failing run, e.g. the whole violation list of a closure suite); one suite at a time |
+| `test-in.mjs <clone> <test file>... [--name <pattern>] [--full] [--private-tmp]` | `node --test` in a clone with a fresh TMPDIR per run, failing lines and summary only (`--full` prints the first 200 output lines of a failing run, e.g. the whole violation list of a closure suite; `--private-tmp` puts the TMPDIR under `$HOME/.cache` for cases that refuse a world-writable ancestor); one suite at a time |
+| `fill-base.mjs <sha> <package file>...` | replace the placeholder `BASE_SHA` in briefing packages written before their base commit existed |
 | `run-in.mjs <clone> <script> [args]` | run a node script with the clone as working directory |
 | `save-patch.mjs <clone> <base> <rev> <out> [<check-clone>]` | write `git diff --binary` and prove `git apply --check` on the repository or on a chain clone |
 | `mkpkg.mjs <slice.json> <package.json>` | compact slice description to a full `pipeline.dispatch-briefing-package.v1` (feed `dispatch-briefing.mjs build`); a slice with `effortEscalation: "MP-05"` and `modelWhy` carries the deep-tier escalation into the package |
