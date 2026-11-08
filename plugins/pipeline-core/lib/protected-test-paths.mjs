@@ -60,7 +60,7 @@ import { isPhysicalScratchTarget } from "./physical-scratch-boundary.mjs";
  * backstop for `push`, not a fix to this classifier, and it does nothing for the other
  * two bullets above or for any protected-path write that is not a `git push`.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { isGitIndexOnlyInvocation, parseGuardCommand, sedWriteTargets } from "../hooks/guard-command-grammar.mjs";
@@ -72,7 +72,107 @@ import {
 } from "./project-authority.mjs";
 import { closedContinuityBoundSha256, resolveProtectedBaseline } from "./protected-baseline.mjs";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
+
+// ---------------------------------------------------------------------------------
+// G20-66 (live Antigravity greenfield 2026-11-08): the commit capability of a sanctioned writer.
+// ---------------------------------------------------------------------------------
+// pipeline-state.mjs approve-plan / close-feature and finish-feature.mjs write protected files (state, lifecycle, audit
+// bundle, result) and the very commit that publishes them was refused at the commit boundary, which cost the PO extra
+// human-guard-override signatures for the Pipeline's own state files. lib/writer-commit-capability.mjs (the writer side)
+// records, after a successful write, the exact paths and sha256 digests it wrote in a record store under the git common
+// directory, authenticated with an HMAC key in the same store. This is the hook side, in the shape of the G20-55 admission
+// above: per staged finding, the STAGED blob must hash to a recorded digest, so an extra protected path, one changed byte
+// or a file the writer never wrote stays a finding. Unprotected files staged beside the writer's bytes do not matter
+// (nothing is bound to the index tree). Expiry is by bytes, never by a clock: the capability is spent when the commit
+// that used it exists (an entry used at HEAD X is admitted again only while HEAD is still X, so a commit-msg failure and
+// retry at the same HEAD is not stranded). Fail-closed: any fault, an unreadable store or a bad MAC is "no verdict".
+export const WRITER_COMMIT_SCHEMA = "pipeline.writer-commit-capability.v1";
+export const WRITER_COMMIT_STORE_SEGMENTS = Object.freeze(["agent-pipeline", "writer-commit"]);
+const WRITER_COMMIT_KEY_FILE = "mac.key";
+
+export function writerCommitStoreDir(rootDir, { spawn = spawnSync } = {}) {
+  const common = spawn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: rootDir, encoding: "utf8", timeout: 15000 });
+  if (common.status !== 0 || typeof common.stdout !== "string" || common.stdout.trim() === "") return null;
+  return join(common.stdout.trim(), ...WRITER_COMMIT_STORE_SEGMENTS);
+}
+
+export function writerCommitMac(keyHex, record) {
+  const { mac: _ignored, ...core } = record;
+  return createHmac("sha256", Buffer.from(keyHex, "hex")).update(JSON.stringify(core)).digest("hex");
+}
+
+function writerCommitRecords(store) {
+  const keyPath = join(store, WRITER_COMMIT_KEY_FILE);
+  if (!existsSync(keyPath)) return [];
+  const keyHex = readFileSync(keyPath, "utf8").trim();
+  if (!/^[a-f0-9]{64}$/u.test(keyHex)) return [];
+  const records = [];
+  for (const name of readdirSync(store).filter((entry) => entry.endsWith(".json")).sort()) {
+    try {
+      const record = JSON.parse(readFileSync(join(store, name), "utf8"));
+      if (record?.schema !== WRITER_COMMIT_SCHEMA || !Array.isArray(record.entries) || record.mac !== writerCommitMac(keyHex, record)) continue;
+      records.push({ record, file: join(store, name), keyHex });
+    } catch { /* a record that cannot be read or authenticated grants nothing */ }
+  }
+  return records;
+}
+
+const headOf = (rootDir, spawn) => {
+  const head = spawn("git", ["rev-parse", "--verify", "-q", "HEAD"], { cwd: rootDir, encoding: "utf8", timeout: 15000 });
+  return head.status === 0 ? String(head.stdout).trim() : "";
+};
+
+/**
+ * G20-66: the verdict of the writer-commit store for one STAGED path. null: no writer armed this path (or any fault).
+ * { admitted: true, path, recordId }: the staged bytes are exactly bytes a writer armed and the entry is unspent.
+ * { admitted: false, stale: { path, writer, rerun } }: a writer armed this path with other bytes (the file changed after the
+ * writer wrote it); { admitted: false, spent: true, path, writer, rerun }: those exact bytes were armed and already committed.
+ */
+export function writerCommitAdmission(rootDir, relPath, { spawn = spawnSync } = {}) {
+  try {
+    const store = writerCommitStoreDir(rootDir, { spawn });
+    if (store === null || !existsSync(store)) return null;
+    const hits = [];
+    for (const { record } of writerCommitRecords(store)) {
+      for (const entry of record.entries) if (entry?.path === relPath) hits.push({ record, entry });
+    }
+    if (hits.length === 0) return null;
+    const blob = spawn("git", ["cat-file", "blob", `:${relPath}`], { cwd: rootDir, encoding: "buffer", timeout: 15000, maxBuffer: 64 * 1024 * 1024 });
+    if (blob.status !== 0 || !Buffer.isBuffer(blob.stdout)) return null;
+    const staged = createHash("sha256").update(blob.stdout).digest("hex");
+    const same = hits.filter((hit) => hit.entry.sha256 === staged);
+    const last = (list) => list[list.length - 1];
+    if (same.length === 0) return { admitted: false, stale: { path: relPath, writer: last(hits).record.writer, rerun: last(hits).record.rerun } };
+    const head = headOf(rootDir, spawn);
+    const live = same.find((hit) => hit.entry.consumedAtHead == null || hit.entry.consumedAtHead === head);
+    if (live) return { admitted: true, path: relPath, recordId: live.record.id };
+    return { admitted: false, spent: true, path: relPath, writer: last(same).record.writer, rerun: last(same).record.rerun };
+  } catch { return null; }
+}
+
+/** G20-66: marks the admitted entries used at the current HEAD (best effort: a bookkeeping fault never strands the commit). */
+export function writerCommitConsume(rootDir, admissions, { spawn = spawnSync } = {}) {
+  try {
+    const store = writerCommitStoreDir(rootDir, { spawn });
+    if (store === null || !existsSync(store)) return;
+    const head = headOf(rootDir, spawn);
+    const wanted = new Map();
+    for (const admission of admissions ?? []) {
+      if (admission?.admitted !== true) continue;
+      wanted.set(admission.recordId, [...(wanted.get(admission.recordId) ?? []), admission.path]);
+    }
+    for (const { record, file, keyHex } of writerCommitRecords(store)) {
+      const paths = wanted.get(record.id);
+      if (!paths) continue;
+      for (const entry of record.entries) if (paths.includes(entry.path) && entry.consumedAtHead == null) entry.consumedAtHead = head;
+      record.mac = writerCommitMac(keyHex, record);
+      const temporary = `${file}.${process.pid}.tmp`;
+      writeFileSync(temporary, `${JSON.stringify(record)}\n`, { encoding: "utf8", mode: 0o600 });
+      renameSync(temporary, file);
+    }
+  } catch { /* the capability stays unspent; the same commit can be retried */ }
+}
 
 /**
  * C20b G20-55: true only when the rule is a closed-continuity rule (PB-CONTINUITY-*) and the STAGED bytes of `relPath` are

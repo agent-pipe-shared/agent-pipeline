@@ -237,3 +237,43 @@ test("closed-State recovery rejects a mismatched actor, audit, or coordinator wi
   }
   assert.deepEqual(calls.map(argv => argv[1]), ["inspect", "inspect", "inspect"]);
 });
+
+test("G20-66: every close stage that writes protected files arms the commit of exactly those bytes, and the result prints the one commit", async () => {
+  const { execFileSync } = await import("node:child_process");
+  const { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const ptp = await import("../lib/protected-test-paths.mjs");
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "finish-wc-")));
+  try {
+    const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+    git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+    mkdirSync(join(root, ".claude"));
+    writeFileSync(join(root, ".claude/guard-config.json"), JSON.stringify({ protectedTestPaths: [{ pattern: "(?:lifecycle|audit|state)-fixture\\.json$", reason: "fixture close outputs", id: "TP-1" }] }));
+    for (const name of ["lifecycle", "audit", "state"]) writeFileSync(join(root, `${name}-fixture.json`), "{\"v\":0}\n");
+    git("add", "-A"); git("commit", "-q", "-m", "baseline");
+    const f = fixture();
+    const writes = { "apply-start": "audit", "apply-transition": "lifecycle", "close-feature": "state" };
+    let prepared = 0;
+    const runner = (executable, argv) => {
+      const key = argv[0].endsWith("pipeline-state.mjs") ? "close-feature" : argv[1];
+      const target = key === "apply-transition" ? (argv.includes("feature-close-prepared") ? "lifecycle" : null) : writes[key];
+      if (target) writeFileSync(join(root, `${target}-fixture.json`), `{"v":"${key}-${prepared += 1}"}\n`);
+      return f.runner(executable, argv);
+    };
+    const result = finishFeature({ rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", auditRequest: "specs/feature/audit-request.json", criticVerifyLifecycle: f.criticVerifyLifecycle, lifecycleId: "feature-abc" }, {
+      readFileSyncFn: () => JSON.stringify({ activeFeature: { id: "feature-abc" } }), runCommand: runner,
+    });
+    assert.equal(result.status, "closed");
+    assert.equal(result.writerCommit.status, "armed");
+    assert.deepEqual(result.writerCommit.paths, ["audit-fixture.json", "lifecycle-fixture.json", "state-fixture.json"]);
+    assert.deepEqual(result.writerCommit.stages.map((stage) => [stage.stage, stage.paths]), [["apply-start", ["audit-fixture.json"]], ["apply-prepared", ["lifecycle-fixture.json"]], ["close-feature", ["state-fixture.json"]]]);
+    assert.match(result.writerCommit.steps.join("\n"), /git add -- audit-fixture\.json lifecycle-fixture\.json state-fixture\.json/);
+    assert.match(result.writerCommit.message, /^chore\(pipeline\): /);
+    git("add", "audit-fixture.json", "lifecycle-fixture.json", "state-fixture.json");
+    for (const path of result.writerCommit.paths) assert.equal(ptp.writerCommitAdmission(root, path).admitted, true, `${path} is admitted`);
+    writeFileSync(join(root, "state-fixture.json"), "{\"v\":\"tampered\"}\n"); git("add", "state-fixture.json");
+    const stale = ptp.writerCommitAdmission(root, "state-fixture.json");
+    assert.equal(stale.admitted, false); assert.match(stale.stale.rerun, /finish-feature\.mjs/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

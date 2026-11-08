@@ -13,6 +13,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
 
 const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
@@ -64,6 +65,28 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
     cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root },
   }));
   const base = { root, lifecycle: id, actor: by.trim() };
+  // G20-66: every stage that writes files (the coordinator's start, checkpoint and prepared transitions, then the State close)
+  // arms the commit of exactly the bytes it wrote, so the close's own outputs are committed without a human override. A fault
+  // in arming never changes a stage's outcome: it is recorded in `stages` and the hook then keeps its old refusal.
+  const writerCommitStages = [];
+  const rerun = `node ${fileURLToPath(import.meta.url)} --root ${root} --by ${JSON.stringify(by.trim())} --architecture-impact ${architectureImpact} --audit-request ${JSON.stringify(auditRequest)} --critic-verify-lifecycle ${criticVerifyLifecycle}${continuityCloseRequest === null ? "" : ` --continuity-close-request ${JSON.stringify(continuityCloseRequest)}`} --resume-lifecycle-id ${id}`;
+  const armStage = (stage, run, succeeded = () => true) => {
+    const before = captureWorktree(root);
+    const out = run();
+    if (before === null || !succeeded(out)) return out;
+    try {
+      const armed = armWrittenSince({ rootDir: root, before, writer: `finish-feature.mjs ${stage}`, rerun });
+      if (armed.paths.length > 0) writerCommitStages.push({ stage, status: armed.status, paths: armed.paths });
+    } catch (error) {
+      writerCommitStages.push({ stage, status: "unavailable", paths: [], code: error?.code ?? "WC-FAULT", heal: error?.heal ?? rerun });
+    }
+    return out;
+  };
+  const writerCommit = () => {
+    const paths = [...new Set(writerCommitStages.flatMap((entry) => entry.paths))].sort();
+    const message = "chore(pipeline): commit the finish-feature output";
+    return { status: writerCommitStages.some((entry) => entry.status === "armed") ? "armed" : "not-needed", paths, stages: writerCommitStages, message, steps: paths.length > 0 ? writerCommitSteps(paths, message) : [], writer: "finish-feature.mjs", rerun };
+  };
   const invokeCoordinator = (subcommand, values, code) => command(runner, process.execPath, [COORDINATOR, subcommand, ...flagPairs(values)], code);
   if (featureId === undefined) {
     try {
@@ -119,25 +142,25 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
   let preparedApplied;
     if (phase === null) {
       const start = invokeCoordinator("plan-start", { ...base, "close-intent": "durable-stop" }, "FINISH-START-PLAN");
-      apply(start, { ...base, "close-intent": "durable-stop" }, "FINISH-START-APPLY", "apply-start");
+      armStage("apply-start", () => apply(start, { ...base, "close-intent": "durable-stop" }, "FINISH-START-APPLY", "apply-start"));
       phase = "active";
     }
     if (phase === "active") {
       const checkpoint = invokeCoordinator("plan-transition", { ...base, phase: "checkpointed" }, "FINISH-CHECKPOINT-PLAN");
-      apply(checkpoint, { ...base, phase: "checkpointed" }, "FINISH-CHECKPOINT-APPLY", "apply-transition");
+      armStage("apply-checkpoint", () => apply(checkpoint, { ...base, phase: "checkpointed" }, "FINISH-CHECKPOINT-APPLY", "apply-transition"));
       phase = "checkpointed";
     }
     if (phase === "checkpointed") {
       const prepared = invokeCoordinator("plan-transition", preparedValues, "FINISH-PREPARE-PLAN");
-      preparedApplied = apply(prepared, preparedValues, "FINISH-PREPARE-APPLY", "apply-transition");
+      preparedApplied = armStage("apply-prepared", () => apply(prepared, preparedValues, "FINISH-PREPARE-APPLY", "apply-transition"));
     } else {
       if (prior.coordinator.architectureImpact !== architectureImpact
         || prior.coordinator.featureCloseAudit?.criticVerifyLifecycleId !== criticVerifyLifecycle
         || !/^[a-f0-9]{64}$/u.test(prior.coordinator.effects?.at(-1)?.operationSha256 ?? "")) {
         fail("FINISH-RESUME-BINDING", "The prepared close is not bound to these exact inputs.");
       }
-      preparedApplied = invokeCoordinator("apply-transition", { ...preparedValues,
-        "plan-sha256": prior.coordinator.effects.at(-1).operationSha256, activate: true }, "FINISH-PREPARE-REPLAY");
+      preparedApplied = armStage("replay-prepared", () => invokeCoordinator("apply-transition", { ...preparedValues,
+        "plan-sha256": prior.coordinator.effects.at(-1).operationSha256, activate: true }, "FINISH-PREPARE-REPLAY"));
       if (preparedApplied?.status !== "replayed") fail("FINISH-PREPARE-REPLAY", "The prepared close was not replayed from its durable record.");
   }
   const next = preparedApplied.nextAction;
@@ -151,9 +174,9 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
     || JSON.stringify(next?.argv) !== JSON.stringify(expectedCloseArgv)) {
     fail("FINISH-CLOSE-ACTION", "Coordinator did not return its exact bound close-feature action.");
   }
-  const closed = runner(next.executable, next.argv);
+  const closed = armStage("close-feature", () => runner(next.executable, next.argv), (out) => out?.status === 0);
   if (closed?.status !== 0) fail("FINISH-CLOSE", String(closed?.stderr ?? closed?.stdout ?? "State close failed.").trim() || "State close failed.");
-  return Object.freeze({ schema: "pipeline.finish-feature.v1", status: "closed", lifecycleId: id, featureId, coordinator: preparedApplied, closeOutput: String(closed.stdout ?? "").trim() });
+  return Object.freeze({ schema: "pipeline.finish-feature.v1", status: "closed", lifecycleId: id, featureId, coordinator: preparedApplied, closeOutput: String(closed.stdout ?? "").trim(), writerCommit: writerCommit() });
   } catch (error) {
     error.lifecycleId = id;
     throw error;
@@ -171,6 +194,11 @@ function parse(argv) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  try { process.stdout.write(`${JSON.stringify(finishFeature(parse(process.argv.slice(2))), null, 2)}\n`); }
+  try {
+    const result = finishFeature(parse(process.argv.slice(2)));
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    // G20-66: the exact commit of what the close wrote, as the next step (stderr; stdout stays the one JSON object).
+    if (result.writerCommit?.status === "armed") process.stderr.write(`${formatWriterCommitNextStep({ ...result.writerCommit, id: "per stage, see writerCommit.stages" }).join("\n")}\n`);
+  }
   catch (error) { process.stderr.write(`finish-feature: ${error?.code ?? "FINISH-ERROR"}: ${error.message}${error.lifecycleId ? ` (lifecycle-id: ${error.lifecycleId})` : ""}\n`); process.exitCode = 2; }
 }

@@ -510,6 +510,7 @@ import {
 } from "../lib/feature-package-topology.mjs";
 import { armReconcileCommitCapability } from "../lib/human-guard-override.mjs";
 import { COMMIT_PIPELINE_OWNED_SCRIPT } from "../lib/pipeline-owned-files.mjs";
+import { withWriterCommitCapability } from "../lib/writer-commit-capability.mjs";
 import {
   clearGateEstimateForMutation,
   prepareGateEstimateMutation,
@@ -14576,7 +14577,20 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
   return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported. Repair: ${repairInspect} names the cause and the command that clears it.${elapsedText}`;
 }
 
+// G20-66: the sanctioned writers whose protected output (State, lifecycle, audit bundle, result) their own commit must be able
+// to publish without a human-guard-override signature. After a successful run each arms the commit of exactly the files it
+// wrote (lib/writer-commit-capability.mjs) and prints that commit as its next step on stderr.
+export const WRITER_COMMIT_COMMANDS = new Set(["approve-plan", "close-feature"]);
+
 export function run(argv = process.argv.slice(2), deps = {}) {
+  const sub = argv[0];
+  if (!WRITER_COMMIT_COMMANDS.has(sub)) return runPipelineState(argv, deps);
+  if (argv.slice(1).some((arg) => arg === "--help" || arg === "-h")) return runPipelineState(argv, deps);
+  const rootDir = deps.dir ?? projectDir();
+  return withWriterCommitCapability({ rootDir, writer: `pipeline-state.mjs ${sub}`, rerun: `node ${fileURLToPath(import.meta.url)} ${argv.map((arg) => (/^[\w./:=@+-]+$/u.test(arg) ? arg : JSON.stringify(arg))).join(" ")}` }, () => runPipelineState(argv, deps));
+}
+
+function runPipelineState(argv, deps) {
   const sub = argv[0];
   // `<command> --help` (or -h) is a question about that command, never a run: before this, a lifecycle verb given --help executed.
   // rebind-approval keeps its own usage text below; configure-verify is a command the list does not name.

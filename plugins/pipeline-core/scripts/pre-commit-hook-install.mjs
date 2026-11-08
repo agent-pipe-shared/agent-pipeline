@@ -1002,6 +1002,8 @@ async function main() {
   let loadProtectedTestPathRules;
   let protectedTestPathRuleFor;
   let stagedClosedContinuityMatchesBinding;
+  let writerCommitAdmission;
+  let writerCommitConsume;
   let defaultHasConsumedCapabilityForPath;
   let verifyQualityPackageCommitAuthorization;
   let resolveHandoverConfig;
@@ -1009,7 +1011,7 @@ async function main() {
   let windowCoversRule;
   try {
     ({ gateStrengthRuleFor } = await import(pathToFileURL(resolve(PLUGIN_HOOKS_DIR, "guard-gate-strength.mjs")).href));
-    ({ loadProtectedTestPathRules, protectedTestPathRuleFor, stagedClosedContinuityMatchesBinding } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "protected-test-paths.mjs")).href));
+    ({ loadProtectedTestPathRules, protectedTestPathRuleFor, stagedClosedContinuityMatchesBinding, writerCommitAdmission, writerCommitConsume } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "protected-test-paths.mjs")).href));
     ({ defaultHasConsumedCapabilityForPath } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "check-protected-path-integrity.mjs")).href));
     ({ verifyQualityPackageCommitAuthorization } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "signed-quality-package.mjs")).href));
     ({ resolveHandoverConfig } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "handover-rotation.mjs")).href));
@@ -1092,6 +1094,9 @@ async function main() {
   try { qualityPackageAuthorized = verifyQualityPackageCommitAuthorization({ repoRoot: projectRoot }).ok === true; } catch { qualityPackageAuthorized = false; }
 
   const findings = [];
+  // G20-66: staged protected paths a sanctioned writer armed with exactly these bytes (consumed only when the commit goes through).
+  const writerAdmitted = [];
+  const writerNotes = [];
   for (const relPath of paths) {
     let rule = null;
     try { rule = gateStrengthRuleFor(relPath, projectRoot); } catch { rule = null; }
@@ -1104,6 +1109,16 @@ async function main() {
     let closedEvidenceAsBound = false;
     try { closedEvidenceAsBound = typeof stagedClosedContinuityMatchesBinding === "function" && stagedClosedContinuityMatchesBinding(projectRoot, rule, relPath) === true; } catch { closedEvidenceAsBound = false; }
     if (closedEvidenceAsBound) continue;
+    // G20-66: the commit publishes exactly the bytes a sanctioned writer (approve-plan, close-feature, finish-feature) wrote and armed;
+    // an extra protected path, one changed byte or an already-spent capability is not admitted and stays a finding.
+    let writerVerdict = null;
+    try { writerVerdict = typeof writerCommitAdmission === "function" ? writerCommitAdmission(projectRoot, relPath) : null; } catch { writerVerdict = null; }
+    if (writerVerdict && writerVerdict.admitted === true) { writerAdmitted.push(writerVerdict); continue; }
+    if (writerVerdict && writerVerdict.stale) {
+      writerNotes.push({ path: relPath, text: "PB-WRITER-COMMIT-STALE: " + relPath + " no longer holds the bytes " + writerVerdict.stale.writer + " armed for commit (it changed after the writer wrote it); repair: rerun the writer: " + writerVerdict.stale.rerun });
+    } else if (writerVerdict && writerVerdict.spent) {
+      writerNotes.push({ path: relPath, text: "PB-WRITER-COMMIT-STALE: the commit capability " + writerVerdict.writer + " armed for " + relPath + " was already used by a commit; repair: rerun the writer: " + writerVerdict.rerun });
+    }
     if (sanctionedVerifyPaths.has(relPath) && (rule.id === "GS-10" || rule.id === "GS-11")) continue;
     let kernelPath = true;
     try { kernelPath = isNeverLiftableKernelPath(relPath, { rootDir: projectRoot, livePluginRoot: resolve(PLUGIN_LIB_DIR, "..") }); } catch { kernelPath = true; }
@@ -1124,7 +1139,10 @@ async function main() {
     findings.push({ path: relPath, id: rule.id, reason: rule.reason });
   }
 
-  if (findings.length === 0) return;
+  if (findings.length === 0) {
+    if (writerAdmitted.length > 0) { try { writerCommitConsume(projectRoot, writerAdmitted); } catch { /* the capability stays unspent */ } }
+    return;
+  }
 
   // C20 G20-46: the calibration tiers of a ready set-phase/configure-verify transition are admitted only as their own commit
   // (the exact-set rule above stays). When they are the ONLY protected findings, other paths are staged with them and that
@@ -1158,12 +1176,16 @@ async function main() {
   // re-print the signing course. Any fault inside degrades to the plain refusal below.
   let override = { admit: false, lines: [] };
   try { override = await commitOverrideCourse(projectRoot, commonDir, findings); } catch { override = { admit: false, lines: [] }; }
-  if (override.admit === true) return;
+  if (override.admit === true) {
+    if (writerAdmitted.length > 0) { try { writerCommitConsume(projectRoot, writerAdmitted); } catch { /* the capability stays unspent */ } }
+    return;
+  }
 
   block([
     \`\${findings.length} staged path(s) are protected and carry no matching consumed human-guard-override capability:\`,
     ...findings.map((finding) => \`  - \${finding.id} \${finding.path}: \${finding.reason}\`),
     "Why: this is the git-level backstop for guard-testpath.mjs / guard-gate-strength.mjs -- it exists because a spawned process (a different interpreter, a shelled-out redirect) can write these paths without ever crossing a PreToolUse hook boundary; this commit boundary is the one such a process cannot walk around.",
+    ...writerNotes.filter((note) => findings.some((finding) => finding.path === note.path)).map((note) => note.text),
     ...override.lines,
   ]);
 }

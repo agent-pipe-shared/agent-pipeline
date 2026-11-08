@@ -1400,3 +1400,85 @@ test("installed hook: a non-canonical but valid calibration path spelling for th
   assert.match(stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/);
   assert.match(stderr, /hard size cap/);
 });
+
+// ---------------------------------------------------------------------------------------------
+// G20-66: a sanctioned writer arms a commit capability for exactly the protected files and bytes it wrote
+// (lib/writer-commit-capability.mjs); the hook admits a commit that stages exactly those bytes without a human override,
+// and refuses everything else with the old findings. These cases drive the real installed hook through a real `git commit`.
+// ---------------------------------------------------------------------------------------------
+const sha256Of = (text) => createHash("sha256").update(text).digest("hex");
+const WRITER_RERUN = "node pipeline-state.mjs approve-plan --by <name>";
+
+/** A repository whose tracked `writer-state.json` is protected (project rule TP-1), with the real hook installed, and the
+ * writer's own write already made: `v2` bytes in the working tree. Returns the armed capability for them. */
+async function writerRepo(prefix, { arm = true } = {}) {
+  const { dir, git } = freshRepo(prefix);
+  writeTestPathConfig(dir, [{ pattern: "writer-state\\.json$", reason: "fixture sanctioned-writer state", id: "TP-1" }, { pattern: "other-protected\\.json$", reason: "fixture second protected file", id: "TP-2" }]);
+  writeFileSync(join(dir, "writer-state.json"), "{\"v\":1}\n");
+  writeFileSync(join(dir, "other-protected.json"), "{\"o\":1}\n");
+  git("add", ".claude/guard-config.json", "writer-state.json", "other-protected.json");
+  git("commit", "-q", "-m", "seed guard-config and the protected files (no hook installed yet)");
+  installHook(dir);
+  writeFileSync(join(dir, "writer-state.json"), "{\"v\":2}\n");
+  let armed = null;
+  if (arm) {
+    const { armWriterCommitCapability } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "writer-commit-capability.mjs")).href);
+    armed = armWriterCommitCapability({ rootDir: dir, writer: "pipeline-state.mjs approve-plan", rerun: WRITER_RERUN, files: [{ path: "writer-state.json", sha256: sha256Of("{\"v\":2}\n") }] });
+  }
+  return { dir, git, armed };
+}
+
+test("G20-66: the commit of exactly the bytes a sanctioned writer wrote passes the installed hook with no human override, and prints its exact next step", { timeout: commitTestTimeout(1) }, async () => {
+  const { dir, git, armed } = await writerRepo("g2066-exact");
+  assert.equal(armed.status, "armed");
+  assert.deepEqual(armed.paths, ["writer-state.json"]);
+  assert.deepEqual(armed.protectedPaths, ["writer-state.json"]);
+  assert.match(armed.message, /^chore\(pipeline\): /u, "the printed message is a conventional commit subject");
+  assert.ok(armed.steps.some((step) => step.includes("writer-state.json") && /commit/u.test(step)), "the next step names the exact commit and its paths");
+  git("add", "writer-state.json");
+  const { code, stderr } = commit(dir, armed.message);
+  assert.equal(code, 0, stderr);
+});
+
+test("G20-66: the same commit plus an unprotected file passes; plus one more protected path it is refused with the old findings", { timeout: commitTestTimeout(2) }, async () => {
+  const withExtra = await writerRepo("g2066-extra-unprotected");
+  writeFileSync(join(withExtra.dir, "notes.txt"), "unprotected\n");
+  withExtra.git("add", "writer-state.json", "notes.txt");
+  const admitted = commit(withExtra.dir, "chore(pipeline): the writer output with an unprotected file");
+  assert.equal(admitted.code, 0, admitted.stderr);
+  const withProtected = await writerRepo("g2066-extra-protected");
+  writeFileSync(join(withProtected.dir, "other-protected.json"), "{\"o\":2}\n");
+  withProtected.git("add", "writer-state.json", "other-protected.json");
+  const refused = commit(withProtected.dir, "chore(pipeline): the writer output with another protected path");
+  assert.notEqual(refused.code, 0);
+  assert.match(refused.stderr, /TP-2/u);
+  assert.match(refused.stderr, /other-protected\.json/u);
+});
+
+test("G20-66: a changed bound byte is refused as stale and names the rerun of the writer; without a capability the old refusal stands", { timeout: commitTestTimeout(2) }, async () => {
+  const stale = await writerRepo("g2066-stale");
+  writeFileSync(join(stale.dir, "writer-state.json"), "{\"v\":3}\n");
+  stale.git("add", "writer-state.json");
+  const refused = commit(stale.dir, "chore(pipeline): bytes the writer did not write");
+  assert.notEqual(refused.code, 0);
+  assert.match(refused.stderr, /TP-1/u);
+  assert.match(refused.stderr, /PB-WRITER-COMMIT-STALE/u);
+  assert.match(refused.stderr, /writer-state\.json/u);
+  assert.ok(refused.stderr.includes(WRITER_RERUN), "the repair is the rerun of the writer");
+  const none = await writerRepo("g2066-unarmed", { arm: false });
+  none.git("add", "writer-state.json");
+  const old = commit(none.dir, "chore(pipeline): no capability armed");
+  assert.notEqual(old.code, 0);
+  assert.match(old.stderr, /TP-1/u);
+  assert.doesNotMatch(old.stderr, /PB-WRITER-COMMIT-STALE/u);
+});
+
+test("G20-66: an unrelated commit between the write and the commit of the writer's bytes does not strand the capability (it is bound to bytes, not to HEAD)", { timeout: commitTestTimeout(2) }, async () => {
+  const { dir, git } = await writerRepo("g2066-head-moved");
+  writeFileSync(join(dir, "unrelated.txt"), "x\n");
+  git("add", "unrelated.txt");
+  assert.equal(commit(dir, "chore: an unrelated commit that moves HEAD").code, 0);
+  git("add", "writer-state.json");
+  const { code, stderr } = commit(dir, "chore(pipeline): the writer output after an unrelated commit");
+  assert.equal(code, 0, stderr);
+});

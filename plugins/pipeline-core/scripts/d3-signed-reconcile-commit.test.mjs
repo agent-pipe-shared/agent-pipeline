@@ -252,6 +252,99 @@ test("D3 (3): a staged foreign path refuses the apply BEFORE the proof is consum
   assert.equal(retried.status, 0, retried.err); assert.equal(JSON.parse(retried.out).commitCapability.status, "armed");
 });
 
+// ---------------------------------------------------------------------------------------------
+// G20-66: a sanctioned writer arms a commit capability for exactly the protected files and bytes it wrote
+// (lib/writer-commit-capability.mjs; the consumer is protected-test-paths.mjs writerCommitAdmission, called by the pre-commit
+// hook next to the G20-55 closed-continuity admission). The reconcile capability above is left as it is.
+// ---------------------------------------------------------------------------------------------
+const wcLib = () => import("../lib/writer-commit-capability.mjs");
+const ptp = await import("../lib/protected-test-paths.mjs");
+const WRITE_B = "{\"writer\":\"b\"}\n";
+
+/** A closed-feature fixture whose manifest is protected (dynamic PB-CONTINUITY rule), with the writer's own write made. */
+function writerFixture(name, bytes = `${WRITE_B}`) {
+  const f = fixture(name); closeInState(f);
+  writeFileSync(join(f.root, MANIFEST), bytes);
+  return { ...f, sha: hash(bytes) };
+}
+
+test("G20-66: arming binds exactly the written protected file and its bytes, stages nothing, and a staged copy of those bytes is admitted", async () => {
+  const f = writerFixture("wc-arm");
+  const { armWriterCommitCapability } = await wcLib();
+  const armed = armWriterCommitCapability({ rootDir: f.root, writer: "pipeline-state.mjs close-feature", rerun: "node pipeline-state.mjs close-feature --by <name>", files: [{ path: MANIFEST, sha256: f.sha }] });
+  assert.equal(armed.status, "armed");
+  assert.deepEqual(armed.paths, [MANIFEST]); assert.deepEqual(armed.protectedPaths, [MANIFEST]);
+  assert.equal(f.git("diff", "--cached", "--name-only").trim(), "", "arming stages nothing");
+  assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST).admitted, false, "the bytes are not staged yet: not admitted");
+  f.git("add", MANIFEST);
+  const admission = ptp.writerCommitAdmission(f.root, MANIFEST);
+  assert.equal(admission.admitted, true, JSON.stringify(admission));
+  assert.equal(ptp.writerCommitAdmission(f.root, "specs/feature/spec.md"), null, "a path no writer armed has no verdict");
+});
+
+test("G20-66: arming refuses bytes other than the ones the writer wrote, names the rerun of the writer, and arms nothing", async () => {
+  const f = writerFixture("wc-bytes");
+  const { armWriterCommitCapability } = await wcLib();
+  assert.throws(() => armWriterCommitCapability({ rootDir: f.root, writer: "pipeline-state.mjs approve-plan", rerun: "node pipeline-state.mjs approve-plan --by <name>", files: [{ path: MANIFEST, sha256: h("9") }] }),
+    (error) => error.code === "WC-BYTES" && /pipeline-state\.mjs approve-plan --by <name>/.test(error.heal));
+  f.git("add", MANIFEST);
+  assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST), null, "nothing was armed");
+});
+
+test("G20-66: changed bytes are stale with the writer's rerun; the capability is spent once its commit exists (bound to bytes, not to HEAD)", async () => {
+  const f = writerFixture("wc-stale-spent");
+  const { armWriterCommitCapability } = await wcLib();
+  armWriterCommitCapability({ rootDir: f.root, writer: "pipeline-state.mjs close-feature", rerun: "node pipeline-state.mjs close-feature --by <name>", files: [{ path: MANIFEST, sha256: f.sha }] });
+  writeFileSync(join(f.root, MANIFEST), "{\"writer\":\"tampered\"}\n"); f.git("add", MANIFEST);
+  const stale = ptp.writerCommitAdmission(f.root, MANIFEST);
+  assert.equal(stale.admitted, false); assert.equal(stale.stale.path, MANIFEST); assert.match(stale.stale.rerun, /close-feature --by <name>/);
+  writeFileSync(join(f.root, MANIFEST), WRITE_B); f.git("add", MANIFEST);
+  const admitted = ptp.writerCommitAdmission(f.root, MANIFEST); assert.equal(admitted.admitted, true);
+  ptp.writerCommitConsume(f.root, [admitted]);
+  assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST).admitted, true, "a retry of the same commit at the same HEAD is still admitted");
+  f.git("commit", "-q", "-m", "the writer output");
+  writeFileSync(join(f.root, MANIFEST), "{\"later\":1}\n"); f.git("commit", "-q", "-am", "a later change");
+  writeFileSync(join(f.root, MANIFEST), WRITE_B); f.git("add", MANIFEST);
+  const spent = ptp.writerCommitAdmission(f.root, MANIFEST);
+  assert.equal(spent.admitted, false); assert.equal(spent.spent, true, "the spent capability is not reusable");
+});
+
+test("G20-66: a gate-strength or shipped-baseline path is never armed, even when a writer's tree delta contains it", async () => {
+  const f = writerFixture("wc-excluded");
+  mkdirSync(join(f.root, "project"), { recursive: true });
+  writeFileSync(join(f.root, "project/guard-config.json"), "{}\n"); f.git("add", "project/guard-config.json"); f.git("commit", "-q", "-m", "config");
+  writeFileSync(join(f.root, "project/guard-config.json"), "{\"changed\":true}\n");
+  const { armWriterCommitCapability } = await wcLib();
+  const armed = armWriterCommitCapability({ rootDir: f.root, writer: "pipeline-state.mjs close-feature", rerun: "rerun", files: [{ path: "project/guard-config.json", sha256: hash("{\"changed\":true}\n") }] });
+  assert.equal(armed.status, "not-needed"); assert.deepEqual(armed.excluded, ["project/guard-config.json"]);
+  f.git("add", "project/guard-config.json");
+  assert.equal(ptp.writerCommitAdmission(f.root, "project/guard-config.json"), null);
+});
+
+test("G20-66: approve-plan and close-feature are the wired writers; the wrapper arms what a successful writer wrote, prints the exact commit, and arms nothing for a failed one", async () => {
+  const { WRITER_COMMIT_COMMANDS } = await import("./pipeline-state.mjs");
+  for (const sub of ["approve-plan", "close-feature"]) assert.ok(WRITER_COMMIT_COMMANDS.has(sub), `${sub} arms its commit capability`);
+  const { withWriterCommitCapability } = await wcLib();
+  for (const sub of ["approve-plan", "close-feature"]) {
+    const f = fixture(`wc-wrapper-${sub}`); closeInState(f);
+    const printed = []; const original = console.error; console.error = (...v) => printed.push(v.join(" "));
+    let status;
+    try {
+      status = withWriterCommitCapability({ rootDir: f.root, writer: `pipeline-state.mjs ${sub}`, rerun: `node pipeline-state.mjs ${sub} --by <name>` }, () => { writeFileSync(join(f.root, MANIFEST), WRITE_B); return 0; });
+    } finally { console.error = original; }
+    assert.equal(status, 0);
+    const out = printed.join("\n");
+    assert.match(out, new RegExp(`git add -- ${MANIFEST.replace(/[.]/g, "\\.")}`));
+    assert.match(out, /git commit -m "chore\(pipeline\): /);
+    assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST) === null, false, "the record exists");
+    f.git("add", MANIFEST); assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST).admitted, true);
+  }
+  const failed = fixture("wc-wrapper-failed"); closeInState(failed);
+  const status = withWriterCommitCapability({ rootDir: failed.root, writer: "pipeline-state.mjs approve-plan", rerun: "rerun" }, () => { writeFileSync(join(failed.root, MANIFEST), WRITE_B); return 2; });
+  assert.equal(status, 2, "the writer's exit code is returned unchanged");
+  failed.git("add", MANIFEST); assert.equal(ptp.writerCommitAdmission(failed.root, MANIFEST), null, "a failed writer arms nothing");
+});
+
 test("D3 (3): with no protected path in the reconcile commit nothing is armed and nothing is staged (exit 0)", () => {
   const f = fixture("not-needed");
   const completion = bootstrapped(f); assert.equal(commitPipelineOwned(["--root", f.root, "--agent"]).status, "committed");
