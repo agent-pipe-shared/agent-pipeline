@@ -102,9 +102,9 @@ function proofsSection(manifest) {
   if (!Object.hasOwn(manifest, "proofs")) return "";
   return `\n## Signed approval proofs\n\nThe detached, public proof objects of the human approvals that authorized this candidate (no private key is ever copied). Each is bound by file digest and by the signed intent digest, and the offline verification re-checks both and the Ed25519 signature:\n\n${manifest.proofs.map((entry) => `- ${entry.kind}: \`${entry.path}\` (SHA-256: \`${entry.sha256}\`, signed intent: \`${entry.intentSha256}\`)`).join("\n")}\n`;
 }
-function proofFindings(root, manifest) {
+function proofFindings(root, entries) {
   const findings = [];
-  for (const entry of manifest.proofs) {
+  for (const entry of entries) {
     let bytes; try { bytes = readFileSync(join(root, entry.path)); } catch { findings.push(`AB-MISSING ${entry.path}`); continue; }
     if (digest(bytes) !== entry.sha256) { findings.push(`AB-DIGEST ${entry.path}`); continue; }
     const proof = jsonOrNull(bytes);
@@ -113,6 +113,22 @@ function proofFindings(root, manifest) {
     if (!proofSignatureHolds(proof)) findings.push(`AB-PROOF-SIGNATURE ${entry.path}`);
   }
   return findings;
+}
+// C20E-AP (AC-108): the push approval signs the commit that CARRIES the bundle and the release approval comes later still, so their public proofs reach
+// the bundle in ONE follow-up: new files under proofs/ plus this list. manifest.json and README.md are never rewritten (the bundle is create-only), so the
+// manifest-level verification above is unchanged; the list binds the follow-up to the bundle's candidate and to the approved commit, and the verifier
+// re-checks every listed file by bytes, signed intent and Ed25519 signature. A chat-mode approval is an attribution record (kind, mode, time), never a proof.
+export const AUDIT_BUNDLE_FOLLOWUP_PATH = "proofs/follow-up.json"; export const AUDIT_BUNDLE_FOLLOWUP_SCHEMA = "pipeline.audit-bundle-followup.v1";
+export const auditBundleProofBytes = (proof) => proofBytes(proof);
+const FOLLOWUP_KEYS = ["schema", "candidate", "approvedCommit", "proofs", "attributions"]; const ATTRIBUTION_MODE = /^[a-z-]{1,64}$/u;
+export const followUpAttributionShape = (entry) => exact(entry, ["kind", "mode", "approvedAt"]) && PROOF_KIND.test(entry.kind) && ATTRIBUTION_MODE.test(entry.mode) && (entry.approvedAt === null || (typeof entry.approvedAt === "string" && entry.approvedAt.length <= 40));
+function followUpFindings(root, manifest) {
+  let bytes; try { bytes = readFileSync(join(root, AUDIT_BUNDLE_FOLLOWUP_PATH)); } catch (error) { return error?.code === "ENOENT" ? [] : ["AB-FOLLOWUP"]; }
+  const list = jsonOrNull(bytes); const taken = new Set((manifest.proofs ?? []).map((entry) => entry?.path));
+  const proofsOk = Array.isArray(list?.proofs) && list.proofs.length <= 16 && list.proofs.every((entry) => exact(entry, ["kind", "path", "sha256", "intentSha256"]) && PROOF_KIND.test(entry.kind) && PROOF_PATH.test(entry.path) && SHA.test(entry.sha256) && SHA.test(entry.intentSha256) && !taken.has(entry.path)) && new Set(list.proofs.map((entry) => entry.path)).size === list.proofs.length;
+  const attributionsOk = Array.isArray(list?.attributions) && list.attributions.length <= 8 && list.attributions.every(followUpAttributionShape);
+  if (!exact(list, FOLLOWUP_KEYS) || list.schema !== AUDIT_BUNDLE_FOLLOWUP_SCHEMA || !sameCandidate(list.candidate, manifest.candidate ?? {}) || !OID.test(list.approvedCommit) || !proofsOk || !attributionsOk || list.proofs.length + list.attributions.length === 0) return ["AB-FOLLOWUP"];
+  return proofFindings(root, list.proofs);
 }
 function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
 const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan"]);
@@ -227,7 +243,8 @@ export function verifyAuditBundleSync({ bundleRoot } = {}) {
   if (hasReadme) { try { if (digest(readFileSync(join(root, "README.md"))) !== manifest.readmeSha256) findings.push("AB-README-DIGEST"); } catch { findings.push("AB-README"); } }
   for (const artifact of manifest.artifacts ?? []) { if (!exact(artifact, ["path", "sourcePath", "sha256"]) || typeof artifact.sourcePath !== "string" || !/^artifacts\/[0-9]{3}-[a-z-]+$/u.test(artifact.path) || !SHA.test(artifact.sha256)) { findings.push("AB-ARTIFACT"); continue; } try { if (digest(readFileSync(join(root, artifact.path))) !== artifact.sha256) findings.push(`AB-DIGEST ${artifact.path}`); } catch { findings.push(`AB-MISSING ${artifact.path}`); } }
   if (hasEvidence && evidenceShape(manifest.evidence)) findings.push(...evidenceFindings(root, manifest));
-  if (Object.hasOwn(manifest, "proofs")) { if (proofsManifestShape(manifest.proofs)) findings.push(...proofFindings(root, manifest)); else findings.push("AB-PROOFS"); }
+  if (Object.hasOwn(manifest, "proofs")) { if (proofsManifestShape(manifest.proofs)) findings.push(...proofFindings(root, manifest.proofs)); else findings.push("AB-PROOFS"); }
+  findings.push(...followUpFindings(root, manifest));
   return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: findings.length ? "invalid" : "verified", candidate: manifest.candidate ?? null, findings: Object.freeze(findings) });
 }
 function manifestKeys(manifest, hasReadme) { return ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", ...optionalKeys(manifest), ...(hasReadme ? ["readmeSha256"] : [])]; }

@@ -54,7 +54,7 @@
  * through the fixed executor and is untouched here.
  */
 import { spawnSync } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, verify as cryptoVerify } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { closeSync, existsSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -561,6 +561,90 @@ export function authorizeRecordedReleaseTag({ projectDir, anchorDir = projectDir
     }
   }
   return { ok: true };
+}
+
+/**
+ * C20E-AP (AC-108): the evidence-only follow-up commit of a consumer release. The push approval signs the commit that carries the audit bundle and the release
+ * approval comes later, so the PO's approval proofs can reach the remote only in ONE further commit that adds them to the bundle. That single commit is admitted
+ * to the same branch push WITHOUT a second approval -- and only that: it must be exactly one commit on top of the release-approved commit P, P must be the
+ * published tip of the destination, P must carry a recorded push approval for this remote and destination, the release approval and the annotated release tag at P
+ * must hold (`authorizeRecordedReleaseTag`, the tag push's own check), and the commit's diff must ADD, as regular files, nothing but `proofs/NNN-<kind>.json` files and
+ * the one `proofs/follow-up.json` list of ONE bundle that already exists at P (create-only: no existing file is modified). Every added file is size-bounded and
+ * must be exactly a public proof object (five fields, a verifying Ed25519 signature, no private key) or the list that binds those files by digest to P and to
+ * the bundle's candidate. Anything else is refused here and falls through to the full push gate, unchanged; this function relaxes no check for any other content.
+ * @returns {{ok: true, approvedCommit: string, bundle: string, paths: string[]} | {ok: false, code: string, message: string}}
+ */
+const FOLLOWUP_FILE = /^audit-bundles\/([a-z][a-z0-9-]{2,63})\/([0-9a-f]{40}|[0-9a-f]{64})\/proofs\/(?:([0-9]{3}-[a-z-]{1,40})|follow-up)\.json$/u;
+const FOLLOWUP_PROOF_SCHEMA = "pipeline.po-approval-proof.v1"; const FOLLOWUP_LIST_SCHEMA = "pipeline.audit-bundle-followup.v1"; const FOLLOWUP_MAX_BYTES = 16_384;
+const exactKeys = (value, keys) => object(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+export function authorizeAuditProofFollowUp({ projectDir, anchorDir = projectDir, commit, remote, destination } = {}) {
+  const refuse = (code, message) => ({ ok: false, code: `AUDIT-FOLLOWUP-${code}`, message });
+  const oid = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+  if (typeof projectDir !== "string" || projectDir === "" || !oid.test(commit ?? "") || !/^[A-Za-z0-9._-]{1,64}$/u.test(remote ?? "") || destination !== "refs/heads/main") return refuse("INPUT-INVALID", "the follow-up push is not one commit pushed to refs/heads/main of one remote");
+  const git = (args, options = {}) => { const result = spawnSync("git", ["-C", projectDir, ...args], { encoding: "utf8", timeout: 5000, maxBuffer: 1_048_576, ...options }); return result; };
+  const text = (args) => { const result = git(args); return result.status === 0 ? String(result.stdout) : null; };
+  const lineage = text(["rev-list", "--parents", "-n", "1", commit])?.trim().split(" ") ?? [];
+  if (lineage.length !== 2 || lineage[0] !== commit || !oid.test(lineage[1])) return refuse("NOT-ONE-PARENT", "the follow-up is exactly one commit with one parent");
+  const parent = lineage[1];
+  const common = resolveCriticalApprovalCommonDir(projectDir);
+  const release = common === null ? null : readLastPrivateApproval(common, "release-preflight")?.approval ?? null;
+  if (!object(release) || release.forCommit !== parent) return refuse("NO-RELEASE-APPROVAL", "the parent commit has no recorded release approval");
+  const tag = authorizeRecordedReleaseTag({ projectDir, anchorDir, tagRef: `refs/tags/${release.tag}`, commit: parent });
+  if (!tag.ok || text(["rev-parse", "--verify", "--quiet", `refs/tags/${release.tag}^{commit}`])?.trim() !== parent) return refuse("RELEASE-TAG", "the annotated release tag at the approved commit does not hold");
+  const pushRecord = readPrivateApprovals(common, "push").find((entry) => entry.approval?.forCommit === parent && entry.approval.remote === remote && entry.approval.destination === destination);
+  if (pushRecord === undefined) return refuse("NO-PUSH-APPROVAL", "the parent commit has no recorded push approval for this remote and destination");
+  if (text(["rev-parse", "--verify", "--quiet", `refs/remotes/${remote}/main`])?.trim() !== parent) return refuse("PARENT-NOT-PUBLISHED", "the approved commit is not the published tip of the destination");
+  const raw = git(["diff-tree", "--no-commit-id", "--raw", "-r", "-z", "--no-renames", parent, commit]);
+  const tokens = raw.status === 0 ? String(raw.stdout).split("\0").filter((token) => token !== "") : [];
+  const added = [];
+  for (let index = 0; index + 1 < tokens.length; index += 2) {
+    const head = tokens[index].split(" ");
+    if (head.length !== 5 || head[0] !== ":000000" || head[1] !== "100644" || head[4] !== "A" || !oid.test(head[3])) return refuse("NOT-ADD-ONLY", "the commit changes something other than adding regular files");
+    added.push({ path: tokens[index + 1], blob: head[3] });
+  }
+  if (added.length === 0 || added.length > 18 || tokens.length !== added.length * 2) return refuse("NOT-ADD-ONLY", "the commit does not add one to eighteen files");
+  const parts = added.map((file) => FOLLOWUP_FILE.exec(file.path));
+  if (parts.some((part) => part === null) || new Set(parts.map((part) => `${part[1]}/${part[2]}`)).size !== 1) return refuse("PATH", "the commit adds a path outside the proofs/ directory of one bundle");
+  const [, feature, bundleCommit] = parts[0]; const bundle = `audit-bundles/${feature}/${bundleCommit}`;
+  const listFiles = added.filter((file) => file.path === `${bundle}/proofs/follow-up.json`);
+  if (listFiles.length !== 1) return refuse("LIST", "the commit adds no single follow-up list");
+  let manifest = null; try { manifest = JSON.parse(text(["show", `${parent}:${bundle}/manifest.json`]) ?? ""); } catch { manifest = null; }
+  if (!object(manifest) || manifest.bundleId !== feature || manifest.candidate?.commit !== bundleCommit || git(["merge-base", "--is-ancestor", bundleCommit, parent]).status !== 0) return refuse("NO-BUNDLE", "the bundle does not exist at the approved commit for this candidate");
+  const blobs = new Map();
+  for (const file of added) {
+    const size = Number(text(["cat-file", "-s", file.blob])?.trim());
+    const body = Number.isFinite(size) && size <= FOLLOWUP_MAX_BYTES ? git(["cat-file", "blob", file.blob], { encoding: "buffer" }) : null;
+    if (body === null || body.status !== 0) return refuse("CONTENT", `${file.path} is missing or larger than ${FOLLOWUP_MAX_BYTES} bytes`);
+    let parsed = null; try { parsed = JSON.parse(body.stdout.toString("utf8")); } catch { parsed = null; }
+    if (!object(parsed) || /PRIVATE KEY/u.test(body.stdout.toString("utf8"))) return refuse("CONTENT", `${file.path} is not a public JSON record`);
+    blobs.set(file.path, { bytes: body.stdout, parsed });
+  }
+  const list = blobs.get(listFiles[0].path).parsed;
+  const proofPaths = added.filter((file) => file !== listFiles[0]).map((file) => file.path.slice(bundle.length + 1)).sort();
+  const attributions = Array.isArray(list.attributions) ? list.attributions : null; const entries = Array.isArray(list.proofs) ? list.proofs : null;
+  if (!exactKeys(list, ["schema", "candidate", "approvedCommit", "proofs", "attributions"]) || list.schema !== FOLLOWUP_LIST_SCHEMA || list.approvedCommit !== parent || list.candidate?.commit !== bundleCommit
+    || entries === null || attributions === null || attributions.length > 8 || entries.length + attributions.length === 0
+    || !attributions.every((entry) => exactKeys(entry, ["kind", "mode", "approvedAt"]) && /^[a-z-]{1,40}$/u.test(entry.kind) && /^[a-z-]{1,64}$/u.test(entry.mode) && (entry.approvedAt === null || (typeof entry.approvedAt === "string" && entry.approvedAt.length <= 40)))
+    || JSON.stringify(entries.map((entry) => entry?.path).sort()) !== JSON.stringify(proofPaths)) return refuse("LIST", "the follow-up list does not match the added files");
+  // Only the two approvals of this release can be carried, and a signed one must be the very proof the private store recorded for it: a proof object signed by
+  // any other key (the agent's own, for instance) is refused. Both are compared by the digest the store recorded, sha256 over the canonical proof object, which covers
+  // the public key and the signature: the signature check further down only proves the file is self-consistent, its key travels in the file. A chat or waiver approval has no proof file.
+  const recordedProofSha256 = { push: pushRecord.approval.criticalProof?.proofSha256, "release-preflight": release.mode === "signature" ? release.criticalProof?.proofSha256 : null };
+  if (!attributions.every((entry) => entry.kind === "push" || entry.kind === "release-preflight")) return refuse("LIST", "the follow-up list carries an approval other than the push and the release approval");
+  for (const entry of entries) {
+    if (!exactKeys(entry, ["kind", "path", "sha256", "intentSha256"])) return refuse("LIST", "the follow-up list holds a malformed proof entry");
+    const { bytes, parsed } = blobs.get(`${bundle}/${entry.path}`) ?? {};
+    const intent = parsed?.intentSha256;
+    const expected = Object.hasOwn(recordedProofSha256, entry.kind) ? recordedProofSha256[entry.kind] : null;
+    const bound = object(parsed) && SHA256.test(expected ?? "") && createHash("sha256").update(canonical(parsed)).digest("hex") === expected;
+    if (!bound) return refuse("CONTENT", `${entry.path} is not the signed proof recorded for the ${entry.kind} approval`);
+    if (!exactKeys(entry, ["kind", "path", "sha256", "intentSha256"]) || !/^[a-z-]{1,40}$/u.test(entry.kind) || bytes === undefined || createHash("sha256").update(bytes).digest("hex") !== entry.sha256
+      || !exactKeys(parsed, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"]) || parsed.schema !== FOLLOWUP_PROOF_SCHEMA || !SHA256.test(intent ?? "") || intent !== entry.intentSha256
+      || typeof parsed.publicKey !== "string" || !parsed.publicKey.includes("PUBLIC KEY") || typeof parsed.keyReference !== "string" || parsed.keyReference.length > 128 || typeof parsed.signatureBase64 !== "string") return refuse("CONTENT", `${entry.path} is not a public approval proof object`);
+    let holds = false; try { holds = cryptoVerify(null, Buffer.from(intent, "utf8"), parsed.publicKey, Buffer.from(parsed.signatureBase64, "base64")) === true; } catch { holds = false; }
+    if (!holds) return refuse("CONTENT", `${entry.path} carries a signature that does not verify`);
+  }
+  return { ok: true, approvedCommit: parent, bundle, paths: added.map((file) => file.path).sort() };
 }
 
 /**

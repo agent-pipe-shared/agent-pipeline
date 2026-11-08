@@ -21,11 +21,15 @@
  * Run: node plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs
  * Exit: 0 = all cases pass · 1 = at least one case failed (failure list on stdout).
  */
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { createHash, generateKeyPairSync, sign as cryptoSign } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { authorizeAuditProofFollowUp, writeCriticalApproval } from "../lib/critical-action-authorization.mjs";
+import { canonical } from "../lib/critical-action-authorization-read.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
 function enrollFixtureGovernance(root) {
@@ -90,9 +94,21 @@ function runGuard(command, dir) {
 
 let pass = 0;
 const failures = [];
+// C20E-AP: a refused follow-up must be refused for the RIGHT reason, not merely refused (the full gate refuses every raw main push without an approval,
+// so the exit code alone would pass for a broken fixture). The case id names the typed code `authorizeAuditProofFollowUp` has to return for its fixture.
+const FOLLOWUP_REFUSALS = Object.freeze({
+  "C20E-AP2": "AUDIT-FOLLOWUP-PATH", "C20E-AP3": "AUDIT-FOLLOWUP-NOT-ADD-ONLY", "C20E-AP4": "AUDIT-FOLLOWUP-NO-RELEASE-APPROVAL", "C20E-AP5": "AUDIT-FOLLOWUP-RELEASE-TAG",
+  "C20E-AP6": "AUDIT-FOLLOWUP-NO-RELEASE-APPROVAL", "C20E-AP7": "AUDIT-FOLLOWUP-CONTENT", "C20E-AP8": "AUDIT-FOLLOWUP-PARENT-NOT-PUBLISHED", "C20E-AP10": "AUDIT-FOLLOWUP-CONTENT",
+  "C20E-AP11": "AUDIT-FOLLOWUP-CONTENT", "C20E-AP12": "AUDIT-FOLLOWUP-CONTENT",
+});
 function check(id, command, dir, expectExit, { stderrIncludes, stderrNotIncludes } = {}) {
   const { code, stderr } = runGuard(command, dir);
   const problems = [];
+  const wantRefusal = FOLLOWUP_REFUSALS[id.split(" ")[0]];
+  if (wantRefusal !== undefined) {
+    const got = authorizeAuditProofFollowUp({ projectDir: dir, anchorDir: dir, commit: gitAt(dir, "rev-parse", "HEAD").stdout.trim(), remote: "origin", destination: "refs/heads/main" });
+    if (got.ok !== false || got.code !== wantRefusal) problems.push(`the follow-up check returned ${JSON.stringify(got).slice(0, 200)}, expected the refusal ${wantRefusal}`);
+  }
   if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit}) -- stderr: ${stderr.trim().slice(0, 500)}`);
   for (const needle of [].concat(stderrIncludes ?? [])) {
     if (!stderr.includes(needle)) problems.push(`stderr missing "${needle}" -- got: ${stderr.trim().slice(0, 500)}`);
@@ -381,6 +397,126 @@ const BLOCK = 2, ALLOW = 0, WARN = 1; // WARN = hooks.json's own "1 = allow + wa
     ALLOW,
     { stderrNotIncludes: ["release-tag ancestry"] },
   );
+}
+
+// ---- C20E-AP (AC-108) -- the evidence-only follow-up commit. A consumer release approval is recorded for commit P (the closed, pushed feature
+// commit that already carries audit-bundles/<feature>/<C>/); the push approval signs P, so the PO's approval proofs can only reach the remote in ONE
+// commit on top of P that ONLY adds proofs/ files of that bundle. The guard admits that single commit WITHOUT a second approval; every other content,
+// and every other shape, falls through to the full gate unchanged. -------------------------------------------------------------------------------
+const FOLLOWUP_FEATURE = "feature-x";
+const sha256Hex = (bytes) => createHash("sha256").update(bytes).digest("hex");
+function followUpProof(intentSha256) {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  return { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: "po-key-1", publicKey: publicKey.export({ type: "spki", format: "pem" }), signatureBase64: cryptoSign(null, Buffer.from(intentSha256, "utf8"), privateKey).toString("base64") };
+}
+/** A consumer project at P (bundle committed, release approval + push approval recorded, annotated tag at P, origin/main = P) and the follow-up files on disk. */
+function followUpScenario(prefix, { tag = true, releaseApproval = true, origin = "published", recordedPushIntent = "a".repeat(64), foreignKey = null } = {}) {
+  const { dir, head: bundleCommit } = freshRepo(prefix);
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  const bundle = `audit-bundles/${FOLLOWUP_FEATURE}/${bundleCommit}`;
+  writeEvidence(dir, `${bundle}/manifest.json`, { schema: "pipeline.audit-bundle-manifest.v1", bundleId: FOLLOWUP_FEATURE, candidate: { commit: bundleCommit, tree: gitAt(dir, "rev-parse", `${bundleCommit}^{tree}`).stdout.trim() } });
+  gitAt(dir, "add", "-A");
+  gitAt(dir, "commit", "-q", "-m", "close commit carrying the bundle");
+  const approved = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  const common = join(dir, ".git");
+  const approvedAt = "2026-11-08T10:00:00.000Z";
+  const pushProof = followUpProof("a".repeat(64));
+  const releaseProof = followUpProof("b".repeat(64));
+  // the push approval's recorded proof: the guard admits only the very proof the private store holds for it (a proof signed by any other key is refused)
+  const recorded = recordedPushIntent === "a".repeat(64) ? pushProof : followUpProof(recordedPushIntent);
+  assert.equal(writeCriticalApproval({ gitCommonDir: common, kind: "push", approval: { forCommit: approved, remote: "origin", destination: "refs/heads/main", approvedAt, criticalProof: { proofSha256: sha256Hex(canonical(recorded)), proof: recorded } } }).ok, true);
+  if (releaseApproval) {
+    // the digest the private store really holds: sha256 over the canonical proof object (release-preflight-cli.mjs, verified.proofSha256)
+    const proofSha256 = sha256Hex(canonical(releaseProof));
+    assert.equal(writeCriticalApproval({ gitCommonDir: common, kind: "release-preflight", approval: { schema: "pipeline.consumer-release-approval.v1", forCommit: approved, version: "1.0.0", tag: "v1.0.0", mode: "signature", criticalProof: { proofSha256 }, approvedAt } }).ok, true);
+  }
+  if (tag) gitAt(dir, "tag", "-a", "v1.0.0", "-m", "version tag", approved);
+  if (origin === "published") gitAt(dir, "update-ref", "refs/remotes/origin/main", approved);
+  // foreignKey: the carried file holds the recorded intent, validly signed, but under a key the private store never saw
+  const carriedPush = foreignKey === "push" ? followUpProof(pushProof.intentSha256) : pushProof;
+  const carriedRelease = foreignKey === "release" ? followUpProof(releaseProof.intentSha256) : releaseProof;
+  const files = [["proofs/003-push.json", carriedPush, "push"], ["proofs/004-release-preflight.json", carriedRelease, "release-preflight"]].map(([path, proof, kind]) => {
+    const bytes = Buffer.from(`${JSON.stringify(proof)}\n`);
+    return { path, bytes, kind, sha256: sha256Hex(bytes), intentSha256: proof.intentSha256 };
+  });
+  const list = { schema: "pipeline.audit-bundle-followup.v1", candidate: { commit: bundleCommit, tree: gitAt(dir, "rev-parse", `${bundleCommit}^{tree}`).stdout.trim() }, approvedCommit: approved,
+    proofs: files.map((f) => ({ kind: f.kind, path: f.path, sha256: f.sha256, intentSha256: f.intentSha256 })), attributions: [] };
+  const write = (extra = {}) => {
+    for (const f of files) { mkdirSync(join(dir, bundle, "proofs"), { recursive: true }); writeFileSync(join(dir, bundle, f.path), f.bytes); }
+    writeFileSync(join(dir, bundle, "proofs", "follow-up.json"), `${JSON.stringify({ ...list, ...extra })}\n`);
+  };
+  const commit = (message = "evidence: approval proofs of the approved commit") => { gitAt(dir, "add", "-A"); gitAt(dir, "commit", "-q", "-m", message); };
+  return { dir, bundle, approved, bundleCommit, files, list, write, commit };
+}
+const FOLLOWUP_PUSH = "git push origin HEAD:refs/heads/main";
+{
+  const s = followUpScenario("followup-admitted");
+  s.write(); s.commit();
+  check("C20E-AP1 allow  one commit on top of the approved commit that only adds the bundle's proofs/ files is pushed with no second approval", FOLLOWUP_PUSH, s.dir, ALLOW, {
+    stderrNotIncludes: ["BLOCKED"],
+  });
+}
+{
+  const s = followUpScenario("followup-other-path");
+  s.write(); writeEvidence(s.dir, "src/app.js", "console.log(1);\n"); s.commit();
+  check("C20E-AP2 block  a follow-up commit that also touches any other path falls through to the full gate", FOLLOWUP_PUSH, s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+}
+{
+  const s = followUpScenario("followup-modifies-bundle");
+  s.write();
+  writeFileSync(join(s.dir, s.bundle, "manifest.json"), `${JSON.stringify({ tampered: true })}\n`);
+  s.commit();
+  check("C20E-AP3 block  a follow-up commit that changes the bundle's own manifest (create-only: only files are added) is refused", FOLLOWUP_PUSH, s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+}
+{
+  const s = followUpScenario("followup-no-release-approval", { releaseApproval: false });
+  s.write(); s.commit();
+  check("C20E-AP4 block  without the recorded release approval for the parent the follow-up is refused", FOLLOWUP_PUSH, s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+}
+{
+  const s = followUpScenario("followup-no-tag", { tag: false });
+  s.write(); s.commit();
+  check("C20E-AP5 block  without the annotated release tag at the approved commit the follow-up is refused", FOLLOWUP_PUSH, s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+}
+{
+  const s = followUpScenario("followup-two-commits");
+  s.write(); s.commit();
+  writeEvidence(s.dir, `${s.bundle}/proofs/005-extra.json`, "{}\n"); s.commit("a second follow-up commit");
+  check("C20E-AP6 block  two commits on top of the approved commit are not THE follow-up (exactly one commit is admitted)", FOLLOWUP_PUSH, s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+}
+{
+  const s = followUpScenario("followup-private-key");
+  s.write();
+  const leaked = { ...JSON.parse(readFileSync(join(s.dir, s.bundle, s.files[0].path), "utf8")), privateKey: "-----BEGIN PRIVATE KEY-----" };
+  writeFileSync(join(s.dir, s.bundle, s.files[0].path), `${JSON.stringify(leaked)}\n`);
+  s.commit();
+  check("C20E-AP7 block  a proofs/ file that is not exactly a public proof object (a private key rides along) is refused", FOLLOWUP_PUSH, s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+}
+{
+  const s = followUpScenario("followup-origin-moved", { origin: "absent" });
+  s.write(); s.commit();
+  check("C20E-AP8 block  when the parent is not the published tip of the destination the follow-up is refused", FOLLOWUP_PUSH, s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+}
+{
+  const s = followUpScenario("followup-forged-proof", { recordedPushIntent: "c".repeat(64) });
+  s.write(); s.commit();
+  check("C20E-AP10 block  a validly self-signed push proof that is not the proof the private store recorded for the push approval is refused", FOLLOWUP_PUSH, s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+}
+{
+  const s = followUpScenario("followup-foreign-push-key", { foreignKey: "push" });
+  s.write(); s.commit();
+  check("C20E-AP11 block  the recorded push intent signed under a key the store never saw (the agent's own) is refused", FOLLOWUP_PUSH, s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+}
+{
+  const s = followUpScenario("followup-foreign-release-key", { foreignKey: "release" });
+  s.write(); s.commit();
+  check("C20E-AP12 block  a release proof signed under a key the store never saw (the agent's own) is refused", FOLLOWUP_PUSH, s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+}
+{
+  // the tag push of the same release is untouched by the follow-up: the annotated tag still peels to the approved commit and is admitted by G20-42b
+  const s = followUpScenario("followup-tag-push");
+  s.write(); s.commit();
+  check("C20E-AP9 allow  the annotated release tag at the approved commit is still admitted after the follow-up commit exists", "git push origin refs/tags/v1.0.0", s.dir, ALLOW, { stderrNotIncludes: ["BLOCKED"] });
 }
 
 console.log(`\n${pass}/${pass + failures.length} cases passed.`);

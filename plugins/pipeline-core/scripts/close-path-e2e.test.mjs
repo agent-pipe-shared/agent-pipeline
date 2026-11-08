@@ -592,7 +592,35 @@ test("G20-35: the close path from implementation to release preflight is walked 
       const releaseResult = JSON.parse(released.stdout);
       assert.equal(releaseResult.status, "ready", released.stdout);
       assert.equal(releaseResult.tag, tag);
-      assert.equal(JSON.parse(readFileSync(join(fx.root, "evidence", "release-preflight.json"), "utf8")).candidate.commit, git(log, fx.root, ["rev-parse", "HEAD"]));
+      // C20E-AP (AC-108), QG-04 restated in place: this walk closed an audit bundle, so the ready release now also adds the approval record of the approved commit
+      // to it (new files only; this fixture is chat mode, so an ATTRIBUTION record and no proof file) and the printed next actions become: the tag, the commit step
+      // of exactly those files, the push of that one evidence-only commit, then the tag push. They used to be the tag and its push alone.
+      const approvedCommit = git(log, fx.root, ["rev-parse", "HEAD"]);
+      const followUp = releaseResult.auditProofFollowUp;
+      assert.equal(followUp.status, "written", released.stdout);
+      assert.deepEqual(followUp.paths, [`${followUp.bundleDir}/proofs/follow-up.json`], `${identity.runner}: a chat-mode approval is an attribution record, never a proof file`);
+      assert.deepEqual(releaseResult.nextActions, [`git tag -a ${tag} -m "version tag" ${approvedCommit}`, ...followUp.commit.steps, pushCommand, `git push origin refs/tags/${tag}`]);
+      const bundleVerify = () => JSON.parse(step(log, `${identity.runner}: audit-bundle verify`, process.execPath, [script("audit-bundle.mjs"), "verify", "--bundle", join(fx.root, followUp.bundleDir)], { cwd: fx.root }).stdout);
+      const followUpList = JSON.parse(readFileSync(join(fx.root, followUp.bundleDir, "proofs", "follow-up.json"), "utf8"));
+      assert.ok(followUpList.attributions.some((entry) => entry.kind === "release-preflight"), "the release approval is carried as an attribution record");
+      assert.equal(followUpList.approvedCommit, approvedCommit);
+      assert.equal(bundleVerify().status, "verified", `${identity.runner}: the bundle verifies with the follow-up file present`);
+      const commitFollowUp = (extra = []) => {
+        git(log, fx.root, ["add", "--", ...followUp.paths, ...extra]);
+        git(log, fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", followUp.commit.message, ...(extra.length === 0 ? ["--", ...followUp.paths] : [])]);
+      };
+      // a follow-up commit that ALSO touches another path is not the evidence-only commit: the full gate refuses it (a raw main push has no approval for it)
+      writeFileSync(join(fx.root, "stray.txt"), "not evidence\n");
+      commitFollowUp(["stray.txt"]);
+      assert.equal(guardPush(pushCommand).status, 2, `${identity.runner}: a follow-up commit that touches any other path falls through to the full gate`);
+      git(log, fx.root, ["reset", "-q", "--soft", "HEAD~1"]); git(log, fx.root, ["reset", "-q", "--", "stray.txt"]); rmSync(join(fx.root, "stray.txt"));
+      commitFollowUp();
+      const admittedFollowUp = guardPush(pushCommand);
+      assert.equal(admittedFollowUp.status, 0, `${identity.runner}: the one evidence-only follow-up commit is pushed without a second approval\n${admittedFollowUp.stderr}`);
+      step(log, `${identity.runner}: the follow-up push`, "git", ["-C", fx.root, "push", "-q", "origin", "HEAD:refs/heads/main"]);
+      assert.equal(bundleVerify().status, "verified", `${identity.runner}: the bundle verifies after the follow-up commit`);
+      // C20E-AP, restated in place: HEAD has moved to the evidence-only follow-up commit by now; the record still binds the commit that was approved (read above).
+      assert.equal(JSON.parse(readFileSync(join(fx.root, "evidence", "release-preflight.json"), "utf8")).candidate.commit, approvedCommit);
       const tagAdmitted = guardPush(tagPush);
       assert.equal(tagAdmitted.status, 0, `${identity.runner}: the guard admits exactly the approved version tag\n${tagAdmitted.stderr}`);
       step(log, `${identity.runner}: another annotated tag`, "git", ["-C", fx.root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "tag", "-a", "v9.9.9", "-m", "version tag"]);

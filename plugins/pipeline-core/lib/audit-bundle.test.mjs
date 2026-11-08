@@ -259,6 +259,69 @@ test("P3 collection reads the plan approval proof from State and the store envel
     assert.deepEqual(collectAuditProofs({}), { proofs: [], gaps: [] });
   } finally { rmSync(common, { recursive: true, force: true }); }
 });
+// C20E-AP (AC-108): the push and release approvals come AFTER the close commit (the push approval signs the commit that carries the bundle), so their
+// public proofs reach the bundle in a follow-up: new files under proofs/ plus ONE follow-up list; manifest.json and README.md stay byte for byte.
+async function followUpBundle(proofs = [{ kind: "plan-approval", proof: signedProof("1".repeat(64)) }]) {
+  const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, proofs }); mkdirSync(join(input.root, "audit-bundles", "release-evidence"), { recursive: true }); await buildAuditBundle({ repositoryRoot: input.root, outputPath: `audit-bundles/release-evidence/${CANDIDATE.commit}`, plan });
+  return { ...input, bundleDir: `audit-bundles/release-evidence/${CANDIDATE.commit}`, bundle: join(input.root, "audit-bundles", "release-evidence", CANDIDATE.commit) };
+}
+test("C20E-AP the follow-up adds the push and release proofs as new files, leaves the manifest and README bytes alone, and the bundle verifies before and after", async () => {
+  const { writeAuditProofFollowUp } = await import("./audit-proof-collection.mjs");
+  const input = await followUpBundle(); const manifestBefore = readFileSync(join(input.bundle, "manifest.json")); const readmeBefore = readFileSync(join(input.bundle, "README.md"));
+  assert.equal((await verifyAuditBundle({ bundleRoot: input.bundle })).status, "verified");
+  const approved = "c".repeat(40);
+  const written = writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: approved, proofs: [{ kind: "push", proof: signedProof("2".repeat(64)) }, { kind: "release-preflight", proof: signedProof("3".repeat(64)) }], attributions: [] });
+  assert.equal(written.status, "written");
+  assert.deepEqual(written.files.map((file) => file.path), [`${input.bundleDir}/proofs/002-push.json`, `${input.bundleDir}/proofs/003-release-preflight.json`, `${input.bundleDir}/proofs/follow-up.json`]);
+  assert.deepEqual(readFileSync(join(input.bundle, "manifest.json")), manifestBefore, "manifest.json is create-only: unchanged");
+  assert.deepEqual(readFileSync(join(input.bundle, "README.md")), readmeBefore, "README.md is unchanged");
+  const list = JSON.parse(readFileSync(join(input.bundle, "proofs", "follow-up.json"), "utf8"));
+  assert.equal(list.approvedCommit, approved); assert.deepEqual(list.candidate, CANDIDATE); assert.deepEqual(list.proofs.map((entry) => entry.kind), ["push", "release-preflight"]);
+  for (const file of written.files) { const bytes = readFileSync(join(input.root, file.path)); assert.equal(hash(bytes), file.sha256); assert.doesNotMatch(bytes.toString("utf8"), /PRIVATE KEY/u); }
+  assert.equal((await verifyAuditBundle({ bundleRoot: input.bundle })).status, "verified");
+  assert.equal(writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: approved, proofs: [{ kind: "push", proof: signedProof("4".repeat(64)) }], attributions: [] }).status, "already-followed-up", "create-only: a second follow-up adds nothing");
+});
+test("C20E-AP the verifier refuses a tampered follow-up at every level: bytes, the intent it names and the signature", async () => {
+  const { writeAuditProofFollowUp } = await import("./audit-proof-collection.mjs");
+  const input = await followUpBundle(); writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: "c".repeat(40), proofs: [{ kind: "push", proof: signedProof("2".repeat(64)) }], attributions: [] });
+  const proofPath = join(input.bundle, "proofs", "002-push.json"); const listPath = join(input.bundle, "proofs", "follow-up.json"); const proofBytes = readFileSync(proofPath); const listBytes = readFileSync(listPath);
+  writeFileSync(proofPath, `${proofBytes.toString("utf8")} `); assert.ok((await verifyAuditBundle({ bundleRoot: input.bundle })).findings.some((finding) => finding.startsWith("AB-DIGEST proofs/002-push.json")));
+  const rewrite = (mutate) => { const proof = mutate(JSON.parse(proofBytes.toString("utf8"))); const bytes = Buffer.from(`${JSON.stringify(proof)}\n`); writeFileSync(proofPath, bytes); const list = JSON.parse(listBytes.toString("utf8")); list.proofs[0].sha256 = hash(bytes); writeFileSync(listPath, `${JSON.stringify(list)}\n`); };
+  rewrite((proof) => ({ ...proof, signatureBase64: Buffer.alloc(64, 7).toString("base64") })); assert.ok((await verifyAuditBundle({ bundleRoot: input.bundle })).findings.includes("AB-PROOF-SIGNATURE proofs/002-push.json"));
+  rewrite((proof) => ({ ...proof, intentSha256: "e".repeat(64) })); assert.ok((await verifyAuditBundle({ bundleRoot: input.bundle })).findings.includes("AB-PROOF-INTENT proofs/002-push.json"));
+  writeFileSync(listPath, "{}\n"); assert.ok((await verifyAuditBundle({ bundleRoot: input.bundle })).findings.includes("AB-FOLLOWUP"));
+  writeFileSync(listPath, listBytes.toString("utf8").replace(CANDIDATE.commit, "9".repeat(40))); assert.ok((await verifyAuditBundle({ bundleRoot: input.bundle })).findings.includes("AB-FOLLOWUP"), "a follow-up bound to another candidate is refused");
+});
+test("C20E-AP a chat-mode approval is carried as an attribution record (kind, mode, time), never as a proof; a proof that does not verify is refused; the follow-up never holds a key", async () => {
+  const { writeAuditProofFollowUp } = await import("./audit-proof-collection.mjs");
+  const input = await followUpBundle();
+  assert.throws(() => writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: "c".repeat(40), proofs: [{ kind: "push", proof: { ...signedProof(), signatureBase64: Buffer.alloc(64, 1).toString("base64") } }], attributions: [] }), (error) => error.code === "AB-PROOF-INVALID");
+  assert.throws(() => writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: "c".repeat(40), proofs: [{ kind: "push", proof: { ...signedProof(), privateKey: "-----BEGIN PRIVATE KEY-----" } }], attributions: [] }), (error) => error.code === "AB-PROOF-INVALID");
+  const written = writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: "c".repeat(40), proofs: [], attributions: [{ kind: "push", mode: "chat-attributed-unattested", approvedAt: "2026-11-08T10:00:00.000Z" }, { kind: "release-preflight", mode: "waiver", approvedAt: null }] });
+  assert.deepEqual(written.files.map((file) => file.path), [`${input.bundleDir}/proofs/follow-up.json`], "no proof file is written for an attribution");
+  const list = JSON.parse(readFileSync(join(input.bundle, "proofs", "follow-up.json"), "utf8")); assert.deepEqual(list.proofs, []); assert.equal(list.attributions.length, 2);
+  assert.equal((await verifyAuditBundle({ bundleRoot: input.bundle })).status, "verified");
+  const empty = await followUpBundle(); assert.equal(writeAuditProofFollowUp({ root: empty.root, bundleDir: empty.bundleDir, approvedCommit: "c".repeat(40), proofs: [], attributions: [] }).status, "nothing-to-carry");
+});
+test("C20E-AP the release step finds the feature's bundle (named after the package candidate, an ancestor of the approved commit), carries the signed push proof from the store and the release proof, and is never blocking without a bundle", async () => {
+  const { prepareAuditProofFollowUp } = await import("./audit-proof-collection.mjs");
+  const { criticalApprovalStoreRoot, CRITICAL_APPROVAL_STORE_SCHEMA } = await import("./critical-action-authorization.mjs");
+  const root = mkdtempSync(join(tmpdir(), "audit-followup-prepare-")); const git = (...args) => execFileSync("git", ["-C", root, "-c", "user.name=T", "-c", "user.email=t@example.invalid", ...args], { encoding: "utf8" }).trim();
+  try {
+    git("init", "-q", "-b", "main"); writeFileSync(join(root, "a.txt"), "a\n"); git("add", "a.txt"); git("commit", "-q", "-m", "candidate"); const candidate = git("rev-parse", "HEAD"); const tree = git("rev-parse", "HEAD^{tree}");
+    const common = join(root, ".git"); const noBundle = prepareAuditProofFollowUp({ root, featureId: "feature-x", approvedCommit: candidate, common, releaseProof: null, releaseApproval: null });
+    assert.equal(noBundle.status, "no-bundle", "a release without a bundle is a typed notice, not a refusal");
+    const dir = `audit-bundles/feature-x/${candidate}`; mkdirSync(join(root, dir, "proofs"), { recursive: true }); writeFileSync(join(root, dir, "manifest.json"), `${JSON.stringify({ schema: "pipeline.audit-bundle-manifest.v1", bundleId: "feature-x", candidate: { commit: candidate, tree }, proofs: [{ kind: "plan-approval", path: "proofs/001-plan-approval.json", sha256: "1".repeat(64), intentSha256: "1".repeat(64) }] })}\n`); writeFileSync(join(root, dir, "proofs", "001-plan-approval.json"), "{}\n");
+    git("add", "-A"); git("commit", "-q", "-m", "close"); const approved = git("rev-parse", "HEAD");
+    const put = (kind, name, value) => { const directory = join(criticalApprovalStoreRoot(common), "approvals", kind); mkdirSync(directory, { recursive: true }); writeFileSync(join(directory, name), JSON.stringify(value)); };
+    put("push", "a.json", { schema: CRITICAL_APPROVAL_STORE_SCHEMA, kind: "push", forCommit: approved, approvedAt: "2026-11-08T10:00:00.000Z", remote: "origin", destination: "refs/heads/main", approval: { forCommit: approved, approvedAt: "2026-11-08T10:00:00.000Z", remote: "origin", destination: "refs/heads/main", criticalProof: { proofSha256: "5".repeat(64), proof: signedProof("5".repeat(64)) } } });
+    const result = prepareAuditProofFollowUp({ root, featureId: "feature-x", approvedCommit: approved, common, releaseProof: signedProof("6".repeat(64)), releaseApproval: { mode: "signature", approvedAt: "2026-11-08T11:00:00.000Z" } });
+    assert.equal(result.status, "written", JSON.stringify(result)); assert.equal(result.bundleDir, dir);
+    assert.deepEqual(result.files.map((file) => file.path), [`${dir}/proofs/002-push.json`, `${dir}/proofs/003-release-preflight.json`, `${dir}/proofs/follow-up.json`], "numbering continues after the manifest's proofs");
+    const chat = prepareAuditProofFollowUp({ root, featureId: "feature-x", approvedCommit: approved, common, releaseProof: null, releaseApproval: { mode: "waiver", approvedAt: "2026-11-08T11:00:00.000Z" } });
+    assert.equal(chat.status, "already-followed-up");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 // E-AC-20: export metadata is never source authority -- a bundle whose export metadata is
 // internally inconsistent with the rest of the bundle (arbitrary digest, unrelated receipt values)
 // still builds and verifies, because nothing in the trust chain ever reads it.

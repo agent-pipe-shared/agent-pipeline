@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ReleasePreflightCliError, buildReleasePreflight, prepareReleasePreflightAuthorizeLine } from "./release-preflight-cli.mjs";
+import { ReleasePreflightCliError, buildReleasePreflight, prepareReleasePreflightAuthorizeLine, recordAuditProofFollowUp } from "./release-preflight-cli.mjs";
 import { READER_REVIEW_PATHS, snapshotReaderDocumentation } from "../../../harness/scripts/check-doc-reader-binding.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
@@ -466,6 +466,32 @@ try {
         return true;
       }, note);
     }
+  });
+
+  // C20E-AP (AC-108): after a ready consumer release approval the approval proofs are added to the feature's audit bundle as new files, the commit of exactly those
+  // files is armed and the commit step is returned; no bundle is a typed notice and a chat approval is an attribution record. The release output of a project
+  // without a bundle is unchanged (nextActions stay the tag and its push).
+  check("C20E-AP the release step writes the follow-up files into the feature's bundle, returns the commit step, and is a typed notice (never a refusal) without a bundle", () => {
+    const root = externalDir();
+    const git = (...args) => spawnSync("git", ["-C", root, "-c", "user.name=T", "-c", "user.email=t@example.invalid", ...args], { encoding: "utf8" });
+    git("init", "-q", "-b", "main"); writeFileSync(join(root, "a.txt"), "a\n"); git("add", "a.txt"); git("commit", "-q", "-m", "candidate");
+    const candidate = git("rev-parse", "HEAD").stdout.trim(); const tree = git("rev-parse", "HEAD^{tree}").stdout.trim();
+    const built = { proofBacked: false, record: { lifecycle: { featureId: "feature-x" } } };
+    const approval = { forCommit: candidate, tag: "v0.1.0", mode: "waiver", approvedAt: "2026-11-08T11:00:00.000Z" };
+    assert.deepEqual(recordAuditProofFollowUp(root, built, {}, approval), { status: "no-bundle" });
+    const dir = `audit-bundles/feature-x/${candidate}`;
+    mkdirSync(join(root, dir), { recursive: true });
+    writeFileSync(join(root, dir, "manifest.json"), `${JSON.stringify({ schema: "pipeline.audit-bundle-manifest.v1", bundleId: "feature-x", candidate: { commit: candidate, tree } })}\n`);
+    git("add", "-A"); git("commit", "-q", "-m", "close");
+    const approved = git("rev-parse", "HEAD").stdout.trim();
+    const result = recordAuditProofFollowUp(root, built, {}, { ...approval, forCommit: approved });
+    assert.equal(result.status, "written", JSON.stringify(result));
+    assert.equal(result.bundleDir, dir);
+    assert.deepEqual(result.paths, [`${dir}/proofs/follow-up.json`], "a chat or waiver approval writes the list only: an attribution record, no proof file");
+    assert.match(result.commit.steps.join("\n"), /git add -- .*follow-up\.json/u); assert.match(result.commit.steps.join("\n"), /git commit/u);
+    const list = JSON.parse(readFileSync(join(root, dir, "proofs", "follow-up.json"), "utf8"));
+    assert.deepEqual(list.attributions.map((entry) => `${entry.kind}:${entry.mode}`), ["release-preflight:waiver"]); assert.deepEqual(list.proofs, []);
+    assert.deepEqual(recordAuditProofFollowUp(root, built, {}, { ...approval, forCommit: approved }), { status: "already-followed-up" }, "create-only: a rerun adds nothing");
   });
 
   check("RPC13 --consent and --proof-request/--proof exclusivity is enforced at the CLI parseArgs layer", () => {

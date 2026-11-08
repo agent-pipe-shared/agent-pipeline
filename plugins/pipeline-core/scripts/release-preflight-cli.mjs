@@ -62,6 +62,8 @@ import { criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from
 import { criticalProofWaiverFor, isWellFormedEd25519PublicKey, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { isConsumerReleaseProject, resolveCriticalApprovalCommonDir, writeCriticalApproval } from "../lib/critical-action-authorization.mjs";
+import { prepareAuditProofFollowUp } from "../lib/audit-proof-collection.mjs";
+import { armWriterCommitCapability, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
 import {
   CONSUMER_RELEASE_PREFLIGHT_ID, CONSUMER_RELEASE_RECORD_PATH, CONSUMER_RETENTION_POLICY_SHA256, CONSUMER_VERSION_INITIAL,
   consumerManifestDocuments, consumerVersionRepair, firstConsumerReleaseBlocker, readConsumerVersion,
@@ -706,6 +708,29 @@ function recordConsumerReleaseApproval(root, built) {
   return approval;
 }
 
+/**
+ * C20E-AP (AC-108): after a ready release approval, the push approval's and the release approval's public proofs (a chat or waiver approval: an attribution record)
+ * are added to the feature's audit bundle as NEW files only, the commit of exactly those files is armed (G20-66) and the commit step is returned. The step never
+ * blocks the release: no bundle, nothing to carry or a fault is a typed status and the release output is unchanged.
+ */
+export function recordAuditProofFollowUp(root, built, options, approval) {
+  try {
+    const common = resolveCriticalApprovalCommonDir(root);
+    if (common === null) return { status: "unavailable" };
+    let releaseProof = null;
+    if (built.proofBacked && options.proofPath) { try { releaseProof = readExternalJson(root, options.proofPath, "--proof"); } catch { releaseProof = null; } }
+    const prepared = prepareAuditProofFollowUp({ root, featureId: built.record.lifecycle.featureId, approvedCommit: approval.forCommit, common, releaseProof, releaseApproval: approval });
+    if (prepared.status !== "written") return { status: prepared.status };
+    const paths = prepared.files.map((file) => file.path);
+    let armed = null;
+    try { armed = armWriterCommitCapability({ rootDir: root, writer: "release-preflight-cli.mjs", rerun: "release-preflight-cli.mjs (the same command again)", files: prepared.files }); } catch { armed = null; }
+    const message = armed?.message ?? "evidence: approval proofs of the approved commit";
+    return { status: "written", bundleDir: prepared.bundleDir, paths, commit: { message, steps: armed?.steps ?? writerCommitSteps(paths, message) } };
+  } catch (error) {
+    return { status: "failed", code: error?.code ?? "AB-FOLLOWUP", message: String(error?.message ?? error).slice(0, 200) };
+  }
+}
+
 const USAGE = "Usage: release-preflight-cli.mjs --preflight-id <id> --base <commit> (--consent <repo-path> | --proof-request <external-path> --proof <external-path>) --lifecycle <path> --retention-policy <sha256> --out <path> [--gg03 <path>] [--root <repo>]";
 
 function parseArgs(argv) {
@@ -810,6 +835,7 @@ if (isDirectInvocation(import.meta.url)) {
     const built = buildReleasePreflight(options);
     const approval = recordConsumerReleaseApproval(resolve(options.rootDir), built);
     writeOutput(options.rootDir, options.outPath, built.record);
+    const followUp = approval === null ? null : recordAuditProofFollowUp(resolve(options.rootDir), built, options, approval);
     process.stdout.write(`${JSON.stringify({
       status: built.record.status,
       reasons: built.record.reasons,
@@ -818,8 +844,12 @@ if (isDirectInvocation(import.meta.url)) {
       writtenTo: options.outPath,
       ...(approval === null ? {} : {
         tag: approval.tag,
-        // The agent's last two steps; the push guard admits exactly this annotated tag at exactly this commit.
-        nextActions: [`git tag -a ${approval.tag} -m "version tag" ${approval.forCommit}`, `git push origin refs/tags/${approval.tag}`],
+        // The agent's last steps; the push guard admits exactly this annotated tag at exactly this commit. With an audit bundle (C20E-AP) the approval proofs
+        // reach the remote first, in the ONE evidence-only follow-up commit the guard admits without a second approval; the tag still names the approved commit.
+        nextActions: [`git tag -a ${approval.tag} -m "version tag" ${approval.forCommit}`,
+          ...(followUp.status === "written" ? [...followUp.commit.steps, "git push origin HEAD:refs/heads/main"] : []),
+          `git push origin refs/tags/${approval.tag}`],
+        auditProofFollowUp: followUp,
       }),
     }, null, 2)}\n`);
   } catch (error) {
