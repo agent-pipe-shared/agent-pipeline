@@ -70,7 +70,25 @@ import {
   NEUTRAL_GUARD_CONFIG,
   resolveProjectAuthorityPaths,
 } from "./project-authority.mjs";
-import { resolveProtectedBaseline } from "./protected-baseline.mjs";
+import { closedContinuityBoundSha256, resolveProtectedBaseline } from "./protected-baseline.mjs";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+
+/**
+ * C20b G20-55: true only when the rule is a closed-continuity rule (PB-CONTINUITY-*) and the STAGED bytes of `relPath` are
+ * exactly the bytes the close bound (closedContinuityBoundSha256). The pre-commit hook then admits that path: committing the
+ * closed evidence the close itself produced is not a change to it. Any fault, any other rule, any other bytes: false.
+ */
+export function stagedClosedContinuityMatchesBinding(rootDir, rule, relPath, { spawn = spawnSync } = {}) {
+  try {
+    if (typeof rule?.id !== "string" || !rule.id.startsWith("PB-CONTINUITY-")) return false;
+    const bound = closedContinuityBoundSha256(rootDir, relPath);
+    if (bound === null) return false;
+    const staged = spawn("git", ["cat-file", "blob", `:${relPath}`], { cwd: rootDir, encoding: "buffer", timeout: 15000, maxBuffer: 64 * 1024 * 1024 });
+    if (staged.status !== 0 || !Buffer.isBuffer(staged.stdout)) return false;
+    return createHash("sha256").update(staged.stdout).digest("hex") === bound;
+  } catch { return false; }
+}
 
 /** Denial code for the shell lane; the write lane keeps guard-testpath's own message shape. */
 export const TESTPATH_SHELL_DENIAL_CODE = "GUARD-TESTPATH-SHELL";

@@ -152,6 +152,31 @@ function dynamicContinuityEntries(rootDir, adapters) {
   }
 }
 
+/**
+ * C20b G20-55 (live Antigravity greenfield 2026-11-08): the sha256 the close bound for one closed-continuity path, or null.
+ * The close itself writes result.md (and the close evidence) and records their digests in closedFeatures[].continuityClose;
+ * the very commit that publishes those bytes was refused as a change to "closed continuity evidence" and cost a PO override
+ * signature at the last step of the happy path. A commit that stages EXACTLY the bound bytes changes nothing the close did not
+ * already bind, so the commit boundary may admit it; any other bytes stay protected. Fail-closed: any read fault is null.
+ */
+export function closedContinuityBoundSha256(rootDir, relPath, { readFileSyncFn = readFileSync, existsSyncFn = existsSync, lstatSyncFn = lstatSync, realpathSyncFn = realpathSync } = {}) {
+  try {
+    const adapters = { readFileSyncFn, existsSyncFn, lstatSyncFn, realpathSyncFn };
+    const state = resolveAuthorityArtifactPath("state", { rootDir });
+    if (!existsSyncFn(state.path)) return null;
+    const parsed = JSON.parse(readFileSyncFn(state.path, "utf8"));
+    const target = canonicalProjectPath(rootDir, relPath, adapters);
+    const bound = new Set();
+    for (const feature of Array.isArray(parsed?.closedFeatures) ? parsed.closedFeatures : []) {
+      for (const binding of Object.values(feature?.continuityClose ?? {})) {
+        if (!binding || typeof binding !== "object" || typeof binding.path !== "string" || !/^[a-f0-9]{64}$/u.test(binding.sha256 ?? "")) continue;
+        if (canonicalProjectPath(rootDir, binding.path, adapters) === target) bound.add(binding.sha256);
+      }
+    }
+    return bound.size === 1 ? [...bound][0] : null;
+  } catch { return null; }
+}
+
 /** Resolves baseline ∪ project additions ∪ state-bound continuity evidence. */
 export function resolveProtectedBaseline({ rootDir = process.cwd(), readFileSyncFn = readFileSync, existsSyncFn = existsSync, lstatSyncFn = lstatSync, realpathSyncFn = realpathSync } = {}) {
   const adapters = { readFileSyncFn, existsSyncFn, lstatSyncFn, realpathSyncFn };

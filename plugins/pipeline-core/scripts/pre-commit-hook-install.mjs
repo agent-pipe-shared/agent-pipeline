@@ -1001,6 +1001,7 @@ async function main() {
   let gateStrengthRuleFor;
   let loadProtectedTestPathRules;
   let protectedTestPathRuleFor;
+  let stagedClosedContinuityMatchesBinding;
   let defaultHasConsumedCapabilityForPath;
   let verifyQualityPackageCommitAuthorization;
   let resolveHandoverConfig;
@@ -1008,7 +1009,7 @@ async function main() {
   let windowCoversRule;
   try {
     ({ gateStrengthRuleFor } = await import(pathToFileURL(resolve(PLUGIN_HOOKS_DIR, "guard-gate-strength.mjs")).href));
-    ({ loadProtectedTestPathRules, protectedTestPathRuleFor } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "protected-test-paths.mjs")).href));
+    ({ loadProtectedTestPathRules, protectedTestPathRuleFor, stagedClosedContinuityMatchesBinding } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "protected-test-paths.mjs")).href));
     ({ defaultHasConsumedCapabilityForPath } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "check-protected-path-integrity.mjs")).href));
     ({ verifyQualityPackageCommitAuthorization } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "signed-quality-package.mjs")).href));
     ({ resolveHandoverConfig } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "handover-rotation.mjs")).href));
@@ -1099,6 +1100,10 @@ async function main() {
     }
     if (!rule) continue;
     if (qualityPackageAuthorized) continue;
+    // C20b G20-55: the close commit publishes exactly the bytes the close bound (result.md, close evidence); not a change to them.
+    let closedEvidenceAsBound = false;
+    try { closedEvidenceAsBound = typeof stagedClosedContinuityMatchesBinding === "function" && stagedClosedContinuityMatchesBinding(projectRoot, rule, relPath) === true; } catch { closedEvidenceAsBound = false; }
+    if (closedEvidenceAsBound) continue;
     if (sanctionedVerifyPaths.has(relPath) && (rule.id === "GS-10" || rule.id === "GS-11")) continue;
     let kernelPath = true;
     try { kernelPath = isNeverLiftableKernelPath(relPath, { rootDir: projectRoot, livePluginRoot: resolve(PLUGIN_LIB_DIR, "..") }); } catch { kernelPath = true; }

@@ -13,10 +13,12 @@ import {
   PB_DYNAMIC_UNAVAILABLE,
   PB_SUBTRACTION_ATTEMPT,
   canonicalProjectPath,
+  closedContinuityBoundSha256,
   protectedBaselineRuleFor,
   resolveProtectedBaseline,
 } from "./protected-baseline.mjs";
-import { loadProtectedTestPathRules } from "./protected-test-paths.mjs";
+import { loadProtectedTestPathRules, stagedClosedContinuityMatchesBinding } from "./protected-test-paths.mjs";
+import { createHash } from "node:crypto";
 
 function fixture(config, state = undefined) {
   const root = mkdtempSync(join(tmpdir(), "protected-baseline-"));
@@ -89,6 +91,26 @@ test("A3 reads continuity-close bindings as a dynamic protected class", () => {
   assert.equal(baseline.dynamic.status, "available");
   assert.ok(protectedBaselineRuleFor(baseline.entries, "evidence/closed-result.md")?.dynamic);
   assert.ok(protectedBaselineRuleFor(baseline.entries, "evidence/close.md")?.dynamic);
+});
+
+test("G20-55: the close commit may stage exactly the bytes the close bound, never other bytes", () => {
+  const closed = "# Result\n\nClosed by the close coordinator.\n";
+  const bound = createHash("sha256").update(Buffer.from(closed, "utf8")).digest("hex");
+  const root = fixture({}, { closedFeatures: [{ id: "closed-a", continuityClose: { result: { path: "specs/a/result.md", sha256: bound } } }] });
+  const git = (...args) => { const out = spawnSync("git", args, { cwd: root, encoding: "utf8" }); assert.equal(out.status, 0, `git ${args[0]}: ${out.stderr}`); };
+  git("init", "-q"); git("config", "core.autocrlf", "false");
+  mkdirSync(join(root, "specs/a"), { recursive: true });
+  const rule = protectedBaselineRuleFor(resolveProtectedBaseline({ rootDir: root }).entries, "specs/a/result.md");
+  assert.ok(rule?.dynamic, "the closed result is dynamically protected");
+  assert.equal(closedContinuityBoundSha256(root, "specs/a/result.md"), bound);
+  writeFileSync(join(root, "specs/a/result.md"), closed);
+  git("add", "--", "specs/a/result.md");
+  assert.equal(stagedClosedContinuityMatchesBinding(root, rule, "specs/a/result.md"), true, "exactly the bound bytes: admitted");
+  assert.equal(stagedClosedContinuityMatchesBinding(root, { id: "GS-10" }, "specs/a/result.md"), false, "only a closed-continuity rule");
+  writeFileSync(join(root, "specs/a/result.md"), `${closed}edited after the close\n`);
+  git("add", "--", "specs/a/result.md");
+  assert.equal(stagedClosedContinuityMatchesBinding(root, rule, "specs/a/result.md"), false, "other bytes stay protected");
+  assert.equal(closedContinuityBoundSha256(root, "specs/other.md"), null, "an unbound path has no binding");
 });
 
 test("A3 keeps an unreadable lifecycle state fail-closed", () => {
