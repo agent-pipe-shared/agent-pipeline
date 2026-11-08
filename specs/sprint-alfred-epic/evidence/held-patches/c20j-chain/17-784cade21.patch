@@ -1,0 +1,22 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 2452413c7df14d48d9e27ab6437a70a251755d98..73b6dd7871a0f762682323750c7a4259a2f5c543 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -1445,10 +1445,14 @@ const DEV_PLAN_BLOCKING_GATE = "gates:\n"
+   + "  # Human plan approval. Implementation writes are REFUSED until the PO has\n"
+   + "  # approved this feature's plan and the phase has been switched:\n"
+   + "  # For epic/feature, first author the architecture design package in the draft\n"
+-  + "  # PRD, then:\n"
++  + "  # PRD, then the agent runs:\n"
+   + "  #   pipeline-state submit-plan --by <name> --profile <epic|feature|mini>\n"
+-  + "  #   pipeline-state present-plan\n"
+-  + "  #   pipeline-state approve-plan --by <name>\n"
++  + "  #   pipeline-state prepare-seal\n"
++  + "  #   pipeline-state present-plan --by <name> --review-receipt <path>\n"
++  + "  # The PO signs with the one command present-plan returns; then the agent runs\n"
++  + "  # what pipeline-state inspect names:\n"
++  + "  #   pipeline-state approve-plan\n"
++  + "  #   pipeline-state materialize-architecture\n"
+   + "  #   pipeline-state set-phase --phase implementation\n"
+   + "  dev-plan:\n    mode: blocking\n    type: human\n"
+   // Same shape, same reason: the refusal reports what is missing but not the whole

@@ -1,0 +1,564 @@
+diff --git a/docs/operating-model.md b/docs/operating-model.md
+index 058e953bec3fc1bc34b3858663409192f077a6ca..4dc4f0e18b7cac3e73e0523d758bb981ddc6c2e0 100644
+--- a/docs/operating-model.md
++++ b/docs/operating-model.md
+@@ -529,9 +529,10 @@ and evidence remain exactly `po`; omitted configuration renders the default
+ `PO`.
+ 
+ `language.human_facing` is the single human-facing language authority in the
+-compiled runtime. The PO-gate language projection is checked with
+-`node harness/scripts/check-po-gate-authority.mjs`; user-facing copies must not
+-invent a competing language or approval form.
++compiled runtime. In the Pipeline's own source checkout, the PO-gate language
++projection is checked with `node harness/scripts/check-po-gate-authority.mjs`;
++a hosted project has no `harness/` and uses the language recorded at onboarding.
++User-facing copies must not invent a competing language or approval form.
+ 
+ ### Local capability reference: availability is not activation
+ 
+diff --git a/plugins/pipeline-core/agents/readiness-reviewer.md b/plugins/pipeline-core/agents/readiness-reviewer.md
+index af89a11884ffbaa6157ce4f4b8245137b05e4a4e..1b8da17612c21bac0ce4b4fa9d398170c3542960 100644
+--- a/plugins/pipeline-core/agents/readiness-reviewer.md
++++ b/plugins/pipeline-core/agents/readiness-reviewer.md
+@@ -49,6 +49,8 @@ the design makes such a choice and no module names an ADR path for it in
+ and point to the `architecture-decision` skill. This is a question, never a block;
+ the close only reports which named ADR paths exist.
+ 
+-Return one concise readiness review with references. The host, not this agent,
++Return one concise readiness review with references. Give every open finding an
++id of upper-case letters and digits such as `DESIGN-REVIEW-3`, and say ready only
++when none is open. The host, not this agent,
+ creates the sanitized, dispatch-bound duty and execution receipts; never return
+ or persist raw prompts, answers, paths, credentials, or private coordinates.
+diff --git a/plugins/pipeline-core/docs/operating-model.md b/plugins/pipeline-core/docs/operating-model.md
+index 058e953bec3fc1bc34b3858663409192f077a6ca..4dc4f0e18b7cac3e73e0523d758bb981ddc6c2e0 100644
+--- a/plugins/pipeline-core/docs/operating-model.md
++++ b/plugins/pipeline-core/docs/operating-model.md
+@@ -529,9 +529,10 @@ and evidence remain exactly `po`; omitted configuration renders the default
+ `PO`.
+ 
+ `language.human_facing` is the single human-facing language authority in the
+-compiled runtime. The PO-gate language projection is checked with
+-`node harness/scripts/check-po-gate-authority.mjs`; user-facing copies must not
+-invent a competing language or approval form.
++compiled runtime. In the Pipeline's own source checkout, the PO-gate language
++projection is checked with `node harness/scripts/check-po-gate-authority.mjs`;
++a hosted project has no `harness/` and uses the language recorded at onboarding.
++User-facing copies must not invent a competing language or approval form.
+ 
+ ### Local capability reference: availability is not activation
+ 
+diff --git a/plugins/pipeline-core/hooks/codex-session-start-hint.mjs b/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
+index 27285c6633b47dd196ede7720aef736048bc21c9..fb14196f62ce4bcf29e9ed0e74733408e892127d 100644
+--- a/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
++++ b/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
+@@ -173,7 +173,7 @@ export function sessionStartDecision(projectDir = process.cwd(), exists = exists
+     };
+   }
+   const message =
+-    "Agent Pipeline is available as an optional project workflow, but it is not active in this folder. Ask the user whether they want to install it before any project work.";
++    "Agent Pipeline is available as an optional project workflow, but it is not active in this folder. Run the pipeline-start skill before any project work: its preflight carries the exact question to relay, so the user is asked once and not first in your own words.";
+   return {
+     governed,
+     message,
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index d7c36788582c98c9864c33540f02e84f865ccbba..1d232832a39396eafefaa7f37b1df4b9ee1bcea1 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -84,7 +84,7 @@ export function deriveArchitecturePlanningSurface(rootDir, read = readFileSync)
+   const paths = new Set();
+   for (const match of source.matchAll(PLAN_PATH_TOKEN)) {
+     const candidate = match[1].replace(/[),.;:\]}`]+$/u, "");
+-    if (candidate.length > 0 && !candidate.split("/").some((part) => part === "" || part === "." || part === "..")) paths.add(candidate);
++    if (candidate.length > 0 && !candidate.split("/").some((part) => part === "" || part === "." || part === ".." || part.startsWith("-"))) paths.add(candidate);
+   }
+   return paths.size > 0 ? { planPath, paths: [...paths].sort() } : null;
+ }
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index b3f29b0067c56fcfd0d97dd2ccea2550251220e4..5b5e13233e89cf58f1b2ce5e3658ae78770bd31b 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -335,6 +335,7 @@ const CREATE_ADR_TITLE = (value) => typeof value === "string" && value.length >
+   && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value);
+ function sanctionedCreateAdrArgs(args, root) {
+   const rooted = { "--root": (value) => value === root, "--slug": (value) => CREATE_ADR_SLUG.test(value) };
++  if (args.includes("--refresh") && !args.includes("--slug")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: { "--root": rooted["--root"] } });
+   if (args.includes("--refresh")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: rooted });
+   return matchFlagSpec(args, {
+     requiredValue: { ...rooted, "--title": CREATE_ADR_TITLE },
+diff --git a/plugins/pipeline-core/lib/guard/entry-gates.mjs b/plugins/pipeline-core/lib/guard/entry-gates.mjs
+index a5a8d66bd75acbcd056de802ba2d2cf4568d1955..df655a892414e2ed451f526ee743c262189364d7 100644
+--- a/plugins/pipeline-core/lib/guard/entry-gates.mjs
++++ b/plugins/pipeline-core/lib/guard/entry-gates.mjs
+@@ -79,7 +79,8 @@ function activeFeaturePlanningSurface(root, dependencies = {}) {
+   const token = /(?:^|[\s`"'([{])((?:(?:\.claude|app|architecture|backlog|bin|config|docs|governance|harness|lib|plugins|policies|project|roles|schemas|scripts|specs|src|templates|test|tests)\/[A-Za-z0-9_@+./-]+)|(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|pipeline-manifest\.schema\.json|pipeline\.user\.schema\.json))/gmu;
+   for (const match of source.matchAll(token)) {
+     const candidate = match[1].replace(/[),.;:\]}`]+$/u, "");
+-    if (candidate.length > 0 && !candidate.split("/").some((part) => part === "" || part === "." || part === "..")) {
++    // Antigravity greenfield 2026-11-08: the German compound `app/`-Ordner became the path app/-Ordner; no path segment starts with a hyphen.
++    if (candidate.length > 0 && !candidate.split("/").some((part) => part === "" || part === "." || part === ".." || part.startsWith("-"))) {
+       paths.add(candidate);
+     }
+   }
+diff --git a/plugins/pipeline-core/lib/guard/grammar-denials.mjs b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+index d214452b845aa6db4740d4303489ac1089c0ea56..284e64c736741c66212e1a782dffcc52ff32b1aa 100644
+--- a/plugins/pipeline-core/lib/guard/grammar-denials.mjs
++++ b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+@@ -135,6 +135,11 @@ export const ADMITTED_GRAMMAR_SHAPES = [
+       + "allowlist (echo; \"mkdir -p\" under scratch/ or .claude/worktrees/)",
+     example: "rg -n needle probe.txt && rg -n needle probe.txt",
+   },
++  {
++    // Codex greenfield 2026-11-08: a regular expression ending in $ inside double quotes was refused with no hint why.
++    spelling: "a search pattern holding a dollar sign or a backtick stands in single quotes, since double quotes would let the shell expand it",
++    example: "rg -n 'needle$' probe.txt",
++  },
+ ];
+ 
+ function grammarShapeLines() {
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index e9c8198de1cd53e9b55405d202c4a3ce7e4aff69..c9cd88ecb8be76bca5192aa328b0fe144d8f7ff5 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -8149,7 +8149,7 @@ function applyOnboardingIntakeGenerateTracked({
+ function resolveBootstrapBindInputs({ rootDir, repositoryCapability = "local", spawn = defaultGitSpawn } = {}) {
+   const observed = readOnboardingIntakeCheckpoint({ rootDir, repositoryCapability, spawn });
+   if (observed.status !== "present") {
+-    fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires an existing intake checkpoint");
++    fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires an existing intake checkpoint, and none is readable from here. If onboarding already recorded one, this boundary cannot see it (a sandbox has no access to the private checkpoint): run this same command at the boundary its executionBoundary names. Otherwise complete the intake steps first.");
+   }
+   const checkpoint = observed.value;
+   if (checkpoint.transactionState !== "generated") {
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index e1ac33d5d88c8773efbf182d06abae04ecc1844b..9d842e86da64bdf7d8abb04cc16f37ed86eb0e5c 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -654,7 +654,9 @@ test("C20 w253 create-adr: the create and refresh shapes are admitted, every nea
+     bothAdmit(make("--slug", "s", "--title", "T", "--modules", "alpha,beta-2"), f, "create with modules");
+     bothAdmit(make("--date", "2026-11-07", "--title", "T", "--slug", "s"), f, "flag order is free");
+     bothAdmit(make("--slug", "storage-adapter", "--refresh"), f, "refresh");
++    bothAdmit(make("--refresh"), f, "refresh of every draft");
+     for (const [label, action] of [
++      ["refresh of a foreign root", scriptAction(script, "--root", join(f.root, ".."), "--refresh")],
+       ["foreign root", scriptAction(script, "--root", join(f.root, ".."), "--slug", "s", "--title", "T")],
+       ["relative root", scriptAction(script, "--root", ".", "--slug", "s", "--title", "T")],
+       ["no root", scriptAction(script, "--slug", "s", "--title", "T")],
+diff --git a/plugins/pipeline-core/lib/pins/greenfield-adr-references-keep-navigation-current.test.mjs b/plugins/pipeline-core/lib/pins/greenfield-adr-references-keep-navigation-current.test.mjs
+index dace45455b522ccf133b905e9b2fb7e0beb0f509..d95dcfba3617d20c791e1a4337d826725412ccb6 100644
+--- a/plugins/pipeline-core/lib/pins/greenfield-adr-references-keep-navigation-current.test.mjs
++++ b/plugins/pipeline-core/lib/pins/greenfield-adr-references-keep-navigation-current.test.mjs
+@@ -146,6 +146,13 @@ test("negative: mapStale true is stale even when every touched path is a cited A
+   assert.equal(checkpoint.stalenessDebt[0].type, STALE);
+ });
+ 
++test("a German compound after a folder name is not a planned path", () => {
++  const read = (path) => (String(path).endsWith("pipeline-state.json")
++    ? JSON.stringify({ activeFeature: { planPath: "specs/one/prd_one.md" } })
++    : "Der kopierbare `app/`-Ordner und app/-Ordner bleiben Text.\nImplement app/index.html.\n");
++  assert.deepEqual(deriveArchitecturePlanningSurface("/project", read).paths, ["app/index.html"]);
++});
++
+ test("derived path: the plan's own paths run through architectureTouchedContracts pass class 7, and fail without the references", () => {
+   const plan = `# Design\n\nDecision records: \`${ADR_TENANCY}\` and ${ADR_LEDGER}, kept under docs/adr/ (module documentation owns docs/adr/**).\n`
+     + `The documentation contract is ${DOC_CONTRACT}.\n`;
+diff --git a/plugins/pipeline-core/roles/elephant.md b/plugins/pipeline-core/roles/elephant.md
+index 2051373b8652a9a9e6ed606ad2c1bad04a5ecb56..928a55d9a7ae75b0ee7d01bb47eee6b58920090f 100644
+--- a/plugins/pipeline-core/roles/elephant.md
++++ b/plugins/pipeline-core/roles/elephant.md
+@@ -159,7 +159,7 @@ PO target: at most 10 % of the Elephant's main-thread context is pipeline admini
+ 
+ ### EL-19 (MUST) — PO gate (PRD) before implementation
+ 
+-- **Rule:** For **rigor ≥ 1 OR risk class high**, after the spec passes its readiness check (EL-07) and BEFORE the first implementation dispatch (EL-05/EL-08), obtain the PO's PRD release. Run `node harness/scripts/check-po-gate-authority.mjs`; if the shared mode-`0600` profile receipt, the canonical primary checkout's narrow source/runtime PO-language projection, or the active PRD authority disagree, stop. Republish only through `node setup.mjs --publish-po-profile` in the canonical primary checkout or correct the active feature — never infer a language, copy a profile, or rewrite another worktree. Branch-local profile bytes are not PO-language authority. The physical directory containing `.claude/pipeline-state.json.activeFeature.planPath` contains exactly one `prd_*.md`, that file equals `planPath`, and it carries exactly one matching marker: `<!-- po-language: de -->` or `<!-- po-language: en -->`. `spec_*.md`, `design_*.md`, and optional `sdp_*.md` are internal artifacts, never child PRDs. Produce the PRD in that language — product rationale (what/why/scope/non-goals/risks/alternatives considered), NOT acceptance criteria (those stay agent-facing English in the spec, which the PRD references and does not duplicate). **PO-readable content:** each block answers which problem? what are we changing? what's in it for you?, rule-IDs/file paths/jargon out of the main narrative (compact tech-lines or an appendix only), a coverage matrix for feedback-/review-driven PRDs, and numbered decision points at the end. **Sharpened:** PROACTIVELY deliver it as a READABLE document per EL-17(a) (numbered inline summary + file reference **+ readable delivery to the PO's device/render — remote sessions: send it; a repo path alone is NOT delivery**). A readable PRD marked `freigegeben` by the PO is the sole authority for exactly one first implementation dispatch; do not request a second implementation approval. After the PO's release, record it only through `node harness/scripts/pipeline-state.mjs approve-plan --by po`, which revalidates the same authority and plan digest under the writer lock. Omitted proactive delivery is a process incident, flagged at the close-/critic-trajectory checkpoint. Merge, push, and release approvals stay distinct. A **true stage-0 fast-path** task (`roles/elephant.md` — *EL-01*) is exempt — small hotfixes need no product review. Location: `specs/<task>/prd_<topic>.md`. Optional, gate-free companion: `sdp_<topic>.md` (Software Development Plan) — documented, never a mandatory sign-off.
++- **Rule:** For **rigor ≥ 1 OR risk class high**, after the spec passes its readiness check (EL-07) and BEFORE the first implementation dispatch (EL-05/EL-08), obtain the PO's PRD release. A hosted project has no `harness/` and uses the language recorded at onboarding. In the Pipeline's own source checkout, run `node harness/scripts/check-po-gate-authority.mjs`; if the shared mode-`0600` profile receipt, the canonical primary checkout's narrow source/runtime PO-language projection, or the active PRD authority disagree, stop. Republish only through `node setup.mjs --publish-po-profile` in the canonical primary checkout or correct the active feature — never infer a language, copy a profile, or rewrite another worktree. Branch-local profile bytes are not PO-language authority. The physical directory containing `.claude/pipeline-state.json.activeFeature.planPath` contains exactly one `prd_*.md`, that file equals `planPath`, and it carries exactly one matching marker: `<!-- po-language: de -->` or `<!-- po-language: en -->`. `spec_*.md`, `design_*.md`, and optional `sdp_*.md` are internal artifacts, never child PRDs. Produce the PRD in that language — product rationale (what/why/scope/non-goals/risks/alternatives considered), NOT acceptance criteria (those stay agent-facing English in the spec, which the PRD references and does not duplicate). **PO-readable content:** each block answers which problem? what are we changing? what's in it for you?, rule-IDs/file paths/jargon out of the main narrative (compact tech-lines or an appendix only), a coverage matrix for feedback-/review-driven PRDs, and numbered decision points at the end. **Sharpened:** PROACTIVELY deliver it as a READABLE document per EL-17(a) (numbered inline summary + file reference **+ readable delivery to the PO's device/render — remote sessions: send it; a repo path alone is NOT delivery**). A readable PRD marked `freigegeben` by the PO is the sole authority for exactly one first implementation dispatch; do not request a second implementation approval. After the PO's release, record it only through `node harness/scripts/pipeline-state.mjs approve-plan --by po`, which revalidates the same authority and plan digest under the writer lock. Omitted proactive delivery is a process incident, flagged at the close-/critic-trajectory checkpoint. Merge, push, and release approvals stay distinct. A **true stage-0 fast-path** task (`roles/elephant.md` — *EL-01*) is exempt — small hotfixes need no product review. Location: `specs/<task>/prd_<topic>.md`. Optional, gate-free companion: `sdp_<topic>.md` (Software Development Plan) — documented, never a mandatory sign-off.
+ - **Why:** Human gates otherwise exist only at the back (🟡 verification); there is no PO hold on the *designed plan*. A PRD gate forces a written, verifiable plan before expensive (mis-)implementation (evidence: <PROJECT_B> had no committed spec, requirements only dictated) and yields clean Critic input + reproducible review material (B6). The proactive-delivery sharpening closes a gap the PO found live: the gate held in substance, but delivery form was too weak, and EL-19 was never bootstrap-anchored.
+ - **Check:** For rigor ≥1 / class-high work, the implementation dispatch references an approved PRD; a Critic reviewing the trajectory flags an implementation dispatch that skipped the PO gate **or skipped proactive readable delivery / the explicit wait**. Details: `docs/operating-model.md` §3.2 step 3b / §3.3.
+ 
+diff --git a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+index 2351f981cf5cc0cac9c1d3e1c22b7d892a8e59e4..606a93e01d3dac58eb75e9f840464e248f3bc8db 100644
+--- a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+@@ -480,6 +480,18 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+       assert.equal(result.acceptedIdAfterApproval, "0008-next");
+     });
+ 
++    it("7.6a create-adr --refresh without a slug updates every draft in one call", () => {
++      const root = makeRoot();
++      assert.equal(create(root, "--slug", "one", "--title", "One", "--date", "2026-11-07").status, 0);
++      assert.equal(create(root, "--slug", "two", "--title", "Two", "--date", "2026-11-07").status, 0);
++      fs.appendFileSync(path.join(root, "docs", "adr", "draft-two.md"), "\nedited\n");
++      const refreshed = JSON.parse(create(root, "--refresh").stdout);
++      assert.deepEqual(refreshed.refreshed.map((entry) => entry.id), ["draft-one", "draft-two"]);
++      assert.deepEqual(refreshed.changed, ["draft-two"]);
++      const record = JSON.parse(fs.readFileSync(path.join(root, "docs", "adr", "draft-two.json"), "utf8"));
++      assert.equal(record.digest, sha(fs.readFileSync(path.join(root, "docs", "adr", "draft-two.md"))));
++    });
++
+     it("7.7 create-adr writes a v2 record for named modules, sorted and unique, only when the physical map has them", () => {
+       const root = makeRoot();
+       makeMap(root, ["alpha", "beta"]);
+diff --git a/plugins/pipeline-core/scripts/bind-adr-proposals.mjs b/plugins/pipeline-core/scripts/bind-adr-proposals.mjs
+index 91a60cad879d9d7e8c922e91982e9eca8865f93f..421a5e1d1e1eb4e49d768a7ba031885346dd35f4 100644
+--- a/plugins/pipeline-core/scripts/bind-adr-proposals.mjs
++++ b/plugins/pipeline-core/scripts/bind-adr-proposals.mjs
+@@ -94,7 +94,7 @@ function readSelection(root, rel) {
+   const file = readRegular(root, rel);
+   if (!file) {
+     refuse(`${rel} does not exist. It carries the PO's own selection, and this step never writes or edits it: save what the PO chose, in the PO's words, as JSON at that path `
+-      + `(shape ${shape}), then run this command again. Without the PO's selection the proposals cannot be bound.`);
++      + `(shape ${shape}), then run this command again. Without the PO's selection the proposals cannot be bound. The words must answer these decisions: an answer given earlier to another question is not a selection, so show the PO each decision with your recommendation and save the reply (a reply that adopts your recommendations is a valid answer).`);
+   }
+   const value = parseJson(file, `expected ${shape}`);
+   const fail = (why) => refuse(`${rel}: ${why}. Expected ${shape}. Fix the file with the PO's actual words, then run this command again.`);
+diff --git a/plugins/pipeline-core/scripts/create-adr.mjs b/plugins/pipeline-core/scripts/create-adr.mjs
+index 842e8e5b6973edf1d05fe6959b6047210a056f12..7609303d4efd288fc4dba257b73ec208586c1d60 100644
+--- a/plugins/pipeline-core/scripts/create-adr.mjs
++++ b/plugins/pipeline-core/scripts/create-adr.mjs
+@@ -7,6 +7,7 @@
+  *   create-adr.mjs --root <root> --slug <slug> --title <title> [--scope project|global | --modules <id[,id...]>]
+  *                  [--supersedes <adr-id>] [--date YYYY-MM-DD]
+  *   create-adr.mjs --root <root> --slug <slug> --refresh
++ *   create-adr.mjs --root <root> --refresh    (every docs/adr/draft-*.md at once)
+  *
+  * Writes docs/adr/draft-<slug>.md and docs/adr/draft-<slug>.json: a PROPOSAL (status `proposed`, schema
+  * pipeline.architecture-decision.v1, or .v2 when module ids are named) whose `digest` is already the SHA-256 of the Markdown bytes.
+@@ -94,6 +95,20 @@ function refreshDigest(root, slug) {
+   return { ok: true, id, sidecar: `docs/adr/${id}.json`, digest, changed: true };
+ }
+ 
++/** Claude greenfield 2026-11-08: one call per draft cost about thirty calls. `--refresh` without a slug updates every draft at once. */
++function refreshAllDigests(root) {
++  const dir = adrDirectory(root, false);
++  const slugs = pendingDraftSlugs(dir);
++  if (slugs.length === 0) refuse("docs/adr holds no draft-<slug>.md to refresh");
++  const refreshed = slugs.map((slug) => refreshDigest(root, slug));
++  return { ok: true, refreshed, changed: refreshed.filter((entry) => entry.changed).map((entry) => entry.id) };
++}
++
++function pendingDraftSlugs(dir) {
++  if (!existsSync(dir)) return [];
++  return readdirSync(dir).map((name) => /^draft-(.+)\.md$/u.exec(name)?.[1]).filter((slug) => typeof slug === "string" && SLUG.test(slug)).sort();
++}
++
+ function createProposal(root, values) {
+   const slug = values.get("--slug");
+   const title = values.get("--title");
+@@ -147,7 +162,7 @@ function createProposal(root, values) {
+   }
+   return { ok: true, id, schema: record.schema, status: "proposed", digest: record.digest, markdown: `docs/adr/${id}.md`, sidecar: `docs/adr/${id}.json`,
+     nextFreeNumber: free, acceptedIdAfterApproval: `${free}-${slug}`,
+-    next: "Replace each REPLACE: line in the Markdown, run this script again with --refresh to recompute the digest, then bind the proposal in the design package; it becomes `accepted` only through the PO's design approval and `pipeline-state.mjs materialize-architecture`." };
++    next: "Replace each REPLACE: line in the Markdown, run this script again with --refresh (without --slug it updates every draft) to recompute the digest once after the last edit, then bind the proposal in the design package; it becomes `accepted` only through the PO's design approval and `pipeline-state.mjs materialize-architecture`. The number is a preview: bind-adr-proposals.mjs assigns the final numbers in --draft order." };
+ }
+ 
+ export function main(argv = process.argv.slice(2)) {
+@@ -161,9 +176,13 @@ export function main(argv = process.argv.slice(2)) {
+     }
+     const root = resolve(rootValue);
+     const slug = values.get("--slug");
+-    if (typeof slug !== "string" || !SLUG.test(slug)) refuse("--slug must be 1 to 64 characters of a-z, 0-9 and '-', starting with a letter or digit");
+     const refresh = values.has("--refresh");
+-    if (refresh && values.size !== 3) refuse("--refresh takes only --root and --slug");
++    if (refresh && values.size === 2) {
++      console.log(JSON.stringify(refreshAllDigests(root), null, 2));
++      return 0;
++    }
++    if (typeof slug !== "string" || !SLUG.test(slug)) refuse("--slug must be 1 to 64 characters of a-z, 0-9 and '-', starting with a letter or digit");
++    if (refresh && values.size !== 3) refuse("--refresh takes only --root and, for one draft, --slug");
+     const result = refresh ? refreshDigest(root, slug) : createProposal(root, values);
+     console.log(JSON.stringify(result, null, 2));
+     return 0;
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.mjs b/plugins/pipeline-core/scripts/onboarding-init.mjs
+index 4b00a84e9a1ef88147e2cc8177fd58a722763519..5700082a9dc8ce6f8ab4ffd7f0e06f53e3b2eb94 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.mjs
+@@ -1778,6 +1778,8 @@ function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STE
+       runner,
+       root,
+       outcome: "unsupported-next-action",
++      // Codex greenfield 2026-11-08: the designed stop before a restart read like a failure.
++      ...(nextAction?.kind === "restart-process" ? { expectedStop: "This is the designed stop, not a fault: the restart needs an attended terminal. Follow final.nextAction." } : {}),
+       stepCap,
+       stepsExecuted: steps.length,
+       steps,
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 9d668b47d4fdec69cbd0f2064bf825d4f364de73..80bbfa91cbc37cb2d4fd0c24cb8ada0918fff8c7 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -12579,9 +12579,14 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+           // Only an already-open exact replay may retain the persisted audit
+           // timestamp.  A successor approval reopened after a prior audit must
+           // bind this invocation's timestamp and current authority objects.
+-          reopenedAt = observed.activeFeature?.phase === "design" && observed.planApproved === false
+-            ? observed.planInvalidation?.invalidatedAt ?? now()
+-            : now();
++          // Claude greenfield 2026-11-08: a second reopen of a NEW submission printed the first reopen's time.
++          const prior = observed.planInvalidation;
++          const digestOf = (value) => (value === undefined ? null : sha256CanonicalJson(value));
++          const exactReplay = observed.activeFeature?.phase === "design" && observed.planApproved === false
++            && typeof prior?.invalidatedAt === "string"
++            && prior.invalidatedSubmissionSha256 === digestOf(observed.planSubmission)
++            && prior.invalidatedApprovalSha256 === digestOf(observed.planApproval);
++          reopenedAt = exactReplay ? prior.invalidatedAt : now();
+           const transition = reopenPlanDesign({
+             state: observed,
+             expectedStateSha256: sha256CanonicalJson(observed),
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 6d1cd4e94c21a0fcddb749cc5f0a2d23beaaf50b..b0a75548d8181258a7706c6fb0630b6e06091a20 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -1154,6 +1154,20 @@ for (const [name, prepare] of [
+ // Fixture shape mirrors acknowledgeFixture() above: a state/continuity pair
+ // already bound to a plan/spec pair, deps mocking poGateAuthority/poGateProfile
+ // so no real onboarded project tree is needed.
++test("a second reopen of a new submission records its own time, not the first reopen's", () => {
++  const featureId = "reopen-own-time";
++  const planPath = `specs/${featureId}/prd_${featureId}.md`;
++  const specPath = `specs/${featureId}/spec.md`;
++  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-08-27T10:00:00.000Z" });
++  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
++  assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], deps)).result, 0);
++  const laterDeps = { ...deps, now: () => "2026-08-27T11:00:00.000Z" };
++  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], laterDeps)).result, 0);
++  assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], laterDeps)).result, 0);
++  const recorded = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
++  assert.equal(recorded.planInvalidation.invalidatedAt, "2026-08-27T11:00:00.000Z");
++});
++
+ function planAuthorityFixture({ featureId, planPath, specPath, advisorUnavailable = false, now = "2026-08-27T10:00:00.000Z" }) {
+   const root = mktempProjectDir();
+   mkdirSync(join(root, "project"), { recursive: true });
+diff --git a/plugins/pipeline-core/scripts/refresh-mandatory-hooks.mjs b/plugins/pipeline-core/scripts/refresh-mandatory-hooks.mjs
+index af401cd2006bbdf13359afe41b029c7d101fd047..b5f2564a45bbc8245d73a4ce32a9c3e3fad14220 100644
+--- a/plugins/pipeline-core/scripts/refresh-mandatory-hooks.mjs
++++ b/plugins/pipeline-core/scripts/refresh-mandatory-hooks.mjs
+@@ -21,6 +21,7 @@ import { resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-clone-provisioning.mjs";
++import { detectRunner } from "./design-review-receipt.mjs";
+ import { applyInstall as applyPreCommit, planInstall as planPreCommit } from "./pre-commit-hook-install.mjs";
+ import { applyInstall as applyCommitMsg, planInstall as planCommitMsg } from "./commit-msg-hook-install.mjs";
+ import { applyInstall as applyPrePush, planInstall as planPrePush } from "./pre-push-hook-install.mjs";
+@@ -51,7 +52,9 @@ function refreshOne(hook, rootDir, dependencies) {
+ /** W1: the version of the plugin copy this refresh binds the hooks to (null when its manifest cannot be read). */
+ function readBoundPluginVersion() {
+   try {
+-    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("../.claude-plugin/plugin.json", import.meta.url)), "utf8"));
++    // Antigravity greenfield 2026-11-08: the refresh printed the +claude build next to a preflight that printed +antigravity.
++    const manifestPath = { antigravity: "../plugin.json", codex: "../.codex-plugin/plugin.json" }[detectRunner(process.env)] ?? "../.claude-plugin/plugin.json";
++    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL(manifestPath, import.meta.url)), "utf8"));
+     return typeof manifest?.version === "string" ? manifest.version : null;
+   } catch { return null; }
+ }
+diff --git a/plugins/pipeline-core/scripts/rigor-floor.mjs b/plugins/pipeline-core/scripts/rigor-floor.mjs
+index 7cfccd2eb92429303fb2580209fa6ac73d81abb0..33463c01c64c817c17bc15693dc8d736a50abf1c 100644
+--- a/plugins/pipeline-core/scripts/rigor-floor.mjs
++++ b/plugins/pipeline-core/scripts/rigor-floor.mjs
+@@ -420,7 +420,8 @@ export function deriveMinimumRigor(inputs, policy = null) {
+       escalate("feature", "PLANNED_SURFACE_EXCEEDS_THRESHOLD", "Planned file count " + pp.value.length + " exceeds mini threshold " + maxChangedFiles);
+     }
+     const plannedSet = new Set(pp.value);
+-    const expandedPaths = ap.value.filter((p) => !plannedSet.has(p));
++    // Antigravity greenfield 2026-11-08: the design course's own records (ADR drafts, the feature folder) counted as implementation that left the plan.
++    const expandedPaths = ap.value.filter((p) => !plannedSet.has(p) && !p.startsWith("docs/adr/") && !p.startsWith("specs/"));
+     if (expandedPaths.length > 0) {
+       escalate("feature", "SURFACE_EXPANSION", "Actual surface expanded beyond planned paths: " + expandedPaths.slice(0, 3).join(", "));
+     }
+diff --git a/plugins/pipeline-core/scripts/rigor-floor.test.mjs b/plugins/pipeline-core/scripts/rigor-floor.test.mjs
+index c3257085045d4a794789d896688723409cc211eb..e709bafe47e87292d5b42b5dfe05ec8935d79499 100644
+--- a/plugins/pipeline-core/scripts/rigor-floor.test.mjs
++++ b/plugins/pipeline-core/scripts/rigor-floor.test.mjs
+@@ -293,6 +293,19 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
+     assert.ok(result.escalationTriggers.includes("SURFACE_EXPANSION"));
+   });
+ 
++  test("7-records. The design course's own records are not surface expansion", () => {
++    const input = {
++      plannedPaths: { value: ["src/app.mjs"], status: "available", sourceContract: "pipeline.plan.v1" },
++      actualPaths: { value: ["src/app.mjs", "docs/adr/draft-store.json", "specs/one/acceptance.md"], status: "available", sourceContract: "git.diff" },
++      protectedTouches: false,
++      contractDeltas: false,
++      reversibility: "high",
++      diffStats: { files: 3, lines: 25 },
++      selectedProfile: "mini"
++    };
++    assert.ok(!deriveMinimumRigor(input, policy).escalationTriggers.includes("SURFACE_EXPANSION"));
++  });
++
+   test("7a. A clean worktree cannot hide an over-threshold PO-bound plan surface", () => {
+     const input = {
+       plannedPaths: { value: ["docs/a.md", "docs/b.md", "docs/c.md", "docs/d.md", "docs/e.md", "docs/f.md"], status: "available", sourceContract: "pipeline.po-bound-plan-surface.v1" },
+diff --git a/plugins/pipeline-core/scripts/runner-capabilities.mjs b/plugins/pipeline-core/scripts/runner-capabilities.mjs
+index 5e54bf2f67c1e60807e8e980ee752ae3b1593d68..7e4fbc268ad878ff700a08109ecc27a7c84ffb61 100644
+--- a/plugins/pipeline-core/scripts/runner-capabilities.mjs
++++ b/plugins/pipeline-core/scripts/runner-capabilities.mjs
+@@ -3,7 +3,7 @@
+ /**
+  * Prints the sourced per-runner capability table (config/runner-capabilities.json) as one JSON line, or one runner's column.
+  *
+- *   node runner-capabilities.mjs [--runner <claude|codex|antigravity>]
++ *   node runner-capabilities.mjs --runner <claude|codex|antigravity>
+  *
+  * Read-only. The file states only facts another shipped document or script states; a cell without a source says so. It is
+  * deliberately not part of the start preflight envelope: that readback is pinned and size-budgeted for all three runners, and
+@@ -31,7 +31,7 @@ export function selectRunner(table, runner) {
+ export function main(argv = process.argv.slice(2), out = process.stdout) {
+   let runner = null;
+   if (argv.length === 2 && argv[0] === "--runner") runner = argv[1];
+-  else if (argv.length !== 0) { out.write(`${JSON.stringify({ ok: false, code: "RC-USAGE", message: "usage: runner-capabilities.mjs [--runner <claude|codex|antigravity>]" })}\n`); return 2; }
++  else if (argv.length !== 0) { out.write(`${JSON.stringify({ ok: false, code: "RC-USAGE", message: "usage: runner-capabilities.mjs --runner <claude|codex|antigravity>" })}\n`); return 2; }
+   try {
+     const table = readRunnerCapabilities();
+     out.write(`${JSON.stringify(runner === null ? table : selectRunner(table, runner))}\n`);
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index e01ab316db11900c358ead2d755dce23914e1d5b..8bdef6819badc50ed2da263c87aee4bd9c5161d9 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -237,7 +237,7 @@ recommendation.
+    answered value. For their exact shapes, screens, and resumed-intake source
+    rules, load `references/resume-hint.md` before capture or consumption.
+ 
+-7. **Normal restart is handover-only:** a same-topic restart, context cut, or
++8. **Normal restart is handover-only:** a same-topic restart, context cut, or
+    request to save progress is not a block close. Update only the calibrated
+    handover and, where needed, the sanitised Resume-Hint, then re-enter with
+    this bootstrap. Never invoke `close-block`, `close-feature`, or the close
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+index a9ab757b369421d5e0e0eb9a3f3a3e128f5bad1e..9a26750f2a57fac4a6dab8d13f821459e59b0ef3 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+@@ -48,18 +48,28 @@ was needed; capability evidence is not an Advisor answer.
+    batches (diff range, batch preflight) and does not fit uncommitted design
+    sources. Dispatch the agent type `pipeline-core:readiness-reviewer` instead.
+    Its briefing needs a line `Ruleset SHA: <sha>` (`ruleset-sha` or `=` also
+-   read; without it `DISPATCH-NO-RULESET-SHA`) and any model-family token such
+-   as `Requested route: claude-sonnet-5-5` (without it `DISPATCH-NO-MODEL`), and
++   read; without it `DISPATCH-NO-RULESET-SHA`) and a `Requested route:` line
++   naming a model of the runner you are on, as your model-role readback gives
++   it (a `claude-` name on Claude, a `gpt-` or `codex-` name on Codex, a
++   `gemini-` name on Antigravity; without one `DISPATCH-NO-MODEL`), and
+    none of the contamination phrases (claims-to-verify, hunt list, expected
+    verdict). Naming Opus additionally needs `Batch scope (MP-07):` and a
+    rationale line (`DISPATCH-OPUS-NO-BATCH-RATIONALE`). Then create the receipt.
++   Every finding the report leaves open goes into the receipt as one
++   `--open-finding <id>`: a report that says ready while it still lists findings
++   is `open-findings`, not `pass`, and the PO sees that when signing.
+    After the delta round: if round 2 still reports open findings, correct the
+-   sources with `reopen-design`, `submit-plan`, `present-plan`. The approval
+-   then carries the change as `unreviewedSourceDelta`, which the PO signs
+-   knowingly; there is no round 3. `DRR-SOURCE-DRIFT` with `nextRound: null` is
+-   not a dead end here: `present-plan` does not use that check.
+-3. Use the sanctioned source-binding and document-integration routes. Keep
+-   PRD/Spec markers current and commit the finalized sources, bound companions,
++   sources now. Before `submit-plan` this is an ordinary edit and commit;
++   `reopen-design` exists only for a package that was already submitted. The
++   approval then carries the change as `unreviewedSourceDelta`, which the PO
++   signs knowingly; there is no round 3. `DRR-SOURCE-DRIFT` with
++   `nextRound: null` is not a dead end here: `present-plan` does not use that
++   check.
++3. Use the sanctioned source-binding and document-integration routes. Update
++   digests once, after the last edit: `create-adr.mjs --root <root> --refresh`
++   without `--slug` recomputes every ADR draft, and the PRD's
++   `technical-spec-sha256` line takes the digest of the final `spec.md`. Commit
++   the finalized sources, bound companions,
+    review reports and receipts. Before presentation every bound path must be
+    a tracked, unmodified regular file. If bound or submitted sources require
+    material edits, use the current inspector's sanctioned draft recovery;
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+index 2da12857bf6dfa770964d65083b1bc446e56f10a..36f7fc459056f236b2d3480fff9e906ec865e28d 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+@@ -88,7 +88,11 @@ only on the PO's explicit consent. Claude keeps material capture separate (its
+ opaque native turn reference arrives with the PO's next turn), so Claude takes
+ at most 3 PO turns before the first design draft (merged first round,
+ material turn, design questions) and Codex and Antigravity at most 2 (merged
+-first round, design questions). The `signature` trust-anchor key ceremony is a
++first round, design questions). Ask the design questions in one round. When the
++PO adopts your recommendations, record each question with the adopted answer:
++`{"disposition":"no-open-questions"}` means no question was open, and an earlier
++answer to something else is neither that nor an ADR selection. The `signature`
++trust-anchor key ceremony is a
+ conditional follow-up of the human-approval answer, not one of these turns.
+ If the consent command is skipped or fails, the ordinary `intake-required`
+ consent action is published again; nothing already answered is asked twice.
+diff --git a/plugins/pipeline-core/templates/prompts/elephant-kickoff.md b/plugins/pipeline-core/templates/prompts/elephant-kickoff.md
+index 46161463a1d02c4cd286ef9f33b60e4296de8168..8b56474e899b4b9a05058851f87160799c2083f9 100644
+--- a/plugins/pipeline-core/templates/prompts/elephant-kickoff.md
++++ b/plugins/pipeline-core/templates/prompts/elephant-kickoff.md
+@@ -84,7 +84,7 @@ You orchestrate; you do not implement.
+ - **No-code phase until the spec is ready.** No implementation before the spec
+   (rigor level 1/2 per triage) exists and — where mandatory — has passed the
+   Spec-Readiness-Check by a fresh read-only Goldfish (`docs/operating-model.md` — The lifecycle, step 3).
+-- **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md`. Use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / `docs/operating-model.md` — The lifecycle). True stage-0 hotfixes are exempt. Do not drift the human-facing language mid-document while authoring the PRD or Spec — once started in the resolved language, stay in it through submission; an undetected mid-document switch forces expensive repair later.
++- **PO-Gate (PRD):** for rigor ≥1 / class-high work, a hosted project has no `harness/` and uses the language recorded at onboarding; in the Pipeline's own source checkout, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md` and use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / `docs/operating-model.md` — The lifecycle). True stage-0 hotfixes are exempt. Do not drift the human-facing language mid-document while authoring the PRD or Spec — once started in the resolved language, stay in it through submission; an undetected mid-document switch forces expensive repair later.
+ - **AI proposes the first design.** After the interview, YOU propose the first
+   technical design (prose + diagram, no code) before I state mine — that is how
+   we detect whether the system was actually understood (the first draft comes
+diff --git a/plugins/pipeline-core/templates/prompts/kickoff-new-project.md b/plugins/pipeline-core/templates/prompts/kickoff-new-project.md
+index dd3c8e64adef4bda0b88abae15ab8d2c3a809e13..dc01bb7c3c077d821690c66a66f07ed91b9e6c47 100644
+--- a/plugins/pipeline-core/templates/prompts/kickoff-new-project.md
++++ b/plugins/pipeline-core/templates/prompts/kickoff-new-project.md
+@@ -234,7 +234,7 @@ session specifically:
+ - **Workspace boundary (EL-18)** — one repo, one Elephant; cross-project
+   findings become a transfer item in the target repo's `backlog/items/`,
+   never a direct foreign-repo edit.
+-- **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md`. Use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / `docs/operating-model.md` — The lifecycle). True stage-0 hotfixes are exempt. Do not drift the human-facing language mid-document while authoring the PRD or Spec — once started in the resolved language, stay in it through submission; an undetected mid-document switch forces expensive repair later.
++- **PO-Gate (PRD):** for rigor ≥1 / class-high work, a hosted project has no `harness/` and uses the language recorded at onboarding; in the Pipeline's own source checkout, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md` and use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / `docs/operating-model.md` — The lifecycle). True stage-0 hotfixes are exempt. Do not drift the human-facing language mid-document while authoring the PRD or Spec — once started in the resolved language, stay in it through submission; an undetected mid-document switch forces expensive repair later.
+ - **EL-01** — every implementation is a briefed Goldfish
+   dispatch; stage-0 (`roles/elephant.md` — EL-01) is the only exception, further ones only from
+   the PO.
+diff --git a/roles/elephant.md b/roles/elephant.md
+index 2051373b8652a9a9e6ed606ad2c1bad04a5ecb56..928a55d9a7ae75b0ee7d01bb47eee6b58920090f 100644
+--- a/roles/elephant.md
++++ b/roles/elephant.md
+@@ -159,7 +159,7 @@ PO target: at most 10 % of the Elephant's main-thread context is pipeline admini
+ 
+ ### EL-19 (MUST) — PO gate (PRD) before implementation
+ 
+-- **Rule:** For **rigor ≥ 1 OR risk class high**, after the spec passes its readiness check (EL-07) and BEFORE the first implementation dispatch (EL-05/EL-08), obtain the PO's PRD release. Run `node harness/scripts/check-po-gate-authority.mjs`; if the shared mode-`0600` profile receipt, the canonical primary checkout's narrow source/runtime PO-language projection, or the active PRD authority disagree, stop. Republish only through `node setup.mjs --publish-po-profile` in the canonical primary checkout or correct the active feature — never infer a language, copy a profile, or rewrite another worktree. Branch-local profile bytes are not PO-language authority. The physical directory containing `.claude/pipeline-state.json.activeFeature.planPath` contains exactly one `prd_*.md`, that file equals `planPath`, and it carries exactly one matching marker: `<!-- po-language: de -->` or `<!-- po-language: en -->`. `spec_*.md`, `design_*.md`, and optional `sdp_*.md` are internal artifacts, never child PRDs. Produce the PRD in that language — product rationale (what/why/scope/non-goals/risks/alternatives considered), NOT acceptance criteria (those stay agent-facing English in the spec, which the PRD references and does not duplicate). **PO-readable content:** each block answers which problem? what are we changing? what's in it for you?, rule-IDs/file paths/jargon out of the main narrative (compact tech-lines or an appendix only), a coverage matrix for feedback-/review-driven PRDs, and numbered decision points at the end. **Sharpened:** PROACTIVELY deliver it as a READABLE document per EL-17(a) (numbered inline summary + file reference **+ readable delivery to the PO's device/render — remote sessions: send it; a repo path alone is NOT delivery**). A readable PRD marked `freigegeben` by the PO is the sole authority for exactly one first implementation dispatch; do not request a second implementation approval. After the PO's release, record it only through `node harness/scripts/pipeline-state.mjs approve-plan --by po`, which revalidates the same authority and plan digest under the writer lock. Omitted proactive delivery is a process incident, flagged at the close-/critic-trajectory checkpoint. Merge, push, and release approvals stay distinct. A **true stage-0 fast-path** task (`roles/elephant.md` — *EL-01*) is exempt — small hotfixes need no product review. Location: `specs/<task>/prd_<topic>.md`. Optional, gate-free companion: `sdp_<topic>.md` (Software Development Plan) — documented, never a mandatory sign-off.
++- **Rule:** For **rigor ≥ 1 OR risk class high**, after the spec passes its readiness check (EL-07) and BEFORE the first implementation dispatch (EL-05/EL-08), obtain the PO's PRD release. A hosted project has no `harness/` and uses the language recorded at onboarding. In the Pipeline's own source checkout, run `node harness/scripts/check-po-gate-authority.mjs`; if the shared mode-`0600` profile receipt, the canonical primary checkout's narrow source/runtime PO-language projection, or the active PRD authority disagree, stop. Republish only through `node setup.mjs --publish-po-profile` in the canonical primary checkout or correct the active feature — never infer a language, copy a profile, or rewrite another worktree. Branch-local profile bytes are not PO-language authority. The physical directory containing `.claude/pipeline-state.json.activeFeature.planPath` contains exactly one `prd_*.md`, that file equals `planPath`, and it carries exactly one matching marker: `<!-- po-language: de -->` or `<!-- po-language: en -->`. `spec_*.md`, `design_*.md`, and optional `sdp_*.md` are internal artifacts, never child PRDs. Produce the PRD in that language — product rationale (what/why/scope/non-goals/risks/alternatives considered), NOT acceptance criteria (those stay agent-facing English in the spec, which the PRD references and does not duplicate). **PO-readable content:** each block answers which problem? what are we changing? what's in it for you?, rule-IDs/file paths/jargon out of the main narrative (compact tech-lines or an appendix only), a coverage matrix for feedback-/review-driven PRDs, and numbered decision points at the end. **Sharpened:** PROACTIVELY deliver it as a READABLE document per EL-17(a) (numbered inline summary + file reference **+ readable delivery to the PO's device/render — remote sessions: send it; a repo path alone is NOT delivery**). A readable PRD marked `freigegeben` by the PO is the sole authority for exactly one first implementation dispatch; do not request a second implementation approval. After the PO's release, record it only through `node harness/scripts/pipeline-state.mjs approve-plan --by po`, which revalidates the same authority and plan digest under the writer lock. Omitted proactive delivery is a process incident, flagged at the close-/critic-trajectory checkpoint. Merge, push, and release approvals stay distinct. A **true stage-0 fast-path** task (`roles/elephant.md` — *EL-01*) is exempt — small hotfixes need no product review. Location: `specs/<task>/prd_<topic>.md`. Optional, gate-free companion: `sdp_<topic>.md` (Software Development Plan) — documented, never a mandatory sign-off.
+ - **Why:** Human gates otherwise exist only at the back (🟡 verification); there is no PO hold on the *designed plan*. A PRD gate forces a written, verifiable plan before expensive (mis-)implementation (evidence: <PROJECT_B> had no committed spec, requirements only dictated) and yields clean Critic input + reproducible review material (B6). The proactive-delivery sharpening closes a gap the PO found live: the gate held in substance, but delivery form was too weak, and EL-19 was never bootstrap-anchored.
+ - **Check:** For rigor ≥1 / class-high work, the implementation dispatch references an approved PRD; a Critic reviewing the trajectory flags an implementation dispatch that skipped the PO gate **or skipped proactive readable delivery / the explicit wait**. Details: `docs/operating-model.md` §3.2 step 3b / §3.3.
+ 
+diff --git a/templates/prd.md b/templates/prd.md
+index 856b4c0262fedefd4eb9bea4c7ca05d25fed49c7..eac8e2a3b0d23e4101f30005531ed000f240e3f5 100644
+--- a/templates/prd.md
++++ b/templates/prd.md
+@@ -1,7 +1,9 @@
+ <!-- po-language: de -->
+ <!--
+ PROMPT/DOC TEMPLATE: PRD — Product Review Document (PO gate) — Agent-Pipeline
+-PO-facing language: run `node harness/scripts/check-po-gate-authority.mjs` and use
++PO-facing language: a hosted project has no `harness/` and uses the language
++recorded at onboarding. In the Pipeline's own source checkout, run
++`node harness/scripts/check-po-gate-authority.mjs` and use
+ the repository-scoped language it validates from the canonical primary checkout's
+ narrow source/runtime projection and common mode-0600 receipt. Branch-local profile
+ bytes are not authority. If it reports `en`, replace the marker above accordingly.
+diff --git a/templates/prompts/elephant-kickoff.md b/templates/prompts/elephant-kickoff.md
+index 46161463a1d02c4cd286ef9f33b60e4296de8168..8b56474e899b4b9a05058851f87160799c2083f9 100644
+--- a/templates/prompts/elephant-kickoff.md
++++ b/templates/prompts/elephant-kickoff.md
+@@ -84,7 +84,7 @@ You orchestrate; you do not implement.
+ - **No-code phase until the spec is ready.** No implementation before the spec
+   (rigor level 1/2 per triage) exists and — where mandatory — has passed the
+   Spec-Readiness-Check by a fresh read-only Goldfish (`docs/operating-model.md` — The lifecycle, step 3).
+-- **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md`. Use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / `docs/operating-model.md` — The lifecycle). True stage-0 hotfixes are exempt. Do not drift the human-facing language mid-document while authoring the PRD or Spec — once started in the resolved language, stay in it through submission; an undetected mid-document switch forces expensive repair later.
++- **PO-Gate (PRD):** for rigor ≥1 / class-high work, a hosted project has no `harness/` and uses the language recorded at onboarding; in the Pipeline's own source checkout, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md` and use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / `docs/operating-model.md` — The lifecycle). True stage-0 hotfixes are exempt. Do not drift the human-facing language mid-document while authoring the PRD or Spec — once started in the resolved language, stay in it through submission; an undetected mid-document switch forces expensive repair later.
+ - **AI proposes the first design.** After the interview, YOU propose the first
+   technical design (prose + diagram, no code) before I state mine — that is how
+   we detect whether the system was actually understood (the first draft comes
+diff --git a/templates/prompts/kickoff-new-project.md b/templates/prompts/kickoff-new-project.md
+index dd3c8e64adef4bda0b88abae15ab8d2c3a809e13..dc01bb7c3c077d821690c66a66f07ed91b9e6c47 100644
+--- a/templates/prompts/kickoff-new-project.md
++++ b/templates/prompts/kickoff-new-project.md
+@@ -234,7 +234,7 @@ session specifically:
+ - **Workspace boundary (EL-18)** — one repo, one Elephant; cross-project
+   findings become a transfer item in the target repo's `backlog/items/`,
+   never a direct foreign-repo edit.
+-- **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md`. Use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / `docs/operating-model.md` — The lifecycle). True stage-0 hotfixes are exempt. Do not drift the human-facing language mid-document while authoring the PRD or Spec — once started in the resolved language, stay in it through submission; an undetected mid-document switch forces expensive repair later.
++- **PO-Gate (PRD):** for rigor ≥1 / class-high work, a hosted project has no `harness/` and uses the language recorded at onboarding; in the Pipeline's own source checkout, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md` and use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / `docs/operating-model.md` — The lifecycle). True stage-0 hotfixes are exempt. Do not drift the human-facing language mid-document while authoring the PRD or Spec — once started in the resolved language, stay in it through submission; an undetected mid-document switch forces expensive repair later.
+ - **EL-01** — every implementation is a briefed Goldfish
+   dispatch; stage-0 (`roles/elephant.md` — EL-01) is the only exception, further ones only from
+   the PO.

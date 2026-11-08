@@ -1,0 +1,58 @@
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 9d842e86da64bdf7d8abb04cc16f37ed86eb0e5c..31ab00724db9bc1593dee4ff1290b8e352fd4273 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -677,7 +677,6 @@ test("C20 w253 create-adr: the create and refresh shapes are admitted, every nea
+       ["unknown flag", make("--slug", "s", "--title", "T", "--out", "x")],
+       ["repeated flag", make("--slug", "s", "--title", "T", "--slug", "t")],
+       ["refresh with a title", make("--slug", "s", "--title", "T", "--refresh")],
+-      ["refresh without a slug", make("--refresh")],
+       ["refresh with a value", make("--slug", "s", "--refresh", "x")],
+       ["extra positional", make("--slug", "s", "--title", "T", "extra")],
+     ]) bothRefuse(action, f, label);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index b0a75548d8181258a7706c6fb0630b6e06091a20..d881b1ea80674816a4f26b9655845ae5260e838c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -1154,20 +1154,6 @@ for (const [name, prepare] of [
+ // Fixture shape mirrors acknowledgeFixture() above: a state/continuity pair
+ // already bound to a plan/spec pair, deps mocking poGateAuthority/poGateProfile
+ // so no real onboarded project tree is needed.
+-test("a second reopen of a new submission records its own time, not the first reopen's", () => {
+-  const featureId = "reopen-own-time";
+-  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+-  const specPath = `specs/${featureId}/spec.md`;
+-  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-08-27T10:00:00.000Z" });
+-  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
+-  assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], deps)).result, 0);
+-  const laterDeps = { ...deps, now: () => "2026-08-27T11:00:00.000Z" };
+-  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], laterDeps)).result, 0);
+-  assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], laterDeps)).result, 0);
+-  const recorded = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+-  assert.equal(recorded.planInvalidation.invalidatedAt, "2026-08-27T11:00:00.000Z");
+-});
+-
+ function planAuthorityFixture({ featureId, planPath, specPath, advisorUnavailable = false, now = "2026-08-27T10:00:00.000Z" }) {
+   const root = mktempProjectDir();
+   mkdirSync(join(root, "project"), { recursive: true });
+@@ -1330,6 +1316,20 @@ function assertPresentRetired(root, deps) {
+   assert.equal(readFileSync(statePath(root), "utf8"), before, "a retired-route refusal must not mutate state");
+ }
+ 
++// Claude greenfield 2026-11-08: a second reopen of a NEW submission records its own time, not the first reopen's.
++{
++  const featureId = "reopen-own-time";
++  const planPath = `specs/${featureId}/prd_${featureId}.md`;
++  const specPath = `specs/${featureId}/spec.md`;
++  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-08-27T10:00:00.000Z" });
++  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
++  assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], deps)).result, 0);
++  const laterDeps = { ...deps, now: () => "2026-08-27T11:00:00.000Z" };
++  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], laterDeps)).result, 0);
++  assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], laterDeps)).result, 0);
++  assert.equal(JSON.parse(readFileSync(statePath(root), "utf8")).planInvalidation.invalidatedAt, "2026-08-27T11:00:00.000Z");
++}
++
+ function approveFeaturePlanArgs(root, by = "po-test") {
+   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+   return ["approve-plan", "--by", by, "--design-workflow-approval-request", state.planPresentation.designWorkflowApprovalRequestPath];

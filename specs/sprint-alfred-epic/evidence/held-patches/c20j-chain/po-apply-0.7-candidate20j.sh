@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for 20j (all three greenfield transcripts, implementation entry gate): 15 held patches exported from the build clone chain dc40e9cc4..7e87d39c5
+# PO apply script for 20j (all three greenfield transcripts, implementation entry gate): 18 held patches exported from the build clone chain dc40e9cc4..4bd6b287d
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -29,6 +29,9 @@ step 12-704cc8910 'fix(guard): the generated Codex files are committable, a life
 step 13-c76bb3bfe 'fix(dispatch): an Antigravity record lands only what a taken-over child branch delivered'
 step 14-5abcfe2f4 'fix(lifecycle): held answers are used, seal and receipt instructions agree, a Windows access conflict is retried, and hand-written receipts offer no override'
 step 15-7e87d39c5 'test(verify): register the eleventh dispatch-select case'
+step 16-767e52627 'fix(design): routes and findings are named honestly, digests refresh once, the planned surface ignores compounds and design records, and refusal texts say what to do'
+step 17-784cade21 'docs(onboarding): the seeded manifest names the signature and materialization steps'
+step 18-4bd6b287d 'test(lifecycle): a later reopen keeps its own time, and the bare ADR refresh is admitted'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
