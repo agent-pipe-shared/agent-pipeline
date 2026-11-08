@@ -123,6 +123,7 @@ function consumerFixture(log, identity) {
     let status;
     try { status = run(argv, { dir: root, now: () => AT }); } finally { Object.assign(console, old); }
     assert.equal(status, 0, `SETUP ${argv[0]}: ${logs.join("\n")}`);
+    return logs;
   };
   gitOk("init", "-q", "-b", "main");
   gitOk("config", "user.email", "goldfish@example.invalid");
@@ -187,7 +188,9 @@ function consumerFixture(log, identity) {
   const current = () => { const observed = readState(root); assert.equal(observed.status, "ok"); return observed.state; };
   lifecycle(["approve-plan", "--by", "synthetic-po", "--design-approval-request", current().planPresentation.designApprovalRequestPath]);
   assert.equal(current().planApproval.schema, "pipeline.plan-approval.v9");
-  lifecycle(["materialize-architecture"]);
+  // G20-51 (candidate 20b): materialize-architecture registers the feature package itself and names its files in the commit step.
+  const materialized = JSON.parse(lifecycle(["materialize-architecture"]).at(-1));
+  assert.equal(materialized.featurePackage?.status, "registered", `materialize-architecture registers the package: ${JSON.stringify(materialized).slice(0, 600)}`);
   lifecycle(["set-phase", "--phase", "implementation"]);
   assert.ok(current().rigorHistory.some((row) => (row.body ?? row).boundary === "plan-submission"), "the plan-submission rigor row exists (recorded by submit-plan)");
   // A fixture signature for a critical action, made the way the PO's terminal makes it (Ed25519 over the approval intent digest) with the
@@ -201,7 +204,7 @@ function consumerFixture(log, identity) {
       signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keyPair.privateKey).toString("base64") }));
     return files;
   };
-  return { root, parent, env, gitOk, read, write, current, signProof };
+  return { root, parent, env, gitOk, read, write, current, signProof, materializedPackage: materialized.featurePackage };
 }
 
 /** The authored dispatch record a Critic review binds to (shape of the record the host commit route persists). */
@@ -252,8 +255,12 @@ test("G20-35: the close path from implementation to release preflight is walked 
     walkEnv = runnerEnv(identity.runner, fx.root);
     try {
       // 0 the feature package of the approved plan, registered through the sanctioned verb (manifest, Result, Acceptance, review unit, envelope)
+      // QG-04 restatement (candidate 20b, G20-51): materialize-architecture already registered the package, so the sanctioned verb is
+      // the readback here (already-registered, byte-stable); the commit carries every file both outputs name, as the agent's commit
+      // step does.
       const registeredPackage = json(step(log, `${identity.runner}: register-feature-package`, process.execPath, [script("register-feature-package.mjs"), "--root", fx.root], { cwd: fx.root }));
-      assert.equal(registeredPackage.status, "registered", JSON.stringify(registeredPackage).slice(0, 600));
+      assert.equal(registeredPackage.status, "already-registered", JSON.stringify(registeredPackage).slice(0, 600));
+      registeredPackage.commitPaths = [...new Set([...fx.materializedPackage.commitPaths, ...registeredPackage.commitPaths])];
       const commitPaths = (message, paths) => {
         git(log, fx.root, ["add", "-f", "--", ...paths]);
         git(log, fx.root, ["commit", "-qm", message]);

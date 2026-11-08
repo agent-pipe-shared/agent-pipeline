@@ -918,6 +918,37 @@ function autoRegisterFeaturePackage(dir) {
     ...(printed.status === "refused" ? { repair: `node ${script} --root ${resolve(dir)} names the missing artifact or conflict (${printed.code ?? "FPR"})` } : {}) };
 }
 
+/**
+ * C20b (G20-51 follow-up, found by close-path-e2e): the feature package is registered before implementation starts (set-phase
+ * refuses CAC-REGISTRATION-INVALID otherwise; materialize-architecture now does it), so its manifest records the plan status of
+ * that moment, `approved`. Nothing moved it on, and the close path later refused approved -> verifying (one admitted step at a
+ * time). When set-phase implementation succeeds, the one admitted next step approved -> implementing is applied here through the
+ * unchanged feature-package plan/apply route (same planner, digest, journal, lock and readback). Never fatal: a refusal is named
+ * with the manual route. Returns null when there is nothing to advance.
+ */
+function advanceRegisteredPackageToImplementing(dir, planPath, deps = {}) {
+  if (typeof planPath !== "string" || planPath === "") return null;
+  const root = resolve(dir);
+  const manifest = `${dirname(planPath).split(sep).join("/")}/lifecycle.json`;
+  let current = null;
+  try { current = JSON.parse(readFileSync(join(root, manifest), "utf8")); } catch { return null; }
+  if (current?.state !== "approved") return null;
+  const manual = `pipeline-state.mjs feature-package-plan --root <root> --manifest ${manifest} --next-state implementing, then feature-package-apply with the printed planSha256`;
+  const plan = planFeaturePackageTransition(root, manifest, "implementing", { head: featurePackageHead(root, deps) });
+  if (plan?.status !== "preview") return { status: "refused", manifest, code: plan?.reason ?? plan?.status ?? "unavailable", repair: manual };
+  const printed = [];
+  const old = { log: console.log, error: console.error };
+  console.log = (...args) => { printed.push(args.map(String).join(" ")); };
+  console.error = (...args) => { printed.push(args.map(String).join(" ")); };
+  let status;
+  try {
+    status = runFeaturePackageApplyCommand(["--root", root, "--manifest", manifest, "--next-state", "implementing", "--plan-sha256", sha256CanonicalJson(plan)], deps);
+  } finally { Object.assign(console, old); }
+  return status === 0
+    ? { status: "applied", manifest, from: "approved", to: "implementing" }
+    : { status: "refused", manifest, code: "feature-package-apply", detail: printed.join(" ").slice(0, 400), repair: manual };
+}
+
 function stateRelativePath(dir) {
   return relative(resolve(dir), statePath(dir)).split(sep).join("/");
 }
@@ -11851,6 +11882,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       }
       syncNextActionDocs(dir, written.transition.state);
       console.log('Phase set: "implementation"; lifecycle="implementing".');
+      const advanced = (deps.advanceRegisteredPackageToImplementing ?? advanceRegisteredPackageToImplementing)(dir, written.transition.state?.activeFeature?.planPath, deps);
+      if (advanced?.status === "applied") {
+        console.log(`Feature package: ${advanced.manifest} moved approved -> implementing; commit it with the other implementation-entry files (a separate commit from the verification tiers below).`);
+      } else if (advanced?.status === "refused") {
+        console.error(`Warning: the feature package ${advanced.manifest} stays "approved" (${advanced.code}); the close path needs it at "implementing". Repair (agent, no PO step): ${advanced.repair}.`);
+      }
       // C20 G20-46: the verify command now sits in the protected calibration tiers (GS-10/GS-11). The pre-commit hook admits
       // them without any human step ONLY as their own commit: the staged set must be exactly these paths. A live Antigravity
       // run staged docs/state.md with them, lost the route silently and spent a PO override signature. Name the step here,
