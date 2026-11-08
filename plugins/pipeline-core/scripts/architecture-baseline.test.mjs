@@ -665,6 +665,32 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       assert.equal(predecessor.date, "2026-01-01", "the predecessor keeps its own date and scope; only the status changes");
     });
 
+    it("7.13a the binding step refuses a git-ignored selection and one holding a private identifier before anything is written, and names the repair", () => {
+      const root = makeRoot();
+      assert.equal(spawnSync("git", ["-C", root, "init", "-q"], { encoding: "utf8" }).status, 0);
+      assert.equal(spawnSync("git", ["-C", root, "config", "user.email", "owner@corp.example"], { encoding: "utf8" }).status, 0);
+      fs.mkdirSync(path.join(root, "specs"), { recursive: true });
+      fs.mkdirSync(path.join(root, "scratch"), { recursive: true });
+      fs.writeFileSync(path.join(root, ".gitignore"), "scratch/\n");
+      fs.writeFileSync(path.join(root, "specs", "design.md"), "# Design\n");
+      assert.equal(create(root, "--slug", "store", "--title", "Use a store", "--date", "2026-11-07").status, 0);
+      fs.writeFileSync(path.join(root, "docs", "adr", "draft-store.md"), filled("Use a store"));
+      ok(CREATE_ADR, "--root", root, "--slug", "store", "--refresh");
+      const base = ["--root", root, "--feature", "e2e", "--carrier", "specs/design.md", "--draft", "store"];
+      const carrier = fs.readFileSync(path.join(root, "specs", "design.md"));
+      fs.writeFileSync(path.join(root, "scratch", "po-selection.json"), `${JSON.stringify(SELECTION)}\n`);
+      const ignored = run(BIND, ...base, "--selection", "scratch/po-selection.json");
+      assert.notEqual(ignored.status, 0);
+      assert.match(ignored.stderr, /git-ignored[\s\S]*specs\/po-selection\.json/u);
+      const held = { attributedTo: "PO chat selection 2026-11-08", selections: [{ topic: "owner", text: "Mail owner@corp.example about every release." }] };
+      fs.writeFileSync(path.join(root, "specs", "po-selection.json"), `${JSON.stringify(held)}\n`);
+      const identifier = run(BIND, ...base, "--selection", "specs/po-selection.json");
+      assert.notEqual(identifier.status, 0);
+      assert.match(identifier.stderr, /private identifier[\s\S]*Replace the identifier/u);
+      assert.doesNotMatch(identifier.stderr, /owner@corp/u, "the refusal names the category, never the value");
+      assert.ok(fs.readFileSync(path.join(root, "specs", "design.md")).equals(carrier), "the carrier is untouched");
+    });
+
     it("7.14 the binding step refuses without the PO's own selection, with a REPLACE: placeholder or with a malformed selection, names the repair and leaves nothing behind", () => {
       const root = makeRoot();
       assert.equal(spawnSync("git", ["-C", root, "init", "-q"], { encoding: "utf8" }).status, 0);

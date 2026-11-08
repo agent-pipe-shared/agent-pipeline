@@ -91,7 +91,8 @@ node <plugin-root>/scripts/create-adr.mjs --root "$PWD" --slug <slug> --title "<
   ```bash
   node <plugin-root>/scripts/bind-adr-proposals.mjs --root "$PWD" --feature <feature-id> --carrier <design-companion>.md --selection <po-selection>.json --draft <slug> [--draft <slug>...]
   ```
-  `--selection` is a JSON file holding the PO's own selection, saved verbatim from the PO's reply:
+  `--selection` is a JSON file next to the design file in the feature folder (it is committed with the package, so never under the
+  git-ignored `scratch/`), holding the PO's own selection, saved verbatim from the PO's reply except that a private identifier is replaced:
   `{"attributedTo": "PO chat selection <date>", "selections": [{"topic": "...", "text": "<the PO's words>", "adr": "<optional slug>"}]}`.
   The step copies it and never writes or edits it, so do not invent selection text; if the PO has not chosen yet, ask first. It
   refuses a draft that still has `REPLACE:` lines or a stale digest and names the repair. On success it writes the manifest and one

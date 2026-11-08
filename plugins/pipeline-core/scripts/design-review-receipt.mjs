@@ -30,7 +30,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 
 import { createDesignReviewReceipt, describeDesignReviewFindingIdRefusal } from "../lib/design-review-receipt.mjs";
@@ -129,6 +129,20 @@ function resolveOutput(repoReal, outPath) {
 
 const sha256Of = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
+/** A sibling receipt that binds this report to other PRD or Spec bytes, or null. Unreadable siblings are not receipts and are skipped. */
+function priorReceiptOfReport(repoReal, outPath, reportSha256, sources) {
+  const directory = dirname(outPath) === "." ? "" : `${dirname(outPath)}/`;
+  let names;
+  try { names = readdirSync(join(repoReal, ...directory.split("/").filter(Boolean))); } catch { return null; }
+  for (const name of names.filter((entry) => entry.endsWith(".json")).sort()) {
+    let parsed;
+    try { parsed = JSON.parse(readFileSync(join(repoReal, ...directory.split("/").filter(Boolean), name), "utf8")); } catch { continue; }
+    if (typeof parsed?.report?.sha256 !== "string" || parsed.report.sha256 !== reportSha256 || typeof parsed?.sources?.prd?.sha256 !== "string") continue;
+    if (parsed.sources.prd.sha256 !== sources.prd.sha256 || parsed.sources.spec?.sha256 !== sources.spec.sha256) return `${directory}${name}`;
+  }
+  return null;
+}
+
 /**
  * Produce a receipt from files on disk and write it with exclusive create.
  * `deps.now` exists for tests; no command-line flag reaches them.
@@ -216,6 +230,13 @@ export function createReceiptFromDisk(input, deps = {}) {
     const previousRead = readBound(repoReal, previousPath, "previous receipt");
     if (!previousRead.ok) return previousRead;
     previous = { path: previousPath, bytes: previousRead.bytes };
+  }
+
+  // Antigravity greenfield 2026-11-08: the old report was stamped onto a changed PRD, labelled round 1, and the second signature bound it.
+  // A receipt says a review read these bytes, so a report already bound to other bytes in this folder cannot be bound again.
+  const reused = priorReceiptOfReport(repoReal, request.outPath, sha256Of(reportRead.bytes), sources);
+  if (reused !== null) {
+    return refuse("DRC-REPORT-REUSED", `the report ${request.reportPath} is already bound to different PRD or Spec bytes by ${reused}. A report describes what its review read: run the review again for the current bytes, write a new report, and pass the earlier receipt with --previous for a delta round.`);
   }
 
   const runner = detectRunner(env);

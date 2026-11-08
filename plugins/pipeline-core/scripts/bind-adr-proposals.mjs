@@ -21,6 +21,7 @@
  * come only from --selection, a file the PO's reply was saved into; the script validates and copies it, it never invents or edits it.
  * Nothing is written unless the whole result passed the consumer's own manifest check; a refused request leaves no file behind.
  */
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -31,6 +32,7 @@ import {
   inspectProspectiveArchitectureManifest, prospectiveJson,
 } from "../lib/architecture-prospective-materialization.mjs";
 import { parseDesignDecisionBindings } from "../lib/design-decision-bindings.mjs";
+import { intakePrivateIdentifierFindings } from "../lib/onboarding-continuity.mjs";
 import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
 import { nextFreeNumber } from "./create-adr.mjs";
 
@@ -147,7 +149,16 @@ function bind(root, values, slugs) {
   let existingBinding;
   try { existingBinding = parseDesignDecisionBindings(carrier.bytes); }
   catch (error) { return refuse(`${carrierPath} holds a malformed pipeline-design-decision-bindings block (${error.message}); repair or remove that block, then run this command again`); }
+  // Claude greenfield 2026-11-08: a selection under the git-ignored scratch/ became a bound companion nobody could commit; two reopens and three receipts.
+  if (spawnSync("git", ["-C", root, "check-ignore", "-q", "--", selectionPath], { encoding: "utf8", shell: false }).status === 0) {
+    refuse(`${selectionPath} is git-ignored, but the PO's selection is bound into the signed package and has to be committed. Move it next to the design file (${dirname(carrierPath) === "." ? "" : `${dirname(carrierPath)}/`}po-selection.json), then run this command again with that path as --selection.`);
+  }
   const selection = readSelection(root, selectionPath);
+  // Antigravity greenfield 2026-11-08: the PO's reply held an address, the pre-commit hook refused it after the binding. Refused here, before any file exists.
+  let identifiers = [];
+  try { identifiers = intakePrivateIdentifierFindings({ root, targets: { selection: { path: selectionPath, content: selection.file.text } }, spawn: spawnSync }); }
+  catch { identifiers = []; }
+  if (identifiers.length > 0) refuse(`${selectionPath} holds a private identifier (${identifiers[0].categories.join(", ")}), and the pre-commit hook would refuse the bound copy. Replace the identifier with a neutral word such as [address], keep the rest of the PO's words, then run this command again.`);
   for (const item of selection.selections) {
     if (item.adr !== undefined && !slugs.includes(item.adr)) refuse(`${selectionPath}: a selection names the draft ${JSON.stringify(item.adr)}, which is not among the --draft slugs (${slugs.join(", ")})`);
   }

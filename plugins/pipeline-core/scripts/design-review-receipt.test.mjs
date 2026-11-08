@@ -199,6 +199,25 @@ test("DRC-OUT-EXISTS names a new --out path as the way forward and keeps the exi
   assert.equal(readFileSync(join(repo, RECEIPT1), "utf8"), "do not touch\n");
 }));
 
+// Antigravity greenfield 2026-11-08: an old report was stamped onto a changed PRD and bound by the second signature.
+test("a report already bound to other PRD or Spec bytes is refused, names the earlier receipt and writes nothing", withRepo((repo) => {
+  assert.equal(createReceiptFromDisk(request(repo), { env: CLAUDE, now }).ok, true);
+  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v2\n");
+  const result = createReceiptFromDisk(request(repo, { outPath: RECEIPT2 }), { env: CLAUDE, now });
+  assert.deepEqual([result.ok, result.code], [false, "DRC-REPORT-REUSED"]);
+  assert.match(result.message, /design-review-1\.receipt\.json/u);
+  assert.match(result.message, /run the review again/u);
+  assert.equal(existsSync(join(repo, RECEIPT2)), false);
+}));
+
+test("control: the same report over the same bytes and a new report over changed bytes are both still accepted", withRepo((repo) => {
+  assert.equal(createReceiptFromDisk(request(repo), { env: CLAUDE, now }).ok, true);
+  assert.equal(createReceiptFromDisk(request(repo, { outPath: RECEIPT2 }), { env: CLAUDE, now }).ok, true);
+  writeFileSync(join(repo, SPEC), "# Spec\n\nspec text v2\n");
+  const third = "specs/feat-x/review/design-review-3.receipt.json";
+  assert.equal(createReceiptFromDisk(request(repo, { reportPath: REPORT2, outPath: third }), { env: CLAUDE, now }).ok, true);
+}));
+
 test("an output whose directory does not exist is refused, never created", withRepo((repo) => {
   const result = createReceiptFromDisk(request(repo, { outPath: "specs/feat-x/other/receipt.json" }), { env: CLAUDE, now });
   assert.equal(result.code, "DRC-OUT-PARENT-MISSING");

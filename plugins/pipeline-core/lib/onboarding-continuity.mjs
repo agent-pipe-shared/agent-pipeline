@@ -7734,7 +7734,7 @@ function buildOnboardingIntakeGeneratePlan({
 // An early, typed hint -- never a gate -- that a generated text holds what the pre-commit hook
 // (scripts/check-private-identifiers.mjs) will refuse. It reuses that detector's exports and
 // reports category and target names only, never the matched value. Any failure is silent.
-function intakePrivateIdentifierFindings({ root, targets, spawn, patterns }) {
+export function intakePrivateIdentifierFindings({ root, targets, spawn, patterns }) {
   let active = patterns;
   if (!active) {
     const configured = spawn("git", ["config", "--get", "user.email"], { cwd: root, encoding: "utf8", shell: false });
