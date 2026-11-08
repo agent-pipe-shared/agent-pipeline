@@ -1,0 +1,128 @@
+diff --git a/harness/review-protocol.md b/harness/review-protocol.md
+index 3ed71fa7a9fb8c6667132030b626fadd191a66bb..b4737ae44fe8d4aa655daef289d8ffead7b6815c 100644
+--- a/harness/review-protocol.md
++++ b/harness/review-protocol.md
+@@ -119,7 +119,9 @@ blob SHA-256 and mode without emitting bytes and never reads it, and the
+ forbidden-material rule for handover, state and history is not relaxed. The
+ Coordinator derives the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`
+ (schema `pipeline.critic-correction-input-bindings.v1`) and the Critic verifies
+-them; the command refuses a mixed path (CCI-MIXED), and an unknown role, a
++them; the command refuses a mixed path (CCI-MIXED), except that a source file
++moved into the project-state record counts as a reviewed deletion plus an
++excluded addition, and an unknown role, a
+ refused path or missing bindings for such paths still stops the review.
+ 
+ The role finding-disposition record is admissible only for the files the project
+diff --git a/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+index e535da1d55c3f1433685d3802f276673a0ce3ec6..af8a084d04bcc348a363a97013391eb9f1a6672a 100644
+--- a/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
++++ b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+@@ -113,6 +113,16 @@ function parseRaw(output) {
+ }
+ const side = (value) => (ZERO_ID.test(value) ? ABSENT : value);
+ 
++// Live 2026-11-08 (Codex greenfield): a resolved note moved from specs/<id>/evidence/ to docs/state-archive/ stopped the Critic preflight, and the only way
++// left was rewriting history. Moving a source file into the project-state record is a deletion the Critic reviews plus an addition the role already excludes,
++// so each side is classified on its own. Every other crossing, the reverse direction included, stays CCI-MIXED.
++function splitMoveIntoProjectState(entry, roleOf) {
++  const [from, to] = entry.paths;
++  if (entry.status !== "R" || roleOf(from) !== "source" || roleOf(to) !== ROLE_PROJECT_STATE_RECORD) return [entry];
++  const noBlob = "0".repeat(entry.blobBefore.length), noMode = "000000";
++  return [{ ...entry, status: "D", paths: [from], blobAfter: noBlob, modeAfter: noMode }, { ...entry, status: "A", paths: [to], blobBefore: noBlob, modeBefore: noMode }];
++}
++
+ function sha256OfBlob(repoRoot, blob) {
+   if (blob === ABSENT) return ABSENT;
+   const object = git(repoRoot, ["cat-file", "blob", blob], { buffer: true });
+@@ -152,9 +162,10 @@ export function deriveCriticCorrectionInputBindings({ repoRoot, base, head, proj
+     for (const { commit, parents } of commits) {
+       const from = parents[0] ?? EMPTY_TREE;
+       const raw = gitOrRange(repoRoot, ["diff-tree", "-r", "-z", "-M", "--raw", "--no-textconv", "--no-ext-diff", from, commit], "diff-tree");
+-      for (const entry of parseRaw(raw)) {
+-        const roles = entry.paths.map((p) => classify(p, handover, findingRecords));
+-        if (new Set(roles).size > 1) fail("CCI-MIXED", `a ${CHANGE_NAMES[entry.status] ?? "change"} crosses classes (${roles.join(" / ")})`);
++      const roleOf = (p) => classify(p, handover, findingRecords);
++      for (const entry of parseRaw(raw).flatMap((found) => splitMoveIntoProjectState(found, roleOf))) {
++        const roles = entry.paths.map(roleOf);
++        if (new Set(roles).size > 1) fail("CCI-MIXED", `${entry.paths.join(" -> ")} crosses classes (${roles.join(" / ")}) in commit ${commit}; before committing, add the new path and delete the old one in two separate commits so each side is classified on its own; a move already in the history is a question for the PO, never a history rewrite`);
+         entry.paths.forEach((path, index) => {
+           if (roles[index] === "source") { sources.add(path); return; }
+           const pair = entry.paths.length === 2;
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index a8c5aaa6e150a1d98e9ee37f9e95270807f5d2d1..9bc294c237cc757c3569f5de08b704ab34b794bf 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -211,7 +211,8 @@ function checkCorrectionInputBindings(root, baseCommit, candidateCommit, referen
+     }
+   } catch (error) {
+     const code = error instanceof CriticCorrectionInputBindingsError ? error.code : "CCI-UNEXPECTED";
+-    fail("CDP-CORRECTION-INPUT-REFUSED", `Fix the range and rerun the preflight; the bindings derivation refused it with ${code}.`);
++    const detail = error instanceof CriticCorrectionInputBindingsError ? `: ${error.detail}` : "";
++    fail("CDP-CORRECTION-INPUT-REFUSED", `Fix the range and rerun the preflight; the bindings derivation refused it with ${code}${detail}.`);
+   }
+   // N41: a block-history-shaped file in the range collides with the Critic's reference boundary (CR-01a); refuse here, before anything is reserved.
+   const historyPaths = historyPathsInBindings(derived);
+@@ -871,7 +872,7 @@ export function criticDispatchPreflightRefusalLine(error, { sweep = false } = {}
+     code,
+     // C18-8 (AC-239): a CDP-ARGUMENT refusal used to reach the caller as a bare code. Its human reason now rides on the same stderr line;
+     // a reason a refusal already carries in its details is kept as it is.
+-    ...(code === "CDP-ARGUMENT" && typed ? { reason: error.message } : {}),
++    ...((code === "CDP-ARGUMENT" || code === "CDP-CORRECTION-INPUT-REFUSED") && typed ? { reason: error.message } : {}),
+     ...(!sweep && details !== null ? details : {}),
+   })}\n`;
+ }
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 44202d299bfb31a12743d34e1fde81d0a6c8c3ec..ae5f66ffafb591073321e6b584a5109e92e878c8 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -10,7 +10,7 @@ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ const completionCases = [];
+ function test(name, run) { completionCases.push({id: "CDPF" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
+ 
+-import { CriticDispatchPreflightError, EVIDENCE_SWEEP_SCHEMA, enumerateEvidenceArtifacts, preflightCriticDispatch, parseCriticDispatchPreflightArgs } from "./critic-dispatch-preflight.mjs";
++import { CriticDispatchPreflightError, EVIDENCE_SWEEP_SCHEMA, criticDispatchPreflightRefusalLine, enumerateEvidenceArtifacts, preflightCriticDispatch, parseCriticDispatchPreflightArgs } from "./critic-dispatch-preflight.mjs";
+ import * as preflightModule from "./critic-dispatch-preflight.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import childProcess from "node:child_process";
+@@ -1565,9 +1565,41 @@ test("CCI preflight (6) a rename across classes is CDP-CORRECTION-INPUT-REFUSED
+     writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
+     const error = cdpRefusal(() => preflightCriticDispatch(input({ ...fx, candidate })), "CDP-CORRECTION-INPUT-REFUSED");
+     assert.ok(error.message.includes("CCI-MIXED"));
++    // Live 2026-11-08: the caller saw a bare code and no way out.
++    const printed = JSON.parse(criticDispatchPreflightRefusalLine(error));
++    assert.match(printed.reason, /src\/a\.txt -> evidence\/critic\/p1\/a\.txt crosses classes/u);
++    assert.match(printed.reason, /two separate commits/u);
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++test("C21 a source file moved into the state archive is a reviewed deletion plus an excluded addition, and the preflight admits the range", () => {
++  const fx = cciFixture();
++  try {
++    mkdirSync(join(fx.root, "docs", "state-archive"), { recursive: true });
++    git(fx.root, ["mv", "src/a.txt", "docs/state-archive/a.txt"]);
++    const moved = commit(fx.root, "archive a resolved note");
++    const document = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: moved });
++    assert.ok(document.sourcePaths.includes("src/a.txt"));
++    const archived = document.exclusions.find((row) => row.path === "docs/state-archive/a.txt");
++    assert.equal(archived.role, "project-state record");
++    assert.equal(archived.versions[0].change, "added");
++    git(fx.root, ["mv", "docs/state-archive/a.txt", "src/a.txt"]);
++    const back = commit(fx.root, "the reverse direction");
++    cciRefusal(() => deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: moved, head: back }), "CCI-MIXED");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++  const live = cciPreflightFixture({});
++  try {
++    mkdirSync(join(live.root, "docs", "state-archive"), { recursive: true });
++    git(live.root, ["mv", "src/a.txt", "docs/state-archive/a.txt"]);
++    const candidate = commit(live.root, "archive a resolved note");
++    const tree = git(live.root, ["rev-parse", "HEAD^{tree}"]);
++    writeFileSync(join(live.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
++    const result = preflightCriticDispatch(input({ ...live, candidate }));
++    assert.equal(result.status, "packet-ready");
++    assert.equal(result.correctionInputBindings.bindings.exclusions.find((row) => row.path === "docs/state-archive/a.txt").role, "project-state record");
++  } finally { rmSync(live.root, { recursive: true, force: true }); }
++});
++
+ test("CCI preflight (7) projectStateOptional lets an unreadable calibration mean no project-state paths, while the default still refuses", () => {
+   const fx = cciPreflightFixture({ "docs/state.md": "state v1\n", "evidence/critic/p1/r.md": "retained\n" }, { calibration: false });
+   try {

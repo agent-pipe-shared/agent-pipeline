@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 21 (live findings of the three greenfield runs, Codex association repair, read grammar): 16 held patches exported from the build clone chain 03d51f690..19042a31a
+# PO apply script for candidate 21 (live findings of the three greenfield runs, Codex association repair, read grammar): 19 held patches exported from the build clone chain 03d51f690..9a92456f2
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -30,6 +30,9 @@ step 13-6f924fce0 'fix(guard): the listing row of the admitted grammar no longer
 step 14-197f8a5f7 'test(session-authority): the stranded association is proven against the real reader; the design-phase pin'"'"'s two cases join its policy'
 step 15-82898aded 'test(verify): the grep suite left the single-test class when it gained the context-flag case'
 step 16-19042a31a 'test(verify): the design-phase pin'"'"'s policy lists all twelve of its cases'
+step 17-fab1d317d 'fix(critic): a source file moved into the state archive no longer stops the Critic preflight'
+step 18-1745064de 'fix(dispatch): a sibling replacing the registry on Windows is retried a few times before the launch is refused'
+step 19-9a92456f2 'test(verify): register the new Critic preflight case and the grown assertion counts'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

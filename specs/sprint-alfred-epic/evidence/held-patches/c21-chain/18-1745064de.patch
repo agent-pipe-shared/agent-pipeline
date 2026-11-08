@@ -1,0 +1,55 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs
+index edb698fb37a0d420599b289d2a1fd8a56172033e..1af1e861d7e6de9f2aefc8348df86a8d2d079de9 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs
+@@ -85,6 +85,22 @@ const cases = [
+     assert.ok(bindingClock <= 10000, "the opt-in retry stays inside the budget");
+     const otherRoot = () => { const e = new Error("root"); e.code = "SDC-ROOT"; e.reason = "repository-root-changed"; throw e; };
+     assert.throws(() => retryWhileSessionAuthorityLockHeld(otherRoot, { sleep: () => {}, retryBindingChange: true }), error => error.reason === "repository-root-changed", "only the binding change is retried, no other SDC-ROOT reason");
++    // C21 (QG-04, extension only): a sibling replacing the registry surfaces as WIN-AUTH-CAS / WIN-AUTH-OPEN before the boundary; a few retries, never more, never after entry.
++    for (const reason of ["WIN-AUTH-CAS", "WIN-AUTH-OPEN"]) {
++      const windowsRefusal = () => { const e = new Error(reason); e.code = "SDC-AUTHORITY-UNAVAILABLE"; e.reason = reason; throw e; };
++      let replaced = 0;
++      assert.equal(retryWhileSessionAuthorityLockHeld(() => { replaced += 1; if (replaced < 3) windowsRefusal(); return "bound"; }, { sleep: () => {} }), "bound");
++      let lasting = 0;
++      assert.throws(() => retryWhileSessionAuthorityLockHeld(() => { lasting += 1; windowsRefusal(); }, { sleep: () => {} }), error => error.reason === reason);
++      assert.equal(lasting, 5, "a lasting cause surfaces after the bounded retries");
++      let afterEntry = 0;
++      assert.throws(() => retryWhileSessionAuthorityLockHeld((entered) => { afterEntry += 1; entered.value = true; windowsRefusal(); }, { sleep: () => {} }), error => error.reason === reason);
++      assert.equal(afterEntry, 1, "a refusal after the boundary opened is reported, not repeated");
++    }
++    const otherWindows = () => { const e = new Error("dacl"); e.code = "SDC-AUTHORITY-UNAVAILABLE"; e.reason = "WIN-AUTH-DACL"; throw e; };
++    let dacl = 0;
++    assert.throws(() => retryWhileSessionAuthorityLockHeld(() => { dacl += 1; otherWindows(); }, { sleep: () => {} }), error => error.reason === "WIN-AUTH-DACL");
++    assert.equal(dacl, 1, "no other Windows authority refusal is retried");
+     // C19L-W251 (QG-04, extension only): the terminal write boundary is repeated on a fresh boundary while a sibling race refuses it, with a refresh
+     // between rounds, bounded; any other refusal and the last race are raised unchanged.
+     const race = (reason) => () => { const e = new Error(reason); e.code = reason === "reference-preimage-changed" ? "SDC-AUTHORITY-CAS" : "SDC-AUTHORITY-UNAVAILABLE"; e.reason = reason; throw e; };
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index c6472453eca8bb3e959fc9953dfcea6b06c2d475..db8ad416f72e67340ad64dd2fb58dccecf8eb5d9 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -1380,8 +1380,9 @@ export function resolveGovernedItemQueue({ root } = {}) {
+ 
+ /** Bounded retry for a transiently held Session Authority lock (SDC-LOCK-HELD is thrown, not returned).
+  * Only a refusal raised before the callback ran is retried; the same code is rethrown when the budget ends. */
++const WINDOWS_AUTHORITY_RACE_RETRIES=4;
+ export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),now=()=>Date.now(),onWait=null,retryBindingChange=false}={}) {
+-  const deadline=now()+budgetMs;let delay=25;
++  const deadline=now()+budgetMs;let delay=25,windowsRaces=0;
+   for(;;){
+     const entered={value:false};
+     try{return attempt(entered);}
+@@ -1392,7 +1393,11 @@ export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep
+       // repository afresh, so the retry binds the moved HEAD; a refusal after the boundary opened (`entered`) is still reported, not repeated.
+       const transient=error?.code==='SDC-LOCK-HELD'||(error?.code==='SDC-AUTHORITY-UNAVAILABLE'&&error?.reason==='state-push-owner-unavailable')
+         ||(retryBindingChange===true&&error?.code==='SDC-ROOT'&&error?.reason==='repository-binding-changed');
+-      if(!transient||entered.value||now()+delay>deadline)throw error;
++      // Live 2026-11-08 (native Windows, five starts in one reply): two launches were refused WIN-AUTH-CAS / WIN-AUTH-OPEN before their boundary opened, while a
++      // sibling rewrote the registry. Seen from outside the lock that is a concurrent replace, so a few retries bind the new file; a lasting cause still surfaces.
++      const windowsRace=error?.code==='SDC-AUTHORITY-UNAVAILABLE'&&(error?.reason==='WIN-AUTH-CAS'||error?.reason==='WIN-AUTH-OPEN')&&windowsRaces<WINDOWS_AUTHORITY_RACE_RETRIES;
++      if(!(transient||windowsRace)||entered.value||now()+delay>deadline)throw error;
++      if(!transient)windowsRaces+=1;
+       if(typeof onWait==='function'){try{onWait(error,delay);}catch{/* a diagnostic never changes the wait */}}
+       sleep(delay);delay=Math.min(delay*2,1000);
+     }
