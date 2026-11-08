@@ -1,0 +1,157 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index cbe6a68bd6c2e9795c743897f819362bce45096f..c7d2ebd5d0a06e2b33c56d49a36bf7258b647515 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -578,7 +578,7 @@ const isCriticName = (value) => typeof value === "string" && bareNativeType(valu
+  * G20-41 (AC-108): the Critic CHILD's final `send_message` to its parent issues the Source return record. The child is recognised only through facts the
+  * runner wrote: its own conversationId in the payload (and an artifact directory of that same name), the host's descriptor under the PARENT's brain
+  * directory (`attributed`, from evaluateNativeChildCall) naming the Critic by type or role, and a Recipient equal to the parent the DESCRIPTOR names --
+- * never a value the Message supplies beyond the verdict itself. Anything else is `not-applicable` (a silent no-op). Never throws and never decides the tool call;
++ * never a value the Message supplies beyond the verdict itself. Anything else is `not-applicable` (a silent no-op). Never throws;
+  * the hook fires twice per call (child worktree cwd, main repository cwd) and the record is created exclusively, so the second firing is `already-issued`.
+  * @returns {{ status: string, packetId?: string }}
+  */
+@@ -594,10 +594,13 @@ export function issueAntigravityCriticReturn(input, attributed, { nowMs = Date.n
+     let commonDir = null;
+     for (const workspace of workspaces) { commonDir = resolveGitCommonDir(workspace); if (commonDir !== null) break; }
+     if (commonDir === null) return { status: "unavailable" };
+-    return issueCriticSourceReturnFromMessage({ commonDir, runner: "antigravity", text: args.Message, nowMs });
++    return issueCriticSourceReturnFromMessage({ commonDir, runner: "antigravity", text: args.Message, nowMs, child: attributed.childConversationId, stepIdx: input.stepIdx });
+   } catch { return { status: "unavailable" }; }
+ }
+ 
++/** C21B: the one refusal a Critic child gets when its message to the parent carries no verdict while its packet waits for one. */
++export const CRITIC_VERDICT_REQUIRED_DENIAL = "BLOCKED (Antigravity Critic return): CRITIC-VERDICT-JSON-REQUIRED: this message to your parent carries no machine-readable verdict, so the review cannot be bound to its packet and the feature close would need a PO signature. Send the same report again and end it with one fenced json block holding exactly the keys findings, deliberately_not_flagged, trajectory_verdict, trajectory_evidence, briefing_violations and pass (each finding: gap, risk, severity blocker|major|minor, evidence, spec_ref; trajectory_verdict: consistent|inconsistent|not verifiable). If you cannot state a verdict, send your message unchanged: this refusal happens once.";
++
+ export async function runAntigravityPreToolGuard(rawInput) {
+   // M4b: a native child in a branch worktree names the worktree FIRST in workspacePaths. The worktree is outside the project and carries no
+   // governance marker, so every check below would see an ungoverned directory and allow the call (measured: even `git push origin main`).
+@@ -635,11 +638,12 @@ export async function runAntigravityPreToolGuard(rawInput) {
+   if (!nativeChild.ok) deny(`BLOCKED (Antigravity native child): ${nativeChild.reason}`);
+   // G20-43: a resolved model that differs from the registry cell is recorded in the verdict and noticed here (one stderr line), never denied.
+   if (nativeChild.notice) diagnostic("agy-native-child-model-mismatch", { child: nativeChild.attributed.typeName, resolved: nativeChild.modelCheck.resolved, expected: nativeChild.modelCheck.expected.value, duty: nativeChild.modelCheck.expected.duty });
+-  // G20-41: the Critic child's final send_message to its parent issues the Source return record. This never decides the call; the write is the
+-  // only effect and one diagnostic line says what became of it when it was applicable.
++  // G20-41: the Critic child's final send_message to its parent issues the Source return record, and one diagnostic line says what became of it when it was applicable.
++  // C21B: the only call this decides is a verdict-less message while its packet waits for a verdict, and that one is refused once per child.
+   if (input?.toolCall?.name === "send_message") {
+     const criticReturn = issueAntigravityCriticReturn(input, nativeChild.attributed);
+     if (criticReturn.status !== "not-applicable") diagnostic("critic-source-return", { status: criticReturn.status, packetId: criticReturn.packetId });
++    if (criticReturn.refuse === true) deny(CRITIC_VERDICT_REQUIRED_DENIAL);
+   }
+   // The host owns its brain and config directories; an agent write there would forge a child's identity or message.
+   const brainRefusal = ["Edit", "Write", "Bash"].includes(normalized.toolName)
+diff --git a/plugins/pipeline-core/lib/critic-source-return.mjs b/plugins/pipeline-core/lib/critic-source-return.mjs
+index d2014a9a1facde0057257ef6712b53a34ac6eb2a..016be3a62a54ac85a516e94275a4dba20f82346b 100644
+--- a/plugins/pipeline-core/lib/critic-source-return.mjs
++++ b/plugins/pipeline-core/lib/critic-source-return.mjs
+@@ -95,16 +95,41 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
+ /**
+  * G20-41: the Antigravity producer. The caller (hooks/antigravity-pretool-guard.mjs) has already recognised the Critic child's final `send_message`
+  * to its parent from runner-written facts; this takes only the message text and issues the record exactly like the stop path. Never throws.
+- * @param {{ commonDir: string, runner: "antigravity", text: string, nowMs?: number }} request
++ * @param {{ commonDir: string, runner: "antigravity", text: string, nowMs?: number, child?: string, stepIdx?: number }} request
+  */
+-export function issueCriticSourceReturnFromMessage({ commonDir, runner, text, nowMs = Date.now() } = {}) {
++export function issueCriticSourceReturnFromMessage({ commonDir, runner, text, nowMs = Date.now(), child = null, stepIdx = null } = {}) {
+   try {
+     if (!MESSAGE_RUNNERS.has(runner)) return { status: "not-applicable" };
+     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
+-    return issueForVerdict({ commonDir, runner, verdict: extractCriticVerdict(text), nowMs });
++    const verdict = extractCriticVerdict(text);
++    return verdict === null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs });
+   } catch { return { status: "unavailable" }; }
+ }
+ 
++/**
++ * C21B: a Critic child's message without a verdict, while exactly one admitted packet waits for that verdict, is sent back ONCE per child (`refuse: true`), because the
++ * calling agent would otherwise transcribe the verdict, it would finalize as caller-authored and the close would need a PO signature. The marker sits in the private packet
++ * directory, created exclusively; the hook fires twice per call, so the same step is refused again and any LATER step passes, which leaves a Critic that cannot state a verdict a way out.
++ */
++function noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) {
++  const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
++  if (typeof child !== "string" || child === "" || !existsSync(controlRoot)) return { status: "no-verdict" };
++  const open = openAdmittedPackets(controlRoot, runner, nowMs);
++  if (open === null || open.length !== 1 || open[0].issued === true) return { status: "no-verdict" };
++  const [target] = open;
++  const marker = join(target.packetDir, `verdict-requested-${sha256(child)}.json`);
++  let fd;
++  try { fd = openSync(marker, "wx", 0o600); }
++  catch (error) {
++    if (error?.code !== "EEXIST") return { status: "no-verdict", packetId: target.packetId };
++    let prior = null;
++    try { prior = JSON.parse(readFileSync(marker, "utf8")); } catch { prior = null; }
++    return Number.isSafeInteger(stepIdx) && prior?.stepIdx === stepIdx ? { status: "no-verdict", packetId: target.packetId, refuse: true } : { status: "no-verdict", packetId: target.packetId };
++  }
++  try { writeSync(fd, canonicalJson({ stepIdx: Number.isSafeInteger(stepIdx) ? stepIdx : null })); } finally { closeSync(fd); }
++  return { status: "no-verdict", packetId: target.packetId, refuse: true };
++}
++
+ /** The shared half: bind the returned verdict to the one open admitted packet of this runner and write the record exclusively. */
+ function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
+   if (verdict === null) return { status: "no-verdict" };
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index a056608e65ba95f5689be4d73f9369f183eab3ff..66f901b047d06da3c2680ec2a1dc2e9cf8842efb 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -2039,6 +2039,60 @@ test("G20-41 (b) a send_message that the runner-written facts do not identify as
+   } finally { for (const dir of [goldfishBrain, criticBrain, bareBrain]) rmSync(dir, { recursive: true, force: true }); cleanup(fx); }
+ });
+ 
++test("C21B a Critic child's message without a verdict is sent back once while its packet waits, the same hook step stays refused, a later step passes, and the corrected message still issues", async () => {
++  const fx = fixture();
++  const brain = agyBrain();
++  const plain = "The review is finished; the findings are in the report above.";
++  const step = (stepIdx, message = plain) => ({ ...agySendMessage(fx, brain, { message }), stepIdx });
++  try {
++    const admitted = admitAntigravity(fx);
++    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
++    const first = await agyIssue(step(9));
++    assert.deepEqual([first.status, first.refuse, first.packetId], ["no-verdict", true, admitted.packetId], JSON.stringify(first));
++    const secondFiring = await agyIssue(step(9));
++    assert.equal(secondFiring.refuse, true, "the hook fires twice for one call and both firings must agree");
++    const later = await agyIssue(step(11));
++    assert.equal(later.status, "no-verdict"); assert.notEqual(later.refuse, true, "a Critic that cannot state a verdict must get out");
++    assert.equal(existsSync(target), false);
++    const corrected = await agyIssue(step(13, criticReturn()));
++    assert.equal(corrected.status, "issued", JSON.stringify(corrected));
++  } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
++});
++
++test("C21B a message without a verdict is not refused when no packet waits for one, and a stepless payload is refused at most once", async () => {
++  const fx = fixture();
++  const brain = agyBrain();
++  try {
++    const none = await agyIssue(agySendMessage(fx, brain, { message: "no verdict here" }));
++    assert.equal(none.status, "no-verdict"); assert.notEqual(none.refuse, true);
++    admitAntigravity(fx);
++    const stepless = () => { const { stepIdx, ...rest } = agySendMessage(fx, brain, { message: "no verdict here" }); return rest; };
++    assert.equal((await agyIssue(stepless())).refuse, true);
++    assert.notEqual((await agyIssue(stepless())).refuse, true, "without a step index a repeat is never treated as the same call");
++  } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
++});
++
++test("C21B the Antigravity guard itself denies the verdict-less message, names the required shape, and admits the same message at a later step", () => {
++  const fx = fixture();
++  const brain = agyBrain();
++  const home = mkdtempSync(join(tmpdir(), "c21b-home-"));
++  const env = { ...process.env, HOME: home, USERPROFILE: home };
++  const guard = fileURLToPath(new URL("../hooks/antigravity-pretool-guard.mjs", import.meta.url));
++  const fire = (stepIdx) => spawnSync(process.execPath, [guard], { cwd: fx.root, env, encoding: "utf8", input: JSON.stringify({ ...agySendMessage(fx, brain, { message: "The review is finished." }), stepIdx }), timeout: 30000 });
++  const scope = new URL("../lib/governance-scope.mjs", import.meta.url).href;
++  // Only an enrolled repository reaches the guard's checks; the enrolment runs under the throwaway HOME so nothing lands outside the fixture.
++  const enrolment = spawnSync(process.execPath, ["--input-type=module", "-e", `const s=await import(${JSON.stringify(scope)});const plan=s.planGovernanceScopeDecision({rootDir:${JSON.stringify(fx.root)},decision:"enroll",by:"Synthetic fixture operator"});s.applyGovernanceScopeDecision(plan,{activate:true,planSha256:plan.planSha256});`], { cwd: fx.root, env, encoding: "utf8", timeout: 30000 });
++  assert.equal(enrolment.status, 0, enrolment.stderr);
++  try {
++    admitAntigravity(fx);
++    const refused = fire(21);
++    assert.equal(JSON.parse(refused.stdout).decision, "deny", refused.stdout + refused.stderr);
++    assert.match(refused.stdout, /CRITIC-VERDICT-JSON-REQUIRED/u);
++    for (const key of ["findings", "deliberately_not_flagged", "trajectory_verdict", "trajectory_evidence", "briefing_violations", "pass"]) assert.ok(refused.stdout.includes(key), key);
++    assert.doesNotMatch(fire(23).stdout, /CRITIC-VERDICT-JSON-REQUIRED/u);
++  } finally { rmSync(brain, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }); cleanup(fx); }
++});
++
+ test("G20-41 (d) the Critic is named by the descriptor's type or its role, exactly (the plugin namespace is stripped); a name that merely contains the word is not the Critic", async () => {
+   for (const [descriptor, expected] of [
+     [{ typeName: "pipeline-core:critic", role: "reviewer" }, "issued"],
