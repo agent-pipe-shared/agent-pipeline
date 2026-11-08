@@ -86,3 +86,17 @@ including a SID based single directory ACL preview where applicable. The
 operator may instead relocate the project into a private user profile path.
 No action in this diagnostic writes an ACL. Rerun preflight after a reviewed
 repair; a WSL fixture cannot certify native Windows custody.
+
+The onboarding driver checks the `project/` folder already in the first question
+round. When its rights are inherited from above the repository, `pendingAsks`
+carries a `windowsPrivateStateRights` step with the commands. Show it with the
+other questions. The human runs it, the agent never does.
+
+## Antigravity restart after the repository was created
+
+Driver outcome `runner-restart-required` means this onboarding created the
+project's Git repository. Antigravity only recognizes a repository that existed
+when the session started, so the first code worker would be refused. Run a held
+consent record action, tell the human the restart in `restart.humanAction`, and
+stop. The questions come after the restart, and the same driver command continues
+from the state on disk.

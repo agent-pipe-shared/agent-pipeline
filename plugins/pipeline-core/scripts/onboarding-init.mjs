@@ -116,6 +116,7 @@ import { printOnboardingInitResult } from "../lib/onboarding-driver-output.mjs";
 import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
 import { existsSync as actorExistsSync } from "node:fs";
 import { heldIdentityChoice, normalizePipelineActorAssignment, writePipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
+import { windowsPrivateStateCause } from "../lib/windows-authority-readiness.mjs";
 import { beginInitialAnswersJournal, completeInitialAnswersJournal } from "../lib/onboarding-initial-answers-transaction.mjs";
 import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
 import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -1423,10 +1424,53 @@ function normalizeOnboardingDriverOutput(output, root) {
  * whatever machine-plane state happens to live under the real caller's `$HOME`
  * (backlog: 2026-08-28-a-verify-gate-suite-reads-real-machine-state-through-a-subprocess).
  */
+const FIRST_ROUND_OUTCOMES = ["pending-asks", "collect-input"];
+
+// PO decision 2026-11-08: Antigravity only sees a repository that existed when the session started, so `Workspace: "branch"` would fail at the first code
+// worker, after the design sign-off. When this driver call created the repository, the run stops here and names the restart, before the first question round.
+function antigravityRestartStop(result, root, hadRepository, exists) {
+  if (hadRepository || result.runner !== "antigravity" || !FIRST_ROUND_OUTCOMES.includes(result.outcome) || !exists(join(root, ".git"))) return null;
+  return {
+    schema: SCHEMA, runner: result.runner, root, outcome: "runner-restart-required",
+    stepCap: result.stepCap, stepsExecuted: result.stepsExecuted, steps: result.steps,
+    restart: {
+      reason: "This onboarding created the project's Git repository, and Antigravity only recognizes a repository that existed when the session started. Without a restart the first code worker would be refused.",
+      humanAction: "Close Antigravity, open it again on this folder and start the session the normal way. The onboarding continues from the state on disk; no answer is lost, because no question has been asked yet.",
+      agentGuidance: "Run the consent record action first if you hold one, tell the human exactly this restart, then stop. Do not ask the onboarding questions in this session; they come after the restart.",
+    },
+    final: null,
+  };
+}
+
+// PO decision 2026-11-08: the Windows rights step can only be done by the human, so it stands next to the other first-round questions instead of stopping the run later.
+function withWindowsRightsAsk(result, root, platform, privateStateCause) {
+  if (platform !== "win32" || !FIRST_ROUND_OUTCOMES.includes(result.outcome)) return result;
+  let cause = null;
+  try { cause = privateStateCause({ projectRoot: root }); } catch { return result; }
+  if (cause?.reason !== "WIN-AUTH-PRIVATE-ROOT") return result;
+  const ask = {
+    kind: "operator-step", name: "windowsPrivateStateRights", path: cause.path,
+    summary: cause.nextAction.summary, commands: cause.nextAction.repairPreview.commands,
+    guidance: "Show this step together with the other questions of this round. The human runs the one command for their shell in their own terminal; the agent never runs it. Afterwards run the same driver command again; the step disappears once the folder is secure.",
+  };
+  const extend = (action) => (Array.isArray(action?.pendingAsks) ? { ...action, pendingAsks: [...action.pendingAsks, ask] } : action);
+  return {
+    ...result,
+    pendingAsks: [...(Array.isArray(result.pendingAsks) ? result.pendingAsks : []), ask],
+    ...(result.collectInput ? { collectInput: extend(result.collectInput) } : {}),
+    ...(result.final?.nextAction ? { final: { ...result.final, nextAction: extend(result.final.nextAction) } } : {}),
+  };
+}
+
 export function driveOnboardingInit(options = {}) {
-  const result = driveOnboardingInitCore(options);
-  if (!result || typeof result !== "object" || !options?.rootDir) return result;
+  const { exists = actorExistsSync, platform = process.platform, privateStateCause = windowsPrivateStateCause } = options;
+  const hadRepository = options?.rootDir ? exists(join(resolve(options.rootDir), ".git")) : true;
+  const core = driveOnboardingInitCore(options);
+  if (!core || typeof core !== "object" || !options?.rootDir) return core;
   const root = resolve(options.rootDir);
+  const restart = antigravityRestartStop(core, root, hadRepository, exists);
+  if (restart !== null) return restart;
+  const result = withWindowsRightsAsk(core, root, platform, privateStateCause);
   for (const repositoryCapability of ["local", "host-managed"]) {
     let choice = null;
     try { choice = heldIdentityChoice(root, repositoryCapability); } catch { choice = null; }
@@ -1865,6 +1909,7 @@ export function main(args = process.argv.slice(2), {
     || result.outcome === "collect-input"
     || result.outcome === "external-operator"
     || result.outcome === "pending-asks"
+    || result.outcome === "runner-restart-required"
     || ((initialAnswers !== null || bootstrap !== null) && result.outcome === "unsupported-next-action") ? 0 : 1;
 }
 

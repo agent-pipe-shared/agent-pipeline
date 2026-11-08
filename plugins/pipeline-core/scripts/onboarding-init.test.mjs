@@ -303,7 +303,12 @@ function checkConvergenceCell(selectedCell) {
         roots.push(root);
         const label = `${runner}/${machine.name}`;
         const env = withConflictingAmbientRunner(machine.env, runner);
-        const first = driveOnboardingInit({ rootDir: root, runner, env });
+        let first = driveOnboardingInit({ rootDir: root, runner, env });
+        // PO decision 2026-11-08: on Antigravity the call that creates the repository ends in the restart, and the first question round follows it.
+        if (runner === "antigravity") {
+          assert.equal(first.outcome, "runner-restart-required", `${label}: ${JSON.stringify(first)}`);
+          first = driveOnboardingInit({ rootDir: root, runner, env });
+        }
 
         assert.equal(first.schema, SCHEMA, label);
         // G15 / D210 (restates: Codex stopped on a separate consent collect-input): every runner's first stop
@@ -354,6 +359,55 @@ function checkConvergenceCell(selectedCell) {
 
 test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh no-key/valid-key homes without ambient drift or repeated answered asks", async () => {
   if (!MATRIX_CELL) await runMatrix("convergence");
+});
+
+test("Antigravity: the driver call that creates the repository names the restart before any question; a repository that already existed does not", () => {
+  const root = freshRoot();
+  const existing = freshRoot();
+  const home = freshHome();
+  try {
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "antigravity");
+    const first = driveOnboardingInit({ rootDir: root, runner: "antigravity", env });
+    assert.equal(first.outcome, "runner-restart-required", JSON.stringify(first));
+    assert.equal(first.pendingAsks, undefined, "no question is asked before the restart");
+    assert.match(first.restart.humanAction, /Close Antigravity/u);
+    assert.match(first.restart.agentGuidance, /consent record action/u);
+    assert.equal(existsSync(join(root, ".git")), true);
+    assert.equal(driveOnboardingInit({ rootDir: root, runner: "antigravity", env }).outcome, "pending-asks", "the same command after the restart reaches the first question round");
+    spawnSync("git", ["init", "--initial-branch=main"], { cwd: existing, encoding: "utf8" });
+    assert.notEqual(driveOnboardingInit({ rootDir: existing, runner: "antigravity", env }).outcome, "runner-restart-required");
+  } finally {
+    for (const dir of [root, existing, home]) rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("Windows rights step: an insecure state folder stands beside the first-round questions, a secure one and other platforms add nothing", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "claude");
+    let calls = 0;
+    const insecure = () => {
+      calls += 1;
+      return { reason: "WIN-AUTH-PRIVATE-ROOT", path: "D:\\work\\project", nextAction: { summary: "narrow the rights", repairPreview: { commands: [{ shell: "cmd", command: "icacls x" }] } } };
+    };
+    const onWindows = driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "win32", privateStateCause: insecure });
+    assert.equal(onWindows.outcome, "pending-asks", JSON.stringify(onWindows));
+    const ask = onWindows.pendingAsks.at(-1);
+    assert.equal(ask.name, "windowsPrivateStateRights");
+    assert.equal(ask.path, "D:\\work\\project");
+    assert.deepEqual(ask.commands, [{ shell: "cmd", command: "icacls x" }]);
+    assert.match(ask.guidance, /the agent never runs it/u);
+    assert.equal(onWindows.final.nextAction.pendingAsks.at(-1).name, "windowsPrivateStateRights", "the printed form keeps one copy only when both copies agree");
+    const secure = driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "win32", privateStateCause: () => null });
+    assert.equal(secure.pendingAsks.some((entry) => entry.name === "windowsPrivateStateRights"), false);
+    const before = calls;
+    const linux = driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "linux", privateStateCause: insecure });
+    assert.equal(calls, before, "other platforms never run the probe");
+    assert.equal(linux.pendingAsks.some((entry) => entry.name === "windowsPrivateStateRights"), false);
+  } finally {
+    for (const dir of [root, home]) rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("initial answer CLI refuses absent or invalid language before any source or receipt write", () => {
@@ -1421,6 +1475,7 @@ test("a new-key post-setup failure replays the same public action from its bound
   const destination = join(home, "recoverable-new-authority");
   const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
   try {
+    assert.equal(driveOnboardingInit({ rootDir: root, runner: "antigravity", env }).outcome, "runner-restart-required");
     assert.equal(driveOnboardingInit({ rootDir: root, runner: "antigravity", env }).outcome, "pending-asks");
     const policyPath = join(root, "project", "critical-human-proof.json");
     const policyPreimage = readFileSync(policyPath, "utf8");

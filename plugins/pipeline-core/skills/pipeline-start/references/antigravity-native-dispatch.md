@@ -54,7 +54,7 @@ transport only. Do not `define_subagent` a Pipeline role yourself; `dispatch-bri
   (`AGY-NATIVE-WORKTREE-UNCOMMITTED`, repair: commit first; untracked files are not checked, but the child sees none of them). Several code
   writers may run in parallel, in one call or several; there is no one-per-call and no alive-count rule, because a finished child's descriptor
   stays `SUBAGENT_STATE_ALIVE`. Read-only roles are unaffected.
-- **When the host refuses `Workspace: "branch"` (measured, greenfield 2026-11-08).** The message says the language server did not detect a
+- **When the host refuses `Workspace: "branch"` (measured, greenfield 2026-11-08).** Onboarding normally prevents this with its restart stop right after it creates the repository. The message says the language server did not detect a
   repository: the folder became a git repository after this Antigravity session started, and the host keeps that view for the session. Do not
   retry the same call and do not write the slice yourself, which is not a sanctioned route. Ask the PO once to restart Antigravity on this folder,
   run the bootstrap, and dispatch again; the project state is on disk and nothing is lost.

@@ -161,29 +161,37 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
       }
     }
   }
-  const stateRoot = win32.join(projectRoot, 'project');
-  if (exists(stateRoot)) {
-    let verdict;
-    try { verdict = assessPrivateRoot(stateRoot); } catch { verdict = null; }
-    const status = verdict?.status;
-    if (status === 'insecure') {
-      const quoted = stateRoot.includes('"');
-      causes.push({ pathClass: 'private-state', reason: 'WIN-AUTH-PRIVATE-ROOT', path: stateRoot, nextAction: {
-        kind: 'operator-review', mutation: false,
-        summary: 'The private state folder carries access rights inherited from above the repository. Remove the inherited grants, keep full control for the current user, then rerun readiness.',
-        inspection: ['Confirm the folder is a physical non-reparse directory inside the project.', 'Read its access list and find the entries inherited from a parent folder.'],
-        repairPreview: { folder: stateRoot,
-          commands: quoted ? [] : [
-            { shell: 'powershell', command: `icacls "${stateRoot}" /inheritance:r /grant:r "$(whoami):(OI)(CI)F"` },
-            { shell: 'cmd', command: `icacls "${stateRoot}" /inheritance:r /grant:r "%USERNAME%:(OI)(CI)F"` },
-          ],
-          reason: 'inherited grants from above the repository are removed, the current user keeps full control, files created later inherit the narrow rights',
-          afterwards: 'The next preflight reads the folder back and continues only when it is secure.' },
-      } });
-    } else if (status !== 'secure') {
-      causes.push({ pathClass: 'private-state', reason: 'WIN-AUTH-OBSERVATION-UNAVAILABLE', path: stateRoot,
-        nextAction: guidance('private-state', 'WIN-AUTH-OBSERVATION-UNAVAILABLE') });
-    }
-  }
+  const stateCause = windowsPrivateStateCause({ projectRoot, exists, assessPrivateRoot });
+  if (stateCause !== null) causes.push(stateCause);
   return { schema: WINDOWS_AUTHORITY_READINESS_SCHEMA, status: causes.length ? 'unavailable' : 'ready', causes };
+}
+
+/**
+ * The private state folder check alone (one native call, the full assessment is one per path). The onboarding driver runs it in the first question round,
+ * so the one manual step stands next to the other questions instead of stopping the run later. Null when the folder is absent or secure.
+ */
+export function windowsPrivateStateCause({ projectRoot, exists = existsSync, assessPrivateRoot = assessWindowsPrivateRoot } = {}) {
+  const stateRoot = win32.join(projectRoot, 'project');
+  if (!exists(stateRoot)) return null;
+  let verdict;
+  try { verdict = assessPrivateRoot(stateRoot); } catch { verdict = null; }
+  const status = verdict?.status;
+  if (status === 'secure') return null;
+  if (status !== 'insecure') {
+    return { pathClass: 'private-state', reason: 'WIN-AUTH-OBSERVATION-UNAVAILABLE', path: stateRoot,
+      nextAction: guidance('private-state', 'WIN-AUTH-OBSERVATION-UNAVAILABLE') };
+  }
+  const quoted = stateRoot.includes('"');
+  return { pathClass: 'private-state', reason: 'WIN-AUTH-PRIVATE-ROOT', path: stateRoot, nextAction: {
+    kind: 'operator-review', mutation: false,
+    summary: 'The private state folder carries access rights inherited from above the repository. Remove the inherited grants, keep full control for the current user, then rerun readiness.',
+    inspection: ['Confirm the folder is a physical non-reparse directory inside the project.', 'Read its access list and find the entries inherited from a parent folder.'],
+    repairPreview: { folder: stateRoot,
+      commands: quoted ? [] : [
+        { shell: 'powershell', command: `icacls "${stateRoot}" /inheritance:r /grant:r "$(whoami):(OI)(CI)F"` },
+        { shell: 'cmd', command: `icacls "${stateRoot}" /inheritance:r /grant:r "%USERNAME%:(OI)(CI)F"` },
+      ],
+      reason: 'inherited grants from above the repository are removed, the current user keeps full control, files created later inherit the narrow rights',
+      afterwards: 'The next preflight reads the folder back and continues only when it is secure.' },
+  } };
 }
