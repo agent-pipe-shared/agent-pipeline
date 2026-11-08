@@ -436,7 +436,12 @@ function unbound(reasonCode) {
 function requestedShapeValid(runner, requested) {
   if (!exactKeys(requested, ["selector", "effort"]) || !exactKeys(requested.selector, ["kind", "value"])) return false;
   if (runner === "claude") return requested.selector.kind === "alias" && ["fable", "haiku", "opus", "sonnet"].includes(requested.selector.value) && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(requested.effort);
-  if (runner === "antigravity") return requested.selector.kind === "model-id" && ["gemini-3.1-pro-high", "gemini-3.7-flash-high", "gemini-3.7-flash-low"].includes(requested.selector.value) && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(requested.effort);
+  // C20b (FV fv20 red p3b C03): the Antigravity shape was a frozen list of three pre-G20-43 model ids, so the registry's current cells
+  // (the Critic's `inherit` alias, the newer flash ids) were refused as binding-mismatch before the exact registry match below
+  // (requestedMatchesRegisteredCell) could run. The shape now admits any Gemini model id and the inherit alias; the registry decides.
+  if (runner === "antigravity") return ((requested.selector.kind === "model-id" && /^gemini-[a-z0-9][a-z0-9.-]{0,80}$/u.test(String(requested.selector.value)))
+    || (requested.selector.kind === "alias" && requested.selector.value === "inherit"))
+    && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(requested.effort);
   return requested.selector.kind === "model-id"
     && ["gpt-5.6-sol", "gpt-5.6-terra"].includes(requested.selector.value)
     && ["xhigh", "max"].includes(requested.effort)
