@@ -63,9 +63,11 @@ project root. Exactly one of `--text` / `--text-file` is accepted per call.
 
 **Answers from a file.** `intake-design-questions-apply` and its `-replace`
 variant take the bundled answers either inline (`--answers-json`) or from a
-file (`--answers-file <repo-relative path>`), never both. Write a long or
-multi-line answers array to a file under `scratch/` first and pass that path,
-for the same reason as `--text-file`. The optional `--answers-file-sha256
+file (`--answers-file <repo-relative path>`), never both. The file is the
+default route: write the answers to `scratch/design-answers.json` and run the
+returned `fileApplyAction`. A shell command carrying answers with parentheses,
+a dollar sign or a backtick is refused as a possible hidden push, and a
+multi-line array fails for the same reason as `--text-file`. The optional `--answers-file-sha256
 <64 lowercase hex>` refuses the call unless it equals the SHA-256 of the file's
 raw bytes; it is accepted only together with `--answers-file`. The file route
 follows the same rules as the inline one, including "exactly ONE bundled round".
