@@ -15,8 +15,10 @@ BUILDS candidate 20e first and only then runs the greenfields. Everything 20e ne
 | `w283-c20e-proof-wait-subject.package.json` | G20-76 (the signature wait accepts an old proof: `authorize-critical` mirrors to `scratch/critical-<kind>-{request,proof,authority,signer}-<repo fingerprint>.json`, one fixed name per repository, and `proof-wait.mjs` only checks the file schema, so a mirror from an earlier signature ends the wait at once and `approve-push` then refuses with CRITICAL-PROOF-SUBJECT) | Goldfish package, not built; added after the first handover |
 
 **State 2026-11-08:** every row above is built and exported as ONE chain of 9 patches in `../c20e-chain/`
-(`po-apply-0.7-candidate20e.sh`; part 1 is included, so `chain/po-apply-0.7-candidate20e-part1.sh` is NOT run separately). Commit 9
-registers the new cases and restates four measured counts (QG-04). Targeted suites green; the Critic preimage suite stays red for exactly
+(`po-apply-0.7-candidate20e.sh`; part 1 is included, so `chain/po-apply-0.7-candidate20e-part1.sh` is NOT run separately). The standalone `w277/w281/w282/w283-*.patch`
+files are superseded by that chain (the tracked w282 patch lacks the digest binding). Commit 9 registers the new cases, restates four
+measured counts (QG-04) and turns two fixture setup asserts in `guard-push-release-tag-ancestry.test.mjs` into the file's own
+`throw new Error` idiom, so the script-style suite keeps its classification; equivalent control flow, no case assertion changes. Targeted suites green; the Critic preimage suite stays red for exactly
 its two known entries, by design. Known limits of G20-72: the bound of 25 files is a first estimate; a generic-batch packet resumed after
 a failed first admit binds no split and refuses a split round at finalize; no live N-Critic run on any runner. Full Verify, Critic, the
 greenfields and PO acceptance are open.
