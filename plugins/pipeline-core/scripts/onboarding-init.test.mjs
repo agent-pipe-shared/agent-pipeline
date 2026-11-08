@@ -855,7 +855,12 @@ function checkApprovalCell(selectedCell) {
         PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home,
       }, runner);
 
-      const first = driveOnboardingInit({ rootDir: root, runner, env });
+      let first = driveOnboardingInit({ rootDir: root, runner, env });
+      // PO decision 2026-11-08: on Antigravity the call that creates the repository ends in the restart, and the first question round follows it.
+      if (runner === "antigravity") {
+        assert.equal(first.outcome, "runner-restart-required", JSON.stringify(first));
+        first = driveOnboardingInit({ rootDir: root, runner, env });
+      }
       // G15 / D210 (restates: Codex stopped on collect-input and the first round omitted consent values).
       assert.equal(first.outcome, "pending-asks", runner);
       assert.equal(first.pendingAsks.length, 1, `${runner}: the first PO stop is one bundled action, not sibling command fragments`);
