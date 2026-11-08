@@ -119,7 +119,9 @@ blob SHA-256 and mode without emitting bytes and never reads it, and the
 forbidden-material rule for handover, state and history is not relaxed. The
 Coordinator derives the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`
 (schema `pipeline.critic-correction-input-bindings.v1`) and the Critic verifies
-them; the command refuses a mixed path (CCI-MIXED), and an unknown role, a
+them; the command refuses a mixed path (CCI-MIXED), except that a source file
+moved into the project-state record counts as a reviewed deletion plus an
+excluded addition, and an unknown role, a
 refused path or missing bindings for such paths still stops the review.
 
 The role finding-disposition record is admissible only for the files the project

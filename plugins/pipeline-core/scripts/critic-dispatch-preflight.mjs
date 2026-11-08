@@ -211,7 +211,8 @@ function checkCorrectionInputBindings(root, baseCommit, candidateCommit, referen
     }
   } catch (error) {
     const code = error instanceof CriticCorrectionInputBindingsError ? error.code : "CCI-UNEXPECTED";
-    fail("CDP-CORRECTION-INPUT-REFUSED", `Fix the range and rerun the preflight; the bindings derivation refused it with ${code}.`);
+    const detail = error instanceof CriticCorrectionInputBindingsError ? `: ${error.detail}` : "";
+    fail("CDP-CORRECTION-INPUT-REFUSED", `Fix the range and rerun the preflight; the bindings derivation refused it with ${code}${detail}.`);
   }
   // N41: a block-history-shaped file in the range collides with the Critic's reference boundary (CR-01a); refuse here, before anything is reserved.
   const historyPaths = historyPathsInBindings(derived);
@@ -871,7 +872,7 @@ export function criticDispatchPreflightRefusalLine(error, { sweep = false } = {}
     code,
     // C18-8 (AC-239): a CDP-ARGUMENT refusal used to reach the caller as a bare code. Its human reason now rides on the same stderr line;
     // a reason a refusal already carries in its details is kept as it is.
-    ...(code === "CDP-ARGUMENT" && typed ? { reason: error.message } : {}),
+    ...((code === "CDP-ARGUMENT" || code === "CDP-CORRECTION-INPUT-REFUSED") && typed ? { reason: error.message } : {}),
     ...(!sweep && details !== null ? details : {}),
   })}\n`;
 }

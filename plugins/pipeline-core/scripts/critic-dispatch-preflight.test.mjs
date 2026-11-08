@@ -10,7 +10,7 @@ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 const completionCases = [];
 function test(name, run) { completionCases.push({id: "CDPF" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
 
-import { CriticDispatchPreflightError, EVIDENCE_SWEEP_SCHEMA, enumerateEvidenceArtifacts, preflightCriticDispatch, parseCriticDispatchPreflightArgs } from "./critic-dispatch-preflight.mjs";
+import { CriticDispatchPreflightError, EVIDENCE_SWEEP_SCHEMA, criticDispatchPreflightRefusalLine, enumerateEvidenceArtifacts, preflightCriticDispatch, parseCriticDispatchPreflightArgs } from "./critic-dispatch-preflight.mjs";
 import * as preflightModule from "./critic-dispatch-preflight.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import childProcess from "node:child_process";
@@ -1565,7 +1565,39 @@ test("CCI preflight (6) a rename across classes is CDP-CORRECTION-INPUT-REFUSED 
     writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
     const error = cdpRefusal(() => preflightCriticDispatch(input({ ...fx, candidate })), "CDP-CORRECTION-INPUT-REFUSED");
     assert.ok(error.message.includes("CCI-MIXED"));
+    // Live 2026-11-08: the caller saw a bare code and no way out.
+    const printed = JSON.parse(criticDispatchPreflightRefusalLine(error));
+    assert.match(printed.reason, /src\/a\.txt -> evidence\/critic\/p1\/a\.txt crosses classes/u);
+    assert.match(printed.reason, /two separate commits/u);
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("C21 a source file moved into the state archive is a reviewed deletion plus an excluded addition, and the preflight admits the range", () => {
+  const fx = cciFixture();
+  try {
+    mkdirSync(join(fx.root, "docs", "state-archive"), { recursive: true });
+    git(fx.root, ["mv", "src/a.txt", "docs/state-archive/a.txt"]);
+    const moved = commit(fx.root, "archive a resolved note");
+    const document = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: moved });
+    assert.ok(document.sourcePaths.includes("src/a.txt"));
+    const archived = document.exclusions.find((row) => row.path === "docs/state-archive/a.txt");
+    assert.equal(archived.role, "project-state record");
+    assert.equal(archived.versions[0].change, "added");
+    git(fx.root, ["mv", "docs/state-archive/a.txt", "src/a.txt"]);
+    const back = commit(fx.root, "the reverse direction");
+    cciRefusal(() => deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: moved, head: back }), "CCI-MIXED");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+  const live = cciPreflightFixture({});
+  try {
+    mkdirSync(join(live.root, "docs", "state-archive"), { recursive: true });
+    git(live.root, ["mv", "src/a.txt", "docs/state-archive/a.txt"]);
+    const candidate = commit(live.root, "archive a resolved note");
+    const tree = git(live.root, ["rev-parse", "HEAD^{tree}"]);
+    writeFileSync(join(live.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
+    const result = preflightCriticDispatch(input({ ...live, candidate }));
+    assert.equal(result.status, "packet-ready");
+    assert.equal(result.correctionInputBindings.bindings.exclusions.find((row) => row.path === "docs/state-archive/a.txt").role, "project-state record");
+  } finally { rmSync(live.root, { recursive: true, force: true }); }
 });
 
 test("CCI preflight (7) projectStateOptional lets an unreadable calibration mean no project-state paths, while the default still refuses", () => {

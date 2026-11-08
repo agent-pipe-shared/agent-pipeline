@@ -113,6 +113,16 @@ function parseRaw(output) {
 }
 const side = (value) => (ZERO_ID.test(value) ? ABSENT : value);
 
+// Live 2026-11-08 (Codex greenfield): a resolved note moved from specs/<id>/evidence/ to docs/state-archive/ stopped the Critic preflight, and the only way
+// left was rewriting history. Moving a source file into the project-state record is a deletion the Critic reviews plus an addition the role already excludes,
+// so each side is classified on its own. Every other crossing, the reverse direction included, stays CCI-MIXED.
+function splitMoveIntoProjectState(entry, roleOf) {
+  const [from, to] = entry.paths;
+  if (entry.status !== "R" || roleOf(from) !== "source" || roleOf(to) !== ROLE_PROJECT_STATE_RECORD) return [entry];
+  const noBlob = "0".repeat(entry.blobBefore.length), noMode = "000000";
+  return [{ ...entry, status: "D", paths: [from], blobAfter: noBlob, modeAfter: noMode }, { ...entry, status: "A", paths: [to], blobBefore: noBlob, modeBefore: noMode }];
+}
+
 function sha256OfBlob(repoRoot, blob) {
   if (blob === ABSENT) return ABSENT;
   const object = git(repoRoot, ["cat-file", "blob", blob], { buffer: true });
@@ -152,9 +162,10 @@ export function deriveCriticCorrectionInputBindings({ repoRoot, base, head, proj
     for (const { commit, parents } of commits) {
       const from = parents[0] ?? EMPTY_TREE;
       const raw = gitOrRange(repoRoot, ["diff-tree", "-r", "-z", "-M", "--raw", "--no-textconv", "--no-ext-diff", from, commit], "diff-tree");
-      for (const entry of parseRaw(raw)) {
-        const roles = entry.paths.map((p) => classify(p, handover, findingRecords));
-        if (new Set(roles).size > 1) fail("CCI-MIXED", `a ${CHANGE_NAMES[entry.status] ?? "change"} crosses classes (${roles.join(" / ")})`);
+      const roleOf = (p) => classify(p, handover, findingRecords);
+      for (const entry of parseRaw(raw).flatMap((found) => splitMoveIntoProjectState(found, roleOf))) {
+        const roles = entry.paths.map(roleOf);
+        if (new Set(roles).size > 1) fail("CCI-MIXED", `${entry.paths.join(" -> ")} crosses classes (${roles.join(" / ")}) in commit ${commit}; before committing, add the new path and delete the old one in two separate commits so each side is classified on its own; a move already in the history is a question for the PO, never a history rewrite`);
         entry.paths.forEach((path, index) => {
           if (roles[index] === "source") { sources.add(path); return; }
           const pair = entry.paths.length === 2;
