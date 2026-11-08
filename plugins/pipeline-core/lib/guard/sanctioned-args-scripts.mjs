@@ -902,7 +902,10 @@ export function sanctionedOnboardingConsentMarkArgs(args, root) {
   if (!matchesRoot) return false;
   if (args[3] !== "--session-id" || typeof args[4] !== "string" || args[4].trim() === "") return false;
   if (args[5] !== "--answer" || (args[6] !== "yes" && args[6] !== "no")) return false;
-  return args.length === 7;
+  if (args.length === 7) return true;
+  // G20-45: an optional bounded single-line verbatim quote of the user's answer (the record stores it, capped at 400 characters).
+  return args.length === 9 && args[7] === "--quote" && typeof args[8] === "string"
+    && args[8].length >= 1 && args[8].length <= 400 && !/[\u0000-\u001f\u007f]/u.test(args[8]);
 }
 
 // Reader admission preserves the existing readiness gate; observations are method seams.

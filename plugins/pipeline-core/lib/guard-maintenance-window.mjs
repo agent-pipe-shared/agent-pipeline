@@ -300,6 +300,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/human-role-exception-decision.mjs",
   "plugins/pipeline-core/lib/lifecycle-governance-events.mjs",
   "plugins/pipeline-core/lib/onboarding-consent-marker.mjs",
+  "plugins/pipeline-core/lib/onboarding-consent-scope.mjs",
   "plugins/pipeline-core/lib/threat-model-approval-request.mjs",
   "plugins/pipeline-core/lib/threat-model.mjs",
   // NVA-KERNELDYN-1 (2026-08-27): project-onboarding-v3.mjs (already kernel above)

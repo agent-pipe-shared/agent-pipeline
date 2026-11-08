@@ -155,6 +155,11 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/human-decision-attribution.mjs`, `lib/human-governance-decision.mjs`,
   `lib/human-governance-ledger.mjs`, `lib/human-role-exception-decision.mjs`,
   `lib/lifecycle-governance-events.mjs`, `lib/onboarding-consent-marker.mjs`,
+  `lib/onboarding-consent-scope.mjs` (G20-45, 2026-11-08: the one list of steps the
+  onboarding consent covers, imported by `pipeline-state.mjs`,
+  `project-onboarding-v3.mjs` and `pipeline-start-preflight.mjs`; it decides which
+  printed actions are marked as covered by the consent, so a window covering it would
+  let one edit widen that claim),
   `lib/threat-model-approval-request.mjs`, and `lib/threat-model.mjs`. A third
   closure gap (NVA-KERNELDYN-1, 2026-08-27 — `pre-push-hook-install.mjs`'s
   dynamic `import()` edges, resolved via a declared table rather than the

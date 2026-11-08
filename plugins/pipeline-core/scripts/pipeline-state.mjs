@@ -462,6 +462,7 @@ import {
 import { readPromotionDesignInputCapture } from "../lib/onboarding-continuity.mjs";
 import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRetirementIntakeLock} from '../lib/onboarding-continuity.mjs';
 import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
+import {coverOnboardingOutput} from '../lib/onboarding-consent-scope.mjs';
 import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
 import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
 import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
@@ -14294,7 +14295,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         pushApproval: inspectPushApproval(withPrivateCriticalApprovals(base, dir), () => gitHead(dir)),
         closedFeaturesCount: Array.isArray(base.closedFeatures) ? base.closedFeatures.length : 0,
         phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),
-        nextAction: buildInspectNextAction(dir, base, lifecycle, deps) ?? drift?.recovery ?? null,
+        // G20-45: with a recorded onboarding consent, submit-plan / prepare-seal / present-plan print requiresConfirmation false with
+        // coveredBy and a verbatim escalation line; approve-plan, push and release are not in the consent scope and keep their gate.
+        nextAction: coverOnboardingOutput(buildInspectNextAction(dir, base, lifecycle, deps) ?? drift?.recovery ?? null, { rootDir: dir, readRecord: deps.readOnboardingConsentRecord }),
         nextActionText: lifecycle.nextAction === "reopen-design"
           ? reopenDesignNextActionText(dir)
           : nextActionSection(base),

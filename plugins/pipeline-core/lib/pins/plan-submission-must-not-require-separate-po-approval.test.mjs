@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { run, statePath } from "../../scripts/pipeline-state.mjs";
 import { applyOnboardingIntakeConsent } from "../onboarding-continuity.mjs";
+import { recordOnboardingConsent } from "../../scripts/onboarding-consent-mark.mjs";
 import { initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
 import { designWorkflowAdvisorExceptionRationale, designWorkflowAdvisorQuestionSha256, validateDesignWorkflowPackage } from "../design-workflow-package.mjs";
 import { createAdvisoryAttemptTrail } from "../advisory-attempt-trail.mjs";
@@ -149,6 +150,39 @@ test("AC1/AC4: the post-submission next-action is the mechanical present-plan co
   assert.equal(payload.nextAction.kind, "command");
   assert.deepEqual(payload.nextAction.argv.slice(1, 2), ["present-plan"]);
   assert.equal(payload.nextAction.requiresConfirmation, false);
+});
+
+// G20-45: the Pipeline states, in the action it hands over, that the user's recorded onboarding consent covers the step; the design approval stays gated.
+test("G20-45: with a recorded onboarding consent the inspect next-action for submit-plan and present-plan is covered by it, with a verbatim escalation line", () => {
+  const f = fixture("pin-covered", { intake: true });
+  assert.equal(JSON.parse(capture(["inspect"], f.deps).out).nextAction.coveredBy, undefined, "no record, no claim");
+  recordOnboardingConsent(f.root, "s1", "yes", "2026-11-08T10:00:00.000Z", "ja bitte installieren");
+  const draft = JSON.parse(capture(["inspect"], f.deps).out).nextAction;
+  assert.deepEqual(draft.argv.slice(1, 2), ["submit-plan"]);
+  assert.equal(draft.requiresConfirmation, false);
+  assert.equal(draft.coveredBy.record, ".claude/.pipeline-install-consent-s1.json");
+  assert.equal(draft.coveredBy.step, "submit-plan");
+  assert.match(draft.escalationJustification, /^covered by the user's recorded onboarding consent \(\.claude\/\.pipeline-install-consent-s1\.json\): .+; no further approval before the design approval$/u);
+  assert.equal(capture(draft.argv.slice(1), f.deps).status, 0);
+  const present = JSON.parse(capture(["inspect"], f.deps).out).nextAction;
+  assert.deepEqual(present.argv.slice(1, 2), ["present-plan"]);
+  assert.equal(present.requiresConfirmation, false);
+  assert.equal(present.coveredBy.step, "present-plan");
+});
+
+test("G20-45: the design approval step is never marked covered by the onboarding consent, in either approval mode", () => {
+  for (const mode of ["chat", "signature"]) {
+    const f = fixture(`pin-covered-gate-${mode}`);
+    recordOnboardingConsent(f.root, "s1", "yes", "2026-11-08T10:00:00.000Z");
+    assert.equal(capture(submitArgs(), f.deps).status, 0);
+    assert.equal(capture(["present-plan", "--by", "coordinator"], f.deps).status, 0);
+    const deps = { ...f.deps, readHumanApprovalMode: () => ({ mode, source: "pipeline.user.yaml", key: "human_approval", scope: "global" }) };
+    const payload = JSON.parse(capture(["inspect"], deps).out);
+    assert.equal(payload.status, "awaiting-approval");
+    assert.ok(!JSON.stringify(payload.nextAction).includes("coveredBy"), `mode ${mode}: ${JSON.stringify(payload.nextAction)}`);
+    const approve = payload.nextAction.applyAction ?? payload.nextAction;
+    if (approve.argv?.includes("approve-plan")) assert.equal(approve.requiresConfirmation, true);
+  }
 });
 
 test("AC4: submission and presentation grant no implementation authority; approval is a separate final step", () => {

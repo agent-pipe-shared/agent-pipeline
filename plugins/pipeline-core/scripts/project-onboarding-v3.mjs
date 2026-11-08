@@ -15,6 +15,7 @@ import { inspectConfirmedIntakeLanguageProjection, projectConfirmedIntakeLanguag
 import { chatAttributionRecord, requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { loadManifestSafe, resolveHumanFacingLanguage, gateConfig } from "../lib/manifest.mjs";
+import { coverOnboardingOutput } from "../lib/onboarding-consent-scope.mjs";
 import { planInstall as planPrePushHookInstall, MARKER_SCHEMA as PRE_PUSH_HOOK_MARKER_SCHEMA, DECLINE_MARKER_SCHEMA as PRE_PUSH_HOOK_DECLINE_MARKER_SCHEMA } from "./pre-push-hook-install.mjs";
 import { resolveActiveRunner } from "./pipeline-start-preflight.mjs";
 import { readIntakeMaterialReference } from "../lib/intake-material-reference.mjs";
@@ -1128,7 +1129,11 @@ export function main(args = process.argv.slice(2), {
       }),
     };
   }
-  write(`${JSON.stringify(output, null, 2)}\n`);
+  // G20-45: with a recorded onboarding consent, the actions the consent covers print requiresConfirmation false with coveredBy and a
+  // verbatim escalation line. The exit code below reads the unmarked `output`; only the printed copy is marked.
+  write(`${JSON.stringify(output !== null && typeof output === "object"
+    ? coverOnboardingOutput(output, { rootDir: options.root, readRecord: deps?.readOnboardingConsentRecord })
+    : output, null, 2)}\n`);
   if (output.schema === EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA) return output.ok === true ? 0 : 1;
   if(output.schema===ENROLLMENT_GIT_CREATION_SCHEMA)return ["planned","created","retained","refused"].includes(output.status)?0:1;
   // Wave 4 step 4 (NVA-W4-COORD-2): intake-generate-plan is `{ schema, root,

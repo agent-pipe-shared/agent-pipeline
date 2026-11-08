@@ -2554,3 +2554,33 @@ test("K139 MP-04 readback: the readback is the Elephant's duty, a Goldfish or Cr
   }
   assert.deepEqual(runPreflightProcess({ [MP04_VARIABLE]: MP04_VALUE_SENTINEL }, ["--role", "elephant"]).line.subagentModelEnv, { status: "set" });
 });
+
+// G20-45: the question the Pipeline renders for the inactive project names every agent step the "yes" covers (and what it does not).
+test("G20-45: the pipeline-governance-inactive result carries the consent question with the full scope and the record command", async () => {
+  const { ONBOARDING_CONSENT_COVERED_STEPS, ONBOARDING_CONSENT_NOT_COVERED } = await import("../lib/onboarding-consent-scope.mjs");
+  const result = preflight({
+    cwd: ROOT_CURRENT,
+    observeGovernanceScopeFn: ({ rootDir }) => ({ schema: "pipeline.governance-scope.v1", state: "inactive", root: rootDir, scopeKey: "b".repeat(64), repositoryKind: "git", provenance: { kind: "none", refs: [] }, diagnostics: [], requiresEnforcement: false, hintAllowed: true }),
+  });
+  assert.equal(result.status, "pipeline-governance-inactive");
+  const question = result.consentQuestion;
+  assert.equal(question.schema, "pipeline.onboarding-consent-question.v1");
+  assert.equal(question.language, "en");
+  for (const step of ONBOARDING_CONSENT_COVERED_STEPS) assert.ok(question.text.includes(step.en), step.id);
+  for (const step of ONBOARDING_CONSENT_NOT_COVERED) assert.ok(question.text.includes(step.en), step.id);
+  assert.ok(question.textByLanguage.de.includes(ONBOARDING_CONSENT_COVERED_STEPS[0].de));
+  const record = result.consentRecordAction;
+  assert.equal(record.kind, "command");
+  assert.deepEqual(record.argv.slice(1, 7), ["record", "--root", ROOT_CURRENT, "--session-id", "onboarding", "--answer"]);
+  assert.ok(record.argv[0].endsWith(join("scripts", "onboarding-consent-mark.mjs")), record.argv[0]);
+  assert.ok(record.argv.includes("--quote"));
+  assert.equal(record.mutation, true);
+  assert.equal(record.requiresConfirmation, false);
+  assert.match(record.guidance, /once the first onboarding apply \(the portable seed\) has completed/u);
+  assert.match(record.guidance, /verbatim, never paraphrased/u);
+  // The existing guided onboarding action is unchanged.
+  assert.ok(result.nextAction.argv[0].endsWith(join("scripts", "onboarding-init.mjs")));
+  assert.deepEqual(result.nextAction.argv.slice(1, 4), ["--root", ROOT_CURRENT, "--runner"]);
+  assert.equal(result.nextAction.mutation, false);
+  assert.equal(result.nextAction.requiresConfirmation, false);
+});

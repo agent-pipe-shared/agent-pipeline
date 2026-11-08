@@ -15,7 +15,11 @@ or material design input exists, a configured plan/acceptance gate is reached,
 an action is external or irreversible, or a typed hard block has no supplied
 safe recovery. Never treat this consent as approval for unrelated adoption,
 remote operations, deployment, publication, destructive work, or a scope
-change.
+change. The consent's scope is one list (`lib/onboarding-consent-scope.mjs`),
+named in the question the user answered and stored in the consent record
+(`scripts/onboarding-consent-mark.mjs`, schema v2: scope and the user's answer
+as a bounded quote); the design approval, push, release and any human-guard
+override stay outside it.
 
 For inherited handoff run `codex-project-runtime-readback-host.mjs --root
 "$PWD"`; accept only `pipeline.codex-project-runtime-readback-status.v1`,

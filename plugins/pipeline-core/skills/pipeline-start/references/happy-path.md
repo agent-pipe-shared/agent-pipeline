@@ -14,6 +14,12 @@ The first call of a standard command returns a typed `runbook` field `{ path, di
 session and path, and always on a refusal); follow that runbook when this guide and the command's own output differ, because it is regenerated from the
 command tables.
 
+Escalations (G20-45). The user's recorded onboarding consent covers every agent step up to presenting the design (hooks, onboarding commits, intake and
+kickoff artifacts, the unsealed-draft bind, the review rounds, `submit-plan`, `prepare-seal`, `present-plan`); the design approval, push, release and any
+human-guard override are not covered. An action the consent covers prints `requiresConfirmation: false`, `coveredBy` (the record path and the step) and
+`escalationJustification`: when a runner's escalation review asks for a reason to run it (Codex mounts `.git` read-only, so every lifecycle write is
+escalated), give that line verbatim. Without a record nothing is marked covered.
+
 ## 1. Design
 
 1. `pipeline-state.mjs set-feature --id <id> --plan-path <path>` (agent). Both flags are required.

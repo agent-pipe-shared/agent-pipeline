@@ -8,6 +8,8 @@ import { existsSync, readFileSync, readdirSync, realpathSync, statSync, lstatSyn
 import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadManifestSafe, resolveHumanFacingLanguage } from "../lib/manifest.mjs";
+import { onboardingConsentQuestion } from "../lib/onboarding-consent-scope.mjs";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { attachRunbookLink } from "../lib/runbook-link.mjs";
@@ -1112,6 +1114,31 @@ export function resolveCodexAttestationSourceForPreflight({
   };
 }
 
+// G20-45: the consent question (operator language: the project's human-facing language, English when unknown) and the command that
+// records the answer. The record is written right after the first onboarding apply, never before: a `.claude/` file in a fresh root
+// makes the onboarding inspection read it as a partial authority.
+function onboardingConsentFields({ rootDir, scriptUrl }) {
+  let language = "en";
+  try {
+    const manifest = loadManifestSafe(rootDir);
+    const resolved = manifest ? resolveHumanFacingLanguage(manifest) : null;
+    if (resolved?.ok) language = resolved.value;
+  } catch { /* an unreadable manifest keeps English */ }
+  return {
+    consentQuestion: onboardingConsentQuestion({ language }),
+    consentRecordAction: {
+      kind: "command",
+      executable: process.execPath,
+      argv: [resolve(dirname(fileURLToPath(scriptUrl)), "onboarding-consent-mark.mjs"), "record", "--root", rootDir, "--session-id", "onboarding", "--answer", "yes", "--quote", "<the-user-answer-verbatim>"],
+      mutation: true,
+      requiresConfirmation: false,
+      executionBoundary: "host",
+      expected: { schema: "pipeline.onboarding-consent-mark.v2", answer: "yes" },
+      guidance: "Relay consentQuestion.text to the user verbatim, never paraphrased. After an affirmative answer, run this record command once the first onboarding apply (the portable seed) has completed, replacing <the-user-answer-verbatim> with the user's answer word for word; a file written into .claude/ earlier makes a fresh root read as partial. The record is what lets later actions print coveredBy instead of asking again. A decline is recorded with --answer no and leaves the project inactive.",
+    },
+  };
+}
+
 export function observePipelineStartPreflight({
   env = process.env,
   pluginList,
@@ -1174,6 +1201,9 @@ export function observePipelineStartPreflight({
       status: state === "inactive" ? "pipeline-governance-inactive" : state === "declined" ? "pipeline-governance-declined" : "pipeline-governance-unverifiable",
       governanceScope: validScope ? governanceScope : null,
       ...(diagnostic ? { cause: diagnostic.cause, topologyDiagnostic: diagnostic.topologyDiagnostic } : {}),
+      // G20-45: the question the agent relays verbatim, naming every step the user's yes covers (and what it does not), plus the
+      // action that records the answer with its verbatim quote. Only for the inactive project the hint is allowed for.
+      ...(!diagnostic && state === "inactive" && governanceScope.hintAllowed ? onboardingConsentFields({ rootDir: resolve(cwd), scriptUrl }) : {}),
       pipelineWorkPerformed: false,
       nextAction: diagnostic ? governanceScopeDiagnosticAction({ rootDir: resolve(cwd) }) : state === "inactive" && governanceScope.hintAllowed
         ? {
