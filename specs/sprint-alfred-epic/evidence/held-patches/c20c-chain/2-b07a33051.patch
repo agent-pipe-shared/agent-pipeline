@@ -1,0 +1,167 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 033bdcb1ea1dac201eebd20e96fe79bc70bdc48f..698e5fa4f825b9bf768b700a0e483bc148d5c76f 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -699,6 +699,14 @@ accepts a receipt only with exactly the device-local fields or exactly those plu
+ the source digest. `lib/rebind-approval.mjs` gains one import, `lib/yaml-lite.mjs`,
+ already a kernel path.
+ 
++G20-64 (2026-11-08) moves that routing-only comparison into the kernel module itself:
++`lib/plan-approval-device-rebind.mjs` exports `profileSourceChangedKeys` and gains the
++same one import, `lib/yaml-lite.mjs`, already a kernel path; `lib/rebind-approval.mjs`
++and the contract readback in `scripts/pipeline-state.mjs` (`acceptedOriginalPolicy`)
++both call it, so a PO profile source that differs only in `routing` and
++`core_registry_sha256` is judged by one rule in both places and nothing else is
++widened.
++
+ Dispatch-model enforcement (D84, 2026-10-21) adds
+ `plugins/pipeline-core/lib/dispatch-model-enforcement.mjs` (decides whether the
+ tool-layer `model` of a subagent dispatch is one the configured routing selects,
+diff --git a/plugins/pipeline-core/lib/plan-approval-device-rebind.mjs b/plugins/pipeline-core/lib/plan-approval-device-rebind.mjs
+index 19acf7d90cc8d34d581578343671f34593167c2f..8b57c024ff0aad42f08ef899694750a54b9b1843 100644
+--- a/plugins/pipeline-core/lib/plan-approval-device-rebind.mjs
++++ b/plugins/pipeline-core/lib/plan-approval-device-rebind.mjs
+@@ -15,6 +15,7 @@
+ import { join } from "node:path";
+ import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
+ import { readPrivateJson, writePrivateJsonAtomic } from "./private-boundary.mjs";
++import { parseYaml } from "./yaml-lite.mjs";
+ 
+ export const PLAN_APPROVAL_DEVICE_REBIND_SCHEMA = "pipeline.plan-approval-device-rebind.v1";
+ export const DEVICE_LOCAL_AUTHORITY_FIELDS = Object.freeze(["receiptSha256", "repositoryFingerprint"]);
+@@ -35,6 +36,28 @@ const deviceValues = (value, fields = DEVICE_LOCAL_AUTHORITY_FIELDS) => Object.f
+ const validDeviceValues = (value, fields = DEVICE_LOCAL_AUTHORITY_FIELDS) => sameKeys(value, fields)
+   && fields.every((key) => SHA256.test(value[key] ?? ""));
+ 
++// G20-58: the only PO profile source keys a plan approval may outlive. Model routing (and the registry digest that is
++// regenerated with it) chooses which model runs a role; it decides no gate, approval, autonomy, export or release value.
++export const REBINDABLE_PROFILE_SOURCE_KEYS = Object.freeze(["core_registry_sha256", "routing"]);
++
++/**
++ * G20-58/G20-64: the top-level keys of the PO profile source (pipeline.user.yaml text) that differ between the approved and
++ * the current text, ignoring only the model routing. Unparseable text or a non-mapping root is a change of everything.
++ */
++export function profileSourceChangedKeys(approvedText, currentText) {
++  let approved;
++  let current;
++  try {
++    approved = parseYaml(String(approvedText));
++    current = parseYaml(String(currentText));
++  } catch { return ["<unparseable>"]; }
++  if (!isObject(approved) || !isObject(current)) return ["<root>"];
++  const keys = [...new Set([...Object.keys(approved), ...Object.keys(current)])].sort();
++  return keys.filter((key) => !REBINDABLE_PROFILE_SOURCE_KEYS.includes(key)
++    && (Object.hasOwn(approved, key) !== Object.hasOwn(current, key)
++      || sha256CanonicalJson(approved[key] ?? null) !== sha256CanonicalJson(current[key] ?? null)));
++}
++
+ /** True only when both values carry the same keys and differ in nothing but the given rebindable fields. */
+ export function differsOnlyInDeviceFields(stored, current, fields = DEVICE_LOCAL_AUTHORITY_FIELDS) {
+   if (!isObject(stored) || !isObject(current)) return false;
+diff --git a/plugins/pipeline-core/lib/rebind-approval.mjs b/plugins/pipeline-core/lib/rebind-approval.mjs
+index 68c5bc2180d7a8ac357bc3df7b47fae3fbb99c59..397232bbe186d3186442be010d061e838634beb2 100644
+--- a/plugins/pipeline-core/lib/rebind-approval.mjs
++++ b/plugins/pipeline-core/lib/rebind-approval.mjs
+@@ -33,9 +33,8 @@ import { verifyFinalDesignWorkflowApproval } from "./architecture-design.mjs";
+ import { ensurePrivateDirectory, writePrivateFileNoReplaceAtomic } from "./private-boundary.mjs";
+ import { poGateProfileProjectionPaths, validatePoGateAuthorityForRepository, validatePoGateProfileForRepository } from "./po-gate-authority.mjs";
+ import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
+-import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_SOURCE_REBIND_FIELDS, withOriginDeviceValues,
+-  writePlanApprovalDeviceRebindReceipt } from "./plan-approval-device-rebind.mjs";
+-import { parseYaml } from "./yaml-lite.mjs";
++import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_SOURCE_REBIND_FIELDS, profileSourceChangedKeys,
++  withOriginDeviceValues, writePlanApprovalDeviceRebindReceipt } from "./plan-approval-device-rebind.mjs";
+ import { observeCurrentPlanApprovalForCalibration, readAcceptedDeliveryContract } from "../scripts/pipeline-state.mjs";
+ 
+ export const REBIND_APPROVAL_SCHEMA = "pipeline.rebind-approval.v1";
+@@ -160,9 +159,6 @@ function lostArtifactPrerequisite(paths) {
+   };
+ }
+ 
+-// G20-58: the only PO profile source keys a plan approval may outlive. Model routing (and the registry digest that is
+-// regenerated with it) chooses which model runs a role; it decides no gate, approval, autonomy, export or release value.
+-export const REBINDABLE_PROFILE_SOURCE_KEYS = Object.freeze(["core_registry_sha256", "routing"]);
+ const MAX_PROFILE_SOURCE_HISTORY = 200;
+ 
+ /**
+@@ -190,22 +186,7 @@ export function routingOnlyProfileSourceChange({ root, approvedSha256, currentSh
+     }
+   }
+   if (approvedText === null) return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE" };
+-  let approved;
+-  let current;
+-  try {
+-    approved = parseYaml(approvedText);
+-    current = parseYaml(currentFile.bytes.toString("utf8"));
+-  } catch {
+-    return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-CHANGED", extra: { changedKeys: ["<unparseable>"] } };
+-  }
+-  const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+-  if (!plain(approved) || !plain(current)) {
+-    return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-CHANGED", extra: { changedKeys: ["<root>"] } };
+-  }
+-  const keys = [...new Set([...Object.keys(approved), ...Object.keys(current)])].sort();
+-  const changedKeys = keys.filter((key) => !REBINDABLE_PROFILE_SOURCE_KEYS.includes(key)
+-    && (Object.hasOwn(approved, key) !== Object.hasOwn(current, key)
+-      || sha256CanonicalJson(approved[key] ?? null) !== sha256CanonicalJson(current[key] ?? null)));
++  const changedKeys = profileSourceChangedKeys(approvedText, currentFile.bytes.toString("utf8"));
+   if (changedKeys.length > 0) return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-CHANGED", extra: { changedKeys } };
+   return { ok: true };
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 34d6681d48d49a1b799e6a23e2fe099c98feb0e7..2e834249bf677df46590f591101b33159d4852f8 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -467,6 +467,7 @@ import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicabili
+ import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
+ import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
+ import { rebindApproval } from "../lib/rebind-approval.mjs";
++import { profileSourceChangedKeys } from "../lib/plan-approval-device-rebind.mjs";
+ import { designWorkflowAdvisorExceptionBinding, readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
+ import {
+   createDesignWorkflowPackageApprovalRequest,
+@@ -10155,7 +10156,12 @@ function acceptedCandidateAt({dir,candidate}) {
+ function acceptedOriginalPolicy({dir,candidate,path}, reader) {
+   const bytes = acceptedCandidateFile({dir,candidate,path});
+   const physical = physicalRebindFile(dir,path);
+-  if (!physical || !Buffer.from(physical.bytes).equals(Buffer.from(bytes))) throw Error("current policy differs from original approval policy");
++  if (!physical) throw Error("current policy differs from original approval policy");
++  // G20-64: the PO profile source may differ from the approved bytes in its model routing only (the rule rebind-approval
++  // applies, G20-58); the approval mode, gates and every other key still have to be the approved ones.
++  const routingOnly = path === "pipeline.user.yaml"
++    && profileSourceChangedKeys(Buffer.from(bytes).toString("utf8"), Buffer.from(physical.bytes).toString("utf8")).length === 0;
++  if (!Buffer.from(physical.bytes).equals(Buffer.from(bytes)) && !routingOnly) throw Error("current policy differs from original approval policy");
+   return reader(dir);
+ }
+ function acceptedOriginalMode({dir,candidate}) {
+diff --git a/plugins/pipeline-core/scripts/rebind-approval.test.mjs b/plugins/pipeline-core/scripts/rebind-approval.test.mjs
+index 9730e30814680cc51aced6d1a8baae60de620f89..8b1dd123e21250b728a534e8816dc858d280b5e3 100644
+--- a/plugins/pipeline-core/scripts/rebind-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/rebind-approval.test.mjs
+@@ -82,7 +82,7 @@ import { validPlanSubmission, validPreviousCurrentPlanApproval } from "../lib/pl
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+ import { run, SCHEMA_ID, statePath } from "./pipeline-state.mjs";
+-import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_SOURCE_REBIND_FIELDS, readPlanApprovalDeviceRebind,
++import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_SOURCE_REBIND_FIELDS, profileSourceChangedKeys, readPlanApprovalDeviceRebind,
+   withOriginDeviceValues, writePlanApprovalDeviceRebindReceipt } from "../lib/plan-approval-device-rebind.mjs";
+ import { readPlanApprovalDeviceRebind as readKernelPlanApprovalDeviceRebind } from "../lib/po-gate-authority-read.mjs";
+ import { routingOnlyProfileSourceChange } from "../lib/rebind-approval.mjs";
+@@ -613,6 +613,17 @@ test("G20-58c: any change outside the model routing, unknown approved bytes or a
+     "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE", "the current bytes must be the ones the authority read");
+ });
+ 
++// G20-64 (measured live 2026-11-08 after 20b was installed): rebind-approval passed the routing-only check, then the
++// retained contract readback refused CAC-SOURCE-UNAVAILABLE because acceptedOriginalMode compared the full bytes of the
++// PO profile source with the approved ones a second time. Both places now share one rule.
++test("G20-64: the shared profile-source rule ignores only the model routing, for rebind and contract readback alike", () => {
++  const routed = APPROVED_PROFILE.replace("effort: \"high\"", "effort: \"low\"").replace(h("1"), h("2"));
++  assert.deepEqual(profileSourceChangedKeys(APPROVED_PROFILE, routed), []);
++  assert.deepEqual(profileSourceChangedKeys(APPROVED_PROFILE, APPROVED_PROFILE.replace("\"signature\"", "\"chat\"")), ["gates"]);
++  assert.deepEqual(profileSourceChangedKeys(APPROVED_PROFILE, "gates: [unclosed"), ["<unparseable>"]);
++  assert.deepEqual(profileSourceChangedKeys(APPROVED_PROFILE, "- a\n- b\n"), ["<root>"]);
++});
++
+ test("R7-5g: rebind-approval --help and -h answer the question and run nothing; an argument is refused", () => {
+   const origin = approvedOrigin("help");
+   const clone = cloneOf(origin, "help");

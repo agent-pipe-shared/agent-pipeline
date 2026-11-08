@@ -1,0 +1,36 @@
+diff --git a/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs b/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
+index 91aa04364364a61d155d91de179e9de96cf9bafa..0e3eb617329126430831842cbde0ef576243ea9c 100644
+--- a/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
++++ b/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
+@@ -24,6 +24,15 @@ test("the guide tells when to call the architecture-decision skill: at design pr
+   assert.ok(existsSync(join(PLUGIN, "skills", "architecture-decision", "SKILL.md")));
+ });
+ 
++// G20-61 (Claude greenfield 2026-11-08 06:03 -> 06:59 UTC): the hand-back arrived before the host commit, the session reported
++// and ended its turn, and the completion notification a minute later produced no action until the PO asked.
++test("G20-61: the guide makes the Goldfish completion notification the cue to continue and forbids a status-report turn end", () => {
++  const guide = readFileSync(GUIDE, "utf8");
++  assert.match(guide, /hand-back message can arrive before that commit/u);
++  assert.match(guide, /act on that notification, read `git log -1` and dispatch the next ready slice in the same turn/u);
++  assert.match(guide, /never end a turn with a status report/u);
++});
++
+ test("the guide keeps its honesty markers and holds no host path", () => {
+   const guide = readFileSync(GUIDE, "utf8");
+   assert.match(guide, /## Gaps this guide does not close/u);
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 8d9aaff4a67c62a09220478ca435e9dae343b377..33c103448e57293f1053117a5b427e844407ebc6 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -71,8 +71,9 @@ command tables.
+      `status: "prepared"` call `invoke_subagent` with `invocation.Subagents` unchanged. A native implementation consent is not available: read
+      `references/antigravity-native-dispatch.md` before the first dispatch and ask the PO when the sanctioned route does not return an authored commit.
+ 4. Commit what the dispatch produced under the host-commit rules of its runner; never hand-build a record the writer refuses (the refusal names its repair).
+-   On Claude the host commit of a background Goldfish lands at its SubagentStop, before its completion report reaches you: read `git log -1` once and
+-   continue in the same turn with the next slice. Never end the turn to wait for the pipeline to commit; a turn that ends there waits for the PO.
++   On Claude the host commit of a background Goldfish lands at its SubagentStop. Its hand-back message can arrive before that commit, its completion
++   task-notification arrives after it: act on that notification, read `git log -1` and dispatch the next ready slice in the same turn. While ready
++   slices remain, never end a turn with a status report or to wait for the pipeline to commit; a turn that ends there waits for the PO.
+ 
+ ## 3. Critic
+ 

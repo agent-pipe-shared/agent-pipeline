@@ -1,0 +1,48 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 353d3d852aae603039bf0027fdec6697ac174cd8..725e8d816dbebd91cf4e71f2238644230a07fed6 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -4728,6 +4728,23 @@ test("GUARDFIX-1: a null-device stderr suppressor is never itself a cross-reposi
+   } finally { rmSync(path, { recursive: true, force: true }); }
+ });
+ 
++// G20-60 (probed 2026-11-08 against the installed guard after the PO asked about a public "xargs dirname -> rm -rf
++// ~/Library" incident): `rm -rf ~/Library` was refused, `rm -rf ../../Library` was admitted, because only absolute and
++// `~` operands were judged. Every operand of a mutating verb is now judged by the path it resolves to.
++test("G20-60: a relative operand that escapes the project root is a cross-repository mutation; one inside is not", () => {
++  const path = root();
++  try {
++    for (const command of ["rm -rf ../../Library", "rm -rf ../sibling", "mv notes.md ../notes.md", "touch ../x", "chmod 777 ../x",
++      "mkdir -p ../../made", "ln -s target ../link"]) {
++      assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
++    }
++    for (const command of ["rm -rf scratch/probe-dir", "rm -rf ./scratch/x", "mkdir -p scratch/a/../b", "chmod 644 docs/a.md",
++      "ln -s ../outside-target scratch/link"]) {
++      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
++    }
++  } finally { rmSync(path, { recursive: true, force: true }); }
++});
++
+ test("partial PO authority rebind admits only the exact read-only planner", () => {
+   const path = root();
+   try {
+diff --git a/plugins/pipeline-core/lib/guard/po-commands.mjs b/plugins/pipeline-core/lib/guard/po-commands.mjs
+index e4a7bb44667558e4da178e72fc25be97bec3ae30..1f9ad83d4dbe177f769ae60e38bb23e2c205acd0 100644
+--- a/plugins/pipeline-core/lib/guard/po-commands.mjs
++++ b/plugins/pipeline-core/lib/guard/po-commands.mjs
+@@ -326,9 +326,13 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
+         return target !== null && !pathInside(root, target);
+       });
+     }
+-    return written.some((arg) => {
++    // G20-60: every operand is judged by the path it resolves to, a relative `../..` escape included (`rm -rf ../../Library`
++    // was admitted while `rm -rf ~/Library` was refused). Only a symbolic link's TARGET operand of `ln` is not a write.
++    const lastOperand = written.filter((arg) => !arg.startsWith("-")).at(-1);
++    const judged = executable === "ln" ? written.filter((arg) => isShellExternalPathToken(arg) || arg === lastOperand) : written;
++    return judged.some((arg) => {
+       const target = commandPath(arg, root);
+-      return target !== null && isShellExternalPathToken(arg) && !pathInside(root, target);
++      return target !== null && !pathInside(root, target);
+     });
+   }
+   if (executable === "sed" && args.some((arg) => /^-[^-]*i/u.test(arg) || /^--in-place(?:=|$)/u.test(arg))) {
