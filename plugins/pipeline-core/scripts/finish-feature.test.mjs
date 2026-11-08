@@ -376,6 +376,19 @@ test("P3: after the commit the next call continues to closed-local; an uncommitt
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed repair on stderr with exit 2; a bad flag is a usage refusal", () => {
+  const f = oneShotFixture({ closed: true });
+  try {
+    const script = new URL("./finish-feature.mjs", import.meta.url).pathname;
+    const stopped = spawnSync(process.execPath, [script, "--one-shot", "--root", f.root, "--by", "PO", "--architecture-impact", "no-architecture-impact"], { encoding: "utf8" });
+    assert.equal(stopped.status, 2, stopped.stderr);
+    assert.equal(JSON.parse(stopped.stdout).stop.code, "ONESHOT-NO-ACTIVE-FEATURE");
+    assert.match(stopped.stderr, /ONESHOT-NO-ACTIVE-FEATURE/u); assert.match(stopped.stderr, /^repair: /mu);
+    const usage = spawnSync(process.execPath, [script, "--one-shot", "--root", f.root, "--bogus", "x"], { encoding: "utf8" });
+    assert.equal(usage.status, 2); assert.match(usage.stderr, /FINISH-USAGE/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("G20-66: every close stage that writes protected files arms the commit of exactly those bytes, and the result prints the one commit", async () => {
   const { execFileSync } = await import("node:child_process");
   const { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } = await import("node:fs");
