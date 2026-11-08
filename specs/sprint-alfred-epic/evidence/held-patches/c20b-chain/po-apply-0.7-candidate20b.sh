@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 20b: 24 held patches exported from the build clone chain daae02455..df3e1a6ba
+# PO apply script for candidate 20b: 26 held patches exported from the build clone chain daae02455..871a73986
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -38,6 +38,8 @@ step 21-7f2b3b792 'docs(skill): a Claude Elephant continues in the same turn aft
 step 22-bc15619c2 'fix(po-gate): name the agent-admitted profile repair route first (G20-53)'
 step 23-23d7e20f4 'fix(provisioning): the profile receipt repair names the agent-admitted repair plan (G20-53)'
 step 24-df3e1a6ba 'fix(pipeline-state): set-phase points at the verification tiers below only when they follow (G20-54)'
+step 25-45c8e7ebc 'fix(rebind): an approval outlives a model-routing-only change of the PO profile source (G20-58)'
+step 26-871a73986 'fix(dispatch-briefing): a module dispatch carries the module'"'"'s slice id, so its delivery releases the next wave (G20-59)'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

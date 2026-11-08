@@ -1,0 +1,158 @@
+diff --git a/plugins/pipeline-core/lib/module-dispatch-scope.mjs b/plugins/pipeline-core/lib/module-dispatch-scope.mjs
+index bf27be4725919feaa74c9baff34fef0b687efb4e..70d93970f8359f7a6ccd41bc64ad3ee5874cfb86 100644
+--- a/plugins/pipeline-core/lib/module-dispatch-scope.mjs
++++ b/plugins/pipeline-core/lib/module-dispatch-scope.mjs
+@@ -22,6 +22,18 @@ export const MODULE_DISPATCH_SCOPE_SCHEMA = "pipeline.module-dispatch-scope.v1";
+ const MAX_PRD_BYTES = 4 * 1024 * 1024;
+ 
+ const refuse = (code, message, extra = {}) => ({ ok: false, schema: MODULE_DISPATCH_SCOPE_SCHEMA, code, message, ...extra });
++const FURTHER_ATTEMPT_SUFFIX = /^-r(?:[2-9]|[1-9]\d{1,2})$/u;
++
++/**
++ * G20-59: `id` delivers the plan's slice `sliceId` when it is that id or a numbered further attempt on the same module
++ * (`<sliceId>-r2`, `-r3`, ...) that is not itself the slice id of another module of the plan. The wave order tracks a module
++ * by this id alone, so a delivery under any other id never releases the modules that wait for it.
++ */
++export function deliversModuleSlice(id, sliceId, planSliceIds = []) {
++  if (typeof id !== "string" || typeof sliceId !== "string") return false;
++  if (id === sliceId) return true;
++  return id.startsWith(sliceId) && FURTHER_ATTEMPT_SUFFIX.test(id.slice(sliceId.length)) && !planSliceIds.includes(id);
++}
+ 
+ /** The modules of an approved architecture design in a PRD under `root` (repository-relative path); never throws. */
+ export function readPrdModules(root, prd) {
+@@ -64,12 +76,13 @@ export function moduleDispatchScope(input) {
+         }
+       }
+     }
+-    const accepted = new Set(integratedSliceIds ?? []);
+-    const waiting = slice.dependsOn.filter((sliceId) => !accepted.has(sliceId));
++    const accepted = [...new Set(integratedSliceIds ?? [])];
++    const planSliceIds = proposal.slices.map((entry) => entry.id);
++    const waiting = slice.dependsOn.filter((sliceId) => !accepted.some((id) => deliversModuleSlice(id, sliceId, planSliceIds)));
+     if (waiting.length > 0) {
+       return refuse("DBG-MODULE-NOT-RUNNABLE", `module ${moduleId} is in wave ${slice.wave} and waits for ${waiting.join(", ")}, which ${waiting.length === 1 ? "has" : "have"} no accepted result yet; repair: deliver and integrate ${waiting.join(", ")} first (wave order: ${proposal.waves.map((wave, index) => `${index}: ${wave.join(", ")}`).join("; ")}), then build this briefing again`, { moduleId, wave: slice.wave, waitingFor: waiting });
+     }
+-    return { ok: true, schema: MODULE_DISPATCH_SCOPE_SCHEMA, moduleId, sliceId: slice.id, wave: slice.wave, writeScope: paths === undefined ? [...slice.writeScope] : [...paths] };
++    return { ok: true, schema: MODULE_DISPATCH_SCOPE_SCHEMA, moduleId, sliceId: slice.id, planSliceIds, wave: slice.wave, writeScope: paths === undefined ? [...slice.writeScope] : [...paths] };
+   } catch (error) {
+     return refuse("DBG-MODULE-CUT-INVALID", `the module scope could not be derived (${error?.name ?? "error"}); repair: check the module list of the plan`);
+   }
+diff --git a/plugins/pipeline-core/lib/module-slice-proposal.test.mjs b/plugins/pipeline-core/lib/module-slice-proposal.test.mjs
+index e690eed187fc80fac70a3ee1ff579c1c0ef03f3d..6d60140db08d7f90c015d698e747211790dc4980 100644
+--- a/plugins/pipeline-core/lib/module-slice-proposal.test.mjs
++++ b/plugins/pipeline-core/lib/module-slice-proposal.test.mjs
+@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+ 
+-import { moduleDispatchScope, readPrdModules } from "./module-dispatch-scope.mjs";
++import { deliversModuleSlice, moduleDispatchScope, readPrdModules } from "./module-dispatch-scope.mjs";
+ import { MODULE_SLICE_PROPOSAL_SCHEMA, proposeSlicesFromModules } from "./module-slice-proposal.mjs";
+ import { run as runProposal } from "../scripts/module-slice-proposal.mjs";
+ import { runCli } from "../scripts/slice-queue.mjs";
+@@ -175,6 +175,19 @@ test("MDS3: a module whose dependency module has no accepted result is not runna
+   assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "docs", integratedSliceIds: [] }).ok, true, "a wave-0 module needs no result");
+ });
+ 
++test("G20-59: a numbered further attempt delivers its module's slice; another module's slice id or a free id never does", () => {
++  assert.equal(deliversModuleSlice("slice-core", "slice-core"), true);
++  assert.equal(deliversModuleSlice("slice-core-r2", "slice-core"), true);
++  assert.equal(deliversModuleSlice("slice-core-r12", "slice-core"), true);
++  assert.equal(deliversModuleSlice("slice-core-r1", "slice-core"), false, "the first attempt is the plain id");
++  assert.equal(deliversModuleSlice("slice-1a-core", "slice-core"), false);
++  assert.equal(deliversModuleSlice("slice-core-x", "slice-core"), false);
++  assert.equal(deliversModuleSlice("slice-core-r2", "slice-core", ["slice-core", "slice-core-r2"]), false,
++    "a module whose own id looks like an attempt keeps its own slice");
++  assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "api", integratedSliceIds: ["slice-core-r2"] }).ok, true);
++  assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "api", integratedSliceIds: ["slice-1a-core"] }).code, "DBG-MODULE-NOT-RUNNABLE");
++});
++
+ test("MDS4: an unknown module, an invalid cut and a malformed call are typed refusals that never throw", () => {
+   assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "nope", integratedSliceIds: [] }).code, "DBG-MODULE-UNKNOWN");
+   const cycle = [mod("a", ["src/a/**"], ["b"]), mod("b", ["src/b/**"], ["a"])];
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index e6f376e5272c9971c562f31699bfa2dbe2389466..8455faee5005278da647b80c62197a81b046346c 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -136,7 +136,7 @@ const { observeContinuityAuthorityDrift, observePipelineStartPreflight } = cliHe
+ const { continuityAuthorityDriftRefusalText, continuityAuthorityDriftSources } = cliHelp ? {} : await import("../lib/continuity-authority-drift.mjs");
+ const sessionAuthorityRegistry = cliHelp ? {} : await import("../lib/session-authority-registry.mjs");
+ const { inspectSignedDescriptorCustodyRepository } = cliHelp ? {} : await import("../lib/worktree-lifecycle.mjs");
+-const { moduleDispatchScope, readPrdModules } = cliHelp ? {} : await import("../lib/module-dispatch-scope.mjs");
++const { deliversModuleSlice, moduleDispatchScope, readPrdModules } = cliHelp ? {} : await import("../lib/module-dispatch-scope.mjs");
+ const { loadMapBundle } = cliHelp ? {} : await import("./module-inventory.mjs");
+ const { owningModules } = cliHelp ? {} : await import("./architecture-boundary-check.mjs");
+ 
+@@ -1208,6 +1208,11 @@ function resolveModulePackage(root, pkg, deps) {
+   const input = { modules: read.modules, moduleId: pkg.module, integratedSliceIds: integrated };
+   const checked = moduleDispatchScope({ ...input, ...(declared.length === 0 ? {} : { paths: declared }) });
+   if (!checked.ok) throw new BriefingPackageRefusal(checked.code, checked.message);
++  // G20-59: the wave order tracks a module by its slice id; a dispatch under another id is delivered and integrated, but the
++  // modules waiting for it stay blocked, and the only way out was a second dispatch of the whole module.
++  if (!deliversModuleSlice(pkg.id, checked.sliceId, checked.planSliceIds)) {
++    throw new BriefingPackageRefusal("DBG-MODULE-SLICE-ID", `dispatch id ${JSON.stringify(String(pkg.id).slice(0, 64))} does not name the slice of module ${pkg.module}; the wave order tracks this module as ${checked.sliceId}, so a delivery under another id never releases the modules that wait for it; repair: set "id" to ${checked.sliceId} (a further attempt on the same module: ${checked.sliceId}-r2, -r3, ...), then build again`);
++  }
+   if (pkg.paths !== undefined) return { pkg, warnings: [] };
+   const derived = declared.length === 0 ? checked : moduleDispatchScope(input);
+   const files = expandModuleScope(root, derived.writeScope);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 05a572f2e840052ec33f04d1a92498eb785a01f0..185730b3b67439b3d7f1859077f2cf8bb9c71290 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -2339,7 +2339,9 @@ test("A18-M1C build --runner antigravity renders a verified briefing that names
+ // --- M1.4 (candidate 19): a package may name a module of the approved architecture design; the write scope is derived from the cut and the cut is enforced ---
+ 
+ function modulePackage(over = {}) {
+-  const made = packageFixture({ paths: undefined, module: "core", modulePlan: "specs/prd.md", ...over });
++  // G20-59 (QG-04, restated in place): a module package's dispatch id is the module's slice id; the fixture used the generic
++  // "ALF-T1", which build now refuses with DBG-MODULE-SLICE-ID (pinned below). Every assertion of these cases is unchanged.
++  const made = packageFixture({ paths: undefined, module: "core", modulePlan: "specs/prd.md", id: `slice-${over.module ?? "core"}`, ...over });
+   const design = {
+     schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
+     disposition: { decision: "approved-scoped", scope: ["specs/", "src/", "tests/", "architecture/"], rationale: "fixture" },
+@@ -2400,6 +2402,31 @@ test("module package: a module whose dependency has no accepted result is refuse
+   assert.equal(released.ok, true, JSON.stringify(released));
+ });
+ 
++// G20-59 (measured in the Claude greenfield on candidate 20, 2026-11-08): module storage was dispatched as "slice-1a-storage",
++// delivered and integrated; module family then stayed refused DBG-MODULE-NOT-RUNNABLE ("waits for slice-storage") and the agent
++// dispatched the whole storage module a second time under "slice-storage".
++test("G20-59: a module package under another dispatch id is refused before dispatch, naming the module's slice id", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = modulePackage({ id: "slice-1a-core" });
++  const refused = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(refused.ok, false);
++  assert.equal(refused.code, "DBG-MODULE-SLICE-ID");
++  assert.match(refused.message, /repair: set "id" to slice-core/u);
++  const probed = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx));
++  const finding = probed.findings.find((entry) => entry.check === "module-scope");
++  assert.equal(finding?.code, "DBG-MODULE-SLICE-ID", JSON.stringify(probed.findings));
++  const retry = modulePackage({ id: "slice-core-r2" });
++  assert.equal(runDispatchBriefing(retry.argv, depsOf(retry.fx)).ok, true, "a numbered further attempt on the same module is admitted");
++});
++
++test("G20-59: a further attempt on a dependency releases the waiting module like the first delivery", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = modulePackage({ module: "api" });
++  assert.equal(runDispatchBriefing(argv, depsOf(fx, { integratedSliceIds: () => ["slice-core-r2"] })).ok, true);
++  assert.equal(runDispatchBriefing(argv, depsOf(fx, { integratedSliceIds: () => ["slice-1a-core"] })).code, "DBG-MODULE-NOT-RUNNABLE",
++    "an unrelated id never stands in for the module's slice");
++});
++
+ test("module package: the two reference keys come together, and a package without them keeps the old shape and the old paths rule", async () => {
+   const { runDispatchBriefing } = await lib();
+   const half = packageFixture({ module: "core" });
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index fb018f6f492d6e193c743341bce2955731055867..8d9aaff4a67c62a09220478ca435e9dae343b377 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -62,6 +62,8 @@ command tables.
+    The cut is enforced by `dispatch-briefing.mjs build` and `probe`: a briefing package that names `module` and `modulePlan` (the PRD with the design) takes its
+    write scope from the module (the exact files its owned paths hold now, warning `DBG-MODULE-SCOPE-DERIVED`), is refused with `DBG-MODULE-SCOPE-CROSSES` when a
+    declared path reaches another module, and with `DBG-MODULE-NOT-RUNNABLE` while a module it depends on has no accepted result.
++   The package `id` of a module dispatch is that module's slice id from the proposal (`slice-<module>`; a further attempt on the same module:
++   `slice-<module>-r2`, `-r3`, ...): the waves track a module by this id only, so any other id is refused with `DBG-MODULE-SLICE-ID`.
+ 3. Dispatch by runner:
+    - **Claude**: `Agent` / `Task` with the functional `agentType`.
+    - **Codex**: `spawn_agent` with `nativeAgentType: "worker"`, keeping the `pipeline-core:goldfish-implementor` (or `-mechanic`) role.
