@@ -128,6 +128,9 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/runner-profiles-v3.mjs`, `lib/runtime-projection-v2.mjs`,
   `lib/runtime-projection-v3.mjs`, `lib/schema-lite.mjs`,
   `lib/signed-quality-package.mjs`,
+  `lib/writer-commit-capability.mjs` (candidate 20d, G20-66: a sanctioned writer records the
+  exact protected paths and bytes it wrote; the pre-commit hook admits only a staged blob that
+  hashes to a recorded digest, never a gate-strength or shipped-baseline path),
   `lib/session-cleanup-recovery.mjs`, `lib/source-observation.mjs`,
   `lib/successful-spawn.mjs`, `lib/windows-private-state.mjs`,
   `lib/worktree-lifecycle.mjs`,

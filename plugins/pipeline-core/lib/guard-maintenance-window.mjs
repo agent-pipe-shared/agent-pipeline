@@ -218,6 +218,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // scripts/pipeline-state.mjs (one of the two spawn-edge additions), not spawn edges
   // themselves.
   "plugins/pipeline-core/lib/publication-authority.mjs",
+  // G20-66: scripts/pipeline-state.mjs (approve-plan, close-feature) statically imports the sanctioned writer's commit
+  // capability, which the pre-commit hook's admission (lib/protected-test-paths.mjs writerCommitAdmission) reads the records of.
+  "plugins/pipeline-core/lib/writer-commit-capability.mjs",
   "plugins/pipeline-core/lib/publication-bundle.mjs",
   "plugins/pipeline-core/lib/publication-bundle-v2.mjs",
   "plugins/pipeline-core/lib/publication-capability-preflight.mjs",
