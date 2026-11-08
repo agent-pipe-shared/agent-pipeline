@@ -15,6 +15,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { deriveCriticCorrectionInputBindings } from "./critic-correction-input-bindings.mjs";
 import { sha256Canonical } from "./review-economy.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 
@@ -31,7 +32,8 @@ export const splitScopeMarker = (id) => `${SPLIT_SCOPE_PREFIX}${id}`;
 
 const ENTRY_ID = /^[a-z][a-z0-9-]*$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
-const MAX_ENTRIES = 64;
+/** A sanity bound on one split round (PO 2026-11-08: 256), not a read budget. A range that needs more entries is refused by the preflight before anything is reserved. */
+export const SPLIT_MAX_ENTRIES = 256;
 const MAX_PRD_BYTES = 4 * 1024 * 1024;
 const SPLIT_KEYS = ["schema", "base", "candidate", "maxChangedFiles", "changedFileCount", "plan", "entries"];
 const ENTRY_KEYS = ["id", "moduleId", "paths", "scopeMarker", "reviewerInput", "batchScopeLine"];
@@ -80,6 +82,22 @@ function matchLength(pattern, file) {
 }
 
 /**
+ * The changed paths a Critic must never read: exactly the exclusions of the range's correction-input bindings (project-state record, finding-disposition record, retained prior
+ * result; harness/review-protocol.md §2.2). No directory or file class is excluded wholesale, which that section forbids; a path is here only because the derivation bound it.
+ * The preflight has already judged this derivation, so a failure here excludes nothing and the path stays visible to its Critic.
+ */
+function boundExclusions(root, base, candidate) {
+  const derive = (options) => deriveCriticCorrectionInputBindings({ repoRoot: root, base, head: candidate, ...options });
+  try {
+    try { return new Set(derive({}).exclusions.map((exclusion) => exclusion.path)); }
+    catch (error) {
+      if (error?.code !== "CCI-CALIBRATION") throw error;
+      return new Set(derive({ projectStateOptional: true }).exclusions.map((exclusion) => exclusion.path));
+    }
+  } catch { return new Set(); }
+}
+
+/**
  * Cuts paths into parts of at most `max` files. A directory that fits stays whole; a larger one is cut along its subdirectories, and only files lying directly in one directory
  * are chunked. Neighbouring pieces are then packed together while they fit, so a range does not turn into many tiny Critics. Disjoint, covers every path, deterministic.
  */
@@ -107,7 +125,7 @@ function cutByDirectory(paths, max) {
 }
 
 /**
- * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES changed files).
+ * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES reviewable files: the changed files minus the bound exclusions).
  * One entry per module of the approved architecture plan that owns a changed path (disjoint scopes: a path goes to the module whose owned-path pattern matches it most
  * specifically, ties by module id), plus ONE shared entry for every changed path no module owns, which is never dropped. Without exactly one approved plan every path is in
  * the shared group and `plan.status` says why. A group above the bound (the shared group without a plan, or one very large module) is cut along directories into entries
@@ -119,11 +137,14 @@ export function buildCriticSplit({ root, result }) {
   const base = result.base?.commit ?? result.base?.tree;
   const candidate = result.candidate.commit;
   const changed = typeof base === "string" ? gitLines(root, ["diff", "--name-only", "--no-renames", "-z", base, candidate]) : null;
-  if (changed === null || changed.length <= SPLIT_MAX_CHANGED_FILES) return null;
+  if (changed === null) return null;
+  const excluded = boundExclusions(root, base, candidate);
+  const reviewable = changed.filter((file) => !excluded.has(file));
+  if (reviewable.length <= SPLIT_MAX_CHANGED_FILES) return null;
   const plan = readPlan(root, candidate, result.spec?.path ?? "");
   const owned = new Map(plan.modules.map((module) => [module.id, []]));
   const shared = [];
-  for (const file of [...changed].sort()) {
+  for (const file of [...reviewable].sort()) {
     let best = null;
     for (const module of plan.modules) {
       const length = Math.max(...module.ownedPaths.map((pattern) => matchLength(pattern, file)));
@@ -161,7 +182,7 @@ export function criticSplitProblem(split) {
     || !Number.isSafeInteger(split.maxChangedFiles) || !Number.isSafeInteger(split.changedFileCount)
     || !closed(split.plan, ["status", "path"]) || !["approved", "none", "ambiguous"].includes(split.plan.status)
     || !(split.plan.path === null || typeof split.plan.path === "string")
-    || !Array.isArray(split.entries) || split.entries.length === 0 || split.entries.length > MAX_ENTRIES) return "the split does not have the closed shape of a Critic review split";
+    || !Array.isArray(split.entries) || split.entries.length === 0 || split.entries.length > SPLIT_MAX_ENTRIES) return "the split does not have the closed shape of a Critic review split";
   const ids = new Set(), paths = new Set();
   for (const entry of split.entries) {
     if (!closed(entry, ENTRY_KEYS) || !ENTRY_ID.test(entry.id ?? "") || ids.has(entry.id) || entry.scopeMarker !== splitScopeMarker(entry.id)

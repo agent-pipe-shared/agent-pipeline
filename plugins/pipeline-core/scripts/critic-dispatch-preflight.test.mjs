@@ -2141,9 +2141,9 @@ function g2072Design() {
     implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
     fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } } };
 }
-function g2072Fixture({ core = 12, api = 12, loose = 4, plan = true } = {}) {
+function g2072Fixture({ core = 12, api = 12, loose = 4, plan = true, records = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "critic-split-preflight-"));
-  for (const dir of [".claude", "governance/guidelines", "governance/policies", "specs/feat", "evidence", "src/core", "src/api", "docs"]) mkdirSync(join(root, dir), { recursive: true });
+  for (const dir of [".claude", "governance/guidelines", "governance/policies", "specs/feat", "evidence/critic/p1", "docs/state-archive", "src/core", "src/api", "docs"]) mkdirSync(join(root, dir), { recursive: true });
   git(root, ["init", "-q"]);
   writeFileSync(join(root, ".claude", "pipeline.yaml"), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
   writeFileSync(join(root, "governance", "guidelines", "review.md"), "Review changed code.\n");
@@ -2155,6 +2155,11 @@ function g2072Fixture({ core = 12, api = 12, loose = 4, plan = true } = {}) {
   for (let index = 0; index < core; index += 1) writeFileSync(join(root, "src", "core", `c${index}.mjs`), `export const c${index} = ${index};\n`);
   for (let index = 0; index < api; index += 1) writeFileSync(join(root, "src", "api", `a${index}.mjs`), `export const a${index} = ${index};\n`);
   for (let index = 0; index < loose; index += 1) writeFileSync(join(root, "docs", `note${index}.md`), `note ${index}\n`);
+  if (records) {
+    writeFileSync(join(root, "evidence", "critic", "p1", "verdict.json"), "{}\n");
+    writeFileSync(join(root, "docs", "state-archive", "old.md"), "old state\n");
+    writeFileSync(join(root, "evidence", "machine.json"), "{}\n");
+  }
   const candidate = commit(root, "candidate");
   const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
   writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
@@ -2246,6 +2251,30 @@ test("G20-72 a module above the bound is cut into parts, one flat directory incl
     assert.deepEqual(split.entries.flatMap((entry) => entry.paths).sort(), g2072Changed(fx).sort());
     assert.match(split.entries.find((entry) => entry.id === "core-part-2").batchScopeLine, /^Batch scope \(MP-07\): path group core-part-2 of module core /u);
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("G20-72 a split leaves out exactly the bound exclusions and never a directory wholesale: another evidence file stays review source", async () => {
+  const fx = g2072Fixture({ records: true });
+  try {
+    const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
+    const paths = split.entries.flatMap((entry) => entry.paths);
+    assert.equal(paths.includes("evidence/critic/p1/verdict.json"), false, "a retained prior result is forbidden input");
+    assert.equal(paths.includes("docs/state-archive/old.md"), false, "a project-state record is forbidden input");
+    assert.equal(paths.includes("evidence/machine.json"), true, "harness/review-protocol.md: evidence/ is never excluded wholesale");
+    assert.equal(split.changedFileCount, g2072Changed(fx).length);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("G20-72 the bound exclusions do not count against the size bound, and a range above the entry bound is refused before anything is reserved", async () => {
+  const { SPLIT_MAX_CHANGED_FILES, SPLIT_MAX_ENTRIES } = await import("../lib/critic-split.mjs");
+  assert.equal(SPLIT_MAX_ENTRIES, 256);
+  const fits = g2072Fixture({ core: 10, api: 8, loose: 4, records: true });
+  const huge = g2072Fixture({ core: SPLIT_MAX_ENTRIES * SPLIT_MAX_CHANGED_FILES + 1, api: 0, loose: 0, plan: false });
+  try {
+    assert.equal(g2072Changed(fits).length, SPLIT_MAX_CHANGED_FILES + 2);
+    assert.equal(Object.hasOwn(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fits), { env: {} }), "split"), false, "25 reviewable files fit one Critic");
+    assert.throws(() => preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(huge), { env: {} }), (error) => error.code === "CDP-SPLIT-TOO-LARGE" && /later --base/u.test(error.details.repair));
+  } finally { rmSync(fits.root, { recursive: true, force: true }); rmSync(huge.root, { recursive: true, force: true }); }
 });
 
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});

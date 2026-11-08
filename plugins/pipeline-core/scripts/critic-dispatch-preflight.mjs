@@ -26,7 +26,7 @@ import { evaluateReviewAdmission } from "../lib/review-admission-read.mjs";
 import { criticCoverageAdvisory, listUncoveredCriticRecords, terminalAuthoredDelivery, walkDispatchRecordsForReview } from "../lib/review-admission-read.mjs";
 import { criticDisposition } from "../lib/critic-skip-decision.mjs";
 import { SAFE_ID, admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
-import { buildCriticSplit } from "../lib/critic-split.mjs";
+import { SPLIT_MAX_ENTRIES, buildCriticSplit } from "../lib/critic-split.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import {
   CriticGuardrailDerivationError,
@@ -705,6 +705,10 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
   const promptLines = opusCriticPromptLines({ root, result, env: deps.env ?? process.env, registry: deps.registry, trigger });
   // G20-72: a range above the one named bound is split per module; `admit` rebuilds the identical object and binds its digest.
   const split = buildCriticSplit({ root, result });
+  if (split !== null && split.entries.length > SPLIT_MAX_ENTRIES) {
+    const reason = `This range needs ${split.entries.length} split entries, above the bound of ${SPLIT_MAX_ENTRIES} for one review round (${split.changedFileCount} changed files).`;
+    fail("CDP-SPLIT-TOO-LARGE", reason, { reason, repair: "Review a narrower exact range (a later --base), or review the range in several delivery units." });
+  }
   const nextStep = [
     `Write admitRequest verbatim as ${ADMIT_REQUEST_FILE} (JSON), replace only its placeholders (${admitRequestPlaceholderPaths(request).join(", ")}), then run admitCommand; admit refuses an unfilled placeholder by name.`,
     `trigger ${trigger} is ${trigger === appliedRow ? "the applied Critic row of the matched dispatch record" : "the strictest default (no matched record row of T1 to T3)"}; change it only if your Critic-required decision says otherwise.`,
