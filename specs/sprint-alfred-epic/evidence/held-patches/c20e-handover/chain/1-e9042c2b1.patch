@@ -1,0 +1,59 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+index 817f9c39ab487b5f5eabe7de10b1f64295cc4e27..dede3a77a706fc1ce27f9e97700d0bba1c478a17 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+@@ -101,12 +101,20 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
+   const allSelectors = [...new Set(dutyRoutes.map((route) => route.selector.value))];
+   const defaultSelector = dutyRoutes.find((route) => route.taskRoute === "duty.implement")?.selector.value ?? allSelectors[0];
+   const hasModel = typeof model === "string" && model.trim() !== "";
++  // G20-70 (Claude greenfield 2026-11-08): a Critic dispatch without a model was told "implementation work uses
++  // duty.implement", the selector of another role. A plugin agent type that serves a configured duty names that duty's
++  // own selector; only an agent type with no duty of its own keeps the implementation default.
++  const ownDuties = AGENT_TYPE_DUTIES[subagentType];
++  const ownRoutes = ownDuties ? dutyRoutes.filter((route) => ownDuties.includes(route.taskRoute.slice("duty.".length))) : [];
+   if (!hasModel) {
++    const routeHint = ownRoutes.length > 0
++      ? `${subagentType} serves ${ownRoutes.map((route) => `${route.taskRoute} = "${route.selector.value}"`).join(" / ")}`
++      : `implementation work uses duty.implement = "${defaultSelector}"`;
+     return { ok: false, skipped: null, findings: [{
+       code: "DISPATCH-MODEL-MISSING",
+       message: `the dispatch names no model, so it would inherit the session's model; the configured routing decides the model, not the dispatcher. `
+         + `Re-issue the same dispatch with the tool-layer \`model\` parameter set to one of the configured selectors (${allSelectors.map((value) => `"${value}"`).join(", ")}; `
+-        + `implementation work uses duty.implement = "${defaultSelector}").`,
++        + `${routeHint}).`,
+     }] };
+   }
+   if (!dutyRoutes.some((route) => selectorMatches(route.selector, model))) {
+@@ -116,8 +124,7 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
+         + `Re-issue it with one of the configured selectors: ${allSelectors.map((value) => `"${value}"`).join(", ")}.`,
+     }] };
+   }
+-  const duties = AGENT_TYPE_DUTIES[subagentType];
+-  const routes = duties ? dutyRoutes.filter((route) => duties.includes(route.taskRoute.slice("duty.".length))) : [];
++  const routes = ownRoutes;
+   if (routes.length > 0 && !routes.some((route) => selectorMatches(route.selector, model))) {
+     const expected = [...new Set(routes.map((route) => `"${route.selector.value}"`))].join(" or ");
+     // A configured but different selector is the MP-05/MP-07 escalation shape (a stated tier change), so it
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+index 4e5ce1e408cce757e0da1fb7e7002847d75bdb3c..0badb7df7b3dc72e9dfeb8373bcde5a6bba31b38 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+@@ -33,6 +33,18 @@ test("DME02 an empty or non-string model counts as missing", () => {
+   }
+ });
+ 
++// G20-70 (Claude greenfield 2026-11-08): a Critic dispatch without a model was told "implementation work uses duty.implement".
++test("DME02b a missing model names the dispatched agent type's own duty selector, not the implementation default", () => {
++  const critic = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:critic", model: undefined, routeSource: routes() });
++  assert.equal(critic.findings[0].code, "DISPATCH-MODEL-MISSING");
++  assert.match(critic.findings[0].message, /pipeline-core:critic serves duty\.critic_normal = "opus" \/ duty\.critic_high_risk = "opus"/u);
++  assert.doesNotMatch(critic.findings[0].message, /implementation work uses/u);
++  const mechanic = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-mechanic", model: undefined, routeSource: routes() });
++  assert.match(mechanic.findings[0].message, /pipeline-core:goldfish-mechanic serves duty\.mechanic = "haiku"/u);
++  const generic = evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model: undefined, routeSource: routes() });
++  assert.match(generic.findings[0].message, /implementation work uses duty\.implement = "sonnet"/u);
++});
++
+ test("DME03 a generic agent type accepts any configured, available Claude selector", () => {
+   for (const model of ["sonnet", "haiku", "opus", "Sonnet"]) {
+     assert.equal(evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model, routeSource: routes() }).ok, true, model);

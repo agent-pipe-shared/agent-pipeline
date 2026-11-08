@@ -1,0 +1,32 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+index dede3a77a706fc1ce27f9e97700d0bba1c478a17..e59bd48c9529c6bdf8fa2d6671714f7e9b1094b9 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+@@ -107,8 +107,12 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
+   const ownDuties = AGENT_TYPE_DUTIES[subagentType];
+   const ownRoutes = ownDuties ? dutyRoutes.filter((route) => ownDuties.includes(route.taskRoute.slice("duty.".length))) : [];
+   if (!hasModel) {
++    // The same greenfield then met DISPATCH-OPUS-NO-BATCH-RATIONALE (MP-07, dispatch-policy.mjs) after following an Opus route,
++    // so a Critic route on the Opus tier names that prompt condition in the same breath.
++    const opusCritic = subagentType === "pipeline-core:critic" && ownRoutes.some((route) => /\bopus\b/iu.test(route.selector.value));
+     const routeHint = ownRoutes.length > 0
+       ? `${subagentType} serves ${ownRoutes.map((route) => `${route.taskRoute} = "${route.selector.value}"`).join(" / ")}`
++        + (opusCritic ? `; an Opus Critic prompt also needs a non-empty \`Batch scope (MP-07):\` line and a rationale line naming critical architecture or security (else DISPATCH-OPUS-NO-BATCH-RATIONALE)` : "")
+       : `implementation work uses duty.implement = "${defaultSelector}"`;
+     return { ok: false, skipped: null, findings: [{
+       code: "DISPATCH-MODEL-MISSING",
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+index 0badb7df7b3dc72e9dfeb8373bcde5a6bba31b38..a55629f5a9210024b2c8c0c97e387d2bfc007a59 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+@@ -39,6 +39,10 @@ test("DME02b a missing model names the dispatched agent type's own duty selector
+   assert.equal(critic.findings[0].code, "DISPATCH-MODEL-MISSING");
+   assert.match(critic.findings[0].message, /pipeline-core:critic serves duty\.critic_normal = "opus" \/ duty\.critic_high_risk = "opus"/u);
+   assert.doesNotMatch(critic.findings[0].message, /implementation work uses/u);
++  assert.match(critic.findings[0].message, /Batch scope \(MP-07\):.*critical architecture or security.*DISPATCH-OPUS-NO-BATCH-RATIONALE/u);
++  const sonnetCritic = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:critic", model: undefined,
++    routeSource: routes({ critic_normal: "sonnet", critic_high_risk: "sonnet" }) });
++  assert.doesNotMatch(sonnetCritic.findings[0].message, /MP-07/u);
+   const mechanic = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-mechanic", model: undefined, routeSource: routes() });
+   assert.match(mechanic.findings[0].message, /pipeline-core:goldfish-mechanic serves duty\.mechanic = "haiku"/u);
+   const generic = evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model: undefined, routeSource: routes() });

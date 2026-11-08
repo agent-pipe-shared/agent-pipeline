@@ -1,0 +1,51 @@
+{
+  "schema": "pipeline.dispatch-briefing-package.v1",
+  "id": "C20E-AUDIT-PUSH-PROOF-FOLLOWUP",
+  "item": "c20e-the-push-and-release-approval-proofs-reach-the-remote-audit-bundle",
+  "agentType": "goldfish-deep",
+  "modelId": "claude-sonnet-5-5",
+  "effortEscalation": "MP-05",
+  "criterion": "AC-108",
+  "estimatedToolCalls": 150,
+  "budgetRationale": "a proof follow-up step in the consumer release, its admission in the release-tag push route without a second approval, regression cases in the release, guard-push and close-path walk suites; no grant planned",
+  "check": "specs/sprint-alfred-epic/evidence/held-patches/w282-c20e-audit-push-proof-followup.check.test.mjs",
+  "title": "The push and release approval proofs of an audited commit reach the remote audit bundle in one evidence-only follow-up commit",
+  "ac": "AC-108",
+  "goal": "Candidate 20e (PO tile decision 2026-11-08: the push/release approval proof is added afterwards as its own evidence file under audit-bundles/<feature>/<commit>/proofs/ in the release commit and pushed with the version tag; the bundle itself stays unchanged, create-only, only the file is added). Background: since candidate 20d (w275) the one-shot close writes audit-bundles/<feature>/<commit>/ with proofs/ (design approval, reconcile) and commits it in the close commit; the push approval signs exactly that commit, so its proof can never sit inside it, and the release approval comes even later. Build, runner-neutral: (1) the consumer release route (scripts/release-preflight-cli.mjs consumer mode, lib/consumer-release.mjs) gains, after a ready release approval, one step that writes the public proof objects of the push approval and the release approval for exactly the approved commit (lib/audit-proof-collection.mjs already reads the push envelope by forCommit; never a private key, only the public proof object; a chat-mode approval is carried as an attribution record, never as a proof) as new files into audit-bundles/<feature>/<approved commit>/proofs/ plus one appended manifest entry file that lists them (the existing manifest and README bytes stay unchanged, so the bundle's own verify still passes; `audit-bundle.mjs verify` learns to also check the follow-up file when present), arms the writer commit capability (G20-66, armWriterCommitCapability) for exactly those files, and prints the commit step; (2) the release-tag push admission (hooks/guard-push.mjs authorizeRecordedReleaseTag, G20-42b) admits pushing the branch to exactly ONE commit on top of the approved commit whose diff ONLY adds files under audit-bundles/<feature>/<approved commit>/proofs/ (and that follow-up manifest file), together with the annotated release tag that still peels to the approved commit; anything else in that commit falls through to the full gate unchanged; (3) docs/push-release-flow.md (consumer release section) names the step. If admitting the follow-up commit needs any weaker check than today's push gate for every other content, STOP (see stops). Restate in place with a comment any test that pins the old release output (QG-04). Regression cases: the follow-up commit with only proof files is pushed with the tag without a second approval; a follow-up commit that touches any other path is refused by the full gate; the bundle verifies before and after the follow-up; a chat-mode project carries an attribution record, not a proof. Developed and tested in the clone named in facts; delivered as the held patch specs/sprint-alfred-epic/evidence/held-patches/w282-c20e-audit-push-proof-followup.patch.",
+  "paths": ["specs/sprint-alfred-epic/evidence/held-patches/w282-c20e-audit-push-proof-followup.notes.md"],
+  "newFiles": [
+    "specs/sprint-alfred-epic/evidence/held-patches/w282-c20e-audit-push-proof-followup.notes.md",
+    "specs/sprint-alfred-epic/evidence/held-patches/w282-c20e-audit-push-proof-followup.patch",
+    "specs/sprint-alfred-epic/evidence/held-patches/w282-c20e-audit-push-proof-followup.check.test.mjs"
+  ],
+  "context": [
+    "specs/sprint-alfred-epic/evidence/held-patches/w270-c20-consumer-release.notes.md",
+    "specs/sprint-alfred-epic/evidence/held-patches/w275-c20d-one-shot-close.notes.md",
+    "scratch/agent-out/c20e-ap/plugins/pipeline-core/lib/consumer-release.mjs",
+    "scratch/agent-out/c20e-ap/plugins/pipeline-core/scripts/release-preflight-cli.mjs",
+    "scratch/agent-out/c20e-ap/plugins/pipeline-core/hooks/guard-push.mjs (authorizeRecordedReleaseTag)",
+    "scratch/agent-out/c20e-ap/plugins/pipeline-core/lib/audit-bundle.mjs and lib/audit-proof-collection.mjs",
+    "scratch/agent-out/c20e-ap/plugins/pipeline-core/scripts/close-path-e2e.test.mjs (consumer release walk)"
+  ],
+  "facts": [
+    "CLONE-SLICE ROUTE: the clone is scratch/agent-out/c20e-ap (a shared clone of BASE_SHA, the applied and stamped candidate 20d with the 20e sibling patches); first step: `git -C scratch/agent-out/c20e-ap rev-parse HEAD` must print that SHA, otherwise STOP. Never run a git command that writes; use the helpers: `node scratch/agent-out/test-in.mjs scratch/agent-out/c20e-ap <test file> --private-tmp` (one suite at a time), `node scratch/agent-out/commit-in.mjs scratch/agent-out/c20e-ap \"<conventional message>\"`, `node scratch/agent-out/save-patch.mjs scratch/agent-out/c20e-ap BASE_SHA HEAD specs/sprint-alfred-epic/evidence/held-patches/w282-c20e-audit-push-proof-followup.patch`. The helper's `apply --check on repo` line is expected to fail: ignore it. A commit message must not contain the name of the version-control tool.",
+    "Write the three deliverables early; commit-in and save-patch after every green step. The final return JSON must carry every schema field including changedPaths (a missing field fails the host commit with NGHR-FINAL-SHAPE).",
+    "The check test is a plain node:test file (60 s, no product run): the .patch exists and is non-empty, every touched file is under plugins/pipeline-core/, harness/ or docs/ (docs only when the notes name them).",
+    "hooks/guard-push.test.mjs is a protected test (PGD*, PG-N27-TAG-06/07 pin the full gate for tags): add new cases in hooks/guard-push-release-tag-ancestry.test.mjs instead, as w270 did; never change an existing guard-push case.",
+    "PO rules: never fully blocking; runner and platform neutral; QG-04 restate in place with a comment; never re-pin the Critic preimage; a new kernel import must keep GMWKC01 (guard-maintenance-window-kernel-closure.test.mjs) green with the threat-model doc entry; a new auth verb or kind must keep harness/scripts/check-auth-gate-inventory-drift.test.mjs green.",
+    "Notes follow one existing held-patches *.notes.md (what / why / not changed / not proven); no absolute host paths; AC-108 closest criterion; PRD and Spec unchanged."
+  ],
+  "targeted": [
+    "the suites next to every file you change, one at a time (release-preflight-cli, consumer-release, guard-push-release-tag-ancestry, audit-bundle lib and script, close-path-e2e, check-auth-gate-inventory-drift, GMWKC01)",
+    "node --test specs/sprint-alfred-epic/evidence/held-patches/w282-c20e-audit-push-proof-followup.check.test.mjs"
+  ],
+  "forbidden": [
+    "Do not run refresh-derived-files, the inventory rebaseline or full-verify.",
+    "Never two suites at once.",
+    "Do not edit anything in the real checkout except the three w282 deliverables."
+  ],
+  "stops": [
+    "Admitting the evidence-only follow-up commit would need a weaker check than today's push gate for any content other than the added proof files: write the notes with the smallest design that would not, change no code, and return.",
+    "A file that must change is covered by the Critic preimage pin or is a protected test (report the file; never re-pin, never edit the protected test)."
+  ]
+}
