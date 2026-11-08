@@ -91,7 +91,13 @@ absence at an addition/deletion boundary. The Coordinator establishes that the
 artifact contains no source or operative contract before dispatch. These are
 bare exclusion bindings, not readable evidence references: do not include the
 report body, findings, verdict label, or a summary. Never exclude `evidence/`,
-JSON, or another directory/file class wholesale. Mixed source/verdict content,
+JSON, or another directory/file class wholesale, with exactly one exception: a
+split review round, where a range too large for one Critic is cut into parts,
+leaves the delivery records under `specs/<feature>/evidence/`, `backlog/items/`,
+`backlog/evidence/` and `backlog/dispatch-specs/` out of the parts. A file there
+with a script extension (`.mjs`, `.cjs`, `.js`, `.ts`, `.sh`, `.ps1`, `.py`)
+stays review source, a file a review names as evidence stays readable input, and
+a review that is not split keeps these paths. Mixed source/verdict content,
 an unbound version, or an ambiguous role rejects the input preparation; neither
 silently carve out source nor hand the mixed artifact to the fresh reviewer.
 

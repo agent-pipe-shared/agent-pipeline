@@ -2141,9 +2141,9 @@ function g2072Design() {
     implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
     fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } } };
 }
-function g2072Fixture({ core = 12, api = 12, loose = 4, plan = true, records = false } = {}) {
+function g2072Fixture({ core = 12, api = 12, loose = 4, plan = true, records = false, delivery = 0 } = {}) {
   const root = mkdtempSync(join(tmpdir(), "critic-split-preflight-"));
-  for (const dir of [".claude", "governance/guidelines", "governance/policies", "specs/feat", "evidence/critic/p1", "docs/state-archive", "src/core", "src/api", "docs"]) mkdirSync(join(root, dir), { recursive: true });
+  for (const dir of [".claude", "governance/guidelines", "governance/policies", "specs/feat/evidence/run", "specs/feat/notes", "backlog/items", "backlog/evidence", "backlog/dispatch-specs", "backlog/other", "evidence/critic/p1", "docs/state-archive", "src/core", "src/api", "docs"]) mkdirSync(join(root, dir), { recursive: true });
   git(root, ["init", "-q"]);
   writeFileSync(join(root, ".claude", "pipeline.yaml"), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
   writeFileSync(join(root, "governance", "guidelines", "review.md"), "Review changed code.\n");
@@ -2160,6 +2160,7 @@ function g2072Fixture({ core = 12, api = 12, loose = 4, plan = true, records = f
     writeFileSync(join(root, "docs", "state-archive", "old.md"), "old state\n");
     writeFileSync(join(root, "evidence", "machine.json"), "{}\n");
   }
+  for (let index = 0; index < delivery; index += 1) writeFileSync(join(root, "specs", "feat", "evidence", "run", `record${index}.json`), "{}\n");
   const candidate = commit(root, "candidate");
   const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
   writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
@@ -2253,16 +2254,67 @@ test("G20-72 a module above the bound is cut into parts, one flat directory incl
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
-test("G20-72 a split leaves out exactly the bound exclusions and never a directory wholesale: another evidence file stays review source", async () => {
+test("G20-72 outside the delivery-record folders a split leaves out exactly the bound exclusions: another evidence file stays review source", async () => {
   const fx = g2072Fixture({ records: true });
   try {
     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
     const paths = split.entries.flatMap((entry) => entry.paths);
     assert.equal(paths.includes("evidence/critic/p1/verdict.json"), false, "a retained prior result is forbidden input");
     assert.equal(paths.includes("docs/state-archive/old.md"), false, "a project-state record is forbidden input");
-    assert.equal(paths.includes("evidence/machine.json"), true, "harness/review-protocol.md: evidence/ is never excluded wholesale");
+    assert.equal(paths.includes("evidence/machine.json"), true, "harness/review-protocol.md: a root evidence/ folder is not a delivery-record folder");
     assert.equal(split.changedFileCount, g2072Changed(fx).length);
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("G20-72 a split round leaves the named delivery records out of its parts and keeps scripts there, specs outside evidence and other backlog folders", async () => {
+  const { SPLIT_MAX_CHANGED_FILES, criticSplitProblem } = await import("../lib/critic-split.mjs");
+  const fx = g2072Fixture({ plan: false, delivery: 3 });
+  try {
+    const left = ["specs/feat/evidence/run/record0.json", "specs/feat/evidence/run/record2.json"];
+    const added = {
+      "specs/feat/evidence/run/check.test.mjs": "export {};\n", "specs/feat/evidence/run/apply.sh": "true\n", "specs/feat/notes/design.md": "design\n", "backlog/other/note.md": "note\n",
+      "backlog/items/item.md": "item\n", "backlog/evidence/run.log": "log\n", "backlog/dispatch-specs/brief.md": "brief\n",
+    };
+    for (const [path, body] of Object.entries(added)) writeFileSync(join(fx.root, path), body);
+    fx.candidate = commit(fx.root, "more records");
+    writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(fx.candidate, git(fx.root, ["rev-parse", "HEAD^{tree}"])))}\n`);
+    const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
+    const paths = split.entries.flatMap((entry) => entry.paths);
+    for (const path of [...left, "backlog/items/item.md", "backlog/evidence/run.log", "backlog/dispatch-specs/brief.md"]) assert.equal(paths.includes(path), false, `${path} is a delivery record`);
+    for (const path of ["specs/feat/evidence/run/check.test.mjs", "specs/feat/evidence/run/apply.sh", "specs/feat/notes/design.md", "specs/feat/spec.md", "backlog/other/note.md", "src/core/c0.mjs"]) assert.equal(paths.includes(path), true, `${path} stays review source`);
+    assert.equal(split.changedFileCount, g2072Changed(fx).length, "the count stays the size of the whole range");
+    assert.ok(split.entries.every((entry) => entry.paths.length <= SPLIT_MAX_CHANGED_FILES));
+    assert.equal(criticSplitProblem(split), null);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("G20-72 delivery records count towards the size bound: a range they push over it is split, one that stays at the bound keeps them and is not split", async () => {
+  const { SPLIT_MAX_CHANGED_FILES, criticSplitProblem } = await import("../lib/critic-split.mjs");
+  const over = g2072Fixture({ core: 5, api: 4, loose: 2, plan: false, delivery: 20 });
+  const atBound = g2072Fixture({ core: 5, api: 4, loose: 2, plan: false, delivery: 13 });
+  try {
+    assert.ok(g2072Changed(over).length > SPLIT_MAX_CHANGED_FILES);
+    const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(over), { env: {} });
+    assert.deepEqual(split.entries.map((entry) => entry.id), ["shared"], "the remaining files fit one part, and that part is the whole round");
+    assert.equal(criticSplitProblem(split), null);
+    assert.equal(split.entries[0].paths.some((path) => path.startsWith("specs/feat/evidence/")), false);
+    assert.equal(g2072Changed(atBound).length, SPLIT_MAX_CHANGED_FILES);
+    assert.equal(Object.hasOwn(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(atBound), { env: {} }), "split"), false, "a review that is not split keeps these paths");
+  } finally { rmSync(over.root, { recursive: true, force: true }); rmSync(atBound.root, { recursive: true, force: true }); }
+});
+
+test("G20-72 a range of nothing but delivery records has no part to review and is not split", async () => {
+  const { buildCriticSplit, SPLIT_MAX_CHANGED_FILES } = await import("../lib/critic-split.mjs");
+  const root = mkdtempSync(join(tmpdir(), "critic-split-records-"));
+  try {
+    mkdirSync(join(root, "specs", "feat", "evidence"), { recursive: true });
+    git(root, ["init", "-q"]);
+    writeFileSync(join(root, "README.md"), "x\n");
+    const base = commit(root, "base");
+    for (let index = 0; index <= SPLIT_MAX_CHANGED_FILES; index += 1) writeFileSync(join(root, "specs", "feat", "evidence", `r${index}.json`), "{}\n");
+    const candidate = commit(root, "records");
+    assert.equal(buildCriticSplit({ root, result: { status: "packet-ready", base: { commit: base }, candidate: { commit: candidate }, spec: { path: "specs/feat/spec.md" }, dispatch: { reviewerInput: {} } } }), null);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("G20-72 the bound exclusions do not count against the size bound, and a range above the entry bound is refused before anything is reserved", async () => {

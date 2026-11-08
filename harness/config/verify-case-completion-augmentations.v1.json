@@ -586,7 +586,10 @@
           "CDPF099",
           "CDPF100",
           "CDPF101",
-          "CDPF102"
+          "CDPF102",
+          "CDPF103",
+          "CDPF104",
+          "CDPF105"
         ],
         "maxBytes": 65536
       }

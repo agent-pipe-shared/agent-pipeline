@@ -83,7 +83,7 @@ function matchLength(pattern, file) {
 
 /**
  * The changed paths a Critic must never read: exactly the exclusions of the range's correction-input bindings (project-state record, finding-disposition record, retained prior
- * result; harness/review-protocol.md §2.2). No directory or file class is excluded wholesale, which that section forbids; a path is here only because the derivation bound it.
+ * result; harness/review-protocol.md §2.2). A path is here only because the derivation bound it.
  * The preflight has already judged this derivation, so a failure here excludes nothing and the path stays visible to its Critic.
  */
 function boundExclusions(root, base, candidate) {
@@ -96,6 +96,14 @@ function boundExclusions(root, base, candidate) {
     }
   } catch { return new Set(); }
 }
+
+/**
+ * The one directory exception of harness/review-protocol.md §2.2, for split rounds only: delivery records (run evidence of a feature, backlog notes) are left out of the parts,
+ * a file with a script extension in those folders stays review source. Keep this list and that section identical.
+ */
+const DELIVERY_RECORD_PATH = /^(?:specs\/[^/]+\/evidence\/|backlog\/(?:items|evidence|dispatch-specs)\/)/u;
+const SCRIPT_EXTENSION = /\.(?:mjs|cjs|js|ts|sh|ps1|py)$/u;
+const isDeliveryRecord = (file) => DELIVERY_RECORD_PATH.test(file) && !SCRIPT_EXTENSION.test(file);
 
 /**
  * Cuts paths into parts of at most `max` files. A directory that fits stays whole; a larger one is cut along its subdirectories, and only files lying directly in one directory
@@ -125,7 +133,8 @@ function cutByDirectory(paths, max) {
 }
 
 /**
- * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES reviewable files: the changed files minus the bound exclusions).
+ * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES changed files after the bound exclusions) or holds nothing but
+ * delivery records. Delivery records count towards that bound, because an unsplit Critic would have them in its range, and are then left out of the parts.
  * One entry per module of the approved architecture plan that owns a changed path (disjoint scopes: a path goes to the module whose owned-path pattern matches it most
  * specifically, ties by module id), plus ONE shared entry for every changed path no module owns, which is never dropped. Without exactly one approved plan every path is in
  * the shared group and `plan.status` says why. A group above the bound (the shared group without a plan, or one very large module) is cut along directories into entries
@@ -139,8 +148,10 @@ export function buildCriticSplit({ root, result }) {
   const changed = typeof base === "string" ? gitLines(root, ["diff", "--name-only", "--no-renames", "-z", base, candidate]) : null;
   if (changed === null) return null;
   const excluded = boundExclusions(root, base, candidate);
-  const reviewable = changed.filter((file) => !excluded.has(file));
-  if (reviewable.length <= SPLIT_MAX_CHANGED_FILES) return null;
+  const remaining = changed.filter((file) => !excluded.has(file));
+  if (remaining.length <= SPLIT_MAX_CHANGED_FILES) return null;
+  const reviewable = remaining.filter((file) => !isDeliveryRecord(file));
+  if (reviewable.length === 0) return null;
   const plan = readPlan(root, candidate, result.spec?.path ?? "");
   const owned = new Map(plan.modules.map((module) => [module.id, []]));
   const shared = [];
