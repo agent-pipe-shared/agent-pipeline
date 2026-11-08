@@ -16,7 +16,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "./native-goldfish-host-return.mjs";
+import { DISPATCH_ADMISSION_BRIEFING_RUNNERS, NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "./native-goldfish-host-return.mjs";
 import { resolveAuthorityArtifactPath } from "./project-authority.mjs";
 
 export const BRIEFING_PACKAGE_SCHEMA = "pipeline.dispatch-briefing-package.v1";
@@ -261,13 +261,14 @@ export function generatedBriefingAdmission(prompt, generatorCommand = "node <plu
   if (prompt.includes("<!-- pipeline-briefing-generator:")) {
     const verified = verifyGeneratedBriefing(prompt);
     if (!verified.ok) return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; ${repair}` };
-    const parsed = parseNativeGoldfishBriefing(prompt);
+    // G20-48: the D78 rule is runner-neutral, so an Antigravity binding is parsed too.
+    const parsed = parseNativeGoldfishBriefing(prompt, { runners: DISPATCH_ADMISSION_BRIEFING_RUNNERS });
     if (requireGenerated && (!parsed.ok || parsed.binding.itemDelivery === undefined)) {
       return { code: "DBG-GENERATED-BINDING-REQUIRED", message: `a generated Goldfish briefing must carry a valid item-delivery binding; ${repair}` };
     }
     return null;
   }
-  const parsed = parseNativeGoldfishBriefing(prompt);
+  const parsed = parseNativeGoldfishBriefing(prompt, { runners: DISPATCH_ADMISSION_BRIEFING_RUNNERS });
   if (!requireGenerated && (!parsed.ok || parsed.binding.itemDelivery === undefined)) return null;
   return { code: "DBG-GENERATED-BRIEFING-REQUIRED", message: `a governed Goldfish item briefing must come from the briefing generator, not be assembled by hand; ${repair}` };
 }

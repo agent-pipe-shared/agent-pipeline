@@ -92,11 +92,13 @@ import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, res
 const HOOK_ENTRY_MS = Math.round(performance.timeOrigin);
 // GD73: the one admission budget of this hook (the queue preparation and the host-state preparation share it).
 const ADMISSION_BUDGET_MS = 300000;
-import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+import { DISPATCH_ADMISSION_BRIEFING_RUNNERS, parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+// G20-48: the runner-neutral admission parses an Antigravity binding too; the host-commit paths keep the claude/codex default.
+const parseAdmissionBriefing = (prompt) => parseNativeGoldfishBriefing(prompt, { runners: DISPATCH_ADMISSION_BRIEFING_RUNNERS });
 import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
 import { carriesBriefingFilePointer, loadReferencedBriefing } from "../lib/briefing-file-reference.mjs";
 import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchModel } from "../lib/dispatch-model-enforcement.mjs";
-import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+import { enterAntigravityHookSessionOwner, enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { describeWindowsAuthorityRefusal, prepareWithWindowsContentionRetry } from "../lib/windows-authority-readiness.mjs";
@@ -258,7 +260,13 @@ export function writeCapableCarrierAdmission({ subagentType, transport = "direct
   if (transport === "codex" && type === "explorer") return null;
   if (transport === "direct" && type === "Explore") return null;
   if (["pipeline-core:goldfish-deep", "pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"].includes(type)) return null;
-  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; ${type === "" ? "no agent type was named" : `${JSON.stringify(type)} is not a shipped Pipeline role, and a runner-native type carries no read-only guarantee`}; repair: for a read-only review dispatch a shipped read-only role (pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor; on Antigravity prepare the call first, references/antigravity-native-dispatch.md), for implementation a shipped pipeline-core:goldfish-* role, and dispatch its generated or required role briefing; the Antigravity prepare command is \`node <plugin-root>/scripts/antigravity-native-dispatch-prepare.mjs prepare --root <repo> --request <file>\`` };
+  // C20 G20-47 (live Antigravity greenfield 2026-11-07): the Antigravity host refuses an agent name with a colon ("must start
+  // with a letter or digit and contain only letters, digits, '_', '-', and '.'"), so a native Goldfish can only be named bare.
+  // Refusing the bare name here left no runnable name at all. On that transport only, the bare shipped Goldfish names are
+  // the Pipeline carriers (lib/agy-native-goldfish.mjs already treats both spellings alike); Claude and Codex keep the
+  // namespaced form, where a bare name could be a project's own agent.
+  if (transport === "antigravity" && ["goldfish-deep", "goldfish-implementor", "goldfish-mechanic"].includes(type)) return null;
+  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; ${type === "" ? "no agent type was named" : `${JSON.stringify(type)} is not a shipped Pipeline role, and a runner-native type carries no read-only guarantee`}; repair: for a read-only review dispatch a shipped read-only role (pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor; on Antigravity prepare the call first, references/antigravity-native-dispatch.md), for implementation a shipped pipeline-core:goldfish-* role (on Antigravity the bare goldfish-implementor, goldfish-mechanic or goldfish-deep: the host refuses a colon in an agent name), and dispatch its generated or required role briefing; the Antigravity prepare command is \`node <plugin-root>/scripts/antigravity-native-dispatch-prepare.mjs prepare --root <repo> --request <file>\`` };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -753,7 +761,7 @@ export function recordFanoutEvents(plan, events, now) {
 // project-onboarding-v3, and a static import of dispatch-record-liveness.mjs here changed its initialisation order, K104).
 export function dispatchWriteScope(prompt) {
   try {
-    const bound = parseNativeGoldfishBriefing(prompt);
+    const bound = parseAdmissionBriefing(prompt);
     if (bound.ok && bound.binding.allowedPaths?.length > 0) return { id: bound.binding.dispatchId, scope: [...bound.binding.allowedPaths] };
     const named = parseDispatchSlice(prompt);
     return { id: named.sliceId, scope: named.writeScope };
@@ -776,7 +784,10 @@ if (isDirectInvocation(import.meta.url)) {
   const toolInput = input?.tool_input;
   if (!toolInput || typeof toolInput !== "object") process.exit(0);
   // T6-A: a Claude Task/Agent call binds this hook process to its own hook-observed session owner.
-  if (["Task", "Agent"].includes(input?.tool_name)) {
+  if (["Task", "Agent"].includes(input?.tool_name) && Array.isArray(toolInput.Subagents)) {
+    // G20-49: an adapted Antigravity invoke_subagent binds the host conversation as its hook-observed owner.
+    enterAntigravityHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
+  } else if (["Task", "Agent"].includes(input?.tool_name)) {
     enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
   } else if (input?.tool_name === "spawn_agent") {
     // GDW01: a Codex governed item dispatch binds its hook-observed owner the same way (runner-neutral).
@@ -958,7 +969,7 @@ if (isDirectInvocation(import.meta.url)) {
     const courseRoot=input.cwd??process.env.CLAUDE_PROJECT_DIR??process.cwd();
     let governed=resolveGovernedItemQueue({root:courseRoot});
     if(productive.length===1) {
-      const parsed=parseNativeGoldfishBriefing(productive[0].dispatch.prompt);
+      const parsed=parseAdmissionBriefing(productive[0].dispatch.prompt);
       if(parsed.ok&&parsed.binding.itemDelivery)governed=prepareGovernedItemQueue({root:courseRoot,itemDelivery:parsed.binding.itemDelivery,
         candidate:{commit:parsed.binding.candidateCommit,tree:parsed.binding.candidateTree},writeScope:parsed.binding.allowedPaths,
         // E4: the queue preparation waits for a sibling launch's registry lock within this hook's admission deadline.
@@ -978,7 +989,7 @@ if (isDirectInvocation(import.meta.url)) {
     itemGovernanceRequired=governed.status==='required';
     const unsupported = governed.status === "required" && productive.some(({ dispatch }) =>
       !["direct", "codex", "antigravity"].includes(dispatch.transport)
-      || !parseNativeGoldfishBriefing(dispatch.prompt).ok);
+      || !parseAdmissionBriefing(dispatch.prompt).ok);
     if (governed.status === "refused" || unsupported) {
       // PF-47: a queue-preparation refusal carries its own reason (and, where one exists, an exact repair);
       // the generic transport text applies only to the unsupported-transport case.

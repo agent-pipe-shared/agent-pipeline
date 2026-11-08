@@ -54,6 +54,21 @@ export function enterCodexHookSessionOwner({ root, input } = {}) {
   return enterHookSessionOwner(root, codexHookDescriptorSessionId(input?.session_id), CODEX_HOOK_SESSION_OWNER_SOURCE);
 }
 
+// G20-49 (live Antigravity greenfield 2026-11-07): the same fallback for an Antigravity native invoke_subagent, keyed by the
+// host's own conversationId (the antigravity-pretool-guard adapter forwards it as `antigravity_conversation_id`). Without it a
+// governed Antigravity Goldfish was refused SDC-AUTHORITY-UNAVAILABLE (item-course-requester-unavailable): no owner was bound.
+export const ANTIGRAVITY_HOOK_SESSION_OWNER_SOURCE = "antigravity-hook-session-descriptor";
+
+/** Map an Antigravity conversationId to its private descriptor id, or null when unusable (the same id rule as the Claude form). */
+export function antigravityHookDescriptorSessionId(conversationId) {
+  return typeof conversationId === "string" && CLAUDE_SESSION_ID.test(conversationId) ? `antigravity-${conversationId}` : null;
+}
+
+/** Enter the scope from an adapted Antigravity hook input (`antigravity_conversation_id`). Returns whether a usable id was bound. */
+export function enterAntigravityHookSessionOwner({ root, input } = {}) {
+  return enterHookSessionOwner(root, antigravityHookDescriptorSessionId(input?.antigravity_conversation_id), ANTIGRAVITY_HOOK_SESSION_OWNER_SOURCE);
+}
+
 function enterHookSessionOwner(root, descriptorSessionId, ownerSource) {
   entered = null;
   if (!descriptorSessionId || typeof root !== "string" || root === "") return false;

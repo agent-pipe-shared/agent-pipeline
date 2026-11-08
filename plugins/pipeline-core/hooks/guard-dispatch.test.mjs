@@ -656,6 +656,39 @@ manualCheck("GD20 extractAntigravityDispatches is importable and callable direct
   }
 });
 
+// GD20b -- C20 G20-47 (live Antigravity greenfield 2026-11-07): the Antigravity host refuses a colon in an agent name, so a
+// native Goldfish can only be named bare; the carrier rule refused the bare name and left no runnable name. Pinned: on the
+// antigravity transport the three bare Goldfish names are carriers; on direct and codex transport a bare name stays refused
+// (it may be a project's own agent), and the namespaced names stay carriers everywhere.
+manualCheck("GD20b the bare Goldfish names are write carriers on the Antigravity transport only (G20-47)", () => {
+  const runnerDir = mkdtempSync(join(tmpdir(), "guard-dispatch-g2047-"));
+  try {
+    const runnerPath = join(runnerDir, "carrier-check.mjs");
+    writeFileSync(runnerPath, [
+      "const { writeCapableCarrierAdmission: admit } = await import(process.argv[2]);",
+      "const rows = [];",
+      "for (const name of ['goldfish-implementor', 'goldfish-mechanic', 'goldfish-deep']) {",
+      "  for (const transport of ['antigravity', 'direct', 'codex']) rows.push([name, transport, admit({ subagentType: name, transport })?.code ?? 'ADMITTED']);",
+      "  rows.push(['pipeline-core:' + name, 'direct', admit({ subagentType: 'pipeline-core:' + name, transport: 'direct' })?.code ?? 'ADMITTED']);",
+      "}",
+      "rows.push(['general-purpose', 'antigravity', admit({ subagentType: 'general-purpose', transport: 'antigravity' })?.code ?? 'ADMITTED']);",
+      "console.log('G20-47 ' + JSON.stringify(rows));",
+    ].join("\n"));
+    const res = spawnSync(process.execPath, [runnerPath, GUARD], { input: "", encoding: "utf8", timeout: 10000 });
+    assert.equal(res.status, 0, res.stderr);
+    const line = (res.stdout ?? "").split("\n").find((entry) => entry.startsWith("G20-47 "));
+    assert.ok(line, res.stdout);
+    const rows = JSON.parse(line.slice("G20-47 ".length));
+    for (const [name, transport, code] of rows) {
+      const expected = name === "general-purpose" ? "DISPATCH-WRITE-CARRIER-REQUIRED"
+        : name.startsWith("pipeline-core:") || transport === "antigravity" ? "ADMITTED" : "DISPATCH-WRITE-CARRIER-REQUIRED";
+      assert.equal(code, expected, `${name} over ${transport}`);
+    }
+  } finally {
+    rmSync(runnerDir, { recursive: true, force: true });
+  }
+});
+
 // GD21-GD27 -- ALF-C-P19-05C / V-10: the route digest is bound to the briefing INLINE in the dispatch. A route
 // record `evidence/dispatch-route-<sliceId>.json` carries the digest; the guard hashes the canonical inline
 // briefing (CRLF -> LF, nothing else) and refuses a mismatch typed. The expected digests below are computed
@@ -1269,7 +1302,43 @@ manualCheck("GD80 block  D183: a pointer carried by a Workflow script, a Codex s
   }
 });
 
-assert.equal(cases.length, 83, "the complete dispatch guard corpus must register before execution");
+// G20-48 (live Antigravity greenfield 2026-11-07): a briefing the generator built with --runner antigravity was refused
+// DBG-GENERATED-BINDING-REQUIRED by every consumer, because the binding parser admitted only the claude and codex runners. No
+// admit case existed for an Antigravity Goldfish; this one walks the whole guard with the real generator and the host's own
+// spelling (bare TypeName, Model "flash", Workspace "branch") and must be ADMITTED.
+function generatedAntigravityItemFixture() {
+  const root = realpathSync(mkdtempSync(join(nativeContractFixtureParent(), "guard-dispatch-agy-generated-")));
+  generatedFixtureRoots.push(root);
+  prepareApprovedItemCourseFixture({ root, calibrationExtra: { handover: "docs/state.md" } });
+  recordConsentGiven({ rootDir: root });
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  writeFileSync(join(root, "scratch", "pkg.json"), JSON.stringify({
+    id: ITEM_BACKGROUND_SLICE, item: "unit-item", criterion: "AC-1", agentType: "goldfish-implementor", runner: "antigravity", modelId: "flash", modelWhy: "role default",
+    check: "src/change.test.mjs", paths: ["src/change.mjs"], spec: "specs/unit/spec.md", title: "Fixture title", ac: "AC-1", goal: "Fixture goal text.",
+    context: ["`src/change.mjs` -- the module."], targeted: ["`node --test src/change.test.mjs` (green)"], forbidden: ["Fixture forbidden rule."], stops: ["Fixture stop rule."],
+  }));
+  const built = runDispatchBriefing(["build", "--root", root, "--package", "scratch/pkg.json"], {
+    observePreflight: () => ({ rulesetSource: { selectedPlugin: { id: "pipeline-core", version: "9.9.9+test" }, loadedIdentity: { status: "available", algorithm: "content-sha256", value: "c".repeat(64) } } }),
+    resolveBaseline: () => ({ status: "ready", entries: [] }),
+    antigravityRoute: () => "flash",
+  });
+  assert.equal(built.ok, true, `the generator must build the Antigravity fixture briefing -- ${JSON.stringify(built).slice(0, 400)}`);
+  return { root, text: built.text };
+}
+manualCheck("GD20c allow  G20-48: an item-governed generated ANTIGRAVITY Goldfish dispatch (bare TypeName, Model flash, Workspace branch) is admitted", () => {
+  const governed = generatedAntigravityItemFixture();
+  // The default (host-commit) parser keeps refusing it (A18-M1C); the admission opts in (G20-48).
+  assert.equal(parseNativeGoldfishBriefing(governed.text).ok, false, "the default host parser still refuses an Antigravity binding");
+  assert.equal(parseNativeGoldfishBriefing(governed.text, { runners: ["claude", "codex", "antigravity"] }).ok, true, "the admission runner set parses it");
+  // The adapted payload of antigravity-pretool-guard: no session_id, the host conversation as antigravity_conversation_id (G20-49).
+  const result = runAtOut({ cwd: governed.root, antigravity_conversation_id: "32f30ca6-8c1e-47dc-876e-00dec48d273d", tool_name: "Agent",
+    tool_input: { Subagents: [{ TypeName: "goldfish-implementor", Role: "Goldfish Implementor", Model: "flash", Workspace: "branch", Prompt: governed.text }] } }, governed.root);
+  assert.equal(result.code, ALLOW, `exit ${result.code} (expected ${ALLOW}) -- ${result.stderr.trim().slice(0, 600)}`);
+  assert.ok(!result.stderr.includes("BLOCKED"), result.stderr.slice(0, 600));
+});
+
+// QG-04 restatement (candidate 20b, G20-47/G20-48): the corpus grew by the Antigravity bare-name and generated-briefing cases.
+assert.equal(cases.length, 85, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

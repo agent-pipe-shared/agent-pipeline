@@ -359,6 +359,8 @@ export function antigravityGuardPayload(input, normalized, projectRoot) {
     tool_input: normalized.toolInput,
     cwd: projectRoot,
     tool_use_id: input?.tool_use_id ?? input?.toolUseId,
+    // G20-49: the host's conversation id, the hook-observed owner of a governed native Goldfish dispatch (guard-dispatch).
+    ...(typeof input?.conversationId === "string" ? { antigravity_conversation_id: input.conversationId } : {}),
     antigravity_artifact_host: antigravityArtifactHostContext(input),
   };
 }

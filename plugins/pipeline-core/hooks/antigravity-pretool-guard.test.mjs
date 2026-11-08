@@ -30,6 +30,9 @@ import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-disp
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
 import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
 import { statePath as pipelineStatePath } from "../scripts/pipeline-state.mjs";
+import { recordConsentGiven } from "../lib/onboarding-consent-marker.mjs";
+import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
+import { runDispatchBriefing } from "../scripts/dispatch-briefing.mjs";
 
 const hookDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = join(hookDir, "..");
@@ -1990,6 +1993,36 @@ check("lifecycle-not-ready denial does not advertise a human override ceremony",
         /Human override available|sign-intent|human-held Ed25519 key|authorize-by-signature|verify-audit/u,
       );
     }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// G20-47/G20-48/G20-49 (live Antigravity greenfield 2026-11-07): no native Goldfish could start, and no case walked the admit path.
+// This one goes through the whole adapter with the host's own envelope: a real generated --runner antigravity item briefing, the
+// bare TypeName, Model "flash", Workspace "branch", the args JSON-string-encoded as the host sends them, and the parent conversationId.
+check("G20-48 an item-governed generated Antigravity Goldfish invoke_subagent is ADMITTED end to end (bare TypeName, encoded args)", () => {
+  const root = realpathSync(mkdtempSync(join(nativeContractFixtureParent(), "agy-pretool-generated-")));
+  try {
+    prepareApprovedItemCourseFixture({ root, calibrationExtra: { handover: "docs/state.md" } });
+    recordConsentGiven({ rootDir: root });
+    mkdirSync(join(root, "scratch"), { recursive: true });
+    writeFileSync(join(root, "scratch", "pkg.json"), JSON.stringify({
+      id: "AGY-ITEM", item: "unit-item", criterion: "AC-1", agentType: "goldfish-implementor", runner: "antigravity", modelId: "flash", modelWhy: "role default",
+      check: "src/change.test.mjs", paths: ["src/change.mjs"], spec: "specs/unit/spec.md", title: "Fixture title", ac: "AC-1", goal: "Fixture goal text.",
+      context: ["`src/change.mjs` -- the module."], targeted: ["`node --test src/change.test.mjs` (green)"], forbidden: ["Fixture forbidden rule."], stops: ["Fixture stop rule."],
+    }));
+    const built = runDispatchBriefing(["build", "--root", root, "--package", "scratch/pkg.json"], {
+      observePreflight: () => ({ rulesetSource: { selectedPlugin: { id: "pipeline-core", version: "9.9.9+test" }, loadedIdentity: { status: "available", algorithm: "content-sha256", value: "c".repeat(64) } } }),
+      resolveBaseline: () => ({ status: "ready", entries: [] }),
+      antigravityRoute: () => "flash",
+    });
+    assert.equal(built.ok, true, JSON.stringify(built).slice(0, 400));
+    const encoded = (value) => JSON.stringify(value);
+    const res = decision(run({
+      conversationId: "32f30ca6-8c1e-47dc-876e-00dec48d273d",
+      toolCall: { name: "invoke_subagent", args: { TypeName: encoded("goldfish-implementor"), Role: encoded("Goldfish Implementor"),
+        Model: encoded("flash"), Workspace: encoded("branch"), Prompt: encoded(built.text) } },
+    }, root, { timeoutMs: 60_000 }));
+    assert.notEqual(res.decision, "deny", String(res.reason).slice(0, 800));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

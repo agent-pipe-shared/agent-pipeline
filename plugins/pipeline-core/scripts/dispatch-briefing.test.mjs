@@ -390,6 +390,19 @@ for (const [name, overrides, extra, depOverrides, code, mention] of REFUSALS) {
   });
 }
 
+// C20 G20-47 (live Antigravity greenfield 2026-11-07): the namespaced spelling of a shipped role names the same role; an
+// Antigravity Elephant lost a round trip on DBG-AGENT-TYPE-UNKNOWN for `pipeline-core:goldfish-implementor`.
+test("G20-47 the namespaced agent type pipeline-core:goldfish-implementor builds the same binding as the bare name", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const bare = runDispatchBriefing(argvOf(fx), depsOf(fx));
+  assert.equal(bare.ok, true, JSON.stringify(bare).slice(0, 300));
+  const namespaced = runDispatchBriefing(argvOf(fx, { "--agent-type": "pipeline-core:goldfish-implementor" }), depsOf(fx));
+  assert.equal(namespaced.ok, true, JSON.stringify(namespaced).slice(0, 300));
+  assert.equal(namespaced.binding.agentType, "goldfish-implementor");
+  assert.equal(namespaced.binding.role, bare.binding.role);
+});
+
 // 17 (PO 2026-11-01): every route reads allowedPaths as EXACT files, so a directory given as --path is resolved to the regular files it
 // holds today (visibly: DBG-DIRECTORY-EXPANDED), never kept as one useless entry and never widened into a prefix match.
 test("17 a --path that is an existing directory is resolved to its regular files and says so; a new file stays an exact entry", async () => {

@@ -54,6 +54,12 @@ function normalizedPath(value) {
 
 function fail(code) { return { ok: false, code }; }
 
+/** G20-48 (live Antigravity greenfield 2026-11-07): the runner set of the runner-neutral DISPATCH ADMISSION (the generated-briefing
+ * rule, the write scope and the governed item queue in guard-dispatch). Those consumers parsed with the default below, so every
+ * `--runner antigravity` briefing was refused DBG-GENERATED-BINDING-REQUIRED and no native Goldfish could start. They opt in with
+ * this set; the default stays claude/codex for the Claude and Codex host-commit paths (A18-M1C). */
+export const DISPATCH_ADMISSION_BRIEFING_RUNNERS = Object.freeze(["claude", "codex", "antigravity"]);
+
 /** Parse exactly one host-generated binding block from the dispatched prompt. */
 export function parseNativeGoldfishBriefing(prompt, { runners = ["claude", "codex"] } = {}) {
   if (typeof prompt !== "string" || prompt.length > 2 * 1024 * 1024) return fail("NGHR-BRIEFING-INPUT");

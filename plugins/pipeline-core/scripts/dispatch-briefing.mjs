@@ -688,7 +688,11 @@ export function generateDispatchBinding(options, deps = {}) {
   // and the generator goes on. Without a collector (every other caller) this IS refuse, so the refusals are unchanged.
   const soft = deps.softRefusals ? (code, message) => { deps.softRefusals.push({ code, message }); } : refuse;
 
-  const { dispatchId, item, agentType, modelId, check } = options;
+  const { dispatchId, item, modelId, check } = options;
+  // C20 G20-47: the namespaced spelling every refusal and the Claude dispatch call use (pipeline-core:goldfish-*) names the same
+  // shipped role; a live Antigravity run lost a round trip on DBG-AGENT-TYPE-UNKNOWN for it. Accept it as its bare role name.
+  const agentType = typeof options.agentType === "string" && options.agentType.startsWith("pipeline-core:")
+    ? options.agentType.slice("pipeline-core:".length) : options.agentType;
   const runner = options.runner ?? "claude";
   const effortEscalation = options.effortEscalation;
   if (!RUNNERS.includes(runner)) refuse("DBG-RUNNER-UNKNOWN", `unknown runner ${JSON.stringify(runner)}; repair: pass --runner ${RUNNERS.join(" or ")} (default ${RUNNERS[0]}), or omit the flag for a Claude dispatch`);

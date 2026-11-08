@@ -26,6 +26,11 @@ array. In a hook payload the arguments may be JSON-string-encoded (`Model` arriv
 decodes one level. Build the call from the briefing the generator produced (`dispatch-briefing.mjs build --runner antigravity`, a native
 alias as the model id) and set `Model` to `flash` for the three Goldfish roles (a Critic dispatch passes no `Model`).
 
+**`TypeName` is the BARE role name** (`goldfish-implementor`, `goldfish-mechanic`, `goldfish-deep`, `critic`,
+`readiness-reviewer`, ...), never `pipeline-core:...`: the host refuses a colon in an agent name ("must start with a letter or
+digit and contain only letters, digits, '_', '-', and '.'", measured live 2026-11-07). The guard admits the bare names on this
+transport only. Do not `define_subagent` a Pipeline role yourself; `dispatch-briefing.mjs build` accepts either spelling.
+
 - **Admission** is the one Claude uses: the generated briefing route, the selected model and the write-capable carrier are judged by
   `guard-dispatch`. There is no per-dispatch PO consent and no signature, and no prepare step for these three roles (the prepared
   one-shot artifact stays the route of the read-only roles above).
