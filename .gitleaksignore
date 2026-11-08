@@ -270,7 +270,7 @@ content-v1:3e5df2c354bedaac92eae3619b5d50d225567e7960649756f7e5cd560cb5dbc5:spec
 content-v1:3ed3f435fa87a772f82d03a923415046f06826e638bc0fce0f72c4223b8ff534:specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/quality-request.json:generic-api-key:12:20
 content-v1:3ff2c5691fe7c85f4a4d4a9cad3af44e9844664d502b593b798f84a5bfef2d59:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/advisory-host-bridge-tests.log:generic-api-key:17:645
 content-v1:40fb057e7bb51e09dd33b8ce7f156b0b350dcee56682dfcfecc9129fce90174d:specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt:generic-api-key:29404:471
-content-v1:41f58bc0a3ea78b5b3e759ecc3de88beb353fcf52a994cf5cfe5e047417e6ba4:plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs:generic-api-key:122:108
+content-v1:46fd8796cc61e3191a7414cc392f92ba4dd6a12d65cf3ab3941869a211c18871:plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs:generic-api-key:124:108
 content-v1:4b6095195d2dd0faab0cd4bd1bbe4206de0bf3dd450138ee8d8287fcf305a8df:specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json:generic-api-key:10:31662
 content-v1:4b80fcd368a1240d974d52248b5d3a2b47b8f2de1f04f7fd4795c1a1b0dc161b:specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current120-crosswalk-reconciliation-20261010/focused-proofs.json:sourcegraph-access-token:18:21
 content-v1:4e6d18fe7d7b570989c1f5a604774493dc282c1033727dbb68580b7fe4c3dad8:specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-verify-registration-plan-r2.txt:generic-api-key:12951:23
