@@ -1,0 +1,140 @@
+diff --git a/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs b/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
+index 64d0f8196b477c4de9dbbb80275b39215106e15e..50b9392970c2cb79f093569cb1dcbae6ef212196 100644
+--- a/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
++++ b/plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs
+@@ -109,7 +109,8 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
+   const pointer=initialGreenfieldAgentEntryTarget('fresh');write(f,pointer.path,pointer.bytes);write(f,'docs/adr/.gitkeep','');
+   write(f,'specs/e2e/acceptance.md','# Synthetic acceptance\n');write(f,'specs/e2e/result.md','# Synthetic result\n');
+   write(f,SPEC,'# Synthetic Test Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | The package must receive a PASS verdict from an independent Critic before acceptance. | Synthetic candidate-bound review |\n');
+-  write(f,PLAN,`${po.PO_GATE_PRD_LANGUAGE_MARKER('de')}\n${po.PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n<!-- technical-spec-sha256: ${hash(bytes(f,SPEC))} -->\n# Synthetic Test PRD\nImplementation surface: \`src/index.mjs\`.\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(architecture)}\n\`\`\`\n`);
++  // A signed package carries no acknowledgement line in the real flow: the signature is the acknowledgement (greenfield 2026-11-08).
++  write(f,PLAN,`${po.PO_GATE_PRD_LANGUAGE_MARKER('de')}\n${mode==='signature'?'':`${po.PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`}<!-- technical-spec-sha256: ${hash(bytes(f,SPEC))} -->\n# Synthetic Test PRD\nImplementation surface: \`src/index.mjs\`.\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(architecture)}\n\`\`\`\n`);
+   write(f,COMPANIONS[0],'# Synthetic Design\n');write(f,COMPANIONS[1],'| ID | Evidence |\n| --- | --- |\n');write(f,REPORT,'# Synthetic method review\nVerdict: pass.\n');
+   if(bindProposals){bindProposals(f,COMPANIONS);COMPANIONS.sort();}else prospectiveSubjects(f, COMPANIONS);
+ 
+diff --git a/plugins/pipeline-core/lib/design-decision-bindings.mjs b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+index 846e9af16618f8de772fd0346e1dac5b4e2fa7b4..bbf722a95cf5a6376fbff96e126c3d293650b584 100644
+--- a/plugins/pipeline-core/lib/design-decision-bindings.mjs
++++ b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+@@ -372,7 +372,9 @@ function approved(root, area) {
+   requireValue(lifecycle.ok && ['approved','implementing'].includes(lifecycle.status), 'DDB-LIFECYCLE-STALE');
+   requireValue(designAdvisoryAdmission(state, root, prd.path, spec.path).ok, 'DDB-CURRENT-APPROVAL-REQUIRED');
+   const gate = validatePoGateAuthorityForRepository({ repoRoot: root, expectedPlanSha256: prd.sha256, expectedSpecSha256: spec.sha256 });
+-  requireValue(gate.ok && canonicalizeJson(gate.value) === canonicalizeJson(record.poGateAuthority)
++  // The reader's own code stays visible: DDB-REPOSITORY-BINDING alone hid a missing acknowledgement from the session that had to act on it.
++  requireValue(gate.ok, `DDB-PO-GATE-AUTHORITY:${gate.code ?? 'UNAVAILABLE'}`);
++  requireValue(canonicalizeJson(gate.value) === canonicalizeJson(record.poGateAuthority)
+     && gate.value.repositoryFingerprint === candidateSubset.binding.repositoryFingerprint, 'DDB-REPOSITORY-BINDING');
+   const requestFile = physical(root, presentation.designApprovalRequestPath), request = parseStrictJson(requestFile.bytes);
+   requireValue(canonicalizeJson(request.binding) === canonicalizeJson(binding), 'DDB-PRESENTATION-DRIFT');
+diff --git a/plugins/pipeline-core/lib/po-gate-authority-read.mjs b/plugins/pipeline-core/lib/po-gate-authority-read.mjs
+index e8e6cc14b6dbb90f1184f362632dd598a5a38822..2a757a5b28b80c5aaba7e8601a6ec41f864c38be 100644
+--- a/plugins/pipeline-core/lib/po-gate-authority-read.mjs
++++ b/plugins/pipeline-core/lib/po-gate-authority-read.mjs
+@@ -160,6 +160,7 @@ const ACKNOWLEDGEMENT_REPAIR = "The active PRD does not carry the PO's plan ackn
+   + " ceremony already used for push approval and kickoff (lib/chat-gate-ceremony.mjs), so an agent's own tool"
+   + " call cannot complete it at all. The PO must run po-authority-acknowledge-apply themselves, directly in"
+   + " their own attended terminal, and retype the --by value shown back to them when prompted."
++  + " A signed final design approval of these exact PRD and Spec bytes needs no such line: the signature is the acknowledgement."
+   + " Do not change activeFeature.planPath, which is not what is wrong here.";
+ // A PRD whose bytes are not decodable UTF-8 never reaches any marker check. The
+ // defect is the encoding of one file; no path, directory or PRD count is
+@@ -762,7 +763,19 @@ function activeFeatureState(repoRoot) {
+   const authorityPrdPath = authorityPrd !== null && authorityPrd.startsWith("specs/") && PRD_NAME.test(basename(authorityPrd))
+     ? authorityPrd
+     : null;
+-  return { status: "active", id: active.id, planPath, authorityPrdPath, documentLanguage };
++  return { status: "active", id: active.id, planPath, authorityPrdPath, documentLanguage, signedDesignApproval: signedDesignApprovalOf(state) };
++}
++
++// The digests the PO signed in a final design approval, or null. A stored approval that is current, unrevoked and made by signature IS the
++// PO's content acknowledgement of exactly these bytes: the signature ceremony shows the PRD and Spec and binds both digests, and no step
++// adds a marker line afterwards (it would change the signed bytes). Chat approval stays out: it is an attribution, not a proof.
++function signedDesignApprovalOf(state) {
++  const record = state?.planApproval;
++  if (state?.planApproved !== true || state?.planRevocation) return null;
++  if (!["pipeline.plan-approval.v8", "pipeline.plan-approval.v9"].includes(record?.schema) || record?.designApproval?.mode !== "signature") return null;
++  const planSha256 = record?.designApprovalBinding?.sources?.prd?.sha256;
++  const specSha256 = record?.designApprovalBinding?.sources?.spec?.sha256;
++  return SHA256.test(planSha256 ?? "") && SHA256.test(specSha256 ?? "") ? { planSha256, specSha256 } : null;
+ }
+ 
+ function prdAuthority(repoRoot, active, expectedLanguage, requireAcknowledgement) {
+@@ -871,7 +884,8 @@ function prdAuthority(repoRoot, active, expectedLanguage, requireAcknowledgement
+   // that never carried this marker before and must not be forced to
+   // retroactively. Only an ACTIVE approval/rebind validation -- the caller
+   // passing at least one of those two expected digests -- requires it.
+-  if (requireAcknowledgement) {
++  const signedByPo = active.signedDesignApproval?.planSha256 === sha256(planBytes) && active.signedDesignApproval?.specSha256 === specSha256;
++  if (requireAcknowledgement && !signedByPo) {
+     const acknowledgementMarkers = [...text.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)];
+     if (acknowledgementMarkers.length !== 1) {
+       return fail(
+diff --git a/plugins/pipeline-core/lib/po-gate-authority.test.mjs b/plugins/pipeline-core/lib/po-gate-authority.test.mjs
+index a110685417d746eb5ccd2b06d37e2862969bc583..7564d27b9d69fce3b349dfb1aa13af3f9638b23b 100644
+--- a/plugins/pipeline-core/lib/po-gate-authority.test.mjs
++++ b/plugins/pipeline-core/lib/po-gate-authority.test.mjs
+@@ -811,6 +811,42 @@ check("the PO plan acknowledgement marker must be present exactly once", () => {
+   }
+ });
+ 
++// Greenfield 2026-11-08 (Claude): the signature approved the package, then the first reader after it refused because no marker line exists.
++check("a signed final design approval of these exact bytes stands in for the acknowledgement marker, and nothing weaker does", () => {
++  const specBytes = spec();
++  const content = `${PO_GATE_PRD_LANGUAGE_MARKER("de")}\n${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n# PRD\n`;
++  const planSha256 = sha256(content);
++  const specSha256 = sha256(specBytes);
++  const approved = (changes = {}, mode = "signature", binding = { prd: planSha256, spec: specSha256 }, schema = "pipeline.plan-approval.v8") => `${JSON.stringify({
++    ...JSON.parse(state()),
++    planApproved: true,
++    planApproval: { schema, designApproval: { mode }, designApprovalBinding: { sources: { prd: { sha256: binding.prd }, spec: { sha256: binding.spec } } } },
++    ...changes,
++  }, null, 2)}\n`;
++  const outcome = (stateText) => {
++    let result;
++    withFixture({}, ({ primary, validate }) => {
++      write(join(primary, "specs", "feature", "prd_feature.md"), content);
++      write(join(primary, ".claude", "pipeline-state.json"), stateText);
++      result = validate({ expectedPlanSha256: planSha256, expectedSpecSha256: specSha256 });
++    });
++    return result;
++  };
++  assert.equal(outcome(approved()).ok, true, "the signed approval is the acknowledgement");
++  assert.equal(outcome(approved({}, "signature", { prd: planSha256, spec: specSha256 }, "pipeline.plan-approval.v9")).ok, true, "the retained schema counts");
++  for (const [name, text] of [
++    ["no approval", state()],
++    ["chat approval", approved({}, "chat")],
++    ["revoked", approved({ planRevocation: { revokedAt: "x" } })],
++    ["not approved", approved({ planApproved: false })],
++    ["older schema", approved({}, "signature", { prd: planSha256, spec: specSha256 }, "pipeline.plan-approval.v7")],
++    ["other PRD bytes", approved({}, "signature", { prd: "a".repeat(64), spec: specSha256 })],
++    ["other Spec bytes", approved({}, "signature", { prd: planSha256, spec: "b".repeat(64) })],
++  ]) {
++    assert.equal(outcome(text).code, "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING", name);
++  }
++});
++
+ check("a PRD carrying the language marker, the Spec marker and the acknowledgement marker exactly once each passes", () => {
+   withFixture({}, ({ validate }) => {
+     const result = validate();
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+index 8c2a88f6b4ecb261fdd9500e7c19fb51f4fcac8c..9012181731cea7b72391666a00e12128e7939838 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+@@ -173,10 +173,12 @@ deliberately never admitted there — it stays immutable.
+ In a shared `human_approval: signature` policy, do all authoring and internal
+ review first. Present the completed PRD and Spec together, explain that their
+ exact bytes are being approved for the design-to-implementation transition,
+-and request the one returned `sign-intent` command. That proof writes the
+-acknowledgement marker and becomes the receipt consumed for plan approval;
+-there is no chat `approved`, manual marker edit, or second PO terminal command
+-after the signature. A changed PRD or Spec invalidates the proof and returns
++and request the one returned `sign-intent` command. That proof is the PO's
++acknowledgement of those exact bytes and becomes the receipt consumed for plan
++approval. Nothing is added to the PRD afterwards, and the
++`po-plan-acknowledged` line is not needed for a signed approval: there is no
++chat `approved`, manual marker edit, or second PO terminal command after the
++signature. A changed PRD or Spec invalidates the proof and returns
+ the package to this same completed-design-before-signing boundary. Chat policy
+ uses its policy-selected acknowledgement instead; it must likewise never ask
+ the PO to edit a marker manually.
