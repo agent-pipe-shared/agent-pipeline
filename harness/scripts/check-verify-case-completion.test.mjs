@@ -170,6 +170,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // Restated 2026-11-08 (candidate 20e, QG-04, extension only): four sites counts were outgrown by their suites, measured on the candidate 20e chain with the
   // unchanged classifier: close-path-e2e 89->98, critic-dispatch-preflight 409->488, g23-quoted-pipeline-reads 18->19, guard-dispatch-budget-checkpoint 157->169.
   // Only these four numbers change; names, paths, classifications and the other counts stay as pinned, and no assertion is weakened.
+  // Restated 2026-11-08 (split without a module plan, QG-04, extension only): critic-dispatch-preflight 488->500, measured with the unchanged classifier; only this number changes.
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",36],
@@ -194,7 +195,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",349],
-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",488], // cand. 20 w252 (QG-04: extension only): G20-11 retained prior result cases, measured
+    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",500], // cand. 20 w252 (QG-04: extension only): G20-11 retained prior result cases, measured
     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",119], // cand. 20 w252 (QG-04: extension only), measured
     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
