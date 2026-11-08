@@ -23,7 +23,8 @@ import { readReservedGenericCriticBatchAdmission, registerGenericCriticBatch } f
 import * as CGB from "../lib/critic-generic-batch.mjs";
 import * as CCA from "../lib/critic-course-admission.mjs";
 import { readBoundConsumedCriticReceipt, readConsumedCriticCourseResult } from "../lib/critic-verify-lifecycle.mjs";
-import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+import { preflightCriticDispatch, preflightCriticDispatchWithAdmitRequest } from "./critic-dispatch-preflight.mjs";
+import { admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
 
 import {
   SESSION_CRITIC_ASSURANCE,
@@ -2540,5 +2541,56 @@ test("W7 round takeover CLI: a consumed round whose lineage cannot be registered
     assert.equal(done.status, 0, JSON.stringify(done.out));
     assert.equal(done.out.status, "superseded");
     assert.equal(takeoverVerb(fx, "supersede-course-takeover", { schema: TAKEOVER_SUPERSEDE_SCHEMA, featureId: fx.featureId, digestSha256: inspected.out.digestSha256, reason: "round could not be registered; rerun it" }).out.replay, true);
+  } finally { cleanup(fx); }
+});
+
+// G20-69 (candidate 20e, AC-108): the request the preflight prints is the request admit accepts once only its placeholders are filled; an unfilled
+// placeholder is refused by NAME (it used to fail the generic closed-key-set check), so nothing is guessed from the finalizer source.
+test("G20-69 an unfilled placeholder is refused by name, and the printed generic-batch admit request admits once only its placeholders are filled", () => {
+  const fx = fixture();
+  try {
+    const printed = preflightCriticDispatchWithAdmitRequest(options(fx).preflightInput, { env: {} });
+    assert.equal(printed.status, "packet-ready");
+    const request = structuredClone(printed.admitRequest);
+    assert.equal(request.schema, SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA);
+    assert.equal(request.taskId, fx.taskId, "the one dispatch record the review admission matches (a descendant candidate of the delivered record)");
+    const unfilled = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, "g2069-unfilled.json", request)]);
+    assert.equal(unfilled.exitCode, 2);
+    assert.equal(unfilled.output.code, "SCF-REQUEST-PLACEHOLDER");
+    for (const name of ["projectId", "sessionId", "route.*", "verdictPath", "event", "review.genericBatchRef.*"]) assert.ok(unfilled.output.detail.includes(name), `${name}: ${unfilled.output.detail}`);
+    assert.equal(unfilled.output.detail.includes("taskId"), false, "only the open placeholders are named");
+    request.projectId = "pipeline";
+    request.sessionId = "session-g2069-1";
+    request.route = options(fx).route;
+    request.verdictPath = "evidence/critic-verdict.json";
+    request.event = null;
+    request.review.genericBatchRef = batchFor(fx);
+    assert.deepEqual(admitRequestPlaceholderPaths(request), []);
+    const admitted = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, "g2069-filled.json", request)]);
+    assert.equal(admitted.exitCode, 0, JSON.stringify(admitted.output));
+    assert.equal(admitted.output.status, "admitted");
+    assert.equal(admitted.output.packetId, printed.admitRequest.packetId);
+  } finally { cleanup(fx); }
+});
+
+test("G20-69 the printed feature-package admit request is a v2 request carrying the course context, and admits once only its placeholders are filled", () => {
+  const fx = featureCourseFixture();
+  try {
+    const printed = preflightCriticDispatchWithAdmitRequest(fx.request.preflightInput, { env: {} });
+    assert.equal(printed.status, "packet-ready", JSON.stringify(printed));
+    const request = structuredClone(printed.admitRequest);
+    assert.equal(request.schema, SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA);
+    assert.deepEqual(request.review.courseContext, fx.request.preflightInput.courseContext, "the course context the preflight ran with, so admit reproduces the same preflight");
+    assert.equal(request.taskId, "feature-held-task");
+    assert.equal(Object.hasOwn(request.review, "genericBatchRef"), false);
+    assert.deepEqual(admitRequestPlaceholderPaths(request).sort(), ["event", "projectId", "route.adapter", "route.effortTier", "route.modelTier", "route.provider", "route.routeId", "route.runner", "sessionId", "verdictPath"]);
+    request.projectId = "pipeline";
+    request.sessionId = "session-g2069-2";
+    request.route = options({ taskId: "feature-held-task" }).route;
+    request.verdictPath = "evidence/critic-verdict.json";
+    request.event = null;
+    const admitted = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, "g2069-feature.json", request)]);
+    assert.equal(admitted.exitCode, 0, JSON.stringify(admitted.output));
+    assert.equal(admitted.output.status, "admitted");
   } finally { cleanup(fx); }
 });

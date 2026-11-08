@@ -21,7 +21,7 @@ import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admi
 import { addCriticReviewLineage } from "../lib/feature-package-registration.mjs";
 import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import { registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission, SESSION_PACKET_BINDING_SCHEMA, canonicalJson, claimCandidatePacket, cleanupCandidatePacket, consumeCandidatePacket, inspectClaimedSessionAdmission, inspectClaimedCandidatePacket, inspectCandidatePacket, packetDigestMatches, prepareCandidatePacket, publishClaimedSessionAdmission, readConsumedCandidateReceipt, recordCandidateResult, sha256 } from "./critic-packet-preflight.mjs";
-import { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, PACKET_ID, SHA256, OID, SAFE_ID, SessionCriticFinalizerError, fail, record, exact, validateSessionCriticReceipt, independenceFlagsConsistent } from "../lib/session-critic-finalizer-read.mjs";
+import { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, PACKET_ID, SHA256, OID, SAFE_ID, SessionCriticFinalizerError, fail, record, exact, validateSessionCriticReceipt, independenceFlagsConsistent, admitRequestPlaceholderPaths, describeOpenPlaceholders } from "../lib/session-critic-finalizer-read.mjs";
 export { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, SessionCriticFinalizerError, validateSessionCriticReceipt } from "../lib/session-critic-finalizer-read.mjs";
 /** Durable, runner-neutral acceptance boundary for the ordinary fresh-session Critic. */
 
@@ -268,7 +268,10 @@ function featureReservationFor(options,preflight,root,controlRoot,packetId,prefl
     sourceSha256:course.sourceSha256,decisionSha256:course.decisionSha256});
 }
 function validateCliRequest(value) {
-  const version3 = value?.schema === SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA;
+  // G20-69: a `<FILL ...>` placeholder the preflight printed and the caller left in the file is named, not reported as a shape mismatch.
+  const openPlaceholders = admitRequestPlaceholderPaths(value);
+  if (openPlaceholders.length > 0) fail("SCF-REQUEST-PLACEHOLDER", `unfilled placeholders: ${describeOpenPlaceholders(openPlaceholders)}; put each real value into the request file`);
+  const version3 =value?.schema === SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA;
   const version2 = value?.schema === SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA;
   const hasSignedImportAnchor = record(value) && Object.hasOwn(value, "signedQualityImportAnchor");
   if (!exact(value, hasSignedImportAnchor ? [...REQUEST_KEYS, "signedQualityImportAnchor"] : REQUEST_KEYS) || ![SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA, SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA, SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA].includes(value.schema)

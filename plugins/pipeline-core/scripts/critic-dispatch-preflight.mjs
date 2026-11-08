@@ -13,7 +13,7 @@ import { CriticCorrectionInputBindingsError, PROJECT_STATE_CONVENTION_DIRECTORIE
  * Critic is asked to spend a turn on it.  It does not probe or select a
  * runner, so a packet-ready result is deliberately not a spawn authorization.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { CRITIC_DIAGNOSTIC_SCHEMA, inspectCriticVerifyDiagnostic, validateCriticDiagnostic } from "../lib/critic-diagnostic-evidence.mjs";
 import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
@@ -23,7 +23,10 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
 import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { evaluateReviewAdmission } from "../lib/review-admission-read.mjs";
-import { criticCoverageAdvisory, listUncoveredCriticRecords } from "../lib/review-admission-read.mjs";
+import { criticCoverageAdvisory, listUncoveredCriticRecords, terminalAuthoredDelivery, walkDispatchRecordsForReview } from "../lib/review-admission-read.mjs";
+import { criticDisposition } from "../lib/critic-skip-decision.mjs";
+import { SAFE_ID, admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
+import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import {
   CriticGuardrailDerivationError,
   deriveRequiredCriticGuardrails,
@@ -576,6 +579,140 @@ export function preflightCriticDispatchWithCoverage(input, observer = null) {
   return advisory === null ? result : { ...result, criticCoverageAdvisory: advisory };
 }
 
+// ---------------------------------------------------------------------------------------------------------------------------------------
+// G20-69 / G20-71 (candidate 20e, AC-108). Measured in a greenfield run: after `packet-ready` the coordinator spent about 15 tool calls reading the
+// session finalizer's source to hand-build the request file `admit` takes (a closed key set, a lower-case project id, a 32-hex packet id, then the
+// task id of the last slice's dispatch record), and a default-route (Opus) Critic dispatch was refused for lacking the MP-07 prompt lines.
+// The PRINTED result now carries both. They live in this wrapper and not in `preflightCriticDispatch` for the same reason the coverage advisory does:
+// the finalizer binds the library result by digest at admit and again at finalize, and a fresh packet id inside it would change that digest on every
+// call. Everything stays read-only (no packet, no file, no state); the coordinator writes the request file itself.
+// ---------------------------------------------------------------------------------------------------------------------------------------
+const ADMIT_REQUEST_FILE = "scratch/session-critic-finalization-request.json";
+const ADMIT_SCRIPT = "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs";
+const ADMIT_REQUEST_V2 = "pipeline.session-critic-finalization-request.v2";
+const ADMIT_REQUEST_V3 = "pipeline.session-critic-finalization-request.v3";
+const TASK_ID_CANDIDATE_LIMIT = 25;
+const fillPlaceholder = (path, hint) => `<FILL ${path}: ${hint}>`;
+
+/** The calibration project name in the form admit accepts (SAFE_ID, lower case), or null. Read-only. */
+function calibrationProjectId(root) {
+  for (const relativePath of ["project/pipeline.json", ".claude/pipeline.json"]) {
+    try {
+      const project = JSON.parse(readFileSync(resolve(root, relativePath), "utf8"))?.project;
+      if (typeof project === "string" && SAFE_ID.test(project.toLowerCase())) return project.toLowerCase();
+    } catch { /* no readable calibration at this path */ }
+  }
+  return null;
+}
+
+/**
+ * The task ids the review admission would accept for this candidate: `matching` pass the same admission `--task-id` asks for (skipped when the
+ * caller gave one). `appliedRows` maps each Critic-required record's task id to its applied Critic row, which is the trigger admit should carry.
+ */
+function reviewAdmissionTaskIds({ root, baseCommit, candidateCommit, given = null }) {
+  let scan;
+  try { scan = walkDispatchRecordsForReview(root, []); } catch { return { matching: [], considered: [], appliedRows: new Map() }; }
+  const exactIds = [], laterIds = [], appliedRows = new Map();
+  for (const { record } of scan.records) {
+    if (typeof record?.taskId !== "string" || !isSafeTaskId(record.taskId)) continue;
+    let required = false;
+    try { required = criticDisposition(record) === "required"; } catch { required = false; }
+    if (!required) continue;
+    appliedRows.set(record.taskId, record.criticRequired?.appliedRow);
+    if (record.candidateCommit === candidateCommit) exactIds.push(record.taskId);
+    else if (terminalAuthoredDelivery(record)) laterIds.push(record.taskId);
+  }
+  const considered = [...new Set([...exactIds, ...laterIds.slice(-TASK_ID_CANDIDATE_LIMIT)])].sort(compare);
+  const matching = given !== null ? [] : considered.filter((taskId) => {
+    try { return evaluateReviewAdmission({ root, taskId, baseCommit, candidateCommit }).ok === true; } catch { return false; }
+  });
+  return { matching, considered, appliedRows };
+}
+
+/** MP-07 prompt lines for a Critic route that resolves to an Opus model; null for any other route. T1 and T2 select the high-risk Critic duty (as admit does). */
+function opusCriticPromptLines({ root, result, env, registry, trigger }) {
+  const runner = env.CODEX_SESSION_ID !== undefined || env.CODEX_THREAD_ID !== undefined ? "codex" : "claude";
+  const duty = trigger === "T1" || trigger === "T2" ? "critic_high_risk" : "critic_normal";
+  let cell;
+  try { cell = (registry ?? loadRunnerProfilesV3Registry()).duties?.[duty]?.[runner]; } catch { return null; }
+  if (!isObject(cell) || cell.state === "unavailable" || !isObject(cell.selector) || typeof cell.selector.value !== "string" || !/opus/iu.test(cell.selector.value)) return null;
+  const base = result.base.commit ?? result.base.tree, head = result.candidate.commit;
+  const names = gitOrNull(root, ["diff", "--name-only", base, head]);
+  const files = names === null ? [] : names.split("\n").filter((line) => line !== "");
+  const modules = new Set(files.map((file) => file.split("/")[0]));
+  const counts = names === null ? "" : ` (${files.length} changed file${files.length === 1 ? "" : "s"} in ${modules.size} top-level path${modules.size === 1 ? "" : "s"})`;
+  return [
+    `Batch scope (MP-07): the reviewed range ${base.slice(0, 12)}..${head.slice(0, 12)}${counts}, one batch.`,
+    `Rationale (MP-07): the registered Critic route duty.${duty} is ${cell.selector.value} at effort ${cell.effort}; it is used for critical architecture or security review of this one batch only.`,
+  ];
+}
+
+/**
+ * The printed packet-ready result: the coverage result plus `admitRequest` (the complete closed request for `session-critic-finalizer.mjs admit`),
+ * `admitCommand` (argv), `nextStep`, `taskIdResolution` when the task id could not be resolved, and `criticDispatchPromptLines` for an Opus route.
+ * Only values the caller alone owns stay `<FILL path: hint>` placeholders, which admit refuses by name. A current-artifact review scope (admit
+ * takes an exact range only) and every refusal are returned as they are. `deps` ({ env, registry, randomBytesFn }) is for tests.
+ */
+export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
+  const result = preflightCriticDispatchWithCoverage(input);
+  if (result?.status !== "packet-ready" || result.reviewScope !== undefined || typeof result.candidate?.commit !== "string") return result;
+  const root = realpathSync(input.root);
+  const course = result.coordinatorOnly.courseAdmission;
+  // admit re-runs the preflight over the range the CALLER gave; an effective full round reports the course genesis as its base instead.
+  const requestBase = course?.fallbackFull === true ? course.courseBase : (result.base.commit ?? result.base.tree);
+  const reviewer = result.dispatch.reviewerInput;
+  let taskId = result.reviewAdmission?.taskId ?? null;
+  let taskIdResolution = null;
+  const found = reviewAdmissionTaskIds({ root, baseCommit: course?.fallbackFull === true ? course.courseBase : result.base.commit, candidateCommit: result.candidate.commit, given: taskId });
+  if (taskId === null) {
+    if (found.matching.length === 1) taskId = found.matching[0];
+    else {
+      const candidateTaskIds = found.matching.length > 1 ? found.matching : found.considered;
+      taskIdResolution = { status: "unresolved", candidateTaskIds,
+        reason: `${found.matching.length > 1 ? "several dispatch records match" : "no single dispatch record matches"} this review candidate; rerun this preflight with --task-id <id> (the review admission is then checked here, before admit) or fill taskId; candidate task ids: ${candidateTaskIds.length === 0 ? "none found" : candidateTaskIds.join(", ")}` };
+    }
+  }
+  // The trigger is the matched record's applied Critic row where admit has that trigger (T1 to T3); otherwise the strictest row, which admit itself
+  // defaults to and which selects the high-risk Critic duty, so it can never lower a check.
+  const appliedRow = taskId === null ? undefined : found.appliedRows.get(taskId);
+  const trigger = ["T1", "T2", "T3"].includes(appliedRow) ? appliedRow : "T1";
+  const request = {
+    schema: course ? ADMIT_REQUEST_V2 : ADMIT_REQUEST_V3,
+    taskId: taskId ?? fillPlaceholder("taskId", "the dispatch record task id, see taskIdResolution"),
+    projectId: calibrationProjectId(root) ?? fillPlaceholder("projectId", "a lower-case project id, for example the calibration project name"),
+    sessionId: fillPlaceholder("sessionId", "id of the fresh Critic session, lower case [a-z0-9._-]"),
+    packetId: (deps.randomBytesFn ?? randomBytes)(16).toString("hex"),
+    trigger,
+    route: Object.fromEntries([["routeId", "route id of the Critic route, for example session-critic"], ["runner", "claude, codex or antigravity"], ["adapter", "route adapter of the runner"],
+      ["provider", "model provider"], ["modelTier", "model tier of the Critic route"], ["effortTier", "effort tier of the Critic route"]].map(([key, hint]) => [key, fillPlaceholder(`route.${key}`, hint)])),
+    review: {
+      base: requestBase,
+      candidate: result.candidate.commit,
+      specPath: reviewer.specPath,
+      guardrailPaths: reviewer.guardrailPaths,
+      evidencePaths: reviewer.evidencePaths,
+      priorCriticEvidencePath: result.coordinatorOnly.priorCriticEvidence?.path ?? null,
+      ...(course
+        ? { courseContext: input.courseContext ?? null }
+        : { genericBatchRef: Object.fromEntries([["batchId", "batchRef.batchId printed by register-batch"], ["registrationSha256", "batchRef.registrationSha256 printed by register-batch"], ["memberSha256", "memberSha256 printed by register-batch"]]
+          .map(([key, hint]) => [key, fillPlaceholder(`review.genericBatchRef.${key}`, hint)])) }),
+      ...(typeof result.correctionInputBindings?.path === "string" ? { correctionInputBindings: result.correctionInputBindings.path } : {}),
+    },
+    verdictPath: fillPlaceholder("verdictPath", "repository-relative path of the JSON verdict the fresh Critic returns"),
+    event: fillPlaceholder("event", "null, or an object with eventOutPath and featureId"),
+  };
+  const promptLines = opusCriticPromptLines({ root, result, env: deps.env ?? process.env, registry: deps.registry, trigger });
+  const nextStep = [
+    `Write admitRequest verbatim as ${ADMIT_REQUEST_FILE} (JSON), replace only its placeholders (${admitRequestPlaceholderPaths(request).join(", ")}), then run admitCommand; admit refuses an unfilled placeholder by name.`,
+    `trigger ${trigger} is ${trigger === appliedRow ? "the applied Critic row of the matched dispatch record" : "the strictest default (no matched record row of T1 to T3)"}; change it only if your Critic-required decision says otherwise.`,
+    ...(taskIdResolution === null ? [] : [`taskId: ${taskIdResolution.reason}.`]),
+    ...(course ? [] : ["This review is no feature package, so it needs a registered generic batch: run session-critic-finalizer.mjs register-batch first and copy its batchRef and memberSha256 into review.genericBatchRef."]),
+    ...(promptLines === null ? [] : ["The Critic route is Opus: put criticDispatchPromptLines into the Critic dispatch prompt (MP-07), or the dispatch policy refuses it."]),
+  ].join(" ");
+  return { ...result, admitRequest: request, admitCommand: ["node", ADMIT_SCRIPT, "admit", "--root", input.root, "--request", ADMIT_REQUEST_FILE], nextStep,
+    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }) };
+}
+
 /**
  * Advisory, non-failing enumeration of evidence-shaped artifacts for a given
  * task id, across every location ADR-0063 names as an evidence home. This is
@@ -702,7 +839,7 @@ if (isDirectInvocation(import.meta.url)) {
       const result = enumerateEvidenceArtifacts({ root: args.root, taskId: args.sweepEvidenceTaskId });
       process.stdout.write(`${JSON.stringify(result)}\n`);
     } else {
-      const result = preflightCriticDispatchWithCoverage(args);
+      const result = preflightCriticDispatchWithAdmitRequest(args);
       process.stdout.write(`${JSON.stringify(result)}\n`);
       if (result.status !== "packet-ready") process.exitCode = 1;
     }

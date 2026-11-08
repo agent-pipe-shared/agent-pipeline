@@ -23,6 +23,9 @@ import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { runCriticDiagnosticCli, CRITIC_DIAGNOSTIC_EVIDENCE_HELP } from "./critic-diagnostic-evidence.mjs";
 import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
 import { admitSessionCriticReview } from "./session-critic-finalizer.mjs";
+import * as readModule from "../lib/session-critic-finalizer-read.mjs";
+import { dispatchFindings } from "../lib/dispatch-policy.mjs";
+import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
 import { CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA, CriticCorrectionInputBindingsError, FINDING_RECORDS_FIELD, bindingsRoleCounts, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
 
@@ -686,7 +689,17 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
   const fx = captureFixture(t), value = input(fx);
   const before = git(fx.root, ["status", "--porcelain", "--untracked-files=all"]);
   const expected = preflightCriticDispatch(value);
-  assert.deepEqual(directCli(fx, producerArgv(value)), { status: 0, stdout: JSON.stringify(expected) + "\n", stderr: "" });
+  // G20-69 restatement, criterion kept (the printed packet-ready protocol is the library result, exit 0, empty stderr): the printed line now ALSO carries the
+  // additive admit fields (admitRequest, admitCommand, nextStep and, for an Opus route, criticDispatchPromptLines). The assertion compares the printed line
+  // WITHOUT those fields byte for byte against the library result and requires the admit fields separately.
+  const printedRun = directCli(fx, producerArgv(value));
+  assert.equal(printedRun.status, 0);
+  assert.equal(printedRun.stderr, "");
+  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, ...printedRest } = JSON.parse(printedRun.stdout);
+  assert.equal(JSON.stringify(printedRest) + "\n", JSON.stringify(expected) + "\n");
+  assert.equal(printedAdmitRequest.schema, "pipeline.session-critic-finalization-request.v3");
+  assert.equal(printedAdmitCommand.at(-1), "scratch/session-critic-finalization-request.json");
+  assert.ok(printedNextStep.includes("admitRequest"));
   // Candidate 17: this rejection now carries its reason (the producers and the flag), like the evidence-mode rejection does.
   const evidenceRequired = directCli(fx, producerArgv(input(fx, { evidencePaths: [] })));
   assert.equal(evidenceRequired.status, 1);
@@ -2002,6 +2015,116 @@ test("D216A the hardened read of po-gate-authority-read refuses a file that chan
     syncBuiltinESMExports();
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// G20-69 / G20-71 (candidate 20e, AC-108): the PRINTED packet-ready result carries the complete closed request for `session-critic-finalizer.mjs admit`, so the
+// coordinator never reads the finalizer source to learn its keys; for an Opus Critic route it also carries the MP-07 prompt lines. The library result the
+// finalizer binds by digest stays byte-identical (a fresh packet id inside it would change that digest on every call).
+const G2069_REQUEST_FILE = "scratch/session-critic-finalization-request.json";
+const G2069_KEYS = ["schema", "taskId", "projectId", "sessionId", "packetId", "trigger", "route", "review", "verdictPath", "event"];
+function g2069Printed(fx, overrides = {}, deps = { env: {} }) {
+  return preflightModule.preflightCriticDispatchWithAdmitRequest(input(fx, overrides), deps);
+}
+test("G20-69 the printed packet-ready result carries the complete admit request, its command and the next-step text; the library result is unchanged", () => {
+  const fx = fixture();
+  try {
+    mkdirSync(join(fx.root, "project"), { recursive: true });
+    writeFileSync(join(fx.root, "project", "pipeline.json"), `${JSON.stringify({ project: "Agent-Pipeline" })}\n`);
+    n33bRequiredRecord(fx.root, "G2069-ONE", fx.candidate);
+    const covered = preflightModule.preflightCriticDispatchWithCoverage(input(fx));
+    assert.equal(Object.hasOwn(covered, "admitRequest"), false, "the coverage entry point stays as it was");
+    assert.equal(Object.hasOwn(preflightCriticDispatch(input(fx)), "admitRequest"), false, "the library result is digest-bound by the session finalizer");
+    const printed = g2069Printed(fx);
+    const { admitRequest, admitCommand, nextStep, criticDispatchPromptLines: _lines, ...rest } = printed;
+    assert.deepEqual(rest, covered, "the admit fields are the only difference");
+    assert.deepEqual(Object.keys(admitRequest), G2069_KEYS);
+    assert.equal(admitRequest.schema, "pipeline.session-critic-finalization-request.v3", "a review that is no feature package is a generic batch request");
+    assert.equal(admitRequest.taskId, "G2069-ONE", "the one dispatch record the review admission matches");
+    assert.equal(admitRequest.projectId, "agent-pipeline", "the calibration project, in the form admit accepts (lower case)");
+    assert.equal(admitRequest.trigger, "T1");
+    assert.match(admitRequest.packetId, /^[a-f0-9]{32}$/u);
+    assert.notEqual(g2069Printed(fx).admitRequest.packetId, admitRequest.packetId, "a fresh packet id per call");
+    assert.deepEqual(Object.keys(admitRequest.review), ["base", "candidate", "specPath", "guardrailPaths", "evidencePaths", "priorCriticEvidencePath", "genericBatchRef"]);
+    const reviewerInput = printed.dispatch.reviewerInput;
+    assert.deepEqual({ ...admitRequest.review, genericBatchRef: undefined }, { base: reviewerInput.baseCommit, candidate: reviewerInput.candidateCommit, specPath: reviewerInput.specPath,
+      guardrailPaths: reviewerInput.guardrailPaths, evidencePaths: reviewerInput.evidencePaths, priorCriticEvidencePath: "evidence/prior-critic.json", genericBatchRef: undefined });
+    assert.deepEqual(readModule.admitRequestPlaceholderPaths(admitRequest).sort(), ["event", "review.genericBatchRef.batchId", "review.genericBatchRef.memberSha256", "review.genericBatchRef.registrationSha256",
+      "route.adapter", "route.effortTier", "route.modelTier", "route.provider", "route.routeId", "route.runner", "sessionId", "verdictPath"]);
+    assert.deepEqual(admitCommand, ["node", "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs", "admit", "--root", fx.root, "--request", G2069_REQUEST_FILE]);
+    for (const needle of ["admitRequest", "admitCommand", G2069_REQUEST_FILE, "verbatim", "register-batch"]) assert.ok(nextStep.includes(needle), `the next-step text names ${needle}: ${nextStep}`);
+    assert.equal(Object.hasOwn(printed, "taskIdResolution"), false);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("G20-69 --task-id is taken as given; zero or several matching admission targets name --task-id and the candidate ids instead of leaving it to admit", () => {
+  const fx = fixture();
+  try {
+    const none = g2069Printed(fx);
+    assert.equal(none.status, "packet-ready", "never refuses");
+    assert.equal(none.taskIdResolution.status, "unresolved");
+    assert.deepEqual(none.taskIdResolution.candidateTaskIds, []);
+    assert.match(none.taskIdResolution.reason, /--task-id/u);
+    assert.ok(readModule.admitRequestPlaceholderPaths(none.admitRequest).includes("taskId"), "an unresolved task id stays an explicit placeholder");
+    assert.match(none.nextStep, /--task-id/u);
+    n33bRequiredRecord(fx.root, "G2069-A", fx.candidate);
+    n33bRequiredRecord(fx.root, "G2069-B", fx.candidate);
+    const several = g2069Printed(fx);
+    assert.equal(several.taskIdResolution.status, "unresolved");
+    assert.deepEqual(several.taskIdResolution.candidateTaskIds, ["G2069-A", "G2069-B"]);
+    assert.match(several.taskIdResolution.reason, /--task-id/u);
+    assert.ok(several.nextStep.includes("--task-id") && several.nextStep.includes("G2069-A") && several.nextStep.includes("G2069-B"), several.nextStep);
+    const given = g2069Printed(fx, { taskId: "G2069-B" });
+    assert.equal(given.admitRequest.taskId, "G2069-B", "a given --task-id was admission-checked and is used as given");
+    assert.equal(given.reviewAdmission.taskId, "G2069-B");
+    assert.equal(Object.hasOwn(given, "taskIdResolution"), false);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("G20-71 an Opus Critic route carries the MP-07 prompt lines the dispatch policy admits unchanged; a non-Opus route carries none", () => {
+  const fx = fixture();
+  try {
+    const claude = { env: { CLAUDE_CODE_SESSION_ID: "session-g2071" } };
+    const printed = g2069Printed(fx, {}, claude);
+    const lines = printed.criticDispatchPromptLines;
+    assert.equal(lines.length, 2);
+    assert.match(lines[0], /^Batch scope \(MP-07\):\s*\S/u);
+    assert.ok(lines[0].includes(`${fx.base.slice(0, 12)}..${fx.candidate.slice(0, 12)}`) && /1 changed file/u.test(lines[0]), lines[0]);
+    assert.match(lines[1], /rationale/iu);
+    const prompt = (extra) => ["Model/effort for this run: claude-opus-4-1 / max", `Ruleset SHA: ${fx.candidate}`, ...extra].join("\n");
+    const codes = (extra) => dispatchFindings({ subagentType: "critic", prompt: prompt(extra) }).findings.map(({ code }) => code);
+    assert.ok(codes([]).includes("DISPATCH-OPUS-NO-BATCH-RATIONALE"), "control: an Opus prompt without the lines is refused");
+    const withLines = codes(lines);
+    assert.equal(withLines.includes("DISPATCH-OPUS-NO-BATCH-RATIONALE"), false, `the generated lines pass the dispatch policy unchanged: ${withLines}`);
+    assert.deepEqual(withLines.filter((code) => code.startsWith("DISPATCH-CONTAMINATION") || code.startsWith("DISPATCH-RECRITIC")), []);
+    const registry = structuredClone(loadRunnerProfilesV3Registry());
+    registry.duties.critic_high_risk.claude.selector = { kind: "alias", value: "sonnet" };
+    assert.equal(Object.hasOwn(g2069Printed(fx, {}, { ...claude, registry }), "criticDispatchPromptLines"), false, "a non-Opus route carries no such lines");
+    assert.equal(Object.hasOwn(g2069Printed(fx, {}, { env: { CODEX_SESSION_ID: "session-g2071" } }), "criticDispatchPromptLines"), false, "the registered Codex Critic route is not Opus");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("G20-69 the request trigger is the applied Critic row of the matched dispatch record where admit has that trigger, else the strictest default", () => {
+  const fx = fixture();
+  try {
+    const rows = { "G2069-R2": ["T2", { rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }],
+      "G2069-R3": ["T3", { rigorLevel: 2, riskClass: "medium", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }],
+      "G2069-R4": ["T4", { rigorLevel: 1, riskClass: "medium", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }] };
+    for (const [taskId, [appliedRow, trigger]] of Object.entries(rows)) {
+      n33bRequiredRecord(fx.root, taskId, fx.candidate);
+      const recordPath = join(fx.root, `evidence/dispatch-record-${taskId}.json`);
+      const record = JSON.parse(readFileSync(recordPath, "utf8"));
+      record.criticRequired = { ...record.criticRequired, trigger: { ...record.criticRequired.trigger, ...trigger }, appliedRow };
+      writeFileSync(recordPath, `${JSON.stringify(record)}\n`);
+    }
+    assert.equal(g2069Printed(fx, { taskId: "G2069-R2" }).admitRequest.trigger, "T2");
+    assert.equal(g2069Printed(fx, { taskId: "G2069-R3" }).admitRequest.trigger, "T3");
+    assert.equal(g2069Printed(fx, { taskId: "G2069-R4" }).admitRequest.trigger, "T1", "admit has no T4: the strictest default");
+    assert.match(g2069Printed(fx, { taskId: "G2069-R2" }).nextStep, /trigger T2 is the applied Critic row/u);
+    assert.match(g2069Printed(fx, { taskId: "G2069-R4" }).nextStep, /trigger T1 is the strictest default/u);
+    // The duty follows the trigger as admit's does: the normal Critic duty for T3, the high-risk one for T1 and T2 (both are Opus on the registered Claude route).
+    assert.match(g2069Printed(fx, { taskId: "G2069-R3" }).criticDispatchPromptLines[1], /duty\.critic_normal/u);
+    assert.match(g2069Printed(fx, { taskId: "G2069-R2" }).criticDispatchPromptLines[1], /duty\.critic_high_risk/u);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});

@@ -26,6 +26,25 @@ export function record(value) { return value !== null && typeof value === "objec
 export function exact(value, keys) {
   return record(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 }
+// G20-69: the Critic preflight prints the complete admit request; a value only the caller can supply is an explicit typed placeholder
+// `<FILL path: hint>`. Both the printer and the admit/finalize validation read this one definition, so a placeholder left in the file is refused
+// BY NAME instead of failing the generic closed-key-set check.
+export const ADMIT_REQUEST_PLACEHOLDER = /^<FILL [^>]+>$/u;
+export function admitRequestPlaceholderPaths(value, prefix = "", depth = 0) {
+  if (typeof value === "string") return ADMIT_REQUEST_PLACEHOLDER.test(value) ? [prefix] : [];
+  if (depth > 6 || value === null || typeof value !== "object") return [];
+  return Object.entries(value).flatMap(([key, item]) => admitRequestPlaceholderPaths(item, prefix === "" ? key : `${prefix}.${key}`, depth + 1));
+}
+/** The open placeholder paths as one short line (the CLI cuts a detail at 200 characters): siblings under one parent are written `parent.*`. */
+export function describeOpenPlaceholders(paths) {
+  const groups = new Map();
+  for (const path of paths) {
+    const parent = path.includes(".") ? path.slice(0, path.lastIndexOf(".")) : null;
+    const key = parent ?? path;
+    groups.set(key, [...(groups.get(key) ?? []), path]);
+  }
+  return [...groups].map(([key, members]) => (members.length > 1 ? `${key}.*` : members[0])).join(", ");
+}
 // D2a: the session flags of a result/receipt must agree with its independence label; no label is the legacy true/false pair.
 export function independenceFlagsConsistent(independence, session) {
   if (independence === "caller-authored-fallback") return session.freshContext === false && session.historyInherited === true;
