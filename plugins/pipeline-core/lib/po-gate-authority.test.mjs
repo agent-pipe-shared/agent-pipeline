@@ -943,6 +943,8 @@ function submitFixturePlan(primary, authority, profile) {
   const presented = runPipelineState(["present-plan", "--by", "coordinator", "--review-receipt", receiptPath], {
     dir: primary,
     now: () => NOW,
+    poGateAuthority: () => authority,
+    architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }),
   });
   assert.equal(presented, 0);
   return { receiptPath };

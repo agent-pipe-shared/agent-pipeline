@@ -10139,13 +10139,13 @@ function readDesignApprovalInputs(dir, submission, paths) {
  * The implementation entry gate, in front of the PO's signature. Each check is the reader the same condition meets after the signature;
  * every one runs, so the PO is asked to sign only when nothing behind the signature can still refuse, and the agent reads all open points at once.
  */
-function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { handoffRefusal }) {
+function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { handoffRefusal, submissionSha256 }) {
   const approvalMode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn });
   const signature = approvalMode?.mode === "signature";
   const poGate = deps.poGateAuthority ?? ((request) => checkPoGateAuthority(request, deps));
   let inputs = null, sealGate = null, designDraft = null, decisionDraft = null;
   const sources = () => (inputs?.ok ? inputs.currentSources : inputs?.draftSources ?? null);
-  const dcc = (entry) => ({ code: entry.code, path: entry.path, message: entry.expected !== undefined ? `expected ${entry.expected}, found ${entry.observed}` : null, repair: entryGateRepair(entry.code) });
+  const dcc = (entry) => ({ code: entry.code, path: entry.path, message: entry.expected !== undefined ? `expected ${entry.expected}, found ${entry.observed}` : null, repair: entryGateRepair(entry.code)?.replaceAll("<SUBMISSION_SHA256>", submissionSha256) ?? null });
   const result = runImplementationEntryGate({ stage: "before-signature", checks: [
     { id: "profile", run: () => {
       const selection = inspectSelectedPlanProfile(dir, state);
@@ -10213,9 +10213,11 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
   return { result, inputs, sealGate };
 }
 
-/** Files of the feature folder that git would still have to record. Unreadable git status reports nothing: the package check names it later. */
-function uncommittedDesignPackagePaths(dir, planPath) {
-  const status = spawnSync("git", ["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--", dirname(planPath).replaceAll("\\", "/")], { cwd: dir, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+/** The PRD or Spec with changes git has not recorded: exactly the files the commit guard refuses once the plan is submitted. Unreadable git status reports nothing: the package check names it later. */
+function uncommittedSubmissionSources(dir, planPath, specPath) {
+  // A PRD git has never recorded is a package that was not adopted into history at all; present-plan names each of its files, with the cancel route.
+  if (spawnSync("git", ["ls-files", "--error-unmatch", "--", planPath], { cwd: dir, encoding: "utf8" }).status !== 0) return [];
+  const status = spawnSync("git", ["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--", planPath, specPath], { cwd: dir, encoding: "utf8", maxBuffer: 1024 * 1024 });
   if (status.status !== 0 || status.error) return [];
   return status.stdout.split("\0").filter(Boolean).map((entry) => entry.slice(3)).sort();
 }
@@ -11928,13 +11930,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           return { code: committed.code ?? committed.status, text: `set-phase implementation refused calibration commit preflight (${committed.code ?? committed.status}); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.` };
         } },
         { id: "model-policy-binding", run: () => {
+          if (!base.planApproval?.designApprovalBinding) return null;
           const modelPolicy = inspectApprovedDesignDecisionBindings({ rootDir: dir, area: "model-policy" });
           return modelPolicy.ok ? null : { code: modelPolicy.code, path: modelPolicy.path ?? null, repair: entryGateRepair(modelPolicy.code) };
-        } },
-        { id: "materialized-architecture-committed", run: () => {
-          if (!existsSync(join(dir, "architecture", "design-materialization.json"))) return null;
-          const open = architectureCommitStep(dir);
-          return open.uncommittedPaths.length === 0 ? null : { code: "ARCHITECTURE-MATERIALIZATION-UNCOMMITTED", message: `uncommitted: ${open.uncommittedPaths.slice(0, 20).join(", ")}`, repair: open.commitStep };
         } },
       ] });
       if (implementationEntry.status !== "ready") {
@@ -12206,18 +12204,18 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         }
       }
       const submitHandoff = planHandoffRefusal("submit-plan", inspectPlanDeliveryHandoff({ rootDir: dir, specPath: authority.value.specPath, expectedSpecSha256: authority.value.specSha256 })); if (submitHandoff) { console.error(submitHandoff); return 2; } // AC-264/D30/D85: refused before any write
+      // After the submission the PRD and Spec are immutable and the commit guard refuses them, so uncommitted bytes here could only leave through a cancel or reopen.
+      if (["epic", "feature"].includes(profileName)) {
+        const uncommittedSources = uncommittedSubmissionSources(dir, authority.value.planPath, authority.value.specPath);
+        if (uncommittedSources.length > 0) {
+          console.error(`Error: submit-plan refused (PLAN-SUBMIT-UNCOMMITTED): commit these first, because a submitted PRD and Spec can no longer be committed afterwards: ${uncommittedSources.join(", ")}. Then run this command again. Zero State mutation.`);
+          return 2;
+        }
+      }
       const submitSources = inspectSubmissionSources(dir, authority.value, deps);
       if (!submitSources.ok) {
         console.error(`Error: submit-plan refused (${submitSources.code}); ${submitSources.message ?? "restore and validate the authored source before submission."} Zero State mutation.`);
         return 2;
-      }
-      // After the submission the PRD and Spec are immutable and the commit guard refuses them, so an uncommitted package could only leave through reopen-design.
-      if (["epic", "feature"].includes(profileName)) {
-        const uncommittedPackage = uncommittedDesignPackagePaths(dir, authority.value.planPath);
-        if (uncommittedPackage.length > 0) {
-          console.error(`Error: submit-plan refused (PLAN-SUBMIT-UNCOMMITTED): commit the design package first, because the submitted PRD and Spec can no longer be committed afterwards. Uncommitted: ${uncommittedPackage.slice(0, 20).join(", ")}${uncommittedPackage.length > 20 ? ` and ${uncommittedPackage.length - 20} more` : ""}. Then run this command again. Zero State mutation.`);
-          return 2;
-        }
       }
       // C18-2: a null/placeholder verify command is otherwise found late (VEP-NO-COMMAND at the first Verify); warn while it is cheap, never refuse.
       const submitVerifyStatus = readCalibrationVerifyStatus(dir);
@@ -12454,7 +12452,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       if (requiresWorkflowPackage) {
         // The entry gate: every condition the signature will later meet, all at once, before a request exists (PO 2026-11-08: no reopen-design in the happy path).
         const presentHandoff = planHandoffRefusal("present-plan", inspectPlanDeliveryHandoff({ rootDir: dir, specPath: submitted.specPath, expectedSpecSha256: submitted.specSha256 }));
-        const entry = beforeSignatureEntryGate(dir, base, submitted, reviewPaths, deps, { handoffRefusal: presentHandoff });
+        const entry = beforeSignatureEntryGate(dir, base, submitted, reviewPaths, deps, { handoffRefusal: presentHandoff, submissionSha256 });
         if (entry.result.status !== "ready") { console.error(renderImplementationEntryGate({ verb: "present-plan", result: entry.result })); return 2; }
         const { inputs, sealGate } = entry;
         const binding = createDesignApprovalBinding({ featureId: submitted.featureId, receipts: inputs.receipts, currentSources: inputs.currentSources,

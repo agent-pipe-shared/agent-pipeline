@@ -294,14 +294,22 @@ test("[entry gate] the PO gate is asked about the signed outcome only in signatu
   }
 });
 
-test("[entry gate] submit-plan refuses an uncommitted design package and names the paths", async (t) => {
+test("[entry gate] submit-plan refuses an uncommitted PRD or Spec and names the path; another package file does not block it", async (t) => {
   const fx = await routeFixture(t);
   const before = fx.readState().planSubmission;
-  put(fx.primary, "specs/feature/notes.md", "# not committed\n");
+  put(fx.primary, ROUTE_SPEC, "# Technical Spec changed after the commit\n");
   const submitted = fx.drive(["submit-plan", "--by", "coordinator", "--profile", "feature"]);
   assert.notEqual(submitted.status, 0);
-  assert.match(submitted.stderr, /PLAN-SUBMIT-UNCOMMITTED.*specs\/feature\/notes\.md/u, submitted.stderr);
+  assert.match(submitted.stderr, new RegExp(`PLAN-SUBMIT-UNCOMMITTED.*${ROUTE_SPEC}`, "u"), submitted.stderr);
   assert.deepEqual(fx.readState().planSubmission, before, "nothing was recorded");
+});
+
+test("[entry gate] the repair for a dirty file carries the cancel route with the real submission digest", async (t) => {
+  const fx = await routeFixture(t);
+  put(fx.primary, ROUTE_DESIGN, "# Design changed after the review\n");
+  const presented = fx.drive(["present-plan", "--by", "coordinator", "--review-receipt", ROUTE_RECEIPT]);
+  assert.match(presented.stderr, /cancel-submitted-plan --by <name> --submission-sha256 [a-f0-9]{64}/u, presented.stderr);
+  assert.doesNotMatch(presented.stderr, /SUBMISSION_SHA256/u, "the placeholder is filled");
 });
 
 test("[entry gate] the collector runs every check, turns a throwing reader into a finding, and renders all of them", async () => {

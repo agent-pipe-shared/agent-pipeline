@@ -49,7 +49,8 @@ export function runImplementationEntryGate({ stage, checks } = {}) {
   return Object.freeze({ schema: IMPLEMENTATION_ENTRY_GATE_SCHEMA, stage, status: findings.length === 0 ? "ready" : "blocked", findings: Object.freeze(findings) });
 }
 
-const COMMIT_THEN_REPEAT = "Commit it, then run this command again. A reviewed file that changed needs a new review receipt for the committed bytes.";
+// After submit-plan the commit guard refuses the PRD and Spec. Before any signature the way back is cancel-submitted-plan, an agent step: no reopen-design, no PO step.
+const COMMIT_THEN_REPEAT = "Commit it, then run this command again. If the commit is refused because the plan is already submitted, run cancel-submitted-plan --by <name> --submission-sha256 <SUBMISSION_SHA256>, commit, and run submit-plan again (agent work, no reopen-design and no PO step). A reviewed file that changed needs a new review receipt for the committed bytes.";
 const REPEAT_REVIEW = "Run the design review for the current committed bytes (a delta round passes --previous <receipt>), then pass the new receipt with --review-receipt. Never re-stamp an old report over changed files.";
 
 /** The repair for a known code. Agent work, repository-relative, and never a reopen-design for something a draft can still fix. */
