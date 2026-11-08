@@ -2147,7 +2147,7 @@ const READY_ROW = (id) => ({ id, status: "ready", nextAction: null });
 export function observeCloseAndPushCapability({
   platform = process.platform, nodePath = process.execPath, exists = existsSync, windowsAuthorityReadiness = null,
   lockProbe = () => ({ status: "unknown" }), ownerRouteProbe = () => ({ status: "unavailable" }),
-  repairScript = "scripts/session-authority-repair.mjs",
+  repairScript = "scripts/session-authority-repair.mjs", rootDir = process.cwd(),
 } = {}) {
   const rows = [];
   let nodeOk = false;
@@ -2164,7 +2164,7 @@ export function observeCloseAndPushCapability({
   }
   let lock;
   try { lock = lockProbe(); } catch { lock = { status: "unknown" }; }
-  const lockRepair = `node ${repairScript} inspect, then the routine heal it names; last resort move-aside when no Goldfish runs.`;
+  const lockRepair = `node ${repairScript} inspect --root ${rootDir}, then the routine heal it names; last resort move-aside when no Goldfish runs.`;
   if (lock?.status === "absent") rows.push(READY_ROW("lock"));
   else if (lock?.status === "held") rows.push({ id: "lock", status: "degraded", nextAction: lock.owner === "live"
     ? `The registry lock is held by a running process (${lock.ageSeconds ?? "?"}s): wait for it, then ${lockRepair}`

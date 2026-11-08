@@ -105,13 +105,14 @@ test("E2: capability probe names the repair per failing check", () => {
     platform: "win32", ...okProbes, exists: () => false,
     windowsAuthorityReadiness: { schema: SCHEMA, status: "unavailable", causes: [{ reason: "WIN-AUTH-OPEN", path: "C:\\proj\\evidence" }] },
     lockProbe: () => ({ status: "held", owner: "dead", ageSeconds: 141 }),
-    ownerRouteProbe: () => ({ status: "unavailable" }),
+    ownerRouteProbe: () => ({ status: "unavailable" }), rootDir: "/repo",
   });
   assert.equal(cap.status, "unavailable");
   const byId = Object.fromEntries(cap.checks.map((row) => [row.id, row]));
   assert.equal(byId.node.status, "unavailable");
   assert.match(byId.acl.nextAction, /C:\\proj\\evidence/u);
-  assert.match(byId.lock.nextAction, /session-authority-repair\.mjs inspect/u);
+  // Live Codex run: the printed inspect without --root was refused by the closed catalogue.
+  assert.match(byId.lock.nextAction, /session-authority-repair\.mjs inspect --root \/repo,/u);
   assert.match(byId.ownerRoute.nextAction, /\S/u);
 });
 
