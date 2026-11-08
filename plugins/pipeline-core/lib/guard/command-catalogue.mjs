@@ -391,7 +391,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
 }
 
-import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT, PROOF_WAIT_SCRIPT } from "./constants.mjs";
+import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, CODEX_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT, PROOF_WAIT_SCRIPT } from "./constants.mjs";
 
 // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
 // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
@@ -408,6 +408,15 @@ const NATIVE_DISPATCH_REQUEST = /^(?:scratch|evidence)\/[A-Za-z0-9][A-Za-z0-9._/
 function sanctionedAntigravityNativeDispatchPrepareArgs(args, root) {
   return args.length === 5 && args[0] === "prepare" && args[1] === "--root" && args[2] === root
     && args[3] === "--request" && NATIVE_DISPATCH_REQUEST.test(args[4])
+    && !args[4].split("/").some((part) => part === "." || part === "..");
+}
+
+// G20-63: scripts/codex-native-dispatch-prepare.mjs accepts exactly `prepare --root <root> --briefing <md>` (its argvRequest). The briefing is a
+// repository-relative scratch/*.md file (what `dispatch-briefing.mjs build --out` writes) with no dot segment.
+const CODEX_DISPATCH_BRIEFING = /^scratch\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\.md$/u;
+function sanctionedCodexNativeDispatchPrepareArgs(args, root) {
+  return args.length === 5 && args[0] === "prepare" && args[1] === "--root" && args[2] === root
+    && args[3] === "--briefing" && CODEX_DISPATCH_BRIEFING.test(args[4])
     && !args[4].split("/").some((part) => part === "." || part === "..");
 }
 
@@ -646,6 +655,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === ANALYSIS_RUN_SCRIPT) return sanctionedAnalysisRunArgs(args, root);
   if (script === MODEL_ROLE_BOOTSTRAP_SCRIPT) return sanctionedModelRoleBootstrapArgs(args, root);
   if (script === ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT) return sanctionedAntigravityNativeDispatchPrepareArgs(args, root);
+  if (script === CODEX_NATIVE_DISPATCH_PREPARE_SCRIPT) return sanctionedCodexNativeDispatchPrepareArgs(args, root);
   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
   if (script === MODEL_ROLE_DISPATCH_SELECT_SCRIPT) return sanctionedModelRoleDispatchSelectArgs(args, root);

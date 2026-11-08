@@ -35,6 +35,7 @@ import { recordConsentGiven } from "../lib/onboarding-consent-marker.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { nativeContractFixtureParent, nativeContractFixtureRepositoryRoot, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
 import { runDispatchBriefing } from "../scripts/dispatch-briefing.mjs";
+import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 
 // NOTE, deliberately absent: no module-scope `import { extractWorkflowDispatches } from
 // "./guard-dispatch.mjs"` here. That shape was tried and removed (NVA-B-GD16HARDEN-1): if the
@@ -213,7 +214,132 @@ manualCheck("GD15m check a marked worker packet against the functional Goldfish 
   } finally { rmSync(fixture, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 4, "the native-worker dispatch regression corpus must register four cases");
+// ---------------------------------------------------------------------------------------------------------------------------------
+// G20-63 (candidate 20d; measured 2026-11-08, Codex CLI 0.167.0): Codex runs no PreToolUse hook for spawn_agent, so the governed
+// admission above never ran there. The agent-run prepare command performs that same admission (it spawns this guard with a
+// synthetic spawn_agent hook input) before spawn_agent; SubagentStart then binds the child to the prepared pending state and
+// SubagentStop host-commits it. These cases are written from the criterion (AC-108: a governed Goldfish is host-committed and its
+// slice integrated), not from the implementation.
+const PREPARE = fileURLToPath(new URL("../scripts/codex-native-dispatch-prepare.mjs", import.meta.url));
+const HOST = fileURLToPath(new URL("./native-goldfish-host.mjs", import.meta.url));
+const CODEX_SESSION = "g2063-codex-session";
+const PREPARED_TOKEN = /^prepared-codex-[a-f0-9]{64}$/u;
+function codexEnv(root, session = CODEX_SESSION) {
+  const env = { ...process.env, CLAUDE_PROJECT_DIR: root, CODEX_THREAD_ID: session };
+  delete env.CODEX_SESSION_ID;
+  return env;
+}
+function runPrepare(root, briefingRelative, session = CODEX_SESSION) {
+  const res = spawnSync(process.execPath, [PREPARE, "prepare", "--root", root, "--briefing", briefingRelative], { encoding: "utf8", env: codexEnv(root, session) });
+  let json = null;
+  try { json = JSON.parse(res.stdout.trim().split("\n").filter(Boolean).at(-1) ?? ""); } catch { /* the assertion below names it */ }
+  return { code: res.status, stdout: res.stdout ?? "", stderr: res.stderr ?? "", json };
+}
+function runHost(root, input, session = CODEX_SESSION) {
+  const res = spawnSync(process.execPath, [HOST, "--runner", "codex"], { input: JSON.stringify({ session_id: session, cwd: root, ...input }), encoding: "utf8", env: codexEnv(root, session) });
+  return { code: res.status, stdout: res.stdout ?? "", stderr: res.stderr ?? "" };
+}
+const preparedFixture = (label) => {
+  const fixture = generatedCodexFixture(label);
+  writeFileSync(join(fixture.root, "scratch", "briefing-prep.md"), fixture.text);
+  return fixture;
+};
+const routeRecordPath = (root) => join(root, "evidence", "dispatch-route-GD15N-CODEX-WORKER.json");
+const queueRows = (root) => {
+  const governed = resolveGovernedItemQueue({ root });
+  return governed.status === "required" ? governed.normalized.slices.map((row) => row.id) : [];
+};
+manualCheck("GDW05 G20-63 the Codex prepare command admits a generated item briefing and writes the route record, the queue row and the pending state", () => {
+  const { root, text } = preparedFixture("prepare-admit");
+  assert.equal(queueRows(root).length, 0, "the fixture has no delivery course before the first admission");
+  const prepared = runPrepare(root, "scratch/briefing-prep.md");
+  assert.equal(prepared.code, 0, `prepare must admit a generated item briefing: ${prepared.stdout} ${prepared.stderr}`);
+  assert.equal(prepared.json.status, "prepared");
+  assert.equal(prepared.json.spawn_agent.agent_type, "worker");
+  assert.equal(prepared.json.spawn_agent.message, text, "the message is the verified briefing bytes");
+  assert.match(prepared.json.preparedToken, PREPARED_TOKEN);
+  assert.equal(prepared.json.dispatchId, "GD15N-CODEX-WORKER");
+  assert.equal(pendingCodexFiles(root).length, 1, "one native pending state");
+  assert.ok(existsSync(routeRecordPath(root)), "the briefing route record is written");
+  assert.deepEqual(queueRows(root).includes("GD15N-CODEX-WORKER"), true, "the governed queue row is written");
+  const pending = JSON.parse(readFileSync(pendingCodexFiles(root)[0], "utf8"));
+  assert.equal(pending.sessionId, CODEX_SESSION, "the pending state is bound to the Codex session");
+  assert.equal(pending.binding.nativeAgentType, "worker");
+});
+manualCheck("GDW06 G20-63 prepare refuses an unmarked briefing, a non-Goldfish carrier and a tampered generated briefing with the guard's codes and leaves no state", () => {
+  const { root, text } = preparedFixture("prepare-refuse");
+  writeFileSync(join(root, "scratch", "handwritten.md"), "### 1. Goal\nA hand-written Goldfish briefing without the generator binding.\n");
+  const unmarked = runPrepare(root, "scratch/handwritten.md");
+  assert.equal(unmarked.code, 2, `an unmarked briefing is refused: ${unmarked.stdout}`);
+  assert.equal(unmarked.json.status, "rejected");
+  assert.equal(unmarked.json.code, "DISPATCH-WRITE-CARRIER-REQUIRED", "a briefing that names no Goldfish carrier is refused with the guard's carrier code");
+  assert.match(unmarked.json.reason, /pipeline-core/u, "the guard's own repair text is carried");
+  writeFileSync(join(root, "scratch", "tampered.md"), text.replace("Fixture goal text.", "Fixture goal text, edited by hand."));
+  const tampered = runPrepare(root, "scratch/tampered.md");
+  assert.equal(tampered.code, 2, `a hand-edited generated briefing is refused: ${tampered.stdout}`);
+  assert.equal(tampered.json.status, "rejected");
+  assert.match(tampered.json.code, /^DBG-/u, `the generated-briefing guard code is kept: ${tampered.json.code}`);
+  assert.equal(pendingCodexFiles(root).length, 0, "a refusal leaves no pending state");
+  assert.equal(existsSync(routeRecordPath(root)), false, "a refusal leaves no route record");
+  assert.equal(queueRows(root).length, 0, "a refusal leaves no queue row");
+});
+manualCheck("GDW07 G20-63 preparing one briefing twice, and a later PreToolUse admission of it, write no second queue row or pending state", () => {
+  const { root, text } = preparedFixture("prepare-idempotent");
+  const first = runPrepare(root, "scratch/briefing-prep.md");
+  assert.equal(first.code, 0, `${first.stdout} ${first.stderr}`);
+  const stateBefore = readFileSync(pendingCodexFiles(root)[0], "utf8");
+  const second = runPrepare(root, "scratch/briefing-prep.md");
+  assert.equal(second.code, 0, `a second prepare of the same briefing is admitted: ${second.stdout} ${second.stderr}`);
+  assert.equal(second.json.preparedToken, first.json.preparedToken, "the token is a function of the briefing");
+  assert.equal(pendingCodexFiles(root).length, 1, "no second pending state");
+  assert.equal(queueRows(root).filter((id) => id === "GD15N-CODEX-WORKER").length, 1, "no second queue row");
+  assert.equal(readFileSync(pendingCodexFiles(root)[0], "utf8"), stateBefore, "the first pending state is untouched");
+  const late = spawnSync(process.execPath, [GUARD], { input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "spawn_agent", tool_use_id: "g2063-late-pretooluse", session_id: CODEX_SESSION, cwd: root,
+    tool_input: { agent_type: "worker", message: text } }), encoding: "utf8", env: codexEnv(root) });
+  assert.equal(late.status, ALLOW, `a PreToolUse admission of the prepared briefing is idempotent: ${late.stderr}`);
+  assert.equal(pendingCodexFiles(root).length, 1, "the PreToolUse admission wrote no second pending state");
+  assert.equal(queueRows(root).filter((id) => id === "GD15N-CODEX-WORKER").length, 1);
+});
+manualCheck("GDW08 G20-63 a Codex SubagentStart binds a prepared child and an unprepared worker child gets a model-visible notice", () => {
+  const { root } = preparedFixture("start-bind");
+  const start = { hook_event_name: "SubagentStart", agent_id: "g2063-agent-1", agent_type: "worker", model: "gpt-6-luna" };
+  // Governed feature in implementation, nothing prepared: the child is told its work will not be integrated.
+  const unprepared = runHost(root, start);
+  assert.equal(unprepared.code, 0, "a SubagentStart hook never blocks");
+  const notice = JSON.parse(unprepared.stdout).hookSpecificOutput;
+  assert.equal(notice.hookEventName, "SubagentStart");
+  assert.match(notice.additionalContext, /will not be (?:host-committed|integrated)/u);
+  assert.match(notice.additionalContext, /codex-native-dispatch-prepare\.mjs prepare/u, "the notice names the prepare command");
+  assert.match(notice.additionalContext, /spawn_agent/u);
+  // A child that is not a worker (an explorer) gets no notice.
+  assert.equal(runHost(root, { ...start, agent_id: "g2063-agent-x", agent_type: "explorer" }).stdout, "", "a non-worker child gets no notice");
+  // Prepared: the same start binds and prints no notice.
+  assert.equal(runPrepare(root, "scratch/briefing-prep.md").code, 0);
+  const bound = runHost(root, start);
+  assert.equal(bound.code, 0);
+  assert.equal(bound.stdout, "", "a bound child gets no notice");
+  const privateDir = join(root, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
+  assert.equal(readdirSync(privateDir).filter((name) => name.startsWith("agent-codex-")).length, 1, "the start wrote its agent binding to the prepared pending state");
+});
+manualCheck("GDW09 G20-63 the SubagentStop finalizer host-commits the Codex child bound to a prepared dispatch", () => {
+  const { root } = preparedFixture("stop-commit");
+  for (const [key, value] of [["user.name", "Fixture"], ["user.email", "fixture@example.invalid"], ["commit.gpgsign", "false"]]) execFileSync("git", ["config", key, value], { cwd: root });
+  const candidate = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  assert.equal(runPrepare(root, "scratch/briefing-prep.md").code, 0);
+  const start = { hook_event_name: "SubagentStart", agent_id: "g2063-agent-2", agent_type: "worker", model: "gpt-6-luna" };
+  assert.equal(runHost(root, start).code, 0);
+  writeFileSync(join(root, "src", "change.mjs"), "// G20-63 prepared Codex child change\nexport const value = 'expected';\n");
+  const last = JSON.stringify({ schema: "pipeline.native-goldfish-host-return.v1", dispatchId: "GD15N-CODEX-WORKER", candidateCommit: candidate, outcome: "succeeded",
+    report: "Implemented the fixture change.", changedPaths: ["src/change.mjs"] });
+  const stop = runHost(root, { hook_event_name: "SubagentStop", agent_id: "g2063-agent-2", agent_type: "worker", model: "gpt-6-luna", last_assistant_message: last });
+  assert.equal(stop.code, 0, stop.stderr);
+  assert.match(stop.stderr, /Goldfish host commit verified/u, `the stop host-commits the prepared child: ${stop.stderr}`);
+  const message = execFileSync("git", ["log", "-1", "--format=%B"], { cwd: root, encoding: "utf8" });
+  assert.match(message, /Dispatch: GD15N-CODEX-WORKER \(goldfish\)/u);
+  assert.notEqual(execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), candidate, "HEAD moved by the host commit");
+});
+
+assert.equal(cases.length, 9, "the native-worker dispatch regression corpus must register nine cases (G20-63 adds five)");
 
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")

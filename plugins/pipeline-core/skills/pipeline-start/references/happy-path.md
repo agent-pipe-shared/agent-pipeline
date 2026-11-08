@@ -66,7 +66,10 @@ command tables.
    `slice-<module>-r2`, `-r3`, ...): the waves track a module by this id only, so any other id is refused with `DBG-MODULE-SLICE-ID`.
 3. Dispatch by runner:
    - **Claude**: `Agent` / `Task` with the functional `agentType`.
-   - **Codex**: `spawn_agent` with `nativeAgentType: "worker"`, keeping the `pipeline-core:goldfish-implementor` (or `-mechanic`) role.
+   - **Codex**: Codex runs no PreToolUse hook for `spawn_agent`, so the governed admission is run by hand first. Write the briefing (`dispatch-briefing.mjs build --package <package.json> --out scratch/<briefing>.md`),
+     run `codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing scratch/<briefing>.md` (it performs the guard's admission: route record, governed queue row, pending state; a refusal carries the guard's
+     code and repair and leaves no state), and only after exit 0 and `status: "prepared"` call `spawn_agent` with exactly the printed `spawn_agent.agent_type` (`worker`) and `spawn_agent.message`, keeping the
+     `pipeline-core:goldfish-implementor` (or `-mechanic`) role, within the printed `bindWindowSeconds`. Preparing the same briefing again is safe. A `worker` started without a prepared dispatch gets a SubagentStart notice that its work will not be integrated.
    - **Antigravity**: `antigravity-native-dispatch-prepare.mjs prepare --root <repository-root> --request <native-dispatch-request.json>`; only after exit 0 and
      `status: "prepared"` call `invoke_subagent` with `invocation.Subagents` unchanged. A native implementation consent is not available: read
      `references/antigravity-native-dispatch.md` before the first dispatch and ask the PO when the sanctioned route does not return an authored commit.
@@ -124,7 +127,7 @@ Owner: `docs/push-release-flow.md`, section "Releasing a consumer project". A co
 
 | Topic | Claude | Codex | Antigravity |
 | --- | --- | --- | --- |
-| Dispatch carrier | `Agent` / `Task`, functional `agentType` | `spawn_agent`, `nativeAgentType: "worker"` | `invoke_subagent` (flat args); read-only roles after `antigravity-native-dispatch-prepare.mjs`, Goldfish roles from the generated briefing, no consent |
+| Dispatch carrier | `Agent` / `Task`, functional `agentType` | `spawn_agent`, `nativeAgentType: "worker"`, after `codex-native-dispatch-prepare.mjs` (Codex runs no PreToolUse hook for `spawn_agent`) | `invoke_subagent` (flat args); read-only roles after `antigravity-native-dispatch-prepare.mjs`, Goldfish roles from the generated briefing, no consent |
 | Mechanic and deep tiers | available | see `config/runner-profiles-v3.json` | `unavailable` there |
 | Tool budget | per-agent counter; a grant raises it | nothing counts it (the briefing says so) | nothing counts it (the briefing says so) |
 | Dispatch record model | host-observed | declared, labelled unobserved | see `references/antigravity-native-dispatch.md` |

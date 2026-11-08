@@ -1282,7 +1282,14 @@ export function buildDispatchBriefing(options, deps = {}) {
   // the tier of the (possibly raised) binding, the model family of the package's model id, the briefing passed verbatim.
   const boundTier = generated.binding?.agentType;
   const base = dispatchCallBase(pkg, boundTier);
-  const dispatchCall = base === null ? null : {
+  // G20-63: Codex runs no PreToolUse hook for spawn_agent, so its governed admission is the prepare command, run before the call.
+  const codexCall = pkg.runner !== "codex" ? null : {
+    tool: "spawn_agent", agent_type: "worker",
+    prepare: options.out === undefined ? "write the briefing with --out scratch/<briefing>.md first, then run node <plugin-root>/scripts/codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing scratch/<briefing>.md"
+      : `node <plugin-root>/scripts/codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing ${options.out}`,
+    message: "the spawn_agent.message that the prepare command prints, verbatim; call spawn_agent only after prepare exited 0 with status prepared",
+  };
+  const dispatchCall = base === null ? codexCall : {
     ...base,
     prompt: options.out === undefined ? "the `text` field of this result, verbatim" : `the file ${options.out}, verbatim including its final newline`,
     // D183: a Claude Agent dispatch may carry this two-line pointer prompt instead of the full text; guard-dispatch hands the child the verified file bytes.

@@ -77,7 +77,29 @@ test("K152: no other script of the plugin is admitted by these pins (design-revi
   assert.equal(admitted(`node ${receipt}`), false);
 });
 
-if (cases.length !== 5) throw new Error("K152 admission case count drift");
+// G20-63 (candidate 20d): the Codex prepare command is admitted by exactly its documented argv shape, like its Antigravity counterpart.
+const codexPrepare = join(scripts, "codex-native-dispatch-prepare.mjs");
+test("G20-63: codex-native-dispatch-prepare is admitted with exactly `prepare --root <root> --briefing <scratch md>`", () => {
+  assert.equal(admitted(`node ${codexPrepare} prepare --root ${root} --briefing scratch/dispatch-briefing.md`), true);
+});
+test("G20-63: codex-native-dispatch-prepare stays refused for any other argv shape", () => {
+  const other = mkdtempSync(join(tmpdir(), "k152-other-root-"));
+  try {
+    for (const tail of [
+      `prepare --root ${other} --briefing scratch/b.md`,                           // a different root
+      `prepare --root ${root} --briefing ../outside.md`,                           // traversal
+      `prepare --root ${root} --briefing /etc/passwd`,                             // absolute briefing path
+      `prepare --root ${root} --briefing scratch/b.json`,                          // not a markdown briefing
+      `prepare --root ${root} --briefing src/b.md`,                                // not the scratch directory
+      `prepare --root ${root} --briefing scratch/b.md --apply`,                    // an extra argument
+      `apply --root ${root} --briefing scratch/b.md`,                              // another subcommand
+      `prepare --root ${root} --request scratch/b.md`,                             // the Antigravity flag
+      "",
+    ]) assert.equal(admitted(`node ${codexPrepare} ${tail}`.trim()), false, tail);
+  } finally { rmSync(other, { recursive: true, force: true }); }
+});
+
+if (cases.length !== 7) throw new Error("K152 admission case count drift (five original examiners and the two G20-63 cases)");
 
 // Supplementary controlled Source tests. The original five examiners and their
 // order remain above. Fixture state and readiness dependencies are test doubles,

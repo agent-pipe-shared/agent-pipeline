@@ -6,11 +6,11 @@ import { join } from "node:path";
 import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget-core.mjs";
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
+import { integrateNativeGoldfishItemDelivery, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { finalizeNativeGoldfishHostReturn, readSubagentHandbackMessage, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
 import { issueCriticSourceReturn } from "../lib/critic-source-return.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
-import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 import { admissionProgress } from "../lib/admission-progress.mjs";
 // Repository admission precedes hook input hardening and all governed effects.
@@ -48,6 +48,25 @@ export function nativeGoldfishCheckpointBlock({ commonDir, input, runner, result
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     writeFileSync(countPath, `${used + 1}\n`, { mode: 0o600 });
     return { decision: "block", reason: `Your budget checkpoint is recorded and the slice stays started. Do not stop: continue with the remaining work of your briefing from your continuation card. The recorded budget grant (${described.count - used} of ${described.count} remaining) adds up to ${described.last.extra} further tool calls. The Elephant may cancel the slice if what you are doing is not right; hand back again only at the next checkpoint or when the work is complete.` };
+  } catch { return null; }
+}
+
+/**
+ * G20-63: the model-visible SubagentStart notice for a Codex worker child that started with NO prepared dispatch state while a governed
+ * feature is in implementation (an approved delivery course exists or is yet to be written). Such a child is not host-committed and its
+ * slice is not integrated, and nothing else tells anyone: Codex runs no PreToolUse hook for spawn_agent, so the admission only happens when
+ * the Elephant runs the prepare command first. Returns the text, or null when the notice does not apply (not a Codex worker, not governed,
+ * no feature in implementation). Never throws.
+ */
+export function codexUnpreparedStartNotice({ root, input } = {}) {
+  try {
+    if (input?.hook_event_name !== "SubagentStart" || input?.agent_type !== "worker") return null;
+    const governed = resolveGovernedItemQueue({ root });
+    if (governed.status !== "required" && governed.code !== "SQ-DELIVERY-COURSE-ABSENT") return null;
+    return "Pipeline notice (G20-63): this worker started with no prepared Goldfish dispatch, so its work will not be host-committed and its slice will not be integrated. "
+      + "The Elephant must prepare a governed dispatch before spawn_agent: build the briefing with dispatch-briefing.mjs build --out scratch/<briefing>.md, run "
+      + "node <plugin-root>/scripts/codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing scratch/<briefing>.md, then call spawn_agent with the arguments it prints. "
+      + "If you are such a Goldfish, finish the briefed work, leave your changes uncommitted and return the JSON contract; the Elephant has to prepare and re-dispatch before it counts.";
   } catch { return null; }
 }
 
@@ -206,6 +225,9 @@ if (isDirectInvocation(import.meta.url)) {
   process.once("exit", () => admissionProgress("exit"));
   // T6-A: bind this Claude hook process to its own hook-observed session owner.
   if (runner === "claude") enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
+  // G20-63: the Codex SubagentStart/SubagentStop hooks bind the same hook-observed owner (the prepare command's admission bound it for the
+  // pending state); without it the stop's authority boundary refused SDC-AUTHORITY-UNAVAILABLE and nothing was host-committed.
+  else enterCodexHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
   // G20-39: the Critic subagent's stop issues the Critic Source return record (this hook, never the calling agent). Any other stop, and
   // any fault here, continues below exactly as before; this branch never blocks the stop and prints nothing on stdout.
   if (input.hook_event_name === "SubagentStop") {
@@ -228,6 +250,11 @@ if (isDirectInvocation(import.meta.url)) {
   // message, exit 0.
   try { result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result}); }
   catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: result?.commit ?? null }; }
+  // G20-63: a Codex SubagentStart that bound nothing says so to the starting child (additionalContext), not only on the hook's stderr.
+  if (runner === "codex" && input.hook_event_name === "SubagentStart" && result?.code === "NGHS-CODEX-START-UNBOUND") {
+    const notice = codexUnpreparedStartNotice({ root: process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd(), input });
+    if (notice) process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "SubagentStart", additionalContext: notice } })}\n`);
+  }
   // Slice C: a PostToolUse call is the one channel the Elephant reads, so a failed background stop is shown there.
   let stopFailure = null;
   if (runner === "claude" && input.hook_event_name === "PostToolUse" && ["Agent", "Task"].includes(input.tool_name)) {

@@ -36,6 +36,7 @@ import { fileURLToPath } from "node:url";
 // Repairs name the absolute script, so a plain terminal can run them as printed (Critic F9).
 const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
 const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
+const CODEX_PREPARE_SCRIPT = fileURLToPath(new URL("../scripts/codex-native-dispatch-prepare.mjs", import.meta.url));
 /** A cancel names a slice the queue has no row for while a native dispatch state still names it (the queue file was restored or replaced
  * after the dispatch started): a cancel cannot release that reservation, so the refusal names the repair that can. */
 function orphanReservationRepair(sliceId) {
@@ -51,6 +52,12 @@ export const NATIVE_GOLDFISH_ITEM_HOST_STATE_SCHEMA = "pipeline.native-goldfish-
 export const NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA="pipeline.native-goldfish-host-state.v3";
 const nativeStateSchema = value => [NATIVE_GOLDFISH_HOST_STATE_SCHEMA, NATIVE_GOLDFISH_ITEM_HOST_STATE_SCHEMA,NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA].includes(value);
 export const NATIVE_GOLDFISH_CODEX_START_BINDING_TTL_MS = 120_000;
+// G20-63: a Codex dispatch prepared by scripts/codex-native-dispatch-prepare.mjs (its tool_use_id is the prepared-dispatch token) waits for
+// the Elephant to re-emit the whole briefing in spawn_agent, which takes a model turn, not a hook round trip: its bind window is longer.
+// The state of a hook-admitted PreToolUse keeps the window above.
+export const NATIVE_GOLDFISH_CODEX_PREPARED_START_BINDING_TTL_MS = 300_000;
+const PREPARED_CODEX_TOKEN = /^prepared-codex-[a-f0-9]{64}$/u;
+const codexBindWindowMs = (toolUseId) => (PREPARED_CODEX_TOKEN.test(toolUseId ?? "") ? NATIVE_GOLDFISH_CODEX_PREPARED_START_BINDING_TTL_MS : NATIVE_GOLDFISH_CODEX_START_BINDING_TTL_MS);
 const RUNNERS = new Set(["claude", "codex"]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const SHA = /^[a-f0-9]{64}$/u;
@@ -322,6 +329,17 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
   if (!captured?.ok && !binding.itemDelivery) return fail(captured?.code ?? "NGHS-BASELINE");
   const commonDir = (dependencies.resolveCommonDir ?? resolveGitCommonDir)(physicalRoot);
   if (typeof commonDir !== "string") return fail("NGHS-COMMON-DIR");
+  if (runner === "codex") {
+    // G20-63 (idempotent admission): the Codex prepare command and a later PreToolUse admission of the same briefing (should a future Codex
+    // fire that hook) carry different tool_use_ids and would publish two unclaimed pending states, which SubagentStart then refuses as
+    // ambiguous. An unclaimed state of this session with the identical binding is reused; its queue row is already the same row.
+    const prior = findUnclaimedCodexPending({ commonDir, sessionId: fields.sessionId, dispatchId: binding.dispatchId, binding });
+    // A state whose bind window has passed can no longer be bound by a start: it is not reused, the normal admission below decides
+    // (its reservation of the slice, if still held, is refused there with the existing repair).
+    if (prior.ok && (dependencies.nowEpochMs ?? Date.now)() - prior.createdAtMs <= codexBindWindowMs(prior.toolUseId)) {
+      return { ok: true, code: "NGHS-ALREADY-PREPARED", sha256: prior.sha256, runner, dispatchId: binding.dispatchId };
+    }
+  }
   const state = {
     schema: delivery ? NATIVE_GOLDFISH_ITEM_HOST_STATE_SCHEMA : NATIVE_GOLDFISH_HOST_STATE_SCHEMA, runner, sessionId: fields.sessionId,
     toolUseId: fields.correlation, agentId: null, role: binding.role,
@@ -373,27 +391,62 @@ export function readNativeGoldfishPrepareFailure({ commonDir, runner, sessionId,
   } catch { return null; }
 }
 
-/** Codex's SubagentStart lacks tool_use_id: permit only one exact waiting native dispatch. */
-export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now() } = {}) {
-  if (!ID.test(input?.session_id ?? "") || !ID.test(input?.agent_id ?? "")
-    || input?.hook_event_name !== "SubagentStart" || !Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0) return fail("NGHS-CODEX-START-INPUT");
-  const dir = privateDirectory(commonDir, false);
-  const observedAgentType = typeof input.agent_type === "string" ? input.agent_type : "";
-  const expectedRole = observedAgentType.replace(/^pipeline-core:/u, "");
-  const expectedModel = typeof input.model === "string" ? input.model : "";
-  const claimedPendingFiles = new Set();
+/** The pending files a started Codex agent of this session has already claimed (their write-once agent associations). */
+function claimedCodexPendingFiles(commonDir, dir, sessionId) {
+  const claimed = new Set();
   for (const filename of readdirSync(dir)) {
     if (!filename.startsWith("agent-codex-") || !filename.endsWith(".json")) continue;
     try {
       const { value } = readPrivate(commonDir, filename);
       if (exact(value, ["schema", "runner", "sessionId", "agentId", "pendingFile", "pendingSha256", "agentType", "createdAtMs"])
         && value.schema === "pipeline.native-goldfish-host-agent-binding.v1"
-        && value.runner === "codex" && value.sessionId === input.session_id
+        && value.runner === "codex" && value.sessionId === sessionId
         && ID.test(value.agentId ?? "") && SHA.test(value.pendingSha256 ?? "")
         && typeof value.pendingFile === "string" && value.pendingFile.startsWith("pending-codex-")
-        && value.pendingFile.endsWith(".json")) claimedPendingFiles.add(value.pendingFile);
+        && value.pendingFile.endsWith(".json")) claimed.add(value.pendingFile);
     } catch { /* unreadable private association cannot claim a pending dispatch */ }
   }
+  return claimed;
+}
+
+/**
+ * G20-63: the pending Codex state of this session and dispatch that no started agent has claimed yet, or null-like `{ok:false}`.
+ * `binding` (optional) must equal the stored binding byte for byte, so a changed briefing of the same dispatch id is not "the same".
+ * Used by the Codex prepare command's readback and by the idempotent preparation below; it only reads private files.
+ */
+export function findUnclaimedCodexPending({ commonDir, sessionId, dispatchId, binding } = {}) {
+  try {
+    if (!ID.test(sessionId ?? "") || !ID.test(dispatchId ?? "")) return fail("NGHS-CODEX-PENDING-INPUT");
+    const dir = privateDirectory(commonDir, false);
+    const claimed = claimedCodexPendingFiles(commonDir, dir, sessionId);
+    const found = [];
+    for (const filename of readdirSync(dir)) {
+      if (!filename.startsWith("pending-codex-") || !filename.endsWith(".json") || claimed.has(filename)) continue;
+      try {
+        const { value, sha256 } = readPrivate(commonDir, filename);
+        if (nativeStateSchema(value.schema) && value.runner === "codex" && value.sessionId === sessionId && value.agentId === null
+          && value.binding?.dispatchId === dispatchId && Number.isSafeInteger(value.createdAtMs)
+          && (binding === undefined || JSON.stringify(value.binding) === JSON.stringify(binding))) {
+          found.push({ ok: true, code: "NGHS-CODEX-PENDING-FOUND", filename, sha256, createdAtMs: value.createdAtMs, toolUseId: value.toolUseId });
+        }
+      } catch { /* corrupt private evidence is never a match */ }
+    }
+    // The newest wins: an older unclaimed state of the same dispatch (its bind window passed) is never the one a start can bind.
+    return found.sort((a, b) => b.createdAtMs - a.createdAtMs)[0] ?? fail("NGHS-CODEX-PENDING-ABSENT");
+  } catch { return fail("NGHS-CODEX-PENDING-ABSENT"); }
+}
+
+/** Codex's SubagentStart lacks tool_use_id: permit only one exact waiting native dispatch. */
+export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now() } = {}) {
+  if (!ID.test(input?.session_id ?? "") || !ID.test(input?.agent_id ?? "")
+    || input?.hook_event_name !== "SubagentStart" || !Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0) return fail("NGHS-CODEX-START-INPUT");
+  // G20-63: no private directory yet means no dispatch was ever prepared in this repository: that is "unbound", not a hook exception.
+  let dir;
+  try { dir = privateDirectory(commonDir, false); } catch { return fail("NGHS-CODEX-START-UNBOUND"); }
+  const observedAgentType = typeof input.agent_type === "string" ? input.agent_type : "";
+  const expectedRole = observedAgentType.replace(/^pipeline-core:/u, "");
+  const expectedModel = typeof input.model === "string" ? input.model : "";
+  const claimedPendingFiles = claimedCodexPendingFiles(commonDir, dir, input.session_id);
   const candidates = [];
   for (const filename of readdirSync(dir)) {
     if (!filename.startsWith("pending-codex-") || !filename.endsWith(".json")) continue;
@@ -405,7 +458,7 @@ export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now()
         && (value.binding.adapterVersion === 2 ? value.binding.nativeAgentType === observedAgentType : value.binding.agentType === expectedRole)
         && value.binding.model === expectedModel && value.agentId === null
         && Number.isSafeInteger(value.createdAtMs) && nowEpochMs >= value.createdAtMs
-        && nowEpochMs - value.createdAtMs <= NATIVE_GOLDFISH_CODEX_START_BINDING_TTL_MS) {
+        && nowEpochMs - value.createdAtMs <= codexBindWindowMs(value.toolUseId)) {
         candidates.push({ filename, value });
       }
     } catch { /* corrupt private evidence is never a match */ }
@@ -1307,7 +1360,7 @@ export function resolveGovernedItemQueue({ root } = {}) {
       if (error?.code === "ENOENT") return { status: "refused", code: "SQ-DELIVERY-COURSE-ABSENT",
         // G20-62: the repair named the internal writer function; a Codex session imported it into a scratch script, which the
         // writer refuses outside a dispatch admission (SDC-AUTHORITY-UNAVAILABLE), and stayed stuck for hours.
-        repair: "The approved feature has no delivery course (slice-queue.json) yet. The dispatch admission writes it from the first item: build that item's briefing with dispatch-briefing.mjs build (its binding carries the item delivery: criterion locator and check paths) and dispatch it through the runner's native route (Claude Agent; Antigravity prepare then invoke_subagent). On Codex no admission runs at spawn_agent in this version (Codex runs no PreToolUse hook for spawn_agent), so the course cannot be written there yet: stop and report this refusal to the PO instead of committing the work as orchestrator. The course writer runs only inside that admission; never call it from a script." };
+        repair: "The approved feature has no delivery course (slice-queue.json) yet. The dispatch admission writes it from the first item: build that item's briefing with dispatch-briefing.mjs build (its binding carries the item delivery: criterion locator and check paths) and dispatch it through the runner's native route (Claude Agent; Antigravity prepare then invoke_subagent; Codex prepare then spawn_agent). On Codex no hook admits spawn_agent (Codex runs no PreToolUse hook for it), so the admission is run by hand before it: write the briefing with dispatch-briefing.mjs build --out scratch/<briefing>.md, then node " + CODEX_PREPARE_SCRIPT + " prepare --root <repository-root> --briefing scratch/<briefing>.md (it writes the course, the route record and the pending state, or refuses with the guard's code and repair), then spawn_agent with exactly the arguments it prints. The course writer runs only inside that admission; never call it from a script." };
       throw error;
     }
     const queue = parseStrictJson(bytes.toString("utf8"));

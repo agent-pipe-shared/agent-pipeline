@@ -38,7 +38,12 @@ For native host-commit dispatches, select the binding from the caller being
 invoked: Claude `Agent`/`Task` uses the v1 functional `agentType`; Codex
 `spawn_agent` uses the v2 `nativeAgentType: "worker"` while retaining the
 functional `pipeline-core:goldfish-implementor` or
-`pipeline-core:goldfish-mechanic` role. Insert one selected binding and one
+`pipeline-core:goldfish-mechanic` role. Codex runs no PreToolUse hook for
+`spawn_agent`, so a governed Codex Goldfish is admitted by hand first: write the
+generated briefing to `scratch/<briefing>.md`, run
+`node <plugin-root>/scripts/codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing scratch/<briefing>.md`
+(it performs the guard's admission and leaves no state when it refuses), then
+call `spawn_agent` with exactly the arguments it prints. Insert one selected binding and one
 host directive into the complete six-field Goldfish briefing. Keep unused
 runner examples out of the dispatched message so hook preparation sees one
 unambiguous marker.

@@ -6,7 +6,7 @@
     {
       "topic": "Dispatch carrier",
       "claude": "`Agent` / `Task`, functional `agentType`",
-      "codex": "`spawn_agent`, `nativeAgentType: \"worker\"`",
+      "codex": "`spawn_agent`, `nativeAgentType: \"worker\"`, after `codex-native-dispatch-prepare.mjs` (Codex runs no PreToolUse hook for `spawn_agent`)",
       "antigravity": "`invoke_subagent` (flat args); read-only roles after `antigravity-native-dispatch-prepare.mjs`, Goldfish roles from the generated briefing, no consent",
       "owner": "skills/pipeline-start/references/implementation-continuation.md; references/antigravity-native-dispatch.md"
     },

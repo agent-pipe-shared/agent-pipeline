@@ -500,10 +500,12 @@ test("AC-264 added (P0-1): an approved feature without a delivery course reports
   // called it from a scratch script (refused SDC-AUTHORITY-UNAVAILABLE). It now names the executable route instead.
   assert.match(absent.repair, /dispatch-briefing\.mjs build/u, "the repair names the briefing builder of the first item");
   // G20-63 (measured 2026-11-08, Codex 0.167.0): Codex runs no PreToolUse hook for spawn_agent, so no admission writes the
-  // course there; the repair must not offer spawn_agent as a working route and tells Codex to stop and report instead.
-  assert.match(absent.repair, /Claude Agent; Antigravity prepare then invoke_subagent/u, "the repair names the native dispatch routes that admit");
-  assert.match(absent.repair, /On Codex no admission runs at spawn_agent/u, "the repair names the Codex gap honestly");
-  assert.match(absent.repair, /stop and report this refusal to the PO/u);
+  // course there on its own. The 20c wording said the course could not be written on Codex and told it to stop and report; G20-63
+  // (candidate 20d) restates it in place: the repair names the agent-run prepare command, then spawn_agent (same assertion count).
+  assert.match(absent.repair, /Claude Agent; Antigravity prepare then invoke_subagent; Codex prepare then spawn_agent/u, "the repair names the native dispatch routes that admit, Codex included");
+  assert.match(absent.repair, /On Codex no hook admits spawn_agent[^.]*, so the admission is run by hand before it/u, "the repair names the Codex gap and its remedy honestly");
+  assert.match(absent.repair, /codex-native-dispatch-prepare\.mjs prepare --root <repository-root> --briefing scratch\/<briefing>\.md[^.]*then spawn_agent with exactly the arguments it prints/u);
+  assert.doesNotMatch(absent.repair, /cannot be written there yet|stop and report this refusal to the PO/u, "the 20c wording that Codex cannot write the course is gone");
   assert.doesNotMatch(absent.repair, /prepareGovernedItemQueue/u, "the repair never names the internal writer");
   symlinkSync(join(root, "nowhere.json"), join(root, "specs/unit/slice-queue.json"));
   assert.equal(resolveGovernedItemQueue({ root }).code, "SQ-DELIVERY-STATE-UNAVAILABLE", "only a missing file is an absent course");
