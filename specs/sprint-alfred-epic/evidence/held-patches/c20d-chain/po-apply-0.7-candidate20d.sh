@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 20d: 11 held patches exported from the build clone chain 9443438b0..92c111b49
+# PO apply script for candidate 20d: 12 held patches exported from the build clone chain 9443438b0..ed00cb2de
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -25,6 +25,7 @@ step 08-d0c27953d 'feat(codex): an agent-run prepare command runs the governed G
 step 09-7f7daadaa 'feat(dispatch): a documentation-only module names one owned document as its item check and the host finalize verifies it (G20-65)'
 step 10-f0dfb8187 'feat(onboarding): the onboarding consent names every agent step up to the design approval, is recorded with a quote, and covered actions print coveredBy (G20-45)'
 step 11-92c111b49 'fix(guard): a read of a missing in-root path is an existence probe, not a refusal (G20-67)'
+step 12-ed00cb2de 'fix(pipeline-start): the start skill names the consent record step after the driver'"'"'s mutations (G20-45)'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

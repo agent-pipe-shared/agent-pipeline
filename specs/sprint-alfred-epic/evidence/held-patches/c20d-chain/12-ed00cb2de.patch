@@ -1,0 +1,13 @@
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 3987c8389af2a5b7fbdaba6ef099b19225aa6dce..729115b12f46ace3a720858d6e2daf630f634d10 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -30,7 +30,7 @@ For `pipeline-governance-inactive`, ask the human once whether this project
+ should use the Pipeline. That question lists in short what agreeing
+ installs and activates, git hooks included: relay `consentQuestion` verbatim. Only after an affirmative answer, execute the exact
+ read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
+-subsequent consent and mutations. A decline leaves the project inactive.
++mutations; then run `consentRecordAction`. A decline leaves the project inactive.
+ 
+ Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
+ carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`

@@ -839,18 +839,21 @@ index fce82d203..37900d198 100644
    if(output.schema===ENROLLMENT_GIT_CREATION_SCHEMA)return ["planned","created","retained","refused"].includes(output.status)?0:1;
    // Wave 4 step 4 (NVA-W4-COORD-2): intake-generate-plan is `{ schema, root,
 diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
-index 96af6fd4d..3987c8389 100644
+index 96af6fd4d..729115b12 100644
 --- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
 +++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
-@@ -28,7 +28,7 @@ conflicting or unknown carriers stop — Critic is closed, never Elephant.
+@@ -28,9 +28,9 @@ conflicting or unknown carriers stop — Critic is closed, never Elephant.
  
  For `pipeline-governance-inactive`, ask the human once whether this project
  should use the Pipeline. That question lists in short what agreeing
 -installs and activates, git hooks included. Only after an affirmative answer, execute the exact
 +installs and activates, git hooks included: relay `consentQuestion` verbatim. Only after an affirmative answer, execute the exact
  read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
- subsequent consent and mutations. A decline leaves the project inactive.
+-subsequent consent and mutations. A decline leaves the project inactive.
++mutations; then run `consentRecordAction`. A decline leaves the project inactive.
  
+ Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
+ carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`
 diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
 index 33c103448..2aca3e746 100644
 --- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
