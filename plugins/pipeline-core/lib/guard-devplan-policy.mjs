@@ -571,7 +571,7 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = 
   const lifecycleReason = lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"
     ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
     : lifecycle.status === "awaiting-approval"
-      ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
+      ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`reopen-design --by <name>\`.`
       : lifecycle.status === "approved"
         ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
         : "The feature is still in draft design and has no implementation authority.");
@@ -592,6 +592,16 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = 
 }
 
 const STAGED_PATH_MAX_BYTES = 16 * 1024;
+
+// The Codex runtime projection onboarding generates. Committing it is what leaves the tree clean, so the
+// commit boundary admits exactly these paths in a draft lifecycle. Deliberately not part of the onboarding
+// scaffold set: that set also opens the Edit/Write and shell lanes, and these files have one writer.
+const GENERATED_CODEX_PROJECTION_PATHS = new Set([
+  ".codex/config.toml",
+  ".codex/agents/implementor.toml",
+  ".codex/agents/critic.toml",
+  ".codex/agents/consult-advisor.toml",
+]);
 
 function isHookSettingsPath(path) {
   return typeof path === "string" && /^\.claude\/settings[^/]*\.json$/iu.test(path);
@@ -768,6 +778,8 @@ export function evaluateStagedDevPlanPaths({
         return unavailable("PIPELINE-STAGED-SETTINGS-INVALID", "the base or staged hook-settings JSON could not be safely compared");
       }
     }
+
+    if (GENERATED_CODEX_PROJECTION_PATHS.has(path)) continue;
 
     let result;
     try { result = devPlanGateVerdictFn({ filePath: path, projectDir }); }

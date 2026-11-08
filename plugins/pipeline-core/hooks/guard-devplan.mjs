@@ -569,7 +569,7 @@ const lifecycleReason = ledgerAuthorityUnresolved
   : lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"
   ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
   : lifecycle.status === "awaiting-approval"
-    ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
+    ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`reopen-design --by <name>\`.`
     : lifecycle.status === "approved"
       ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
       : "The feature is still in draft design and has no implementation authority.");

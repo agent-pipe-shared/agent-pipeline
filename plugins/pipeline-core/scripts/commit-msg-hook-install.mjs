@@ -149,8 +149,8 @@ import { pathToFileURL } from "node:url";
 
 const PLUGIN_LIB_DIR = ${lib};
 
-function block(lines) {
-  console.error("BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.");
+function block(lines, headline = "commit message violates GIT-03.") {
+  console.error("BLOCKED (agent-pipeline commit-msg): " + headline);
   for (const line of lines) console.error(\`  - \${line}\`);
   console.error("Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.");
   process.exitCode = 1;
@@ -303,7 +303,12 @@ async function main() {
     const findings = Array.isArray(stagedLifecycle?.findings) && stagedLifecycle.findings.length
       ? stagedLifecycle.findings.map((finding) => String(finding?.code ?? stagedLifecycle?.code ?? "PIPELINE-STAGED-LIFECYCLE-UNAVAILABLE") + (finding?.path ? " (" + finding.path + ")" : ""))
       : [stagedLifecycle?.code ?? "PIPELINE-STAGED-LIFECYCLE-UNAVAILABLE"];
-    block(["staged lifecycle policy denied or could not verify this commit: " + findings.join(", ") + "."]);
+    const firstReason = stagedLifecycle?.findings?.find((finding) => typeof finding?.reason === "string")?.reason;
+    block(
+      ["staged lifecycle policy denied or could not verify this commit: " + findings.join(", ") + ".",
+        ...(firstReason ? [firstReason.slice(0, 400)] : [])],
+      "a staged path is not committable in the current lifecycle. The commit message is not the problem.",
+    );
     return;
   }
   // D223: a correction commit on top of a finished Critic round whose lineage is not registered makes that lineage unregisterable.

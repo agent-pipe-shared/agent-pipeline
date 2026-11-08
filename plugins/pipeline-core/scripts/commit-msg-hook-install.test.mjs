@@ -261,6 +261,8 @@ test("commit hook blocks unapproved staged implementation paths but still permit
   const denied = commitWithStagedMessage("feat: blocked implementation\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
   assert.notEqual(denied.status, 0);
   assert.match(denied.stderr, /GUARD-DEVPLAN-LIFECYCLE/);
+  assert.match(denied.stderr, /not committable in the current lifecycle\. The commit message is not the problem/);
+  assert.doesNotMatch(denied.stderr, /violates GIT-03/);
 
   assert.equal(git("reset", "-q").status, 0);
   assert.equal(git("add", ".claude/pipeline.yaml", ".claude/pipeline-state.json", "docs/notes.md").status, 0);

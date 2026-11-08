@@ -618,7 +618,7 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   writeState(dir, AWAITING_AUTHORITY_STATE);
   check("DP26 block  awaiting-approval exact PRD authority", "Edit", AUTHORITY_PLAN_PATH, BLOCK, {
     projectDir: dir,
-    stderrIncludes: ["awaiting-approval", "immutable"],
+    stderrIncludes: ["awaiting-approval", "immutable", "cancel-submitted-plan --by <name> --submission-sha256 ", "Only an already signed design goes through"],
   });
   check("DP26b block  awaiting-approval exact Spec authority", "Edit", AUTHORITY_SPEC_PATH, BLOCK, {
     projectDir: dir,

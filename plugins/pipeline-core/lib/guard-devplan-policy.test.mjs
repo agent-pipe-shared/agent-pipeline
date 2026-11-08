@@ -50,6 +50,19 @@ test("staged lifecycle policy blocks indirect implementation and package outputs
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("the generated Codex projection is committable in a draft lifecycle, and no other path under .codex is", () => {
+  const root = lifecycleFixture();
+  try {
+    const generated = [".codex/config.toml", ".codex/agents/implementor.toml", ".codex/agents/critic.toml", ".codex/agents/consult-advisor.toml"];
+    assert.deepEqual(evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: generated }), { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings: [] });
+    for (const path of [".codex/agents/other.toml", ".codex/hooks.mjs", "sub/.codex/config.toml"]) {
+      const result = evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: [path] });
+      assert.equal(result.code, "PIPELINE-STAGED-LIFECYCLE-BLOCKED", path);
+    }
+    assert.equal(devPlanGateVerdict({ filePath: ".codex/config.toml", projectDir: root }).verdict, "block", "the write lane stays closed");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("staged lifecycle policy adds no independent approval gate after the existing policy allows a source commit", () => {
   const root = lifecycleFixture();
   try {
