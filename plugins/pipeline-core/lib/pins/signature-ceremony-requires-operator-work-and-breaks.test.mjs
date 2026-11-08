@@ -586,11 +586,23 @@ function why(out) {
 function assertSigningBlocks(out) {
   const note = why(out);
   // Revised 2026-10-27 (slice A): one operator block (sign-intent) per refusal; the proof import is an agent action.
-  assert.deepEqual([...out.stderr.matchAll(/^Step: (\S+)$/gmu)].map((m) => m[1]), ["sign-intent"], note);
-  assert.equal(countOf(out.stderr, "POSIX:"), 1, note);
-  assert.equal(countOf(out.stderr, "PowerShell:"), 1, note);
-  assert.equal(countOf(out.stderr, 'eval "$CMD"'), 1, note);
-  assert.equal(countOf(out.stderr, "Invoke-Expression $CMD"), 1, note);
+  // QG-04 restatement (candidate 20b, FV red): G20-16 (renderPoTerminalCommand) renders the ONE sign-intent step for the PO's own
+  // terminal: inside WSL as two alternatives of the same argv (option A: WSL terminal / POSIX, option B: Windows PowerShell via
+  // wsl.exe) under "Copy exactly ONE of the two blocks"; on native Windows as one PowerShell block; elsewhere as one POSIX block.
+  // The expectation follows the hook's inherited environment exactly, so no host may pass with a block too many or too few.
+  const wsl = process.platform !== "win32" && typeof process.env.WSL_DISTRO_NAME === "string"
+    && /^[A-Za-z0-9._-]{1,64}$/u.test(process.env.WSL_DISTRO_NAME);
+  const expected = process.platform === "win32"
+    ? { steps: ["sign-intent (PowerShell)"], posix: 0, powershell: 1 }
+    : wsl
+      ? { steps: ["sign-intent, option A: WSL terminal", "sign-intent, option B: Windows PowerShell"], posix: 1, powershell: 1 }
+      : { steps: ["sign-intent"], posix: 1, powershell: 0 };
+  assert.deepEqual([...out.stderr.matchAll(/^Step: (.+)$/gmu)].map((m) => m[1]), expected.steps, note);
+  assert.equal(countOf(out.stderr, "Copy exactly ONE of the two blocks below"), wsl ? 1 : 0, note);
+  assert.equal(countOf(out.stderr, "POSIX:"), expected.posix, note);
+  assert.equal(countOf(out.stderr, "PowerShell:"), expected.powershell, note);
+  assert.equal(countOf(out.stderr, 'eval "$CMD"'), expected.posix, note);
+  assert.equal(countOf(out.stderr, "Invoke-Expression $CMD"), expected.powershell, note);
 }
 
 describe("commit-scoped override course through the real pre-commit hook (AC-258)", () => {
