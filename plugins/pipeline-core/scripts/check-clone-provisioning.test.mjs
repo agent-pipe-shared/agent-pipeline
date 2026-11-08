@@ -21,6 +21,14 @@ test("checkCloneProvisioning handles non-git root cleanly", () => {
   assert.ok(report.checks.every((c) => c.status === "unresolved" || c.status === "absent"));
 });
 
+test("G20-53: the profile receipt repair names the agent-admitted repair plan for this root, never the source publisher", () => {
+  const report = checkCloneProvisioning("/tmp");
+  const receipt = report.checks.find((check) => check.id === "po-profile-receipt");
+  assert.match(receipt.repairAction, /po-gate-profile-repair\.mjs" plan --root "/u);
+  assert.ok(receipt.repairAction.endsWith(`--root "${"/tmp"}"`), receipt.repairAction);
+  assert.doesNotMatch(receipt.repairAction, /setup\.mjs/u);
+});
+
 test("hook projection preserves ownership and makes only managed plans current", () => {
   const spec = (status) => ({ id: "fixture-hook", name: "fixture", installer: "fixture.mjs", planInstall: () => ({ status, hookPath: "/repo/hooks/fixture", detail: "fixture detail" }) });
   assert.equal(projectHookProvisioning({ spec: spec("ready"), rootDir: "/repo" }).status, "install");

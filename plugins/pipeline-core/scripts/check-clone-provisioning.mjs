@@ -18,6 +18,13 @@ import { planInstall as planCommitMsgHookInstall } from "./commit-msg-hook-insta
 
 export const CLONE_PROVISIONING_REPORT_SCHEMA = "pipeline.clone-provisioning-report.v1";
 
+// C20b G20-53: the receipt repair names the agent-admitted repair route (its plan returns the exact apply action);
+// the source-checkout publisher is refused to an agent and does not exist in a consumer project.
+const PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("./po-gate-profile-repair.mjs", import.meta.url));
+function profileReceiptRepairAction(root) {
+  return `node "${PROFILE_REPAIR_SCRIPT}" plan --root "${root}"`;
+}
+
 /** The hooks readiness GATES on. Single source for assessment and the clone apply step. */
 export const MANDATORY_HOOK_IDS = Object.freeze(["pre-commit-hook", "commit-msg-hook"]);
 /** AC-116 / PO decision 13: hooks the clone apply step installs but readiness never gates on (the pre-push backstop). */
@@ -151,7 +158,7 @@ export function checkCloneProvisioning(rootDir = process.cwd(), options = {}) {
       status: "provisioning-required",
       checks: [
         ...HOOK_SPECS.map((spec) => ({ id: spec.id, status: "unresolved", path: `hooks/${spec.name}`, repairAction: "git init" })),
-        { id: "po-profile-receipt", status: "absent", path: "agent-pipeline/po-gate/profile-receipt.json", repairAction: "node setup.mjs --publish-po-profile" },
+        { id: "po-profile-receipt", status: "absent", path: "agent-pipeline/po-gate/profile-receipt.json", repairAction: profileReceiptRepairAction(resolvedRoot) },
         { id: "private-state-directory", status: "absent", path: "agent-pipeline", repairAction: "mkdir -p .git/agent-pipeline" },
       ],
     };
@@ -169,7 +176,7 @@ export function checkCloneProvisioning(rootDir = process.cwd(), options = {}) {
       id: "po-profile-receipt",
       status: "absent",
       path: receiptPath,
-      repairAction: "node setup.mjs --publish-po-profile",
+      repairAction: profileReceiptRepairAction(resolvedRoot),
     });
   } else {
     let valid = false;
@@ -190,7 +197,7 @@ export function checkCloneProvisioning(rootDir = process.cwd(), options = {}) {
       id: "po-profile-receipt",
       status: valid ? "present" : "invalid",
       path: receiptPath,
-      repairAction: valid ? null : "node setup.mjs --publish-po-profile",
+      repairAction: valid ? null : profileReceiptRepairAction(resolvedRoot),
     });
   }
 
