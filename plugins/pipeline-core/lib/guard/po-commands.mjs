@@ -326,9 +326,13 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
         return target !== null && !pathInside(root, target);
       });
     }
-    return written.some((arg) => {
+    // G20-60: every operand is judged by the path it resolves to, a relative `../..` escape included (`rm -rf ../../Library`
+    // was admitted while `rm -rf ~/Library` was refused). Only a symbolic link's TARGET operand of `ln` is not a write.
+    const lastOperand = written.filter((arg) => !arg.startsWith("-")).at(-1);
+    const judged = executable === "ln" ? written.filter((arg) => isShellExternalPathToken(arg) || arg === lastOperand) : written;
+    return judged.some((arg) => {
       const target = commandPath(arg, root);
-      return target !== null && isShellExternalPathToken(arg) && !pathInside(root, target);
+      return target !== null && !pathInside(root, target);
     });
   }
   if (executable === "sed" && args.some((arg) => /^-[^-]*i/u.test(arg) || /^--in-place(?:=|$)/u.test(arg))) {

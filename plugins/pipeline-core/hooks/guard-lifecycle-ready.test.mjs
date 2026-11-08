@@ -4728,6 +4728,23 @@ test("GUARDFIX-1: a null-device stderr suppressor is never itself a cross-reposi
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// G20-60 (probed 2026-11-08 against the installed guard after the PO asked about a public "xargs dirname -> rm -rf
+// ~/Library" incident): `rm -rf ~/Library` was refused, `rm -rf ../../Library` was admitted, because only absolute and
+// `~` operands were judged. Every operand of a mutating verb is now judged by the path it resolves to.
+test("G20-60: a relative operand that escapes the project root is a cross-repository mutation; one inside is not", () => {
+  const path = root();
+  try {
+    for (const command of ["rm -rf ../../Library", "rm -rf ../sibling", "mv notes.md ../notes.md", "touch ../x", "chmod 777 ../x",
+      "mkdir -p ../../made", "ln -s target ../link"]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
+    }
+    for (const command of ["rm -rf scratch/probe-dir", "rm -rf ./scratch/x", "mkdir -p scratch/a/../b", "chmod 644 docs/a.md",
+      "ln -s ../outside-target scratch/link"]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("partial PO authority rebind admits only the exact read-only planner", () => {
   const path = root();
   try {
