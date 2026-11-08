@@ -338,7 +338,10 @@ export const DEFAULT_EXEMPT_PREFIXES = Object.freeze(["docs/", "specs/", ".claud
 // committable in the draft lifecycle. Kept separate from DEFAULT_EXEMPT_PREFIXES (which generated
 // guidance mirrors). Exact files match exactly; no product path (src/, tests/) is admitted.
 // C19-Q8: the onboarding seeds `.gitattributes` (evidence line endings) in the first commit, so it belongs here with `.gitignore`.
-const ONBOARDING_SCAFFOLD_EXACT_PATHS = Object.freeze([".gitignore", ".gitattributes", "AGENTS.md", "pipeline.user.yaml"]);
+// C20b G20-52 (live Claude greenfield 2026-11-07): the onboarding seeds `VERSION` (consumer release = version tag, G20-42) in the same
+// scaffold, and the staged-commit check refused it GUARD-DEVPLAN-LIFECYCLE twice (scaffold commit, architecture commit); it is
+// release coordination, not product implementation, so it belongs here too.
+const ONBOARDING_SCAFFOLD_EXACT_PATHS = Object.freeze([".gitignore", ".gitattributes", "AGENTS.md", "pipeline.user.yaml", "VERSION"]);
 const ONBOARDING_SCAFFOLD_PREFIXES = Object.freeze(["architecture/", "project/"]);
 
 /**

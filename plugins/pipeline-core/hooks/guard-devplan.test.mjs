@@ -1052,6 +1052,9 @@ console.log("PASS  private Advisor transaction and exact final-approval matrix i
     [".gitignore", true],
     [".gitattributes", true],
     ["sub/.gitattributes", false],
+    // C20b G20-52: the onboarding-seeded VERSION is scaffold; a nested one is not.
+    ["VERSION", true],
+    ["sub/VERSION", false],
     ["project/pipeline.json", true],
     ["src/implementation.mjs", false],
     ["lib/production.mjs", false],
