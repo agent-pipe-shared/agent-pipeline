@@ -39,6 +39,10 @@ test("DME02b a missing model names the dispatched agent type's own duty selector
   assert.equal(critic.findings[0].code, "DISPATCH-MODEL-MISSING");
   assert.match(critic.findings[0].message, /pipeline-core:critic serves duty\.critic_normal = "opus" \/ duty\.critic_high_risk = "opus"/u);
   assert.doesNotMatch(critic.findings[0].message, /implementation work uses/u);
+  assert.match(critic.findings[0].message, /Batch scope \(MP-07\):.*critical architecture or security.*DISPATCH-OPUS-NO-BATCH-RATIONALE/u);
+  const sonnetCritic = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:critic", model: undefined,
+    routeSource: routes({ critic_normal: "sonnet", critic_high_risk: "sonnet" }) });
+  assert.doesNotMatch(sonnetCritic.findings[0].message, /MP-07/u);
   const mechanic = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-mechanic", model: undefined, routeSource: routes() });
   assert.match(mechanic.findings[0].message, /pipeline-core:goldfish-mechanic serves duty\.mechanic = "haiku"/u);
   const generic = evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model: undefined, routeSource: routes() });

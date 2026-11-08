@@ -107,8 +107,12 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
   const ownDuties = AGENT_TYPE_DUTIES[subagentType];
   const ownRoutes = ownDuties ? dutyRoutes.filter((route) => ownDuties.includes(route.taskRoute.slice("duty.".length))) : [];
   if (!hasModel) {
+    // The same greenfield then met DISPATCH-OPUS-NO-BATCH-RATIONALE (MP-07, dispatch-policy.mjs) after following an Opus route,
+    // so a Critic route on the Opus tier names that prompt condition in the same breath.
+    const opusCritic = subagentType === "pipeline-core:critic" && ownRoutes.some((route) => /\bopus\b/iu.test(route.selector.value));
     const routeHint = ownRoutes.length > 0
       ? `${subagentType} serves ${ownRoutes.map((route) => `${route.taskRoute} = "${route.selector.value}"`).join(" / ")}`
+        + (opusCritic ? `; an Opus Critic prompt also needs a non-empty \`Batch scope (MP-07):\` line and a rationale line naming critical architecture or security (else DISPATCH-OPUS-NO-BATCH-RATIONALE)` : "")
       : `implementation work uses duty.implement = "${defaultSelector}"`;
     return { ok: false, skipped: null, findings: [{
       code: "DISPATCH-MODEL-MISSING",
