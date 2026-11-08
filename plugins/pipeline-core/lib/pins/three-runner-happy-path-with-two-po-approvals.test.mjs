@@ -34,6 +34,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { readState, run } from "../../scripts/pipeline-state.mjs";
 import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
+import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../critical-action-approval-request.mjs";
+import { awaitSignatureFields } from "../signed-proof-wait.mjs";
 import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
 import { createGovernanceScopeController } from "../governance-scope.mjs";
 import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
@@ -744,6 +746,137 @@ test("G20-30: the proof wait is admitted by exact argv only, and only for the pl
     "timeout over bound": wait("--root", root, "--proof", `scratch/x-proof.json`, "--timeout", "601"),
     "extra flag": wait("--root", root, "--proof", `scratch/x-proof.json`, "--verbose", "1"),
     "repository copy": `node ${join(root, "scripts/proof-wait.mjs")} --root ${root} --proof scratch/x-proof.json`,
+  };
+  for (const [label, command] of Object.entries(refused)) assert.equal(isSanctionedLifecycleCommand(command, root), false, label);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// C20e G20-76 (AC-108): authorize-critical mirrors request/proof into ONE fixed name per repository and kind, so an older
+// signature's mirror still sitting in scratch/ must not end the wait for a new signature. With the expected subject the wait
+// counts a proof as present only when its sibling request carries exactly that subject AND the proof signs that request's
+// intent. The mirror files below are built in the test's own temporary project, with the real naming.
+// ---------------------------------------------------------------------------------------------------------------------
+const G2076_CANDIDATE = { commit: "a".repeat(40), tree: "b".repeat(40) };
+function g2076Subject(destination) {
+  return criticalActionSubjectSha256({ kind: "push", candidate: G2076_CANDIDATE, subject: { sourceCommit: G2076_CANDIDATE.commit, remote: "origin", destination } });
+}
+function g2076Request(destination, expiresAt) {
+  return createCriticalActionApprovalRequest({
+    candidate: G2076_CANDIDATE, featureId: "f20e", planBytes: Buffer.from("plan\n"), specBytes: Buffer.from("spec\n"),
+    action: { kind: "push", subjectSha256: g2076Subject(destination), expiresAt },
+  });
+}
+function g2076Proof(request) {
+  return { schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "fixture-key", publicKey: "fixture-public-key", signatureBase64: "Zml4dHVyZQ==" };
+}
+function g2076Project() {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "g2076-")));
+  mkdirSync(join(root, "scratch"));
+  const write = (name, value) => writeFileSync(join(root, "scratch", name), `${JSON.stringify(value, null, 2)}\n`);
+  return { root, requestRel: "scratch/critical-push-request-0123456789ab.json", proofRel: "scratch/critical-push-proof-0123456789ab.json",
+    mirror: (request, proof = g2076Proof(request)) => { write("critical-push-request-0123456789ab.json", request); write("critical-push-proof-0123456789ab.json", proof); },
+    writeRequest: (request) => write("critical-push-request-0123456789ab.json", request),
+    writeProof: (proof) => write("critical-push-proof-0123456789ab.json", proof) };
+}
+function waitWithSubjectCli(root, proofRel, extra, seconds = 1) {
+  const child = spawnSync(process.execPath, [PROOF_WAIT_SCRIPT, "--root", root, "--proof", proofRel, "--timeout", String(seconds), ...extra], { encoding: "utf8", timeout: 60000 });
+  return { status: child.status, out: child.stdout.trim() === "" ? null : JSON.parse(child.stdout), stderr: child.stderr };
+}
+
+test("G20-76: an older signature's mirror never ends the wait for the expected subject; the typed timeout names the move-aside recovery", () => {
+  const wanted = g2076Subject("refs/heads/new");
+  const older = g2076Request("refs/heads/old", "2026-11-08T10:00:00.000Z");
+  // (a) request and proof both from the older signature: another subject.
+  const bothOld = g2076Project();
+  bothOld.mirror(older);
+  const staleBoth = waitWithSubjectCli(bothOld.root, bothOld.proofRel, ["--subject", wanted]);
+  assert.equal(staleBoth.status, 2, staleBoth.stderr);
+  assert.equal(staleBoth.out.code, "PROOF-WAIT-STALE", "a file existed at the path but never matched the expected subject");
+  assert.match(staleBoth.out.repair, /critical-push-/u, "the repair names the mirror files of the older signature");
+  assert.match(staleBoth.out.repair, /rename|move/iu);
+  assert.doesNotMatch(staleBoth.out.repair, /delete|\brm\b/iu, "set aside, never deleted");
+  assert.match(staleBoth.out.repair, /sign-intent/u, "then the one signing command again");
+  assert.match(staleBoth.out.repair, /proof-wait\.mjs/u, "then the same wait");
+  assert.ok(staleBoth.out.repair.includes(wanted), "the same wait keeps the expected subject");
+  // (b) a proof file with its sibling request missing: not signed yet.
+  const noRequest = g2076Project();
+  noRequest.writeProof(g2076Proof(older));
+  assert.equal(waitWithSubjectCli(noRequest.root, noRequest.proofRel, ["--subject", wanted]).out.code, "PROOF-WAIT-STALE");
+  // (c) the new request is already written but the proof is still the older one (request is mirrored before proof).
+  const window = g2076Project();
+  window.mirror(g2076Request("refs/heads/new", "2026-11-08T11:00:00.000Z"), g2076Proof(older));
+  assert.equal(waitWithSubjectCli(window.root, window.proofRel, ["--subject", wanted]).out.code, "PROOF-WAIT-STALE", "the proof's own intent must belong to the matching request");
+  // (d) a sibling request that is not a critical-action request, not JSON, or has no subject is not signed yet either.
+  for (const [label, content] of [["other schema", JSON.stringify({ schema: "pipeline.other.v1", action: { subjectSha256: wanted } })],
+    ["not JSON", "not json at all"], ["no subject", JSON.stringify({ schema: "pipeline.critical-action-approval-request.v1", action: { kind: "push" }, approvalIntent: { sha256: older.approvalIntent.sha256 } })]]) {
+    const odd = g2076Project();
+    odd.writeProof(g2076Proof(older));
+    writeFileSync(join(odd.root, odd.requestRel), content);
+    assert.equal(waitWithSubjectCli(odd.root, odd.proofRel, ["--subject", wanted]).out.code, "PROOF-WAIT-STALE", label);
+  }
+  // A path with nothing at all is still the plain timeout: no file existed, so there is no older signature to move aside.
+  const empty = g2076Project();
+  assert.equal(waitWithSubjectCli(empty.root, empty.proofRel, ["--subject", wanted]).out.code, "PROOF-WAIT-TIMEOUT");
+});
+
+test("G20-76: the matching mirror ends the wait at once; without a subject the wait behaves exactly as before", () => {
+  const wanted = g2076Subject("refs/heads/new");
+  const matching = g2076Project();
+  matching.mirror(g2076Request("refs/heads/new", "2026-11-08T11:00:00.000Z"));
+  const present = waitWithSubjectCli(matching.root, matching.proofRel, ["--subject", wanted], 5);
+  assert.equal(present.status, 0, present.stderr);
+  assert.equal(present.out.status, "proof-present");
+  // No subject: a caller that does not know it still gets the old behaviour, an older mirror included.
+  const older = g2076Project();
+  older.mirror(g2076Request("refs/heads/old", "2026-11-08T10:00:00.000Z"));
+  const legacy = waitWithSubjectCli(older.root, older.proofRel, [], 5);
+  assert.equal(legacy.status, 0, legacy.stderr);
+  assert.equal(legacy.out.status, "proof-present");
+  const none = g2076Project();
+  assert.equal(waitWithSubjectCli(none.root, none.proofRel, []).out.code, "PROOF-WAIT-TIMEOUT");
+  // A file that is not a proof stays PROOF-WAIT-INVALID with a subject, too.
+  const invalid = g2076Project();
+  invalid.writeProof({ schema: "something-else" });
+  assert.equal(waitWithSubjectCli(invalid.root, invalid.proofRel, ["--subject", wanted]).out.code, "PROOF-WAIT-INVALID");
+});
+
+test("G20-76: --subject is a closed flag; a malformed or repeated value is PROOF-WAIT-ARGS", () => {
+  const project = g2076Project();
+  for (const extra of [["--subject", "abc"], ["--subject", "A".repeat(64)], ["--subject", "a".repeat(63)], ["--subject", "a".repeat(64), "--subject", "a".repeat(64)]]) {
+    const refused = waitWithSubjectCli(project.root, project.proofRel, extra);
+    assert.equal(refused.status, 2, extra.join(" "));
+    assert.equal(refused.out.code, "PROOF-WAIT-ARGS", extra.join(" "));
+  }
+});
+
+test("G20-76: awaitSignatureFields adds --subject after --timeout only when it is given, and says the wait ends only for that subject", () => {
+  const subject = g2076Subject("refs/heads/new");
+  const plain = awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json" });
+  assert.deepEqual(plain.waitAction.argv.slice(1), ["--root", "/p", "--proof", "scratch/critical-push-proof-0123456789ab.json", "--timeout", "120"], "no subject: the argv is unchanged");
+  assert.doesNotMatch(plain.afterSigning, /subject/iu);
+  const bound = awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json", subjectSha256: subject });
+  assert.deepEqual(bound.waitAction.argv.slice(1, 5), ["--root", "/p", "--proof", "scratch/critical-push-proof-0123456789ab.json"], "the first four argv entries keep their place");
+  assert.deepEqual(bound.waitAction.argv.slice(5), ["--timeout", "120", "--subject", subject]);
+  assert.match(bound.afterSigning, /only for the expected subject/u);
+  assert.throws(() => awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json", subjectSha256: "nope" }), /subject/iu);
+});
+
+test("G20-76: the shell grammar admits the proof wait with --subject only as a 64 hex value after --timeout", async () => {
+  const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
+  const root = join(DESIGN_REPO_ROOT, "scratch", ".proof-wait-fixture");
+  const subject = "c".repeat(64);
+  const proof = `scratch/critical-push-proof-0123456789ab.json`;
+  const wait = (...args) => `node ${PROOF_WAIT_SCRIPT} ${args.join(" ")}`;
+  for (const command of [wait("--root", root, "--proof", proof, "--timeout", "120", "--subject", subject), wait("--root", root, "--proof", proof, "--subject", subject)]) {
+    assert.equal(isSanctionedLifecycleCommand(command, root), true, command);
+  }
+  const refused = {
+    "short subject": wait("--root", root, "--proof", proof, "--timeout", "120", "--subject", "c".repeat(63)),
+    "uppercase subject": wait("--root", root, "--proof", proof, "--timeout", "120", "--subject", "C".repeat(64)),
+    "subject before timeout": wait("--root", root, "--proof", proof, "--subject", subject, "--timeout", "120"),
+    "repeated subject": wait("--root", root, "--proof", proof, "--timeout", "120", "--subject", subject, "--subject", subject),
+    "subject without value": wait("--root", root, "--proof", proof, "--timeout", "120", "--subject"),
+    "timeout over bound with subject": wait("--root", root, "--proof", proof, "--timeout", "601", "--subject", subject),
   };
   for (const [label, command] of Object.entries(refused)) assert.equal(isSanctionedLifecycleCommand(command, root), false, label);
 });

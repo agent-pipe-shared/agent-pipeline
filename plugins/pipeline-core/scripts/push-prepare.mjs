@@ -40,7 +40,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { awaitSignatureFields } from "../lib/signed-proof-wait.mjs";
+import { awaitSignatureFields, isProofSubjectSha256 } from "../lib/signed-proof-wait.mjs";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -1001,9 +1001,10 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
 
   report.subjectSha256 = subjectSha256;
   // G20-30: the signature lands in the scratch mirror this report already names; the agent waits for that one file itself
-  // (the PO reports nothing back) and then runs the approve-push line below.
+  // (the PO reports nothing back) and then runs the approve-push line below. G20-76: the mirror name is one fixed fingerprint per
+  // repository, so the wait carries the prepared subject and ends only for a proof whose request carries exactly it.
   const proofRelative = relative(dir, artifacts.proof).split(sep).join("/");
-  const awaitFields = /^scratch\//u.test(proofRelative) ? awaitSignatureFields({ root: resolve(dir), proofPath: proofRelative }) : null;
+  const awaitFields = /^scratch\//u.test(proofRelative) ? awaitSignatureFields({ root: resolve(dir), proofPath: proofRelative, subjectSha256: isProofSubjectSha256(subjectSha256) ? subjectSha256 : null }) : null;
   if (awaitFields !== null) report.awaitSignature = awaitFields;
   return {
     ok: true,

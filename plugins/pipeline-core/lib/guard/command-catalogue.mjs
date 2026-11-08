@@ -625,15 +625,24 @@ function sanctionedSessionAuthorityRepairReadArgs(args, root) {
 }
 
 // C20 G20-30: scripts/proof-wait.mjs observes one named proof file (read-only, never prints it, never verifies it). Exact argv only:
-// `--root <root> --proof <scratch/<name>proof<name>.json | /abs/proof-<64 hex>.json> [--timeout <1-600>]`, no dot segment, no backslash.
+// `--root <root> --proof <scratch/<name>proof<name>.json | /abs/proof-<64 hex>.json> [--timeout <1-600>] [--subject <64 hex>]`, no dot segment, no backslash.
 function sanctionedProofWaitArgs(args, root) {
   if (args[0] !== "--root" || args[1] !== root || args[2] !== "--proof" || typeof args[3] !== "string") return false;
   const proof = args[3];
   if (proof.length > 400 || /[\u0000-\u001f\u007f\\]/u.test(proof) || proof.split("/").some((part) => part === "." || part === "..")) return false;
   const shaped = proof.startsWith("/") ? /\/proof-[a-f0-9]{64}\.json$/u.test(proof) : /^scratch\/[A-Za-z0-9._-]*proof[A-Za-z0-9._-]*\.json$/u.test(proof);
   if (!shaped) return false;
-  if (args.length === 4) return true;
-  return args.length === 6 && args[4] === "--timeout" && /^(?:[1-9][0-9]{0,2})$/u.test(args[5] ?? "") && Number(args[5]) <= 600;
+  // C20e G20-76: optionally `--subject <64 lowercase hex>` (the subject the wait ends for), only after `--timeout` when both are given.
+  let at = 4;
+  if (args[at] === "--timeout") {
+    if (!/^(?:[1-9][0-9]{0,2})$/u.test(args[at + 1] ?? "") || Number(args[at + 1]) > 600) return false;
+    at += 2;
+  }
+  if (args[at] === "--subject") {
+    if (!/^[a-f0-9]{64}$/u.test(args[at + 1] ?? "")) return false;
+    at += 2;
+  }
+  return args.length === at;
 }
 
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {

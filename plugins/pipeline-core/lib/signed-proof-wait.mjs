@@ -7,10 +7,17 @@
  *
  * A proof reference is exactly one of: `scratch/<name>.json` below the project root (sign-intent --request writes its sibling proof
  * there), or an absolute path whose file name is `proof-<64 hex>.json` (the guard-override signature writes it into the key directory).
+ *
+ * C20e G20-76: authorize-critical mirrors request, proof, authority and signer into scratch/ under ONE fixed name per repository and
+ * kind, so an older signature's mirror can already sit at the proof path. A caller that knows the subject it prepared passes
+ * `subjectSha256`; the wait then counts a scratch proof as present only when its sibling request (the `proof-` -> `request-` name)
+ * carries exactly that subject (the comparison pipeline-state approve-push makes) AND the proof signs that request's own intent.
+ * Still no signature is verified and no key is read: the wait compares two strings the files already carry.
  */
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA } from "./critical-action-approval-request.mjs";
 
 export const PROOF_WAIT_SCHEMA = "pipeline.signed-proof-wait.v1";
 export const PROOF_WAIT_DEFAULT_SECONDS = 120;
@@ -29,8 +36,34 @@ export function proofReferenceKind(reference) {
   return SCRATCH_PROOF.test(reference) ? "scratch" : null;
 }
 
-/** `present` (a regular, well-formed proof file), `absent`, or `invalid` (something else sits at the path). */
-export function observeProofFile(root, reference) {
+export const isProofSubjectSha256 = (value) => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+
+/** The mirrored request that sits beside a scratch proof (the `proof-` -> `request-` mapping sign-intent itself writes under), or null. */
+function siblingRequestName(reference) {
+  const name = basename(reference);
+  return name.includes("proof-") ? name.replace("proof-", "request-") : null;
+}
+
+/** True only when the sibling request is a critical-action request for exactly `subjectSha256` and `proof` signs that request's intent. */
+function proofBelongsToSubject(root, reference, proof, subjectSha256) {
+  const requestName = siblingRequestName(reference);
+  if (requestName === null) return false;
+  const target = join(root, "scratch", requestName);
+  try {
+    const stat = lstatSync(target);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 1 || stat.size > 1024 * 1024) return false;
+    const request = JSON.parse(readFileSync(target, "utf8"));
+    const intentSha256 = request?.approvalIntent?.sha256;
+    return request?.schema === CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA && request?.action?.subjectSha256 === subjectSha256
+      && isProofSubjectSha256(intentSha256) && proof.intentSha256 === intentSha256;
+  } catch { return false; }
+}
+
+/**
+ * `present` (a regular, well-formed proof file), `absent`, or `invalid` (something else sits at the path). With a subject (scratch
+ * proofs only) a well-formed proof that does not belong to it is `stale`: an older signature's file, not signed yet for this subject.
+ */
+export function observeProofFile(root, reference, subjectSha256 = null) {
   const kind = proofReferenceKind(reference);
   if (kind === null) return { state: "invalid", reason: "not a proof reference" };
   const target = kind === "scratch" ? resolve(root, reference) : reference;
@@ -40,19 +73,21 @@ export function observeProofFile(root, reference) {
   if (kind === "scratch") {
     try { if (dirname(realpathSync(target)) !== realpathSync(join(root, "scratch"))) return { state: "invalid", reason: "outside scratch/" }; } catch { return { state: "invalid", reason: "unreadable" }; }
   }
-  try {
-    const proof = JSON.parse(readFileSync(target, "utf8"));
-    return proof?.schema === PROOF_SCHEMA ? { state: "present" } : { state: "invalid", reason: "not a po-approval proof" };
-  } catch { return { state: "invalid", reason: "not JSON" }; }
+  let proof;
+  try { proof = JSON.parse(readFileSync(target, "utf8")); } catch { return { state: "invalid", reason: "not JSON" }; }
+  if (proof?.schema !== PROOF_SCHEMA) return { state: "invalid", reason: "not a po-approval proof" };
+  if (subjectSha256 === null || subjectSha256 === undefined || kind !== "scratch") return { state: "present" };
+  return proofBelongsToSubject(root, reference, proof, subjectSha256) ? { state: "present" } : { state: "stale", reason: "its request does not carry the expected subject" };
 }
 
 const quote = (part) => (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(part) ? part : JSON.stringify(part));
 export const commandText = ({ executable, argv }) => [executable, ...argv].map(quote).join(" ");
 const text = commandText;
 
-/** The exact bounded wait for a proof reference. */
-export function proofWaitCommand(root, proof, seconds = PROOF_WAIT_DEFAULT_SECONDS) {
-  return { executable: process.execPath, argv: [PROOF_WAIT_SCRIPT, "--root", root, "--proof", proof, "--timeout", String(seconds)] };
+/** The exact bounded wait for a proof reference; `--subject` (G20-76) follows `--timeout` and appears only when a subject is given. */
+export function proofWaitCommand(root, proof, seconds = PROOF_WAIT_DEFAULT_SECONDS, subjectSha256 = null) {
+  if (subjectSha256 !== null && !isProofSubjectSha256(subjectSha256)) throw new TypeError("the proof wait subject must be 64 lowercase hex characters");
+  return { executable: process.execPath, argv: [PROOF_WAIT_SCRIPT, "--root", root, "--proof", proof, "--timeout", String(seconds), ...(subjectSha256 === null ? [] : ["--subject", subjectSha256])] };
 }
 
 /** The PO's one signing command for a proof reference, derived by the naming convention sign-intent itself writes under. */
@@ -73,8 +108,8 @@ export function signCommandForProof(root, proof) {
  * The fields every signing step carries beside its sign command (one builder for all of them): the exact proof path, the bounded
  * wait the agent runs itself, and the explicit statement that the PO reports nothing back.
  */
-export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEFAULT_SECONDS }) {
-  const wait = proofWaitCommand(root, proofPath, seconds);
+export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEFAULT_SECONDS, subjectSha256 = null }) {
+  const wait = proofWaitCommand(root, proofPath, seconds, subjectSha256);
   return {
     proofPath,
     reportBackRequired: false,
@@ -82,27 +117,44 @@ export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEF
       kind: "command", ...wait, mutation: false, requiresConfirmation: false,
       expected: { schema: PROOF_WAIT_SCHEMA, statuses: ["proof-present"] },
     },
-    afterSigning: `Do not ask the PO to report back. After handing over the one signing command, run waitAction (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback.`,
+    afterSigning: `Do not ask the PO to report back. After handing over the one signing command, run waitAction (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback.`
+      + (subjectSha256 === null ? "" : ` The wait ends only for the expected subject ${subjectSha256}: an older signature's file at that path does not end it.`),
   };
 }
 
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
+/** The mirror files of one signing kind (request, proof, authority, signer share one fixed name per repository), derived from the proof's own name. */
+function staleMirrorNames(proof) {
+  const name = basename(proof);
+  const at = name.indexOf("proof-");
+  if (at < 0) return [proof];
+  const roles = name.startsWith("critical-") ? ["request", "proof", "authority", "signer"] : ["request", "proof"];
+  return roles.map((role) => `scratch/${name.slice(0, at)}${role}-${name.slice(at + "proof-".length)}`);
+}
+
 /** A bounded poll. Result: `{ status: "proof-present" }` or a typed `refused` whose single `repair` is the recovery. */
-export function waitForSignedProof({ root, proof, timeoutSeconds = PROOF_WAIT_DEFAULT_SECONDS, now = Date.now, pause = sleep, observe = observeProofFile }) {
+export function waitForSignedProof({ root, proof, timeoutSeconds = PROOF_WAIT_DEFAULT_SECONDS, subjectSha256 = null, now = Date.now, pause = sleep, observe = observeProofFile }) {
   if (proofReferenceKind(proof) === null) {
     return { status: "refused", code: "PROOF-WAIT-ARGS", reason: "--proof must be scratch/<name>.json below the project, or an absolute proof-<64 hex>.json written by sign-intent", repair: "pass the proofPath the signing step printed, unchanged" };
+  }
+  if (subjectSha256 !== null && !isProofSubjectSha256(subjectSha256)) {
+    return { status: "refused", code: "PROOF-WAIT-ARGS", reason: "--subject must be 64 lowercase hex characters", repair: "pass the subject sha256 the signing step printed, unchanged, or leave --subject out" };
   }
   const deadline = now() + timeoutSeconds * 1000;
   let last;
   for (;;) {
-    last = observe(root, proof);
+    last = observe(root, proof, subjectSha256);
     if (last.state === "present") return { status: "proof-present", proofPath: proof };
     if (now() >= deadline) break;
     pause(Math.min(500, Math.max(1, deadline - now())));
   }
   const sign = signCommandForProof(root, proof);
-  const again = text(proofWaitCommand(root, proof, timeoutSeconds));
+  const again = text(proofWaitCommand(root, proof, timeoutSeconds, subjectSha256));
+  if (last.state === "stale") {
+    return { status: "refused", code: "PROOF-WAIT-STALE", proofPath: proof, reason: `a signed proof sits at ${proof} but it is an older signature's mirror, not one for the expected subject (${last.reason})`,
+      repair: `rename (do not remove) the older mirror files ${staleMirrorNames(proof).join(", ")}; ${sign === null ? "sign again" : `then ask the PO once to run exactly this signing command: ${text(sign)}`}; then run ${again}` };
+  }
   return last.state === "invalid"
     ? { status: "refused", code: "PROOF-WAIT-INVALID", proofPath: proof, reason: `a file sits at ${proof} but it is not a signed proof (${last.reason})`,
       repair: `${sign === null ? "sign again" : `have the PO run the one signing command again: ${text(sign)}`}; then run ${again}` }

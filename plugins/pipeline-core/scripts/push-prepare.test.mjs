@@ -824,6 +824,25 @@ test("G20-30 pushPrepareReport: the signing step names the scratch proof and the
   assert.doesNotMatch(result.lines.awaitProof, /tell me|let me know|report back to/iu);
 });
 
+// C20e G20-76: the scratch mirror names are one fixed fingerprint per repository, so an older signature's mirror can sit at the proof path;
+// the report's wait therefore carries the prepared subject and ends only for a proof whose request carries exactly it.
+test("G20-76 pushPrepareReport: the wait action carries the prepared subject", () => {
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({
+    criticalPushScratchArtifactPaths: () => ({
+      request: `${FIXTURE_DIR}/scratch/critical-push-request-0123456789ab.json`,
+      proof: `${FIXTURE_DIR}/scratch/critical-push-proof-0123456789ab.json`,
+      authority: `${FIXTURE_DIR}/scratch/critical-push-authority-0123456789ab.json`,
+      signer: `${FIXTURE_DIR}/scratch/critical-push-signer-0123456789ab.json`,
+    }),
+  }));
+  assert.equal(result.report.ready, true);
+  const subject = result.report.subjectSha256;
+  assert.match(subject, /^[a-f0-9]{64}$/u);
+  const argv = result.report.awaitSignature.waitAction.argv;
+  assert.deepEqual(argv.slice(-2), ["--subject", subject], "the wait ends only for the subject the report prepared");
+  assert.match(result.report.awaitSignature.afterSigning, /only for the expected subject/u);
+});
+
 test("pushPrepareReport: all preconditions met -> ready:true, all three commands rendered", () => {
   const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps());
   assert.equal(result.ok, true);
