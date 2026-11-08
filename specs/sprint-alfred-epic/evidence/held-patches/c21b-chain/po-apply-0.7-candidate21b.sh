@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 21b: 5 held patches exported from the build clone chain cf73ce22d..1456959c0
+# PO apply script for candidate 21b: 6 held patches exported from the build clone chain cf73ce22d..b993152ad
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -19,6 +19,7 @@ step 2-6fc14c118 'fix(close): stop before Verify when no Result is bound and nam
 step 3-3e05ccd30 'fix(security): use the repo-root Gitleaks ruleset only in the source checkout, never a stray file above an installed plugin'
 step 4-3c66bfa27 'fix(critic): refuse a misplaced Verify evidence path before the capture and say what to do'
 step 5-1456959c0 'fix(pipeline): bind the caller-authored Critic acknowledgement to the reviewed candidate'
+step 6-b993152ad 'fix(critic): issue no Source return for a verdict that contradicts its own pass'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

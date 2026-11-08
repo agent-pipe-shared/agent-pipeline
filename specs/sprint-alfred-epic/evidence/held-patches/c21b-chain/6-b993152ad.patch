@@ -1,0 +1,139 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index c7d2ebd5d0a06e2b33c56d49a36bf7258b647515..f614aa4d8bbaa9886848bed687a8a8e27b688124 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -599,7 +599,7 @@ export function issueAntigravityCriticReturn(input, attributed, { nowMs = Date.n
+ }
+ 
+ /** C21B: the one refusal a Critic child gets when its message to the parent carries no verdict while its packet waits for one. */
+-export const CRITIC_VERDICT_REQUIRED_DENIAL = "BLOCKED (Antigravity Critic return): CRITIC-VERDICT-JSON-REQUIRED: this message to your parent carries no machine-readable verdict, so the review cannot be bound to its packet and the feature close would need a PO signature. Send the same report again and end it with one fenced json block holding exactly the keys findings, deliberately_not_flagged, trajectory_verdict, trajectory_evidence, briefing_violations and pass (each finding: gap, risk, severity blocker|major|minor, evidence, spec_ref; trajectory_verdict: consistent|inconsistent|not verifiable). If you cannot state a verdict, send your message unchanged: this refusal happens once.";
++export const CRITIC_VERDICT_REQUIRED_DENIAL = "BLOCKED (Antigravity Critic return): CRITIC-VERDICT-JSON-REQUIRED: this message to your parent carries no machine-readable verdict that holds together (pass may be true only when no finding is blocker or major, briefing_violations is empty and trajectory_verdict is consistent), so the review cannot be bound to its packet and the feature close would need a PO signature. Send the same report again and end it with one fenced json block holding exactly the keys findings, deliberately_not_flagged, trajectory_verdict, trajectory_evidence, briefing_violations and pass (each finding: gap, risk, severity blocker|major|minor, evidence, spec_ref; trajectory_verdict: consistent|inconsistent|not verifiable). If you cannot state a verdict, send your message unchanged: this refusal happens once.";
+ 
+ export async function runAntigravityPreToolGuard(rawInput) {
+   // M4b: a native child in a branch worktree names the worktree FIRST in workspacePaths. The worktree is outside the project and carries no
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index c520100e8ce589a9e2a34c0f6b57799f2971aa55..a5ad8ba1b600aee60bda28959db4ffe6e644b35c 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -208,6 +208,7 @@ export function criticSourceReturnMessage(outcome) {
+       return `Critic Source return issued for packet ${outcome.packetId}: finalize reads it from the private control area and labels the verdict source-issued-origin when the verdict file is the returned JSON verbatim.`;
+     case "already-issued": return `Critic Source return not issued: packet ${outcome.packetId} already holds ${outcome.entryId === undefined ? "one" : `this verdict for split entry ${outcome.entryId}`}; it is never overwritten.`;
+     case "no-verdict": return `Critic Source return not issued: the Critic's final message carries no schema-shaped verdict JSON (return it as the whole message or as the last fenced json block); ${finalizeAs}.`;
++    case "contradictory-verdict": return `Critic Source return not issued: the verdict says pass true against its own ${outcome.reason}; resume this Critic and have it return the verdict again with pass false or without that entry, which issues the record; ${finalizeAs}.`;
+     case "no-open-packet": return `Critic Source return not issued: no claimed, admitted, unresulted session packet of this runner is open; ${finalizeAs}.`;
+     case "ambiguous": return `Critic Source return not issued: ${outcome.count} session packets of this runner are open and the stop names none of them; release the stale ones (session-critic-finalizer.mjs release) and finalize; ${finalizeAs}.`;
+     default: return `Critic Source return not issued (the private control area could not be read); ${finalizeAs}.`;
+diff --git a/plugins/pipeline-core/lib/critic-source-return.mjs b/plugins/pipeline-core/lib/critic-source-return.mjs
+index 016be3a62a54ac85a516e94275a4dba20f82346b..601681f4de93e25b09ab5415f976a139f0b2982b 100644
+--- a/plugins/pipeline-core/lib/critic-source-return.mjs
++++ b/plugins/pipeline-core/lib/critic-source-return.mjs
+@@ -18,7 +18,7 @@
+ import { closeSync, existsSync, openSync, readFileSync, readdirSync, writeSync } from "node:fs";
+ import { join } from "node:path";
+ import { PACKET_ID, SESSION_REVIEW_TTL_SECONDS, SPLIT_FILE, canonicalJson, currentState, packetContext, readJson, sha256 } from "./critic-packet-preflight-read.mjs";
+-import { attributeVerdict, criticSplitDigest, criticSplitProblem } from "./critic-split.mjs";
++import { attributeVerdict, criticSplitDigest, criticSplitProblem, verdictPassContradiction } from "./critic-split.mjs";
+ import { validateAgainstSchema } from "./schema-lite.mjs";
+ 
+ export const CRITIC_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return.v1";
+@@ -102,7 +102,7 @@ export function issueCriticSourceReturnFromMessage({ commonDir, runner, text, no
+     if (!MESSAGE_RUNNERS.has(runner)) return { status: "not-applicable" };
+     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
+     const verdict = extractCriticVerdict(text);
+-    return verdict === null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs });
++    return verdict === null || verdictPassContradiction(verdict) !== null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs });
+   } catch { return { status: "unavailable" }; }
+ }
+ 
+@@ -133,6 +133,9 @@ function noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) {
+ /** The shared half: bind the returned verdict to the one open admitted packet of this runner and write the record exclusively. */
+ function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
+   if (verdict === null) return { status: "no-verdict" };
++  // C21B: records are exclusive and a split entry may hold only one, so a return that contradicts itself must leave none or its corrected return could never be recorded.
++  const contradiction = verdictPassContradiction(verdict);
++  if (contradiction !== null) return { status: "contradictory-verdict", reason: contradiction };
+   const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
+   if (!existsSync(controlRoot)) return { status: "no-open-packet" };
+   const open = openAdmittedPackets(controlRoot, runner, nowMs);
+diff --git a/plugins/pipeline-core/lib/critic-split.mjs b/plugins/pipeline-core/lib/critic-split.mjs
+index 33aa330222c46ec537180256281955f39dc81031..7f61863d246f1e2dec7cae9c9c816a3caea270ae 100644
+--- a/plugins/pipeline-core/lib/critic-split.mjs
++++ b/plugins/pipeline-core/lib/critic-split.mjs
+@@ -212,6 +212,16 @@ export function attributeVerdict(split, verdict) {
+   return id !== undefined && split.entries.some((entry) => entry.id === id) ? id : null;
+ }
+ 
++/** C21B: what in a schema-valid verdict contradicts its `pass: true`, in words, or null when nothing does. */
++export function verdictPassContradiction(verdict) {
++  if (verdict?.pass !== true) return null;
++  const reasons = [];
++  if (verdict.findings.some(({ severity }) => severity === "blocker" || severity === "major")) reasons.push("blocker or major finding");
++  if (verdict.briefing_violations.length > 0) reasons.push("briefing violation");
++  if (verdict.trajectory_verdict !== "consistent") reasons.push(`trajectory_verdict ${JSON.stringify(verdict.trajectory_verdict)}`);
++  return reasons.length === 0 ? null : reasons.join(" and ");
++}
++
+ const SEVERITY_RANK = { blocker: 0, major: 1, minor: 2 };
+ const TRAJECTORY_RANK = { consistent: 0, "not verifiable": 1, inconsistent: 2 };
+ const NEXT_ROUND = "release this packet (session-critic-finalizer.mjs release) and open the next round of the batch with a new packet id";
+@@ -249,8 +259,9 @@ export function mergeSplitVerdicts(split, children) {
+     for (const entry of split.entries) {
+       const verdict = byEntry.get(entry.id);
+       if (!validateAgainstSchema(verdict, VERDICT_SCHEMA).valid) return fail("CSM-CHILD-INVALID", `the child verdict of entry ${entry.id} is not a Critic verdict`, "pass the Critic's returned JSON verbatim");
+-      if (verdict.pass && (verdict.findings.some(({ severity }) => severity === "blocker" || severity === "major") || verdict.briefing_violations.length > 0 || verdict.trajectory_verdict !== "consistent")) {
+-        return fail("CSM-CHILD-INVALID", `the child verdict of entry ${entry.id} passes although it has a blocker or major finding, a briefing violation or an unconsistent trajectory`, "pass the Critic's returned JSON verbatim");
++      const contradiction = verdictPassContradiction(verdict);
++      if (contradiction !== null) {
++        return fail("CSM-CHILD-INVALID", `the child verdict of entry ${entry.id} says pass true against its own ${contradiction}`, "resume that Critic and have it return its verdict again with pass false or without that entry, then pass the new return verbatim; a hand-edited file matches no Source return");
+       }
+       if (attributeVerdict(split, verdict) !== entry.id) return fail("CSM-CHILD-UNATTRIBUTED", `the child verdict given for entry ${entry.id} does not start its trajectory_evidence with ${entry.scopeMarker}`, `dispatch the entry's Critic with the instruction to begin trajectory_evidence with "${entry.scopeMarker} " and run that entry again`);
+       const others = split.entries.filter((other) => other.id !== entry.id);
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 66f901b047d06da3c2680ec2a1dc2e9cf8842efb..088328f8a1ad88caac9a4f6af0a64e7637a8f398 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -2059,6 +2059,19 @@ test("C21B a Critic child's message without a verdict is sent back once while it
+   } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
+ });
+ 
++test("C21B an Antigravity Critic message whose verdict contradicts itself is sent back once and issues no record", async () => {
++  const fx = fixture();
++  const brain = agyBrain();
++  try {
++    const admitted = admitAntigravity(fx);
++    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
++    const send = (stepIdx, value) => ({ ...agySendMessage(fx, brain, { message: criticReturn(value) }), stepIdx });
++    const first = await agyIssue(send(9, verdict({ trajectory_verdict: "not verifiable", pass: true })));
++    assert.equal(first.refuse, true, JSON.stringify(first)); assert.equal(existsSync(target), false);
++    assert.equal((await agyIssue(send(11, verdict({ trajectory_verdict: "not verifiable", pass: false })))).status, "issued");
++  } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
++});
++
+ test("C21B a message without a verdict is not refused when no packet waits for one, and a stepless payload is refused at most once", async () => {
+   const fx = fixture();
+   const brain = agyBrain();
+@@ -2750,6 +2763,24 @@ test("G20-72 the merge script refuses a missing child, an unknown or duplicated
+   } finally { cleanup(fx); }
+ });
+ 
++test("C21B a child verdict that passes against its own fields issues no Source return, so the corrected return is the only record and the merge says what to do", () => {
++  const fx = g2072Fixture();
++  try {
++    const admitted = g2072Admit(fx);
++    const contradictory = g2072Child("core", { trajectory_verdict: "not verifiable", pass: true });
++    const first = g2072Hook(fx, criticReturn(contradictory));
++    assert.match(first.stderr, /Source return not issued.*pass true.*trajectory_verdict/u, first.stderr);
++    const children = ["api", "core", "shared"].map((id) => [id, id === "core" ? contradictory : g2072Child(id)]);
++    const refused = g2072MergeCli(fx, admitted, children, null);
++    assert.equal(refused.json.code, "CSM-CHILD-INVALID", JSON.stringify(refused.json));
++    assert.match(refused.json.message, /entry core.*trajectory_verdict.*repair: resume that Critic/u);
++    assert.match(g2072Hook(fx, criticReturn(g2072Child("core", { trajectory_verdict: "not verifiable", pass: false }))).stderr, /Source return issued/u);
++    for (const id of ["api", "shared"]) assert.match(g2072Hook(fx, criticReturn(g2072Child(id))).stderr, /Source return issued/u);
++    const records = readdirSync(admitted.packetDir).filter((name) => /^source-return-[a-f0-9]{64}\.json$/u.test(name));
++    assert.equal(records.length, 3, "one record per entry; the contradictory return left none");
++  } finally { cleanup(fx); }
++});
++
+ test("G20-72 admit binds the split; the Critic stop hook issues one Source return per returning child; the whole chain ends in one source-issued verdict whose receipt carries the split digest", async () => {
+   const { criticSplitDigest } = await import("../lib/critic-split.mjs");
+   const fx = g2072Fixture();
