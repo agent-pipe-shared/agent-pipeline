@@ -1,0 +1,42 @@
+# w273: an agent-run Codex prepare command runs the governed Goldfish admission before spawn_agent, so a Codex Goldfish is host-committed and its slice integrated (candidate 20d, G20-63, AC-108)
+
+Base: `9443438b0a2e10be2c4c139df1e74b2ba762c822` (the applied and stamped candidate 20c). Built in the slice clone `scratch/agent-out/c20d-cx`. One held patch; `git apply --check` in the real repository can only be run against that base.
+Closest criterion: AC-108 (PRD and Spec unchanged).
+
+STATUS: implementation complete in the clone, the targeted checks listed under "Evidence" green. No full Verify, no Critic review, no PO acceptance.
+
+## What the patch changes
+
+1. New `scripts/codex-native-dispatch-prepare.mjs`: `prepare --root <repo> --briefing scratch/<briefing>.md`. It builds the hook input Codex would have sent for that `spawn_agent` call (agent type from the briefing's own binding, message = the briefing bytes, the Codex session id from `CODEX_SESSION_ID`/`CODEX_THREAD_ID`
+   through `resolveModelRoleHostSessionIdentity`, a fresh `prepared-codex-<sha256>` token as `tool_use_id`) and runs `hooks/guard-dispatch.mjs` on it as a child process, the way the Antigravity adapter runs its nested guards. The admission is therefore the guard's own: same carrier, generated-briefing, route-record, second-writer, scope,
+   governed-queue and native-pending checks, same codes, same repair texts, same records, same hook-observed session owner. A refusal prints the guard's code and text (`status: "rejected"`, exit 2) and, like in the hook, leaves no state. After exit 0 it reads the pending state back (the guard also admits a dispatch whose preparation failed with a WARNING) and prints `status: "prepared"`,
+   `spawn_agent: { agent_type, message }`, the token and `bindWindowSeconds`. An ungoverned repository answers `not-applicable` and writes nothing.
+2. `lib/native-goldfish-host-state.mjs`: (a) idempotent admission: for Codex, an unclaimed pending state of the same session with the identical binding is reused (`NGHS-ALREADY-PREPARED`, nothing written), so a second prepare, and a later PreToolUse admission of the same briefing should a future Codex fire it, write no second queue row (the queue side was already idempotent) and no second pending state
+   (which `bindNativeCodexStart` would refuse as ambiguous); new exported `findUnclaimedCodexPending` (the claimed-file scan of `bindNativeCodexStart` is now the shared `claimedCodexPendingFiles`). (b) A prepared state (token `prepared-codex-<64 hex>`) has a 300 s bind window (`NATIVE_GOLDFISH_CODEX_PREPARED_START_BINDING_TTL_MS`), a PreToolUse-admitted one keeps the 120 s window.
+   (c) `bindNativeCodexStart` answers `NGHS-CODEX-START-UNBOUND` (not a hook exception) when no private directory exists yet. (d) The `SQ-DELIVERY-COURSE-ABSENT` repair names the Codex route (prepare, then spawn_agent) instead of "the course cannot be written on Codex".
+3. `hooks/native-goldfish-host.mjs`: the Codex SubagentStart/SubagentStop path binds the hook-observed Codex session owner (without it the stop met `SDC-AUTHORITY-UNAVAILABLE` and committed nothing; measured in the new GDW09 case). A Codex `worker` SubagentStart that bound nothing while a governed feature is in implementation (course present or yet to be written) prints a
+   `hookSpecificOutput` `additionalContext` notice on stdout (new exported `codexUnpreparedStartNotice`): its work will not be host-committed or integrated, the Elephant must run the prepare command and then spawn_agent. Other agent types get none.
+4. Registration: `lib/guard/constants.mjs` (`CODEX_NATIVE_DISPATCH_PREPARE_SCRIPT`) and `lib/guard/command-catalogue.mjs` (exactly `prepare --root <this root> --briefing scratch/<name>.md`).
+5. Texts that tell a Codex agent how to dispatch: `guard-dispatch.mjs` (carrier repair), `skills/pipeline-start/references/happy-path.md` (step and runner table), `config/runner-capabilities.json` (same cell as the table), `skills/pipeline-start/references/implementation-continuation.md`, the `dispatch-briefing.mjs build` result (`dispatchCall` for `--runner codex`: `spawn_agent` / `worker`, the prepare command, "call spawn_agent only after prepare exited 0").
+   `hooks/codex-hooks.json` and the PreToolUse wiring of `guard-dispatch.mjs` are unchanged.
+6. Tests (QG-04: nothing weakened; restated in place with a G20-63 comment): `lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs` (the course-absent repair assertions that pinned the 20c "Codex cannot write the course" wording, one assertion more), `lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs` (case count 5 to 7: the admitted and refused argv shapes of the new script),
+   `hooks/guard-dispatch-native-worker.test.mjs` (count 4 to 9; new GDW05 to GDW09 on the real generated-briefing fixture: prepare admits and writes route record, queue row and pending state; prepare refuses an unmarked briefing, a non-Goldfish carrier and a hand-edited generated briefing with the guard's codes and leaves no state; prepare twice and a later PreToolUse admission are idempotent;
+   a Codex SubagentStart binds a prepared child and an unprepared worker gets the notice, an explorer none; the SubagentStop hook host-commits the bound child, HEAD moves, trailer `Dispatch: ... (goldfish)`).
+
+## Evidence (clone, one suite at a time)
+
+RED before the first production edit: the five new GDW cases failed (`Cannot find module .../codex-native-dispatch-prepare.mjs`), 4 of 9 passed. GREEN afterwards (counts printed by the helper): guard-dispatch-native-worker 9/9, guard-dispatch 85/85, antigravity-design-phase-scripts-refused-in-draft (K152) 10/10, three-runner-happy-path 27 pass + 1 skipped (as before), runner-capabilities 5/5, happy-path-guide-names-only-existing-scripts 4/4.
+Also green: native-goldfish-host-finalizer 50/50, dispatch-briefing 165/165 (the Codex build path now returns the `spawn_agent` dispatchCall; no dedicated assertion for that field was added, budget), native-goldfish-host-state 79/79 (run once at the end), GMWKC01 guard-maintenance-window-kernel-closure 1/1 (the new script is not a kernel import), check-auth-gate-inventory-drift 35/35 (no auth verb or kind added).
+The helper's `apply --check on repo` line printed exit 0 for the saved patch. The RED run is the first console output of this dispatch (no evidence file written; the report carries no `testFirst` block). The K152 pin cases and the dispatch-briefing codex call were added after the implementation (registration and text work), not RED first.
+
+## Deliberately not changed
+
+`hooks/codex-hooks.json` (the PreToolUse wiring stays; it is harmless and takes over if a later Codex fires the hook). The verify suite list (`harness/verify-suites.json`, protected): every new case sits in an existing registered test file, no new test file exists. The case-count inventory baseline and derived files are the Coordinator's refresh.
+No `--session-id` override flag and no widened shell grammar beyond the one argv shape.
+
+## Not proven (real Codex only)
+
+That the Codex SubagentStart/SubagentStop `session_id` equals the shell's `CODEX_THREAD_ID`/`CODEX_SESSION_ID` (the existing model-role code treats them as the session key; the fixtures use that equality). That the Codex SubagentStart payload accepts `hookSpecificOutput.additionalContext` as model-visible context. That a started worker's `agent_type` and `model` are `worker` and the briefing's model, which is what `bindNativeCodexStart` already matched.
+The prepared token cannot travel into SubagentStart (its payload has no field for it): the binding stays "exactly one unclaimed pending state of this session with the matching agent type and model inside the bind window". Two prepared dispatches of one session started back to back are therefore ambiguous (`NGHS-CODEX-START-AMBIGUOUS`): prepare and spawn one dispatch at a time.
+A prepared dispatch that is never spawned keeps its queue reservation and pending state past the bind window; release it with `slice-queue.mjs cancel <slice> --started --reason ... --class ...` like any abandoned dispatch. A refused prepare followed by an identical PreToolUse retry of the same bytes in the same session hits `GUARD-DISPATCH-REFUSED-RETRY` (the guard's own memory).
+The bind window of a prepared state is 300 s (a design decision of this patch, not in the briefing): the Elephant must re-emit the whole briefing in spawn_agent, which takes a model turn.

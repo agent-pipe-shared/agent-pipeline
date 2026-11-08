@@ -1,0 +1,689 @@
+diff --git a/plugins/pipeline-core/config/runner-capabilities.json b/plugins/pipeline-core/config/runner-capabilities.json
+index 344efd76c..e23dfd89c 100644
+--- a/plugins/pipeline-core/config/runner-capabilities.json
++++ b/plugins/pipeline-core/config/runner-capabilities.json
+@@ -6,7 +6,7 @@
+     {
+       "topic": "Dispatch carrier",
+       "claude": "`Agent` / `Task`, functional `agentType`",
+-      "codex": "`spawn_agent`, `nativeAgentType: \"worker\"`",
++      "codex": "`spawn_agent`, `nativeAgentType: \"worker\"`, after `codex-native-dispatch-prepare.mjs` (Codex runs no PreToolUse hook for `spawn_agent`)",
+       "antigravity": "`invoke_subagent` (flat args); read-only roles after `antigravity-native-dispatch-prepare.mjs`, Goldfish roles from the generated briefing, no consent",
+       "owner": "skills/pipeline-start/references/implementation-continuation.md; references/antigravity-native-dispatch.md"
+     },
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+index a14021e12..47bacf301 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+@@ -35,6 +35,7 @@ import { recordConsentGiven } from "../lib/onboarding-consent-marker.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { nativeContractFixtureParent, nativeContractFixtureRepositoryRoot, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
+ import { runDispatchBriefing } from "../scripts/dispatch-briefing.mjs";
++import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+ 
+ // NOTE, deliberately absent: no module-scope `import { extractWorkflowDispatches } from
+ // "./guard-dispatch.mjs"` here. That shape was tried and removed (NVA-B-GD16HARDEN-1): if the
+@@ -213,7 +214,132 @@ manualCheck("GD15m check a marked worker packet against the functional Goldfish
+   } finally { rmSync(fixture, { recursive: true, force: true }); }
+ });
+ 
+-assert.equal(cases.length, 4, "the native-worker dispatch regression corpus must register four cases");
++// ---------------------------------------------------------------------------------------------------------------------------------
++// G20-63 (candidate 20d; measured 2026-11-08, Codex CLI 0.167.0): Codex runs no PreToolUse hook for spawn_agent, so the governed
++// admission above never ran there. The agent-run prepare command performs that same admission (it spawns this guard with a
++// synthetic spawn_agent hook input) before spawn_agent; SubagentStart then binds the child to the prepared pending state and
++// SubagentStop host-commits it. These cases are written from the criterion (AC-108: a governed Goldfish is host-committed and its
++// slice integrated), not from the implementation.
++const PREPARE = fileURLToPath(new URL("../scripts/codex-native-dispatch-prepare.mjs", import.meta.url));
++const HOST = fileURLToPath(new URL("./native-goldfish-host.mjs", import.meta.url));
++const CODEX_SESSION = "g2063-codex-session";
++const PREPARED_TOKEN = /^prepared-codex-[a-f0-9]{64}$/u;
++function codexEnv(root, session = CODEX_SESSION) {
++  const env = { ...process.env, CLAUDE_PROJECT_DIR: root, CODEX_THREAD_ID: session };
++  delete env.CODEX_SESSION_ID;
++  return env;
++}
++function runPrepare(root, briefingRelative, session = CODEX_SESSION) {
++  const res = spawnSync(process.execPath, [PREPARE, "prepare", "--root", root, "--briefing", briefingRelative], { encoding: "utf8", env: codexEnv(root, session) });
++  let json = null;
++  try { json = JSON.parse(res.stdout.trim().split("\n").filter(Boolean).at(-1) ?? ""); } catch { /* the assertion below names it */ }
++  return { code: res.status, stdout: res.stdout ?? "", stderr: res.stderr ?? "", json };
++}
++function runHost(root, input, session = CODEX_SESSION) {
++  const res = spawnSync(process.execPath, [HOST, "--runner", "codex"], { input: JSON.stringify({ session_id: session, cwd: root, ...input }), encoding: "utf8", env: codexEnv(root, session) });
++  return { code: res.status, stdout: res.stdout ?? "", stderr: res.stderr ?? "" };
++}
++const preparedFixture = (label) => {
++  const fixture = generatedCodexFixture(label);
++  writeFileSync(join(fixture.root, "scratch", "briefing-prep.md"), fixture.text);
++  return fixture;
++};
++const routeRecordPath = (root) => join(root, "evidence", "dispatch-route-GD15N-CODEX-WORKER.json");
++const queueRows = (root) => {
++  const governed = resolveGovernedItemQueue({ root });
++  return governed.status === "required" ? governed.normalized.slices.map((row) => row.id) : [];
++};
++manualCheck("GDW05 G20-63 the Codex prepare command admits a generated item briefing and writes the route record, the queue row and the pending state", () => {
++  const { root, text } = preparedFixture("prepare-admit");
++  assert.equal(queueRows(root).length, 0, "the fixture has no delivery course before the first admission");
++  const prepared = runPrepare(root, "scratch/briefing-prep.md");
++  assert.equal(prepared.code, 0, `prepare must admit a generated item briefing: ${prepared.stdout} ${prepared.stderr}`);
++  assert.equal(prepared.json.status, "prepared");
++  assert.equal(prepared.json.spawn_agent.agent_type, "worker");
++  assert.equal(prepared.json.spawn_agent.message, text, "the message is the verified briefing bytes");
++  assert.match(prepared.json.preparedToken, PREPARED_TOKEN);
++  assert.equal(prepared.json.dispatchId, "GD15N-CODEX-WORKER");
++  assert.equal(pendingCodexFiles(root).length, 1, "one native pending state");
++  assert.ok(existsSync(routeRecordPath(root)), "the briefing route record is written");
++  assert.deepEqual(queueRows(root).includes("GD15N-CODEX-WORKER"), true, "the governed queue row is written");
++  const pending = JSON.parse(readFileSync(pendingCodexFiles(root)[0], "utf8"));
++  assert.equal(pending.sessionId, CODEX_SESSION, "the pending state is bound to the Codex session");
++  assert.equal(pending.binding.nativeAgentType, "worker");
++});
++manualCheck("GDW06 G20-63 prepare refuses an unmarked briefing, a non-Goldfish carrier and a tampered generated briefing with the guard's codes and leaves no state", () => {
++  const { root, text } = preparedFixture("prepare-refuse");
++  writeFileSync(join(root, "scratch", "handwritten.md"), "### 1. Goal\nA hand-written Goldfish briefing without the generator binding.\n");
++  const unmarked = runPrepare(root, "scratch/handwritten.md");
++  assert.equal(unmarked.code, 2, `an unmarked briefing is refused: ${unmarked.stdout}`);
++  assert.equal(unmarked.json.status, "rejected");
++  assert.equal(unmarked.json.code, "DISPATCH-WRITE-CARRIER-REQUIRED", "a briefing that names no Goldfish carrier is refused with the guard's carrier code");
++  assert.match(unmarked.json.reason, /pipeline-core/u, "the guard's own repair text is carried");
++  writeFileSync(join(root, "scratch", "tampered.md"), text.replace("Fixture goal text.", "Fixture goal text, edited by hand."));
++  const tampered = runPrepare(root, "scratch/tampered.md");
++  assert.equal(tampered.code, 2, `a hand-edited generated briefing is refused: ${tampered.stdout}`);
++  assert.equal(tampered.json.status, "rejected");
++  assert.match(tampered.json.code, /^DBG-/u, `the generated-briefing guard code is kept: ${tampered.json.code}`);
++  assert.equal(pendingCodexFiles(root).length, 0, "a refusal leaves no pending state");
++  assert.equal(existsSync(routeRecordPath(root)), false, "a refusal leaves no route record");
++  assert.equal(queueRows(root).length, 0, "a refusal leaves no queue row");
++});
++manualCheck("GDW07 G20-63 preparing one briefing twice, and a later PreToolUse admission of it, write no second queue row or pending state", () => {
++  const { root, text } = preparedFixture("prepare-idempotent");
++  const first = runPrepare(root, "scratch/briefing-prep.md");
++  assert.equal(first.code, 0, `${first.stdout} ${first.stderr}`);
++  const stateBefore = readFileSync(pendingCodexFiles(root)[0], "utf8");
++  const second = runPrepare(root, "scratch/briefing-prep.md");
++  assert.equal(second.code, 0, `a second prepare of the same briefing is admitted: ${second.stdout} ${second.stderr}`);
++  assert.equal(second.json.preparedToken, first.json.preparedToken, "the token is a function of the briefing");
++  assert.equal(pendingCodexFiles(root).length, 1, "no second pending state");
++  assert.equal(queueRows(root).filter((id) => id === "GD15N-CODEX-WORKER").length, 1, "no second queue row");
++  assert.equal(readFileSync(pendingCodexFiles(root)[0], "utf8"), stateBefore, "the first pending state is untouched");
++  const late = spawnSync(process.execPath, [GUARD], { input: JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "spawn_agent", tool_use_id: "g2063-late-pretooluse", session_id: CODEX_SESSION, cwd: root,
++    tool_input: { agent_type: "worker", message: text } }), encoding: "utf8", env: codexEnv(root) });
++  assert.equal(late.status, ALLOW, `a PreToolUse admission of the prepared briefing is idempotent: ${late.stderr}`);
++  assert.equal(pendingCodexFiles(root).length, 1, "the PreToolUse admission wrote no second pending state");
++  assert.equal(queueRows(root).filter((id) => id === "GD15N-CODEX-WORKER").length, 1);
++});
++manualCheck("GDW08 G20-63 a Codex SubagentStart binds a prepared child and an unprepared worker child gets a model-visible notice", () => {
++  const { root } = preparedFixture("start-bind");
++  const start = { hook_event_name: "SubagentStart", agent_id: "g2063-agent-1", agent_type: "worker", model: "gpt-6-luna" };
++  // Governed feature in implementation, nothing prepared: the child is told its work will not be integrated.
++  const unprepared = runHost(root, start);
++  assert.equal(unprepared.code, 0, "a SubagentStart hook never blocks");
++  const notice = JSON.parse(unprepared.stdout).hookSpecificOutput;
++  assert.equal(notice.hookEventName, "SubagentStart");
++  assert.match(notice.additionalContext, /will not be (?:host-committed|integrated)/u);
++  assert.match(notice.additionalContext, /codex-native-dispatch-prepare\.mjs prepare/u, "the notice names the prepare command");
++  assert.match(notice.additionalContext, /spawn_agent/u);
++  // A child that is not a worker (an explorer) gets no notice.
++  assert.equal(runHost(root, { ...start, agent_id: "g2063-agent-x", agent_type: "explorer" }).stdout, "", "a non-worker child gets no notice");
++  // Prepared: the same start binds and prints no notice.
++  assert.equal(runPrepare(root, "scratch/briefing-prep.md").code, 0);
++  const bound = runHost(root, start);
++  assert.equal(bound.code, 0);
++  assert.equal(bound.stdout, "", "a bound child gets no notice");
++  const privateDir = join(root, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
++  assert.equal(readdirSync(privateDir).filter((name) => name.startsWith("agent-codex-")).length, 1, "the start wrote its agent binding to the prepared pending state");
++});
++manualCheck("GDW09 G20-63 the SubagentStop finalizer host-commits the Codex child bound to a prepared dispatch", () => {
++  const { root } = preparedFixture("stop-commit");
++  for (const [key, value] of [["user.name", "Fixture"], ["user.email", "fixture@example.invalid"], ["commit.gpgsign", "false"]]) execFileSync("git", ["config", key, value], { cwd: root });
++  const candidate = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
++  assert.equal(runPrepare(root, "scratch/briefing-prep.md").code, 0);
++  const start = { hook_event_name: "SubagentStart", agent_id: "g2063-agent-2", agent_type: "worker", model: "gpt-6-luna" };
++  assert.equal(runHost(root, start).code, 0);
++  writeFileSync(join(root, "src", "change.mjs"), "// G20-63 prepared Codex child change\nexport const value = 'expected';\n");
++  const last = JSON.stringify({ schema: "pipeline.native-goldfish-host-return.v1", dispatchId: "GD15N-CODEX-WORKER", candidateCommit: candidate, outcome: "succeeded",
++    report: "Implemented the fixture change.", changedPaths: ["src/change.mjs"] });
++  const stop = runHost(root, { hook_event_name: "SubagentStop", agent_id: "g2063-agent-2", agent_type: "worker", model: "gpt-6-luna", last_assistant_message: last });
++  assert.equal(stop.code, 0, stop.stderr);
++  assert.match(stop.stderr, /Goldfish host commit verified/u, `the stop host-commits the prepared child: ${stop.stderr}`);
++  const message = execFileSync("git", ["log", "-1", "--format=%B"], { cwd: root, encoding: "utf8" });
++  assert.match(message, /Dispatch: GD15N-CODEX-WORKER \(goldfish\)/u);
++  assert.notEqual(execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), candidate, "HEAD moved by the host commit");
++});
++
++assert.equal(cases.length, 9, "the native-worker dispatch regression corpus must register nine cases (G20-63 adds five)");
+ 
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 02d99e220..4df87c6d3 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -266,7 +266,7 @@ export function writeCapableCarrierAdmission({ subagentType, transport = "direct
+   // the Pipeline carriers (lib/agy-native-goldfish.mjs already treats both spellings alike); Claude and Codex keep the
+   // namespaced form, where a bare name could be a project's own agent.
+   if (transport === "antigravity" && ["goldfish-deep", "goldfish-implementor", "goldfish-mechanic"].includes(type)) return null;
+-  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; ${type === "" ? "no agent type was named" : `${JSON.stringify(type)} is not a shipped Pipeline role, and a runner-native type carries no read-only guarantee`}; repair: for a read-only review dispatch a shipped read-only role (pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor; on Antigravity prepare the call first, references/antigravity-native-dispatch.md), for implementation a shipped pipeline-core:goldfish-* role (on Antigravity the bare goldfish-implementor, goldfish-mechanic or goldfish-deep: the host refuses a colon in an agent name), and dispatch its generated or required role briefing; the Antigravity prepare command is \`node <plugin-root>/scripts/antigravity-native-dispatch-prepare.mjs prepare --root <repo> --request <file>\`` };
++  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; ${type === "" ? "no agent type was named" : `${JSON.stringify(type)} is not a shipped Pipeline role, and a runner-native type carries no read-only guarantee`}; repair: for a read-only review dispatch a shipped read-only role (pipeline-core:critic, readiness-reviewer, plan-verifier or consult-advisor; on Antigravity prepare the call first, references/antigravity-native-dispatch.md), for implementation a shipped pipeline-core:goldfish-* role (on Antigravity the bare goldfish-implementor, goldfish-mechanic or goldfish-deep: the host refuses a colon in an agent name), and dispatch its generated or required role briefing; the Antigravity prepare command is \`node <plugin-root>/scripts/antigravity-native-dispatch-prepare.mjs prepare --root <repo> --request <file>\`; on Codex run \`node <plugin-root>/scripts/codex-native-dispatch-prepare.mjs prepare --root <repo> --briefing scratch/<briefing>.md\` first, then spawn_agent with the arguments it prints (G20-63)` };
+ }
+ 
+ // ---------------------------------------------------------------------------------------------
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index 60e5220b5..9294b7132 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -6,11 +6,11 @@ import { join } from "node:path";
+ import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget-core.mjs";
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
++import { integrateNativeGoldfishItemDelivery, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+ import { finalizeNativeGoldfishHostReturn, readSubagentHandbackMessage, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
+ import { issueCriticSourceReturn } from "../lib/critic-source-return.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+-import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
++import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ import { admissionProgress } from "../lib/admission-progress.mjs";
+ // Repository admission precedes hook input hardening and all governed effects.
+@@ -51,6 +51,25 @@ export function nativeGoldfishCheckpointBlock({ commonDir, input, runner, result
+   } catch { return null; }
+ }
+ 
++/**
++ * G20-63: the model-visible SubagentStart notice for a Codex worker child that started with NO prepared dispatch state while a governed
++ * feature is in implementation (an approved delivery course exists or is yet to be written). Such a child is not host-committed and its
++ * slice is not integrated, and nothing else tells anyone: Codex runs no PreToolUse hook for spawn_agent, so the admission only happens when
++ * the Elephant runs the prepare command first. Returns the text, or null when the notice does not apply (not a Codex worker, not governed,
++ * no feature in implementation). Never throws.
++ */
++export function codexUnpreparedStartNotice({ root, input } = {}) {
++  try {
++    if (input?.hook_event_name !== "SubagentStart" || input?.agent_type !== "worker") return null;
++    const governed = resolveGovernedItemQueue({ root });
++    if (governed.status !== "required" && governed.code !== "SQ-DELIVERY-COURSE-ABSENT") return null;
++    return "Pipeline notice (G20-63): this worker started with no prepared Goldfish dispatch, so its work will not be host-committed and its slice will not be integrated. "
++      + "The Elephant must prepare a governed dispatch before spawn_agent: build the briefing with dispatch-briefing.mjs build --out scratch/<briefing>.md, run "
++      + "node <plugin-root>/scripts/codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing scratch/<briefing>.md, then call spawn_agent with the arguments it prints. "
++      + "If you are such a Goldfish, finish the briefed work, leave your changes uncommitted and return the JSON contract; the Elephant has to prepare and re-dispatch before it counts.";
++  } catch { return null; }
++}
++
+ const STOP_FAILURE_SCHEMA ="pipeline.native-goldfish-host-stop-failure.v1";
+ 
+ /**
+@@ -206,6 +225,9 @@ if (isDirectInvocation(import.meta.url)) {
+   process.once("exit", () => admissionProgress("exit"));
+   // T6-A: bind this Claude hook process to its own hook-observed session owner.
+   if (runner === "claude") enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
++  // G20-63: the Codex SubagentStart/SubagentStop hooks bind the same hook-observed owner (the prepare command's admission bound it for the
++  // pending state); without it the stop's authority boundary refused SDC-AUTHORITY-UNAVAILABLE and nothing was host-committed.
++  else enterCodexHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
+   // G20-39: the Critic subagent's stop issues the Critic Source return record (this hook, never the calling agent). Any other stop, and
+   // any fault here, continues below exactly as before; this branch never blocks the stop and prints nothing on stdout.
+   if (input.hook_event_name === "SubagentStop") {
+@@ -228,6 +250,11 @@ if (isDirectInvocation(import.meta.url)) {
+   // message, exit 0.
+   try { result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result}); }
+   catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: result?.commit ?? null }; }
++  // G20-63: a Codex SubagentStart that bound nothing says so to the starting child (additionalContext), not only on the hook's stderr.
++  if (runner === "codex" && input.hook_event_name === "SubagentStart" && result?.code === "NGHS-CODEX-START-UNBOUND") {
++    const notice = codexUnpreparedStartNotice({ root: process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd(), input });
++    if (notice) process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "SubagentStart", additionalContext: notice } })}\n`);
++  }
+   // Slice C: a PostToolUse call is the one channel the Elephant reads, so a failed background stop is shown there.
+   let stopFailure = null;
+   if (runner === "claude" && input.hook_event_name === "PostToolUse" && ["Agent", "Task"].includes(input.tool_name)) {
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 235ee0a76..109d10ba6 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -391,7 +391,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
+     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
+ }
+ 
+-import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT, PROOF_WAIT_SCRIPT } from "./constants.mjs";
++import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, CODEX_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT, PROOF_WAIT_SCRIPT } from "./constants.mjs";
+ 
+ // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
+ // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
+@@ -411,6 +411,15 @@ function sanctionedAntigravityNativeDispatchPrepareArgs(args, root) {
+     && !args[4].split("/").some((part) => part === "." || part === "..");
+ }
+ 
++// G20-63: scripts/codex-native-dispatch-prepare.mjs accepts exactly `prepare --root <root> --briefing <md>` (its argvRequest). The briefing is a
++// repository-relative scratch/*.md file (what `dispatch-briefing.mjs build --out` writes) with no dot segment.
++const CODEX_DISPATCH_BRIEFING = /^scratch\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\.md$/u;
++function sanctionedCodexNativeDispatchPrepareArgs(args, root) {
++  return args.length === 5 && args[0] === "prepare" && args[1] === "--root" && args[2] === root
++    && args[3] === "--briefing" && CODEX_DISPATCH_BRIEFING.test(args[4])
++    && !args[4].split("/").some((part) => part === "." || part === "..");
++}
++
+ // D165 (S1): the brownfield adoption route. Each script is admitted as exact argv shapes only; `architecture-adoption.mjs apply`
+ // is admitted only in its signed shape (C20 w252, below), never with a chat approval. Every flag is single-use except `prepare --scope` (at most 8, handled by a pre-pass
+ // because matchFlagSpec refuses repeats). The fitness script ignores unknown flags itself, so this catalogue is the strict side.
+@@ -646,6 +655,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === ANALYSIS_RUN_SCRIPT) return sanctionedAnalysisRunArgs(args, root);
+   if (script === MODEL_ROLE_BOOTSTRAP_SCRIPT) return sanctionedModelRoleBootstrapArgs(args, root);
+   if (script === ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT) return sanctionedAntigravityNativeDispatchPrepareArgs(args, root);
++  if (script === CODEX_NATIVE_DISPATCH_PREPARE_SCRIPT) return sanctionedCodexNativeDispatchPrepareArgs(args, root);
+   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
+   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
+   if (script === MODEL_ROLE_DISPATCH_SELECT_SCRIPT) return sanctionedModelRoleDispatchSelectArgs(args, root);
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index 22c944d47..6313c11d4 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -196,6 +196,8 @@ export const DESIGN_REVIEW_RECEIPT_SCRIPT = fileURLToPath(new URL("../../scripts
+ // K152 (G7): the two further scripts the Antigravity references demand in the design phase; each is admitted by its own closed argv grammar in command-catalogue.mjs.
+ export const MODEL_ROLE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("../../scripts/model-role-bootstrap.mjs", import.meta.url));
+ export const ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT = fileURLToPath(new URL("../../scripts/antigravity-native-dispatch-prepare.mjs", import.meta.url));
++// G20-63: the Codex counterpart (the governed admission Codex never runs at spawn_agent).
++export const CODEX_NATIVE_DISPATCH_PREPARE_SCRIPT = fileURLToPath(new URL("../../scripts/codex-native-dispatch-prepare.mjs", import.meta.url));
+ export const REGISTER_FEATURE_PACKAGE_SCRIPT = fileURLToPath(new URL("../../scripts/register-feature-package.mjs", import.meta.url));
+ export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-baseline.mjs", import.meta.url));
+ // C20 w253 (G20-26): the one way an ADR proposal is created (docs/adr/draft-<slug>.md + .json); closed argv grammar in command-catalogue.mjs.
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index db2bdf7a2..aea3b74d0 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -36,6 +36,7 @@ import { fileURLToPath } from "node:url";
+ // Repairs name the absolute script, so a plain terminal can run them as printed (Critic F9).
+ const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
+ const ROUTINE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
++const CODEX_PREPARE_SCRIPT = fileURLToPath(new URL("../scripts/codex-native-dispatch-prepare.mjs", import.meta.url));
+ /** A cancel names a slice the queue has no row for while a native dispatch state still names it (the queue file was restored or replaced
+  * after the dispatch started): a cancel cannot release that reservation, so the refusal names the repair that can. */
+ function orphanReservationRepair(sliceId) {
+@@ -51,6 +52,12 @@ export const NATIVE_GOLDFISH_ITEM_HOST_STATE_SCHEMA = "pipeline.native-goldfish-
+ export const NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA="pipeline.native-goldfish-host-state.v3";
+ const nativeStateSchema = value => [NATIVE_GOLDFISH_HOST_STATE_SCHEMA, NATIVE_GOLDFISH_ITEM_HOST_STATE_SCHEMA,NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA].includes(value);
+ export const NATIVE_GOLDFISH_CODEX_START_BINDING_TTL_MS = 120_000;
++// G20-63: a Codex dispatch prepared by scripts/codex-native-dispatch-prepare.mjs (its tool_use_id is the prepared-dispatch token) waits for
++// the Elephant to re-emit the whole briefing in spawn_agent, which takes a model turn, not a hook round trip: its bind window is longer.
++// The state of a hook-admitted PreToolUse keeps the window above.
++export const NATIVE_GOLDFISH_CODEX_PREPARED_START_BINDING_TTL_MS = 300_000;
++const PREPARED_CODEX_TOKEN = /^prepared-codex-[a-f0-9]{64}$/u;
++const codexBindWindowMs = (toolUseId) => (PREPARED_CODEX_TOKEN.test(toolUseId ?? "") ? NATIVE_GOLDFISH_CODEX_PREPARED_START_BINDING_TTL_MS : NATIVE_GOLDFISH_CODEX_START_BINDING_TTL_MS);
+ const RUNNERS = new Set(["claude", "codex"]);
+ const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+ const SHA = /^[a-f0-9]{64}$/u;
+@@ -322,6 +329,17 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+   if (!captured?.ok && !binding.itemDelivery) return fail(captured?.code ?? "NGHS-BASELINE");
+   const commonDir = (dependencies.resolveCommonDir ?? resolveGitCommonDir)(physicalRoot);
+   if (typeof commonDir !== "string") return fail("NGHS-COMMON-DIR");
++  if (runner === "codex") {
++    // G20-63 (idempotent admission): the Codex prepare command and a later PreToolUse admission of the same briefing (should a future Codex
++    // fire that hook) carry different tool_use_ids and would publish two unclaimed pending states, which SubagentStart then refuses as
++    // ambiguous. An unclaimed state of this session with the identical binding is reused; its queue row is already the same row.
++    const prior = findUnclaimedCodexPending({ commonDir, sessionId: fields.sessionId, dispatchId: binding.dispatchId, binding });
++    // A state whose bind window has passed can no longer be bound by a start: it is not reused, the normal admission below decides
++    // (its reservation of the slice, if still held, is refused there with the existing repair).
++    if (prior.ok && (dependencies.nowEpochMs ?? Date.now)() - prior.createdAtMs <= codexBindWindowMs(prior.toolUseId)) {
++      return { ok: true, code: "NGHS-ALREADY-PREPARED", sha256: prior.sha256, runner, dispatchId: binding.dispatchId };
++    }
++  }
+   const state = {
+     schema: delivery ? NATIVE_GOLDFISH_ITEM_HOST_STATE_SCHEMA : NATIVE_GOLDFISH_HOST_STATE_SCHEMA, runner, sessionId: fields.sessionId,
+     toolUseId: fields.correlation, agentId: null, role: binding.role,
+@@ -373,27 +391,62 @@ export function readNativeGoldfishPrepareFailure({ commonDir, runner, sessionId,
+   } catch { return null; }
+ }
+ 
+-/** Codex's SubagentStart lacks tool_use_id: permit only one exact waiting native dispatch. */
+-export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now() } = {}) {
+-  if (!ID.test(input?.session_id ?? "") || !ID.test(input?.agent_id ?? "")
+-    || input?.hook_event_name !== "SubagentStart" || !Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0) return fail("NGHS-CODEX-START-INPUT");
+-  const dir = privateDirectory(commonDir, false);
+-  const observedAgentType = typeof input.agent_type === "string" ? input.agent_type : "";
+-  const expectedRole = observedAgentType.replace(/^pipeline-core:/u, "");
+-  const expectedModel = typeof input.model === "string" ? input.model : "";
+-  const claimedPendingFiles = new Set();
++/** The pending files a started Codex agent of this session has already claimed (their write-once agent associations). */
++function claimedCodexPendingFiles(commonDir, dir, sessionId) {
++  const claimed = new Set();
+   for (const filename of readdirSync(dir)) {
+     if (!filename.startsWith("agent-codex-") || !filename.endsWith(".json")) continue;
+     try {
+       const { value } = readPrivate(commonDir, filename);
+       if (exact(value, ["schema", "runner", "sessionId", "agentId", "pendingFile", "pendingSha256", "agentType", "createdAtMs"])
+         && value.schema === "pipeline.native-goldfish-host-agent-binding.v1"
+-        && value.runner === "codex" && value.sessionId === input.session_id
++        && value.runner === "codex" && value.sessionId === sessionId
+         && ID.test(value.agentId ?? "") && SHA.test(value.pendingSha256 ?? "")
+         && typeof value.pendingFile === "string" && value.pendingFile.startsWith("pending-codex-")
+-        && value.pendingFile.endsWith(".json")) claimedPendingFiles.add(value.pendingFile);
++        && value.pendingFile.endsWith(".json")) claimed.add(value.pendingFile);
+     } catch { /* unreadable private association cannot claim a pending dispatch */ }
+   }
++  return claimed;
++}
++
++/**
++ * G20-63: the pending Codex state of this session and dispatch that no started agent has claimed yet, or null-like `{ok:false}`.
++ * `binding` (optional) must equal the stored binding byte for byte, so a changed briefing of the same dispatch id is not "the same".
++ * Used by the Codex prepare command's readback and by the idempotent preparation below; it only reads private files.
++ */
++export function findUnclaimedCodexPending({ commonDir, sessionId, dispatchId, binding } = {}) {
++  try {
++    if (!ID.test(sessionId ?? "") || !ID.test(dispatchId ?? "")) return fail("NGHS-CODEX-PENDING-INPUT");
++    const dir = privateDirectory(commonDir, false);
++    const claimed = claimedCodexPendingFiles(commonDir, dir, sessionId);
++    const found = [];
++    for (const filename of readdirSync(dir)) {
++      if (!filename.startsWith("pending-codex-") || !filename.endsWith(".json") || claimed.has(filename)) continue;
++      try {
++        const { value, sha256 } = readPrivate(commonDir, filename);
++        if (nativeStateSchema(value.schema) && value.runner === "codex" && value.sessionId === sessionId && value.agentId === null
++          && value.binding?.dispatchId === dispatchId && Number.isSafeInteger(value.createdAtMs)
++          && (binding === undefined || JSON.stringify(value.binding) === JSON.stringify(binding))) {
++          found.push({ ok: true, code: "NGHS-CODEX-PENDING-FOUND", filename, sha256, createdAtMs: value.createdAtMs, toolUseId: value.toolUseId });
++        }
++      } catch { /* corrupt private evidence is never a match */ }
++    }
++    // The newest wins: an older unclaimed state of the same dispatch (its bind window passed) is never the one a start can bind.
++    return found.sort((a, b) => b.createdAtMs - a.createdAtMs)[0] ?? fail("NGHS-CODEX-PENDING-ABSENT");
++  } catch { return fail("NGHS-CODEX-PENDING-ABSENT"); }
++}
++
++/** Codex's SubagentStart lacks tool_use_id: permit only one exact waiting native dispatch. */
++export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now() } = {}) {
++  if (!ID.test(input?.session_id ?? "") || !ID.test(input?.agent_id ?? "")
++    || input?.hook_event_name !== "SubagentStart" || !Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0) return fail("NGHS-CODEX-START-INPUT");
++  // G20-63: no private directory yet means no dispatch was ever prepared in this repository: that is "unbound", not a hook exception.
++  let dir;
++  try { dir = privateDirectory(commonDir, false); } catch { return fail("NGHS-CODEX-START-UNBOUND"); }
++  const observedAgentType = typeof input.agent_type === "string" ? input.agent_type : "";
++  const expectedRole = observedAgentType.replace(/^pipeline-core:/u, "");
++  const expectedModel = typeof input.model === "string" ? input.model : "";
++  const claimedPendingFiles = claimedCodexPendingFiles(commonDir, dir, input.session_id);
+   const candidates = [];
+   for (const filename of readdirSync(dir)) {
+     if (!filename.startsWith("pending-codex-") || !filename.endsWith(".json")) continue;
+@@ -405,7 +458,7 @@ export function bindNativeCodexStart({ commonDir, input, nowEpochMs = Date.now()
+         && (value.binding.adapterVersion === 2 ? value.binding.nativeAgentType === observedAgentType : value.binding.agentType === expectedRole)
+         && value.binding.model === expectedModel && value.agentId === null
+         && Number.isSafeInteger(value.createdAtMs) && nowEpochMs >= value.createdAtMs
+-        && nowEpochMs - value.createdAtMs <= NATIVE_GOLDFISH_CODEX_START_BINDING_TTL_MS) {
++        && nowEpochMs - value.createdAtMs <= codexBindWindowMs(value.toolUseId)) {
+         candidates.push({ filename, value });
+       }
+     } catch { /* corrupt private evidence is never a match */ }
+@@ -1307,7 +1360,7 @@ export function resolveGovernedItemQueue({ root } = {}) {
+       if (error?.code === "ENOENT") return { status: "refused", code: "SQ-DELIVERY-COURSE-ABSENT",
+         // G20-62: the repair named the internal writer function; a Codex session imported it into a scratch script, which the
+         // writer refuses outside a dispatch admission (SDC-AUTHORITY-UNAVAILABLE), and stayed stuck for hours.
+-        repair: "The approved feature has no delivery course (slice-queue.json) yet. The dispatch admission writes it from the first item: build that item's briefing with dispatch-briefing.mjs build (its binding carries the item delivery: criterion locator and check paths) and dispatch it through the runner's native route (Claude Agent; Antigravity prepare then invoke_subagent). On Codex no admission runs at spawn_agent in this version (Codex runs no PreToolUse hook for spawn_agent), so the course cannot be written there yet: stop and report this refusal to the PO instead of committing the work as orchestrator. The course writer runs only inside that admission; never call it from a script." };
++        repair: "The approved feature has no delivery course (slice-queue.json) yet. The dispatch admission writes it from the first item: build that item's briefing with dispatch-briefing.mjs build (its binding carries the item delivery: criterion locator and check paths) and dispatch it through the runner's native route (Claude Agent; Antigravity prepare then invoke_subagent; Codex prepare then spawn_agent). On Codex no hook admits spawn_agent (Codex runs no PreToolUse hook for it), so the admission is run by hand before it: write the briefing with dispatch-briefing.mjs build --out scratch/<briefing>.md, then node " + CODEX_PREPARE_SCRIPT + " prepare --root <repository-root> --briefing scratch/<briefing>.md (it writes the course, the route record and the pending state, or refuses with the guard's code and repair), then spawn_agent with exactly the arguments it prints. The course writer runs only inside that admission; never call it from a script." };
+       throw error;
+     }
+     const queue = parseStrictJson(bytes.toString("utf8"));
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+index 29cddcc18..d16cfb9a1 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+@@ -77,7 +77,29 @@ test("K152: no other script of the plugin is admitted by these pins (design-revi
+   assert.equal(admitted(`node ${receipt}`), false);
+ });
+ 
+-if (cases.length !== 5) throw new Error("K152 admission case count drift");
++// G20-63 (candidate 20d): the Codex prepare command is admitted by exactly its documented argv shape, like its Antigravity counterpart.
++const codexPrepare = join(scripts, "codex-native-dispatch-prepare.mjs");
++test("G20-63: codex-native-dispatch-prepare is admitted with exactly `prepare --root <root> --briefing <scratch md>`", () => {
++  assert.equal(admitted(`node ${codexPrepare} prepare --root ${root} --briefing scratch/dispatch-briefing.md`), true);
++});
++test("G20-63: codex-native-dispatch-prepare stays refused for any other argv shape", () => {
++  const other = mkdtempSync(join(tmpdir(), "k152-other-root-"));
++  try {
++    for (const tail of [
++      `prepare --root ${other} --briefing scratch/b.md`,                           // a different root
++      `prepare --root ${root} --briefing ../outside.md`,                           // traversal
++      `prepare --root ${root} --briefing /etc/passwd`,                             // absolute briefing path
++      `prepare --root ${root} --briefing scratch/b.json`,                          // not a markdown briefing
++      `prepare --root ${root} --briefing src/b.md`,                                // not the scratch directory
++      `prepare --root ${root} --briefing scratch/b.md --apply`,                    // an extra argument
++      `apply --root ${root} --briefing scratch/b.md`,                              // another subcommand
++      `prepare --root ${root} --request scratch/b.md`,                             // the Antigravity flag
++      "",
++    ]) assert.equal(admitted(`node ${codexPrepare} ${tail}`.trim()), false, tail);
++  } finally { rmSync(other, { recursive: true, force: true }); }
++});
++
++if (cases.length !== 7) throw new Error("K152 admission case count drift (five original examiners and the two G20-63 cases)");
+ 
+ // Supplementary controlled Source tests. The original five examiners and their
+ // order remain above. Fixture state and readiness dependencies are test doubles,
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 61196bd3c..8ae56fb99 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -500,10 +500,12 @@ test("AC-264 added (P0-1): an approved feature without a delivery course reports
+   // called it from a scratch script (refused SDC-AUTHORITY-UNAVAILABLE). It now names the executable route instead.
+   assert.match(absent.repair, /dispatch-briefing\.mjs build/u, "the repair names the briefing builder of the first item");
+   // G20-63 (measured 2026-11-08, Codex 0.167.0): Codex runs no PreToolUse hook for spawn_agent, so no admission writes the
+-  // course there; the repair must not offer spawn_agent as a working route and tells Codex to stop and report instead.
+-  assert.match(absent.repair, /Claude Agent; Antigravity prepare then invoke_subagent/u, "the repair names the native dispatch routes that admit");
+-  assert.match(absent.repair, /On Codex no admission runs at spawn_agent/u, "the repair names the Codex gap honestly");
+-  assert.match(absent.repair, /stop and report this refusal to the PO/u);
++  // course there on its own. The 20c wording said the course could not be written on Codex and told it to stop and report; G20-63
++  // (candidate 20d) restates it in place: the repair names the agent-run prepare command, then spawn_agent (same assertion count).
++  assert.match(absent.repair, /Claude Agent; Antigravity prepare then invoke_subagent; Codex prepare then spawn_agent/u, "the repair names the native dispatch routes that admit, Codex included");
++  assert.match(absent.repair, /On Codex no hook admits spawn_agent[^.]*, so the admission is run by hand before it/u, "the repair names the Codex gap and its remedy honestly");
++  assert.match(absent.repair, /codex-native-dispatch-prepare\.mjs prepare --root <repository-root> --briefing scratch\/<briefing>\.md[^.]*then spawn_agent with exactly the arguments it prints/u);
++  assert.doesNotMatch(absent.repair, /cannot be written there yet|stop and report this refusal to the PO/u, "the 20c wording that Codex cannot write the course is gone");
+   assert.doesNotMatch(absent.repair, /prepareGovernedItemQueue/u, "the repair never names the internal writer");
+   symlinkSync(join(root, "nowhere.json"), join(root, "specs/unit/slice-queue.json"));
+   assert.equal(resolveGovernedItemQueue({ root }).code, "SQ-DELIVERY-STATE-UNAVAILABLE", "only a missing file is an absent course");
+diff --git a/plugins/pipeline-core/scripts/codex-native-dispatch-prepare.mjs b/plugins/pipeline-core/scripts/codex-native-dispatch-prepare.mjs
+new file mode 100644
+index 000000000..e168097b9
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/codex-native-dispatch-prepare.mjs
+@@ -0,0 +1,141 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Agent-run Codex prepare route for a governed Goldfish dispatch (candidate 20d, G20-63).
++ *
++ *   node <plugin-root>/scripts/codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing scratch/<briefing>.md
++ *
++ * WHY. MEASURED 2026-11-08 (Codex CLI 0.167.0): Codex never runs a PreToolUse hook for the spawn_agent tool, so hooks/guard-dispatch.mjs
++ * never admitted a Codex Goldfish: no briefing route record, no governed slice queue row, no native pending state. A Codex child
++ * therefore was never host-committed, no slice was integrated, and the next module stayed DBG-MODULE-NOT-RUNNABLE. SubagentStart and
++ * SubagentStop DO fire on Codex, and they already bind and host-commit a child that has a pending state (hooks/native-goldfish-host.mjs).
++ * This command is the missing admission: the Elephant runs it ONCE per dispatch, from the generated briefing file, before spawn_agent.
++ *
++ * WHAT IT DOES. It builds the hook input Codex would have sent for that spawn_agent call (tool_name spawn_agent, agent_type from the
++ * briefing's own binding, message = the briefing bytes, the Codex session id, a deterministic prepared-dispatch token as tool_use_id) and
++ * runs hooks/guard-dispatch.mjs on it as a child process, exactly as the Antigravity adapter runs its nested guards. The admission is
++ * therefore the guard's own, not a copy: the same carrier, generated-briefing, route-record, second-writer, scope, governed-queue and
++ * native-pending checks, the same codes, the same repair texts, the same records, the same hook-observed session owner. A refusal is
++ * the guard's refusal (exit 2, its code and text) and, like in the hook, leaves no state behind. On success it reads the pending state
++ * back (an exit 0 of the guard alone does not prove one was written) and prints the spawn_agent arguments to use.
++ *
++ * HONEST LIMITS. (1) The session id is the one the Codex runtime exposes to its shell (CODEX_SESSION_ID or CODEX_THREAD_ID, the source
++ * lib/model-role-host-identity.mjs already uses); that it equals the session_id of the later SubagentStart payload is provable only in a
++ * real Codex run. (2) The SubagentStart payload has no field that could carry the prepared token, so the binding stays the existing
++ * rule: exactly one unclaimed pending state of this session whose agent type and model match, inside the bind window. The token is
++ * informational and names the state. (3) The prepared state is idempotent: a second prepare of the same briefing, and a later PreToolUse
++ * admission of it (should a future Codex fire the hook), reuse it and write no second queue row or pending state.
++ */
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { lstatSync, readFileSync, realpathSync } from "node:fs";
++import { isAbsolute, relative, resolve, sep } from "node:path";
++import { fileURLToPath } from "node:url";
++
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { observeGovernanceScope } from "../lib/governance-scope.mjs";
++import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
++import { DISPATCH_ADMISSION_BRIEFING_RUNNERS, parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
++import { NATIVE_GOLDFISH_CODEX_PREPARED_START_BINDING_TTL_MS, findUnclaimedCodexPending } from "../lib/native-goldfish-host-state.mjs";
++import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
++
++export const CODEX_PREPARE_SCHEMA = "pipeline.codex-native-dispatch-prepare.v1";
++const GUARD = fileURLToPath(new URL("../hooks/guard-dispatch.mjs", import.meta.url));
++const BRIEFING_FILE = /^scratch\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\.md$/u;
++const MAX_BRIEFING_BYTES = 1024 * 1024;
++// The guard's own admission budget is 300 s (guard-dispatch ADMISSION_BUDGET_MS); the child gets a little more.
++const GUARD_TIMEOUT_MS = 330_000;
++const clean = (text, max) => String(text).replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, max);
++// The one digest definition of the briefing text (guard-dispatch briefingSha256): CRLF normalised to LF, nothing else.
++const briefingDigest = (text) => createHash("sha256").update(text.replace(/\r\n/gu, "\n"), "utf8").digest("hex");
++const rejected = (code, reason, repair) => ({ schema: CODEX_PREPARE_SCHEMA, status: "rejected", code, reason, ...(repair ? { repair } : {}), modelCalls: 0 });
++
++function readBriefing(root, relativePath) {
++  const fail = (reason) => rejected("CODEX-PREPARE-BRIEFING-FILE", reason,
++    "write the briefing with node <plugin-root>/scripts/dispatch-briefing.mjs build --package <package.json> --out scratch/<briefing>.md and pass that repository-relative path");
++  if (typeof relativePath !== "string" || !BRIEFING_FILE.test(relativePath) || relativePath.split("/").some((part) => part === "." || part === "..")) {
++    return { rejection: fail("--briefing must be a repository-relative scratch/*.md path") };
++  }
++  try {
++    const lexical = resolve(root, relativePath);
++    const rel = relative(root, lexical);
++    if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return { rejection: fail("the briefing path leaves the repository") };
++    const info = lstatSync(lexical);
++    if (!info.isFile() || info.isSymbolicLink() || info.size < 2 || info.size > MAX_BRIEFING_BYTES || realpathSync(lexical) !== lexical) {
++      return { rejection: fail("the briefing is not a regular, unlinked file of bounded size") };
++    }
++    return { text: readFileSync(lexical, "utf8") };
++  } catch { return { rejection: fail("the briefing file cannot be read") }; }
++}
++
++/**
++ * Prepares ONE governed Codex Goldfish dispatch. `spawn` and `env` are seams for tests; the defaults are the real ones.
++ * Returns a closed result object: status "prepared" (use result.spawn_agent), "not-applicable" (an ungoverned repository: nothing to
++ * prepare) or "rejected" (the guard's or this command's code, reason and repair; no state was left).
++ */
++export function prepareCodexNativeDispatch({ root, briefing, env = process.env, spawn = spawnSync } = {}) {
++  let physicalRoot;
++  try { physicalRoot = realpathSync(resolve(root)); } catch { return rejected("CODEX-PREPARE-ROOT", "--root is not a readable directory", "pass the repository root"); }
++  const read = readBriefing(physicalRoot, briefing);
++  if (read.rejection) return read.rejection;
++  const text = read.text;
++  const parsed = parseNativeGoldfishBriefing(text, { runners: DISPATCH_ADMISSION_BRIEFING_RUNNERS });
++  // A briefing without a valid Codex binding names no worker type; the guard then refuses it with its own carrier or marker code.
++  const agentType = parsed.ok && typeof parsed.binding.nativeAgentType === "string" ? parsed.binding.nativeAgentType : "default";
++  if (!observeGovernanceScope({ rootDir: physicalRoot }).requiresEnforcement) {
++    return { schema: CODEX_PREPARE_SCHEMA, status: "not-applicable", code: "CODEX-PREPARE-NOT-GOVERNED",
++      reason: "this repository is not enrolled in Pipeline governance, so no admission applies and no state was written",
++      spawn_agent: { agent_type: agentType, message: text }, modelCalls: 0 };
++  }
++  const identity = resolveModelRoleHostSessionIdentity({ runner: "codex", env });
++  if (!identity.ok) {
++    return rejected("CODEX-PREPARE-SESSION-UNAVAILABLE", `the Codex session id is unavailable (${identity.code})`,
++      "run this command from the Codex session's own shell (it exposes CODEX_THREAD_ID); the pending state is bound to that session, and a shell outside it cannot prepare a dispatch for it");
++  }
++  // Each prepare names its pending state with a fresh token (the briefing digest and the time), so a state whose bind window passed never
++  // collides with the next prepare; a reused state keeps the token it was written with, and that one is reported below.
++  const freshToken = `prepared-codex-${createHash("sha256").update(`${briefingDigest(text)}\0${Date.now()}`).digest("hex")}`;
++  const hookInput = { hook_event_name: "PreToolUse", tool_name: "spawn_agent", tool_use_id: freshToken, session_id: identity.sessionId, cwd: physicalRoot,
++    tool_input: { agent_type: agentType, message: text } };
++  const ran = spawn(process.execPath, [GUARD], { cwd: physicalRoot, input: JSON.stringify(hookInput), encoding: "utf8", timeout: GUARD_TIMEOUT_MS,
++    maxBuffer: 8 * 1024 * 1024, env: { ...env, CLAUDE_PROJECT_DIR: physicalRoot } });
++  const stderr = String(ran.stderr ?? "");
++  if (ran.error || ran.status === null || (ran.status !== 0 && ran.status !== 1 && ran.status !== 2)) {
++    return rejected("CODEX-PREPARE-GUARD-FAILED", `the dispatch admission did not complete (${clean(ran.error?.code ?? ran.error?.name ?? ran.signal ?? `exit ${ran.status}`, 60)})`,
++      "run the same command again; if it repeats, inspect the session authority with node <plugin-root>/scripts/session-authority-repair.mjs inspect --root <repository-root>");
++  }
++  if (ran.status === 2) {
++    const code = /BLOCKED \(guard-dispatch[^)]*\): ([A-Za-z0-9][A-Za-z0-9._-]{0,63}):/u.exec(stderr)?.[1] ?? "CODEX-PREPARE-GUARD-REFUSED";
++    return rejected(code, clean(stderr, 1500), "the refusal text carries its own repair; fix the briefing or the state it names, then run prepare again (a refusal leaves no state)");
++  }
++  // Exit 0 does not prove a pending state exists: the guard also admits a dispatch whose native preparation failed with a WARNING.
++  const commonDir = resolveGitCommonDir(physicalRoot);
++  const dispatchId = parsed.ok ? parsed.binding.dispatchId : null;
++  const pending = typeof commonDir === "string" && dispatchId !== null ? findUnclaimedCodexPending({ commonDir, sessionId: identity.sessionId, dispatchId }) : null;
++  if (!pending?.ok) {
++    return rejected("CODEX-PREPARE-NOT-PREPARED", `the admission ran but left no pending state for this session${stderr.trim() === "" ? "" : `: ${clean(stderr, 800)}`}`,
++      "name the cause above, fix it and run prepare again; do not call spawn_agent without a prepared state, its work would not be host-committed");
++  }
++  const bindWindowSeconds = Math.round(NATIVE_GOLDFISH_CODEX_PREPARED_START_BINDING_TTL_MS / 1000);
++  const warnings = stderr.trim() === "" ? [] : [clean(stderr, 1500)];
++  const preparedToken = pending.toolUseId;
++  return { schema: CODEX_PREPARE_SCHEMA, status: "prepared", dispatchId, preparedToken, bindWindowSeconds,
++    spawn_agent: { agent_type: agentType, message: text }, ...(warnings.length > 0 ? { warnings } : {}),
++    next: `Call spawn_agent now with exactly spawn_agent.agent_type and spawn_agent.message (the verified briefing bytes) within ${bindWindowSeconds} seconds of this preparation; the SubagentStart hook binds the started child to the prepared state and the SubagentStop hook host-commits its work. If the window passes first, run prepare again (it reuses the prepared state while the window is open).`,
++    modelCalls: 0 };
++}
++
++function argvRequest(argv) {
++  if (argv.length !== 5 || argv[0] !== "prepare" || argv[1] !== "--root" || argv[3] !== "--briefing") return null;
++  return { root: argv[2], briefing: argv[4] };
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  const request = argvRequest(process.argv.slice(2));
++  const result = request === null
++    ? rejected("CODEX-PREPARE-ARGUMENTS", "expected exactly: prepare --root <repository-root> --briefing scratch/<briefing>.md",
++      "node <plugin-root>/scripts/codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing scratch/<briefing>.md")
++    : prepareCodexNativeDispatch(request);
++  process.stdout.write(`${JSON.stringify(result)}\n`);
++  process.exit(result.status === "rejected" ? 2 : 0);
++}
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 8455faee5..3c6df55f8 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -1282,7 +1282,14 @@ export function buildDispatchBriefing(options, deps = {}) {
+   // the tier of the (possibly raised) binding, the model family of the package's model id, the briefing passed verbatim.
+   const boundTier = generated.binding?.agentType;
+   const base = dispatchCallBase(pkg, boundTier);
+-  const dispatchCall = base === null ? null : {
++  // G20-63: Codex runs no PreToolUse hook for spawn_agent, so its governed admission is the prepare command, run before the call.
++  const codexCall = pkg.runner !== "codex" ? null : {
++    tool: "spawn_agent", agent_type: "worker",
++    prepare: options.out === undefined ? "write the briefing with --out scratch/<briefing>.md first, then run node <plugin-root>/scripts/codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing scratch/<briefing>.md"
++      : `node <plugin-root>/scripts/codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing ${options.out}`,
++    message: "the spawn_agent.message that the prepare command prints, verbatim; call spawn_agent only after prepare exited 0 with status prepared",
++  };
++  const dispatchCall = base === null ? codexCall : {
+     ...base,
+     prompt: options.out === undefined ? "the `text` field of this result, verbatim" : `the file ${options.out}, verbatim including its final newline`,
+     // D183: a Claude Agent dispatch may carry this two-line pointer prompt instead of the full text; guard-dispatch hands the child the verified file bytes.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 33c103448..b18b6a9da 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -66,7 +66,10 @@ command tables.
+    `slice-<module>-r2`, `-r3`, ...): the waves track a module by this id only, so any other id is refused with `DBG-MODULE-SLICE-ID`.
+ 3. Dispatch by runner:
+    - **Claude**: `Agent` / `Task` with the functional `agentType`.
+-   - **Codex**: `spawn_agent` with `nativeAgentType: "worker"`, keeping the `pipeline-core:goldfish-implementor` (or `-mechanic`) role.
++   - **Codex**: Codex runs no PreToolUse hook for `spawn_agent`, so the governed admission is run by hand first. Write the briefing (`dispatch-briefing.mjs build --package <package.json> --out scratch/<briefing>.md`),
++     run `codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing scratch/<briefing>.md` (it performs the guard's admission: route record, governed queue row, pending state; a refusal carries the guard's
++     code and repair and leaves no state), and only after exit 0 and `status: "prepared"` call `spawn_agent` with exactly the printed `spawn_agent.agent_type` (`worker`) and `spawn_agent.message`, keeping the
++     `pipeline-core:goldfish-implementor` (or `-mechanic`) role, within the printed `bindWindowSeconds`. Preparing the same briefing again is safe. A `worker` started without a prepared dispatch gets a SubagentStart notice that its work will not be integrated.
+    - **Antigravity**: `antigravity-native-dispatch-prepare.mjs prepare --root <repository-root> --request <native-dispatch-request.json>`; only after exit 0 and
+      `status: "prepared"` call `invoke_subagent` with `invocation.Subagents` unchanged. A native implementation consent is not available: read
+      `references/antigravity-native-dispatch.md` before the first dispatch and ask the PO when the sanctioned route does not return an authored commit.
+@@ -124,7 +127,7 @@ Owner: `docs/push-release-flow.md`, section "Releasing a consumer project". A co
+ 
+ | Topic | Claude | Codex | Antigravity |
+ | --- | --- | --- | --- |
+-| Dispatch carrier | `Agent` / `Task`, functional `agentType` | `spawn_agent`, `nativeAgentType: "worker"` | `invoke_subagent` (flat args); read-only roles after `antigravity-native-dispatch-prepare.mjs`, Goldfish roles from the generated briefing, no consent |
++| Dispatch carrier | `Agent` / `Task`, functional `agentType` | `spawn_agent`, `nativeAgentType: "worker"`, after `codex-native-dispatch-prepare.mjs` (Codex runs no PreToolUse hook for `spawn_agent`) | `invoke_subagent` (flat args); read-only roles after `antigravity-native-dispatch-prepare.mjs`, Goldfish roles from the generated briefing, no consent |
+ | Mechanic and deep tiers | available | see `config/runner-profiles-v3.json` | `unavailable` there |
+ | Tool budget | per-agent counter; a grant raises it | nothing counts it (the briefing says so) | nothing counts it (the briefing says so) |
+ | Dispatch record model | host-observed | declared, labelled unobserved | see `references/antigravity-native-dispatch.md` |
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md b/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md
+index c6ae49bb3..8bcff441a 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md
+@@ -38,7 +38,12 @@ For native host-commit dispatches, select the binding from the caller being
+ invoked: Claude `Agent`/`Task` uses the v1 functional `agentType`; Codex
+ `spawn_agent` uses the v2 `nativeAgentType: "worker"` while retaining the
+ functional `pipeline-core:goldfish-implementor` or
+-`pipeline-core:goldfish-mechanic` role. Insert one selected binding and one
++`pipeline-core:goldfish-mechanic` role. Codex runs no PreToolUse hook for
++`spawn_agent`, so a governed Codex Goldfish is admitted by hand first: write the
++generated briefing to `scratch/<briefing>.md`, run
++`node <plugin-root>/scripts/codex-native-dispatch-prepare.mjs prepare --root <repository-root> --briefing scratch/<briefing>.md`
++(it performs the guard's admission and leaves no state when it refuses), then
++call `spawn_agent` with exactly the arguments it prints. Insert one selected binding and one
+ host directive into the complete six-field Goldfish briefing. Keep unused
+ runner examples out of the dispatched message so hook preparation sees one
+ unambiguous marker.
