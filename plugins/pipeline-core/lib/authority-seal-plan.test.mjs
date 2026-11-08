@@ -321,7 +321,9 @@ test("LB4-12 prepare-seal outside the scope says the bind at the end of onboardi
 test("LB4-13 present-plan and approve-plan refuse a draft without a prepared plan, with the exit prepare-seal", () => {
   const fx = buildDraft("walk-unprepared");
   fx.startDraft();
-  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  const submitted = fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  // C20b G20-50: submit-plan names the seal order for a draft package (prepare-seal with no arguments, then present-plan).
+  assert.match(submitted.out, /Next \(agent, no PO step\): run `prepare-seal` with no arguments/u, submitted.out);
   const present = fx.present();
   assert.equal(present.status, 2);
   assert.match(present.out, /PSP-NOT-PREPARED/u);

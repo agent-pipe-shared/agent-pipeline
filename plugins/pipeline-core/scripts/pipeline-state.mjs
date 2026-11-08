@@ -12141,6 +12141,13 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       syncNextActionDocs(dir, written.transition.state);
       console.log(`Plan submitted by "${by}" on ${submittedAt}; lifecycle="awaiting-approval".`);
       console.log(`Briefing: ${summarizePlanApprovalBriefing(submittedBriefing)}`);
+      // G20-50 (live Claude greenfield 2026-11-07): a draft package needs its seal plan before present-plan; the agent met
+      // PSP-NOT-PREPARED, then passed review receipts to prepare-seal (PSP-STALE-REVIEW twice). Name the order once, here.
+      try {
+        if (readAuthoritySeal(written.transition.state?.continuity?.authority)?.status === "draft") {
+          console.log("Next (agent, no PO step): run `prepare-seal` with no arguments (it binds the current PRD and Spec; pass no review receipt to it), then `present-plan --by <name> --review-receipt <each current receipt>`; after the PO's approval `approve-plan` seals the PRD and the Spec. A document edited after prepare-seal needs prepare-seal again.");
+        }
+      } catch { /* advice only: an unreadable seal never changes the submission */ }
       return 0;
       })();
       const submitRunbook = runbookLine({ pathId: "plan", step: "submit-plan", refused: submitCode !== 0, rootDir: dir });
