@@ -11884,7 +11884,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       console.log('Phase set: "implementation"; lifecycle="implementing".');
       const advanced = (deps.advanceRegisteredPackageToImplementing ?? advanceRegisteredPackageToImplementing)(dir, written.transition.state?.activeFeature?.planPath, deps);
       if (advanced?.status === "applied") {
-        console.log(`Feature package: ${advanced.manifest} moved approved -> implementing; commit it with the other implementation-entry files (a separate commit from the verification tiers below).`);
+        // C20b: the verification-tier clause only when that block actually follows.
+        const tiersFollow = calibrationCommitPaths !== null && calibrationCommitPaths.length > 0;
+        console.log(`Feature package: ${advanced.manifest} moved approved -> implementing; commit it with the other implementation-entry files${tiersFollow ? " (a separate commit from the verification tiers below)" : ""}.`);
       } else if (advanced?.status === "refused") {
         console.error(`Warning: the feature package ${advanced.manifest} stays "approved" (${advanced.code}); the close path needs it at "implementing". Repair (agent, no PO step): ${advanced.repair}.`);
       }

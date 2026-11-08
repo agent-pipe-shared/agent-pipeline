@@ -191,7 +191,10 @@ function consumerFixture(log, identity) {
   // G20-51 (candidate 20b): materialize-architecture registers the feature package itself and names its files in the commit step.
   const materialized = JSON.parse(lifecycle(["materialize-architecture"]).at(-1));
   assert.equal(materialized.featurePackage?.status, "registered", `materialize-architecture registers the package: ${JSON.stringify(materialized).slice(0, 600)}`);
-  lifecycle(["set-phase", "--phase", "implementation"]);
+  const setPhaseLogs = lifecycle(["set-phase", "--phase", "implementation"]).join("\n");
+  // G20-54 (candidate 20b): set-phase names the package step, and points at the verification tiers "below" only when they follow.
+  assert.match(setPhaseLogs, /moved approved -> implementing/u, setPhaseLogs.slice(0, 600));
+  assert.equal(/verification tiers below/u.test(setPhaseLogs), /commit the verification tiers ALONE/u.test(setPhaseLogs), setPhaseLogs.slice(0, 600));
   assert.ok(current().rigorHistory.some((row) => (row.body ?? row).boundary === "plan-submission"), "the plan-submission rigor row exists (recorded by submit-plan)");
   // A fixture signature for a critical action, made the way the PO's terminal makes it (Ed25519 over the approval intent digest) with the
   // test key whose public digest is the policy's trust anchor. No real key exists or is needed.
