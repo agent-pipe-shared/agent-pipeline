@@ -1,0 +1,15 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 17b47f17e397667bf6aaf7fc9895d4e4b7e217d7..7ef34a88058741f16948e8b2943fa890266ad0ac 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1873,7 +1873,9 @@
+           "K152C007",
+           "K152C008",
+           "K152C009",
+-          "K152C010"
++          "K152C010",
++          "K152C011",
++          "K152C012"
+         ],
+         "maxBytes": 65536
+       }

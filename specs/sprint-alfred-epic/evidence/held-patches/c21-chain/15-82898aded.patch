@@ -1,0 +1,13 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 3051ae7cbcc3eb67f622c70c50b538e1d14d30b0..659b4eac6fe71a0c7ecd6d80cc4a922cb7c03fd7 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -230,7 +230,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["guard-devplan-design-approval-v7-tests","plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","top-level-assertions",18],
+     ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",169],
+     ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",25], // W7-R7 (QG-04): 19->25, the restated GDM04/GDM05 (dc8204a28) carry more assertion sites; classifier unchanged
+-    ["guard-grep-max-count-read-tests","plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs","node-test-single",9],
++    // cand. 21 (QG-04, restated): guard-grep-max-count-read-tests gained the C21 context-flag case (two node:test cases), so the classifier no longer reports it `node-test-single`.
+     ["hardened-private-directory-install-tests","plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs","top-level-assertions",6],
+     ["human-guard-override-disjoint-tests","plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs","top-level-assertions",58], // W7-R7 (QG-04): 57->58, the restated HGOD005/HGOD011 (c206f3370) assert the denial-drift code; classifier unchanged
+     ["install-agy-inline-candidate-tests","plugins/pipeline-core/install-agy.inline-candidate.test.mjs","top-level-assertions",54],

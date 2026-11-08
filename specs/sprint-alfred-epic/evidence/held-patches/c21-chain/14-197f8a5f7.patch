@@ -1,0 +1,67 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index d106e9da84714aa12df072b292f7a8b4eef54646..17b47f17e397667bf6aaf7fc9895d4e4b7e217d7 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1871,7 +1871,9 @@
+           "K152C005",
+           "K152C006",
+           "K152C007",
+-          "K152C008"
++          "K152C008",
++          "K152C009",
++          "K152C010"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/plugins/pipeline-core/lib/routine-repair.test.mjs b/plugins/pipeline-core/lib/routine-repair.test.mjs
+index 08db8acc158c929105bad462e7024369dce7d9ce..38b0d990bd6658e97548f4ca656b369a9567ab7b 100644
+--- a/plugins/pipeline-core/lib/routine-repair.test.mjs
++++ b/plugins/pipeline-core/lib/routine-repair.test.mjs
+@@ -6,11 +6,14 @@ import test from "node:test";
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { join, relative } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { ROUTINE_REPAIRS, classifyInspectFindings, planRoutineRepair, runRoutineRepair } from "./routine-repair.mjs";
+ import { runRoutineRepairCli } from "../scripts/routine-repair.mjs";
++import { bindNativeCodexStart, createNativeGoldfishAuthorityProducerPort, prepareNativeGoldfishHostState } from "./native-goldfish-host-state.mjs";
++import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
++import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+ 
+ const here = fileURLToPath(new URL(".", import.meta.url));
+ const CLI = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
+@@ -351,6 +354,31 @@ test("C21: heal retires the Codex agent association of a retired pending state a
+   for (const name of [ofSettled, stranded]) assert.ok(aside.some((file) => file.endsWith(`-settled-pending/${name}`)), `${name} retained aside`);
+ }));
+ 
++// The chain of that live refusal against the real owner: a real Codex start writes the association, the pending file leaves, the reader of every
++// registry path refuses, a real heal retires the association and the same reader reads again.
++test("C21 chain: a stranded Codex association refuses the real authority reader, and a real heal clears it", () => withRepo((root, ap) => {
++  const commit = "a".repeat(40), tree = "b".repeat(40), session = "session-c21";
++  const dependencies = { git: (_root, args) => (args.at(-1) === "HEAD^{commit}" ? commit : tree), resolveCommonDir: () => join(root, ".git"),
++    captureBaseline: ({ root: candidateRoot, candidateCommit, resultPath }) => ({ ok: true, baseline: { schema: "pipeline.agy-host-commit-baseline.v1", root: candidateRoot, candidateCommit, resultPath, untracked: [] } }) };
++  const binding = { schema: "pipeline.native-goldfish-host-briefing.v2", dispatchId: "TASK-C21", candidateCommit: commit, candidateTree: tree, runner: "codex",
++    role: "pipeline-core:goldfish-implementor", nativeAgentType: "worker", model: "gpt-6-luna", effort: "high", rulesetSha: "c".repeat(64), allowedPaths: ["src/change.mjs"],
++    criticDecision: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 1, riskClass: "medium", riskFlag: false,
++      diff: { mechanical: false, architecture: true, guardrails: false, security: false } }, appliedRow: "T1" } };
++  const message = `<!-- pipeline-native-goldfish-host-commit:v2\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}`;
++  const prepared = prepareNativeGoldfishHostState({ root, runner: "codex", input: { cwd: root, session_id: session, tool_name: "spawn_agent", tool_use_id: "tool-c21", tool_input: { agent_type: "worker", message } } }, dependencies);
++  assert.equal(prepared.ok, true, prepared.code);
++  const started = bindNativeCodexStart({ commonDir: join(root, ".git"), input: { hook_event_name: "SubagentStart", session_id: session, agent_id: "child-c21", agent_type: "worker", model: binding.model } });
++  assert.equal(started.ok, true, started.code);
++  const pendingFile = readdirSync(commitDir(ap)).find((name) => name.startsWith("pending-codex-"));
++  renameSync(join(commitDir(ap), pendingFile), join(ap, "moved-by-the-earlier-heal.json"));
++  const readBaseline = () => createNativeGoldfishAuthorityProducerPort({ repository: inspectSignedDescriptorCustodyRepository(root) }).readBaseline();
++  assert.throws(readBaseline, (error) => /native-authority-agent-unresolved/u.test(`${error.reason} ${error.message}`));
++  const { result } = runRoutineRepair({ kind: "heal", root, reason: "r" }, SETTLED_DEPS);
++  assert.ok(result.settledPending.retiredOrphanAuthority.some((row) => row.pendingFile === pendingFile), JSON.stringify(result));
++  assert.deepEqual(readdirSync(commitDir(ap)).filter((name) => name.startsWith("agent-codex-")), []);
++  assert.doesNotThrow(readBaseline);
++}));
++
+ test("settled-pending-aside is refused without a reason and when inspect does not report", () => withRepo((root) => {
+   assert.equal(runRoutineRepair({ kind: "settled-pending-aside", root }, { spawn: stub(emptyInspect).spawn }).result.code, "RR-REASON-REQUIRED");
+   const failing = runRoutineRepair({ kind: "settled-pending-aside", root, reason: "r" }, { spawn: () => ({ status: 1, stdout: "", stderr: "x" }) });

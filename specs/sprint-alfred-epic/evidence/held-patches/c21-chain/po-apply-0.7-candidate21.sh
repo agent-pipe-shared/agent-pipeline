@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 21 (live findings of the three greenfield runs, Codex association repair, read grammar): 12 held patches exported from the build clone chain 03d51f690..91e9e6991
+# PO apply script for candidate 21 (live findings of the three greenfield runs, Codex association repair, read grammar): 16 held patches exported from the build clone chain 03d51f690..19042a31a
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -26,6 +26,10 @@ step 09-66e2744fc 'fix(guidance): printed next steps can be walked as printed'
 step 10-6175bc2a9 'fix(session-authority): heal retires the Codex agent association of a pending state that left'
 step 11-37c89bcfd 'test(onboarding): the existing-key cell follows the Antigravity restart before its first question round'
 step 12-91e9e6991 'feat(guard): admit the listing and context read forms workers reach for first'
+step 13-6f924fce0 'fix(guard): the listing row of the admitted grammar no longer reads like an absence report'
+step 14-197f8a5f7 'test(session-authority): the stranded association is proven against the real reader; the design-phase pin'"'"'s two cases join its policy'
+step 15-82898aded 'test(verify): the grep suite left the single-test class when it gained the context-flag case'
+step 16-19042a31a 'test(verify): the design-phase pin'"'"'s policy lists all twelve of its cases'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
