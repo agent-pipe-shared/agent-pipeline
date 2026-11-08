@@ -1,0 +1,198 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 873f830c65908f19a97110bcba51ada5bd2d3ed2..6b9368006f970c99eb9a5d2043da49d05aa10bdc 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -584,7 +584,9 @@
+           "CDPF097",
+           "CDPF098",
+           "CDPF099",
+-          "CDPF100"
++          "CDPF100",
++          "CDPF101",
++          "CDPF102"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index ea8466dc44c815c1083a98a138dd88653694e455..1bdf02befc180a7c5c700c642e1fe13a0d928490 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -170,7 +170,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+   // Restated 2026-11-08 (candidate 20e, QG-04, extension only): four sites counts were outgrown by their suites, measured on the candidate 20e chain with the
+   // unchanged classifier: close-path-e2e 89->98, critic-dispatch-preflight 409->488, g23-quoted-pipeline-reads 18->19, guard-dispatch-budget-checkpoint 157->169.
+   // Only these four numbers change; names, paths, classifications and the other counts stay as pinned, and no assertion is weakened.
+-  // Restated 2026-11-08 (split without a module plan, QG-04, extension only): critic-dispatch-preflight 488->500, measured with the unchanged classifier; only this number changes.
++  // Restated 2026-11-08 (split without a module plan, QG-04, extension only): critic-dispatch-preflight 488->508, measured with the unchanged classifier; only this number changes.
+   const newlyCounted = [
+     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
+     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",36],
+@@ -195,7 +195,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",349],
+-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",500], // cand. 20 w252 (QG-04: extension only): G20-11 retained prior result cases, measured
++    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",508], // cand. 20 w252 (QG-04: extension only): G20-11 retained prior result cases, measured
+     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",119], // cand. 20 w252 (QG-04: extension only), measured
+     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
+diff --git a/plugins/pipeline-core/lib/critic-split.mjs b/plugins/pipeline-core/lib/critic-split.mjs
+index ec7e94602702a8b128ad61410839d5f64601ec6e..cf8b85818e276165ed92421bba1738d5870f700c 100644
+--- a/plugins/pipeline-core/lib/critic-split.mjs
++++ b/plugins/pipeline-core/lib/critic-split.mjs
+@@ -15,6 +15,7 @@
+  */
+ import { spawnSync } from "node:child_process";
+ import { readFileSync } from "node:fs";
++import { deriveCriticCorrectionInputBindings } from "./critic-correction-input-bindings.mjs";
+ import { sha256Canonical } from "./review-economy.mjs";
+ import { validateAgainstSchema } from "./schema-lite.mjs";
+ 
+@@ -31,7 +32,8 @@ export const splitScopeMarker = (id) => `${SPLIT_SCOPE_PREFIX}${id}`;
+ 
+ const ENTRY_ID = /^[a-z][a-z0-9-]*$/u;
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+-const MAX_ENTRIES = 64;
++/** A sanity bound on one split round (PO 2026-11-08: 256), not a read budget. A range that needs more entries is refused by the preflight before anything is reserved. */
++export const SPLIT_MAX_ENTRIES = 256;
+ const MAX_PRD_BYTES = 4 * 1024 * 1024;
+ const SPLIT_KEYS = ["schema", "base", "candidate", "maxChangedFiles", "changedFileCount", "plan", "entries"];
+ const ENTRY_KEYS = ["id", "moduleId", "paths", "scopeMarker", "reviewerInput", "batchScopeLine"];
+@@ -79,6 +81,22 @@ function matchLength(pattern, file) {
+   return file === pattern ? pattern.length + 1 : -1;
+ }
+ 
++/**
++ * The changed paths a Critic must never read: exactly the exclusions of the range's correction-input bindings (project-state record, finding-disposition record, retained prior
++ * result; harness/review-protocol.md §2.2). No directory or file class is excluded wholesale, which that section forbids; a path is here only because the derivation bound it.
++ * The preflight has already judged this derivation, so a failure here excludes nothing and the path stays visible to its Critic.
++ */
++function boundExclusions(root, base, candidate) {
++  const derive = (options) => deriveCriticCorrectionInputBindings({ repoRoot: root, base, head: candidate, ...options });
++  try {
++    try { return new Set(derive({}).exclusions.map((exclusion) => exclusion.path)); }
++    catch (error) {
++      if (error?.code !== "CCI-CALIBRATION") throw error;
++      return new Set(derive({ projectStateOptional: true }).exclusions.map((exclusion) => exclusion.path));
++    }
++  } catch { return new Set(); }
++}
++
+ /**
+  * Cuts paths into parts of at most `max` files. A directory that fits stays whole; a larger one is cut along its subdirectories, and only files lying directly in one directory
+  * are chunked. Neighbouring pieces are then packed together while they fit, so a range does not turn into many tiny Critics. Disjoint, covers every path, deterministic.
+@@ -107,7 +125,7 @@ function cutByDirectory(paths, max) {
+ }
+ 
+ /**
+- * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES changed files).
++ * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES reviewable files: the changed files minus the bound exclusions).
+  * One entry per module of the approved architecture plan that owns a changed path (disjoint scopes: a path goes to the module whose owned-path pattern matches it most
+  * specifically, ties by module id), plus ONE shared entry for every changed path no module owns, which is never dropped. Without exactly one approved plan every path is in
+  * the shared group and `plan.status` says why. A group above the bound (the shared group without a plan, or one very large module) is cut along directories into entries
+@@ -119,11 +137,14 @@ export function buildCriticSplit({ root, result }) {
+   const base = result.base?.commit ?? result.base?.tree;
+   const candidate = result.candidate.commit;
+   const changed = typeof base === "string" ? gitLines(root, ["diff", "--name-only", "--no-renames", "-z", base, candidate]) : null;
+-  if (changed === null || changed.length <= SPLIT_MAX_CHANGED_FILES) return null;
++  if (changed === null) return null;
++  const excluded = boundExclusions(root, base, candidate);
++  const reviewable = changed.filter((file) => !excluded.has(file));
++  if (reviewable.length <= SPLIT_MAX_CHANGED_FILES) return null;
+   const plan = readPlan(root, candidate, result.spec?.path ?? "");
+   const owned = new Map(plan.modules.map((module) => [module.id, []]));
+   const shared = [];
+-  for (const file of [...changed].sort()) {
++  for (const file of [...reviewable].sort()) {
+     let best = null;
+     for (const module of plan.modules) {
+       const length = Math.max(...module.ownedPaths.map((pattern) => matchLength(pattern, file)));
+@@ -161,7 +182,7 @@ export function criticSplitProblem(split) {
+     || !Number.isSafeInteger(split.maxChangedFiles) || !Number.isSafeInteger(split.changedFileCount)
+     || !closed(split.plan, ["status", "path"]) || !["approved", "none", "ambiguous"].includes(split.plan.status)
+     || !(split.plan.path === null || typeof split.plan.path === "string")
+-    || !Array.isArray(split.entries) || split.entries.length === 0 || split.entries.length > MAX_ENTRIES) return "the split does not have the closed shape of a Critic review split";
++    || !Array.isArray(split.entries) || split.entries.length === 0 || split.entries.length > SPLIT_MAX_ENTRIES) return "the split does not have the closed shape of a Critic review split";
+   const ids = new Set(), paths = new Set();
+   for (const entry of split.entries) {
+     if (!closed(entry, ENTRY_KEYS) || !ENTRY_ID.test(entry.id ?? "") || ids.has(entry.id) || entry.scopeMarker !== splitScopeMarker(entry.id)
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index df3ec40a333c2db1a5a16904542155652c203782..0a8b45dac5c1afbcfdb452795e33b5b6e40b2faa 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -26,7 +26,7 @@ import { evaluateReviewAdmission } from "../lib/review-admission-read.mjs";
+ import { criticCoverageAdvisory, listUncoveredCriticRecords, terminalAuthoredDelivery, walkDispatchRecordsForReview } from "../lib/review-admission-read.mjs";
+ import { criticDisposition } from "../lib/critic-skip-decision.mjs";
+ import { SAFE_ID, admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
+-import { buildCriticSplit } from "../lib/critic-split.mjs";
++import { SPLIT_MAX_ENTRIES, buildCriticSplit } from "../lib/critic-split.mjs";
+ import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+ import {
+   CriticGuardrailDerivationError,
+@@ -705,6 +705,10 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
+   const promptLines = opusCriticPromptLines({ root, result, env: deps.env ?? process.env, registry: deps.registry, trigger });
+   // G20-72: a range above the one named bound is split per module; `admit` rebuilds the identical object and binds its digest.
+   const split = buildCriticSplit({ root, result });
++  if (split !== null && split.entries.length > SPLIT_MAX_ENTRIES) {
++    const reason = `This range needs ${split.entries.length} split entries, above the bound of ${SPLIT_MAX_ENTRIES} for one review round (${split.changedFileCount} changed files).`;
++    fail("CDP-SPLIT-TOO-LARGE", reason, { reason, repair: "Review a narrower exact range (a later --base), or review the range in several delivery units." });
++  }
+   const nextStep = [
+     `Write admitRequest verbatim as ${ADMIT_REQUEST_FILE} (JSON), replace only its placeholders (${admitRequestPlaceholderPaths(request).join(", ")}), then run admitCommand; admit refuses an unfilled placeholder by name.`,
+     `trigger ${trigger} is ${trigger === appliedRow ? "the applied Critic row of the matched dispatch record" : "the strictest default (no matched record row of T1 to T3)"}; change it only if your Critic-required decision says otherwise.`,
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index a517d306ac5ff6c3b7a83ad022e90826cb7a937b..03932dad682671421c69db666e1d1f1fe3386459 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -2141,9 +2141,9 @@ function g2072Design() {
+     implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
+     fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } } };
+ }
+-function g2072Fixture({ core = 12, api = 12, loose = 4, plan = true } = {}) {
++function g2072Fixture({ core = 12, api = 12, loose = 4, plan = true, records = false } = {}) {
+   const root = mkdtempSync(join(tmpdir(), "critic-split-preflight-"));
+-  for (const dir of [".claude", "governance/guidelines", "governance/policies", "specs/feat", "evidence", "src/core", "src/api", "docs"]) mkdirSync(join(root, dir), { recursive: true });
++  for (const dir of [".claude", "governance/guidelines", "governance/policies", "specs/feat", "evidence/critic/p1", "docs/state-archive", "src/core", "src/api", "docs"]) mkdirSync(join(root, dir), { recursive: true });
+   git(root, ["init", "-q"]);
+   writeFileSync(join(root, ".claude", "pipeline.yaml"), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
+   writeFileSync(join(root, "governance", "guidelines", "review.md"), "Review changed code.\n");
+@@ -2155,6 +2155,11 @@ function g2072Fixture({ core = 12, api = 12, loose = 4, plan = true } = {}) {
+   for (let index = 0; index < core; index += 1) writeFileSync(join(root, "src", "core", `c${index}.mjs`), `export const c${index} = ${index};\n`);
+   for (let index = 0; index < api; index += 1) writeFileSync(join(root, "src", "api", `a${index}.mjs`), `export const a${index} = ${index};\n`);
+   for (let index = 0; index < loose; index += 1) writeFileSync(join(root, "docs", `note${index}.md`), `note ${index}\n`);
++  if (records) {
++    writeFileSync(join(root, "evidence", "critic", "p1", "verdict.json"), "{}\n");
++    writeFileSync(join(root, "docs", "state-archive", "old.md"), "old state\n");
++    writeFileSync(join(root, "evidence", "machine.json"), "{}\n");
++  }
+   const candidate = commit(root, "candidate");
+   const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
+   writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
+@@ -2248,4 +2253,28 @@ test("G20-72 a module above the bound is cut into parts, one flat directory incl
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++test("G20-72 a split leaves out exactly the bound exclusions and never a directory wholesale: another evidence file stays review source", async () => {
++  const fx = g2072Fixture({ records: true });
++  try {
++    const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
++    const paths = split.entries.flatMap((entry) => entry.paths);
++    assert.equal(paths.includes("evidence/critic/p1/verdict.json"), false, "a retained prior result is forbidden input");
++    assert.equal(paths.includes("docs/state-archive/old.md"), false, "a project-state record is forbidden input");
++    assert.equal(paths.includes("evidence/machine.json"), true, "harness/review-protocol.md: evidence/ is never excluded wholesale");
++    assert.equal(split.changedFileCount, g2072Changed(fx).length);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("G20-72 the bound exclusions do not count against the size bound, and a range above the entry bound is refused before anything is reserved", async () => {
++  const { SPLIT_MAX_CHANGED_FILES, SPLIT_MAX_ENTRIES } = await import("../lib/critic-split.mjs");
++  assert.equal(SPLIT_MAX_ENTRIES, 256);
++  const fits = g2072Fixture({ core: 10, api: 8, loose: 4, records: true });
++  const huge = g2072Fixture({ core: SPLIT_MAX_ENTRIES * SPLIT_MAX_CHANGED_FILES + 1, api: 0, loose: 0, plan: false });
++  try {
++    assert.equal(g2072Changed(fits).length, SPLIT_MAX_CHANGED_FILES + 2);
++    assert.equal(Object.hasOwn(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fits), { env: {} }), "split"), false, "25 reviewable files fit one Critic");
++    assert.throws(() => preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(huge), { env: {} }), (error) => error.code === "CDP-SPLIT-TOO-LARGE" && /later --base/u.test(error.details.repair));
++  } finally { rmSync(fits.root, { recursive: true, force: true }); rmSync(huge.root, { recursive: true, force: true }); }
++});
++
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});

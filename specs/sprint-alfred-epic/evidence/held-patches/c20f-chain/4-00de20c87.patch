@@ -1,0 +1,64 @@
+diff --git a/docs/operating-model.md b/docs/operating-model.md
+index 9714c3de311211868a31f148cb665f2daed63018..058e953bec3fc1bc34b3858663409192f077a6ca 100644
+--- a/docs/operating-model.md
++++ b/docs/operating-model.md
+@@ -142,8 +142,11 @@ groups work. Neither term changes a runner or authorizes a shortcut.
+ ### 3.2 Duties
+ 
+ The route registry distinguishes duties such as `implement`, `mechanic`,
+-`deep`, `test_author`, `readiness`, `critic_normal`, `critic_high_risk` and
+-`advisory`. Optional duties are opt-in. Advisor capability preflight is
++`deep`, `readiness`, `critic_normal`, `critic_high_risk` and `advisory`.
++`test_author` remains a configurable route key, not a separate role or phase:
++one Goldfish writes the criterion-bound tests first and then implements in the
++same dispatch (QG-04, the Dispatch step of the lifecycle).
++Optional duties are opt-in. Advisor capability preflight is
+ model-free for `feature` and `epic` and disabled for `mini`. Actual Advisory is
+ on demand: one concrete question, reason and digest-bound evidence produce a
+ sanitized receipt rather than an implementation decision.
+@@ -832,8 +835,11 @@ Abkürzung.
+ ### Duties
+ 
+ Die Route Registry unterscheidet Duties wie `implement`, `mechanic`, `deep`,
+-`test_author`, `readiness`, `critic_normal`, `critic_high_risk` und
+-`advisory`. Optionale Duties sind Opt-in. Der Advisor-Capability-Preflight ist
++`readiness`, `critic_normal`, `critic_high_risk` und `advisory`.
++`test_author` bleibt ein konfigurierbarer Routen-Schlüssel, aber keine eigene
++Rolle oder Phase: Ein Goldfish schreibt zuerst die kriteriengebundenen Tests
++und implementiert dann im selben Dispatch (QG-04, Schritt Dispatch im Lifecycle).
++Optionale Duties sind Opt-in. Der Advisor-Capability-Preflight ist
+ für `feature` und `epic` modellfrei und für `mini` deaktiviert. Echte Advisory
+ läuft on demand: Eine konkrete Frage, ein Grund und digest-gebundene Evidenz
+ erzeugen eine sanitierte Receipt statt einer Implementierungsentscheidung.
+diff --git a/plugins/pipeline-core/docs/operating-model.md b/plugins/pipeline-core/docs/operating-model.md
+index 9714c3de311211868a31f148cb665f2daed63018..058e953bec3fc1bc34b3858663409192f077a6ca 100644
+--- a/plugins/pipeline-core/docs/operating-model.md
++++ b/plugins/pipeline-core/docs/operating-model.md
+@@ -142,8 +142,11 @@ groups work. Neither term changes a runner or authorizes a shortcut.
+ ### 3.2 Duties
+ 
+ The route registry distinguishes duties such as `implement`, `mechanic`,
+-`deep`, `test_author`, `readiness`, `critic_normal`, `critic_high_risk` and
+-`advisory`. Optional duties are opt-in. Advisor capability preflight is
++`deep`, `readiness`, `critic_normal`, `critic_high_risk` and `advisory`.
++`test_author` remains a configurable route key, not a separate role or phase:
++one Goldfish writes the criterion-bound tests first and then implements in the
++same dispatch (QG-04, the Dispatch step of the lifecycle).
++Optional duties are opt-in. Advisor capability preflight is
+ model-free for `feature` and `epic` and disabled for `mini`. Actual Advisory is
+ on demand: one concrete question, reason and digest-bound evidence produce a
+ sanitized receipt rather than an implementation decision.
+@@ -832,8 +835,11 @@ Abkürzung.
+ ### Duties
+ 
+ Die Route Registry unterscheidet Duties wie `implement`, `mechanic`, `deep`,
+-`test_author`, `readiness`, `critic_normal`, `critic_high_risk` und
+-`advisory`. Optionale Duties sind Opt-in. Der Advisor-Capability-Preflight ist
++`readiness`, `critic_normal`, `critic_high_risk` und `advisory`.
++`test_author` bleibt ein konfigurierbarer Routen-Schlüssel, aber keine eigene
++Rolle oder Phase: Ein Goldfish schreibt zuerst die kriteriengebundenen Tests
++und implementiert dann im selben Dispatch (QG-04, Schritt Dispatch im Lifecycle).
++Optionale Duties sind Opt-in. Der Advisor-Capability-Preflight ist
+ für `feature` und `epic` modellfrei und für `mini` deaktiviert. Echte Advisory
+ läuft on demand: Eine konkrete Frage, ein Grund und digest-gebundene Evidenz
+ erzeugen eine sanitierte Receipt statt einer Implementierungsentscheidung.
