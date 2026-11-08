@@ -1,0 +1,781 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 698e5fa4f..1bda47e8f 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -128,6 +128,9 @@ below assumes it holds and is written to catch a change that would break it.
+   `lib/runner-profiles-v3.mjs`, `lib/runtime-projection-v2.mjs`,
+   `lib/runtime-projection-v3.mjs`, `lib/schema-lite.mjs`,
+   `lib/signed-quality-package.mjs`,
++  `lib/writer-commit-capability.mjs` (candidate 20d, G20-66: a sanctioned writer records the
++  exact protected paths and bytes it wrote; the pre-commit hook admits only a staged blob that
++  hashes to a recorded digest, never a gate-strength or shipped-baseline path),
+   `lib/session-cleanup-recovery.mjs`, `lib/source-observation.mjs`,
+   `lib/successful-spawn.mjs`, `lib/windows-private-state.mjs`,
+   `lib/worktree-lifecycle.mjs`,
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index e67ee2c27..e270cdfbf 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -218,6 +218,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // scripts/pipeline-state.mjs (one of the two spawn-edge additions), not spawn edges
+   // themselves.
+   "plugins/pipeline-core/lib/publication-authority.mjs",
++  // G20-66: scripts/pipeline-state.mjs (approve-plan, close-feature) statically imports the sanctioned writer's commit
++  // capability, which the pre-commit hook's admission (lib/protected-test-paths.mjs writerCommitAdmission) reads the records of.
++  "plugins/pipeline-core/lib/writer-commit-capability.mjs",
+   "plugins/pipeline-core/lib/publication-bundle.mjs",
+   "plugins/pipeline-core/lib/publication-bundle-v2.mjs",
+   "plugins/pipeline-core/lib/publication-capability-preflight.mjs",
+diff --git a/plugins/pipeline-core/lib/protected-test-paths.mjs b/plugins/pipeline-core/lib/protected-test-paths.mjs
+index bf868eed6..2d9378898 100644
+--- a/plugins/pipeline-core/lib/protected-test-paths.mjs
++++ b/plugins/pipeline-core/lib/protected-test-paths.mjs
+@@ -60,7 +60,7 @@ import { isPhysicalScratchTarget } from "./physical-scratch-boundary.mjs";
+  * backstop for `push`, not a fix to this classifier, and it does nothing for the other
+  * two bullets above or for any protected-path write that is not a `git push`.
+  */
+-import { existsSync, readFileSync } from "node:fs";
++import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+ import { basename, join } from "node:path";
+ 
+ import { isGitIndexOnlyInvocation, parseGuardCommand, sedWriteTargets } from "../hooks/guard-command-grammar.mjs";
+@@ -72,7 +72,107 @@ import {
+ } from "./project-authority.mjs";
+ import { closedContinuityBoundSha256, resolveProtectedBaseline } from "./protected-baseline.mjs";
+ import { spawnSync } from "node:child_process";
+-import { createHash } from "node:crypto";
++import { createHash, createHmac } from "node:crypto";
++
++// ---------------------------------------------------------------------------------
++// G20-66 (live Antigravity greenfield 2026-11-08): the commit capability of a sanctioned writer.
++// ---------------------------------------------------------------------------------
++// pipeline-state.mjs approve-plan / close-feature and finish-feature.mjs write protected files (state, lifecycle, audit
++// bundle, result) and the very commit that publishes them was refused at the commit boundary, which cost the PO extra
++// human-guard-override signatures for the Pipeline's own state files. lib/writer-commit-capability.mjs (the writer side)
++// records, after a successful write, the exact paths and sha256 digests it wrote in a record store under the git common
++// directory, authenticated with an HMAC key in the same store. This is the hook side, in the shape of the G20-55 admission
++// above: per staged finding, the STAGED blob must hash to a recorded digest, so an extra protected path, one changed byte
++// or a file the writer never wrote stays a finding. Unprotected files staged beside the writer's bytes do not matter
++// (nothing is bound to the index tree). Expiry is by bytes, never by a clock: the capability is spent when the commit
++// that used it exists (an entry used at HEAD X is admitted again only while HEAD is still X, so a commit-msg failure and
++// retry at the same HEAD is not stranded). Fail-closed: any fault, an unreadable store or a bad MAC is "no verdict".
++export const WRITER_COMMIT_SCHEMA = "pipeline.writer-commit-capability.v1";
++export const WRITER_COMMIT_STORE_SEGMENTS = Object.freeze(["agent-pipeline", "writer-commit"]);
++const WRITER_COMMIT_KEY_FILE = "mac.key";
++
++export function writerCommitStoreDir(rootDir, { spawn = spawnSync } = {}) {
++  const common = spawn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: rootDir, encoding: "utf8", timeout: 15000 });
++  if (common.status !== 0 || typeof common.stdout !== "string" || common.stdout.trim() === "") return null;
++  return join(common.stdout.trim(), ...WRITER_COMMIT_STORE_SEGMENTS);
++}
++
++export function writerCommitMac(keyHex, record) {
++  const { mac: _ignored, ...core } = record;
++  return createHmac("sha256", Buffer.from(keyHex, "hex")).update(JSON.stringify(core)).digest("hex");
++}
++
++function writerCommitRecords(store) {
++  const keyPath = join(store, WRITER_COMMIT_KEY_FILE);
++  if (!existsSync(keyPath)) return [];
++  const keyHex = readFileSync(keyPath, "utf8").trim();
++  if (!/^[a-f0-9]{64}$/u.test(keyHex)) return [];
++  const records = [];
++  for (const name of readdirSync(store).filter((entry) => entry.endsWith(".json")).sort()) {
++    try {
++      const record = JSON.parse(readFileSync(join(store, name), "utf8"));
++      if (record?.schema !== WRITER_COMMIT_SCHEMA || !Array.isArray(record.entries) || record.mac !== writerCommitMac(keyHex, record)) continue;
++      records.push({ record, file: join(store, name), keyHex });
++    } catch { /* a record that cannot be read or authenticated grants nothing */ }
++  }
++  return records;
++}
++
++const headOf = (rootDir, spawn) => {
++  const head = spawn("git", ["rev-parse", "--verify", "-q", "HEAD"], { cwd: rootDir, encoding: "utf8", timeout: 15000 });
++  return head.status === 0 ? String(head.stdout).trim() : "";
++};
++
++/**
++ * G20-66: the verdict of the writer-commit store for one STAGED path. null: no writer armed this path (or any fault).
++ * { admitted: true, path, recordId }: the staged bytes are exactly bytes a writer armed and the entry is unspent.
++ * { admitted: false, stale: { path, writer, rerun } }: a writer armed this path with other bytes (the file changed after the
++ * writer wrote it); { admitted: false, spent: true, path, writer, rerun }: those exact bytes were armed and already committed.
++ */
++export function writerCommitAdmission(rootDir, relPath, { spawn = spawnSync } = {}) {
++  try {
++    const store = writerCommitStoreDir(rootDir, { spawn });
++    if (store === null || !existsSync(store)) return null;
++    const hits = [];
++    for (const { record } of writerCommitRecords(store)) {
++      for (const entry of record.entries) if (entry?.path === relPath) hits.push({ record, entry });
++    }
++    if (hits.length === 0) return null;
++    const blob = spawn("git", ["cat-file", "blob", `:${relPath}`], { cwd: rootDir, encoding: "buffer", timeout: 15000, maxBuffer: 64 * 1024 * 1024 });
++    if (blob.status !== 0 || !Buffer.isBuffer(blob.stdout)) return null;
++    const staged = createHash("sha256").update(blob.stdout).digest("hex");
++    const same = hits.filter((hit) => hit.entry.sha256 === staged);
++    const last = (list) => list[list.length - 1];
++    if (same.length === 0) return { admitted: false, stale: { path: relPath, writer: last(hits).record.writer, rerun: last(hits).record.rerun } };
++    const head = headOf(rootDir, spawn);
++    const live = same.find((hit) => hit.entry.consumedAtHead == null || hit.entry.consumedAtHead === head);
++    if (live) return { admitted: true, path: relPath, recordId: live.record.id };
++    return { admitted: false, spent: true, path: relPath, writer: last(same).record.writer, rerun: last(same).record.rerun };
++  } catch { return null; }
++}
++
++/** G20-66: marks the admitted entries used at the current HEAD (best effort: a bookkeeping fault never strands the commit). */
++export function writerCommitConsume(rootDir, admissions, { spawn = spawnSync } = {}) {
++  try {
++    const store = writerCommitStoreDir(rootDir, { spawn });
++    if (store === null || !existsSync(store)) return;
++    const head = headOf(rootDir, spawn);
++    const wanted = new Map();
++    for (const admission of admissions ?? []) {
++      if (admission?.admitted !== true) continue;
++      wanted.set(admission.recordId, [...(wanted.get(admission.recordId) ?? []), admission.path]);
++    }
++    for (const { record, file, keyHex } of writerCommitRecords(store)) {
++      const paths = wanted.get(record.id);
++      if (!paths) continue;
++      for (const entry of record.entries) if (paths.includes(entry.path) && entry.consumedAtHead == null) entry.consumedAtHead = head;
++      record.mac = writerCommitMac(keyHex, record);
++      const temporary = `${file}.${process.pid}.tmp`;
++      writeFileSync(temporary, `${JSON.stringify(record)}\n`, { encoding: "utf8", mode: 0o600 });
++      renameSync(temporary, file);
++    }
++  } catch { /* the capability stays unspent; the same commit can be retried */ }
++}
+ 
+ /**
+  * C20b G20-55: true only when the rule is a closed-continuity rule (PB-CONTINUITY-*) and the STAGED bytes of `relPath` are
+diff --git a/plugins/pipeline-core/lib/writer-commit-capability.mjs b/plugins/pipeline-core/lib/writer-commit-capability.mjs
+new file mode 100644
+index 000000000..c892dfb5f
+--- /dev/null
++++ b/plugins/pipeline-core/lib/writer-commit-capability.mjs
+@@ -0,0 +1,174 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * G20-66: a sanctioned writer arms the commit of exactly the files it wrote.
++ *
++ * `pipeline-state.mjs approve-plan` / `close-feature` and `finish-feature.mjs` write the Pipeline's own protected files (State,
++ * lifecycle, audit bundle, result). The commit that publishes them used to be refused at the commit boundary and cost the PO
++ * extra human-guard-override signatures for files no human decides about. After a SUCCESSFUL write a writer now calls
++ * `armWriterCommitCapability`, which records the exact paths and sha256 digests it wrote in a record store under the git
++ * common directory (HMAC-authenticated, key in the same store). The pre-commit hook admits a staged protected path only when
++ * its staged blob hashes to a recorded digest (`writerCommitAdmission`, lib/protected-test-paths.mjs, the consumer in the
++ * shape of the G20-55 closed-continuity admission). Nothing here is a signature: the capability is a statement by the writer
++ * about its own output, so it can never cover a path it did not write, a gate-strength path (GS-*) or a shipped-baseline
++ * path (hooks, guard libraries, the protected baseline itself); those are excluded at arming.
++ *
++ * Entry points (stable; the one-shot close calls them):
++ *   armWriterCommitCapability({ rootDir, writer, rerun, files: [{ path, sha256 }] })  the shared mechanism
++ *   withWriterCommitCapability({ rootDir, writer, rerun }, fn)                         snapshot, run `fn` (an exit code), arm what changed, print the next step
++ *   captureWorktree(rootDir) / armWrittenSince({ rootDir, before, writer, rerun })      the same in two steps (finish-feature brackets each stage)
++ *   formatWriterCommitNextStep(result)                                                  the lines printed as the next step
++ */
++import { spawnSync } from "node:child_process";
++import { createHash, randomBytes } from "node:crypto";
++import { existsSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
++import { isAbsolute, join, relative, resolve } from "node:path";
++import { gateStrengthRuleFor } from "../hooks/guard-gate-strength.mjs";
++import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
++import { loadShippedProtectedBaseline } from "./protected-baseline.mjs";
++import { loadProtectedTestPathRules, protectedTestPathRuleFor, writerCommitMac, writerCommitStoreDir, WRITER_COMMIT_SCHEMA } from "./protected-test-paths.mjs";
++
++const SHA256 = /^[a-f0-9]{64}$/u;
++const KEY_FILE = "mac.key";
++const MAX_SNAPSHOT_FILE_BYTES = 16 * 1024 * 1024;
++const sha256Of = (bytes) => createHash("sha256").update(bytes).digest("hex");
++
++function writerCommitError(code, message, heal) {
++  const error = new Error(`${message}; heal: ${heal}`);
++  error.code = code;
++  error.heal = heal;
++  return error;
++}
++
++const quoted = (path) => (/^[\w./@+=-]+$/u.test(path) ? path : JSON.stringify(path));
++const commitSubject = (writer) => `chore(pipeline): commit the ${String(writer).split(/\s+/u).filter(Boolean).pop()?.replace(/\.mjs$/u, "") ?? "writer"} output`;
++
++/** The exact commit that publishes `paths`, as the next step a writer prints. */
++export function writerCommitSteps(paths, message) {
++  const list = paths.map(quoted).join(" ");
++  return [`git add -- ${list}`, `git commit -m "${message}" -- ${list}`];
++}
++
++function repoRootOf(rootDir, spawn) {
++  const top = spawn("git", ["rev-parse", "--show-toplevel"], { cwd: rootDir, encoding: "utf8", timeout: 15000 });
++  if (top.status !== 0 || typeof top.stdout !== "string" || top.stdout.trim() === "") throw writerCommitError("WC-REPO", `${rootDir} is not inside a git work tree`, "run the writer from the project root");
++  return realpathSync(top.stdout.trim());
++}
++
++/**
++ * Arms the commit of `files` (`{ path, sha256 }`: the exact paths and bytes the writer just wrote). Returns
++ * `{ status: "armed" | "not-needed", id, paths, protectedPaths, excluded, message, steps }`; throws an Error with `.code` and
++ * `.heal` (the rerun of the writer) when a file no longer holds the bytes the writer wrote. Stages nothing.
++ */
++export function armWriterCommitCapability({ rootDir, writer, rerun, files, nowMs = Date.now(), spawn = spawnSync } = {}) {
++  if (typeof writer !== "string" || writer === "" || typeof rerun !== "string" || rerun === ""
++    || !Array.isArray(files) || files.length === 0
++    || files.some((file) => typeof file?.path !== "string" || file.path === "" || !SHA256.test(file.sha256 ?? ""))) {
++    throw writerCommitError("WC-INPUT", "the writer commit capability needs the writer, its rerun command and the exact paths and sha256 digests it wrote", "pass { writer, rerun, files: [{ path, sha256 }] }");
++  }
++  const root = repoRootOf(rootDir, spawn);
++  const written = [];
++  for (const file of files) {
++    const rel = relative(root, resolve(root, file.path)).replace(/\\/gu, "/");
++    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) throw writerCommitError("WC-INPUT", `path ${file.path} is outside the repository`, "pass repository-relative paths");
++    let onDisk = null;
++    try { onDisk = sha256Of(readFileSync(resolve(root, rel))); } catch { onDisk = null; }
++    if (onDisk !== file.sha256) throw writerCommitError("WC-BYTES", `${rel} no longer holds the bytes ${writer} wrote`, `rerun the writer: ${rerun}`);
++    written.push({ path: rel, sha256: file.sha256 });
++  }
++  // Never armed: a gate-strength path, or a path of the shipped protected baseline (guard hooks, guard libraries, the baseline
++  // data, the sanctioned writer's own source). A writer's tree delta can contain such a file only by accident.
++  const shipped = loadShippedProtectedBaseline();
++  const staticIds = new Set(shipped.ok ? shipped.baseline.entries.map((entry) => entry.id) : []);
++  const { rules } = loadProtectedTestPathRules({ rootDir: root });
++  const armed = []; const excluded = []; const protectedPaths = [];
++  for (const file of written) {
++    const rule = protectedTestPathRuleFor(rules, file.path);
++    let gate = null;
++    try { gate = gateStrengthRuleFor(file.path, root); } catch { gate = null; }
++    if (gate || (rule && (staticIds.has(rule.id) || rule.id === "PB-BASELINE-UNAVAILABLE"))) { excluded.push(file.path); continue; }
++    armed.push(file);
++    if (rule) protectedPaths.push(file.path);
++  }
++  const paths = armed.map((file) => file.path).sort();
++  const message = commitSubject(writer);
++  const result = { status: "not-needed", paths, protectedPaths: protectedPaths.sort(), excluded: excluded.sort(), message, steps: writerCommitSteps(paths, message), writer, rerun };
++  if (protectedPaths.length === 0) return { ...result, reason: "no-protected-path" };
++  const store = writerCommitStoreDir(root, { spawn });
++  if (store === null) throw writerCommitError("WC-STORE", "the git common directory could not be resolved", `rerun the writer: ${rerun}`);
++  const common = resolve(store, "..", "..");
++  ensureHardenedPrivateDirectory(common, store);
++  const keyPath = join(store, KEY_FILE);
++  if (!existsSync(keyPath)) {
++    try { writeFileSync(keyPath, `${randomBytes(32).toString("hex")}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" }); } catch (error) { if (error?.code !== "EEXIST") throw error; }
++  }
++  const keyHex = readFileSync(keyPath, "utf8").trim();
++  const id = `${String(nowMs).padStart(15, "0")}-${randomBytes(6).toString("hex")}`;
++  const core = {
++    schema: WRITER_COMMIT_SCHEMA, id, writer, rerun, armedAt: new Date(nowMs).toISOString(),
++    entries: armed.map((file) => ({ path: file.path, sha256: file.sha256, consumedAtHead: null })),
++  };
++  const record = { ...core, mac: writerCommitMac(keyHex, core) };
++  const file = join(store, `${id}.json`);
++  const temporary = `${file}.${process.pid}.tmp`;
++  writeFileSync(temporary, `${JSON.stringify(record)}\n`, { encoding: "utf8", mode: 0o600 });
++  renameSync(temporary, file);
++  return { ...result, status: "armed", id };
++}
++
++/** The tracked-dirty and untracked files of `rootDir` with the sha256 of their bytes (null: deleted), or null when unreadable. */
++export function captureWorktree(rootDir, { spawn = spawnSync } = {}) {
++  try {
++    const root = repoRootOf(rootDir, spawn);
++    const status = spawn("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], { cwd: root, encoding: "utf8", timeout: 30000, maxBuffer: 64 * 1024 * 1024 });
++    if (status.status !== 0 || typeof status.stdout !== "string") return null;
++    const tokens = status.stdout.split("\0").filter((token) => token !== "");
++    const snapshot = new Map();
++    for (let index = 0; index < tokens.length; index += 1) {
++      const token = tokens[index];
++      const code = token.slice(0, 2); const path = token.slice(3);
++      if (/[RC]/u.test(code)) index += 1; // the original path of a rename follows as its own token
++      let digest = null;
++      // A writer's protected outputs are small JSON and Markdown files; a large dirty file is never one of them and is not hashed.
++      try { digest = statSync(resolve(root, path)).size > MAX_SNAPSHOT_FILE_BYTES ? null : sha256Of(readFileSync(resolve(root, path))); } catch { digest = null; }
++      snapshot.set(path, digest);
++    }
++    return { root, files: snapshot };
++  } catch { return null; }
++}
++
++/** Arms what changed in the working tree since `before` (a `captureWorktree` result). Never throws for "nothing written". */
++export function armWrittenSince({ rootDir, before, writer, rerun, spawn = spawnSync } = {}) {
++  const after = captureWorktree(rootDir, { spawn });
++  if (before === null || after === null) return { status: "unavailable", paths: [], protectedPaths: [], excluded: [], steps: [], message: commitSubject(writer), writer, rerun };
++  const files = [];
++  for (const [path, sha256] of after.files) if (sha256 !== null && before.files.get(path) !== sha256) files.push({ path, sha256 });
++  if (files.length === 0) return { status: "not-needed", reason: "nothing-written", paths: [], protectedPaths: [], excluded: [], steps: [], message: commitSubject(writer), writer, rerun };
++  return armWriterCommitCapability({ rootDir, writer, rerun, files, spawn });
++}
++
++/** The lines a writer prints as its next step. */
++export function formatWriterCommitNextStep(result) {
++  return [
++    `Next step (no human override needed): commit exactly what ${result.writer} wrote.`,
++    ...result.steps.map((step) => `  ${step}`),
++    `The pre-commit hook admits exactly these bytes (writer commit capability ${result.id}), once, whatever unprotected files are staged beside them. If one of them changes first, rerun: ${result.rerun}`,
++  ];
++}
++
++/**
++ * Runs `fn` (a writer returning its exit code), then arms the files it wrote when it succeeded and prints the exact commit on
++ * stderr (stdout stays the writer's own JSON). An arming fault never changes the writer's exit code: the hook then falls back
++ * to its own refusal, which is today's behaviour.
++ */
++export function withWriterCommitCapability({ rootDir, writer, rerun }, fn, { spawn = spawnSync } = {}) {
++  const before = captureWorktree(rootDir, { spawn });
++  const status = fn();
++  if (status !== 0 || before === null) return status;
++  try {
++    const armed = armWrittenSince({ rootDir, before, writer, rerun, spawn });
++    if (armed.status === "armed") for (const line of formatWriterCommitNextStep(armed)) console.error(line);
++  } catch (error) {
++    console.error(`${writer}: the commit capability was not armed (${error?.code ?? "fault"}); heal: ${error?.heal ?? rerun}`);
++  }
++  return status;
++}
+diff --git a/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs b/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs
+index 284112633..6a794341a 100644
+--- a/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs
++++ b/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs
+@@ -252,6 +252,99 @@ test("D3 (3): a staged foreign path refuses the apply BEFORE the proof is consum
+   assert.equal(retried.status, 0, retried.err); assert.equal(JSON.parse(retried.out).commitCapability.status, "armed");
+ });
+ 
++// ---------------------------------------------------------------------------------------------
++// G20-66: a sanctioned writer arms a commit capability for exactly the protected files and bytes it wrote
++// (lib/writer-commit-capability.mjs; the consumer is protected-test-paths.mjs writerCommitAdmission, called by the pre-commit
++// hook next to the G20-55 closed-continuity admission). The reconcile capability above is left as it is.
++// ---------------------------------------------------------------------------------------------
++const wcLib = () => import("../lib/writer-commit-capability.mjs");
++const ptp = await import("../lib/protected-test-paths.mjs");
++const WRITE_B = "{\"writer\":\"b\"}\n";
++
++/** A closed-feature fixture whose manifest is protected (dynamic PB-CONTINUITY rule), with the writer's own write made. */
++function writerFixture(name, bytes = `${WRITE_B}`) {
++  const f = fixture(name); closeInState(f);
++  writeFileSync(join(f.root, MANIFEST), bytes);
++  return { ...f, sha: hash(bytes) };
++}
++
++test("G20-66: arming binds exactly the written protected file and its bytes, stages nothing, and a staged copy of those bytes is admitted", async () => {
++  const f = writerFixture("wc-arm");
++  const { armWriterCommitCapability } = await wcLib();
++  const armed = armWriterCommitCapability({ rootDir: f.root, writer: "pipeline-state.mjs close-feature", rerun: "node pipeline-state.mjs close-feature --by <name>", files: [{ path: MANIFEST, sha256: f.sha }] });
++  assert.equal(armed.status, "armed");
++  assert.deepEqual(armed.paths, [MANIFEST]); assert.deepEqual(armed.protectedPaths, [MANIFEST]);
++  assert.equal(f.git("diff", "--cached", "--name-only").trim(), "", "arming stages nothing");
++  assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST).admitted, false, "the bytes are not staged yet: not admitted");
++  f.git("add", MANIFEST);
++  const admission = ptp.writerCommitAdmission(f.root, MANIFEST);
++  assert.equal(admission.admitted, true, JSON.stringify(admission));
++  assert.equal(ptp.writerCommitAdmission(f.root, "specs/feature/spec.md"), null, "a path no writer armed has no verdict");
++});
++
++test("G20-66: arming refuses bytes other than the ones the writer wrote, names the rerun of the writer, and arms nothing", async () => {
++  const f = writerFixture("wc-bytes");
++  const { armWriterCommitCapability } = await wcLib();
++  assert.throws(() => armWriterCommitCapability({ rootDir: f.root, writer: "pipeline-state.mjs approve-plan", rerun: "node pipeline-state.mjs approve-plan --by <name>", files: [{ path: MANIFEST, sha256: h("9") }] }),
++    (error) => error.code === "WC-BYTES" && /pipeline-state\.mjs approve-plan --by <name>/.test(error.heal));
++  f.git("add", MANIFEST);
++  assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST), null, "nothing was armed");
++});
++
++test("G20-66: changed bytes are stale with the writer's rerun; the capability is spent once its commit exists (bound to bytes, not to HEAD)", async () => {
++  const f = writerFixture("wc-stale-spent");
++  const { armWriterCommitCapability } = await wcLib();
++  armWriterCommitCapability({ rootDir: f.root, writer: "pipeline-state.mjs close-feature", rerun: "node pipeline-state.mjs close-feature --by <name>", files: [{ path: MANIFEST, sha256: f.sha }] });
++  writeFileSync(join(f.root, MANIFEST), "{\"writer\":\"tampered\"}\n"); f.git("add", MANIFEST);
++  const stale = ptp.writerCommitAdmission(f.root, MANIFEST);
++  assert.equal(stale.admitted, false); assert.equal(stale.stale.path, MANIFEST); assert.match(stale.stale.rerun, /close-feature --by <name>/);
++  writeFileSync(join(f.root, MANIFEST), WRITE_B); f.git("add", MANIFEST);
++  const admitted = ptp.writerCommitAdmission(f.root, MANIFEST); assert.equal(admitted.admitted, true);
++  ptp.writerCommitConsume(f.root, [admitted]);
++  assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST).admitted, true, "a retry of the same commit at the same HEAD is still admitted");
++  f.git("commit", "-q", "-m", "the writer output");
++  writeFileSync(join(f.root, MANIFEST), "{\"later\":1}\n"); f.git("commit", "-q", "-am", "a later change");
++  writeFileSync(join(f.root, MANIFEST), WRITE_B); f.git("add", MANIFEST);
++  const spent = ptp.writerCommitAdmission(f.root, MANIFEST);
++  assert.equal(spent.admitted, false); assert.equal(spent.spent, true, "the spent capability is not reusable");
++});
++
++test("G20-66: a gate-strength or shipped-baseline path is never armed, even when a writer's tree delta contains it", async () => {
++  const f = writerFixture("wc-excluded");
++  mkdirSync(join(f.root, "project"), { recursive: true });
++  writeFileSync(join(f.root, "project/guard-config.json"), "{}\n"); f.git("add", "project/guard-config.json"); f.git("commit", "-q", "-m", "config");
++  writeFileSync(join(f.root, "project/guard-config.json"), "{\"changed\":true}\n");
++  const { armWriterCommitCapability } = await wcLib();
++  const armed = armWriterCommitCapability({ rootDir: f.root, writer: "pipeline-state.mjs close-feature", rerun: "rerun", files: [{ path: "project/guard-config.json", sha256: hash("{\"changed\":true}\n") }] });
++  assert.equal(armed.status, "not-needed"); assert.deepEqual(armed.excluded, ["project/guard-config.json"]);
++  f.git("add", "project/guard-config.json");
++  assert.equal(ptp.writerCommitAdmission(f.root, "project/guard-config.json"), null);
++});
++
++test("G20-66: approve-plan and close-feature are the wired writers; the wrapper arms what a successful writer wrote, prints the exact commit, and arms nothing for a failed one", async () => {
++  const { WRITER_COMMIT_COMMANDS } = await import("./pipeline-state.mjs");
++  for (const sub of ["approve-plan", "close-feature"]) assert.ok(WRITER_COMMIT_COMMANDS.has(sub), `${sub} arms its commit capability`);
++  const { withWriterCommitCapability } = await wcLib();
++  for (const sub of ["approve-plan", "close-feature"]) {
++    const f = fixture(`wc-wrapper-${sub}`); closeInState(f);
++    const printed = []; const original = console.error; console.error = (...v) => printed.push(v.join(" "));
++    let status;
++    try {
++      status = withWriterCommitCapability({ rootDir: f.root, writer: `pipeline-state.mjs ${sub}`, rerun: `node pipeline-state.mjs ${sub} --by <name>` }, () => { writeFileSync(join(f.root, MANIFEST), WRITE_B); return 0; });
++    } finally { console.error = original; }
++    assert.equal(status, 0);
++    const out = printed.join("\n");
++    assert.match(out, new RegExp(`git add -- ${MANIFEST.replace(/[.]/g, "\\.")}`));
++    assert.match(out, /git commit -m "chore\(pipeline\): /);
++    assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST) === null, false, "the record exists");
++    f.git("add", MANIFEST); assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST).admitted, true);
++  }
++  const failed = fixture("wc-wrapper-failed"); closeInState(failed);
++  const status = withWriterCommitCapability({ rootDir: failed.root, writer: "pipeline-state.mjs approve-plan", rerun: "rerun" }, () => { writeFileSync(join(failed.root, MANIFEST), WRITE_B); return 2; });
++  assert.equal(status, 2, "the writer's exit code is returned unchanged");
++  failed.git("add", MANIFEST); assert.equal(ptp.writerCommitAdmission(failed.root, MANIFEST), null, "a failed writer arms nothing");
++});
++
+ test("D3 (3): with no protected path in the reconcile commit nothing is armed and nothing is staged (exit 0)", () => {
+   const f = fixture("not-needed");
+   const completion = bootstrapped(f); assert.equal(commitPipelineOwned(["--root", f.root, "--agent"]).status, "committed");
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 0e4820d96..1ecc65ccd 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -13,6 +13,7 @@ import { readFileSync, realpathSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { spawnSync } from "node:child_process";
+ import { fileURLToPath } from "node:url";
++import { armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
+ 
+ const HERE = new URL(".", import.meta.url);
+ const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
+@@ -64,6 +65,28 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
+     cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+   }));
+   const base = { root, lifecycle: id, actor: by.trim() };
++  // G20-66: every stage that writes files (the coordinator's start, checkpoint and prepared transitions, then the State close)
++  // arms the commit of exactly the bytes it wrote, so the close's own outputs are committed without a human override. A fault
++  // in arming never changes a stage's outcome: it is recorded in `stages` and the hook then keeps its old refusal.
++  const writerCommitStages = [];
++  const rerun = `node ${fileURLToPath(import.meta.url)} --root ${root} --by ${JSON.stringify(by.trim())} --architecture-impact ${architectureImpact} --audit-request ${JSON.stringify(auditRequest)} --critic-verify-lifecycle ${criticVerifyLifecycle}${continuityCloseRequest === null ? "" : ` --continuity-close-request ${JSON.stringify(continuityCloseRequest)}`} --resume-lifecycle-id ${id}`;
++  const armStage = (stage, run, succeeded = () => true) => {
++    const before = captureWorktree(root);
++    const out = run();
++    if (before === null || !succeeded(out)) return out;
++    try {
++      const armed = armWrittenSince({ rootDir: root, before, writer: `finish-feature.mjs ${stage}`, rerun });
++      if (armed.paths.length > 0) writerCommitStages.push({ stage, status: armed.status, paths: armed.paths });
++    } catch (error) {
++      writerCommitStages.push({ stage, status: "unavailable", paths: [], code: error?.code ?? "WC-FAULT", heal: error?.heal ?? rerun });
++    }
++    return out;
++  };
++  const writerCommit = () => {
++    const paths = [...new Set(writerCommitStages.flatMap((entry) => entry.paths))].sort();
++    const message = "chore(pipeline): commit the finish-feature output";
++    return { status: writerCommitStages.some((entry) => entry.status === "armed") ? "armed" : "not-needed", paths, stages: writerCommitStages, message, steps: paths.length > 0 ? writerCommitSteps(paths, message) : [], writer: "finish-feature.mjs", rerun };
++  };
+   const invokeCoordinator = (subcommand, values, code) => command(runner, process.execPath, [COORDINATOR, subcommand, ...flagPairs(values)], code);
+   if (featureId === undefined) {
+     try {
+@@ -119,25 +142,25 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
+   let preparedApplied;
+     if (phase === null) {
+       const start = invokeCoordinator("plan-start", { ...base, "close-intent": "durable-stop" }, "FINISH-START-PLAN");
+-      apply(start, { ...base, "close-intent": "durable-stop" }, "FINISH-START-APPLY", "apply-start");
++      armStage("apply-start", () => apply(start, { ...base, "close-intent": "durable-stop" }, "FINISH-START-APPLY", "apply-start"));
+       phase = "active";
+     }
+     if (phase === "active") {
+       const checkpoint = invokeCoordinator("plan-transition", { ...base, phase: "checkpointed" }, "FINISH-CHECKPOINT-PLAN");
+-      apply(checkpoint, { ...base, phase: "checkpointed" }, "FINISH-CHECKPOINT-APPLY", "apply-transition");
++      armStage("apply-checkpoint", () => apply(checkpoint, { ...base, phase: "checkpointed" }, "FINISH-CHECKPOINT-APPLY", "apply-transition"));
+       phase = "checkpointed";
+     }
+     if (phase === "checkpointed") {
+       const prepared = invokeCoordinator("plan-transition", preparedValues, "FINISH-PREPARE-PLAN");
+-      preparedApplied = apply(prepared, preparedValues, "FINISH-PREPARE-APPLY", "apply-transition");
++      preparedApplied = armStage("apply-prepared", () => apply(prepared, preparedValues, "FINISH-PREPARE-APPLY", "apply-transition"));
+     } else {
+       if (prior.coordinator.architectureImpact !== architectureImpact
+         || prior.coordinator.featureCloseAudit?.criticVerifyLifecycleId !== criticVerifyLifecycle
+         || !/^[a-f0-9]{64}$/u.test(prior.coordinator.effects?.at(-1)?.operationSha256 ?? "")) {
+         fail("FINISH-RESUME-BINDING", "The prepared close is not bound to these exact inputs.");
+       }
+-      preparedApplied = invokeCoordinator("apply-transition", { ...preparedValues,
+-        "plan-sha256": prior.coordinator.effects.at(-1).operationSha256, activate: true }, "FINISH-PREPARE-REPLAY");
++      preparedApplied = armStage("replay-prepared", () => invokeCoordinator("apply-transition", { ...preparedValues,
++        "plan-sha256": prior.coordinator.effects.at(-1).operationSha256, activate: true }, "FINISH-PREPARE-REPLAY"));
+       if (preparedApplied?.status !== "replayed") fail("FINISH-PREPARE-REPLAY", "The prepared close was not replayed from its durable record.");
+   }
+   const next = preparedApplied.nextAction;
+@@ -151,9 +174,9 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
+     || JSON.stringify(next?.argv) !== JSON.stringify(expectedCloseArgv)) {
+     fail("FINISH-CLOSE-ACTION", "Coordinator did not return its exact bound close-feature action.");
+   }
+-  const closed = runner(next.executable, next.argv);
++  const closed = armStage("close-feature", () => runner(next.executable, next.argv), (out) => out?.status === 0);
+   if (closed?.status !== 0) fail("FINISH-CLOSE", String(closed?.stderr ?? closed?.stdout ?? "State close failed.").trim() || "State close failed.");
+-  return Object.freeze({ schema: "pipeline.finish-feature.v1", status: "closed", lifecycleId: id, featureId, coordinator: preparedApplied, closeOutput: String(closed.stdout ?? "").trim() });
++  return Object.freeze({ schema: "pipeline.finish-feature.v1", status: "closed", lifecycleId: id, featureId, coordinator: preparedApplied, closeOutput: String(closed.stdout ?? "").trim(), writerCommit: writerCommit() });
+   } catch (error) {
+     error.lifecycleId = id;
+     throw error;
+@@ -171,6 +194,11 @@ function parse(argv) {
+ }
+ 
+ if (process.argv[1] === fileURLToPath(import.meta.url)) {
+-  try { process.stdout.write(`${JSON.stringify(finishFeature(parse(process.argv.slice(2))), null, 2)}\n`); }
++  try {
++    const result = finishFeature(parse(process.argv.slice(2)));
++    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
++    // G20-66: the exact commit of what the close wrote, as the next step (stderr; stdout stays the one JSON object).
++    if (result.writerCommit?.status === "armed") process.stderr.write(`${formatWriterCommitNextStep({ ...result.writerCommit, id: "per stage, see writerCommit.stages" }).join("\n")}\n`);
++  }
+   catch (error) { process.stderr.write(`finish-feature: ${error?.code ?? "FINISH-ERROR"}: ${error.message}${error.lifecycleId ? ` (lifecycle-id: ${error.lifecycleId})` : ""}\n`); process.exitCode = 2; }
+ }
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 11d17bb83..6606e488b 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -237,3 +237,43 @@ test("closed-State recovery rejects a mismatched actor, audit, or coordinator wi
+   }
+   assert.deepEqual(calls.map(argv => argv[1]), ["inspect", "inspect", "inspect"]);
+ });
++
++test("G20-66: every close stage that writes protected files arms the commit of exactly those bytes, and the result prints the one commit", async () => {
++  const { execFileSync } = await import("node:child_process");
++  const { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } = await import("node:fs");
++  const { tmpdir } = await import("node:os");
++  const { join } = await import("node:path");
++  const ptp = await import("../lib/protected-test-paths.mjs");
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "finish-wc-")));
++  try {
++    const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
++    git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
++    mkdirSync(join(root, ".claude"));
++    writeFileSync(join(root, ".claude/guard-config.json"), JSON.stringify({ protectedTestPaths: [{ pattern: "(?:lifecycle|audit|state)-fixture\\.json$", reason: "fixture close outputs", id: "TP-1" }] }));
++    for (const name of ["lifecycle", "audit", "state"]) writeFileSync(join(root, `${name}-fixture.json`), "{\"v\":0}\n");
++    git("add", "-A"); git("commit", "-q", "-m", "baseline");
++    const f = fixture();
++    const writes = { "apply-start": "audit", "apply-transition": "lifecycle", "close-feature": "state" };
++    let prepared = 0;
++    const runner = (executable, argv) => {
++      const key = argv[0].endsWith("pipeline-state.mjs") ? "close-feature" : argv[1];
++      const target = key === "apply-transition" ? (argv.includes("feature-close-prepared") ? "lifecycle" : null) : writes[key];
++      if (target) writeFileSync(join(root, `${target}-fixture.json`), `{"v":"${key}-${prepared += 1}"}\n`);
++      return f.runner(executable, argv);
++    };
++    const result = finishFeature({ rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", auditRequest: "specs/feature/audit-request.json", criticVerifyLifecycle: f.criticVerifyLifecycle, lifecycleId: "feature-abc" }, {
++      readFileSyncFn: () => JSON.stringify({ activeFeature: { id: "feature-abc" } }), runCommand: runner,
++    });
++    assert.equal(result.status, "closed");
++    assert.equal(result.writerCommit.status, "armed");
++    assert.deepEqual(result.writerCommit.paths, ["audit-fixture.json", "lifecycle-fixture.json", "state-fixture.json"]);
++    assert.deepEqual(result.writerCommit.stages.map((stage) => [stage.stage, stage.paths]), [["apply-start", ["audit-fixture.json"]], ["apply-prepared", ["lifecycle-fixture.json"]], ["close-feature", ["state-fixture.json"]]]);
++    assert.match(result.writerCommit.steps.join("\n"), /git add -- audit-fixture\.json lifecycle-fixture\.json state-fixture\.json/);
++    assert.match(result.writerCommit.message, /^chore\(pipeline\): /);
++    git("add", "audit-fixture.json", "lifecycle-fixture.json", "state-fixture.json");
++    for (const path of result.writerCommit.paths) assert.equal(ptp.writerCommitAdmission(root, path).admitted, true, `${path} is admitted`);
++    writeFileSync(join(root, "state-fixture.json"), "{\"v\":\"tampered\"}\n"); git("add", "state-fixture.json");
++    const stale = ptp.writerCommitAdmission(root, "state-fixture.json");
++    assert.equal(stale.admitted, false); assert.match(stale.stale.rerun, /finish-feature\.mjs/);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 2e834249b..49f41551c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -510,6 +510,7 @@ import {
+ } from "../lib/feature-package-topology.mjs";
+ import { armReconcileCommitCapability } from "../lib/human-guard-override.mjs";
+ import { COMMIT_PIPELINE_OWNED_SCRIPT } from "../lib/pipeline-owned-files.mjs";
++import { withWriterCommitCapability } from "../lib/writer-commit-capability.mjs";
+ import {
+   clearGateEstimateForMutation,
+   prepareGateEstimateMutation,
+@@ -14576,7 +14577,20 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
+   return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported. Repair: ${repairInspect} names the cause and the command that clears it.${elapsedText}`;
+ }
+ 
++// G20-66: the sanctioned writers whose protected output (State, lifecycle, audit bundle, result) their own commit must be able
++// to publish without a human-guard-override signature. After a successful run each arms the commit of exactly the files it
++// wrote (lib/writer-commit-capability.mjs) and prints that commit as its next step on stderr.
++export const WRITER_COMMIT_COMMANDS = new Set(["approve-plan", "close-feature"]);
++
+ export function run(argv = process.argv.slice(2), deps = {}) {
++  const sub = argv[0];
++  if (!WRITER_COMMIT_COMMANDS.has(sub)) return runPipelineState(argv, deps);
++  if (argv.slice(1).some((arg) => arg === "--help" || arg === "-h")) return runPipelineState(argv, deps);
++  const rootDir = deps.dir ?? projectDir();
++  return withWriterCommitCapability({ rootDir, writer: `pipeline-state.mjs ${sub}`, rerun: `node ${fileURLToPath(import.meta.url)} ${argv.map((arg) => (/^[\w./:=@+-]+$/u.test(arg) ? arg : JSON.stringify(arg))).join(" ")}` }, () => runPipelineState(argv, deps));
++}
++
++function runPipelineState(argv, deps) {
+   const sub = argv[0];
+   // `<command> --help` (or -h) is a question about that command, never a run: before this, a lifecycle verb given --help executed.
+   // rebind-approval keeps its own usage text below; configure-verify is a command the list does not name.
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+index c12b607e2..0a7fb03f2 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+@@ -1002,6 +1002,8 @@ async function main() {
+   let loadProtectedTestPathRules;
+   let protectedTestPathRuleFor;
+   let stagedClosedContinuityMatchesBinding;
++  let writerCommitAdmission;
++  let writerCommitConsume;
+   let defaultHasConsumedCapabilityForPath;
+   let verifyQualityPackageCommitAuthorization;
+   let resolveHandoverConfig;
+@@ -1009,7 +1011,7 @@ async function main() {
+   let windowCoversRule;
+   try {
+     ({ gateStrengthRuleFor } = await import(pathToFileURL(resolve(PLUGIN_HOOKS_DIR, "guard-gate-strength.mjs")).href));
+-    ({ loadProtectedTestPathRules, protectedTestPathRuleFor, stagedClosedContinuityMatchesBinding } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "protected-test-paths.mjs")).href));
++    ({ loadProtectedTestPathRules, protectedTestPathRuleFor, stagedClosedContinuityMatchesBinding, writerCommitAdmission, writerCommitConsume } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "protected-test-paths.mjs")).href));
+     ({ defaultHasConsumedCapabilityForPath } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "check-protected-path-integrity.mjs")).href));
+     ({ verifyQualityPackageCommitAuthorization } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "signed-quality-package.mjs")).href));
+     ({ resolveHandoverConfig } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "handover-rotation.mjs")).href));
+@@ -1092,6 +1094,9 @@ async function main() {
+   try { qualityPackageAuthorized = verifyQualityPackageCommitAuthorization({ repoRoot: projectRoot }).ok === true; } catch { qualityPackageAuthorized = false; }
+ 
+   const findings = [];
++  // G20-66: staged protected paths a sanctioned writer armed with exactly these bytes (consumed only when the commit goes through).
++  const writerAdmitted = [];
++  const writerNotes = [];
+   for (const relPath of paths) {
+     let rule = null;
+     try { rule = gateStrengthRuleFor(relPath, projectRoot); } catch { rule = null; }
+@@ -1104,6 +1109,16 @@ async function main() {
+     let closedEvidenceAsBound = false;
+     try { closedEvidenceAsBound = typeof stagedClosedContinuityMatchesBinding === "function" && stagedClosedContinuityMatchesBinding(projectRoot, rule, relPath) === true; } catch { closedEvidenceAsBound = false; }
+     if (closedEvidenceAsBound) continue;
++    // G20-66: the commit publishes exactly the bytes a sanctioned writer (approve-plan, close-feature, finish-feature) wrote and armed;
++    // an extra protected path, one changed byte or an already-spent capability is not admitted and stays a finding.
++    let writerVerdict = null;
++    try { writerVerdict = typeof writerCommitAdmission === "function" ? writerCommitAdmission(projectRoot, relPath) : null; } catch { writerVerdict = null; }
++    if (writerVerdict && writerVerdict.admitted === true) { writerAdmitted.push(writerVerdict); continue; }
++    if (writerVerdict && writerVerdict.stale) {
++      writerNotes.push({ path: relPath, text: "PB-WRITER-COMMIT-STALE: " + relPath + " no longer holds the bytes " + writerVerdict.stale.writer + " armed for commit (it changed after the writer wrote it); repair: rerun the writer: " + writerVerdict.stale.rerun });
++    } else if (writerVerdict && writerVerdict.spent) {
++      writerNotes.push({ path: relPath, text: "PB-WRITER-COMMIT-STALE: the commit capability " + writerVerdict.writer + " armed for " + relPath + " was already used by a commit; repair: rerun the writer: " + writerVerdict.rerun });
++    }
+     if (sanctionedVerifyPaths.has(relPath) && (rule.id === "GS-10" || rule.id === "GS-11")) continue;
+     let kernelPath = true;
+     try { kernelPath = isNeverLiftableKernelPath(relPath, { rootDir: projectRoot, livePluginRoot: resolve(PLUGIN_LIB_DIR, "..") }); } catch { kernelPath = true; }
+@@ -1124,7 +1139,10 @@ async function main() {
+     findings.push({ path: relPath, id: rule.id, reason: rule.reason });
+   }
+ 
+-  if (findings.length === 0) return;
++  if (findings.length === 0) {
++    if (writerAdmitted.length > 0) { try { writerCommitConsume(projectRoot, writerAdmitted); } catch { /* the capability stays unspent */ } }
++    return;
++  }
+ 
+   // C20 G20-46: the calibration tiers of a ready set-phase/configure-verify transition are admitted only as their own commit
+   // (the exact-set rule above stays). When they are the ONLY protected findings, other paths are staged with them and that
+@@ -1158,12 +1176,16 @@ async function main() {
+   // re-print the signing course. Any fault inside degrades to the plain refusal below.
+   let override = { admit: false, lines: [] };
+   try { override = await commitOverrideCourse(projectRoot, commonDir, findings); } catch { override = { admit: false, lines: [] }; }
+-  if (override.admit === true) return;
++  if (override.admit === true) {
++    if (writerAdmitted.length > 0) { try { writerCommitConsume(projectRoot, writerAdmitted); } catch { /* the capability stays unspent */ } }
++    return;
++  }
+ 
+   block([
+     \`\${findings.length} staged path(s) are protected and carry no matching consumed human-guard-override capability:\`,
+     ...findings.map((finding) => \`  - \${finding.id} \${finding.path}: \${finding.reason}\`),
+     "Why: this is the git-level backstop for guard-testpath.mjs / guard-gate-strength.mjs -- it exists because a spawned process (a different interpreter, a shelled-out redirect) can write these paths without ever crossing a PreToolUse hook boundary; this commit boundary is the one such a process cannot walk around.",
++    ...writerNotes.filter((note) => findings.some((finding) => finding.path === note.path)).map((note) => note.text),
+     ...override.lines,
+   ]);
+ }
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+index b000ff13d..b08722b86 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+@@ -1400,3 +1400,85 @@ test("installed hook: a non-canonical but valid calibration path spelling for th
+   assert.match(stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/);
+   assert.match(stderr, /hard size cap/);
+ });
++
++// ---------------------------------------------------------------------------------------------
++// G20-66: a sanctioned writer arms a commit capability for exactly the protected files and bytes it wrote
++// (lib/writer-commit-capability.mjs); the hook admits a commit that stages exactly those bytes without a human override,
++// and refuses everything else with the old findings. These cases drive the real installed hook through a real `git commit`.
++// ---------------------------------------------------------------------------------------------
++const sha256Of = (text) => createHash("sha256").update(text).digest("hex");
++const WRITER_RERUN = "node pipeline-state.mjs approve-plan --by <name>";
++
++/** A repository whose tracked `writer-state.json` is protected (project rule TP-1), with the real hook installed, and the
++ * writer's own write already made: `v2` bytes in the working tree. Returns the armed capability for them. */
++async function writerRepo(prefix, { arm = true } = {}) {
++  const { dir, git } = freshRepo(prefix);
++  writeTestPathConfig(dir, [{ pattern: "writer-state\\.json$", reason: "fixture sanctioned-writer state", id: "TP-1" }, { pattern: "other-protected\\.json$", reason: "fixture second protected file", id: "TP-2" }]);
++  writeFileSync(join(dir, "writer-state.json"), "{\"v\":1}\n");
++  writeFileSync(join(dir, "other-protected.json"), "{\"o\":1}\n");
++  git("add", ".claude/guard-config.json", "writer-state.json", "other-protected.json");
++  git("commit", "-q", "-m", "seed guard-config and the protected files (no hook installed yet)");
++  installHook(dir);
++  writeFileSync(join(dir, "writer-state.json"), "{\"v\":2}\n");
++  let armed = null;
++  if (arm) {
++    const { armWriterCommitCapability } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "writer-commit-capability.mjs")).href);
++    armed = armWriterCommitCapability({ rootDir: dir, writer: "pipeline-state.mjs approve-plan", rerun: WRITER_RERUN, files: [{ path: "writer-state.json", sha256: sha256Of("{\"v\":2}\n") }] });
++  }
++  return { dir, git, armed };
++}
++
++test("G20-66: the commit of exactly the bytes a sanctioned writer wrote passes the installed hook with no human override, and prints its exact next step", { timeout: commitTestTimeout(1) }, async () => {
++  const { dir, git, armed } = await writerRepo("g2066-exact");
++  assert.equal(armed.status, "armed");
++  assert.deepEqual(armed.paths, ["writer-state.json"]);
++  assert.deepEqual(armed.protectedPaths, ["writer-state.json"]);
++  assert.match(armed.message, /^chore\(pipeline\): /u, "the printed message is a conventional commit subject");
++  assert.ok(armed.steps.some((step) => step.includes("writer-state.json") && /commit/u.test(step)), "the next step names the exact commit and its paths");
++  git("add", "writer-state.json");
++  const { code, stderr } = commit(dir, armed.message);
++  assert.equal(code, 0, stderr);
++});
++
++test("G20-66: the same commit plus an unprotected file passes; plus one more protected path it is refused with the old findings", { timeout: commitTestTimeout(2) }, async () => {
++  const withExtra = await writerRepo("g2066-extra-unprotected");
++  writeFileSync(join(withExtra.dir, "notes.txt"), "unprotected\n");
++  withExtra.git("add", "writer-state.json", "notes.txt");
++  const admitted = commit(withExtra.dir, "chore(pipeline): the writer output with an unprotected file");
++  assert.equal(admitted.code, 0, admitted.stderr);
++  const withProtected = await writerRepo("g2066-extra-protected");
++  writeFileSync(join(withProtected.dir, "other-protected.json"), "{\"o\":2}\n");
++  withProtected.git("add", "writer-state.json", "other-protected.json");
++  const refused = commit(withProtected.dir, "chore(pipeline): the writer output with another protected path");
++  assert.notEqual(refused.code, 0);
++  assert.match(refused.stderr, /TP-2/u);
++  assert.match(refused.stderr, /other-protected\.json/u);
++});
++
++test("G20-66: a changed bound byte is refused as stale and names the rerun of the writer; without a capability the old refusal stands", { timeout: commitTestTimeout(2) }, async () => {
++  const stale = await writerRepo("g2066-stale");
++  writeFileSync(join(stale.dir, "writer-state.json"), "{\"v\":3}\n");
++  stale.git("add", "writer-state.json");
++  const refused = commit(stale.dir, "chore(pipeline): bytes the writer did not write");
++  assert.notEqual(refused.code, 0);
++  assert.match(refused.stderr, /TP-1/u);
++  assert.match(refused.stderr, /PB-WRITER-COMMIT-STALE/u);
++  assert.match(refused.stderr, /writer-state\.json/u);
++  assert.ok(refused.stderr.includes(WRITER_RERUN), "the repair is the rerun of the writer");
++  const none = await writerRepo("g2066-unarmed", { arm: false });
++  none.git("add", "writer-state.json");
++  const old = commit(none.dir, "chore(pipeline): no capability armed");
++  assert.notEqual(old.code, 0);
++  assert.match(old.stderr, /TP-1/u);
++  assert.doesNotMatch(old.stderr, /PB-WRITER-COMMIT-STALE/u);
++});
++
++test("G20-66: an unrelated commit between the write and the commit of the writer's bytes does not strand the capability (it is bound to bytes, not to HEAD)", { timeout: commitTestTimeout(2) }, async () => {
++  const { dir, git } = await writerRepo("g2066-head-moved");
++  writeFileSync(join(dir, "unrelated.txt"), "x\n");
++  git("add", "unrelated.txt");
++  assert.equal(commit(dir, "chore: an unrelated commit that moves HEAD").code, 0);
++  git("add", "writer-state.json");
++  const { code, stderr } = commit(dir, "chore(pipeline): the writer output after an unrelated commit");
++  assert.equal(code, 0, stderr);
++});
