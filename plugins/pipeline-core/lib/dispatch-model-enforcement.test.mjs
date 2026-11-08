@@ -33,6 +33,18 @@ test("DME02 an empty or non-string model counts as missing", () => {
   }
 });
 
+// G20-70 (Claude greenfield 2026-11-08): a Critic dispatch without a model was told "implementation work uses duty.implement".
+test("DME02b a missing model names the dispatched agent type's own duty selector, not the implementation default", () => {
+  const critic = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:critic", model: undefined, routeSource: routes() });
+  assert.equal(critic.findings[0].code, "DISPATCH-MODEL-MISSING");
+  assert.match(critic.findings[0].message, /pipeline-core:critic serves duty\.critic_normal = "opus" \/ duty\.critic_high_risk = "opus"/u);
+  assert.doesNotMatch(critic.findings[0].message, /implementation work uses/u);
+  const mechanic = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-mechanic", model: undefined, routeSource: routes() });
+  assert.match(mechanic.findings[0].message, /pipeline-core:goldfish-mechanic serves duty\.mechanic = "haiku"/u);
+  const generic = evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model: undefined, routeSource: routes() });
+  assert.match(generic.findings[0].message, /implementation work uses duty\.implement = "sonnet"/u);
+});
+
 test("DME03 a generic agent type accepts any configured, available Claude selector", () => {
   for (const model of ["sonnet", "haiku", "opus", "Sonnet"]) {
     assert.equal(evaluateDispatchModel({ runner: "claude", subagentType: "general-purpose", model, routeSource: routes() }).ok, true, model);

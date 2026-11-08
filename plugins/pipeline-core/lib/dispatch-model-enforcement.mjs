@@ -101,12 +101,20 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
   const allSelectors = [...new Set(dutyRoutes.map((route) => route.selector.value))];
   const defaultSelector = dutyRoutes.find((route) => route.taskRoute === "duty.implement")?.selector.value ?? allSelectors[0];
   const hasModel = typeof model === "string" && model.trim() !== "";
+  // G20-70 (Claude greenfield 2026-11-08): a Critic dispatch without a model was told "implementation work uses
+  // duty.implement", the selector of another role. A plugin agent type that serves a configured duty names that duty's
+  // own selector; only an agent type with no duty of its own keeps the implementation default.
+  const ownDuties = AGENT_TYPE_DUTIES[subagentType];
+  const ownRoutes = ownDuties ? dutyRoutes.filter((route) => ownDuties.includes(route.taskRoute.slice("duty.".length))) : [];
   if (!hasModel) {
+    const routeHint = ownRoutes.length > 0
+      ? `${subagentType} serves ${ownRoutes.map((route) => `${route.taskRoute} = "${route.selector.value}"`).join(" / ")}`
+      : `implementation work uses duty.implement = "${defaultSelector}"`;
     return { ok: false, skipped: null, findings: [{
       code: "DISPATCH-MODEL-MISSING",
       message: `the dispatch names no model, so it would inherit the session's model; the configured routing decides the model, not the dispatcher. `
         + `Re-issue the same dispatch with the tool-layer \`model\` parameter set to one of the configured selectors (${allSelectors.map((value) => `"${value}"`).join(", ")}; `
-        + `implementation work uses duty.implement = "${defaultSelector}").`,
+        + `${routeHint}).`,
     }] };
   }
   if (!dutyRoutes.some((route) => selectorMatches(route.selector, model))) {
@@ -116,8 +124,7 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
         + `Re-issue it with one of the configured selectors: ${allSelectors.map((value) => `"${value}"`).join(", ")}.`,
     }] };
   }
-  const duties = AGENT_TYPE_DUTIES[subagentType];
-  const routes = duties ? dutyRoutes.filter((route) => duties.includes(route.taskRoute.slice("duty.".length))) : [];
+  const routes = ownRoutes;
   if (routes.length > 0 && !routes.some((route) => selectorMatches(route.selector, model))) {
     const expected = [...new Set(routes.map((route) => `"${route.selector.value}"`))].join(" or ");
     // A configured but different selector is the MP-05/MP-07 escalation shape (a stated tier change), so it
