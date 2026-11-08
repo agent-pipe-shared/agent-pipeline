@@ -1380,8 +1380,9 @@ export function resolveGovernedItemQueue({ root } = {}) {
 
 /** Bounded retry for a transiently held Session Authority lock (SDC-LOCK-HELD is thrown, not returned).
  * Only a refusal raised before the callback ran is retried; the same code is rethrown when the budget ends. */
+const WINDOWS_AUTHORITY_RACE_RETRIES=4;
 export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),now=()=>Date.now(),onWait=null,retryBindingChange=false}={}) {
-  const deadline=now()+budgetMs;let delay=25;
+  const deadline=now()+budgetMs;let delay=25,windowsRaces=0;
   for(;;){
     const entered={value:false};
     try{return attempt(entered);}
@@ -1392,7 +1393,11 @@ export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep
       // repository afresh, so the retry binds the moved HEAD; a refusal after the boundary opened (`entered`) is still reported, not repeated.
       const transient=error?.code==='SDC-LOCK-HELD'||(error?.code==='SDC-AUTHORITY-UNAVAILABLE'&&error?.reason==='state-push-owner-unavailable')
         ||(retryBindingChange===true&&error?.code==='SDC-ROOT'&&error?.reason==='repository-binding-changed');
-      if(!transient||entered.value||now()+delay>deadline)throw error;
+      // Live 2026-11-08 (native Windows, five starts in one reply): two launches were refused WIN-AUTH-CAS / WIN-AUTH-OPEN before their boundary opened, while a
+      // sibling rewrote the registry. Seen from outside the lock that is a concurrent replace, so a few retries bind the new file; a lasting cause still surfaces.
+      const windowsRace=error?.code==='SDC-AUTHORITY-UNAVAILABLE'&&(error?.reason==='WIN-AUTH-CAS'||error?.reason==='WIN-AUTH-OPEN')&&windowsRaces<WINDOWS_AUTHORITY_RACE_RETRIES;
+      if(!(transient||windowsRace)||entered.value||now()+delay>deadline)throw error;
+      if(!transient)windowsRaces+=1;
       if(typeof onWait==='function'){try{onWait(error,delay);}catch{/* a diagnostic never changes the wait */}}
       sleep(delay);delay=Math.min(delay*2,1000);
     }

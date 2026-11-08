@@ -85,6 +85,22 @@ const cases = [
     assert.ok(bindingClock <= 10000, "the opt-in retry stays inside the budget");
     const otherRoot = () => { const e = new Error("root"); e.code = "SDC-ROOT"; e.reason = "repository-root-changed"; throw e; };
     assert.throws(() => retryWhileSessionAuthorityLockHeld(otherRoot, { sleep: () => {}, retryBindingChange: true }), error => error.reason === "repository-root-changed", "only the binding change is retried, no other SDC-ROOT reason");
+    // C21 (QG-04, extension only): a sibling replacing the registry surfaces as WIN-AUTH-CAS / WIN-AUTH-OPEN before the boundary; a few retries, never more, never after entry.
+    for (const reason of ["WIN-AUTH-CAS", "WIN-AUTH-OPEN"]) {
+      const windowsRefusal = () => { const e = new Error(reason); e.code = "SDC-AUTHORITY-UNAVAILABLE"; e.reason = reason; throw e; };
+      let replaced = 0;
+      assert.equal(retryWhileSessionAuthorityLockHeld(() => { replaced += 1; if (replaced < 3) windowsRefusal(); return "bound"; }, { sleep: () => {} }), "bound");
+      let lasting = 0;
+      assert.throws(() => retryWhileSessionAuthorityLockHeld(() => { lasting += 1; windowsRefusal(); }, { sleep: () => {} }), error => error.reason === reason);
+      assert.equal(lasting, 5, "a lasting cause surfaces after the bounded retries");
+      let afterEntry = 0;
+      assert.throws(() => retryWhileSessionAuthorityLockHeld((entered) => { afterEntry += 1; entered.value = true; windowsRefusal(); }, { sleep: () => {} }), error => error.reason === reason);
+      assert.equal(afterEntry, 1, "a refusal after the boundary opened is reported, not repeated");
+    }
+    const otherWindows = () => { const e = new Error("dacl"); e.code = "SDC-AUTHORITY-UNAVAILABLE"; e.reason = "WIN-AUTH-DACL"; throw e; };
+    let dacl = 0;
+    assert.throws(() => retryWhileSessionAuthorityLockHeld(() => { dacl += 1; otherWindows(); }, { sleep: () => {} }), error => error.reason === "WIN-AUTH-DACL");
+    assert.equal(dacl, 1, "no other Windows authority refusal is retried");
     // C19L-W251 (QG-04, extension only): the terminal write boundary is repeated on a fresh boundary while a sibling race refuses it, with a refresh
     // between rounds, bounded; any other refusal and the last race are raised unchanged.
     const race = (reason) => () => { const e = new Error(reason); e.code = reason === "reference-preimage-changed" ? "SDC-AUTHORITY-CAS" : "SDC-AUTHORITY-UNAVAILABLE"; e.reason = reason; throw e; };
