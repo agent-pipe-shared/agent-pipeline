@@ -1,0 +1,47 @@
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index dab89d5edc568bae77b9099cd2693f379d065a8e..0d08881adb97afe0919ff85184280c329b2e6ca6 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -406,9 +406,22 @@ the Pipeline's own source release above is unchanged. It is the LAST step of the
+ 3. The PO approves the release once, through the `release-preflight` critical kind in the configured approval mode. In `chat` mode the run itself
+    records the approval; in `signature` mode the command stops with `RPC-CONSUMER-PO-APPROVAL` and prints the PO's exact signing command for
+    this subject, then runs again with `--proof-request`/`--proof`.
+-4. The agent runs the two `nextActions` the command prints: `git tag -a v<VERSION> -m "version tag" <commit>` and
++4. The agent runs the `nextActions` the command prints: `git tag -a v<VERSION> -m "version tag" <commit>` and
+    `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
+    (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above.
++   **The approval proofs reach the remote audit bundle (C20E-AP).** The push approval signs the commit that carries
++   `audit-bundles/<feature>/<candidate>/`, and the release approval comes later, so neither proof can sit inside that commit. When the feature has a
++   bundle, the same command therefore also adds, as NEW files only, the public proof objects of the push approval and of the release approval to that
++   bundle's `proofs/` directory (numbering continues after the bundle's own proofs) plus one list, `proofs/follow-up.json`, that binds them by digest to the
++   approved commit and to the bundle's candidate. `manifest.json` and `README.md` stay byte for byte, so the bundle's own `audit-bundle.mjs verify` still
++   passes and now also checks the follow-up (`AB-FOLLOWUP`, `AB-DIGEST`, `AB-PROOF-INTENT`, `AB-PROOF-SIGNATURE`). Never a private key: a `chat` or waiver
++   approval is carried as an attribution record (kind, mode, time) and never as a proof. The command arms the commit of exactly those files (G20-66) and
++   prints it between the tag and the pushes: `nextActions` becomes the tag, the commit step, `git push origin HEAD:refs/heads/main`, then the tag push.
++   `hooks/guard-push.mjs` admits that branch push without a second approval ONLY for exactly one commit on top of the release-approved commit
++   (`authorizeAuditProofFollowUp`): the approved commit is the published tip of the destination, carries its recorded push approval and the annotated release
++   tag, and the commit's diff only ADDS regular files under that one bundle's `proofs/` (each a public proof object or the list). Any other path, a changed
++   existing file, a second commit, a merge or an unpublished parent falls through to the full gate unchanged. A project without a bundle sees the `auditProofFollowUp`
++   status `no-bundle` and the tag steps alone.
+ 
+ ### Source reader binding (Agent Pipeline source checkout only)
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 729115b12f46ace3a720858d6e2daf630f634d10..e01ab316db11900c358ead2d755dce23914e1d5b 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -28,9 +28,12 @@ conflicting or unknown carriers stop — Critic is closed, never Elephant.
+ 
+ For `pipeline-governance-inactive`, ask the human once whether this project
+ should use the Pipeline. That question lists in short what agreeing
+-installs and activates, git hooks included: relay `consentQuestion` verbatim. Only after an affirmative answer, execute the exact
++installs and activates, git hooks included, by relaying `consentQuestion.text` verbatim, never paraphrased. Only after an affirmative answer, execute the exact
+ read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
+-mutations; then run `consentRecordAction`. A decline leaves the project inactive.
++mutations; then run `consentRecordAction`. When an escalation review asks why a
++covered action runs, give its `escalationJustification` line verbatim; the
++design approval, push, release and any human-guard override are never covered.
++A decline leaves the project inactive.
+ 
+ Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
+ carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`

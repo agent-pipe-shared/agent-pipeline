@@ -1,0 +1,15 @@
+diff --git a/.gitleaksignore b/.gitleaksignore
+index b4c29653e6bf02aef8fba6a527add23b25fca194..353bd238b6478e8c8d448fa787a8789993eb95ce 100644
+--- a/.gitleaksignore
++++ b/.gitleaksignore
+@@ -358,3 +358,10 @@ content-v1:2bb243f703e651052ed783debf08353b789416d602ecfe4a877a78b9cc58e26d:plug
+ # so its line-bound entry went stale (the fv10 security-scan was the only red of 1144 steps). Same reviewed value (a PEM header literal in a detection check, not a key), new line;
+ # the entry is the one the adapter recomputed from the normalized finding of the applied tree. The stale entry stays as a harmless record.
+ content-v1:60280fcc421d07eff69732a896c13a4ae964153b8e45e8bac399e5cc2f316859:plugins/pipeline-core/scripts/po-human-approval.mjs:private-key:1680:22
++# C20E-GITLEAKS-FP (2026-11-08, PO tile): three private-key hits are the bare PEM header literal used as a refusal marker in the audit-bundle test (and the two held patches that carry that
++# test); the scanner's multi-line rule spans two occurrences in one file. No key material. One sourcegraph-access-token hit is a full-index blob hash on line 2 of a held patch. Each entry is
++# bound to path, rule, line, column and value, computed by the adapter from the normalized finding.
++content-v1:47b4a305e3a4723334254ee4c96bc8dd4a530af5a4a9a37378b8ef6a3cb0e054:plugins/pipeline-core/lib/audit-bundle.test.mjs:private-key:242:120
++content-v1:3faf00e467c7b63ea5f71fdf4eeee23fdf0a0402fce23187857b08a01af15ca1:specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/13-4a80f4c8d.patch:sourcegraph-access-token:2:50
++content-v1:a9a95283499460ba27cbfbfbfd808515b14748908a9aed85901be6363ee76269:specs/sprint-alfred-epic/evidence/held-patches/c20e-chain/6-6661a072c.patch:private-key:164:112
++content-v1:a8b3391fa0b366e8840f061e30e6bc0512bf92b1017573d24307116039056914:specs/sprint-alfred-epic/evidence/held-patches/w282-c20e-audit-push-proof-followup.patch:private-key:158:112
