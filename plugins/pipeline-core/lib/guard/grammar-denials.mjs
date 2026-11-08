@@ -138,7 +138,7 @@ export const ADMITTED_GRAMMAR_SHAPES = [
   {
     // C21 (AC-108): the listing and context forms a worker tries first; the paths are judged by the same scope as every other read.
     spelling: "listing and context forms of those commands: \"rg --files <dir>...\"; a context flag \"-A N\" / \"-B N\" / \"-C N\" (grep: N of 1..3 digits, separate or attached "
-      + "as -C5; rg: N up to 500, separate); \"ls\" with -l -a -R -1 -h (or combined, e.g. -la) over contained paths; a listed directory that does not exist yet is not an error",
+      + "as -C5; rg: N up to 500, separate); \"ls\" with -l -a -R -1 -h (or combined, e.g. -la) over contained paths; listing a directory the project has yet to create is admitted",
     example: "grep -n -C 5 needle probe.txt",
   },
   {
