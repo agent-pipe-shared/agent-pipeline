@@ -1,0 +1,44 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 670297e393be500e271cb490ec8b05250eb4ef85..b545fc2581435e7b83534bea079f628acdcd463f 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -186,7 +186,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["claude-task-output-read-scope-tests","plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs","top-level-assertions",20],
+     ["claude-task-output-scope-posttool-tests","plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs","top-level-assertions",9],
+     ["clone-hook-readiness-rollback-tests","plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs","top-level-assertions",86],
+-    ["close-path-e2e-tests","plugins/pipeline-core/scripts/close-path-e2e.test.mjs","node-test-single",87], // cand. 20b (QG-04: extension only): the legacy-process-only row of candidate 20 step 54, measured 86; 87 after G20-54 (the fixture asserts materialize-architecture registered the package)
++    ["close-path-e2e-tests","plugins/pipeline-core/scripts/close-path-e2e.test.mjs","node-test-single",89], // cand. 20b (QG-04: extension only): the legacy-process-only row of candidate 20 step 54, measured 86; 87 after G20-54 (the fixture asserts materialize-architecture registered the package); 89 after the two set-phase output assertions (package step named, "below" only when the tiers follow)
+     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
+     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index ac5ec18d31e1decf51ac316138624903a7b05c13..b788e6f616fab3e85813048112acfa5b6825a0b9 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -191,7 +191,10 @@ function consumerFixture(log, identity) {
+   // G20-51 (candidate 20b): materialize-architecture registers the feature package itself and names its files in the commit step.
+   const materialized = JSON.parse(lifecycle(["materialize-architecture"]).at(-1));
+   assert.equal(materialized.featurePackage?.status, "registered", `materialize-architecture registers the package: ${JSON.stringify(materialized).slice(0, 600)}`);
+-  lifecycle(["set-phase", "--phase", "implementation"]);
++  const setPhaseLogs = lifecycle(["set-phase", "--phase", "implementation"]).join("\n");
++  // G20-54 (candidate 20b): set-phase names the package step, and points at the verification tiers "below" only when they follow.
++  assert.match(setPhaseLogs, /moved approved -> implementing/u, setPhaseLogs.slice(0, 600));
++  assert.equal(/verification tiers below/u.test(setPhaseLogs), /commit the verification tiers ALONE/u.test(setPhaseLogs), setPhaseLogs.slice(0, 600));
+   assert.ok(current().rigorHistory.some((row) => (row.body ?? row).boundary === "plan-submission"), "the plan-submission rigor row exists (recorded by submit-plan)");
+   // A fixture signature for a critical action, made the way the PO's terminal makes it (Ed25519 over the approval intent digest) with the
+   // test key whose public digest is the policy's trust anchor. No real key exists or is needed.
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index bf4719644e7701159b6c3d20bf2cb5b634c90c87..34d6681d48d49a1b799e6a23e2fe099c98feb0e7 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11884,7 +11884,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       console.log('Phase set: "implementation"; lifecycle="implementing".');
+       const advanced = (deps.advanceRegisteredPackageToImplementing ?? advanceRegisteredPackageToImplementing)(dir, written.transition.state?.activeFeature?.planPath, deps);
+       if (advanced?.status === "applied") {
+-        console.log(`Feature package: ${advanced.manifest} moved approved -> implementing; commit it with the other implementation-entry files (a separate commit from the verification tiers below).`);
++        // C20b: the verification-tier clause only when that block actually follows.
++        const tiersFollow = calibrationCommitPaths !== null && calibrationCommitPaths.length > 0;
++        console.log(`Feature package: ${advanced.manifest} moved approved -> implementing; commit it with the other implementation-entry files${tiersFollow ? " (a separate commit from the verification tiers below)" : ""}.`);
+       } else if (advanced?.status === "refused") {
+         console.error(`Warning: the feature package ${advanced.manifest} stays "approved" (${advanced.code}); the close path needs it at "implementing". Repair (agent, no PO step): ${advanced.repair}.`);
+       }

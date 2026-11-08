@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 20b: 23 held patches exported from the build clone chain daae02455..23d7e20f4
+# PO apply script for candidate 20b: 24 held patches exported from the build clone chain daae02455..df3e1a6ba
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -37,6 +37,7 @@ step 20-90675f62a 'fix(guard): the close commit may stage exactly the closed-con
 step 21-7f2b3b792 'docs(skill): a Claude Elephant continues in the same turn after a Goldfish host commit instead of waiting for the pipeline (G20-57)'
 step 22-bc15619c2 'fix(po-gate): name the agent-admitted profile repair route first (G20-53)'
 step 23-23d7e20f4 'fix(provisioning): the profile receipt repair names the agent-admitted repair plan (G20-53)'
+step 24-df3e1a6ba 'fix(pipeline-state): set-phase points at the verification tiers below only when they follow (G20-54)'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
