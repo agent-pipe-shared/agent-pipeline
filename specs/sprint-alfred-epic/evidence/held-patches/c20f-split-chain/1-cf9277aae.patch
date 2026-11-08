@@ -1,0 +1,133 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 253b4d917974ed9300d82d729aba48def98855af..873f830c65908f19a97110bcba51ada5bd2d3ed2 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -583,7 +583,8 @@
+           "CDPF096",
+           "CDPF097",
+           "CDPF098",
+-          "CDPF099"
++          "CDPF099",
++          "CDPF100"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/plugins/pipeline-core/lib/critic-split.mjs b/plugins/pipeline-core/lib/critic-split.mjs
+index 7007d66fb064d746d749ef205bed153c766e498d..ec7e94602702a8b128ad61410839d5f64601ec6e 100644
+--- a/plugins/pipeline-core/lib/critic-split.mjs
++++ b/plugins/pipeline-core/lib/critic-split.mjs
+@@ -79,11 +79,39 @@ function matchLength(pattern, file) {
+   return file === pattern ? pattern.length + 1 : -1;
+ }
+ 
++/**
++ * Cuts paths into parts of at most `max` files. A directory that fits stays whole; a larger one is cut along its subdirectories, and only files lying directly in one directory
++ * are chunked. Neighbouring pieces are then packed together while they fit, so a range does not turn into many tiny Critics. Disjoint, covers every path, deterministic.
++ */
++function cutByDirectory(paths, max) {
++  const pieces = (items, depth) => {
++    if (items.length <= max) return [items];
++    const byDirectory = new Map();
++    for (const path of items) {
++      const segments = path.split("/");
++      const directory = segments.length > depth + 1 ? segments[depth] : "";
++      byDirectory.set(directory, [...(byDirectory.get(directory) ?? []), path]);
++    }
++    return [...byDirectory].flatMap(([directory, group]) => {
++      if (directory !== "") return pieces(group, depth + 1);
++      return Array.from({ length: Math.ceil(group.length / max) }, (_, index) => group.slice(index * max, (index + 1) * max));
++    });
++  };
++  const parts = [];
++  for (const piece of pieces([...paths].sort(), 0)) {
++    const last = parts.at(-1);
++    if (last !== undefined && last.length + piece.length <= max) last.push(...piece);
++    else parts.push([...piece]);
++  }
++  return parts;
++}
++
+ /**
+  * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES changed files).
+  * One entry per module of the approved architecture plan that owns a changed path (disjoint scopes: a path goes to the module whose owned-path pattern matches it most
+- * specifically, ties by module id), plus ONE shared entry for every changed path no module owns, which is never dropped. Without exactly one approved plan only the shared
+- * entry exists and `plan.status` says why. Deterministic from the repository and the result alone, so `admit` rebuilds the identical object.
++ * specifically, ties by module id), plus ONE shared entry for every changed path no module owns, which is never dropped. Without exactly one approved plan every path is in
++ * the shared group and `plan.status` says why. A group above the bound (the shared group without a plan, or one very large module) is cut along directories into entries
++ * `<group>-part-<n>`, so no entry is larger than one Critic can read. Deterministic from the repository and the result alone, so `admit` rebuilds the identical object.
+  * @param {{ root: string, result: object }} input `result` is the library preflight result (status packet-ready, exact range).
+  */
+ export function buildCriticSplit({ root, result }) {
+@@ -105,14 +133,24 @@ export function buildCriticSplit({ root, result }) {
+   }
+   const groups = [...plan.modules.map((module) => module.id).sort().map((id) => ({ id, moduleId: id, paths: owned.get(id), label: `module ${id}` })),
+     { id: SPLIT_SHARED_ENTRY_ID, moduleId: null, paths: shared, label: "the shared entry (every changed path no module owns)" }].filter((group) => group.paths.length > 0);
++  const moduleIds = new Set(plan.modules.map((module) => module.id));
++  const parts = groups.flatMap((group) => {
++    if (group.paths.length <= SPLIT_MAX_CHANGED_FILES) return [group];
++    let suffix = 0;
++    return cutByDirectory(group.paths, SPLIT_MAX_CHANGED_FILES).map((paths) => {
++      do suffix += 1; while (moduleIds.has(`${group.id}-part-${suffix}`));
++      const id = `${group.id}-part-${suffix}`;
++      return { id, moduleId: null, paths, label: `path group ${id} of ${group.label}` };
++    });
++  });
+   const range = `${base.slice(0, 12)}..${candidate.slice(0, 12)}`;
+   return {
+     schema: CRITIC_SPLIT_SCHEMA, base, candidate, maxChangedFiles: SPLIT_MAX_CHANGED_FILES, changedFileCount: changed.length,
+     plan: { status: plan.status, path: plan.path },
+-    entries: groups.map((group, index) => ({
++    entries: parts.map((group, index) => ({
+       id: group.id, moduleId: group.moduleId, paths: group.paths, scopeMarker: splitScopeMarker(group.id),
+       reviewerInput: { ...result.dispatch.reviewerInput, changedPaths: group.paths },
+-      batchScopeLine: `Batch scope (MP-07): ${group.label} of the reviewed range ${range} (${group.paths.length} of ${changed.length} changed files), part ${index + 1} of ${groups.length} of one split review round.`,
++      batchScopeLine: `Batch scope (MP-07): ${group.label} of the reviewed range ${range} (${group.paths.length} of ${changed.length} changed files), part ${index + 1} of ${parts.length} of one split review round.`,
+     })),
+   };
+ }
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 3584324a8a71548d27eec74eccbfad6a1598c242..a517d306ac5ff6c3b7a83ad022e90826cb7a937b 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -2213,13 +2213,38 @@ test("G20-72 a range at the bound prints no split and a next step without a merg
+   } finally { rmSync(small.root, { recursive: true, force: true }); rmSync(big.root, { recursive: true, force: true }); }
+ });
+ 
+-test("G20-72 without an approved architecture plan the split is the one shared entry, flagged; it never drops a path", async () => {
++// Restated 2026-11-08 (PO tile after the live measurement, QG-04: the pinned behaviour was the defect): without a plan a 91-file range came back as ONE entry of 91 files, so the
++// split did nothing. The case keeps its fixture and its "flagged, never drops a path" assertions and now pins that no entry is above the bound.
++test("G20-72 without an approved architecture plan the shared paths are cut along directories, flagged; no entry is above the bound and no path is dropped", async () => {
++  const { SPLIT_MAX_CHANGED_FILES, attributeVerdict, criticSplitProblem } = await import("../lib/critic-split.mjs");
+   const fx = g2072Fixture({ plan: false });
+   try {
+     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
+-    assert.deepEqual(split.entries.map((entry) => entry.id), ["shared"]);
++    assert.deepEqual(split.entries.map((entry) => entry.id), ["shared-part-1", "shared-part-2"]);
+     assert.equal(split.plan.status, "none");
+-    assert.deepEqual([...split.entries[0].paths].sort(), g2072Changed(fx).sort());
++    assert.equal(criticSplitProblem(split), null, "admit accepts the cut split");
++    assert.deepEqual(split.entries.flatMap((entry) => entry.paths).sort(), g2072Changed(fx).sort());
++    for (const entry of split.entries) {
++      assert.ok(entry.paths.length <= SPLIT_MAX_CHANGED_FILES, `${entry.id}: ${entry.paths.length} files`);
++      assert.ok(entry.batchScopeLine.includes(entry.id), entry.batchScopeLine);
++      assert.equal(attributeVerdict(split, { trajectory_evidence: `${entry.scopeMarker} reviewed` }), entry.id, "a child verdict is attributed to its cut entry");
++    }
++    assert.deepEqual(split.entries[1].paths.every((path) => path.startsWith("src/")), true, "a directory that fits stays whole");
++    assert.deepEqual(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} }).split, split, "admit rebuilds the identical object");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("G20-72 a module above the bound is cut into parts, one flat directory included, while a module that fits keeps its entry", async () => {
++  const { SPLIT_MAX_CHANGED_FILES, criticSplitProblem } = await import("../lib/critic-split.mjs");
++  const fx = g2072Fixture({ core: 40, api: 3, loose: 1 });
++  try {
++    const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
++    assert.deepEqual(split.entries.map((entry) => entry.id), ["api", "core-part-1", "core-part-2", "shared"]);
++    assert.equal(criticSplitProblem(split), null);
++    assert.equal(split.entries.find((entry) => entry.id === "api").moduleId, "api");
++    assert.ok(split.entries.every((entry) => entry.paths.length <= SPLIT_MAX_CHANGED_FILES));
++    assert.deepEqual(split.entries.flatMap((entry) => entry.paths).sort(), g2072Changed(fx).sort());
++    assert.match(split.entries.find((entry) => entry.id === "core-part-2").batchScopeLine, /^Batch scope \(MP-07\): path group core-part-2 of module core /u);
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
