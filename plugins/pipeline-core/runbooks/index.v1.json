@@ -5,7 +5,7 @@
       "pathId": "close",
       "path": "plugins/pipeline-core/runbooks/close-path.v1.json",
       "schema": "pipeline.runbook.v1",
-      "sha256": "44c65340ec00f845442b3c483086d48a00a475be4516b584d01f36b8fdc365e9"
+      "sha256": "258204a0e66d5d2d930b9364ab86adccdbd77cdeb1e0452185e29cbf6e43a4c4"
     },
     {
       "pathId": "start",

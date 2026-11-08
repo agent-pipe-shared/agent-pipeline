@@ -390,6 +390,26 @@ it belongs under `/evidence/` (`.gitignore:39`), the same ignored-but-present
 location every other pre-signature scratch artifact in this flow already
 uses.
 
+### Releasing a consumer project: a version tag (G20-42)
+
+For a **consumer** project a release is a version tag `v<VERSION>` on a closed feature that is already pushed. The consumer mode of
+`release-preflight-cli.mjs` is chosen from the project's shape (no Pipeline plugin manifests under `plugins/pipeline-core/`), never by a flag;
+the Pipeline's own source release above is unchanged. It is the LAST step of the happy path, after the feature close and its push:
+
+1. `VERSION` is tracked (onboarding creates it as `0.1.0`; an older project runs `release-preflight-cli.mjs --init-version --root <root>`
+   and commits the file). `RELEASE-NOTES.md` carries a `## v<VERSION>` entry naming the closed feature id, its title and the acceptance
+   criteria met; the agent writes it with the feature, so the Critic reviews it and the Critic-bound push Verify carries it.
+2. `node ${PIPELINE_PLUGIN_ROOT}/scripts/release-preflight-cli.mjs --root <root> --base <registered base commit> --lifecycle specs/<feature>/lifecycle.json`
+   writes `evidence/release-preflight.json` only when the feature is in `closedFeatures`, the notes entry is committed, push-prepare's own
+   Verify / Critic-bound Verify / security checks are green, the push approval for this candidate exists, and the candidate is reachable from
+   `refs/remotes/origin/main`. Otherwise it exits 2 at the first missing step and prints `repair:` with the command that supplies it.
+3. The PO approves the release once, through the `release-preflight` critical kind in the configured approval mode. In `chat` mode the run itself
+   records the approval; in `signature` mode the command stops with `RPC-CONSUMER-PO-APPROVAL` and prints the PO's exact signing command for
+   this subject, then runs again with `--proof-request`/`--proof`.
+4. The agent runs the two `nextActions` the command prints: `git tag -a v<VERSION> -m "version tag" <commit>` and
+   `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
+   (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above.
+
 ### Source reader binding (Agent Pipeline source checkout only)
 
 Release, tag, marketplace and publication preparation require fresh

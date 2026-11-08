@@ -29,8 +29,8 @@ no hand-maintained guard count or command list.
 | --- | --- | --- | --- |
 | Antigravity | PreInvocation | (all) | node hooks/antigravity-slicing-hint.mjs deliver |
 | Antigravity | PreInvocation | (all) | node hooks/antigravity-start-hint.mjs |
-| Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;write_file&#124;edit_file&#124;read_file&#124;invoke_subagent | node hooks/antigravity-pretool-guard.mjs |
-| Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;write_file&#124;edit_file&#124;read_file&#124;invoke_subagent | node hooks/antigravity-slicing-hint.mjs observe |
+| Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;write_file&#124;edit_file&#124;read_file&#124;invoke_subagent&#124;send_message | node hooks/antigravity-pretool-guard.mjs |
+| Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;write_file&#124;edit_file&#124;read_file&#124;invoke_subagent&#124;send_message | node hooks/antigravity-slicing-hint.mjs observe |
 | Antigravity | Stop | (all) | node hooks/antigravity-stop-hook.mjs |
 | Claude Code | PostToolUse | Bash&#124;PowerShell | node "${CLAUDE_PLUGIN_ROOT}/hooks/claude-task-output-scope-posttool.mjs" |
 | Claude Code | PostToolUse | Task&#124;Agent | node "${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner claude |
@@ -85,4 +85,4 @@ The hashes bind this generated page to the exact manifest bytes it read.
 | --- | --- | --- |
 | Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `b50798c8f187d483f23a537e425606d3ea90883ecf9e986a1652a289780d586c` |
 | Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `6ea0eba1803ea886a6da30328d1618873d39e03759822acd479b066fa56d1e34` |
-| Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `25e9e6ee50cfdc74ca03f08c6884ede844c74b989ae1370ad270d902cb307e13` |
+| Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `356c5819743976907a35322902f6a48083cda1aec3e25ea5ffb7cf35e77ab900` |
