@@ -93,9 +93,13 @@ test("G23 missing local targets are distinct from unknown grammar and protected 
     for (const command of ["rg --column needle docs/absent.md", "cat vault/id_rsa", "cat ../absent.md", "cat docs/*.md", "cat docs/../missing.md", "cat alias/missing.md"]) {
       assert.equal(isMissingSingleReadTarget(parse(command), root), false, command);
     }
+    // QG-04 restated (G20-67, 2026-11-08): a native Read of a missing in-root file is an existence probe and is admitted (it reads
+    // nothing; the host reports the missing file). The distinctions above are unchanged, and a missing path behind a link that leaves
+    // the project is still refused.
     const native = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: join(root, "docs", "absent.md") } }, root, {});
-    assert.equal(native.exitCode, 2);
-    assert.match(native.stderr, /GUARD-READ-TARGET-MISSING/u);
+    assert.equal(native.exitCode, 0, native.stderr);
+    const linked = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: join(root, "alias", "missing.md") } }, root, {});
+    assert.equal(linked.exitCode, 2, "a missing path whose existing ancestor leaves the project stays refused");
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });

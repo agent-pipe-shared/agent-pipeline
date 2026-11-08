@@ -124,8 +124,10 @@ if (worker) {
       assert.equal(consumed.status, 0, consumed.stderr);
       assert.equal(consumed.stdout, marker);
     });
-    test('G23PM03 genuinely missing in-root exact file stays denied as missing on every route', () => {
-      for (const route of routes) for (const path of ['docs/absent.md', join(root, 'docs/absent.md')]) deny(route, path, 'GUARD-READ-TARGET-MISSING');
+    // QG-04 restated (G20-67, 2026-11-08): a genuinely missing in-root exact file is an existence probe; every route now admits it the
+    // same way (it reads nothing and the host reports the missing file). Credential names (G23PM04) and links (G23PM06) are unchanged.
+    test('G23PM03 genuinely missing in-root exact file is admitted as an existence probe on every route', () => {
+      for (const route of routes) for (const path of ['docs/absent.md', join(root, 'docs/absent.md')]) allow(route, path);
     });
     test('G23PM04 nonexistent credential names stay denied for credentials, never absence', () => {
       for (const route of routes) for (const path of ['vault/id_rsa', credential]) deny(route, path, 'GUARD-READ-CREDENTIAL-TARGET');

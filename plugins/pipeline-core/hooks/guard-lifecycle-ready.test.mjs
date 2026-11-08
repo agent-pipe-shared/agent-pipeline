@@ -12329,7 +12329,10 @@ test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G
   }
 });
 
-test("QP4-5 F1 a Read of a missing in-root file is refused with the distinct code GUARD-READ-TARGET-MISSING; private, secret-named and outside paths keep GUARD-READ-TARGET", () => {
+// QG-04 restated (G20-67, 2026-11-08): a Read or a single-operand shell read of a missing in-root file that the plugin does
+// not ship is an existence probe and is admitted (it reads nothing; the host reports the missing file). Private, secret-named
+// and outside paths keep their GUARD-READ-TARGET refusal unchanged.
+test("QP4-5 F1 a Read of a missing in-root file is admitted as an existence probe; private, secret-named and outside paths keep GUARD-READ-TARGET", () => {
   const path = qp4Fixture();
   const outside = qp4Fixture();
   try {
@@ -12337,8 +12340,7 @@ test("QP4-5 F1 a Read of a missing in-root file is refused with the distinct cod
       const read = (file) => qp4Verdict({ tool_name: "Read", tool_input: { file_path: file } }, path);
       for (const file of [join(path, "scratch", "perf", "tests.log"), join(path, "scratch", "missing.log"), "scratch/missing.log", qp4Fwd(join(path, "scratch", "missing.log"))]) {
         const r = read(file);
-        assert.equal(r.exitCode, 2, file);
-        assert.match(r.text, /GUARD-READ-TARGET-MISSING/u, file);
+        assert.equal(r.exitCode, 0, `${file}\n${r.text}`);
       }
       for (const file of [join(path, ".git", "agent-pipeline", "missing.json"), join(path, "scratch", "id_rsa"), join(path, "scratch", ".env"), join(path, "scratch", "k.pem"),
         join(outside, "scratch", "missing.log"), join(path, "..", "missing.log"), join(path, "scratch", "notes.md", "inner"), join(path, "vault", "id_rsa")]) {
@@ -12347,15 +12349,14 @@ test("QP4-5 F1 a Read of a missing in-root file is refused with the distinct cod
         assert.doesNotMatch(r.text, /GUARD-READ-TARGET-MISSING/u, file);
       }
       assert.equal(read(join(path, "scratch", "log.txt")).exitCode, 0);
-      // G23: the same missing-target diagnosis reaches Bash and the two
+      // G23 (restated G20-67): the same existence-probe admission reaches Bash and the two
       // runner-normalized shell packets, with the pattern kept as data.
       for (const command of ["cat scratch/missing.log", "rg -n 'mini|feature|epic' scratch/missing.log"]) {
         for (const packet of [bash(command),
           { tool_name: "Bash", tool_input: { command } },
           { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command, cwd: path } }]) {
           const result = qp4Verdict(packet, path);
-          assert.equal(result.exitCode, 2, command);
-          assert.match(result.text, /GUARD-READ-TARGET-MISSING/u, command);
+          assert.equal(result.exitCode, 0, `${command}\n${result.text}`);
         }
       }
       const poHelp = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));

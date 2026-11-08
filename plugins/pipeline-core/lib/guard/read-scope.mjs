@@ -681,6 +681,19 @@ export function missingProjectTargetDenialText(raw, root, pluginRoots = BOUNDED_
       : "check the spelling or create it first.\n");
 }
 
+/**
+ * G20-67 (Antigravity greenfield 2026-11-08 and a Claude triage run: existence probes such as `rg -n x docs/a.md` or a Read of a
+ * not-yet-written file were refused GUARD-READ-TARGET-MISSING, so the agent spent turns re-spelling a harmless read). True when the
+ * command's ONLY fault is a missing in-root operand: the grammar admits it with an existing in-root stand-in in place of every missing
+ * operand. Such a read reads nothing; the host reports "no such file" itself.
+ */
+export function missingReadOperandIsOnlyFault(parsed, root) {
+  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+  const { executable, argv } = parsed.segments[0];
+  return missingOperandIsTheOnlyFault(basename(executable).toLowerCase(), executable, argv, root);
+}
+
 /** The single read target of a simple command, for the missing-target text (null when the command names none). */
 export function missingSingleReadTargetOperand(parsed) {
   return singleReadTargetOperand(parsed);
@@ -794,6 +807,9 @@ export function readToolScopeVerdict(input, root, dependencies) {
   if (toolName === "Glob" && qp4InRootWildcardListing(path, selector, root, sessionRoots)) return verdict(0);
   // R2-1 (SEC-11): there is no Grep directory lane; Grep with a directory path is refused exactly as at HEAD.
   if (toolName === "Read" && qp4MissingInRootTarget(path, root)) {
+    // G20-67: a Read of a missing in-root file is an existence probe; it reads nothing and the host reports the missing file. Only a canon
+    // pointer the plugin ships keeps the refusal, because its text names the plugin copy to read instead (G20-9).
+    if (pluginCopyOfMissingProjectPath(path, root, pluginRoots) === null) return verdict(0);
     return verdict(2, missingProjectTargetDenialText(path, root, pluginRoots));
   }
   // K105 (PO decision 2026-10-23, asked after K96): a credential TARGET is refused with the typed code and repair the shell lane and the

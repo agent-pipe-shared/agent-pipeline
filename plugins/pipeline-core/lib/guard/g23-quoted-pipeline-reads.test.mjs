@@ -87,7 +87,11 @@ test("external directories, symlink escape and credential operands stay refused"
 
 test("missing target diagnosis stays distinct from grammar and credential refusals", () => fixture(({ root, parse, guard }) => {
   assert.equal(isMissingSingleReadTarget(parse("rg needle plugins/pipeline-core/absent.mjs"), root), true);
-  assert.match(guard("rg needle plugins/pipeline-core/absent.mjs").stderr, /GUARD-READ-TARGET-MISSING/u);
+  // QG-04 restated (G20-67, 2026-11-08): an existence probe whose only fault is the missing in-root file is admitted (the shell reports
+  // the missing file); the grammar and credential distinctions below are unchanged.
+  const probe = guard("rg needle plugins/pipeline-core/absent.mjs");
+  assert.equal(probe.exitCode, 0, probe.stderr);
+  assert.doesNotMatch(probe.stderr ?? "", /GUARD-READ-TARGET-MISSING/u);
   assert.equal(isMissingSingleReadTarget(parse("rg --pre inert needle plugins/pipeline-core/absent.mjs"), root), false);
   assert.equal(isMissingSingleReadTarget(parse("cat vault/id_rsa"), root), false);
   assert.match(guard("rg --column needle plugins/pipeline-core/absent.mjs").stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u);

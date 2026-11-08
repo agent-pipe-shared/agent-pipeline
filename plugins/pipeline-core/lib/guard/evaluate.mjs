@@ -26,7 +26,7 @@ import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation
 import { isClaudeSessionMemoryWritePath, isIntakeLifecycleScratchWrite, isMachinePlaneWritePath } from "./write-scope.mjs";
 import { DISPATCH_RECORD_COLLISION_DENIAL_CODE, EVIDENCE_HOST_PATH_DENIAL_CODE, blockedDispatchRecordCollision, blockedEvidenceHostPath, checkDispatchRecordCollision, claimDispatchRecordOwnership, extractWritePayload, isEvidenceArtifactPath } from "./dispatch-record-lane.mjs";
 import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestPathShellFaultBlocked, protectedTestPathShellRefusalHit } from "./gate-strength-lane.mjs";
-import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, missingProjectTargetDenialText, missingSingleReadTargetOperand, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
+import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, missingProjectTargetDenialText, missingReadOperandIsOnlyFault, missingSingleReadTargetOperand, pluginCopyOfMissingProjectPath, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
 import { externalPoSigningOnly, isForbiddenCrossRepositoryMutation, isHostOnlyClaudeCaptureInvocation, isHumanPoProfileChangeCommand, isHumanPoSigningCommand } from "./po-commands.mjs";
 import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice, rebaseAuthorityShapeBlocked, rebaseAuthorityShapeRefusal } from "./rebase-lane.mjs";
 import { isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
@@ -509,8 +509,13 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       // gets its own typed code (checked only when the target is inside the root: an outside-root credential read keeps the scope code, QP4-1).
       credentialTarget = !outsideRoot && qp4OperandIsCredentialTarget(rejected, root);
       if (!outsideRoot && !credentialTarget && isMissingSingleReadTarget(rejected, root)) {
-        // C20 w252 (G20-9): name the plugin's own copy of a canon pointer the project does not carry.
-        return withLifts(lifts, verdict(2, missingProjectTargetDenialText(missingSingleReadTargetOperand(rejected) ?? "", root)));
+        const missingOperand = missingSingleReadTargetOperand(rejected) ?? "";
+        // G20-67: an existence probe whose only fault is the missing in-root operand is admitted; it reads nothing and the shell reports the
+        // missing file. A canon pointer the plugin ships keeps the refusal, which names the plugin copy (C20 w252, G20-9).
+        if (missingReadOperandIsOnlyFault(rejected, root) && pluginCopyOfMissingProjectPath(missingOperand, root) === null) {
+          return withLifts(lifts, verdict(0));
+        }
+        return withLifts(lifts, verdict(2, missingProjectTargetDenialText(missingOperand, root)));
       }
     } catch { outsideRoot = false; credentialTarget = false; }
     if (credentialTarget) {

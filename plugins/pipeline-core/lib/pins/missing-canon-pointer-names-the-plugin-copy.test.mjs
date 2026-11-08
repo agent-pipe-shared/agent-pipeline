@@ -56,6 +56,18 @@ test("a linked plugin entry is not offered as the copy", (t) => fixture(({ proje
   assert.equal(pluginCopyOfMissingProjectPath("templates/prompts/linked.md", project, [plugin]), null);
 }));
 
+// G20-67 (Antigravity greenfield 2026-11-08, Claude triage run): an existence probe of a missing in-root path was refused, so the agent
+// re-spelled a harmless read. A missing in-root path with no plugin copy is now admitted (it reads nothing; the host reports the missing
+// file); a canon pointer the plugin ships keeps the refusal that names the copy (the test below), and hidden or outside paths stay refused.
+test("G20-67: a Read of a missing in-root path that the plugin does not ship is admitted as an existence probe", () => fixture(({ project }) => {
+  for (const raw of [join(project, "docs", "not-yet-written.md"), join(project, "templates", "notes.md")]) {
+    const verdict = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: raw } }, project, {});
+    assert.equal(verdict.exitCode, 0, `${raw}: ${verdict.stderr}`);
+  }
+  const hidden = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: join(project, ".claude", "missing.json") } }, project, {});
+  assert.equal(hidden.exitCode, 2, "a hidden segment is never an existence probe");
+}));
+
 test("the native Read refusal of a missing canon pointer names the running plugin's copy", () => fixture(({ project }) => {
   const pluginRoot = fileURLToPath(new URL("../..", import.meta.url));
   const verdict = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: join(project, "templates", "prompts", "goldfish-task.md") } }, project, {});

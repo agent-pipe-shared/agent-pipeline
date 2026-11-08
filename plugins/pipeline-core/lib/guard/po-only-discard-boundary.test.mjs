@@ -92,7 +92,16 @@ test('PODB007','direct planner and consumer refuse before private-state or proce
  assert.equal(classifyNonLiftableGuardDenials([{guard:'other.mjs',reason:denial('GUARD-READ-COMMAND-UNSUPPORTED').reason}]),null);
 });
 test('PODB008','closed unsupported and missing reads keep actual adapter metadata without override',()=>{
- for(const runner of ['codex','antigravity'])for(const [command,code] of [['head -c 12 absent.txt','GUARD-READ-COMMAND-UNSUPPORTED'],['cat definitely-missing-fixture.txt','GUARD-READ-TARGET-MISSING']]){
+ // QG-04 restated (G20-67, 2026-11-08): `cat definitely-missing-fixture.txt` is an existence probe whose only fault is the missing in-root
+ // file; both adapters now admit it (asserted below). The unsupported-grammar refusal keeps its metadata unchanged.
+ for(const runner of ['codex','antigravity']){
+  const command='cat definitely-missing-fixture.txt';
+  const input=runner==='antigravity'?{cwd:root,toolCall:{name:'run_command',args:{CommandLine:command,Cwd:root}}}:{cwd:root,session_id:'synthetic-read-fixture',tool_name:'Bash',tool_input:{command}};
+  const result=launch(join(hooks,`${runner}-pretool-guard.mjs`),[],input);
+  assert.equal(result.status,0,result.stderr);
+  assert.doesNotMatch(result.stdout,/"deny"|GUARD-READ-TARGET-MISSING/u,`${runner} admits the existence probe`);
+ }
+ for(const runner of ['codex','antigravity'])for(const [command,code] of [['head -c 12 absent.txt','GUARD-READ-COMMAND-UNSUPPORTED']]){
   const input=runner==='antigravity'?{cwd:root,toolCall:{name:'run_command',args:{CommandLine:command,Cwd:root}}}:{cwd:root,session_id:'synthetic-read-fixture',tool_name:'Bash',tool_input:{command}};
   const result=launch(join(hooks,`${runner}-pretool-guard.mjs`),[],input);assert.equal(result.status,runner==='codex'?0:2,result.stderr);
   const output=JSON.parse(result.stdout);const reason=runner==='codex'?output.hookSpecificOutput.permissionDecisionReason:output.reason;

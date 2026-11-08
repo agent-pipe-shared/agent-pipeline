@@ -240,7 +240,12 @@ function headerCode(root, toolCall) {
 }
 
 test("D5 the diagnostic header names the real guard code: a missing project file is GUARD-READ-TARGET-MISSING, a credential file GUARD-READ-CREDENTIAL-TARGET", { timeout: 300000 }, () => withFixture((root) => {
+  // QG-04 restated (G20-67, 2026-11-08): a missing project file is an existence probe and is admitted, so no refusal header is written
+  // for it any more; a missing canon pointer the plugin ships is still refused and its header names GUARD-READ-TARGET-MISSING.
   for (const path of [join(root, "docs", "does-not-exist.md"), "docs/does-not-exist.md"]) {
+    assert.equal(headerCode(root, native("view_file", { AbsolutePath: path })), null, path);
+  }
+  for (const path of [join(root, "templates", "prompts", "agent-obligations.md"), "templates/prompts/agent-obligations.md"]) {
     assert.equal(headerCode(root, native("view_file", { AbsolutePath: path })), "GUARD-READ-TARGET-MISSING", path);
   }
   for (const path of [join(root, "vault", "id_rsa"), "vault/id_rsa"]) {

@@ -126,9 +126,10 @@ test("P4 the A2 detector is meaningful: it flags a misleading 'not found' text a
 });
 
 test("P5 a genuinely missing in-root Read is labelled GUARD-READ-TARGET-MISSING while a blocked existing secret is not", () => withFixture((path) => {
+  // QG-04 restated (G20-67, 2026-11-08): a genuinely missing in-root Read is an existence probe and is admitted (it reads nothing; the
+  // host reports the missing file). The blocked existing secret below keeps its credential refusal and is never labelled MISSING.
   const missing = run({ tool_name: "Read", tool_input: { file_path: join(path, "docs", "nope.md") } }, path);
-  assert.equal(missing.exitCode, 2);
-  assert.match(missing.text, /GUARD-READ-TARGET-MISSING/u);
+  assert.equal(missing.exitCode, 0, missing.text);
   const blocked = run({ tool_name: "Read", tool_input: { file_path: join(path, "vault", "id_rsa") } }, path);
   assert.equal(blocked.exitCode, 2);
   // QG-04 restatement (K105, PO decision 2026-10-23: the Claude native lane speaks with the typed credential code): was /GUARD-READ-TARGET:/u.
@@ -149,10 +150,11 @@ test("P5b a missing in-root path in any admitted read shape is GUARD-READ-TARGET
     "head -n 5 docs/missing.md",
     "tail -n 5 docs/missing.md",
   ]) {
+    // QG-04 restated (G20-67, 2026-11-08): when the missing in-root path is the command's ONLY fault the read is an existence probe and
+    // is admitted (the shell reports the missing file); before, it was refused with GUARD-READ-TARGET-MISSING. The second loop keeps
+    // every case where the missing path is not the only fault refused.
     const r = run(bash(command), path);
-    assert.equal(r.exitCode, 2, command);
-    assert.match(r.text, /GUARD-READ-TARGET-MISSING/u, `${command}\n${r.text}`);
-    assert.deepEqual(denialProblems(r.text), [], `${command}\n${r.text}`);
+    assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
   }
   for (const command of ["rg --pre=sh apply docs/missing.md", "rg --pre=sh apply docs/2026-09-21-a.md", "cat vault/id_rsa docs/missing.md"]) {
     const r = run(bash(command), path);
@@ -416,9 +418,10 @@ test("M7d negative control: refusals that are not about a credential keep their 
       assert.doesNotMatch(decision.text, CREDENTIAL_CODE, `${runner}: ${command} is not a credential read\n${decision.text}`);
     }
   }
+  // QG-04 restated (G20-67, 2026-11-08): a Read of a missing in-root file is an existence probe and is admitted; it is still never
+  // reported as a credential read.
   const missing = runnerDecision("claude", { claude: { tool_name: "Read", tool_input: { file_path: join(path, "docs", "missing.md") } } }, path);
-  assert.equal(missing.denied, true, missing.text);
-  assert.match(missing.text, /GUARD-READ-TARGET-MISSING/u, missing.text);
+  assert.equal(missing.denied, false, missing.text);
   assert.doesNotMatch(missing.text, CREDENTIAL_CODE, missing.text);
 }));
 

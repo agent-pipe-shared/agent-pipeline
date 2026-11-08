@@ -207,9 +207,10 @@ test("AP7 out-of-repo and credential reads stay refused (path traversal, in-repo
 }));
 
 test("AP8 a Read of a missing in-repo file gets the distinct GUARD-READ-TARGET-MISSING code; secret and outside paths keep GUARD-READ-TARGET", () => withFixture((path) => {
+  // QG-04 restated (G20-67, 2026-11-08): a Read of a missing in-repo file is an existence probe and is admitted (it reads nothing; the
+  // host reports the missing file). Secret and outside paths below keep their refusal unchanged.
   const missing = verdict({ tool_name: "Read", tool_input: { file_path: join(path, "scratch", "missing.log") } }, path);
-  assert.equal(missing.exitCode, 2);
-  assert.match(missing.text, /GUARD-READ-TARGET-MISSING/u);
+  assert.equal(missing.exitCode, 0, missing.text);
   for (const file_path of [join(path, "scratch", "id_rsa"), join(path, "..", "missing.log")]) {
     const r = verdict({ tool_name: "Read", tool_input: { file_path } }, path);
     assert.equal(r.exitCode, 2, file_path);
@@ -422,7 +423,6 @@ test("AP13 the stat lane fails closed: other formats, -c/--format not first, mis
     ["-c", STAT_FORMAT],
     ["-c", STAT_FORMAT, "../x"],
     ["-c", STAT_FORMAT, "/etc/hostname"],
-    ["-c", STAT_FORMAT, "docs/missing.md"],
     ["-c", STAT_FORMAT, "vault/id_rsa"],
     ["-c", STAT_FORMAT, "docs/state.md", "vault/id_rsa"],
     ["-c", STAT_FORMAT, "-"],
@@ -439,6 +439,15 @@ test("AP13 the stat lane fails closed: other formats, -c/--format not first, mis
     assert.equal(statLane(path, ...words), false, `lane: ${command}`);
     const r = verdict(bash(command), path);
     assert.equal(r.exitCode, 2, `${command}\n${r.text}`);
+  }
+  // QG-04 restated (G20-67, 2026-11-08): `stat -c FORMAT docs/missing.md` moved out of the refused list above. The stat lane itself still
+  // does not claim a missing operand, but the guard admits the command as an existence probe because the missing in-repo file is its only
+  // fault (the same command with an existing stand-in is admitted).
+  {
+    const words = ["-c", STAT_FORMAT, "docs/missing.md"];
+    assert.equal(statLane(path, ...words), false, "the lane predicate is unchanged");
+    const probe = verdict(bash(statCommand(...words)), path);
+    assert.equal(probe.exitCode, 0, probe.text);
   }
   // The predicate itself, called directly, never answers true for a mixed list (tolerant of a tree that does not export it yet).
   assert.notEqual(shellGrammar.isFormattedStatReadArgs?.(["-c", STAT_FORMAT, "docs/state.md", "vault/id_rsa"], path), true);
