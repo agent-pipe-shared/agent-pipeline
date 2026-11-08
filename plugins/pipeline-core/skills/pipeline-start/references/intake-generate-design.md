@@ -173,10 +173,12 @@ deliberately never admitted there — it stays immutable.
 In a shared `human_approval: signature` policy, do all authoring and internal
 review first. Present the completed PRD and Spec together, explain that their
 exact bytes are being approved for the design-to-implementation transition,
-and request the one returned `sign-intent` command. That proof writes the
-acknowledgement marker and becomes the receipt consumed for plan approval;
-there is no chat `approved`, manual marker edit, or second PO terminal command
-after the signature. A changed PRD or Spec invalidates the proof and returns
+and request the one returned `sign-intent` command. That proof is the PO's
+acknowledgement of those exact bytes and becomes the receipt consumed for plan
+approval. Nothing is added to the PRD afterwards, and the
+`po-plan-acknowledged` line is not needed for a signed approval: there is no
+chat `approved`, manual marker edit, or second PO terminal command after the
+signature. A changed PRD or Spec invalidates the proof and returns
 the package to this same completed-design-before-signing boundary. Chat policy
 uses its policy-selected acknowledgement instead; it must likewise never ask
 the PO to edit a marker manually.

@@ -372,7 +372,9 @@ function approved(root, area) {
   requireValue(lifecycle.ok && ['approved','implementing'].includes(lifecycle.status), 'DDB-LIFECYCLE-STALE');
   requireValue(designAdvisoryAdmission(state, root, prd.path, spec.path).ok, 'DDB-CURRENT-APPROVAL-REQUIRED');
   const gate = validatePoGateAuthorityForRepository({ repoRoot: root, expectedPlanSha256: prd.sha256, expectedSpecSha256: spec.sha256 });
-  requireValue(gate.ok && canonicalizeJson(gate.value) === canonicalizeJson(record.poGateAuthority)
+  // The reader's own code stays visible: DDB-REPOSITORY-BINDING alone hid a missing acknowledgement from the session that had to act on it.
+  requireValue(gate.ok, `DDB-PO-GATE-AUTHORITY:${gate.code ?? 'UNAVAILABLE'}`);
+  requireValue(canonicalizeJson(gate.value) === canonicalizeJson(record.poGateAuthority)
     && gate.value.repositoryFingerprint === candidateSubset.binding.repositoryFingerprint, 'DDB-REPOSITORY-BINDING');
   const requestFile = physical(root, presentation.designApprovalRequestPath), request = parseStrictJson(requestFile.bytes);
   requireValue(canonicalizeJson(request.binding) === canonicalizeJson(binding), 'DDB-PRESENTATION-DRIFT');

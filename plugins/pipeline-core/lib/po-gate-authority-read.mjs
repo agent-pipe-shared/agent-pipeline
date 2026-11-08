@@ -160,6 +160,7 @@ const ACKNOWLEDGEMENT_REPAIR = "The active PRD does not carry the PO's plan ackn
   + " ceremony already used for push approval and kickoff (lib/chat-gate-ceremony.mjs), so an agent's own tool"
   + " call cannot complete it at all. The PO must run po-authority-acknowledge-apply themselves, directly in"
   + " their own attended terminal, and retype the --by value shown back to them when prompted."
+  + " A signed final design approval of these exact PRD and Spec bytes needs no such line: the signature is the acknowledgement."
   + " Do not change activeFeature.planPath, which is not what is wrong here.";
 // A PRD whose bytes are not decodable UTF-8 never reaches any marker check. The
 // defect is the encoding of one file; no path, directory or PRD count is
@@ -762,7 +763,19 @@ function activeFeatureState(repoRoot) {
   const authorityPrdPath = authorityPrd !== null && authorityPrd.startsWith("specs/") && PRD_NAME.test(basename(authorityPrd))
     ? authorityPrd
     : null;
-  return { status: "active", id: active.id, planPath, authorityPrdPath, documentLanguage };
+  return { status: "active", id: active.id, planPath, authorityPrdPath, documentLanguage, signedDesignApproval: signedDesignApprovalOf(state) };
+}
+
+// The digests the PO signed in a final design approval, or null. A stored approval that is current, unrevoked and made by signature IS the
+// PO's content acknowledgement of exactly these bytes: the signature ceremony shows the PRD and Spec and binds both digests, and no step
+// adds a marker line afterwards (it would change the signed bytes). Chat approval stays out: it is an attribution, not a proof.
+function signedDesignApprovalOf(state) {
+  const record = state?.planApproval;
+  if (state?.planApproved !== true || state?.planRevocation) return null;
+  if (!["pipeline.plan-approval.v8", "pipeline.plan-approval.v9"].includes(record?.schema) || record?.designApproval?.mode !== "signature") return null;
+  const planSha256 = record?.designApprovalBinding?.sources?.prd?.sha256;
+  const specSha256 = record?.designApprovalBinding?.sources?.spec?.sha256;
+  return SHA256.test(planSha256 ?? "") && SHA256.test(specSha256 ?? "") ? { planSha256, specSha256 } : null;
 }
 
 function prdAuthority(repoRoot, active, expectedLanguage, requireAcknowledgement) {
@@ -871,7 +884,8 @@ function prdAuthority(repoRoot, active, expectedLanguage, requireAcknowledgement
   // that never carried this marker before and must not be forced to
   // retroactively. Only an ACTIVE approval/rebind validation -- the caller
   // passing at least one of those two expected digests -- requires it.
-  if (requireAcknowledgement) {
+  const signedByPo = active.signedDesignApproval?.planSha256 === sha256(planBytes) && active.signedDesignApproval?.specSha256 === specSha256;
+  if (requireAcknowledgement && !signedByPo) {
     const acknowledgementMarkers = [...text.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)];
     if (acknowledgementMarkers.length !== 1) {
       return fail(

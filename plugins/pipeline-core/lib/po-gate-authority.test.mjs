@@ -811,6 +811,42 @@ check("the PO plan acknowledgement marker must be present exactly once", () => {
   }
 });
 
+// Greenfield 2026-11-08 (Claude): the signature approved the package, then the first reader after it refused because no marker line exists.
+check("a signed final design approval of these exact bytes stands in for the acknowledgement marker, and nothing weaker does", () => {
+  const specBytes = spec();
+  const content = `${PO_GATE_PRD_LANGUAGE_MARKER("de")}\n${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n# PRD\n`;
+  const planSha256 = sha256(content);
+  const specSha256 = sha256(specBytes);
+  const approved = (changes = {}, mode = "signature", binding = { prd: planSha256, spec: specSha256 }, schema = "pipeline.plan-approval.v8") => `${JSON.stringify({
+    ...JSON.parse(state()),
+    planApproved: true,
+    planApproval: { schema, designApproval: { mode }, designApprovalBinding: { sources: { prd: { sha256: binding.prd }, spec: { sha256: binding.spec } } } },
+    ...changes,
+  }, null, 2)}\n`;
+  const outcome = (stateText) => {
+    let result;
+    withFixture({}, ({ primary, validate }) => {
+      write(join(primary, "specs", "feature", "prd_feature.md"), content);
+      write(join(primary, ".claude", "pipeline-state.json"), stateText);
+      result = validate({ expectedPlanSha256: planSha256, expectedSpecSha256: specSha256 });
+    });
+    return result;
+  };
+  assert.equal(outcome(approved()).ok, true, "the signed approval is the acknowledgement");
+  assert.equal(outcome(approved({}, "signature", { prd: planSha256, spec: specSha256 }, "pipeline.plan-approval.v9")).ok, true, "the retained schema counts");
+  for (const [name, text] of [
+    ["no approval", state()],
+    ["chat approval", approved({}, "chat")],
+    ["revoked", approved({ planRevocation: { revokedAt: "x" } })],
+    ["not approved", approved({ planApproved: false })],
+    ["older schema", approved({}, "signature", { prd: planSha256, spec: specSha256 }, "pipeline.plan-approval.v7")],
+    ["other PRD bytes", approved({}, "signature", { prd: "a".repeat(64), spec: specSha256 })],
+    ["other Spec bytes", approved({}, "signature", { prd: planSha256, spec: "b".repeat(64) })],
+  ]) {
+    assert.equal(outcome(text).code, "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING", name);
+  }
+});
+
 check("a PRD carrying the language marker, the Spec marker and the acknowledgement marker exactly once each passes", () => {
   withFixture({}, ({ validate }) => {
     const result = validate();
