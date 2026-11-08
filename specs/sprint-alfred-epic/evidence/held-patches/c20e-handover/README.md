@@ -25,7 +25,7 @@ greenfields and PO acceptance are open.
 
 **Full Verify of the stamped chain (`b9517bffa`, 1194 steps, 9 red):** five were load effects (green alone), one is the Critic preimage suite (by design), and three were
 real; they are fixed in `../c20e-fix-chain/` (`po-apply-0.7-candidate20e-fix.sh`): the start skill relays `consentQuestion.text` and names the escalation line (the G20-45 test was
-red since 20d), the vendored push flow follows its source, and four reviewed scanner false positives are ignored one by one (PO tile; scan clean afterwards). The Full Verify was not repeated on the fix.
+red since 20d), the vendored push flow follows its source, and four reviewed scanner false positives are ignored one by one (PO tile), plus a fifth of the same class added directly after the apply (the follow-up patch's own blob hash line, which cannot be ignored from inside that patch). The Full Verify was not repeated on the fix.
 
 G20-76 interim, until the fix is installed: before every `push-prepare`, move any old `scratch/critical-*` files aside
 (rename, never delete).
