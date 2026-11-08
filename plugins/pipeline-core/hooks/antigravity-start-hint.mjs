@@ -51,7 +51,7 @@ function reportFailure(code, error) {
 export const AGY_SESSION_CONTINUATION_NOTE = (sessionId) =>
   `Agent Pipeline: this Antigravity session (${sessionId}) was already bootstrapped. Do not re-run pipeline-start for a new `
   + "turn, a PO reply or a delivered subagent message; continue the active work. Re-run it only after a restart, a context "
-  + "clear, or a typed recovery that names it.";
+  + "clear, or a typed recovery that names it. A refusal named Mandatory Session Bootstrap is such a recovery: run the one read it names.";
 
 /**
  * Once-per-session marker for the OPTIONAL onboarding hint of a repository that never opted in. It lives in the machine plane

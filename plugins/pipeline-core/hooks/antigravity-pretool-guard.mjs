@@ -104,6 +104,7 @@ function humanOverrideFailureFields(error) {
 }
 
 function nativeDispatchPreparationGuidance(projectRoot, code) {
+  if (code === "AGY-NATIVE-ARTIFACT-EXISTS") return "A prepared artifact for this exact call is still valid: issue the same invoke_subagent call now instead of preparing again.";
   if (code !== "AGY-NATIVE-ARTIFACT-MISSING") return "The failure is distinct; inspect its code before preparing a replacement.";
   const action = renderHumanCopySafeCommand({
     label: "prepare native Antigravity dispatch",
@@ -118,12 +119,12 @@ function nativeDispatchPreparationGuidance(projectRoot, code) {
     ],
   });
   return [
-    "If no invoke_subagent call has launched, create the closed request containing packets and Subagents, then prepare it with the loaded entrypoint.",
+    "If no invoke_subagent call has launched, create the closed request containing packets and this call's own TypeName, Role and Prompt (plus Workspace or Model only when the call passes them), then prepare it with the loaded entrypoint. A request with a Subagents array prepares a shape this host never issues.",
     `Structured executable (tool/API, not a shell command): ${action.executable}`,
     `Structured argv (tool/API, not a shell command): ${JSON.stringify(action.argv)}`,
     "Copy one matching shell form:",
     action.text,
-    "After prepared status and exit 0, pass only invocation.Subagents unchanged to invoke_subagent. Do not retry a launched job.",
+    "After prepared status and exit 0, pass the fields of the returned invocation unchanged as the invoke_subagent arguments. Do not retry a launched job.",
   ].join("\n");
 }
 

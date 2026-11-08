@@ -117,6 +117,10 @@ export function blocked(
   // ceremony. Only ever set by the restart-required near-miss call site below; every other
   // denial passes no hint and this stays a no-op.
   if (nearMissHint) guidance.push(nearMissHint);
+  // Codex and Claude greenfields 2026-11-08: "intent session" was named but no agent could spell the command.
+  if (guidance.some((line) => line.includes("inspection with intent session"))) {
+    guidance.push("Exact form: node <plugin-root>/scripts/project-onboarding-v3.mjs inspect --root <project root> --intent session");
+  }
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "

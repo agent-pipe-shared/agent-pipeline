@@ -94,7 +94,7 @@ const cases = [
     assert.match(result.stderr, /\nPowerShell:\n/u);
     assert.match(result.stderr, /agy native hook über-/u);
     assert.match(result.stderr, /<native-dispatch-request\.json>/u);
-    assert.match(result.stderr, /closed request containing packets and Subagents/u);
+    assert.match(result.stderr, /closed request containing packets and this call's own TypeName, Role and Prompt/u);
   }],
   ["one complete prepared batch is allowed once", (value) => {
     const requestPath = join(value.root, "agy-native-dispatch-request.json");

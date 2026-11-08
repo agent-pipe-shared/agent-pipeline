@@ -54,6 +54,10 @@ transport only. Do not `define_subagent` a Pipeline role yourself; `dispatch-bri
   (`AGY-NATIVE-WORKTREE-UNCOMMITTED`, repair: commit first; untracked files are not checked, but the child sees none of them). Several code
   writers may run in parallel, in one call or several; there is no one-per-call and no alive-count rule, because a finished child's descriptor
   stays `SUBAGENT_STATE_ALIVE`. Read-only roles are unaffected.
+- **When the host refuses `Workspace: "branch"` (measured, greenfield 2026-11-08).** The message says the language server did not detect a
+  repository: the folder became a git repository after this Antigravity session started, and the host keeps that view for the session. Do not
+  retry the same call and do not write the slice yourself, which is not a sanctioned route. Ask the PO once to restart Antigravity on this folder,
+  run the bootstrap, and dispatch again; the project state is on disk and nothing is lost.
 - **Governance of a branch child.** Its hook payload names the worktree first in `workspacePaths` and the project second. The guard resolves a
   worktree that the project repository lists (`git worktree list`) to that repository and governs the call with the project's governance, with
   every worktree path judged at the same relative path in the project; a worktree-shaped directory the repository does not list is refused
@@ -96,12 +100,13 @@ Read-only carriers are named in the `DISPATCH-WRITE-CARRIER-REQUIRED` refusal: `
 ```
 
 Resolve the already loaded plugin root first. The required entrypoint is
-`scripts/antigravity-native-dispatch-prepare.mjs` below that root. Build one
-closed JSON request file with exactly `packets` and `Subagents` (it may also
-carry `root`). `packets` is the complete shared role-dispatch packet array and
-`Subagents` is the complete native array in the same order, including any
-host-defined members mixed with Pipeline roles. Preserve every role, prompt,
-and array position; do not prepare only Pipeline members of a mixed array.
+`scripts/antigravity-native-dispatch-prepare.mjs` below that root. The host tool
+takes FLAT arguments, so build one closed JSON request file per child with exactly
+`packets` (one packet) and the child's own fields `TypeName`, `Role`, `Prompt`, plus
+`Workspace` or `Model` only when that call passes them (it may also carry `root`).
+A request with a `Subagents` array prepares a batch-shaped call the current host
+does not issue: its artifact is never consumed and the host call fails with
+`AGY-NATIVE-ARTIFACT-MISSING`.
 
 Run the existing CLI with its exact argv shape:
 
@@ -110,13 +115,13 @@ node <loaded-plugin-root>/scripts/antigravity-native-dispatch-prepare.mjs prepar
 ```
 
 Only after the command exits 0 and returns `status: "prepared"` may the
-dispatcher call the native host tool. Pass only the returned
-`invocation.Subagents` unchanged as the host tool's `Subagents` value. The
-preparation binds the complete array, packets, repository root, candidate
-commit/tree, and required-input digests. It publishes an expiring one-shot
-artifact; the immediate PreTool check consumes it, rechecks those bindings,
-and rejects replay, expiry, candidate movement, packet staleness, mutation,
-and partial or reordered mixed arrays.
+dispatcher call the native host tool. Pass the fields of the returned
+`invocation` unchanged as the host tool's arguments. The preparation binds the
+call, packets, repository root, candidate commit/tree, and required-input digests.
+It publishes an expiring one-shot artifact; the immediate PreTool check consumes
+it, rechecks those bindings, and rejects replay, expiry, candidate movement,
+packet staleness and mutation. `AGY-NATIVE-ARTIFACT-EXISTS` means a prepared
+artifact for this exact call is still valid: issue the call now instead of preparing again.
 
 A subagent dispatched with `invoke_subagent` runs in the background and in parallel with its siblings, and its completion message is
 delivered in the SAME parent turn, at the next model invocation, as a `<SYSTEM_MESSAGE>` (measured, M5/M6): the parent need not end
