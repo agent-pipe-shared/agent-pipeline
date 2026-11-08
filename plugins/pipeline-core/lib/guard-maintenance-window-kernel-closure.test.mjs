@@ -304,6 +304,10 @@ const DYNAMIC_IMPORT_EDGES = {
     "./pipeline-state.mjs",
     "../lib/staged-observation-doc-classification.mjs",
     "../lib/calibration-verify-commit-transition.mjs",
+    // C20b G20-46: the mixed-staged-set repair reads the calibration (one builtin load) and asks the already-declared
+    // calibration-verify-commit-transition library whether the transition is ready (a second call site of that edge).
+    "node:fs",
+    "../lib/calibration-verify-commit-transition.mjs",
   ],
   "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs": [
     "../lib/commit-message-policy.mjs",

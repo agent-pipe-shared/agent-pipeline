@@ -134,6 +134,8 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/yaml-lite.mjs`, `scripts/codex-app-server-health.mjs`, `scripts/codex-critic-session-route.mjs`,
   `scripts/continuity-status.mjs`, `scripts/pipeline-state.mjs`,
   `scripts/po-gate-profile-repair.mjs`, `scripts/project-onboarding-v3.mjs`,
+  `scripts/register-feature-package.mjs` and `lib/close-chain-guide.mjs` (candidate 20b,
+  G20-51: `pipeline-state.mjs` materialize-architecture runs the registration as a child),
   `scripts/settings-allowlist-merge.mjs`,
   `scripts/publication-close-journal.mjs`, and
   `scripts/v3-bootstrap-authority.mjs`. A second closure gap (VFX2-GMW,

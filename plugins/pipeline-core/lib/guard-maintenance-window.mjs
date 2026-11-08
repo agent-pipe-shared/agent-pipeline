@@ -261,6 +261,10 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // each of these as process.execPath's own script argument.
   "plugins/pipeline-core/scripts/pipeline-state.mjs",
   "plugins/pipeline-core/scripts/po-gate-profile-repair.mjs",
+  // C20b G20-51: pipeline-state.mjs materialize-architecture runs this registration script as a child (spawn edge) and
+  // names it as the set-phase repair; it and its one first-party import outside the kernel join the kernel.
+  "plugins/pipeline-core/scripts/register-feature-package.mjs",
+  "plugins/pipeline-core/lib/close-chain-guide.mjs",
   // Pre-existing, unrelated static-import gap (see protected-test-paths.mjs note above):
   // guard-lifecycle-ready.mjs already imported this before this dispatch touched anything.
   "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
