@@ -1305,7 +1305,9 @@ export function resolveGovernedItemQueue({ root } = {}) {
     catch (error) {
       // Only a missing file is an absent course. An unsafe, drifting or unreadable file keeps failing closed below.
       if (error?.code === "ENOENT") return { status: "refused", code: "SQ-DELIVERY-COURSE-ABSENT",
-        repair: "The approved feature has no delivery course yet: write its slice-queue.json through the governed course writer prepareGovernedItemQueue with the item delivery briefing (criterion locator and check paths) of the first item." };
+        // G20-62: the repair named the internal writer function; a Codex session imported it into a scratch script, which the
+        // writer refuses outside a dispatch admission (SDC-AUTHORITY-UNAVAILABLE), and stayed stuck for hours.
+        repair: "The approved feature has no delivery course (slice-queue.json) yet. The dispatch admission writes it from the first item: build that item's briefing with dispatch-briefing.mjs build (its binding carries the item delivery: criterion locator and check paths) and dispatch it through the runner's native route (Claude Agent; Antigravity prepare then invoke_subagent). On Codex no admission runs at spawn_agent in this version (Codex runs no PreToolUse hook for spawn_agent), so the course cannot be written there yet: stop and report this refusal to the PO instead of committing the work as orchestrator. The course writer runs only inside that admission; never call it from a script." };
       throw error;
     }
     const queue = parseStrictJson(bytes.toString("utf8"));

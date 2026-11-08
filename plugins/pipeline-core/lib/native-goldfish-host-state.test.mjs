@@ -858,7 +858,12 @@ const cases = [
     writeFileSync(join(root,'.claude/pipeline-state.json'),JSON.stringify({schema:'pipeline.state.v0',activeFeature:{id:'unit',planPath:'specs/unit/plan.md',phase:'implementation'},planApproved:true}));
     const absent=resolveGovernedItemQueue({root});
     assert.equal(absent.status,'refused');assert.equal(absent.code,'SQ-DELIVERY-COURSE-ABSENT');
-    assert.match(absent.repair,/prepareGovernedItemQueue/u);
+    // QG-04 restated (G20-62, Codex greenfield 2026-11-08): the repair named the internal course writer, an agent called it from
+    // a script and was refused outside an admission. It now names the executable route that writes the course: build the first
+    // item's briefing and dispatch it natively; the internal function name must not appear as an instruction.
+    assert.match(absent.repair,/dispatch-briefing\.mjs build/u);
+    assert.match(absent.repair,/dispatch admission writes it/u);
+    assert.doesNotMatch(absent.repair,/prepareGovernedItemQueue/u);
     symlinkSync(join(root,'nowhere.json'),join(root,'specs/unit/slice-queue.json'));
     const unsafe=resolveGovernedItemQueue({root});
     assert.equal(unsafe.status,'refused');assert.equal(unsafe.code,'SQ-DELIVERY-STATE-UNAVAILABLE');

@@ -496,7 +496,15 @@ test("AC-264 added (P0-1): an approved feature without a delivery course reports
   assert.equal(absent.code, "SQ-DELIVERY-COURSE-ABSENT");
   assert.notEqual(absent.code, "SQ-DELIVERY-STATE-UNAVAILABLE", "the absent course is not reported as the generic unavailable state");
   assert.match(absent.repair, /slice-queue\.json/u);
-  assert.match(absent.repair, /prepareGovernedItemQueue/u, "the repair names the governed course writer");
+  // G20-62 (QG-04, restated in place): the repair named the internal writer prepareGovernedItemQueue and a Codex session
+  // called it from a scratch script (refused SDC-AUTHORITY-UNAVAILABLE). It now names the executable route instead.
+  assert.match(absent.repair, /dispatch-briefing\.mjs build/u, "the repair names the briefing builder of the first item");
+  // G20-63 (measured 2026-11-08, Codex 0.167.0): Codex runs no PreToolUse hook for spawn_agent, so no admission writes the
+  // course there; the repair must not offer spawn_agent as a working route and tells Codex to stop and report instead.
+  assert.match(absent.repair, /Claude Agent; Antigravity prepare then invoke_subagent/u, "the repair names the native dispatch routes that admit");
+  assert.match(absent.repair, /On Codex no admission runs at spawn_agent/u, "the repair names the Codex gap honestly");
+  assert.match(absent.repair, /stop and report this refusal to the PO/u);
+  assert.doesNotMatch(absent.repair, /prepareGovernedItemQueue/u, "the repair never names the internal writer");
   symlinkSync(join(root, "nowhere.json"), join(root, "specs/unit/slice-queue.json"));
   assert.equal(resolveGovernedItemQueue({ root }).code, "SQ-DELIVERY-STATE-UNAVAILABLE", "only a missing file is an absent course");
 });
