@@ -80,10 +80,38 @@ function matchLength(pattern, file) {
 }
 
 /**
+ * Cuts paths into parts of at most `max` files. A directory that fits stays whole; a larger one is cut along its subdirectories, and only files lying directly in one directory
+ * are chunked. Neighbouring pieces are then packed together while they fit, so a range does not turn into many tiny Critics. Disjoint, covers every path, deterministic.
+ */
+function cutByDirectory(paths, max) {
+  const pieces = (items, depth) => {
+    if (items.length <= max) return [items];
+    const byDirectory = new Map();
+    for (const path of items) {
+      const segments = path.split("/");
+      const directory = segments.length > depth + 1 ? segments[depth] : "";
+      byDirectory.set(directory, [...(byDirectory.get(directory) ?? []), path]);
+    }
+    return [...byDirectory].flatMap(([directory, group]) => {
+      if (directory !== "") return pieces(group, depth + 1);
+      return Array.from({ length: Math.ceil(group.length / max) }, (_, index) => group.slice(index * max, (index + 1) * max));
+    });
+  };
+  const parts = [];
+  for (const piece of pieces([...paths].sort(), 0)) {
+    const last = parts.at(-1);
+    if (last !== undefined && last.length + piece.length <= max) last.push(...piece);
+    else parts.push([...piece]);
+  }
+  return parts;
+}
+
+/**
  * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES changed files).
  * One entry per module of the approved architecture plan that owns a changed path (disjoint scopes: a path goes to the module whose owned-path pattern matches it most
- * specifically, ties by module id), plus ONE shared entry for every changed path no module owns, which is never dropped. Without exactly one approved plan only the shared
- * entry exists and `plan.status` says why. Deterministic from the repository and the result alone, so `admit` rebuilds the identical object.
+ * specifically, ties by module id), plus ONE shared entry for every changed path no module owns, which is never dropped. Without exactly one approved plan every path is in
+ * the shared group and `plan.status` says why. A group above the bound (the shared group without a plan, or one very large module) is cut along directories into entries
+ * `<group>-part-<n>`, so no entry is larger than one Critic can read. Deterministic from the repository and the result alone, so `admit` rebuilds the identical object.
  * @param {{ root: string, result: object }} input `result` is the library preflight result (status packet-ready, exact range).
  */
 export function buildCriticSplit({ root, result }) {
@@ -105,14 +133,24 @@ export function buildCriticSplit({ root, result }) {
   }
   const groups = [...plan.modules.map((module) => module.id).sort().map((id) => ({ id, moduleId: id, paths: owned.get(id), label: `module ${id}` })),
     { id: SPLIT_SHARED_ENTRY_ID, moduleId: null, paths: shared, label: "the shared entry (every changed path no module owns)" }].filter((group) => group.paths.length > 0);
+  const moduleIds = new Set(plan.modules.map((module) => module.id));
+  const parts = groups.flatMap((group) => {
+    if (group.paths.length <= SPLIT_MAX_CHANGED_FILES) return [group];
+    let suffix = 0;
+    return cutByDirectory(group.paths, SPLIT_MAX_CHANGED_FILES).map((paths) => {
+      do suffix += 1; while (moduleIds.has(`${group.id}-part-${suffix}`));
+      const id = `${group.id}-part-${suffix}`;
+      return { id, moduleId: null, paths, label: `path group ${id} of ${group.label}` };
+    });
+  });
   const range = `${base.slice(0, 12)}..${candidate.slice(0, 12)}`;
   return {
     schema: CRITIC_SPLIT_SCHEMA, base, candidate, maxChangedFiles: SPLIT_MAX_CHANGED_FILES, changedFileCount: changed.length,
     plan: { status: plan.status, path: plan.path },
-    entries: groups.map((group, index) => ({
+    entries: parts.map((group, index) => ({
       id: group.id, moduleId: group.moduleId, paths: group.paths, scopeMarker: splitScopeMarker(group.id),
       reviewerInput: { ...result.dispatch.reviewerInput, changedPaths: group.paths },
-      batchScopeLine: `Batch scope (MP-07): ${group.label} of the reviewed range ${range} (${group.paths.length} of ${changed.length} changed files), part ${index + 1} of ${groups.length} of one split review round.`,
+      batchScopeLine: `Batch scope (MP-07): ${group.label} of the reviewed range ${range} (${group.paths.length} of ${changed.length} changed files), part ${index + 1} of ${parts.length} of one split review round.`,
     })),
   };
 }

@@ -2213,13 +2213,38 @@ test("G20-72 a range at the bound prints no split and a next step without a merg
   } finally { rmSync(small.root, { recursive: true, force: true }); rmSync(big.root, { recursive: true, force: true }); }
 });
 
-test("G20-72 without an approved architecture plan the split is the one shared entry, flagged; it never drops a path", async () => {
+// Restated 2026-11-08 (PO tile after the live measurement, QG-04: the pinned behaviour was the defect): without a plan a 91-file range came back as ONE entry of 91 files, so the
+// split did nothing. The case keeps its fixture and its "flagged, never drops a path" assertions and now pins that no entry is above the bound.
+test("G20-72 without an approved architecture plan the shared paths are cut along directories, flagged; no entry is above the bound and no path is dropped", async () => {
+  const { SPLIT_MAX_CHANGED_FILES, attributeVerdict, criticSplitProblem } = await import("../lib/critic-split.mjs");
   const fx = g2072Fixture({ plan: false });
   try {
     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
-    assert.deepEqual(split.entries.map((entry) => entry.id), ["shared"]);
+    assert.deepEqual(split.entries.map((entry) => entry.id), ["shared-part-1", "shared-part-2"]);
     assert.equal(split.plan.status, "none");
-    assert.deepEqual([...split.entries[0].paths].sort(), g2072Changed(fx).sort());
+    assert.equal(criticSplitProblem(split), null, "admit accepts the cut split");
+    assert.deepEqual(split.entries.flatMap((entry) => entry.paths).sort(), g2072Changed(fx).sort());
+    for (const entry of split.entries) {
+      assert.ok(entry.paths.length <= SPLIT_MAX_CHANGED_FILES, `${entry.id}: ${entry.paths.length} files`);
+      assert.ok(entry.batchScopeLine.includes(entry.id), entry.batchScopeLine);
+      assert.equal(attributeVerdict(split, { trajectory_evidence: `${entry.scopeMarker} reviewed` }), entry.id, "a child verdict is attributed to its cut entry");
+    }
+    assert.deepEqual(split.entries[1].paths.every((path) => path.startsWith("src/")), true, "a directory that fits stays whole");
+    assert.deepEqual(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} }).split, split, "admit rebuilds the identical object");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("G20-72 a module above the bound is cut into parts, one flat directory included, while a module that fits keeps its entry", async () => {
+  const { SPLIT_MAX_CHANGED_FILES, criticSplitProblem } = await import("../lib/critic-split.mjs");
+  const fx = g2072Fixture({ core: 40, api: 3, loose: 1 });
+  try {
+    const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
+    assert.deepEqual(split.entries.map((entry) => entry.id), ["api", "core-part-1", "core-part-2", "shared"]);
+    assert.equal(criticSplitProblem(split), null);
+    assert.equal(split.entries.find((entry) => entry.id === "api").moduleId, "api");
+    assert.ok(split.entries.every((entry) => entry.paths.length <= SPLIT_MAX_CHANGED_FILES));
+    assert.deepEqual(split.entries.flatMap((entry) => entry.paths).sort(), g2072Changed(fx).sort());
+    assert.match(split.entries.find((entry) => entry.id === "core-part-2").batchScopeLine, /^Batch scope \(MP-07\): path group core-part-2 of module core /u);
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
