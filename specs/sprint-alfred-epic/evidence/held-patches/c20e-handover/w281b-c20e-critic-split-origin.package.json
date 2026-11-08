@@ -1,0 +1,54 @@
+{
+  "schema": "pipeline.dispatch-briefing-package.v1",
+  "id": "C20E-G2072-CRITIC-MODULE-SPLIT-R2",
+  "item": "c20e-g2072-a-review-range-too-large-for-one-critic-is-split-per-module",
+  "agentType": "goldfish-deep",
+  "modelId": "claude-sonnet-5-5",
+  "effortEscalation": "MP-05",
+  "criterion": "AC-108",
+  "estimatedToolCalls": 170,
+  "budgetRationale": "an additive split field in the preflight wrapper, a pure merge script, one Source return per child for a split packet, the origin gate over N records, the optional receipt field, regression cases in four suites and one whole-chain walk; a grant is likely near the end, request it at the checkpoint",
+  "check": "specs/sprint-alfred-epic/evidence/held-patches/w281-c20e-critic-module-split.check.test.mjs",
+  "title": "A review range too large for one Critic is split per module, and the Source return covers every child, so a whole-feature review ends in one source-issued verdict",
+  "ac": "AC-108",
+  "goal": "Candidate 20e, G20-72, second attempt. PO tile decision 2026-11-08 after the design stop of the first attempt: extend the origin evidence so that every module Critic has its own Source return (design 3 in the notes file); the caller-authored route is NOT taken. Read the Step 1 finding and design in specs/sprint-alfred-epic/evidence/held-patches/w281-c20e-critic-module-split.notes.md first and build it, with these binding corrections. Build, runner-neutral: (1) PREFLIGHT: the additive `split` field in the w277 wrapper when the changed files exceed the one named constant SPLIT_MAX_CHANGED_FILES (25, its comment states the derivation from the working cap and that it is a first estimate to calibrate), one entry per module of the approved architecture plan with an exact path-only reviewerInput, one shared entry for every changed path no module owns (never dropped), each with its MP-07 `Batch scope (MP-07):` line; a range below the bound keeps today's output byte for byte; the coordinator-facing `nextStep` names dispatching one Critic per entry and the merge command. (2) MERGE: a pure script scripts/critic-split-merge.mjs as in the notes: `pass` is the AND, findings and briefing_violations the union, trajectory_verdict the worst; it refuses a missing child, a child outside its scope, a duplicate finding id, each with a typed code and repair. (3) ORIGIN: `admit` binds the digest of the `split` object into the admission record; for a packet whose admission carries a split, the Critic stop hook issues one record per returning child (same `wx` rule, same packet, session and claimant fields, file name derived from the verdict digest, in lib/critic-source-return.mjs so Claude, Codex and Antigravity all get it through the one existing function); a packet without a split keeps the single source-return.json byte for byte, including `a second stop never overwrites`. `originGate` for a split packet requires exactly one record per split entry, the entry ids distinct and complete, and the finalized verdict equal to the merge of exactly those verdicts; the independence label stays source-issued. BINDING CORRECTION 1 (no verdict shopping): two records for the same split entry REFUSE at finalize with a typed code; the caller must never be able to run a child twice and keep the better verdict. The repair names the existing next-round route; it is a refusal of this merge, not a dead end. BINDING CORRECTION 2: a stray record whose entry id is not in the split, or a record that cannot be attributed to an entry, also refuses. (4) RECEIPT: the optional `splitSha256`; a receipt without it verifies exactly as today. (5) WHOLE CHAIN (PO rule: a fix is the whole chain, never one step): one regression walk with the real commands and real state, not stubs of the steps under test: preflight prints the split, admit, N child verdict stops through the real hook entry, merge, finalize, the receipt verifies, and `close-coordinator` assertCriticIndependenceForClose accepts the label with no PO acknowledgement; first read whether guard-dispatch or the packet binding allows several Critic children under one admitted packet and fix or STOP accordingly. Restate in place with a G20-72 comment the w277 case `actual direct CLI preserves complete packet-ready` so it also strips `split` (QG-04: never weaken another assertion). Regression cases: above the bound one entry per module with disjoint scopes covering every changed path; below the bound no split field; each merge refusal; a split packet with one child missing, with two records for one entry, with a stray entry, and with a merged verdict differing by one finding each refuse at finalize; a non-split packet behaves byte-identically. Developed and tested in the clone named in facts; delivered as the held patch specs/sprint-alfred-epic/evidence/held-patches/w281-c20e-critic-module-split.patch, with the notes file updated from 'design stop' to what was built.",
+  "paths": [
+    "specs/sprint-alfred-epic/evidence/held-patches/w281-c20e-critic-module-split.notes.md",
+    "specs/sprint-alfred-epic/evidence/held-patches/w281-c20e-critic-module-split.check.test.mjs"
+  ],
+  "newFiles": [
+    "specs/sprint-alfred-epic/evidence/held-patches/w281-c20e-critic-module-split.patch"
+  ],
+  "context": [
+    "specs/sprint-alfred-epic/evidence/held-patches/w281-c20e-critic-module-split.notes.md",
+    "specs/sprint-alfred-epic/evidence/held-patches/w277-c20e-critic-admit-request.notes.md",
+    "scratch/agent-out/c20e-cs/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs (preflightCriticDispatchWithAdmitRequest)",
+    "scratch/agent-out/c20e-cs/plugins/pipeline-core/lib/critic-source-return.mjs (issueForVerdict)",
+    "scratch/agent-out/c20e-cs/plugins/pipeline-core/scripts/session-critic-finalizer.mjs (admit, originGate, finalize, receipt) and lib/session-critic-finalizer-read.mjs",
+    "scratch/agent-out/c20e-cs/plugins/pipeline-core/scripts/close-coordinator.mjs (assertCriticIndependenceForClose)",
+    "scratch/agent-out/c20e-cs/plugins/pipeline-core/lib/module-dispatch-scope.mjs (module cut)",
+    "scratch/agent-out/c20e-cs/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json (pinned paths: read only, never change)"
+  ],
+  "facts": [
+    "CLONE-SLICE ROUTE: the clone is scratch/agent-out/c20e-cs (a shared clone of BASE_SHA, candidate 20d plus the 20e part 1 chain and the delivered w277 patch); first step: `git -C scratch/agent-out/c20e-cs rev-parse HEAD` must print that SHA, otherwise STOP. Never run a git command that writes; use the helpers: `node scratch/agent-out/test-in.mjs scratch/agent-out/c20e-cs <test file> --private-tmp` (one suite at a time), `node scratch/agent-out/commit-in.mjs scratch/agent-out/c20e-cs \"<conventional message>\"`, `node scratch/agent-out/save-patch.mjs scratch/agent-out/c20e-cs BASE_SHA HEAD specs/sprint-alfred-epic/evidence/held-patches/w281-c20e-critic-module-split.patch`. The helper's `apply --check on repo` line is expected to fail: ignore it. A commit message must not contain the name of the version-control tool.",
+    "Commit-in and save-patch after every green step, so a budget end leaves a usable partial state. The final return JSON must carry every schema field including changedPaths (a missing field fails the host commit with NGHR-FINAL-SHAPE). The check test already exists and stays as it is unless a touched path legitimately needs naming in the notes.",
+    "codex-isolated-critic-protected-preimage.test.mjs is RED AT THE BASE for exactly two entries, plugins/pipeline-core/skills/critic-review/SKILL.md and templates/prompts/critic-review.md, open by design: it must stay red for exactly those two entries and no other, and that red is not a reason for outcome checkpoint.",
+    "The Critic preimage pin covers agents/critic.md, roles/critic.md, skills/critic-review/SKILL.md, templates/prompts/critic-review.md, harness/review-protocol.md, codex-critic-host.mjs and the Critic schemas: none of them changes, and the verdict schema gets no new field.",
+    "A new test file must be registered in the verify suite configuration and the case-completion registry (the apply rehearsal checks both); prefer new cases in the existing suites and one new test file for the merge script. Clone scratch-using suites need `scratch/` to exist in the clone: create it with `mkdir -p scratch/agent-out/c20e-cs/scratch`.",
+    "PO rules: never fully blocking; runner and platform neutral; QG-04 restate in place with a comment; never re-pin the Critic preimage; a new kernel import must keep GMWKC01 (guard-maintenance-window-kernel-closure.test.mjs) green with the threat-model doc entry; a new auth verb or kind must keep harness/scripts/check-auth-gate-inventory-drift.test.mjs green.",
+    "Notes follow one existing held-patches *.notes.md (what / why / not changed / not proven); no absolute host paths; AC-108 closest criterion; PRD and Spec unchanged."
+  ],
+  "targeted": [
+    "the suites next to every file you change, one at a time (critic-dispatch-preflight, critic-generic-batch, session-critic-finalizer, the critic-source-return suite, the close-coordinator Critic independence pin, the two Critic course pins w277 ran, observe-critic-preflight, GMWKC01, check-auth-gate-inventory-drift)",
+    "node --test specs/sprint-alfred-epic/evidence/held-patches/w281-c20e-critic-module-split.check.test.mjs"
+  ],
+  "forbidden": [
+    "Do not run refresh-derived-files, the inventory rebaseline or full-verify.",
+    "Never two suites at once.",
+    "Do not edit anything in the real checkout except the three w281 deliverables."
+  ],
+  "stops": [
+    "The whole chain cannot pass without a change to a Critic-pinned file, or several Critic children under one packet cannot be admitted without loosening a guard check: report exactly which file or check, keep what is green committed in the clone, and return.",
+    "Accepting the split round would need the independence label or the close check to be weaker than for a single Critic: change nothing there and return."
+  ]
+}

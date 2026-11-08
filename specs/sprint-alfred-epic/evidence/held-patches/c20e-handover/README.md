@@ -10,7 +10,7 @@ BUILDS candidate 20e first and only then runs the greenfields. Everything 20e ne
 |---|---|---|
 | `chain/` (4 patches + `po-apply-0.7-candidate20e-part1.sh`) | G20-70 (w278), G20-73 (w279), G20-75 (w280) | built and tested in a slice clone by the Elephant; notes `w278-*`, `w279-*`, `w280-*.notes.md`; PO apply pending |
 | `w277-c20e-critic-admit-request.package.json` | G20-69 (preflight prints the complete admit request) + G20-71 (opus stays; the preflight writes the MP-07 lines) | Goldfish package, not built |
-| `w281-c20e-critic-module-split.package.json` | G20-72 (a review range too large for one Critic is split per module; measure first, design stop) | Goldfish package, not built |
+| `w281-c20e-critic-module-split.package.json` | G20-72 (a review range too large for one Critic is split per module; measure first, design stop) | first attempt ended at the design stop (notes `w281-*`: one round has one Source return); second attempt is `w281b-c20e-critic-split-origin.package.json` |
 | `w282-c20e-audit-push-proof-followup.package.json` | audit bundle: the push and release approval proofs reach the remote in one evidence-only follow-up commit with the release tag | Goldfish package, not built |
 | `w283-c20e-proof-wait-subject.package.json` | G20-76 (the signature wait accepts an old proof: `authorize-critical` mirrors to `scratch/critical-<kind>-{request,proof,authority,signer}-<repo fingerprint>.json`, one fixed name per repository, and `proof-wait.mjs` only checks the file schema, so a mirror from an earlier signature ends the wait at once and `approve-push` then refuses with CRITICAL-PROOF-SUBJECT) | Goldfish package, not built; added after the first handover |
 
@@ -50,6 +50,7 @@ PO decisions of 2026-11-08 that the first handover left out:
 - G20-72: a review range too large for one Critic is split per module (package w281). The Critic preimage pin is never
   re-pinned. It covers `agents/critic.md`, `roles/critic.md`, `skills/critic-review/SKILL.md`,
   `templates/prompts/critic-review.md`, `harness/review-protocol.md`, the Codex Critic host and its schemas.
+- G20-72 origin evidence (PO tile, after the design stop): every module Critic of a split round gets its own Source return and the finalizer requires all of them; the caller-authored route is not taken. Two records for one module refuse (no choosing the better verdict).
 - Push proof: the push or release approval arrives as its own follow-up commit that only adds files under
   `audit-bundles/<feature>/<commit>/proofs/` and goes out with the version tag (package w282).
 - `--by` on `push-prepare` and `approve-push` only with a value the PO names for exactly that command (EL-36); for the
