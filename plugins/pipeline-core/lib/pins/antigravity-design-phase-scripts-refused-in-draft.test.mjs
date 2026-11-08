@@ -172,4 +172,17 @@ test("G7: malformed and foreign forms remain refused through actual draft lifecy
     }
   } finally { fx.cleanup(); }
 });
+
+// Live Antigravity greenfield 2026-11-08: the slice proposal happy-path.md describes as read-only was refused in draft.
+const sliceProposal = join(scripts, "module-slice-proposal.mjs");
+test("C20K: module-slice-proposal --prd <path> passes the actual draft lifecycle admission", () => {
+  const fx = draftFixture();
+  try { assert.deepEqual(fx.run(`node ${sliceProposal} --prd specs/g7/prd.md`), { exitCode: 0, stderr: "" }); }
+  finally { fx.cleanup(); }
+});
+test("C20K: module-slice-proposal stays refused for any other argv shape", () => {
+  for (const tail of ["", "--prd", "--prd /etc/passwd.md", "--prd ../outside.md", "--prd specs/../../outside.md", "--prd specs/g7/prd.sh", "--prd specs/g7/prd.md --root /tmp", "--root /tmp --prd specs/g7/prd.md"]) {
+    assert.equal(admitted(`node ${sliceProposal} ${tail}`.trim()), false, tail);
+  }
+});
 registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

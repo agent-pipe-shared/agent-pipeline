@@ -230,6 +230,8 @@ export const PROOF_WAIT_SCRIPT = fileURLToPath(new URL("../../scripts/proof-wait
 export const RUNNER_CAPABILITIES_SCRIPT = fileURLToPath(new URL("../../scripts/runner-capabilities.mjs", import.meta.url));
 export const CHECK_PRIVATE_IDENTIFIERS_SCRIPT = fileURLToPath(new URL("../../scripts/check-private-identifiers.mjs", import.meta.url));
 export const CHECK_PO_GATE_AUTHORITY_SCRIPT = fileURLToPath(new URL("../../scripts/check-po-gate-authority.mjs", import.meta.url));
+// Live Antigravity greenfield 2026-11-08: the documented read-only slice proposal was refused in draft as an opaque script (admitted by exact grammar in command-catalogue.mjs).
+export const MODULE_SLICE_PROPOSAL_SCRIPT = fileURLToPath(new URL("../../scripts/module-slice-proposal.mjs", import.meta.url));
 
 export const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/design-course-session.mjs", import.meta.url));
 
