@@ -271,7 +271,16 @@ export function inspectDesignDecisionBindingsDraft({ rootDir, sources } = {}) {
   try { const { files, binding, modelRequest, ...result } = subset(rootPath(rootDir), sources); return result; }
   catch (error) { return refusal(error); }
 }
-function refusal(error) { return fail(error?.message?.startsWith('DDB-') ? error.message : 'DDB-SOURCE-UNAVAILABLE'); }
+function refusal(error) {
+  const result = fail(error?.message?.startsWith('DDB-') ? error.message : 'DDB-SOURCE-UNAVAILABLE');
+  return typeof error?.path === 'string' ? { ...result, path: error.path } : result;
+}
+/** The two facts the signed approval is later verified against and that can already be read before it exists: a registered trust anchor
+ * and every bound source in the candidate commit. The same owners as verifyBasis, so the entry gate cannot disagree with them. */
+export function inspectDesignApprovalPreconditions({ rootDir, sources, candidate } = {}) {
+  try { const root = rootPath(rootDir); trust(root); candidateProvenance(root, candidate, sources); return { ok: true }; }
+  catch (error) { return refusal(error); }
+}
 function reopen(root, files) {
   requireValue(files.every(file => { const after = physical(root, file.path, file.bytes.length, file.internal === true);
     return after.identity === file.identity && after.bytes.equals(file.bytes); }), 'DDB-PHYSICAL-DRIFT');

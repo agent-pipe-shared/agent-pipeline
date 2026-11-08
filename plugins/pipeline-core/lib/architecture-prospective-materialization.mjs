@@ -12,7 +12,7 @@ const pathOK = value => typeof value === 'string' && value.length <= 240
   && /^[A-Za-z0-9][A-Za-z0-9._/-]*$/u.test(value)
   && value.split('/').every(part => part && !part.startsWith('.'));
 const refOK = value => own(value, ['path', 'sha256']) && pathOK(value.path) && /^[a-f0-9]{64}$/u.test(value.sha256);
-function need(value, code) { if (!value) throw new Error(`DDB-PROSPECTIVE-${code}`); }
+function need(value, code, path = null) { if (!value) throw Object.assign(new Error(`DDB-PROSPECTIVE-${code}`), path === null ? {} : { path }); }
 export const prospectiveJson = json;
 /** A draft that still carries a create-adr template line has not been written yet; signing it would freeze a placeholder. */
 export const PLACEHOLDER_LINE = /^REPLACE:/mu;
@@ -45,10 +45,10 @@ export function derivePredecessorSidecar({ supersedes, historic, proposed, prior
  * The reader supplies its normal physical custody checks; this function never
  * accepts a synthetic authority handle or reads an optional caller location. */
 export function inspectProspectiveArchitectureManifest({ manifest, sources, read, existing }) {
-  need(refOK(manifest) && sources.companions.some(ref => ref.path === manifest.path && ref.sha256 === manifest.sha256), 'COMPANION-REQUIRED');
+  need(refOK(manifest) && sources.companions.some(ref => ref.path === manifest.path && ref.sha256 === manifest.sha256), 'COMPANION-REQUIRED', typeof manifest?.path === 'string' ? manifest.path : null);
   const files = [], paths = new Set(), targets = [], decisions = [];
   const get = ref => {
-    need(refOK(ref) && sources.companions.some(source => source.path === ref.path && source.sha256 === ref.sha256), 'INPUT-COMPANION-REQUIRED');
+    need(refOK(ref) && sources.companions.some(source => source.path === ref.path && source.sha256 === ref.sha256), 'INPUT-COMPANION-REQUIRED', typeof ref?.path === 'string' ? ref.path : null);
     const file = read(ref.path); need(file.sha256 === ref.sha256, 'INPUT-DRIFT'); files.push(file); return file;
   };
   const manifestFile = get(manifest), value = parseStrictJson(manifestFile.bytes);

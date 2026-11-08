@@ -574,6 +574,7 @@ export function validatePoGateAuthorityForRepository({
   repoRoot,
   expectedPlanSha256 = undefined,
   expectedSpecSha256 = undefined,
+  assumeSignedDesignApproval = false,
 }, deps = {}) {
   let topology;
   try {
@@ -581,7 +582,7 @@ export function validatePoGateAuthorityForRepository({
   } catch {
     return fail("PO-GATE-AUTHORITY-UNAVAILABLE", "Repository topology or authority inputs are unavailable.", PROFILE_REPAIR);
   }
-  return validatePoGateAuthority({ ...topology, expectedPlanSha256, expectedSpecSha256, deviceRebind: deps.deviceRebind !== false });
+  return validatePoGateAuthority({ ...topology, expectedPlanSha256, expectedSpecSha256, assumeSignedDesignApproval, deviceRebind: deps.deviceRebind !== false });
 }
 
 /** The current plan approval of the authoritative State, or null. Read-only. */
@@ -763,8 +764,15 @@ function activeFeatureState(repoRoot) {
   const authorityPrdPath = authorityPrd !== null && authorityPrd.startsWith("specs/") && PRD_NAME.test(basename(authorityPrd))
     ? authorityPrd
     : null;
-  return { status: "active", id: active.id, planPath, authorityPrdPath, documentLanguage, signedDesignApproval: signedDesignApprovalOf(state) };
+  return { status: "active", id: active.id, planPath, authorityPrdPath, documentLanguage, signedDesignApproval: signedDesignApprovalOf(state),
+    draftPackage: readAuthoritySeal(state?.continuity?.authority).status === "draft" };
 }
+
+// A draft package binds its PRD and Spec only at the approval, so the marker is still the author's line to update. The general text below
+// names three lifecycle branches and sent agents through about 30 source reads (Codex greenfield 2026-11-08); here the state is known.
+const draftSpecRepair = (planPath, specSha256) => `This package is still a draft, so the marker is yours to update: set the line in ${planPath} to`
+  + ` <!-- technical-spec-sha256: ${specSha256} -->, commit the PRD and spec.md together, then run the command again.`
+  + " No reopen-design and no PO step is needed. Every edit of spec.md needs this one-line update.";
 
 // The digests the PO signed in a final design approval, or null. A stored approval that is current, unrevoked and made by signature IS the
 // PO's content acknowledgement of exactly these bytes: the signature ceremony shows the PRD and Spec and binds both digests, and no step
@@ -869,7 +877,8 @@ function prdAuthority(repoRoot, active, expectedLanguage, requireAcknowledgement
     return fail("PO-GATE-PRD-SPEC-MARKER-MISSING", "The active PRD must carry the technical Spec marker exactly once.", SPEC_MARKER_MISSING_REPAIR);
   }
   if (specMarkers[0] !== specSha256) {
-    return fail("PO-GATE-PRD-SPEC-MISMATCH", "The active PRD technical Spec marker must exactly match the neighboring spec.md bytes.", SPEC_REPAIR);
+    return fail("PO-GATE-PRD-SPEC-MISMATCH", `The active PRD technical Spec marker must exactly match the neighboring spec.md bytes (marker ${specMarkers[0]}, spec.md ${specSha256}).`,
+      active.draftPackage ? draftSpecRepair(boundPlanPath, specSha256) : SPEC_REPAIR);
   }
   // Additive third precondition, checked only once the mechanical path/
   // cardinality check and the byte-exact Spec-digest binding above both
@@ -915,6 +924,7 @@ export function validatePoGateAuthority({
   expectedPlanSha256 = undefined,
   expectedSpecSha256 = undefined,
   deviceRebind = true,
+  assumeSignedDesignApproval = false,
 }) {
   const profile = validatePoGateProfileSnapshot({ repoRoot, gitCommonDir, primaryRoot, registeredWorktreeRoots });
   if (!profile.ok) return profile;
@@ -945,7 +955,9 @@ export function validatePoGateAuthority({
   // Passed (not undefined) => ACTIVE approval/rebind validation => the PO
   // acknowledgement marker must fire. Not passed => passive diagnostic read
   // (e.g. check-po-gate-authority.mjs) => it must not.
-  const requireAcknowledgement = expectedPlanSha256 !== undefined || expectedSpecSha256 !== undefined;
+  // The entry gate asks, before the signature is requested, whether the signed approval of exactly these bytes would pass. It only
+  // answers that question: the marker is waived for real only by a stored signed approval (signedDesignApprovalOf).
+  const requireAcknowledgement = (expectedPlanSha256 !== undefined || expectedSpecSha256 !== undefined) && !assumeSignedDesignApproval;
   const prd = prdAuthority(current, active, expectedDocumentLanguage, requireAcknowledgement);
   if (!prd.ok) return prd;
   if (expectedPlanSha256 !== undefined && (!SHA256.test(expectedPlanSha256) || expectedPlanSha256 !== prd.planSha256)) {

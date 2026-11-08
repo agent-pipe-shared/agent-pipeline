@@ -220,7 +220,9 @@ async function routeFixture(t, { ignored = null } = {}) {
     const out = [], err = [];
     console.log = (...values) => out.push(values.map(String).join(" "));
     console.error = console.warn = (...values) => err.push(values.map(String).join(" "));
-    try { return { status: run(argv, { dir: primary, now: () => GATE_NOW, ...deps }), stdout: out.join("\n"), stderr: err.join("\n") }; }
+    // The entry gate reads the PO gate and the architecture entry again at present-plan, through the same fixture route as submit-plan.
+    try { return { status: run(argv, { dir: primary, now: () => GATE_NOW, poGateAuthority: () => authority, poGateProfile: () => profile,
+      architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }), ...deps }), stdout: out.join("\n"), stderr: err.join("\n") }; }
     finally { Object.assign(console, saved); }
   };
   const submitted = drive(["submit-plan", "--by", "coordinator", "--profile", "feature"],
@@ -258,6 +260,69 @@ test("[AC-113 present-plan ignored bound path] control: with every bound path tr
   assert.equal(fx.requests().length, 1, "exactly one pending PO request is written");
   assert.equal(typeof fx.readState().planPresentation?.designApprovalRequestPath, "string");
   assert.match(presented.stdout, /Exact PO request: scratch\/design-approval-request-/u);
+});
+
+// PO 2026-11-08: the signature is requested only when nothing behind it can still refuse, and every open point is reported at once.
+test("[entry gate] three independent faults are reported together, with paths and repairs, and no request is written", async (t) => {
+  const fx = await routeFixture(t);
+  put(fx.primary, ROUTE_DESIGN, "# Design changed after the review\n");
+  put(fx.primary, ROUTE_TRACE, "| ID | Evidence |\n| --- | --- |\n| changed | changed |\n");
+  const presented = fx.drive(["present-plan", "--by", "coordinator", "--review-receipt", ROUTE_RECEIPT],
+    { poGateAuthority: () => ({ ok: false, code: "PO-GATE-PRD-SPEC-MISMATCH", reason: "marker differs", repair: "update the marker line" }) });
+  assert.notEqual(presented.status, 0);
+  assert.match(presented.stderr, /present-plan refused: \d+ open points/u, presented.stderr);
+  assert.match(presented.stderr, new RegExp(`present-plan refused \\(DCC-PATH-MODIFIED\\) ${ROUTE_DESIGN}.*Repair: Commit it`, "u"), presented.stderr);
+  assert.match(presented.stderr, new RegExp(`present-plan refused \\(DCC-PATH-MODIFIED\\) ${ROUTE_TRACE}`, "u"), presented.stderr);
+  assert.match(presented.stderr, /present-plan refused \(PO-GATE-PRD-SPEC-MISMATCH\).*marker differs.*Repair: update the marker line/u, presented.stderr);
+  assert.doesNotMatch(presented.stderr, /use present-plan --review-receipt/u, "the receipts were passed; this hint was wrong");
+  assert.deepEqual(fx.requests(), [], "no PO request may exist for a refused presentation");
+  assert.equal(fx.readState().planPresentation, undefined);
+});
+
+test("[entry gate] the PO gate is asked about the signed outcome only in signature mode", async (t) => {
+  for (const [mode, assumed] of [["signature", true], ["chat", false]]) {
+    const fx = await routeFixture(t);
+    const seen = [];
+    const presented = fx.drive(["present-plan", "--by", "coordinator", "--review-receipt", ROUTE_RECEIPT], {
+      readHumanApprovalMode: () => ({ mode, scope: "global" }),
+      poGateAuthority: (request) => { seen.push(request); return { ok: false, code: "PO-GATE-FIXTURE", reason: "fixture" }; },
+    });
+    assert.notEqual(presented.status, 0);
+    assert.equal(seen.length, 1, "the gate asks the PO gate reader exactly once");
+    assert.equal(seen[0].assumeSignedDesignApproval, assumed, `${mode} mode`);
+    assert.match(seen[0].expectedPlanSha256, /^[a-f0-9]{64}$/u);
+  }
+});
+
+test("[entry gate] submit-plan refuses an uncommitted design package and names the paths", async (t) => {
+  const fx = await routeFixture(t);
+  const before = fx.readState().planSubmission;
+  put(fx.primary, "specs/feature/notes.md", "# not committed\n");
+  const submitted = fx.drive(["submit-plan", "--by", "coordinator", "--profile", "feature"]);
+  assert.notEqual(submitted.status, 0);
+  assert.match(submitted.stderr, /PLAN-SUBMIT-UNCOMMITTED.*specs\/feature\/notes\.md/u, submitted.stderr);
+  assert.deepEqual(fx.readState().planSubmission, before, "nothing was recorded");
+});
+
+test("[entry gate] the collector runs every check, turns a throwing reader into a finding, and renders all of them", async () => {
+  const { runImplementationEntryGate, renderImplementationEntryGate } = await import("../implementation-entry-gate.mjs");
+  const ran = [];
+  const result = runImplementationEntryGate({ stage: "before-signature", checks: [
+    { id: "a", run: () => { ran.push("a"); return { code: "A-1", path: "x.md", message: "first.", repair: "fix x" }; } },
+    { id: "b", run: () => { ran.push("b"); throw new Error("reader broke"); } },
+    { id: "c", run: () => { ran.push("c"); return null; } },
+    { id: "d", run: () => { ran.push("d"); return [{ code: "D-1" }, { code: "D-2", text: "verbatim sentence" }]; } },
+  ] });
+  assert.deepEqual(ran, ["a", "b", "c", "d"]);
+  assert.equal(result.status, "blocked");
+  assert.deepEqual(result.findings.map((item) => item.code), ["A-1", "ENTRY-GATE-CHECK-UNAVAILABLE", "D-1", "D-2"]);
+  const text = renderImplementationEntryGate({ verb: "present-plan", result });
+  assert.match(text, /4 open points/u);
+  assert.match(text, /1\. present-plan refused \(A-1\) x\.md: first\. Repair: fix x/u);
+  assert.match(text, /4\. verbatim sentence/u);
+  const clean = runImplementationEntryGate({ stage: "before-implementation", checks: [{ id: "a", run: () => null }] });
+  assert.equal(clean.status, "ready");
+  assert.throws(() => runImplementationEntryGate({ stage: "later", checks: [] }), TypeError);
 });
 
 // ALF-C-AC113-P3 / AC-113 point 1 -- the tracked-home decision against REAL git. The design-course
