@@ -1,0 +1,853 @@
+diff --git a/plugins/pipeline-core/lib/audit-bundle.mjs b/plugins/pipeline-core/lib/audit-bundle.mjs
+index 93aa8df9c..a20097086 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /** Candidate-bound, offline-verifiable audit bundle service. */
+-import { createHash } from "node:crypto";
++import { createHash, verify as cryptoVerify } from "node:crypto";
+ import { readFileSync } from "node:fs";
+ import { copyFile, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+ import { isAbsolute, join, relative, resolve, sep } from "node:path";
+@@ -34,7 +34,7 @@ This directory is a candidate-bound audit bundle. It contains the copied artifac
+ ## Artifacts
+ 
+ ${artifactLines}
+-${evidenceSection(manifest)}
++${evidenceSection(manifest)}${proofsSection(manifest)}
+ ## Offline verification
+ 
+ Prerequisites: Node.js and a copy of the repository containing \`plugins/pipeline-core/scripts/audit-bundle.mjs\`; no network, provider, key, or deployment access is required.
+@@ -73,7 +73,47 @@ function sanitizeExportEvidence(exportEvidence) {
+ }
+ // Q3: the optional top-level keys a plan or manifest may carry, each validated when present. The absent case keeps the
+ // exact key list it always had, so old bundles and plans stay byte-identical and verifiable.
+-const OPTIONAL_KEYS = ["exportMetadata", "evidence"];
++const OPTIONAL_KEYS = ["exportMetadata", "evidence", "proofs"];
++// P3 (C20D-P3-ONE-SHOT-CLOSE): the signed approval proof envelopes that authorized the feature live in the private approval store, outside the
++// repository. The bundle copies the PUBLIC proof objects (schema, signed digest, key reference, public key, signature; never a private key) into
++// proofs/ and binds each by file digest and by the signed intent digest; the offline verifier re-checks the bytes, the intent and the Ed25519 signature.
++const PROOF_FIELDS = ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"]; const PROOF_KIND = /^[a-z-]{1,40}$/u; const PROOF_PATH = /^proofs\/[0-9]{3}-[a-z-]{1,40}\.json$/u;
++function proofSignatureHolds(proof) {
++  try { return cryptoVerify(null, Buffer.from(proof.intentSha256, "utf8"), proof.publicKey, Buffer.from(proof.signatureBase64, "base64")) === true; } catch { return false; }
++}
++function proofObjectValid(proof) {
++  return exact(proof, PROOF_FIELDS) && proof.schema === PROOF_SCHEMA && SHA.test(proof.intentSha256) && typeof proof.keyReference === "string" && proof.keyReference.length > 0 && proof.keyReference.length <= 128
++    && typeof proof.publicKey === "string" && proof.publicKey.includes("PUBLIC KEY") && !/PRIVATE KEY/u.test(JSON.stringify(proof)) && typeof proof.signatureBase64 === "string" && /^[A-Za-z0-9+/=]{16,4096}$/u.test(proof.signatureBase64) && proofSignatureHolds(proof);
++}
++/** True when `proof` is a public proof object whose Ed25519 signature verifies over its own signed intent digest (what the bundle can carry). */
++export function isCarriableProof(proof) { return proofObjectValid(proof); }
++const proofBytes = (proof) => Buffer.from(`${canonicalizeJson(proof)}\n`, "utf8");
++function planProofs(proofs) {
++  if (!Array.isArray(proofs) || proofs.length === 0 || proofs.length > 16) fail("AB-PROOF-INVALID", "Proofs must be one to sixteen { kind, proof } entries.");
++  return proofs.map((entry, index) => {
++    if (!exact(entry, ["kind", "proof"]) || !PROOF_KIND.test(entry.kind) || !proofObjectValid(entry.proof)) fail("AB-PROOF-INVALID", "A signed proof envelope is not a verifiable public proof object.");
++    return Object.freeze({ kind: entry.kind, bundlePath: `proofs/${String(index + 1).padStart(3, "0")}-${entry.kind}.json`, sha256: digest(proofBytes(entry.proof)), intentSha256: entry.proof.intentSha256, proof: Object.freeze({ ...entry.proof }) });
++  });
++}
++function proofsPlanShape(proofs) { return Array.isArray(proofs) && proofs.length > 0 && proofs.length <= 16 && proofs.every((entry) => exact(entry, ["kind", "bundlePath", "sha256", "intentSha256", "proof"]) && PROOF_KIND.test(entry.kind) && PROOF_PATH.test(entry.bundlePath) && SHA.test(entry.sha256) && proofObjectValid(entry.proof) && entry.proof.intentSha256 === entry.intentSha256 && digest(proofBytes(entry.proof)) === entry.sha256); }
++const proofsManifest = (proofs) => proofs.map((entry) => ({ kind: entry.kind, path: entry.bundlePath, sha256: entry.sha256, intentSha256: entry.intentSha256 }));
++function proofsManifestShape(proofs) { return Array.isArray(proofs) && proofs.length > 0 && proofs.length <= 16 && proofs.every((entry) => exact(entry, ["kind", "path", "sha256", "intentSha256"]) && PROOF_KIND.test(entry.kind) && PROOF_PATH.test(entry.path) && SHA.test(entry.sha256) && SHA.test(entry.intentSha256)); }
++function proofsSection(manifest) {
++  if (!Object.hasOwn(manifest, "proofs")) return "";
++  return `\n## Signed approval proofs\n\nThe detached, public proof objects of the human approvals that authorized this candidate (no private key is ever copied). Each is bound by file digest and by the signed intent digest, and the offline verification re-checks both and the Ed25519 signature:\n\n${manifest.proofs.map((entry) => `- ${entry.kind}: \`${entry.path}\` (SHA-256: \`${entry.sha256}\`, signed intent: \`${entry.intentSha256}\`)`).join("\n")}\n`;
++}
++function proofFindings(root, manifest) {
++  const findings = [];
++  for (const entry of manifest.proofs) {
++    let bytes; try { bytes = readFileSync(join(root, entry.path)); } catch { findings.push(`AB-MISSING ${entry.path}`); continue; }
++    if (digest(bytes) !== entry.sha256) { findings.push(`AB-DIGEST ${entry.path}`); continue; }
++    const proof = jsonOrNull(bytes);
++    if (!exact(proof, PROOF_FIELDS) || proof.schema !== PROOF_SCHEMA || !SHA.test(proof.intentSha256 ?? "")) { findings.push(`AB-PROOF-INVALID ${entry.path}`); continue; }
++    if (proof.intentSha256 !== entry.intentSha256) findings.push(`AB-PROOF-INTENT ${entry.path}`);
++    if (!proofSignatureHolds(proof)) findings.push(`AB-PROOF-SIGNATURE ${entry.path}`);
++  }
++  return findings;
++}
+ function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
+ const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan"]);
+ const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan" });
+@@ -87,7 +127,7 @@ function evidenceShape(value) {
+       && (entry.bundlePath === null || /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath)) && (entry.status === "gap" ? entry.code !== null && entry.bundlePath === null : entry.bundlePath !== null));
+ }
+ function planShape(plan) { return exact(plan, ["schema", "status", "bundleId", "candidate", "effectivePolicy", "effectivePolicySha256", "artifacts", ...optionalKeys(plan)])
+-  && plan.schema === "pipeline.audit-bundle-plan.v1" && plan.status === "preview" && BUNDLE_ID.test(plan.bundleId) && exact(plan.candidate, ["commit", "tree"]) && OID.test(plan.candidate.commit) && OID.test(plan.candidate.tree) && SHA.test(plan.effectivePolicySha256) && canonicalSha256(plan.effectivePolicy) === plan.effectivePolicySha256 && Array.isArray(plan.artifacts) && plan.artifacts.length > 0 && plan.artifacts.every((entry) => exact(entry, ["sourcePath", "bundlePath", "sha256"]) && typeof entry.sourcePath === "string" && /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath) && SHA.test(entry.sha256)) && (!hasExportMetadata(plan) || exportMetadataShape(plan.exportMetadata)) && (!Object.hasOwn(plan, "evidence") || evidenceShape(plan.evidence)); }
++  && plan.schema === "pipeline.audit-bundle-plan.v1" && plan.status === "preview" && BUNDLE_ID.test(plan.bundleId) && exact(plan.candidate, ["commit", "tree"]) && OID.test(plan.candidate.commit) && OID.test(plan.candidate.tree) && SHA.test(plan.effectivePolicySha256) && canonicalSha256(plan.effectivePolicy) === plan.effectivePolicySha256 && Array.isArray(plan.artifacts) && plan.artifacts.length > 0 && plan.artifacts.every((entry) => exact(entry, ["sourcePath", "bundlePath", "sha256"]) && typeof entry.sourcePath === "string" && /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath) && SHA.test(entry.sha256)) && (!hasExportMetadata(plan) || exportMetadataShape(plan.exportMetadata)) && (!Object.hasOwn(plan, "evidence") || evidenceShape(plan.evidence)) && (!Object.hasOwn(plan, "proofs") || proofsPlanShape(plan.proofs)); }
+ 
+ function readEvidenceFile(root, path) {
+   let source; try { source = rootPath(root, path, "AB-EVIDENCE-PATH"); } catch { return null; }
+@@ -152,7 +192,7 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
+  * candidate exactly, so a bundle is never labelled with the parent of the commit it was asked to audit (Q3).
+  * `evidence` (optional) carries the approval trace, detached proofs, release Verify record and security scan; see `collectEvidence`.
+  */
+-export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVersion, packs, exportEvidence, candidate, evidence } = {}) {
++export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVersion, packs, exportEvidence, candidate, evidence, proofs } = {}) {
+   const root = resolve(repositoryRoot ?? ""); if (!BUNDLE_ID.test(bundleId ?? "")) fail("AB-BUNDLE-ID");
+   const packageCheck = validateFeaturePackage(root, manifestPath); if (!packageCheck.ok || !packageCheck.receipt?.candidate) fail("AB-PACKAGE");
+   if (candidate !== undefined && !(exact(candidate, ["commit", "tree"]) && OID.test(candidate.commit) && OID.test(candidate.tree) && candidate.commit === packageCheck.receipt.candidate.commit && candidate.tree === packageCheck.receipt.candidate.tree)) fail("AB-CANDIDATE-MISMATCH", "The audited candidate is not the feature package candidate.");
+@@ -162,7 +202,8 @@ export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVe
+   const exportMetadata = sanitizeExportEvidence(exportEvidence);
+   const carried = evidence === undefined ? null : collectEvidence(root, packageCheck.receipt.candidate, evidence, artifacts.length);
+   if (carried !== null) artifacts.push(...carried.artifacts);
+-  return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}), ...(carried !== null ? { evidence: carried.evidence } : {}) });
++  const carriedProofs = proofs === undefined ? undefined : Object.freeze(planProofs(proofs));
++  return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}), ...(carried !== null ? { evidence: carried.evidence } : {}), ...(carriedProofs !== undefined ? { proofs: carriedProofs } : {}) });
+ }
+ 
+ export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}) {
+@@ -170,7 +211,8 @@ export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}
+   try { await lstat(output); fail("AB-OUTPUT-EXISTS"); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+   await mkdir(output, { recursive: false }); await mkdir(join(output, "artifacts"));
+   for (const artifact of plan.artifacts) { const source = rootPath(root, artifact.sourcePath, "AB-SOURCE"); const bytes = await readFile(source); if (digest(bytes) !== artifact.sha256) fail("AB-SOURCE-DIGEST"); await copyFile(source, join(output, artifact.bundlePath)); }
+-  const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}), ...(Object.hasOwn(plan, "evidence") ? { evidence: plan.evidence } : {}) };
++  const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}), ...(Object.hasOwn(plan, "evidence") ? { evidence: plan.evidence } : {}), ...(Object.hasOwn(plan, "proofs") ? { proofs: proofsManifest(plan.proofs) } : {}) };
++  if (Object.hasOwn(plan, "proofs")) { await mkdir(join(output, "proofs")); for (const entry of plan.proofs) await writeFile(join(output, entry.bundlePath), proofBytes(entry.proof), { flag: "wx", mode: 0o644 }); }
+   const readmeBytes = Buffer.from(auditorReadme(baseManifest), "utf8");
+   const manifest = { ...baseManifest, readmeSha256: digest(readmeBytes) };
+   const bytes = `${canonicalizeJson(manifest)}\n`; await writeFile(join(output, "manifest.json"), bytes, { encoding: "utf8", flag: "wx", mode: 0o644 }); await writeFile(join(output, "README.md"), readmeBytes, { flag: "wx", mode: 0o644 });
+@@ -185,6 +227,7 @@ export function verifyAuditBundleSync({ bundleRoot } = {}) {
+   if (hasReadme) { try { if (digest(readFileSync(join(root, "README.md"))) !== manifest.readmeSha256) findings.push("AB-README-DIGEST"); } catch { findings.push("AB-README"); } }
+   for (const artifact of manifest.artifacts ?? []) { if (!exact(artifact, ["path", "sourcePath", "sha256"]) || typeof artifact.sourcePath !== "string" || !/^artifacts\/[0-9]{3}-[a-z-]+$/u.test(artifact.path) || !SHA.test(artifact.sha256)) { findings.push("AB-ARTIFACT"); continue; } try { if (digest(readFileSync(join(root, artifact.path))) !== artifact.sha256) findings.push(`AB-DIGEST ${artifact.path}`); } catch { findings.push(`AB-MISSING ${artifact.path}`); } }
+   if (hasEvidence && evidenceShape(manifest.evidence)) findings.push(...evidenceFindings(root, manifest));
++  if (Object.hasOwn(manifest, "proofs")) { if (proofsManifestShape(manifest.proofs)) findings.push(...proofFindings(root, manifest)); else findings.push("AB-PROOFS"); }
+   return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: findings.length ? "invalid" : "verified", candidate: manifest.candidate ?? null, findings: Object.freeze(findings) });
+ }
+ function manifestKeys(manifest, hasReadme) { return ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", ...optionalKeys(manifest), ...(hasReadme ? ["readmeSha256"] : [])]; }
+diff --git a/plugins/pipeline-core/lib/audit-bundle.test.mjs b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+index 13bf1596c..63daedbaa 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.test.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+-import { createHash } from "node:crypto";
++import { createHash, generateKeyPairSync, sign as cryptoSign } from "node:crypto";
+ import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+ import { execFileSync } from "node:child_process";
+ import { tmpdir } from "node:os";
+@@ -210,6 +210,55 @@ test("Q3 verification rejects a carried trace that is bound to another commit th
+   manifest.artifacts = manifest.artifacts.map((entry) => entry.path === tracePath ? { ...entry, sha256: hash(forged) } : entry); writeFileSync(join(bundle, "manifest.json"), `${JSON.stringify(manifest)}\n`);
+   assert.ok((await verifyAuditBundle({ bundleRoot: bundle })).findings.includes("AB-EVIDENCE-TRACE-CANDIDATE"));
+ });
++// P3 (C20D-P3-ONE-SHOT-CLOSE, AC-108): the signed approval proof envelopes live in the private store, outside the repository; the audit bundle copies
++// the PUBLIC proof objects (never a key) into proofs/ with their digests in the manifest, and the offline verifier checks bytes, intent and signature.
++function signedProof(intentSha256 = "d".repeat(64)) {
++  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
++  return { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: "po-key-1", publicKey: publicKey.export({ type: "spki", format: "pem" }), signatureBase64: cryptoSign(null, Buffer.from(intentSha256, "utf8"), privateKey).toString("base64") };
++}
++test("P3 the bundle carries every signed proof envelope in proofs/ with matching digests, verifies offline, and a bundle without proofs keeps its old shape", async () => {
++  const input = fixture(); const plan0 = planWith(input, { candidate: CANDIDATE }); assert.equal(Object.hasOwn(plan0, "proofs"), false);
++  const plan = planWith(input, { candidate: CANDIDATE, proofs: [{ kind: "plan-approval", proof: signedProof("1".repeat(64)) }, { kind: "push", proof: signedProof("2".repeat(64)) }] });
++  assert.deepEqual(plan.proofs.map((entry) => entry.bundlePath), ["proofs/001-plan-approval.json", "proofs/002-push.json"]);
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }); const bundle = join(input.root, "bundle"); const manifest = JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8"));
++  assert.deepEqual(manifest.proofs.map((entry) => `${entry.kind}:${entry.path}:${entry.intentSha256}`), [`plan-approval:proofs/001-plan-approval.json:${"1".repeat(64)}`, `push:proofs/002-push.json:${"2".repeat(64)}`]);
++  for (const entry of manifest.proofs) { const bytes = readFileSync(join(bundle, entry.path)); assert.equal(hash(bytes), entry.sha256); assert.doesNotMatch(bytes.toString("utf8"), /PRIVATE KEY/u); }
++  assert.match(readFileSync(join(bundle, "README.md"), "utf8"), /proofs\/001-plan-approval\.json/u);
++  assert.equal((await verifyAuditBundle({ bundleRoot: bundle })).status, "verified");
++  const plain = join(input.root, "plain"); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "plain", plan: plan0 }); assert.equal(Object.hasOwn(JSON.parse(readFileSync(join(plain, "manifest.json"), "utf8")), "proofs"), false);
++});
++test("P3 the verifier refuses a tampered proof at every level: bytes, the intent it names and the signature", async () => {
++  const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, proofs: [{ kind: "plan-approval", proof: signedProof() }] }); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
++  const bundle = join(input.root, "bundle"); const manifestPath = join(bundle, "manifest.json"); const original = readFileSync(manifestPath); const proofPath = join(bundle, "proofs", "001-plan-approval.json"); const proofBytes = readFileSync(proofPath);
++  writeFileSync(proofPath, `${proofBytes.toString("utf8")} `); assert.ok((await verifyAuditBundle({ bundleRoot: bundle })).findings.some((finding) => finding.startsWith("AB-DIGEST proofs/")));
++  // the manifest and the proof rewritten together keep every digest consistent: the signature check is what refuses
++  const rewrite = (mutate) => { const proof = mutate(JSON.parse(proofBytes.toString("utf8"))); const bytes = Buffer.from(`${JSON.stringify(proof)}\n`); writeFileSync(proofPath, bytes); const manifest = JSON.parse(original.toString("utf8")); manifest.proofs[0].sha256 = hash(bytes); writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`); };
++  rewrite((proof) => ({ ...proof, signatureBase64: Buffer.alloc(64, 7).toString("base64") })); assert.ok((await verifyAuditBundle({ bundleRoot: bundle })).findings.includes("AB-PROOF-SIGNATURE proofs/001-plan-approval.json"));
++  rewrite((proof) => ({ ...proof, intentSha256: "e".repeat(64) })); assert.ok((await verifyAuditBundle({ bundleRoot: bundle })).findings.includes("AB-PROOF-INTENT proofs/001-plan-approval.json"));
++});
++test("P3 planning refuses a proof that does not verify, or one that carries anything beyond the public proof fields", () => {
++  const input = fixture(); const good = signedProof();
++  assert.throws(() => planWith(input, { candidate: CANDIDATE, proofs: [{ kind: "push", proof: { ...good, signatureBase64: Buffer.alloc(64, 1).toString("base64") } }] }), (error) => error.code === "AB-PROOF-INVALID");
++  assert.throws(() => planWith(input, { candidate: CANDIDATE, proofs: [{ kind: "push", proof: { ...good, privateKey: "-----BEGIN PRIVATE KEY-----" } }] }), (error) => error.code === "AB-PROOF-INVALID");
++});
++test("P3 collection reads the plan approval proof from State and the store envelopes of exactly the candidate commit; anything else is a typed gap or ignored", async () => {
++  const { collectAuditProofs } = await import("./audit-proof-collection.mjs");
++  const { criticalApprovalStoreRoot, CRITICAL_APPROVAL_STORE_SCHEMA } = await import("./critical-action-authorization.mjs");
++  const common = mkdtempSync(join(tmpdir(), "audit-proofs-"));
++  try {
++    const envelope = (kind, forCommit, proof) => ({ schema: CRITICAL_APPROVAL_STORE_SCHEMA, kind, approval: { forCommit, criticalProof: { proof } } });
++    const put = (kind, name, value) => { const directory = join(criticalApprovalStoreRoot(common), "approvals", kind); mkdirSync(directory, { recursive: true }); writeFileSync(join(directory, name), JSON.stringify(value)); };
++    put("push", "a.json", envelope("push", CANDIDATE.commit, signedProof("2".repeat(64))));
++    put("push", "b.json", envelope("push", "f".repeat(40), signedProof("3".repeat(64))));
++    put("feature-package-reconcile", "c.json", envelope("feature-package-reconcile", CANDIDATE.commit, { ...signedProof("4".repeat(64)), signatureBase64: Buffer.alloc(64, 1).toString("base64") }));
++    const state = { planApproval: { designApproval: { mode: "signature", proof: signedProof("1".repeat(64)) } } };
++    const collected = collectAuditProofs({ common, candidate: CANDIDATE, state });
++    assert.deepEqual(collected.proofs.map((entry) => `${entry.kind}:${entry.proof.intentSha256}`), [`plan-approval:${"1".repeat(64)}`, `push:${"2".repeat(64)}`]);
++    assert.deepEqual(collected.gaps.map((gap) => gap.code.split(":")[0]), ["PROOF-NOT-CARRIABLE"]);
++    assert.deepEqual(collectAuditProofs({ common, candidate: CANDIDATE, state: { planApproval: { designApproval: { mode: "chat" } } } }).proofs.map((entry) => entry.kind), ["push"], "a chat-mode approval keeps no proof");
++    assert.deepEqual(collectAuditProofs({}), { proofs: [], gaps: [] });
++  } finally { rmSync(common, { recursive: true, force: true }); }
++});
+ // E-AC-20: export metadata is never source authority -- a bundle whose export metadata is
+ // internally inconsistent with the rest of the bundle (arbitrary digest, unrelated receipt values)
+ // still builds and verifies, because nothing in the trust chain ever reads it.
+diff --git a/plugins/pipeline-core/lib/audit-proof-collection.mjs b/plugins/pipeline-core/lib/audit-proof-collection.mjs
+new file mode 100644
+index 000000000..e9c7c0755
+--- /dev/null
++++ b/plugins/pipeline-core/lib/audit-proof-collection.mjs
+@@ -0,0 +1,45 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * P3 (C20D-P3-ONE-SHOT-CLOSE, AC-108): reads the PUBLIC signed approval proof objects that authorized a feature candidate, for the audit
++ * bundle's proofs/ directory. Read-only: it never signs, consumes or writes anything, and it never reads a private key (a proof object holds the
++ * signer's public key and signature only).
++ *
++ * Sources, in the order the human-approval trace enumerates them:
++ *   - the plan approval's signed design approval, kept in the State;
++ *   - the private critical approval store (push and feature-package-reconcile envelopes) for exactly this candidate commit.
++ * A human guard override capability keeps no proof (the trace reports it as PROOF-NOT-RETAINED-IN-CAPABILITY); it is named as a typed gap, as is an
++ * envelope whose proof is not a verifiable public proof object. A gap never blocks the close.
++ */
++import { readFileSync, readdirSync } from "node:fs";
++import { join } from "node:path";
++import { isCarriableProof } from "./audit-bundle.mjs";
++import { CRITICAL_APPROVAL_STORE_SCHEMA, criticalApprovalStoreRoot } from "./critical-action-authorization.mjs";
++
++const STORE_KINDS = Object.freeze(["push", "feature-package-reconcile"]);
++const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
++const readJson = (path) => { try { return JSON.parse(readFileSync(path, "utf8")); } catch { return null; } };
++
++/** @returns {{ proofs: Array<{kind: string, proof: object}>, gaps: Array<{kind: string, code: string}> }} */
++export function collectAuditProofs({ common, candidate, state } = {}) {
++  const proofs = []; const gaps = []; const seen = new Set();
++  const take = (kind, proof, source) => {
++    if (!isCarriableProof(proof)) { gaps.push({ kind, code: `PROOF-NOT-CARRIABLE:${source}` }); return; }
++    const key = `${kind}:${proof.intentSha256}`;
++    if (!seen.has(key)) { seen.add(key); proofs.push({ kind, proof: { ...proof } }); }
++  };
++  const design = state?.planApproval?.designApproval;
++  if (object(design) && design.mode === "signature") take("plan-approval", design.proof, "state:planApproval");
++  if (typeof common === "string" && common !== "" && object(candidate)) {
++    for (const kind of STORE_KINDS) {
++      const directory = join(criticalApprovalStoreRoot(common), "approvals", kind); let names = [];
++      try { names = readdirSync(directory).filter((name) => name.endsWith(".json") && !name.startsWith(".")).sort().slice(0, 256); } catch { names = []; }
++      for (const name of names) {
++        const envelope = readJson(join(directory, name));
++        if (!object(envelope) || envelope.schema !== CRITICAL_APPROVAL_STORE_SCHEMA || envelope.kind !== kind || !object(envelope.approval) || envelope.approval.forCommit !== candidate.commit) continue;
++        if (object(envelope.approval.criticalProof?.proof)) take(kind, envelope.approval.criticalProof.proof, `store:${kind}/${name}`);
++      }
++    }
++  }
++  proofs.sort((a, b) => (a.kind + a.proof.intentSha256).localeCompare(b.kind + b.proof.intentSha256));
++  return { proofs: proofs.slice(0, 16), gaps };
++}
+diff --git a/plugins/pipeline-core/lib/feature-close-audit-executor.mjs b/plugins/pipeline-core/lib/feature-close-audit-executor.mjs
+index a331e2e42..980973dff 100644
+--- a/plugins/pipeline-core/lib/feature-close-audit-executor.mjs
++++ b/plugins/pipeline-core/lib/feature-close-audit-executor.mjs
+@@ -50,11 +50,12 @@ export async function executeFeatureCloseAudit({ options, lifecycleId, expectedP
+     const current = await planFeatureCloseAudit(options);
+     if (current.status !== "reuse-verified" || current.planSha256 !== expectedPlanSha256) return blocked("FCA-POSTBUILD-DRIFT", "Bundle remains local; source or candidate drifted and the feature remains unclosed.");
+     // A durable receipt must not precede persistence of the bytes it references.
+-    for (const file of ["manifest.json", "README.md", ...plan.bundlePlan.artifacts.map(a => a.bundlePath)]) {
++    for (const file of ["manifest.json", "README.md", ...plan.bundlePlan.artifacts.map(a => a.bundlePath), ...(plan.bundlePlan.proofs ?? []).map(p => p.bundlePath)]) {
+       syncAuditBundleFile(physicalAuditPath(root, `${plan.outputPath}/${file}`));
+     }
+     const bundleRoot = physicalAuditPath(root, plan.outputPath);
+     syncPublicationCloseDirectory(join(bundleRoot, "artifacts"));
++    if (plan.bundlePlan.proofs !== undefined) syncPublicationCloseDirectory(join(bundleRoot, "proofs"));
+     syncPublicationCloseDirectory(bundleRoot);
+     syncPublicationCloseDirectory(dirname(bundleRoot));
+     const receipt = makeFeatureCloseAuditReceipt(plan, lifecycleId, auditHash(readFileSync(physicalAuditPath(root, `${plan.outputPath}/manifest.json`))));
+diff --git a/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs b/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
+index cd81eb6a2..b5745adbf 100644
+--- a/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
++++ b/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
+@@ -27,7 +27,7 @@ function blocked(code, remedy) { return { schema: "pipeline.feature-close-audit-
+ 
+ // Q3: `evidence` (optional) names the approval trace report, detached proofs, release Verify record and security scan the
+ // bundle carries (see lib/audit-bundle.mjs); the bundle is always bound to the exact `candidate` asked for.
+-export async function planFeatureCloseAudit({ repositoryRoot, featureId, candidate, manifestPath, coreVersion, packs, outputPath, evidence } = {}) {
++export async function planFeatureCloseAudit({ repositoryRoot, featureId, candidate, manifestPath, coreVersion, packs, outputPath, evidence, proofs } = {}) {
+   if (!ID.test(featureId ?? "")) return blocked("FCA-FEATURE-ID", "Supply the exact active feature ID as one safe path component.");
+   if (!candidate || Object.keys(candidate).sort().join() !== "commit,tree" || !OID.test(candidate.commit ?? "") || !OID.test(candidate.tree ?? "") || candidate.commit === candidate.tree || /^0+$/u.test(candidate.commit) || /^0+$/u.test(candidate.tree)) return blocked("FCA-CANDIDATE", "Resolve the qualified source candidate commit and tree before planning its snapshot.");
+   if (!Array.isArray(packs) || packs.length === 0) return blocked("FCA-POLICY-REQUIRED", "Resolve the applicable organization policy packs and core version through the existing policy workflow; do not invent a policy to complete closure. The shipped core baseline pack can be named by id in the audit request: \"packs\":[\"pipeline-core-baseline\"] (docs/organization-policy-packs.md).");
+@@ -70,7 +70,7 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
+       return blocked("FCA-QUALIFICATION", `Produce passing candidate-bound Verify evidence (--mode candidate, full) and bind it into the package. Diagnostic or stale evidence is not qualification. Examined: ${seen}.`);
+     }
+     let bundlePlan;
+-    try { bundlePlan = planAuditBundle({ repositoryRoot: root, manifestPath, bundleId: featureId, coreVersion, packs, candidate, ...(evidence !== undefined ? { evidence } : {}) }); }
++    try { bundlePlan = planAuditBundle({ repositoryRoot: root, manifestPath, bundleId: featureId, coreVersion, packs, candidate, ...(evidence !== undefined ? { evidence } : {}), ...(proofs !== undefined ? { proofs } : {}) }); }
+     catch (error) { return blocked(error.code ?? "FCA-POLICY-INVALID", "Validate the package and applicable organization policy using their existing preparation workflows."); }
+     const destination = outputPath ?? `audit-bundles/${featureId}/${candidate.commit}`;
+     const target = safePath(root, destination);
+@@ -88,7 +88,7 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
+       safePath(root, `${destination}/README.md`);
+       const verification = await verifyAuditBundle({ bundleRoot: target });
+       const expectedArtifacts = bundlePlan.artifacts.map(a => ({ path: a.bundlePath, sourcePath: a.sourcePath, sha256: a.sha256 }));
+-      if (verification.status !== "verified" || !prior.readmeSha256 || prior.bundleId !== featureId || !same(prior.candidate, candidate) || prior.effectivePolicySha256 !== bundlePlan.effectivePolicySha256 || !same(prior.artifacts, expectedArtifacts) || !same(prior.evidence ?? null, bundlePlan.evidence ?? null)) return blocked("FCA-OUTPUT-COLLISION", "Existing snapshot is incomplete, changed or differently bound. Preserve it; inspect and use a distinct explicit output if recovery requires it.");
++      if (verification.status !== "verified" || !prior.readmeSha256 || prior.bundleId !== featureId || !same(prior.candidate, candidate) || prior.effectivePolicySha256 !== bundlePlan.effectivePolicySha256 || !same(prior.artifacts, expectedArtifacts) || !same(prior.evidence ?? null, bundlePlan.evidence ?? null) || !same(prior.proofs ?? null, bundlePlan.proofs?.map(p => ({ kind: p.kind, path: p.bundlePath, sha256: p.sha256, intentSha256: p.intentSha256 })) ?? null)) return blocked("FCA-OUTPUT-COLLISION", "Existing snapshot is incomplete, changed or differently bound. Preserve it; inspect and use a distinct explicit output if recovery requires it.");
+       status = "reuse-verified";
+       existingManifestSha256 = hash(bytes);
+     }
+diff --git a/plugins/pipeline-core/lib/feature-close-audit-receipt.mjs b/plugins/pipeline-core/lib/feature-close-audit-receipt.mjs
+index 81f06b298..b4b99818f 100644
+--- a/plugins/pipeline-core/lib/feature-close-audit-receipt.mjs
++++ b/plugins/pipeline-core/lib/feature-close-audit-receipt.mjs
+@@ -43,6 +43,7 @@ export function validateFeatureCloseAuditReceipt({ repositoryRoot, lifecycleId,
+     const manifest = JSON.parse(bytes);
+     if (!Array.isArray(manifest.artifacts)) throw new Error("FCA-BUNDLE-INVALID");
+     for (const item of manifest.artifacts) physicalAuditPath(root, `${plan.outputPath}/${item.path}`);
++    for (const item of manifest.proofs ?? []) physicalAuditPath(root, `${plan.outputPath}/${item.path}`);
+     physicalAuditPath(root, `${plan.outputPath}/README.md`);
+     const artifacts = plan.bundlePlan.artifacts.map(a => ({ path: a.bundlePath, sourcePath: a.sourcePath, sha256: a.sha256 }));
+     if (!manifest.readmeSha256 || manifest.bundleId !== plan.featureId || !same(manifest.candidate, plan.candidate) || manifest.effectivePolicySha256 !== plan.bundlePlan.effectivePolicySha256 || !same(manifest.artifacts, artifacts) || verifyAuditBundleSync({ bundleRoot: target }).status !== "verified") throw new Error("FCA-BUNDLE-INVALID");
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index adbfb6eeb..02f144201 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
+ import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
+ import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs";
+ import { executeFeatureCloseAudit } from "../lib/feature-close-audit-executor.mjs";
++import { collectAuditProofs } from "../lib/audit-proof-collection.mjs";
+ import { CORE_BASELINE_PACK_ID, resolveNamedOrganizationPolicyPack } from "../lib/organization-policy.mjs";
+ import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
+ import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+@@ -747,6 +748,9 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+         packs: request.value.packs,
+         ...(request.value.evidence !== undefined ? { evidence: request.value.evidence } : {}),
+       };
++      // P3: the signed approval proofs that authorized this candidate travel in the bundle's proofs/ directory (public proof objects only).
++      const collectedProofs = collectAuditProofs({ common, candidate: options.candidate, state: snapshot.state });
++      if (collectedProofs.proofs.length > 0) options.proofs = collectedProofs.proofs;
+       const auditPlan = await planFeatureCloseAudit(options);
+       if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
+       if (auditPlan.result.sha256 !== observed.authority.implementationResultSha256) fail("CLOSE-AUDIT-RESULT", "audit Result differs from active feature authority");
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 1ecc65ccd..d36f4a210 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -8,28 +8,48 @@
+  * action is accepted only when it is the coordinator-provided close-feature
+  * invocation.  The protected State writer remains the sole closer.
+  */
+-import { randomBytes } from "node:crypto";
+-import { readFileSync, realpathSync } from "node:fs";
+-import { resolve } from "node:path";
++import { createHash, randomBytes } from "node:crypto";
++import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
++import { dirname, isAbsolute, join, resolve } from "node:path";
+ import { spawnSync } from "node:child_process";
+ import { fileURLToPath } from "node:url";
+-import { armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
++import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
++import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
++import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+ 
+ const HERE = new URL(".", import.meta.url);
+ const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
+ const STATE_WRITER = fileURLToPath(new URL("./pipeline-state.mjs", HERE));
++const VERIFY_PRODUCER = fileURLToPath(new URL("./verify-evidence-producer.mjs", HERE));
++const REGISTER_PACKAGE = fileURLToPath(new URL("./register-feature-package.mjs", HERE));
++const SECURITY_SCAN = fileURLToPath(new URL("./security-scan.mjs", HERE));
++const PLUGIN_MANIFEST = fileURLToPath(new URL("../.claude-plugin/plugin.json", HERE));
+ const FEATURE = /^[a-z][a-z0-9-]{2,63}$/u;
+-const IMPACT = new Set(["architecture-conforms", "architecture-changed", "no-architecture-impact"]);
++// P3: the same five dispositions the coordinator accepts (the driver used to know only three and refused the rest before the coordinator spoke).
++const IMPACT = new Set(["architecture-conforms", "architecture-changed", "architecture-decision-added", "architecture-decision-superseded", "architecture-summary-updated", "no-architecture-impact"]);
+ 
+ function fail(code, message) { const error = new Error(message); error.code = code; throw error; }
+ function parseJsonOutput(result, code) {
+-  if (result?.status !== 0) fail(code, String(result?.stderr ?? result?.stdout ?? "command failed").trim() || "Command failed.");
++  if (result?.status !== 0) {
++    // P3: the coordinator and the State writer print a typed refusal as JSON on STDOUT with an empty stderr; the old text was a bare "Command failed."
++    let refusal = null;
++    try { const value = JSON.parse(String(result?.stdout ?? "")); if (value !== null && typeof value === "object" && typeof value.code === "string") refusal = value; } catch { /* plain text */ }
++    const text = String(result?.stderr ?? "").trim() || (refusal === null ? String(result?.stdout ?? "").trim() : "");
++    const error = new Error(refusal === null ? (text || "Command failed.") : `${refusal.code}: ${refusal.message ?? "refused"}${text === "" ? "" : ` (${text})`}`);
++    error.code = code;
++    if (refusal !== null) { error.refusalCode = refusal.code; error.refusalMessage = String(refusal.message ?? ""); }
++    throw error;
++  }
+   try { return JSON.parse(String(result.stdout)); } catch { fail(code, "Command did not return one JSON object."); }
+ }
++function statePathFor(root) {
++  try { const authority = resolveProjectAuthorityPaths({ rootDir: root }); if (authority.status === "ready") return authority.state; } catch { /* the conventional paths below */ }
++  return existsSync(resolve(root, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE;
++}
+ function readFeatureState(root, deps) {
+   const read = deps.readFileSyncFn ?? readFileSync;
+   let state;
+-  try { state = JSON.parse(read(resolve(root, ".claude/pipeline-state.json"), "utf8")); } catch { fail("FINISH-STATE", "Pipeline State is unavailable."); }
++  try { state = JSON.parse(read(resolve(root, statePathFor(root)), "utf8")); } catch { fail("FINISH-STATE", "Pipeline State is unavailable."); }
+   if (state === null || typeof state !== "object" || Array.isArray(state)) fail("FINISH-STATE", "Pipeline State is invalid.");
+   return state;
+ }
+@@ -38,8 +58,8 @@ function flagPairs(values) {
+   const argv = [];
+   for (const [name, value] of Object.entries(values)) {
+     if (value === null || value === undefined) continue;
+-    if (name === "activate") {
+-      if (value === true) argv.push("--activate");
++    if (name === "activate" || name === "apply") {
++      if (value === true) argv.push(`--${name}`);
+       continue;
+     }
+     argv.push(`--${name}`, value);
+@@ -47,6 +67,19 @@ function flagPairs(values) {
+   return argv;
+ }
+ 
++/** Applies exactly the coordinator-returned action bound to `plan` (never a reconstructed one). */
++function applyBound(runner, plan, values, code, subcommand) {
++  if (!/^[a-f0-9]{64}$/u.test(plan?.planSha256 ?? "")) fail("FINISH-PLAN", "Coordinator plan lacks an exact digest.");
++  const expectedArgv = [COORDINATOR, subcommand, ...flagPairs({ ...values, "plan-sha256": plan.planSha256, activate: true })];
++  if (plan.nextAction?.executable !== process.execPath
++    || JSON.stringify(plan.nextAction?.argv) !== JSON.stringify(expectedArgv)) {
++    fail("FINISH-PLAN-ACTION", "Coordinator plan did not return the exact bound apply action.");
++  }
++  const applied = command(runner, plan.nextAction.executable, plan.nextAction.argv, code);
++  if (!new Set(["applied", "replayed"]).has(applied?.status)) fail(code, "Coordinator did not durably apply its exact plan.");
++  return applied;
++}
++
+ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact, auditRequest, criticVerifyLifecycle, continuityCloseRequest = null, lifecycleId = null, resumeLifecycleId = null } = {}, deps = {}) {
+   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
+   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
+@@ -116,17 +149,7 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
+       throw error;
+     }
+   }
+-  const apply = (plan, values, code, subcommand) => {
+-    if (!/^[a-f0-9]{64}$/u.test(plan?.planSha256 ?? "")) fail("FINISH-PLAN", "Coordinator plan lacks an exact digest.");
+-    const expectedArgv = [COORDINATOR, subcommand, ...flagPairs({ ...values, "plan-sha256": plan.planSha256, activate: true })];
+-    if (plan.nextAction?.executable !== process.execPath
+-      || JSON.stringify(plan.nextAction?.argv) !== JSON.stringify(expectedArgv)) {
+-      fail("FINISH-PLAN-ACTION", "Coordinator plan did not return the exact bound apply action.");
+-    }
+-    const applied = command(runner, plan.nextAction.executable, plan.nextAction.argv, code);
+-    if (!new Set(["applied", "replayed"]).has(applied?.status)) fail(code, "Coordinator did not durably apply its exact plan.");
+-    return applied;
+-  };
++  const apply = (plan, values, code, subcommand) => applyBound(runner, plan, values, code, subcommand);
+   const preparedValues = { ...base, phase: "feature-close-prepared", "architecture-impact": architectureImpact, "audit-request": auditRequest, "critic-verify-lifecycle": criticVerifyLifecycle, "continuity-close-request": continuityCloseRequest };
+   let phase = null;
+   let prior = null;
+@@ -183,6 +206,202 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
+   }
+ }
+ 
++// ---- P3 (C20D-P3-ONE-SHOT-CLOSE, AC-108): one agent command for the whole local close ------------------------------------------------------
++// finish-feature.mjs already owns the stage order (start, checkpoint, prepared, State close) and the G20-66 commit capability of each stage, so the
++// one-shot mode extends THIS driver instead of the coordinator's `drive`, which walks one phase per call and has no stage before the start.
++// It runs only the sanctioned verbs, each through the injectable runner, signs nothing and pushes nothing. Every point that needs a human, or a
++// repair, is a typed stop: { code, reason, repair } with the rerun command; it never guesses an input.
++const sha256Hex = (bytes) => createHash("sha256").update(bytes).digest("hex");
++const EMPTY_SHA256 = sha256Hex("");
++const HEX32 = /^[a-f0-9]{32}$/u;
++function stopResult(stage, code, reason, repair, extra = {}) { return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "stopped", stage, stop: Object.freeze({ code, reason: String(reason).slice(0, 1200), repair }), ...extra }); }
++function writeRepoJson(root, path, value) { const target = resolve(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`); return path; }
++
++export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null } = {}, deps = {}) {
++  const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
++  if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
++  if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", "Feature close requires a known architecture impact.");
++  if (criticPacketId !== null && !HEX32.test(criticPacketId)) fail("FINISH-CRITIC-PACKET", "The Critic packet id must be 32 lowercase hex characters.");
++  if (resumeLifecycleId !== null && !/^[A-Za-z0-9._-]{1,100}$/u.test(resumeLifecycleId)) fail("FINISH-LIFECYCLE", "Lifecycle ID is invalid.");
++  const runner = deps.runCommand ?? ((executable, argv) => spawnSync(executable, argv, { cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root } }));
++  const actor = by.trim();
++  const rawGit = (args) => { const out = runner("git", args); return out?.status === 0 ? String(out.stdout ?? "").trim() : null; };
++  const state = readFeatureState(root, deps);
++  const featureId = state.activeFeature?.id;
++  const statePath = statePathFor(root);
++  const evidenceDir = featureId === undefined ? null : `specs/${featureId}/evidence`;
++  const rerunBase = `node ${fileURLToPath(import.meta.url)} --one-shot --root ${root} --by ${JSON.stringify(actor)} --architecture-impact ${architectureImpact}`;
++  let packetForRerun = criticPacketId;
++  const rerun = (id) => `${rerunBase}${id || packetForRerun === null ? "" : ` --critic-packet-id ${packetForRerun}`}${id ? ` --resume-lifecycle-id ${id}` : ""}`;
++  const repairFor = (error, id) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command: ${rerun(id)}`;
++  const stages = [];
++  if (featureId !== undefined && !FEATURE.test(featureId)) fail("FINISH-FEATURE", "A valid active feature is required.");
++  if (featureId === undefined && resumeLifecycleId === null) {
++    return stopResult("preflight", "ONESHOT-NO-ACTIVE-FEATURE", "Pipeline State has no active feature, so there is nothing to close.", `if a close was started, rerun with the lifecycle id it printed: ${rerunBase} --resume-lifecycle-id <id>`);
++  }
++  const common = () => { const value = rawGit(["rev-parse", "--git-common-dir"]); return value === null ? null : resolve(root, value); };
++  const failedText = (out) => String(out?.stderr ?? "").trim() || String(out?.stdout ?? "").trim() || "no output";
++
++  // ---- before the commit: Verify evidence, package, Result block, audit request, then the close itself -------------------------------------------------
++  let id = resumeLifecycleId;
++  const auditRequestPath = featureId === undefined ? null : `${evidenceDir}/audit-request.json`;
++  const closeRequestPath = featureId === undefined ? null : `${evidenceDir}/close-request.json`;
++  const verifyPath = featureId === undefined ? null : `${evidenceDir}/verify-candidate.json`;
++  if (featureId !== undefined) {
++    let criticVerifyLifecycle;
++    if (resumeLifecycleId === null) {
++      let packet = criticPacketId;
++      if (packet === null) {
++        let found = [];
++        try { const dir = common(); found = (deps.listCriticPackets ?? ((c) => readdirSync(join(c, "agent-pipeline", "critic-packets"))))(dir).filter((name) => HEX32.test(name)).sort(); } catch { found = []; }
++        if (found.length === 1) packet = found[0];
++        else return stopResult("critic-packet", "ONESHOT-CRITIC-PACKET-MISSING", found.length === 0 ? "No consumed Critic packet exists for this repository, so the candidate Verify cannot be bound to a Critic review." : `Several Critic packets exist (${found.join(", ")}); the close will not guess which one reviewed this candidate.`,
++          `finish the Critic review (it records the packet), then run: ${rerunBase} --critic-packet-id <packet-id>`);
++      }
++      packetForRerun = packet;
++      stages.push("verify-candidate");
++      const verify = runner(process.execPath, [VERIFY_PRODUCER, "--root", root, "--mode", "candidate", "--critic-packet-id", packet, "--critic-evidence-feature-id", featureId, "--out", verifyPath]);
++      if (verify?.status !== 0) return stopResult("verify-candidate", "ONESHOT-VERIFY-RED", failedText(verify), `fix what the Verify output names without committing, then rerun the identical command: ${rerun(null)}`);
++      stages.push("register-verify-evidence");
++      const register = runner(process.execPath, [REGISTER_PACKAGE, "--root", root, "--add-verify-evidence", verifyPath]);
++      if (register?.status !== 0) return stopResult("register-verify-evidence", "ONESHOT-REGISTER-FAILED", failedText(register), `register the evidence by hand to see the typed refusal: node ${REGISTER_PACKAGE} --root ${root} --add-verify-evidence ${verifyPath}`);
++      const manifest = `specs/${featureId}/lifecycle.json`;
++      for (const nextState of ["verifying", "completed"]) {
++        stages.push(`feature-package-${nextState}`);
++        try {
++          const plan = command(runner, process.execPath, [STATE_WRITER, "feature-package-plan", "--root", root, "--manifest", manifest, "--next-state", nextState], "ONESHOT-PACKAGE-PLAN");
++          command(runner, process.execPath, [STATE_WRITER, "feature-package-apply", "--root", root, "--manifest", manifest, "--next-state", nextState, "--plan-sha256", plan.planSha256], "ONESHOT-PACKAGE-APPLY");
++        } catch (error) { return stopResult(`feature-package-${nextState}`, error.refusalCode ?? error.code, error.message, `nothing was committed; ${repairFor(error, null)}`); }
++      }
++      let lifecycleFile = null;
++      try {
++        const dir = join(common(), "agent-pipeline", "critic-verify-lifecycle");
++        const candidates = readdirSync(dir).filter((name) => /^[a-f0-9]{64}\.json$/u.test(name) && readFileSync(join(dir, name), "utf8").includes(packet)).map((name) => ({ name, mtime: statSync(join(dir, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime);
++        lifecycleFile = candidates[0]?.name ?? null;
++      } catch { lifecycleFile = null; }
++      if (lifecycleFile === null) return stopResult("critic-verify-lifecycle", "ONESHOT-LIFECYCLE-MISSING", "The candidate Verify did not leave a Critic/Verify lifecycle receipt for this packet.", `rerun the Verify bound to the packet: node ${VERIFY_PRODUCER} --root ${root} --mode candidate --critic-packet-id ${packet} --critic-evidence-feature-id ${featureId} --out ${verifyPath}`);
++      criticVerifyLifecycle = lifecycleFile.slice(0, -5);
++      let coreVersion = "0.0.0";
++      try { coreVersion = String(JSON.parse(readFileSync(PLUGIN_MANIFEST, "utf8")).version).split(/[+-]/u)[0]; } catch { /* the request is refused by the coordinator with its typed code */ }
++      stages.push("audit-request");
++      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle });
++      if (state.continuity !== null && typeof state.continuity === "object") {
++        let current = state;
++        if (state.continuity.queueHead?.nextAction !== "close") {
++          stages.push("result-close-block");
++          const result = state.continuity.authority?.result;
++          try {
++            const plan = command(runner, process.execPath, [STATE_WRITER, "continuity-result-close-plan", "--feature-id", featureId, "--expected-revision", String(state.continuity.revision), "--result-path", result?.path, "--result-sha256", result?.sha256], "ONESHOT-RESULT-CLOSE-PLAN");
++            command(runner, plan.applyAction?.executable, plan.applyAction?.argv, "ONESHOT-RESULT-CLOSE-APPLY");
++          } catch (error) {
++            const owner = /SDC-AUTHORITY-UNAVAILABLE/u.test(error.message);
++            return stopResult("result-close-block", owner ? "ONESHOT-OWNER-ROUTE-REQUIRED" : (error.refusalCode ?? error.code), error.message,
++              owner ? `this project has a session-authority catalogue: run the Result close entries through node ${join(dirname(STATE_WRITER), "continuity-owner-route.mjs")} run --root ${root} --lifecycle <id> -- continuity-result-close-plan <flags>, then rerun the identical command` : "repair the refusal above, then rerun the identical command");
++          }
++          current = readFeatureState(root, deps);
++        }
++        stages.push("close-request");
++        writeRepoJson(root, closeRequestPath, { schema: "pipeline.continuity-close.v0", featureId, expectedRevision: current.continuity.revision, result: current.continuity.authority.result, closeEvidence: { path: verifyPath, sha256: sha256Hex(readFileSync(resolve(root, verifyPath))) } });
++      }
++    } else {
++      try { criticVerifyLifecycle = JSON.parse(readFileSync(resolve(root, auditRequestPath), "utf8")).criticVerifyLifecycleId; } catch { criticVerifyLifecycle = undefined; }
++      if (!/^[a-f0-9]{64}$/u.test(criticVerifyLifecycle ?? "")) return stopResult("resume", "ONESHOT-RESUME-REQUEST-MISSING", `The audit request ${auditRequestPath} written by the first call is missing or unreadable.`, `rerun without --resume-lifecycle-id to produce it again: ${rerunBase}`);
++    }
++    stages.push("close");
++    let closed;
++    try {
++      closed = finishFeature({ rootDir: root, by: actor, architectureImpact, auditRequest: auditRequestPath, criticVerifyLifecycle, continuityCloseRequest: state.continuity ? closeRequestPath : null, ...(resumeLifecycleId === null ? {} : { resumeLifecycleId }) }, { ...deps, runCommand: runner, realpathSyncFn: (value) => value });
++    } catch (error) {
++      id = error.lifecycleId ?? id;
++      return stopResult("close", error.refusalCode ?? error.code, error.message, repairFor(error, id), { resumeLifecycleId: id ?? null, next: rerun(id) });
++    }
++    id = closed.lifecycleId;
++  }
++
++  // ---- after the close: tracked effects, the one commit, then the freeze and the final gates up to closed-local -------------------------------------------
++  const coordinate = (subcommand, values, code) => command(runner, process.execPath, [COORDINATOR, subcommand, ...flagPairs(values)], code);
++  const inspect = () => coordinate("inspect", { root, lifecycle: id }, "ONESHOT-INSPECT");
++  const transition = (phase, extra = {}) => { const values = { root, lifecycle: id, actor, phase, ...extra }; return applyBound(runner, coordinate("plan-transition", values, "ONESHOT-PLAN"), values, "ONESHOT-APPLY", "apply-transition"); };
++  const step = (name, fn) => { stages.push(name); try { return { value: fn() }; } catch (error) { return { stop: stopResult(name, error.refusalCode ?? error.code, error.message, repairFor(error, id), { resumeLifecycleId: id, next: rerun(id) }) }; } };
++  let observed = step("inspect", inspect); if (observed.stop) return observed.stop;
++  const closedFeatureId = featureId ?? observed.value.identity?.featureId;
++  const commitFacts = () => {
++    // not rawGit: its trim() would eat the leading space of the first " M" status entry
++    const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`]);
++    const tokens = (status?.status === 0 ? String(status.stdout ?? "") : "").split("\0").filter((token) => token !== "");
++    const paths = []; for (let index = 0; index < tokens.length; index += 1) { const code = tokens[index].slice(0, 2); paths.push(tokens[index].slice(3)); if (/[RC]/u.test(code)) index += 1; }
++    paths.sort();
++    const message = `chore(close): close feature ${closedFeatureId}`;
++    let armed = null;
++    if (paths.length > 0) {
++      try { armed = armWriterCommitCapability({ rootDir: root, writer: "finish-feature.mjs --one-shot", rerun: rerun(id), files: paths.filter((path) => existsSync(resolve(root, path))).map((path) => ({ path, sha256: sha256Hex(readFileSync(resolve(root, path))) })) }); } catch { armed = null; }
++    }
++    return { paths, excluded: armed?.excluded ?? [], capability: armed?.id ?? null, message, steps: paths.length > 0 ? writerCommitSteps(paths, message) : [] };
++  };
++  let phase = observed.value.coordinator?.phase;
++  if (phase === "feature-close-prepared") {
++    const resultPath = state.continuity?.authority?.result?.path ?? `specs/${closedFeatureId}/result.md`;
++    let resultBytes = null; try { resultBytes = readFileSync(resolve(root, resultPath)); } catch { resultBytes = null; }
++    if (resultBytes === null) return stopResult("tracked-close-finalized", "ONESHOT-RESULT-MISSING", `The Result ${resultPath} is missing.`, `restore it, then rerun the identical command: ${rerun(id)}`, { resumeLifecycleId: id, next: rerun(id) });
++    const trackedPath = `specs/${closedFeatureId}/evidence/tracked-close.json`;
++    // Only resultSha256 and pipelineStateSha256 are compared by the coordinator; a project without the other artefacts uses the empty-input digest (PO rule).
++    writeRepoJson(root, trackedPath, { schema: "pipeline.close-tracked-effects.v1", resultSha256: sha256Hex(resultBytes), backlogSha256: EMPTY_SHA256, handoverSha256: EMPTY_SHA256, historySha256: EMPTY_SHA256, telemetrySha256: EMPTY_SHA256, retrospectiveSha256: EMPTY_SHA256, pipelineStateSha256: sha256Hex(readFileSync(resolve(root, statePath))) });
++    const tracked = step("tracked-close-finalized", () => transition("tracked-close-finalized", { evidence: trackedPath })); if (tracked.stop) return tracked.stop;
++    const commit = commitFacts();
++    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId: closedFeatureId, lifecycleId: id, resumeLifecycleId: id, stages, commit,
++      next: rerun(id), message: "Run the commit (the pre-commit hook admits exactly these bytes), then run the next command: it continues to closed-local. Nothing here signs or pushes." });
++  }
++  if (phase === "tracked-close-finalized") {
++    const commit = commitFacts();
++    if (commit.paths.length > 0) return stopResult("commit", "ONESHOT-COMMIT-PENDING", `The close outputs are not committed yet: ${commit.paths.join(", ")}`, `${commit.steps.join(" && ")} then rerun the identical command: ${rerun(id)}`, { commit, resumeLifecycleId: id, next: rerun(id) });
++    const frozen = step("candidate-frozen", () => transition("candidate-frozen")); if (frozen.stop) return frozen.stop;
++    phase = "candidate-frozen";
++  }
++  if (phase === "candidate-frozen") {
++    stages.push("verify-candidate-frozen");
++    const verify = runner(process.execPath, [VERIFY_PRODUCER, "--root", root, "--mode", "candidate", "--out", "evidence/verify-candidate.json"]);
++    if (verify?.status !== 0) return stopResult("verify-candidate-frozen", "ONESHOT-VERIFY-RED", failedText(verify), `fix what the Verify output names and commit the fix (the freeze renews), then rerun the identical command: ${rerun(id)}`, { resumeLifecycleId: id, next: rerun(id) });
++    stages.push("security-scan");
++    const scan = runner(process.execPath, [SECURITY_SCAN, "--root", root]);
++    if (scan?.status !== 0) return stopResult("security-scan", "ONESHOT-SECURITY-BLOCKING", failedText(scan), `the frozen candidate has a blocking finding: fix it and commit, or put it on the scanner's own ignore route with a reason (see the close-feature skill), then rerun the identical command: ${rerun(id)}; the scan is node ${SECURITY_SCAN} --root ${root}`, { resumeLifecycleId: id, next: rerun(id) });
++    const final = step("final-verify-green", () => {
++      const head = rawGit(["rev-parse", "HEAD"]); const tree = rawGit(["rev-parse", "HEAD^{tree}"]);
++      const directory = observed.value.evidenceDirectory;
++      const evidencePath = join(directory, "final-verification.json");
++      ensurePrivateDirectory(directory);
++      writePrivateJsonAtomic(evidencePath, { schema: "pipeline.close-final-verification.v1", candidateOid: head, candidateTree: tree, verifyStatus: "green", verifySha256: sha256Hex(readFileSync(resolve(root, "evidence/verify-candidate.json"))), securityStatus: "green", securitySha256: sha256Hex(readFileSync(resolve(root, "evidence/security-latest.v2.verdict.json"))) });
++      return transition("final-verify-green", { evidence: evidencePath });
++    }); if (final.stop) return final.stop;
++    phase = "final-verify-green";
++  }
++  if (phase === "final-verify-green") {
++    const cleanup = step("cleanup-complete", () => {
++      const driven = coordinate("drive", { root, lifecycle: id, actor, phase: "cleanup-complete", apply: true }, "ONESHOT-CLEANUP");
++      if (driven?.status !== "applied") fail("ONESHOT-CLEANUP", String(driven?.message ?? `cleanup-complete was not applied (${driven?.status})`));
++      return driven;
++    }); if (cleanup.stop) return cleanup.stop;
++    phase = "cleanup-complete";
++  }
++  if (phase === "cleanup-complete") {
++    const local = step("closed-local", () => transition("closed-local")); if (local.stop) return local.stop;
++    phase = "closed-local";
++  }
++  if (phase === "closed-local" || phase === "delivered" || phase === "release-eligible" || phase === "promoted") {
++    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, message: "The feature is closed locally. Publication, push and release are separate human-gated steps and were not touched." });
++  }
++  return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
++}
++
++function parseOneShot(argv) {
++  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id"]; const value = {};
++  for (let i = 0; i < argv.length; i += 2) {
++    const flag = argv[i]; const next = argv[i + 1];
++    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>]");
++    value[flag] = next;
++  }
++  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null };
++}
++
+ function parse(argv) {
+   const value = {};
+   for (let i = 0; i < argv.length; i += 2) {
+@@ -193,7 +412,15 @@ function parse(argv) {
+   return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], auditRequest: value["--audit-request"], criticVerifyLifecycle: value["--critic-verify-lifecycle"], continuityCloseRequest: value["--continuity-close-request"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null };
+ }
+ 
+-if (process.argv[1] === fileURLToPath(import.meta.url)) {
++if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === "--one-shot") {
++  // P3: the one agent command. JSON on stdout; the commit steps or the stop with its repair on stderr; exit 2 when stopped.
++  try {
++    const result = oneShotClose(parseOneShot(process.argv.slice(3)));
++    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
++    if (result.status === "stopped") { process.stderr.write(`finish-feature --one-shot: stopped at ${result.stage}: ${result.stop.code}: ${result.stop.reason}\nrepair: ${result.stop.repair}\n`); process.exitCode = 2; }
++    else if (result.status === "commit-required") process.stderr.write(`finish-feature --one-shot: run the commit, then the next command.\n${(result.commit.steps ?? []).join("\n")}\nnext: ${result.next}\n`);
++  } catch (error) { process.stderr.write(`finish-feature: ${error?.code ?? "FINISH-ERROR"}: ${error.message}\n`); process.exitCode = 2; }
++} else if (process.argv[1] === fileURLToPath(import.meta.url)) {
+   try {
+     const result = finishFeature(parse(process.argv.slice(2)));
+     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 6606e488b..91e5e2f9d 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -2,7 +2,12 @@
+ import assert from "node:assert/strict";
+ import test from "node:test";
+ 
+-import { finishFeature } from "./finish-feature.mjs";
++import { createHash } from "node:crypto";
++import { execFileSync, spawnSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import { finishFeature, oneShotClose } from "./finish-feature.mjs";
+ 
+ function response(value) { return { status: 0, stdout: JSON.stringify(value), stderr: "" }; }
+ function closeAction(criticVerifyLifecycle) {
+@@ -238,6 +243,152 @@ test("closed-State recovery rejects a mismatched actor, audit, or coordinator wi
+   assert.deepEqual(calls.map(argv => argv[1]), ["inspect", "inspect", "inspect"]);
+ });
+ 
++// ---- P3 (C20D-P3-ONE-SHOT-CLOSE, AC-108): feature close is one agent command up to the commit, then one more call to closed-local ----
++const sha256Of = (value) => createHash("sha256").update(value).digest("hex");
++const STATE_PATH = ".claude/pipeline-state.json";
++const COORD = new URL("./close-coordinator.mjs", import.meta.url).pathname;
++const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
++function oneShotFixture({ continuity = false, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false } = {}) {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
++  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
++  git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
++  mkdirSync(join(root, ".claude")); mkdirSync(join(root, "specs/feature-abc/evidence"), { recursive: true });
++  writeFileSync(join(root, "specs/feature-abc/result.md"), "# Result\n");
++  const resultSha = sha256Of("# Result\n");
++  const stateValue = (nextAction) => ({ schema: "pipeline.state.v0", activeFeature: { id: "feature-abc" },
++    ...(continuity ? { continuity: { revision: 3, queueHead: { nextAction }, authority: { result: { path: "specs/feature-abc/result.md", sha256: resultSha } } } } : {}) });
++  const writeState = (value) => writeFileSync(join(root, STATE_PATH), `${JSON.stringify(value)}\n`);
++  writeState(closed ? { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] } : stateValue("review"));
++  git("add", "-A"); git("commit", "-q", "-m", "baseline");
++  const packetId = "a".repeat(32); const lifecycleId = "c".repeat(64);
++  if (packetOnDisk) mkdirSync(join(root, ".git/agent-pipeline/critic-packets", packetId), { recursive: true });
++  const calls = []; let phase = startPhase ?? "none";
++  const json = (value) => ({ status: 0, stdout: JSON.stringify(value), stderr: "" });
++  const flag = (argv, name) => argv[argv.indexOf(name) + 1];
++  const runner = (executable, argv) => {
++    if (executable === "git") return spawnSync("git", argv, { cwd: root, encoding: "utf8" });
++    const script = argv[0].split("/").at(-1); const sub = argv[1]; calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
++    if (script === "verify-evidence-producer.mjs") {
++      if (verifyRed) return { status: 2, stdout: "", stderr: "verify-evidence-producer: VEP-FAILED: suite red\n" };
++      const head = git("rev-parse", "HEAD").trim(); const tree = git("rev-parse", "HEAD^{tree}").trim();
++      mkdirSync(dirname(join(root, flag(argv, "--out"))), { recursive: true }); // the real producer creates the output directory
++      writeFileSync(join(root, flag(argv, "--out")), `${JSON.stringify({ schema: "pipeline.verify-evidence.v0", mode: flag(argv, "--mode"), exitCode: 0, commit: head, tree, candidate: { commit: head, tree } })}\n`);
++      if (argv.includes("--critic-packet-id")) { mkdirSync(join(root, ".git/agent-pipeline/critic-verify-lifecycle"), { recursive: true }); writeFileSync(join(root, `.git/agent-pipeline/critic-verify-lifecycle/${lifecycleId}.json`), JSON.stringify({ critic: { packetId: flag(argv, "--critic-packet-id") } })); }
++      return json({ status: "passed" });
++    }
++    if (script === "security-scan.mjs") { mkdirSync(join(root, "evidence"), { recursive: true }); writeFileSync(join(root, "evidence/security-latest.v2.verdict.json"), "{\"verdict\":{\"blocking\":false}}\n"); return { status: securityBlocking ? 1 : 0, stdout: "scan", stderr: "" }; }
++    if (script === "register-feature-package.mjs") return json({ status: "registered" });
++    if (script === "pipeline-state.mjs") {
++      if (sub === "feature-package-plan") return json({ planSha256: "9".repeat(64) });
++      if (sub === "feature-package-apply") return json({ status: "applied" });
++      if (sub === "continuity-result-close-plan") return json({ applyAction: { executable: process.execPath, argv: [STATE_WRITER, "continuity-result-close-apply", "--feature-id", "feature-abc"] } });
++      if (sub === "continuity-result-close-apply") { writeState(stateValue("close")); return json({ status: "applied" }); }
++      if (sub === "close-feature") { writeState({ schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] }); return { status: 0, stdout: "Feature \"feature-abc\" closed", stderr: "" }; }
++    }
++    if (script === "close-coordinator.mjs") {
++      if (sub === "inspect") return json({ identity: { lifecycleId: "lc-1", featureId: "feature-abc" }, coordinator: { phase }, evidenceDirectory: join(root, ".git/agent-pipeline/publication-close/lc-1/evidence") });
++      if (sub === "drive") { phase = "cleanup-complete"; return json({ status: "applied", phaseAfter: "cleanup-complete" }); }
++      if (sub.startsWith("plan-")) { const planSha256 = `${calls.length}`.padEnd(64, "a"); return json({ planSha256, nextAction: { executable: process.execPath, argv: [COORD, sub.replace("plan-", "apply-"), ...argv.slice(2), "--plan-sha256", planSha256, "--activate"] } }); }
++      if (sub.startsWith("apply-")) {
++        if (sub === "apply-transition") phase = flag(argv, "--phase");
++        if (phase === "feature-close-prepared" && sub === "apply-transition") {
++          return json({ status: "applied", stateSha256: "a".repeat(64), nextAction: { executable: process.execPath, argv: [STATE_WRITER, "close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact", "--coordinator-lifecycle", flag(argv, "--lifecycle"), "--coordinator-sha256", "a".repeat(64), "--critic-verify-lifecycle", lifecycleId, ...(argv.includes("--continuity-close-request") ? ["--continuity-close-request", flag(argv, "--continuity-close-request")] : [])] } });
++        }
++        return json({ status: "applied" });
++      }
++    }
++    throw new Error(`unexpected ${script} ${sub}`);
++  };
++  return { root, git, calls, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId } };
++}
++const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
++
++test("P3: one command takes the active feature from the approved candidate to the printed commit, and signs and pushes nothing", () => {
++  const f = oneShotFixture();
++  try {
++    const result = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 400));
++    assert.deepEqual(f.calls, ["verify-evidence-producer.mjs", "register-feature-package.mjs", "pipeline-state feature-package-plan", "pipeline-state feature-package-apply", "pipeline-state feature-package-plan", "pipeline-state feature-package-apply",
++      "close-coordinator plan-start", "close-coordinator apply-start", "close-coordinator plan-transition", "close-coordinator apply-transition", "close-coordinator plan-transition", "close-coordinator apply-transition", "pipeline-state close-feature",
++      // P3: the one-shot reads the coordinator's phase once after the State close (inspect) before it finalizes the tracked effects; the stage order is otherwise as written.
++      "close-coordinator inspect", "close-coordinator plan-transition", "close-coordinator apply-transition"]);
++    assert.deepEqual(forbidden(f.calls), []);
++    const audit = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), "utf8"));
++    assert.equal(audit.schema, "pipeline.feature-close-audit-request.v1"); assert.equal(audit.criticVerifyLifecycleId, f.lifecycleId); assert.deepEqual(audit.packs, ["pipeline-core-baseline"]); assert.match(audit.coreVersion, /^\d+\.\d+\.\d+$/u);
++    const tracked = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/tracked-close.json"), "utf8"));
++    assert.equal(tracked.schema, "pipeline.close-tracked-effects.v1"); assert.equal(tracked.resultSha256, f.resultSha); assert.equal(tracked.pipelineStateSha256, sha256Of(readFileSync(join(f.root, STATE_PATH))));
++    assert.ok(result.commit.paths.includes(STATE_PATH) && result.commit.paths.includes("specs/feature-abc/evidence/audit-request.json") && result.commit.paths.includes("specs/feature-abc/evidence/tracked-close.json"), result.commit.paths.join());
++    assert.match(result.commit.steps[0], /^git add -- /u); assert.match(result.commit.steps[1], /^git commit -m "chore\(close\): close feature feature-abc/u);
++    assert.ok(result.resumeLifecycleId, "the next call resumes this lifecycle"); assert.match(result.next, /--resume-lifecycle-id/u);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("P3: a feature with Continuity gets its Result close block and close request written by the same command", () => {
++  const f = oneShotFixture({ continuity: true });
++  try {
++    const result = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 400));
++    assert.ok(f.calls.indexOf("pipeline-state continuity-result-close-plan") > f.calls.indexOf("pipeline-state feature-package-apply"));
++    assert.equal(f.calls[f.calls.indexOf("pipeline-state continuity-result-close-plan") + 1], "pipeline-state continuity-result-close-apply");
++    const request = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/close-request.json"), "utf8"));
++    assert.deepEqual(request, { schema: "pipeline.continuity-close.v0", featureId: "feature-abc", expectedRevision: 3, result: { path: "specs/feature-abc/result.md", sha256: f.resultSha }, closeEvidence: { path: "specs/feature-abc/evidence/verify-candidate.json", sha256: sha256Of(readFileSync(join(f.root, "specs/feature-abc/evidence/verify-candidate.json"))) } });
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("P3: every stop that needs a human is one typed reason with its exact repair, and nothing later ran", () => {
++  const missing = oneShotFixture({ packetOnDisk: false });
++  try {
++    const stopped = oneShotClose({ ...missing.input, criticPacketId: null }, { runCommand: missing.runner });
++    assert.equal(stopped.status, "stopped"); assert.equal(stopped.stop.code, "ONESHOT-CRITIC-PACKET-MISSING"); assert.match(stopped.stop.repair, /--critic-packet-id/u); assert.deepEqual(missing.calls, []);
++  } finally { rmSync(missing.root, { recursive: true, force: true }); }
++  const red = oneShotFixture({ verifyRed: true });
++  try {
++    const stopped = oneShotClose(red.input, { runCommand: red.runner });
++    assert.equal(stopped.status, "stopped"); assert.equal(stopped.stop.code, "ONESHOT-VERIFY-RED"); assert.match(stopped.stop.repair, /rerun the identical command/u); assert.deepEqual(red.calls, ["verify-evidence-producer.mjs"]);
++  } finally { rmSync(red.root, { recursive: true, force: true }); }
++  const refused = oneShotFixture();
++  try {
++    const runner = (executable, argv) => argv[1] === "plan-transition" && argv.includes("feature-close-prepared")
++      ? { status: 2, stdout: JSON.stringify({ schema: "pipeline.close-coordinator.error.v1", status: "refused", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "repair: record the PO acknowledgement with approve-critic-acknowledgement" }), stderr: "" }
++      : refused.runner(executable, argv);
++    const stopped = oneShotClose(refused.input, { runCommand: runner });
++    assert.equal(stopped.status, "stopped"); assert.equal(stopped.stop.code, "CLOSE-CRITIC-CALLER-AUTHORED"); assert.match(stopped.stop.repair, /approve-critic-acknowledgement/u);
++    assert.match(stopped.next, /--resume-lifecycle-id /u, "the rerun resumes the started lifecycle and skips the evidence stages");
++  } finally { rmSync(refused.root, { recursive: true, force: true }); }
++});
++
++test("P3: after the commit the next call continues to closed-local; an uncommitted tree or a blocking scan stops with its repair", () => {
++  const f = oneShotFixture({ closed: true, startPhase: "tracked-close-finalized" });
++  try {
++    writeFileSync(join(f.root, "dirty.txt"), "x\n"); writeFileSync(join(f.root, STATE_PATH), "{\"schema\":\"pipeline.state.v0\",\"closedFeatures\":[{\"id\":\"feature-abc\"},{\"id\":\"x\"}]}\n");
++    const pending = oneShotClose({ ...f.input, resumeLifecycleId: "lc-1" }, { runCommand: f.runner });
++    assert.equal(pending.status, "stopped"); assert.equal(pending.stop.code, "ONESHOT-COMMIT-PENDING"); assert.match(pending.stop.repair, /git add -- .*pipeline-state\.json/u);
++    f.git("checkout", "--", STATE_PATH); rmSync(join(f.root, "dirty.txt"));
++    const blocked = oneShotFixture({ closed: true, startPhase: "tracked-close-finalized", securityBlocking: true });
++    try {
++      const stopped = oneShotClose({ ...blocked.input, resumeLifecycleId: "lc-1" }, { runCommand: blocked.runner });
++      assert.equal(stopped.status, "stopped"); assert.equal(stopped.stop.code, "ONESHOT-SECURITY-BLOCKING"); assert.match(stopped.stop.repair, /security-scan\.mjs/u);
++    } finally { rmSync(blocked.root, { recursive: true, force: true }); }
++    const done = oneShotClose({ ...f.input, resumeLifecycleId: "lc-1" }, { runCommand: f.runner });
++    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
++    assert.deepEqual(f.calls.slice(f.calls.indexOf("close-coordinator inspect", 1)), ["close-coordinator inspect", "close-coordinator plan-transition", "close-coordinator apply-transition", "verify-evidence-producer.mjs", "security-scan.mjs", "close-coordinator plan-transition", "close-coordinator apply-transition", "close-coordinator drive", "close-coordinator plan-transition", "close-coordinator apply-transition"]);
++    assert.deepEqual(forbidden(f.calls), []);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed repair on stderr with exit 2; a bad flag is a usage refusal", () => {
++  const f = oneShotFixture({ closed: true });
++  try {
++    const script = new URL("./finish-feature.mjs", import.meta.url).pathname;
++    const stopped = spawnSync(process.execPath, [script, "--one-shot", "--root", f.root, "--by", "PO", "--architecture-impact", "no-architecture-impact"], { encoding: "utf8" });
++    assert.equal(stopped.status, 2, stopped.stderr);
++    assert.equal(JSON.parse(stopped.stdout).stop.code, "ONESHOT-NO-ACTIVE-FEATURE");
++    assert.match(stopped.stderr, /ONESHOT-NO-ACTIVE-FEATURE/u); assert.match(stopped.stderr, /^repair: /mu);
++    const usage = spawnSync(process.execPath, [script, "--one-shot", "--root", f.root, "--bogus", "x"], { encoding: "utf8" });
++    assert.equal(usage.status, 2); assert.match(usage.stderr, /FINISH-USAGE/u);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("G20-66: every close stage that writes protected files arms the commit of exactly those bytes, and the result prints the one commit", async () => {
+   const { execFileSync } = await import("node:child_process");
+   const { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } = await import("node:fs");
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 010a4b495..7b568bd1c 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -2,7 +2,7 @@
+ name: close-feature
+ description: "Feature-lifecycle close: ends the CURRENT activeFeature in .claude/pipeline-state.json via the sanctioned pipeline-state.mjs writer (close-feature subcommand) -- appends an audit entry to closedFeatures, clears activeFeature/planApproval/planRevocation, sets planApproved=false, silences the stop-suggest nudge. Invoke when a feature's work is done and its plan/phase tracking should stop, independent of any session boundary."
+ argument-hint: "<name performing the close>"
+-allowed-tools: Bash(node plugins/pipeline-core/scripts/usage-ledger.mjs:*), Bash(node plugins/pipeline-core/scripts/pipeline-state.mjs:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*)
++allowed-tools: Bash(node plugins/pipeline-core/scripts/usage-ledger.mjs:*), Bash(node plugins/pipeline-core/scripts/pipeline-state.mjs:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*), Bash(node plugins/pipeline-core/scripts/finish-feature.mjs:*)
+ ---
+ 
+ # close-feature — end a feature's lifecycle tracking
+@@ -13,6 +13,20 @@ digest-bound transition, obtain confirmation, then apply only that action with
+ canonical coordinator lifecycle and state digest. This path never implies push
+ or release.
+ 
++## Start here: the one command (P3, runner- and platform-neutral)
++
++The agent closes the active feature with ONE command, up to the one commit it prints; a second call continues to `closed-local`:
++
++```
++node plugins/pipeline-core/scripts/finish-feature.mjs --one-shot --by "<name>" --architecture-impact "<impact>" [--critic-packet-id <32-hex>]
++```
++
++It produces the Verify evidence in candidate mode bound to the Critic packet (found on disk when exactly one exists, else pass `--critic-packet-id`), registers it, takes the package to `verifying` and `completed`, writes the audit request and, with Continuity, the Result close block and the close request, then runs the close-feature stage (start, checkpoint, `feature-close-prepared`, `pipeline-state.mjs close-feature`) and the `tracked-close-finalized` evidence. The audit bundle it writes under `audit-bundles/<feature>/<stamp>/proofs/` copies the signed approval proof envelopes that authorized the feature (the plan approval and, when it exists for the candidate commit, the critical push approval), with their digests in the bundle manifest; the bundle verifier checks every digest and every Ed25519 signature, and refuses a tampered proof. A human guard override keeps no proof (it is listed as a typed gap, never blocking). Nothing it does signs or pushes.
++
++The command stops at `commit-required` and prints the paths and the commit message (`git add -- <paths>`, then `git commit`; the pre-commit hook admits exactly the bytes the stages wrote, G20-66). Run that commit, then run the printed `next` command (the same command with `--resume-lifecycle-id <id>`): it freezes the candidate, runs the final Verify and the Security scan, writes the final-verification and cleanup evidence and ends at `closed-local`. Exit code 2 and `status: "stopped"` mean one typed stop with its exact repair on stderr: `ONESHOT-CRITIC-PACKET-MISSING` (finish the Critic review; pass `--critic-packet-id`), `ONESHOT-VERIFY-RED` (fix what the Verify prints, rerun), `ONESHOT-COMMIT-PENDING` (the close outputs are not committed yet), `ONESHOT-SECURITY-BLOCKING`, `ONESHOT-OWNER-ROUTE-REQUIRED` (a project with a session-authority catalogue runs the Result close through `continuity-owner-route.mjs`), or the coordinator's own typed refusal (for example `CLOSE-CRITIC-CALLER-AUTHORED`). Rerunning the identical command is always safe. Publication, push and release stay separate human-gated steps.
++
++Everything below is the per-stage recovery reference: use it when the one command stops and the repair needs a single stage by hand.
++
+ Closes the feature currently tracked in `.claude/pipeline-state.json` (`activeFeature`). This is a
+ **feature-lifecycle** transition in the same coordinator. `close-block` requests
+ a resumable checkpoint or tracked-finalization transition and can run many
