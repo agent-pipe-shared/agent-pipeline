@@ -93,9 +93,15 @@ function nativeTierRefusal(nativeSubagents) {
     const type = bareRole(entry.TypeName);
     if (!isShippedPipelineAgentType(type)) continue;
     const evaluation = evaluateDispatchModel({ runner: "antigravity", subagentType: type, model: entry.Model });
-    if (!evaluation.ok) return evaluation.findings[0]?.code ?? "DISPATCH-MODEL-UNROUTED";
+    if (!evaluation.ok) return { code: evaluation.findings[0]?.code ?? "DISPATCH-MODEL-UNROUTED", repair: evaluation.findings[0]?.message ?? null };
   }
   return null;
+}
+
+// The finding's message names the exact value to pass; a live run lost two steps reading this script for it.
+function rejectedTier(refusal, field) {
+  const verdict = rejected(refusal.code, field);
+  return typeof refusal.repair === "string" && refusal.repair !== "" ? { ...verdict, repair: refusal.repair } : verdict;
 }
 
 function entriesMatchPackets(nativeSubagents, packets) {
@@ -196,7 +202,7 @@ export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagent
   if (!["flat", "batch"].includes(callShape)) return rejected("AGY-NATIVE-CALL-SHAPE", "callShape");
   if (callShape === "flat" && nativeSubagents.length !== 1) return rejected("AGY-NATIVE-CALL-SHAPE", "nativeSubagents");
   const tierRefusal = nativeTierRefusal(nativeSubagents);
-  if (tierRefusal !== null) return rejected(tierRefusal, "nativeSubagents.Model");
+  if (tierRefusal !== null) return rejectedTier(tierRefusal, "nativeSubagents.Model");
   if (!Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0 || !Number.isSafeInteger(ttlMs) || ttlMs < 1_000 || ttlMs > DEFAULT_TTL_MS) {
     return rejected("AGY-NATIVE-TTL", "ttlMs");
   }
@@ -256,7 +262,7 @@ export function verifyAntigravityNativeDispatch({ root, nativeSubagents, callSha
   if (!["flat", "batch"].includes(callShape)) return rejected("AGY-NATIVE-CALL-SHAPE", "callShape");
   if (callShape === "flat" && nativeSubagents.length !== 1) return rejected("AGY-NATIVE-CALL-SHAPE", "Subagents");
   const tierRefusal = nativeTierRefusal(nativeSubagents);
-  if (tierRefusal !== null) return rejected(tierRefusal, "Subagents.Model");
+  if (tierRefusal !== null) return rejectedTier(tierRefusal, "Subagents.Model");
   const path = artifactPath(state.commonDir, nativeSubagents, state.physicalRoot, callShape);
   const claimedPath = join(dirname(path), `.${randomUUID()}.consume`);
   let raw;
@@ -290,7 +296,7 @@ export function verifyAntigravityNativeDispatch({ root, nativeSubagents, callSha
   if (artifact.candidate.commit !== state.head || artifact.candidate.tree !== state.tree) return rejected("AGY-NATIVE-ARTIFACT-STALE", "candidate");
   if (JSON.stringify(artifact.nativeSubagents) !== JSON.stringify(nativeSubagents)) return rejected("AGY-NATIVE-ARRAY-MUTATED", "Subagents");
   const artifactTierRefusal = nativeTierRefusal(artifact.nativeSubagents);
-  if (artifactTierRefusal !== null) return rejected(artifactTierRefusal, "Subagents.Model");
+  if (artifactTierRefusal !== null) return rejectedTier(artifactTierRefusal, "Subagents.Model");
   if (!entriesMatchPackets(nativeSubagents, artifact.packets)) return rejected("AGY-NATIVE-ARRAY-MISMATCH", "Subagents");
 
   const batch = prepareRoleDispatchBatch({

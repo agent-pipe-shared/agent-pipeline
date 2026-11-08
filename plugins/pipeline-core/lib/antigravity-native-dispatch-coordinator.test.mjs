@@ -110,7 +110,10 @@ test("Model and Workspace are bound to the one-use canonical native argument", (
   assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: changedWorkspace }).code, "AGY-NATIVE-ARTIFACT-MISSING");
   const changedModel = structuredClone(value.nativeSubagents);
   changedModel[0].Model = "flash";
-  assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: changedModel }).code, "DISPATCH-MODEL-DUTY-MISMATCH");
+  const tierVerdict = verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: changedModel });
+  assert.equal(tierVerdict.code, "DISPATCH-MODEL-DUTY-MISMATCH");
+  // Live run: the refusal named no value and the agent read this script to find it.
+  assert.match(tierVerdict.repair, /Model/u);
   assert.equal(verifyAntigravityNativeDispatch(value).status, "prepared");
 }));
 
