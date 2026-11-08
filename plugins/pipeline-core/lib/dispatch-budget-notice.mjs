@@ -51,7 +51,26 @@ export function allowContextStdout(additionalContext) {
   return `${JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", additionalContext } })}\n`;
 }
 
-export function checkpointNoticeText({ critic, nativeHost, count, workingCap, remaining }) {
+/**
+ * G20-73: the exact grant line the dispatcher runs, built by the hook from values it already holds (plugin root, project
+ * root, agent id, remaining grant headroom), so no dispatcher has to look up the script, its flags or the headroom. Paths
+ * use forward slashes (accepted by node on every platform). Returns null when no grant headroom remains.
+ */
+export function grantCommandLine({ scriptPath, rootDir, agentId, headroom }) {
+  if (!Number.isSafeInteger(headroom) || headroom < 1 || typeof scriptPath !== "string" || scriptPath === "") return null;
+  const slash = (value) => String(value).replace(/\\/gu, "/");
+  const root = typeof rootDir === "string" && rootDir !== "" ? ` --root "${slash(rootDir)}"` : "";
+  return `node "${slash(scriptPath)}" --agent-id ${agentId} --extra ${headroom} --reason "finish the remaining scope of the continuation card"${root}`;
+}
+
+function grantCommandSentence(grantCommand) {
+  if (!grantCommand) return "";
+  return grantCommand.line
+    ? `Copy this exact line into your hand-back, so the dispatcher grants without any lookup (it grants the whole remaining headroom of ${grantCommand.headroom} call${grantCommand.headroom === 1 ? "" : "s"}): GRANT-COMMAND: ${grantCommand.line} `
+    : "No grant headroom remains for this dispatch (working cap plus closing allowance already reach maxTurns). Say so in your hand-back with the words NO-GRANT-HEADROOM, so the dispatcher dispatches the remainder as a new task instead of trying a grant. ";
+}
+
+export function checkpointNoticeText({ critic, nativeHost, count, workingCap, remaining, grantCommand }) {
   const calls = `${remaining} call${remaining === 1 ? "" : "s"}`;
   const card = `"${CONTINUATION_CARD}"`;
   const steps = critic
@@ -63,6 +82,7 @@ export function checkpointNoticeText({ critic, nativeHost, count, workingCap, re
     + "Do not start new work. Hand back to the dispatcher now: "
     + `${steps} `
     + "The dispatcher decides: standard procedure is to grant with dispatch-budget-grant.mjs and resume the SAME agent with SendMessage; a successor dispatch only for an agent that is lost or has run itself into a corner (typed reason elephant-restart, owner-lost or context-poisoned). "
+    + grantCommandSentence(grantCommand)
     + GRANT_ARRIVAL_RULE
     + "Do not spend the closing allowance on further work.";
 }

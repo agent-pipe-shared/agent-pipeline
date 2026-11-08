@@ -223,7 +223,7 @@ import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { bindDispatchBudget, consumePendingDispatchBudgetBinding, persistPendingDispatchBudgetBindings, readAgentMaxTurns, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetContractForRole } from "../lib/dispatch-policy.mjs";
-import { allowContextStdout, checkpointNoticeText, grantNoticeText, grantStateSentence, nativeHostBlockedContinuation } from "../lib/dispatch-budget-notice.mjs";
+import { allowContextStdout, checkpointNoticeText, grantCommandLine, grantNoticeText, grantStateSentence, nativeHostBlockedContinuation } from "../lib/dispatch-budget-notice.mjs";
 import {
   CLOSING_ALLOWANCE,
   DENIAL_CODE,
@@ -234,6 +234,7 @@ import {
   decideDispatchBudgetCall,
   describeGrantRecord,
   dispatchCheckpointDecision,
+  dispatchGrantHeadroom,
   dispatchWorkingCap,
   effectiveDispatchWorkingCap,
   isValidGrantAgentId,
@@ -1481,7 +1482,11 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
       ? dispatchCheckpointDecision({ workingCap: budget.workingCap, nextCount: budget.nextCount, decision: budget.decision })
       : { notice: false };
     if (!checkpoint.notice) return grantContext === null ? verdict(0) : { exitCode: 0, stderr: "", stdout: allowContextStdout(grantContext) };
-    const checkpointContext = checkpointNoticeText({ critic: isCriticAgentType(identity.agentType), nativeHost: isNativeHostMode(identity.agentType, counter.commitMode), count: budget.nextCount, workingCap: budget.workingCap, remaining: checkpoint.remainingWorkingCalls });
+    // G20-73: the notice carries the exact grant line with the headroom that is really left (the grant script's own bound),
+    // so the dispatcher neither looks the script up nor has a too-large --extra refused.
+    const grantHeadroom = policyMaxTurns === maxTurns ? Math.max(0, dispatchGrantHeadroom(baseCalls, maxTurns) - grantedCalls) : 0;
+    const grantCommand = { headroom: grantHeadroom, line: grantCommandLine({ scriptPath: join(resolveAgentPluginRoot(rootDir, dependencies), "scripts", "dispatch-budget-grant.mjs"), rootDir, agentId: identity.agentId, headroom: grantHeadroom }) };
+    const checkpointContext = checkpointNoticeText({ critic: isCriticAgentType(identity.agentType), nativeHost: isNativeHostMode(identity.agentType, counter.commitMode), count: budget.nextCount, workingCap: budget.workingCap, remaining: checkpoint.remainingWorkingCalls, grantCommand });
     // Both on one call: the grant notice comes first, in the same context.
     return { exitCode: 0, stderr: "", stdout: allowContextStdout(grantContext === null ? checkpointContext : `${grantContext}\n${checkpointContext}`) };
   }

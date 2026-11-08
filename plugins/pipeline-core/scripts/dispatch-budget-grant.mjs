@@ -164,7 +164,21 @@ export function grantDispatchBudget(argv, dependencies = {}) {
   }
 }
 
+// G20-73: a dispatcher's first reflex is --help; answer it instead of refusing it as an unknown argument.
+export const GRANT_USAGE = "usage: node dispatch-budget-grant.mjs --agent-id <id> --extra <1..40> --reason <text> [--root <repo>]\n"
+  + "Grants extra working calls to one dispatched Claude agent that handed back at its budget checkpoint; resume the same agent with SendMessage afterwards.\n"
+  + "The checkpoint notice gives the child the exact GRANT-COMMAND line (agent id and the remaining headroom); run that line verbatim. "
+  + "--extra above the remaining headroom (working cap plus closing allowance stay below the agent's maxTurns) is refused.\n";
+
+export function isHelpRequest(argv) {
+  return argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h");
+}
+
 if (isDirectInvocation(import.meta.url)) {
+  if (isHelpRequest(process.argv.slice(2))) {
+    process.stdout.write(GRANT_USAGE);
+    process.exit(0);
+  }
   const outcome = grantDispatchBudget(process.argv.slice(2));
   if (outcome.status === "granted") {
     process.stdout.write(`${JSON.stringify(outcome.result)}\n`);

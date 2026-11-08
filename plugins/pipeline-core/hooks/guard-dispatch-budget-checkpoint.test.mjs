@@ -15,7 +15,8 @@ import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { grantDispatchBudget } from "../scripts/dispatch-budget-grant.mjs";
+import { GRANT_USAGE, grantDispatchBudget } from "../scripts/dispatch-budget-grant.mjs";
+import { checkpointNoticeText, grantCommandLine } from "../lib/dispatch-budget-notice.mjs";
 import { persistPendingDispatchBudgetBindings, readAgentMaxTurns } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetBinding, dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
 import { applyGovernanceScopeDecision, planGovernanceScopeDecision } from "../lib/governance-scope.mjs";
@@ -480,6 +481,30 @@ register("GDBC15", "grant script: refuses malformed arguments, an unknown agent 
   const refusedCli = spawnSync(process.execPath, [GRANT_SCRIPT, "--agent-id", "s1", "--extra", "0", "--reason", "x"], { cwd: root, encoding: "utf8", timeout: 60000 });
   assert.equal(refusedCli.status, 2);
   assert.match(refusedCli.stderr, /^DISPATCH-BUDGET-GRANT-REFUSED: extra-out-of-range: /u);
+
+  // G20-73 (greenfield 070-3: `--help` was refused as an unknown argument, the dispatcher globbed for the script and its
+  // first --extra 40 was refused against a headroom of 9). --help answers with the usage and grants nothing.
+  for (const flag of ["--help", "-h"]) {
+    const help = spawnSync(process.execPath, [GRANT_SCRIPT, flag], { cwd: root, encoding: "utf8", timeout: 60000 });
+    assert.equal(help.status, 0, help.stderr);
+    assert.equal(help.stdout, GRANT_USAGE);
+    assert.match(help.stdout, /--agent-id <id> --extra <1\.\.40> --reason <text>/u);
+  }
+  assert.equal(grantDispatchBudget(["--help"]).code, "unknown-argument", "the library entry still refuses --help; only the CLI answers it");
+  // The checkpoint notice carries the exact grant line: the Critic tier (maxTurns 65, base 50) has headroom 9, and the line
+  // grants exactly that, with forward-slash paths and the agent id; no headroom left means the NO-GRANT-HEADROOM sentence.
+  const criticHeadroom = dispatchGrantHeadroom(50, 65);
+  assert.equal(criticHeadroom, 9);
+  const line = grantCommandLine({ scriptPath: "C:\\plug\\scripts\\dispatch-budget-grant.mjs", rootDir: "D:\\Dev\\proj", agentId: "ae4b9c", headroom: criticHeadroom });
+  assert.equal(line, 'node "C:/plug/scripts/dispatch-budget-grant.mjs" --agent-id ae4b9c --extra 9 --reason "finish the remaining scope of the continuation card" --root "D:/Dev/proj"');
+  const withLine = checkpointNoticeText({ critic: true, nativeHost: false, count: 40, workingCap: 50, remaining: 10, grantCommand: { headroom: 9, line } });
+  assert.ok(withLine.includes(`GRANT-COMMAND: ${line} `), withLine);
+  assert.match(withLine, /remaining headroom of 9 calls/u);
+  assert.equal(grantCommandLine({ scriptPath: "/p/s.mjs", rootDir: "/r", agentId: "a", headroom: 0 }), null);
+  const none = checkpointNoticeText({ critic: true, nativeHost: false, count: 40, workingCap: 50, remaining: 10, grantCommand: { headroom: 0, line: null } });
+  assert.match(none, /NO-GRANT-HEADROOM/u);
+  assert.doesNotMatch(none, /GRANT-COMMAND/u);
+  assert.equal(checkpointNoticeText({ critic: true, nativeHost: false, count: 40, workingCap: 50, remaining: 10 }).includes("GRANT-COMMAND"), false, "without the field the text is the prior one");
 });
 
 function readdirSafe(dir) {
