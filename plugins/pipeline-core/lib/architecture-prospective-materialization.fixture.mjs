@@ -109,7 +109,6 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
   const pointer=initialGreenfieldAgentEntryTarget('fresh');write(f,pointer.path,pointer.bytes);write(f,'docs/adr/.gitkeep','');
   write(f,'specs/e2e/acceptance.md','# Synthetic acceptance\n');write(f,'specs/e2e/result.md','# Synthetic result\n');
   write(f,SPEC,'# Synthetic Test Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | The package must receive a PASS verdict from an independent Critic before acceptance. | Synthetic candidate-bound review |\n');
-  // A signed package carries no acknowledgement line in the real flow: the signature is the acknowledgement (greenfield 2026-11-08).
   write(f,PLAN,`${po.PO_GATE_PRD_LANGUAGE_MARKER('de')}\n${mode==='signature'?'':`${po.PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`}<!-- technical-spec-sha256: ${hash(bytes(f,SPEC))} -->\n# Synthetic Test PRD\nImplementation surface: \`src/index.mjs\`.\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(architecture)}\n\`\`\`\n`);
   write(f,COMPANIONS[0],'# Synthetic Design\n');write(f,COMPANIONS[1],'| ID | Evidence |\n| --- | --- |\n');write(f,REPORT,'# Synthetic method review\nVerdict: pass.\n');
   if(bindProposals){bindProposals(f,COMPANIONS);COMPANIONS.sort();}else prospectiveSubjects(f, COMPANIONS);
