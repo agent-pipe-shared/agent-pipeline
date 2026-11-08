@@ -1,0 +1,14 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index ebe757b8e69b884dc00a8764bcc391aab1cda791..302f0461a04809c890a28b2bdb2e9b7ae75cf09f 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1845,7 +1845,8 @@
+           "OBC324",
+           "OBC325",
+           "OBC326",
+-          "OBC327"
++          "OBC327",
++          "OBC328"
+         ],
+         "maxBytes": 65536
+       }

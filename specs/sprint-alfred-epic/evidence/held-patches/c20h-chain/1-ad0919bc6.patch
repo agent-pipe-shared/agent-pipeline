@@ -1,0 +1,129 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index cbcdb68f6eb29fbdb83c780287a61372731a0e4f..ad00723774322304a3a3e63504c181079075cafc 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -7429,13 +7429,18 @@ const INTAKE_TRACKED_LOCAL_PATH_PATTERNS = [
+ ];
+ const INTAKE_TRACKED_PATH_TRAILING_PUNCTUATION = /[),.;:!?\]}]+$/u;
+ 
++// An e-mail address in a design question (the git author identity, for example) would reach the tracked
++// design-input.md, where the pre-commit identifier check refuses it AFTER the file is bound as provenance.
++const INTAKE_TRACKED_EMAIL_MARKER = "[REDACTED EMAIL]";
++const INTAKE_TRACKED_EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/gu;
++
+ function trackedIntakeProjectionText(text) {
+   return INTAKE_TRACKED_LOCAL_PATH_PATTERNS.reduce((projected, pattern) => (
+     projected.replace(pattern, (matched) => {
+       const trailing = matched.match(INTAKE_TRACKED_PATH_TRAILING_PUNCTUATION)?.[0] ?? "";
+       return INTAKE_TRACKED_LOCAL_PATH_MARKER + trailing;
+     })
+-  ), text);
++  ), text).replace(INTAKE_TRACKED_EMAIL_PATTERN, INTAKE_TRACKED_EMAIL_MARKER);
+ }
+ 
+ // PO decision 2026-10-18 (ALF-H4-PF14-DESIGN-INPUT-PROVENANCE): no tracked design artifact
+@@ -7443,7 +7448,7 @@ function trackedIntakeProjectionText(text) {
+ // stays the lossless source; the verbatim text is rendered ONLY into the git-ignored
+ // authoring copy below (renderIntakeMaterialInputSection, raw chunks, never projected).
+ // What remains of the tracked projection is the QUESTION text listed in design-input.md,
+-// which still passes through the local-path projection above.
++// which still passes through the local-path and e-mail projection above.
+ function renderIntakeDesignQuestionList(designQuestions) {
+   if (designQuestions === null) return "(design questions not yet answered)\n";
+   if (designQuestions.length === 0) return "No open design questions were affirmed at intake.\n";
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+index 6cf7977ab3eafd9058bfce2f73f9b14e18c3c716..9af4afdc015f54cf15ee2f7a5072cf90af61b1f0 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+@@ -86,7 +86,7 @@ import {
+   validateKickoffGoal,
+ } from "./onboarding-continuity.mjs";
+ import { devNull } from "node:os";
+-import { derivePatterns } from "../scripts/check-private-identifiers.mjs";
++import { derivePatterns, scanChangedContent } from "../scripts/check-private-identifiers.mjs";
+ import { bindRealSessionCleanup, startBoundRequester } from "./test-session-cleanup-requester-fixture.mjs";
+ 
+ const cases = [];
+@@ -4018,6 +4018,33 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path
+   assert.equal(failed.planSha256, plainPlan.planSha256);
+ });
+ 
++// Greenfield 2026-11-08 (Codex): a design question quoted the git author identity; design-input.md was generated with the
++// address, bound as provenance, and only then refused by the pre-commit identifier check, with no route left to change it.
++check("applyOnboardingIntakeGenerate: an e-mail address in a design question reaches no tracked target, the commit check passes the generated file, and the private checkpoint keeps the original question", () => {
++  const address = "person.name@example.invalid";
++  const question = `Keep git author Person <${address}> or change it?`;
++  const root = readyToGenerateRoot("intake-generate-email-projection");
++  applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: [{ question, answer: "Keep it." }], replace: true, activate: true });
++  const configured = spawnSync("git", ["config", "user.email", address], { cwd: root, encoding: "utf8", shell: false });
++  assert.equal(configured.status, 0, configured.stderr);
++  writeFileSync(join(root, ".gitignore"), "scratch/\n");
++
++  const plan = planOnboardingIntakeGenerate({ rootDir: root });
++  assert.equal("warnings" in plan, false, "nothing is left for the early warning to report");
++  assert.equal(plan.targets.designInput.content.includes("### Q1: Keep git author Person <[REDACTED EMAIL]> or change it?"), true);
++  for (const key of ["designInput", "prd", "spec"]) assert.equal(plan.targets[key].content.includes(address), false, `${key} must not carry the address`);
++
++  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
++  const staged = spawnSync("git", ["add", "--", plan.targets.designInput.path], { cwd: root, encoding: "utf8", shell: false });
++  assert.equal(staged.status, 0, staged.stderr);
++  assert.deepEqual(scanChangedContent(root, { scopes: ["staged"] }), { ok: true, findings: [] }, "the commit check accepts the generated file");
++  assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).value.designQuestions[0].question, question, "the private intake store stays lossless");
++
++  const clean = planOnboardingIntakeGenerate({ rootDir: readyToGenerateRoot("intake-generate-email-clean") });
++  assert.equal(clean.targets.designInput.content.includes("### Q1: What is the goal?"), true, "a question without an address keeps its bytes");
++  assert.equal(clean.targets.designInput.content.includes("[REDACTED EMAIL]"), false);
++});
++
+ // NVA-GF-GREENFIELD-INTAKEPROJ-1: capture remains lossless and private, while
+ // intake-generate-apply publishes one deterministic tracked projection. A
+ // local operator path must not strand the greenfield flow or ride unchanged
+@@ -5607,7 +5634,7 @@ for (const [label, options] of Object.entries({
+   });
+ }
+ 
+-assert.equal(cases.length, 327,"the complete onboarding continuity corpus must be registered before execution begins");
++assert.equal(cases.length, 328,"the complete onboarding continuity corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
+index 59f557b3e3814271e158bee13fa46fcbd14d0b11..42261e9f9a7cfc48a85ea1a63adebc53bc0eed71 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
+@@ -20,7 +20,7 @@ import { join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+ 
+-import { main as onboardingCli, buildPostPromotionHookProvisioningAction, postPromotionActionFor } from "./project-onboarding-v3.mjs";
++import { main as onboardingCli, buildPostPromotionHookProvisioningAction, postPromotionActionFor, summarizeOnboardingIntakeGeneratePlan } from "./project-onboarding-v3.mjs";
+ import { captureClaudeIntakePrompt } from "../lib/claude-intake-prompt-capture.mjs";
+ import { captureClaudeInitialPromptPointer } from "../lib/claude-initial-prompt-pointer.mjs";
+ import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
+@@ -566,6 +566,13 @@ test("intake-generate-plan defaults to a digest-stable summary and requires --ve
+   } finally { rmSync(dir, { recursive: true, force: true }); }
+ });
+ 
++test("the generate plan summary carries a private-identifier warning, and no warnings field when there is none", () => {
++  const plan = { root: "/r", repositoryCapability: "local", featureId: "f", checkpointDataSha256: "c", planSha256: "p", targets: {}, nextAction: null };
++  const warnings = [{ code: "INTAKE-PRIVATE-IDENTIFIER", categories: ["local-pattern"], targets: ["design-input.md"], remedy: "x" }];
++  assert.deepEqual(summarizeOnboardingIntakeGeneratePlan({ ...plan, warnings }).warnings, warnings);
++  assert.equal("warnings" in summarizeOnboardingIntakeGeneratePlan(plan), false);
++});
++
+ test("project-onboarding-v3 CLI: mini retains early acknowledgement while feature and epic wait for the final package", () => {
+   for (const profile of ["mini", "feature", "epic"]) {
+   const dir = neutralGitFixture("bootstrap-bind-e2e-" + profile);
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-v3.mjs b/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
+index 37900d1984d8f59e9f39c28a0f7f0f1d604ff58e..5371e8cbf462cdd3404f374794a7acaa7a41ec0b 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
+@@ -834,6 +834,8 @@ export function summarizeOnboardingIntakeGeneratePlan(plan, { runner, intent } =
+       code: plan.authoringCopy.code ?? null,
+       requiredIgnoreRule: plan.authoringCopy.requiredIgnoreRule,
+     },
++    // The summary is the form the next action requests, so a warning left out here reaches nobody. It holds categories and file names only.
++    ...(plan.warnings === undefined ? {} : { warnings: plan.warnings }),
+     nextAction: plan.nextAction,
+     fullPlanAction: {
+       kind: "command", executable: "node", argv: fullArgv,
