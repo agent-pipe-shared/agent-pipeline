@@ -1,0 +1,15 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index c3f84414df0cb81e768bfec7c27ed2f78c847dd1..3342c907afc82e6680b8d963074f3a676e799407 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -2325,7 +2325,9 @@
+           "GD80",
+           "GD81",
+           "GD82",
+-          "GD83"
++          "GD83",
++          "GD84",
++          "GD85"
+         ],
+         "maxBytes": 65536
+       },

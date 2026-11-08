@@ -1,0 +1,33 @@
+diff --git a/plugins/pipeline-core/lib/authority-seal-plan.test.mjs b/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
+index 721c73484500a1db3c10d7b671350c897106fc8c..eee42ef83b9b7904be8f7c01f1bf37b6da7c581e 100644
+--- a/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
++++ b/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
+@@ -321,7 +321,9 @@ test("LB4-12 prepare-seal outside the scope says the bind at the end of onboardi
+ test("LB4-13 present-plan and approve-plan refuse a draft without a prepared plan, with the exit prepare-seal", () => {
+   const fx = buildDraft("walk-unprepared");
+   fx.startDraft();
+-  fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
++  const submitted = fx.must(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
++  // C20b G20-50: submit-plan names the seal order for a draft package (prepare-seal with no arguments, then present-plan).
++  assert.match(submitted.out, /Next \(agent, no PO step\): run `prepare-seal` with no arguments/u, submitted.out);
+   const present = fx.present();
+   assert.equal(present.status, 2);
+   assert.match(present.out, /PSP-NOT-PREPARED/u);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 13792323e66889432a2f40767b21410726b8619c..27da82f7a6f934ac1f0c64c9089fae350dddfa11 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -12141,6 +12141,13 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       syncNextActionDocs(dir, written.transition.state);
+       console.log(`Plan submitted by "${by}" on ${submittedAt}; lifecycle="awaiting-approval".`);
+       console.log(`Briefing: ${summarizePlanApprovalBriefing(submittedBriefing)}`);
++      // G20-50 (live Claude greenfield 2026-11-07): a draft package needs its seal plan before present-plan; the agent met
++      // PSP-NOT-PREPARED, then passed review receipts to prepare-seal (PSP-STALE-REVIEW twice). Name the order once, here.
++      try {
++        if (readAuthoritySeal(written.transition.state?.continuity?.authority)?.status === "draft") {
++          console.log("Next (agent, no PO step): run `prepare-seal` with no arguments (it binds the current PRD and Spec; pass no review receipt to it), then `present-plan --by <name> --review-receipt <each current receipt>`; after the PO's approval `approve-plan` seals the PRD and the Spec. A document edited after prepare-seal needs prepare-seal again.");
++        }
++      } catch { /* advice only: an unreadable seal never changes the submission */ }
+       return 0;
+       })();
+       const submitRunbook = runbookLine({ pathId: "plan", step: "submit-plan", refused: submitCode !== 0, rootDir: dir });

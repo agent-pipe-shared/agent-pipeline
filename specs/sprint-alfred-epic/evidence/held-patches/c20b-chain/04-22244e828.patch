@@ -1,0 +1,30 @@
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.test.mjs b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+index e4d508dc856c99f8e32928c6bcc7f8bd8575a3b1..c05a0fb9a1e2ea1c0ca83ea3227e0a59234aa559 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+@@ -1052,6 +1052,9 @@ console.log("PASS  private Advisor transaction and exact final-approval matrix i
+     [".gitignore", true],
+     [".gitattributes", true],
+     ["sub/.gitattributes", false],
++    // C20b G20-52: the onboarding-seeded VERSION is scaffold; a nested one is not.
++    ["VERSION", true],
++    ["sub/VERSION", false],
+     ["project/pipeline.json", true],
+     ["src/implementation.mjs", false],
+     ["lib/production.mjs", false],
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+index d4916fd19014b9f9279b25957b1168ed616cf260..ed3843a48efa604b46e84a7cfaa6bc69d9a97d0d 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+@@ -338,7 +338,10 @@ export const DEFAULT_EXEMPT_PREFIXES = Object.freeze(["docs/", "specs/", ".claud
+ // committable in the draft lifecycle. Kept separate from DEFAULT_EXEMPT_PREFIXES (which generated
+ // guidance mirrors). Exact files match exactly; no product path (src/, tests/) is admitted.
+ // C19-Q8: the onboarding seeds `.gitattributes` (evidence line endings) in the first commit, so it belongs here with `.gitignore`.
+-const ONBOARDING_SCAFFOLD_EXACT_PATHS = Object.freeze([".gitignore", ".gitattributes", "AGENTS.md", "pipeline.user.yaml"]);
++// C20b G20-52 (live Claude greenfield 2026-11-07): the onboarding seeds `VERSION` (consumer release = version tag, G20-42) in the same
++// scaffold, and the staged-commit check refused it GUARD-DEVPLAN-LIFECYCLE twice (scaffold commit, architecture commit); it is
++// release coordination, not product implementation, so it belongs here too.
++const ONBOARDING_SCAFFOLD_EXACT_PATHS = Object.freeze([".gitignore", ".gitattributes", "AGENTS.md", "pipeline.user.yaml", "VERSION"]);
+ const ONBOARDING_SCAFFOLD_PREFIXES = Object.freeze(["architecture/", "project/"]);
+ 
+ /**

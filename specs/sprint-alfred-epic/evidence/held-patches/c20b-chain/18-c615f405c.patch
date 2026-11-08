@@ -1,0 +1,35 @@
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 210c776036c6e75be951a0c8f31a69c13a31e92e..90a574fa5c94f0877f7817e1a35f9870f85f578c 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -609,7 +609,29 @@ function posixSigningCommands(stdout) {
+     if (/^\s*eval "\$CMD"\s*$/u.test(line) && chunks !== null) commands.push(chunks.join(""));
+     chunks = null;
+   }
+-  return commands.filter((command) => /\ssign-intent\s/u.test(command));
++  const posix = commands.filter((command) => /\ssign-intent\s/u.test(command));
++  // On native Windows (renderPoTerminalCommand, win32) the ONE signing step is a PowerShell block only: `$CMD = '...'`,
++  // `$CMD += '...'`, `Invoke-Expression $CMD`, every argv word single-quoted with '' escapes. It is decoded into the same
++  // space-separated word form, so the request path and the count are examined on every host, never skipped.
++  return posix.length > 0 || process.platform !== "win32" ? posix : powershellSigningCommands(stdout);
++}
++function powershellSigningCommands(stdout) {
++  const commands = [];
++  let chunks = null;
++  for (const line of stdout.split(/\r?\n/u)) {
++    const chunk = /^\s*\$CMD (\+?)= '((?:[^']|'')*)'\s*$/u.exec(line);
++    if (chunk !== null) {
++      chunks = chunk[1] === "" ? [chunk[2]] : [...(chunks ?? []), chunk[2]];
++      continue;
++    }
++    if (/^\s*Invoke-Expression \$CMD\s*$/u.test(line) && chunks !== null) {
++      const script = chunks.join("").replace(/''/gu, "'");
++      const words = [...script.matchAll(/'((?:[^']|'')*)'/gu)].map((match) => match[1].replace(/''/gu, "'"));
++      commands.push(words.map((word) => (/\s/u.test(word) ? `"${word}"` : word)).join(" "));
++    }
++    chunks = null;
++  }
++  return commands.filter((command) => / sign-intent /u.test(` ${command} `));
+ }
+ function signingAlternatives(stdout) {
+   const powershell = stdout.split(/\r?\n/u).filter((line) => /^\s*Step: PO signs the design approval, option B: Windows PowerShell\s*$/u.test(line)).length;

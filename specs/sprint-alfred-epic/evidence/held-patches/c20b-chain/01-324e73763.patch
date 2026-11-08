@@ -1,0 +1,155 @@
+diff --git a/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs b/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
+index d7def7b36d34787004c892c6879496720db68e4c..4796b0614ea2cc28398b86e85112aedd9e2d1055 100644
+--- a/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
++++ b/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
+@@ -62,7 +62,7 @@ const architecture = { schema: "pipeline.architecture-design.v1", repositoryKind
+ 
+ let counter = 0;
+ // One fixture per case: the profile receipt fingerprint is bound to this exact repository path.
+-function fixture({ stateTracked }) {
++function fixture({ stateTracked, verifyAtPhase = false }) {
+   const parent = join(WORK, `fx-${counter += 1}`);
+   mkdirSync(parent, { recursive: true });
+   const root = join(parent, "repo");
+@@ -89,6 +89,7 @@ function fixture({ stateTracked }) {
+     let status;
+     try { status = run(argv, { dir: root, now: () => AT }); } finally { Object.assign(console, old); }
+     assert.equal(status, 0, `SETUP ${argv[0]}: ${logs.join("\n")}`);
++    return logs;
+   };
+ 
+   write("README.md", "Synthetic walkable-route fixture\n");
+@@ -175,7 +176,10 @@ function fixture({ stateTracked }) {
+   writeJson("specs/e2e/lifecycle.json", { schema: "pipeline.feature-package.v1", feature: { id: FEATURE, rigor: 2 }, state: "approved", artifacts: [artifact("prd", PLAN, true, "mutable", "active"), artifact("spec", SPEC, true, "mutable", "active"), artifact("acceptance", "specs/e2e/acceptance.md", true, "mutable", "active"), artifact("result", "specs/e2e/result.md", true, "mutable", "active"), artifact("candidate-evidence", approved.planApproval.acceptedContract.path, false, "immutable", "retain")], candidate: structuredClone(request.approvalIntent.value.candidate), supersedes: null });
+   const packageRead = validateFeaturePackage(root, "specs/e2e/lifecycle.json");
+   assert.ok(packageRead.ok, `SETUP registered package: ${JSON.stringify(packageRead.findings)}`);
+-  lifecycle(["set-phase", "--phase", "implementation"]);
++  // C20 G20-46: the happy path sets the verify command in the same set-phase step (submit-plan names that route).
++  const phaseLogs = lifecycle(verifyAtPhase
++    ? ["set-phase", "--phase", "implementation", "--verify-command", COMMAND]
++    : ["set-phase", "--phase", "implementation"]);
+   assert.equal(derivePlanLifecycle(readCurrent()).status, "implementing");
+   const stateRelative = statePath(root).slice(root.length + 1).replaceAll("\\", "/");
+   if (stateTracked) {
+@@ -192,7 +196,7 @@ function fixture({ stateTracked }) {
+   assert.equal(observed.status, "eligible", `SETUP genuine default approval reader: ${JSON.stringify(observed)} (win32 private-path verdict: ${privatePath})`);
+   const install = applyInstall({ rootDir: root, ...PLUGIN_DIRS });
+   assert.equal(install.status, "installed", JSON.stringify(install));
+-  return { root, git, env, head: () => git("rev-parse", "HEAD").stdout.trim() };
++  return { root, git, env, phaseLogs, head: () => git("rev-parse", "HEAD").stdout.trim() };
+ }
+ 
+ // Runs the real configure-verify and returns the printed lines.
+@@ -308,6 +312,41 @@ test("refusal: a different staged set (an extra file beside the twins), private
+   assert.equal(existsSync(join(ctx.root, "extra.txt")), true);
+ });
+ 
++// C20 G20-46 (live Antigravity greenfield 2026-11-07): set-phase --verify-command wrote the twins and printed no commit
++// step; the agent staged docs/state.md with them, the exact-set route was lost and the generic refusal sent the PO into a
++// human-guard-override signature. set-phase now prints the walkable route, and executing it verbatim lands.
++test("G20-46: set-phase --verify-command prints the walkable route and it lands (private State untracked)", () => {
++  const { root, git, phaseLogs, head } = fixture({ stateTracked: false, verifyAtPhase: true });
++  const before = head();
++  const route = printedRoute(phaseLogs);
++  assert.deepEqual(route.addArgs.slice(2).sort(), [".claude/pipeline.json", "project/pipeline.json"]);
++  assert.ok(phaseLogs.some((line) => /no PO step/u.test(line)), `the route is named as an agent step:\n${phaseLogs.join("\n")}`);
++  assert.equal(git(...route.addArgs).status, 0);
++  const committed = git(...route.commitArgs);
++  assert.equal(committed.status, 0, committed.stderr);
++  assert.notEqual(head(), before, "the commit landed");
++});
++
++// C20 G20-46: the same extra-path refusal now names the agent repair, never the override/signature course, and the
++// named repair executed verbatim lands the twins; the exact-set rule itself is unchanged (still a refusal first).
++test("G20-46: an extra staged path beside the twins names the agent repair, no signature, and the repair lands", () => {
++  const ctx = { ...fixture({ stateTracked: false, verifyAtPhase: true }) };
++  ctx.before = ctx.head();
++  const route = printedRoute(ctx.phaseLogs);
++  writeFileSync(join(ctx.root, "extra.txt"), "extra\n");
++  assert.equal(ctx.git(...route.addArgs, "extra.txt").status, 0);
++  const first = ctx.git(...route.commitArgs);
++  assert.notEqual(first.status, 0, "the exact-set rule still refuses the mixed commit");
++  assert.equal(ctx.head(), ctx.before);
++  assert.match(first.stderr, /Repair \(agent, no PO step\): git restore --staged -- extra\.txt/u);
++  assert.doesNotMatch(first.stderr, /human-guard-override capability|HUMAN OPERATOR ONLY|sign-intent/u);
++  assert.equal(ctx.git("restore", "--staged", "--", "extra.txt").status, 0);
++  const second = ctx.git(...route.commitArgs);
++  assert.equal(second.status, 0, second.stderr);
++  assert.equal(ctx.git("diff", "--name-only", ctx.before, "HEAD").stdout.trim().split(/\r?\n/u).sort().join(","), ".claude/pipeline.json,project/pipeline.json");
++  assert.equal(existsSync(join(ctx.root, "extra.txt")), true, "the other file is untouched for its own commit");
++});
++
+ // The same refusal for the legacy TRACKED State. Measured RED live on win32 before the hook was tightened (ALF-C-R1H
+ // run 1: "extra staged file: the hook must refuse", actual 0): the late-recovery sanction
+ // (sanctionedLateVerifyRecoveryPaths) judged only the protected delta -- both twins baseline-only -> one identical
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 001f2f16992a50455f309c3909750b2d4f67ccd3..265a1e7993e9834deb5f2d42e234ccf1297955b9 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11808,15 +11808,27 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         console.error(`Error: set-phase implementation requires an exact approved submission (${written.code}).`);
+         return 2;
+       }
++      let calibrationCommitPaths = null;
+       if (calibrationNeeded) {
+         const ready = completeCalibrationVerifyCommitTransition({ preparedHandle: preparedCalibration });
+         if (!ready?.ok || ready.code !== "CVCT-COMMIT-READY") {
+           console.error(`Error: implementation State and calibration were written, but the commit-ready transition failed (${ready?.code ?? "CVCT-COMPLETE-UNAVAILABLE"}); inspect State and both calibration tiers. No configured commit is claimed.`);
+           return 2;
+         }
++        calibrationCommitPaths = Array.isArray(ready.paths) ? ready.paths : null;
+       }
+       syncNextActionDocs(dir, written.transition.state);
+       console.log('Phase set: "implementation"; lifecycle="implementing".');
++      // C20 G20-46: the verify command now sits in the protected calibration tiers (GS-10/GS-11). The pre-commit hook admits
++      // them without any human step ONLY as their own commit: the staged set must be exactly these paths. A live Antigravity
++      // run staged docs/state.md with them, lost the route silently and spent a PO override signature. Name the step here,
++      // in the same walkable shape configure-verify prints (pinned by configure-verify-output-lacks-a-walkable-commit-route).
++      if (calibrationCommitPaths !== null && calibrationCommitPaths.length > 0) {
++        console.log("Next (agent, no PO step): commit the verification tiers ALONE, as the next commit, before staging anything else:");
++        console.log(`git add -- ${calibrationCommitPaths.join(" ")}`);
++        console.log('git commit -m "chore: configure project verification"');
++        console.log("Stage no other path with them (docs/state.md included): the hook admits exactly this set against the approved plan; commit the other files in a separate commit afterwards.");
++      }
+       const decisionSummary = summarizePlanningDecisionApplicability(architecture.artifacts?.decisionApplicability);
+       if (decisionSummary !== null) console.log(`Architecture decisions: ${JSON.stringify(decisionSummary)}`);
+       return 0;
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+index 3168f07aabeba527997c9c04af01d5107d880468..950987278476e9766e111f998bea8eb86ff77b55 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+@@ -1121,6 +1121,34 @@ async function main() {
+ 
+   if (findings.length === 0) return;
+ 
++  // C20 G20-46: the calibration tiers of a ready set-phase/configure-verify transition are admitted only as their own commit
++  // (the exact-set rule above stays). When they are the ONLY protected findings, other paths are staged with them and that
++  // transition is ready, the repair is to commit them alone -- never a human override signature (a live run spent one).
++  const calibrationOnly = findings.every((finding) => VERIFY_CALIBRATION_PATHS.includes(finding.path)
++    && (finding.id === "GS-10" || finding.id === "GS-11"));
++  const otherStaged = paths.filter((path) => !VERIFY_CALIBRATION_PATHS.includes(path));
++  if (calibrationOnly && otherStaged.length > 0) {
++    let readyPaths = null;
++    try {
++      const fs = await import("node:fs");
++      const calibration = JSON.parse(fs.readFileSync(resolve(projectRoot, VERIFY_CALIBRATION_PATHS[0]), "utf8"));
++      const { inspectCurrentCalibrationVerifyReady } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "calibration-verify-commit-transition.mjs")).href);
++      const ready = inspectCurrentCalibrationVerifyReady({ rootDir: projectRoot, verifyCommand: calibration?.verify });
++      if (ready?.ok === true && Array.isArray(ready.paths) && findings.every((finding) => ready.paths.includes(finding.path))) readyPaths = ready.paths;
++    } catch { readyPaths = null; }
++    if (readyPaths !== null) {
++      // Not block(): its footer hands the commit to a human operator, and this refusal has an agent repair.
++      process.stderr.write([
++        "BLOCKED (agent-pipeline pre-commit hook): the verification tiers " + readyPaths.join(", ") + " are admitted without any human step, but only as their own commit; " + otherStaged.length + " other path(s) are staged with them.",
++        "Repair (agent, no PO step): git restore --staged -- " + otherStaged.join(" "),
++        "then: git commit -m \\"chore: configure project verification\\"   (exactly " + readyPaths.join(" ") + " staged)",
++        "then stage and commit the other path(s) in a separate commit. No human-guard-override signature is needed for this.",
++      ].join("\\n") + "\\n");
++      process.exitCode = 1;
++      return;
++    }
++  }
++
+   // AC-258: before refusing, consume an armed commit-scoped capability (admit once) or seed /
+   // re-print the signing course. Any fault inside degrades to the plain refusal below.
+   let override = { admit: false, lines: [] };

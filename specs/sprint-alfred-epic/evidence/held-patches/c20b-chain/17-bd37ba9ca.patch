@@ -1,0 +1,33 @@
+diff --git a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+index 4c304a7e13b23a3f62c25c724bd363b128e1eb4d..c4458e0dfa57c69fcd336c5ee2acd8576bfd73e7 100644
+--- a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
++++ b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+@@ -104,12 +104,12 @@ function buildConsumer({ name, authored, session }) {
+   gitOk("config", "core.autocrlf", "false");
+   assert.equal(realpathSync(root), root);
+   assert.equal(realpathSync(gitOk("rev-parse", "--show-toplevel")), root, "the fixture is its own repository");
+-  const lifecycle = (argv) => {
++  const lifecycle = (argv, extraDeps = {}) => {
+     const logs = [];
+     const old = { log: console.log, error: console.error, warn: console.warn };
+     for (const name of Object.keys(old)) console[name] = (...args) => { logs.push(args.map(String).join(" ")); };
+     let status;
+-    try { status = run(argv, { dir: root, now: () => AT }); } finally { Object.assign(console, old); }
++    try { status = run(argv, { dir: root, now: () => AT, ...extraDeps }); } finally { Object.assign(console, old); }
+     assert.equal(status, 0, `SETUP ${argv[0]}: ${logs.join("\n")}`);
+   };
+ 
+@@ -173,7 +173,12 @@ function buildConsumer({ name, authored, session }) {
+   const current = () => { const observed = readState(root); assert.equal(observed.status, "ok"); return observed.state; };
+   lifecycle(["approve-plan", "--by", "synthetic-po", "--design-approval-request", current().planPresentation.designApprovalRequestPath]);
+   assert.equal(current().planApproval.schema, "pipeline.plan-approval.v9");
+-  lifecycle(["materialize-architecture"]);
++  // QG-04 restatement (candidate 20b, G20-51): materialize-architecture now registers the feature package itself (a spawn of the
++  // same register-feature-package.mjs). This pin examines that CLI's own route (refusal before registration, generation, the
++  // found/generated split, idempotence), so the fixture switches the automatic step off through its seam, the shape of a checkout
++  // where it did not run. The automatic registration of the real chain is pinned by configure-verify-output-lacks-a-walkable-
++  // commit-route.test.mjs (registered: "auto") and walked by scripts/close-path-e2e.test.mjs.
++  lifecycle(["materialize-architecture"], { registerFeaturePackageAfterArchitecture: () => null });
+   assert.equal(compileDecisionSummary(root, { now: AT }).authorityStatus, "source-validated");
+   lifecycle(["set-phase", "--phase", "implementation"]);
+   assert.equal(derivePlanLifecycle(current()).status, "implementing");

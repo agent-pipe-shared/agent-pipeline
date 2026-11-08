@@ -1,0 +1,87 @@
+diff --git a/docs/enforcement.md b/docs/enforcement.md
+index 01862256f9915606cd41ed3dd77c4b94770bd810..c14d89157e4d99f7cea57d43a126c7162a2688ea 100644
+--- a/docs/enforcement.md
++++ b/docs/enforcement.md
+@@ -29,8 +29,8 @@ no hand-maintained guard count or command list.
+ | --- | --- | --- | --- |
+ | Antigravity | PreInvocation | (all) | node hooks/antigravity-slicing-hint.mjs deliver |
+ | Antigravity | PreInvocation | (all) | node hooks/antigravity-start-hint.mjs |
+-| Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;write_file&#124;edit_file&#124;read_file&#124;invoke_subagent | node hooks/antigravity-pretool-guard.mjs |
+-| Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;write_file&#124;edit_file&#124;read_file&#124;invoke_subagent | node hooks/antigravity-slicing-hint.mjs observe |
++| Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;write_file&#124;edit_file&#124;read_file&#124;invoke_subagent&#124;send_message | node hooks/antigravity-pretool-guard.mjs |
++| Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;write_file&#124;edit_file&#124;read_file&#124;invoke_subagent&#124;send_message | node hooks/antigravity-slicing-hint.mjs observe |
+ | Antigravity | Stop | (all) | node hooks/antigravity-stop-hook.mjs |
+ | Claude Code | PostToolUse | Bash&#124;PowerShell | node "${CLAUDE_PLUGIN_ROOT}/hooks/claude-task-output-scope-posttool.mjs" |
+ | Claude Code | PostToolUse | Task&#124;Agent | node "${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner claude |
+@@ -85,4 +85,4 @@ The hashes bind this generated page to the exact manifest bytes it read.
+ | --- | --- | --- |
+ | Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `b50798c8f187d483f23a537e425606d3ea90883ecf9e986a1652a289780d586c` |
+ | Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `6ea0eba1803ea886a6da30328d1618873d39e03759822acd479b066fa56d1e34` |
+-| Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `25e9e6ee50cfdc74ca03f08c6884ede844c74b989ae1370ad270d902cb307e13` |
++| Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `356c5819743976907a35322902f6a48083cda1aec3e25ea5ffb7cf35e77ab900` |
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index e245fd0c8d70dd13bd4bd0586eb37eeae87f5e55..dab89d5edc568bae77b9099cd2693f379d065a8e 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -390,6 +390,26 @@ it belongs under `/evidence/` (`.gitignore:39`), the same ignored-but-present
+ location every other pre-signature scratch artifact in this flow already
+ uses.
+ 
++### Releasing a consumer project: a version tag (G20-42)
++
++For a **consumer** project a release is a version tag `v<VERSION>` on a closed feature that is already pushed. The consumer mode of
++`release-preflight-cli.mjs` is chosen from the project's shape (no Pipeline plugin manifests under `plugins/pipeline-core/`), never by a flag;
++the Pipeline's own source release above is unchanged. It is the LAST step of the happy path, after the feature close and its push:
++
++1. `VERSION` is tracked (onboarding creates it as `0.1.0`; an older project runs `release-preflight-cli.mjs --init-version --root <root>`
++   and commits the file). `RELEASE-NOTES.md` carries a `## v<VERSION>` entry naming the closed feature id, its title and the acceptance
++   criteria met; the agent writes it with the feature, so the Critic reviews it and the Critic-bound push Verify carries it.
++2. `node ${PIPELINE_PLUGIN_ROOT}/scripts/release-preflight-cli.mjs --root <root> --base <registered base commit> --lifecycle specs/<feature>/lifecycle.json`
++   writes `evidence/release-preflight.json` only when the feature is in `closedFeatures`, the notes entry is committed, push-prepare's own
++   Verify / Critic-bound Verify / security checks are green, the push approval for this candidate exists, and the candidate is reachable from
++   `refs/remotes/origin/main`. Otherwise it exits 2 at the first missing step and prints `repair:` with the command that supplies it.
++3. The PO approves the release once, through the `release-preflight` critical kind in the configured approval mode. In `chat` mode the run itself
++   records the approval; in `signature` mode the command stops with `RPC-CONSUMER-PO-APPROVAL` and prints the PO's exact signing command for
++   this subject, then runs again with `--proof-request`/`--proof`.
++4. The agent runs the two `nextActions` the command prints: `git tag -a v<VERSION> -m "version tag" <commit>` and
++   `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
++   (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above.
++
+ ### Source reader binding (Agent Pipeline source checkout only)
+ 
+ Release, tag, marketplace and publication preparation require fresh
+diff --git a/plugins/pipeline-core/runbooks/close-path.v1.json b/plugins/pipeline-core/runbooks/close-path.v1.json
+index f9b450c86283f9a9ede5814e2d2baa23e672997b..a2ab25dcbddfe2621f146e9a8cd80c2c7ccaf221 100644
+--- a/plugins/pipeline-core/runbooks/close-path.v1.json
++++ b/plugins/pipeline-core/runbooks/close-path.v1.json
+@@ -49,7 +49,7 @@
+     {
+       "id": "reconcile-signature",
+       "who": "po-only",
+-      "command": "the signatureCommand printed by the bootstrap completion (po-human-approval.mjs authorize-critical --kind feature-package-reconcile), run in the PO's own terminal",
++      "command": "ONLY when the bootstrap completion's preview.requiredAuthority is \"po\" (a plan that also changes a non-result entry; a result-only plan prints no signatureCommand and needs no signature, G20-38): the signatureCommand it prints (po-human-approval.mjs authorize-critical --kind feature-package-reconcile), run in the PO's own terminal",
+       "needs": [],
+       "evidenceSchema": null,
+       "producer": "close-feature SKILL, Continuity route step 4",
+@@ -61,7 +61,7 @@
+     {
+       "id": "reconcile",
+       "who": "agent",
+-      "command": "the reconcileCommand printed by the bootstrap completion (pipeline-state.mjs feature-package-reconcile ...); needs the PO's own name and the requestPath, authorityPath and proofPath the signing terminal printed",
++      "command": "the reconcileCommand printed by the bootstrap completion (pipeline-state.mjs feature-package-reconcile ...); result-only plan (requiredAuthority \"agent\"): run it as printed, no proof flags; PO route: it needs the PO's own name and the requestPath, authorityPath and proofPath the signing terminal printed",
+       "needs": [],
+       "evidenceSchema": null,
+       "producer": "close-feature SKILL, Continuity route step 5",
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+index d26658a88063612a58d9b4f44f5e6251453ecebe..5e8e44e504489907d16dd8bb9cef7d09067f8a7d 100644
+--- a/plugins/pipeline-core/runbooks/index.v1.json
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -5,7 +5,7 @@
+       "pathId": "close",
+       "path": "plugins/pipeline-core/runbooks/close-path.v1.json",
+       "schema": "pipeline.runbook.v1",
+-      "sha256": "44c65340ec00f845442b3c483086d48a00a475be4516b584d01f36b8fdc365e9"
++      "sha256": "258204a0e66d5d2d930b9364ab86adccdbd77cdeb1e0452185e29cbf6e43a4c4"
+     },
+     {
+       "pathId": "start",

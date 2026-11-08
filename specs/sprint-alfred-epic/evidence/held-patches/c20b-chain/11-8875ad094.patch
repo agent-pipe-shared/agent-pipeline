@@ -1,0 +1,100 @@
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 8a36ac6ef4e098c782bbf9cbe3b9f16d1edd629c..210c776036c6e75be951a0c8f31a69c13a31e92e 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -592,6 +592,33 @@ function skipForHostLimitation(t, run) {
+ /** The whole route, run once and shared by route cases 1-4. Never throws: each step records its outcome. */
+ let routePromise;
+ function routeRun() { routePromise ??= runRoute(); return routePromise; }
++// QG-04 restatement (candidate 20b, FV red): G20-16 renders the PO's signing step bounded for the PO's own terminal. The POSIX
++// block is chunked (`CMD='...'`, `CMD=${CMD}'...'`, `eval "$CMD"`), so `sign-intent` and the `--request` path no longer sit on
++// one line; inside WSL a second ALTERNATIVE block (option B, Windows PowerShell through wsl.exe, the same argv) follows under
++// "Copy exactly ONE of the two blocks". "Exactly one signature command" is restated as exactly one reconstructed POSIX command
++// naming sign-intent, plus at most that one PowerShell alternative, never a second POSIX command.
++function posixSigningCommands(stdout) {
++  const commands = [];
++  let chunks = null;
++  for (const line of stdout.split(/\r?\n/u)) {
++    const chunk = /^\s*CMD=(\$\{CMD\})?'([^']*)'\s*$/u.exec(line);
++    if (chunk !== null) {
++      chunks = chunk[1] === undefined ? [chunk[2]] : [...(chunks ?? []), chunk[2]];
++      continue;
++    }
++    if (/^\s*eval "\$CMD"\s*$/u.test(line) && chunks !== null) commands.push(chunks.join(""));
++    chunks = null;
++  }
++  return commands.filter((command) => /\ssign-intent\s/u.test(command));
++}
++function signingAlternatives(stdout) {
++  const powershell = stdout.split(/\r?\n/u).filter((line) => /^\s*Step: PO signs the design approval, option B: Windows PowerShell\s*$/u.test(line)).length;
++  return { powershell, copyExactlyOne: /Copy exactly ONE of the two blocks below/u.test(stdout) };
++}
++function requestPathOf(command) {
++  const match = /--request\s+(?:"([^"]+)"|'([^']+)'|(\S+))/u.exec(command ?? "");
++  return match ? (match[1] ?? match[2] ?? match[3]) : null;
++}
+ async function runRoute() {
+   const out = { steps: [] };
+   out.fx = await buildSubmittedFeature("route");
+@@ -607,10 +634,10 @@ async function runRoute() {
+   out.dispatchBefore = readState(fx.dir).continuity?.queueHead?.dispatch ?? null;
+   out.present = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
+   if (out.present.status !== 0) return out;
+-  const signLines = out.present.stdout.split(/\r?\n/u).filter((line) => /sign-intent/u.test(line));
++  const signLines = posixSigningCommands(out.present.stdout);
+   out.signLines = signLines;
+-  const match = /--request\s+(?:"([^"]+)"|'([^']+)'|(\S+))/u.exec(signLines[0] ?? "");
+-  out.requestAbs = match ? (match[1] ?? match[2] ?? match[3]) : null;
++  out.signAlternatives = signingAlternatives(out.present.stdout);
++  out.requestAbs = requestPathOf(signLines[0]);
+   if (out.requestAbs === null || !existsSync(out.requestAbs)) return out;
+   out.request = JSON.parse(readFileSync(out.requestAbs, "utf8"));
+   const proof = {
+@@ -634,7 +661,10 @@ test("route 1: present-plan --review-receipt accepts finished sources and hands
+   if (skipForHostLimitation(t, run)) return;
+   t.diagnostic(`present-plan exit ${run.present.status}; stderr: ${run.present.stderr.trim()}`);
+   assert.equal(run.present.status, 0, `present-plan --review-receipt must exit 0; stderr: ${run.present.stderr}`);
+-  assert.equal(run.signLines.length, 1, `exactly one line names sign-intent; stdout: ${run.present.stdout}`);
++  // QG-04 restatement (candidate 20b): one reconstructed POSIX signing command; a PowerShell block is only its WSL alternative.
++  assert.equal(run.signLines.length, 1, `exactly one POSIX command names sign-intent; stdout: ${run.present.stdout}`);
++  assert.ok(run.signAlternatives.powershell <= 1, "at most one PowerShell alternative of the same signing step");
++  assert.equal(run.signAlternatives.powershell === 1, run.signAlternatives.copyExactlyOne, "an alternative block is introduced as copy-exactly-one");
+   assert.match(run.signLines[0], /--repo-root\s+\S+/u);
+   assert.ok(run.requestAbs !== null && isAbsolute(run.requestAbs), "the sign command carries an absolute --request path");
+   assert.ok(existsSync(run.requestAbs), "the printed request file exists");
+@@ -657,9 +687,10 @@ test("route 1: present-plan --review-receipt accepts finished sources and hands
+   const presented = await ownedCli(fb, ["present-plan", "--by", "coordinator", "--review-receipt", fb.receiptPath]);
+   assert.equal(presented.status, 0, `present-plan over a fallback receipt must exit 0; stderr: ${presented.stderr}`);
+   assert.match(presented.stdout, /Review route: \S+ ran on the fallback-self-dispatch route \(RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER; requested duty\.critic_normal, observed unknown\) -- a single-review fallback, not an independent native review\./u);
+-  const signLine = presented.stdout.split(/\r?\n/u).find((line) => /sign-intent/u.test(line)) ?? "";
+-  const requested = /--request\s+(?:"([^"]+)"|'([^']+)'|(\S+))/u.exec(signLine);
+-  const requestPath = requested ? (requested[1] ?? requested[2] ?? requested[3]) : null;
++  // QG-04 restatement (candidate 20b): the chunked signing block is reconstructed first (posixSigningCommands).
++  const fallbackCommands = posixSigningCommands(presented.stdout);
++  assert.equal(fallbackCommands.length, 1, "the fallback route hands over exactly one POSIX signing command");
++  const requestPath = requestPathOf(fallbackCommands[0]);
+   assert.ok(requestPath !== null && existsSync(requestPath), "the fallback route hands over the same ready sign command");
+   assert.deepEqual(JSON.parse(readFileSync(requestPath, "utf8")).binding.reviewReceipts[0].fallback, fallback, "the PO's signed binding names the fallback");
+ });
+@@ -700,7 +731,9 @@ test("route 2: one design proof, approve-plan, and the closed v9 accepted-contra
+   assert.deepEqual(run.accepted.candidate, run.request.approvalIntent.value.candidate);
+   assert.deepEqual(run.acceptedEnvelope.request, run.request);
+   // AC-155: the real present-plan --review-receipt route needs ONE signature and runs no Advisor or readiness stage.
++  // QG-04 restatement (candidate 20b): one signing step = one POSIX command plus at most its PowerShell alternative (route 1 above).
+   assert.equal(run.signLines.length, 1, "exactly one signature command is handed over");
++  assert.ok(run.signAlternatives.powershell <= 1, "at most one PowerShell alternative of that one signature command");
+   const forbidden = /advisor|readiness|design-course/iu;
+   assert.equal(forbidden.test(run.present.stdout), false, "present-plan stdout names no Advisor/readiness/course stage");
+   assert.equal(forbidden.test(JSON.stringify(run.request)), false, "the signed request carries no Advisor/readiness/course content");
+@@ -833,9 +866,8 @@ test("retired: lib/retired-design-codes.mjs holds the four retirement codes (A4)
+ async function presentOwned(fx) {
+   await bindRouteOwner(fx);
+   const present = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
+-  const line = present.stdout.split(/\r?\n/u).find((entry) => /sign-intent/u.test(entry)) ?? "";
+-  const match = /--request\s+(?:"([^"]+)"|'([^']+)'|(\S+))/u.exec(line);
+-  const requestAbs = match ? (match[1] ?? match[2] ?? match[3]) : null;
++  // QG-04 restatement (candidate 20b): the chunked signing block is reconstructed first (posixSigningCommands above).
++  const requestAbs = requestPathOf(posixSigningCommands(present.stdout)[0]);
+   return { present, requestAbs, request: requestAbs !== null && existsSync(requestAbs) ? JSON.parse(readFileSync(requestAbs, "utf8")) : null };
+ }
+ function signRequest(fx, requestAbs, request) {

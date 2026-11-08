@@ -1,0 +1,101 @@
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index a262ab54b302e265c81a9e03cc2eeee3b4cde555..ac5ec18d31e1decf51ac316138624903a7b05c13 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -123,6 +123,7 @@ function consumerFixture(log, identity) {
+     let status;
+     try { status = run(argv, { dir: root, now: () => AT }); } finally { Object.assign(console, old); }
+     assert.equal(status, 0, `SETUP ${argv[0]}: ${logs.join("\n")}`);
++    return logs;
+   };
+   gitOk("init", "-q", "-b", "main");
+   gitOk("config", "user.email", "goldfish@example.invalid");
+@@ -187,7 +188,9 @@ function consumerFixture(log, identity) {
+   const current = () => { const observed = readState(root); assert.equal(observed.status, "ok"); return observed.state; };
+   lifecycle(["approve-plan", "--by", "synthetic-po", "--design-approval-request", current().planPresentation.designApprovalRequestPath]);
+   assert.equal(current().planApproval.schema, "pipeline.plan-approval.v9");
+-  lifecycle(["materialize-architecture"]);
++  // G20-51 (candidate 20b): materialize-architecture registers the feature package itself and names its files in the commit step.
++  const materialized = JSON.parse(lifecycle(["materialize-architecture"]).at(-1));
++  assert.equal(materialized.featurePackage?.status, "registered", `materialize-architecture registers the package: ${JSON.stringify(materialized).slice(0, 600)}`);
+   lifecycle(["set-phase", "--phase", "implementation"]);
+   assert.ok(current().rigorHistory.some((row) => (row.body ?? row).boundary === "plan-submission"), "the plan-submission rigor row exists (recorded by submit-plan)");
+   // A fixture signature for a critical action, made the way the PO's terminal makes it (Ed25519 over the approval intent digest) with the
+@@ -201,7 +204,7 @@ function consumerFixture(log, identity) {
+       signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keyPair.privateKey).toString("base64") }));
+     return files;
+   };
+-  return { root, parent, env, gitOk, read, write, current, signProof };
++  return { root, parent, env, gitOk, read, write, current, signProof, materializedPackage: materialized.featurePackage };
+ }
+ 
+ /** The authored dispatch record a Critic review binds to (shape of the record the host commit route persists). */
+@@ -252,8 +255,12 @@ test("G20-35: the close path from implementation to release preflight is walked
+     walkEnv = runnerEnv(identity.runner, fx.root);
+     try {
+       // 0 the feature package of the approved plan, registered through the sanctioned verb (manifest, Result, Acceptance, review unit, envelope)
++      // QG-04 restatement (candidate 20b, G20-51): materialize-architecture already registered the package, so the sanctioned verb is
++      // the readback here (already-registered, byte-stable); the commit carries every file both outputs name, as the agent's commit
++      // step does.
+       const registeredPackage = json(step(log, `${identity.runner}: register-feature-package`, process.execPath, [script("register-feature-package.mjs"), "--root", fx.root], { cwd: fx.root }));
+-      assert.equal(registeredPackage.status, "registered", JSON.stringify(registeredPackage).slice(0, 600));
++      assert.equal(registeredPackage.status, "already-registered", JSON.stringify(registeredPackage).slice(0, 600));
++      registeredPackage.commitPaths = [...new Set([...fx.materializedPackage.commitPaths, ...registeredPackage.commitPaths])];
+       const commitPaths = (message, paths) => {
+         git(log, fx.root, ["add", "-f", "--", ...paths]);
+         git(log, fx.root, ["commit", "-qm", message]);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 27da82f7a6f934ac1f0c64c9089fae350dddfa11..bf4719644e7701159b6c3d20bf2cb5b634c90c87 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -918,6 +918,37 @@ function autoRegisterFeaturePackage(dir) {
+     ...(printed.status === "refused" ? { repair: `node ${script} --root ${resolve(dir)} names the missing artifact or conflict (${printed.code ?? "FPR"})` } : {}) };
+ }
+ 
++/**
++ * C20b (G20-51 follow-up, found by close-path-e2e): the feature package is registered before implementation starts (set-phase
++ * refuses CAC-REGISTRATION-INVALID otherwise; materialize-architecture now does it), so its manifest records the plan status of
++ * that moment, `approved`. Nothing moved it on, and the close path later refused approved -> verifying (one admitted step at a
++ * time). When set-phase implementation succeeds, the one admitted next step approved -> implementing is applied here through the
++ * unchanged feature-package plan/apply route (same planner, digest, journal, lock and readback). Never fatal: a refusal is named
++ * with the manual route. Returns null when there is nothing to advance.
++ */
++function advanceRegisteredPackageToImplementing(dir, planPath, deps = {}) {
++  if (typeof planPath !== "string" || planPath === "") return null;
++  const root = resolve(dir);
++  const manifest = `${dirname(planPath).split(sep).join("/")}/lifecycle.json`;
++  let current = null;
++  try { current = JSON.parse(readFileSync(join(root, manifest), "utf8")); } catch { return null; }
++  if (current?.state !== "approved") return null;
++  const manual = `pipeline-state.mjs feature-package-plan --root <root> --manifest ${manifest} --next-state implementing, then feature-package-apply with the printed planSha256`;
++  const plan = planFeaturePackageTransition(root, manifest, "implementing", { head: featurePackageHead(root, deps) });
++  if (plan?.status !== "preview") return { status: "refused", manifest, code: plan?.reason ?? plan?.status ?? "unavailable", repair: manual };
++  const printed = [];
++  const old = { log: console.log, error: console.error };
++  console.log = (...args) => { printed.push(args.map(String).join(" ")); };
++  console.error = (...args) => { printed.push(args.map(String).join(" ")); };
++  let status;
++  try {
++    status = runFeaturePackageApplyCommand(["--root", root, "--manifest", manifest, "--next-state", "implementing", "--plan-sha256", sha256CanonicalJson(plan)], deps);
++  } finally { Object.assign(console, old); }
++  return status === 0
++    ? { status: "applied", manifest, from: "approved", to: "implementing" }
++    : { status: "refused", manifest, code: "feature-package-apply", detail: printed.join(" ").slice(0, 400), repair: manual };
++}
++
+ function stateRelativePath(dir) {
+   return relative(resolve(dir), statePath(dir)).split(sep).join("/");
+ }
+@@ -11851,6 +11882,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       }
+       syncNextActionDocs(dir, written.transition.state);
+       console.log('Phase set: "implementation"; lifecycle="implementing".');
++      const advanced = (deps.advanceRegisteredPackageToImplementing ?? advanceRegisteredPackageToImplementing)(dir, written.transition.state?.activeFeature?.planPath, deps);
++      if (advanced?.status === "applied") {
++        console.log(`Feature package: ${advanced.manifest} moved approved -> implementing; commit it with the other implementation-entry files (a separate commit from the verification tiers below).`);
++      } else if (advanced?.status === "refused") {
++        console.error(`Warning: the feature package ${advanced.manifest} stays "approved" (${advanced.code}); the close path needs it at "implementing". Repair (agent, no PO step): ${advanced.repair}.`);
++      }
+       // C20 G20-46: the verify command now sits in the protected calibration tiers (GS-10/GS-11). The pre-commit hook admits
+       // them without any human step ONLY as their own commit: the staged set must be exactly these paths. A live Antigravity
+       // run staged docs/state.md with them, lost the route silently and spent a PO override signature. Name the step here,

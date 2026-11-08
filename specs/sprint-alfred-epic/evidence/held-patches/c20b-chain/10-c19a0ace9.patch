@@ -1,0 +1,13 @@
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index dd7bfcb9dee5cbdb543b41462c11ac9be3cef64d..e0a282951acac1b9097be8997c0128139cd49bee 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -807,7 +807,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
+   if (pluginMissing !== null) {
+     return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the file does not exist in the Pipeline plugin "
+       + `(${pluginMissing.relative}); nothing to read at that path. List the nearest existing plugin directory with Glob (path ${pluginMissing.listDirectory}, pattern *) `
+-      + "and read an exact file it shows; a skill names the references it uses in its own SKILL.md.\n");
++      + "and read an exact file it shows; a skill names the references it uses in its own skill file.\n");
+   }
+   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
+     + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`

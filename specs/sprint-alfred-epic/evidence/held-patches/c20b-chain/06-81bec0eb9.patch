@@ -1,0 +1,69 @@
+diff --git a/plugins/pipeline-core/lib/runner-usage-v1.mjs b/plugins/pipeline-core/lib/runner-usage-v1.mjs
+index 56312b192c9dd382b517545e65473c1377ad944f..cff55a912228854b48cc8b021eec84956d21b721 100644
+--- a/plugins/pipeline-core/lib/runner-usage-v1.mjs
++++ b/plugins/pipeline-core/lib/runner-usage-v1.mjs
+@@ -436,7 +436,12 @@ function unbound(reasonCode) {
+ function requestedShapeValid(runner, requested) {
+   if (!exactKeys(requested, ["selector", "effort"]) || !exactKeys(requested.selector, ["kind", "value"])) return false;
+   if (runner === "claude") return requested.selector.kind === "alias" && ["fable", "haiku", "opus", "sonnet"].includes(requested.selector.value) && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(requested.effort);
+-  if (runner === "antigravity") return requested.selector.kind === "model-id" && ["gemini-3.1-pro-high", "gemini-3.7-flash-high", "gemini-3.7-flash-low"].includes(requested.selector.value) && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(requested.effort);
++  // C20b (FV fv20 red p3b C03): the Antigravity shape was a frozen list of three pre-G20-43 model ids, so the registry's current cells
++  // (the Critic's `inherit` alias, the newer flash ids) were refused as binding-mismatch before the exact registry match below
++  // (requestedMatchesRegisteredCell) could run. The shape now admits any Gemini model id and the inherit alias; the registry decides.
++  if (runner === "antigravity") return ((requested.selector.kind === "model-id" && /^gemini-[a-z0-9][a-z0-9.-]{0,80}$/u.test(String(requested.selector.value)))
++    || (requested.selector.kind === "alias" && requested.selector.value === "inherit"))
++    && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(requested.effort);
+   return requested.selector.kind === "model-id"
+     && ["gpt-5.6-sol", "gpt-5.6-terra"].includes(requested.selector.value)
+     && ["xhigh", "max"].includes(requested.effort)
+diff --git a/plugins/pipeline-core/scripts/runner-usage.schema.json b/plugins/pipeline-core/scripts/runner-usage.schema.json
+index a2d6b3ad72b885f30f3d2823b98b0993710da7c5..535beb79a8ac0ca732cd0731fe54e91ab34d7aaf 100644
+--- a/plugins/pipeline-core/scripts/runner-usage.schema.json
++++ b/plugins/pipeline-core/scripts/runner-usage.schema.json
+@@ -856,16 +856,40 @@
+         "value"
+       ],
+       "additionalProperties": false,
++      "oneOf": [
++        {
++          "type": "object",
++          "properties": {
++            "kind": {
++              "const": "model-id"
++            },
++            "value": {
++              "type": "string",
++              "pattern": "^gemini-[a-z0-9][a-z0-9.-]{0,80}$"
++            }
++          }
++        },
++        {
++          "type": "object",
++          "properties": {
++            "kind": {
++              "const": "alias"
++            },
++            "value": {
++              "const": "inherit"
++            }
++          }
++        }
++      ],
+       "properties": {
+         "kind": {
+-          "const": "model-id"
+-        },
+-        "value": {
+           "enum": [
+-            "gemini-3.1-pro-high",
+-            "gemini-3.7-flash-high",
+-            "gemini-3.7-flash-low"
++            "model-id",
++            "alias"
+           ]
++        },
++        "value": {
++          "type": "string"
+         }
+       }
+     },

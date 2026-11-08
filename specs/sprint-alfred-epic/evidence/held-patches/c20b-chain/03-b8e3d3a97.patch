@@ -1,0 +1,163 @@
+diff --git a/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs b/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
+index 4796b0614ea2cc28398b86e85112aedd9e2d1055..5b65ce45a6018c32f1d8ea8c769cfd415aca423d 100644
+--- a/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
++++ b/plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs
+@@ -62,7 +62,7 @@ const architecture = { schema: "pipeline.architecture-design.v1", repositoryKind
+ 
+ let counter = 0;
+ // One fixture per case: the profile receipt fingerprint is bound to this exact repository path.
+-function fixture({ stateTracked, verifyAtPhase = false }) {
++function fixture({ stateTracked, verifyAtPhase = false, registered = true }) {
+   const parent = join(WORK, `fx-${counter += 1}`);
+   mkdirSync(parent, { recursive: true });
+   const root = join(parent, "repo");
+@@ -82,12 +82,12 @@ function fixture({ stateTracked, verifyAtPhase = false }) {
+   gitOk("config", "core.autocrlf", "false");
+   assert.equal(realpathSync(root), root);
+   assert.equal(realpathSync(gitOk("rev-parse", "--show-toplevel")), root, "the fixture is its own repository");
+-  const lifecycle = (argv) => {
++  const lifecycle = (argv, extraDeps = {}) => {
+     const logs = [];
+     const old = { log: console.log, error: console.error, warn: console.warn };
+     for (const name of Object.keys(old)) console[name] = (...args) => { logs.push(args.map(String).join(" ")); };
+     let status;
+-    try { status = run(argv, { dir: root, now: () => AT }); } finally { Object.assign(console, old); }
++    try { status = run(argv, { dir: root, now: () => AT, ...extraDeps }); } finally { Object.assign(console, old); }
+     assert.equal(status, 0, `SETUP ${argv[0]}: ${logs.join("\n")}`);
+     return logs;
+   };
+@@ -167,10 +167,22 @@ function fixture({ stateTracked, verifyAtPhase = false }) {
+   lifecycle(["approve-plan", "--by", "synthetic-po", "--design-approval-request", requestPath]);
+   const approved = readCurrent();
+   assert.equal(approved.planApproval.schema, "pipeline.plan-approval.v9");
+-  lifecycle(["materialize-architecture"]);
++  // C20 G20-51: materialize-architecture registers the feature package itself; `registered: false` replays the pre-fix state
++  // (no registration) to pin the set-phase repair text, `registered: "auto"` returns the materialization output for inspection.
++  const materializeLogs = lifecycle(["materialize-architecture"], registered === false ? { registerFeaturePackageAfterArchitecture: () => null } : {});
++  if (registered === "auto") return { root, materializeLogs, git };
+   const compiled = compileDecisionSummary(root, { now: AT });
+   assert.equal(compiled.count, 0);
+   assert.equal(compiled.authorityStatus, "source-validated");
++  if (!registered) {
++    // C20 G20-51: the package is NOT registered (the step a live Claude Elephant skipped); set-phase must name that repair.
++    const logs = [];
++    const old = { log: console.log, error: console.error, warn: console.warn };
++    for (const name of Object.keys(old)) console[name] = (...args) => { logs.push(args.map(String).join(" ")); };
++    let status;
++    try { status = run(["set-phase", "--phase", "implementation", "--verify-command", COMMAND], { dir: root, now: () => AT }); } finally { Object.assign(console, old); }
++    return { root, phaseStatus: status, phaseLogs: logs };
++  }
+   const artifact = (kind, path, authority, mutability, retention) => ({ class: kind, path, sha256: sha256(read(path)), authority, mutability, retention });
+   // Synthetic project input, then the actual topology validator registers its real envelope.
+   writeJson("specs/e2e/lifecycle.json", { schema: "pipeline.feature-package.v1", feature: { id: FEATURE, rigor: 2 }, state: "approved", artifacts: [artifact("prd", PLAN, true, "mutable", "active"), artifact("spec", SPEC, true, "mutable", "active"), artifact("acceptance", "specs/e2e/acceptance.md", true, "mutable", "active"), artifact("result", "specs/e2e/result.md", true, "mutable", "active"), artifact("candidate-evidence", approved.planApproval.acceptedContract.path, false, "immutable", "retain")], candidate: structuredClone(request.approvalIntent.value.candidate), supersedes: null });
+@@ -329,6 +341,33 @@ test("G20-46: set-phase --verify-command prints the walkable route and it lands
+ 
+ // C20 G20-46: the same extra-path refusal now names the agent repair, never the override/signature course, and the
+ // named repair executed verbatim lands the twins; the exact-set rule itself is unchanged (still a refusal first).
++// C20 G20-51 (live Claude greenfield 2026-11-07): set-phase --verify-command before the feature package was registered was refused
++// CAC-REGISTRATION-INVALID with "Commit the baseline calibration through normal hooks", twice; the calibration was already committed.
++test("G20-51: set-phase on an unregistered package names register-feature-package as the agent repair, not a calibration commit", () => {
++  const { phaseStatus, phaseLogs } = fixture({ stateTracked: false, registered: false });
++  const text = phaseLogs.join("\n");
++  assert.equal(phaseStatus, 2, text);
++  assert.match(text, /CAC-REGISTRATION-INVALID/u);
++  assert.match(text, /register-feature-package\.mjs --root /u, text);
++  assert.match(text, /no PO step/u, text);
++  assert.doesNotMatch(text, /Commit the baseline calibration/u, text);
++});
++
++test("G20-51: materialize-architecture registers the feature package itself and names its files in the same commit step", () => {
++  const { root, materializeLogs, git } = fixture({ stateTracked: false, registered: "auto" });
++  const printed = JSON.parse(materializeLogs.find((line) => line.startsWith("{\"schema\":\"pipeline.architecture-design-materialization.v1\"")));
++  assert.equal(printed.status, "materialized");
++  assert.equal(printed.featurePackage?.status, "registered", JSON.stringify(printed.featurePackage));
++  assert.ok(existsSync(join(root, printed.featurePackage.manifestPath)), "the manifest exists");
++  assert.ok(printed.uncommittedPaths.includes(printed.featurePackage.manifestPath), `the commit step names the manifest: ${JSON.stringify(printed.uncommittedPaths)}`);
++  assert.ok(printed.uncommittedPaths.some((path) => path.startsWith("architecture/")), "the architecture stays in the same commit step");
++  // A second, explicit registration (the documented route agy and Codex follow) is a harmless no-op.
++  const again = spawnSync(process.execPath, [join(LIVE_PLUGIN_ROOT, "scripts", "register-feature-package.mjs"), "--root", root], { encoding: "utf8", env: { ...process.env } });
++  assert.equal(again.status, 0, again.stderr);
++  assert.equal(JSON.parse(again.stdout).status, "already-registered");
++  assert.equal(git("status", "--porcelain").status, 0);
++});
++
+ test("G20-46: an extra staged path beside the twins names the agent repair, no signature, and the repair lands", () => {
+   const ctx = { ...fixture({ stateTracked: false, verifyAtPhase: true }) };
+   ctx.before = ctx.head();
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 265a1e7993e9834deb5f2d42e234ccf1297955b9..13792323e66889432a2f40767b21410726b8619c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -903,6 +903,21 @@ export function statePath(dir = projectDir()) {
+   return legacy;
+ }
+ 
++/** G20-51: run the unchanged register-feature-package.mjs once after the architecture is materialized; its typed result, compacted. */
++function autoRegisterFeaturePackage(dir) {
++  const script = fileURLToPath(new URL("./register-feature-package.mjs", import.meta.url));
++  const run = spawnSync(process.execPath, [script, "--root", resolve(dir)], { cwd: resolve(dir), encoding: "utf8", shell: false, timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
++  let printed = null;
++  try { printed = JSON.parse(String(run.stdout ?? "").trim()); } catch { printed = null; }
++  if (!printed || typeof printed.status !== "string") {
++    return { status: "unavailable", code: run.error?.code ?? `exit-${run.status}`, commitPaths: [],
++      repair: `node ${script} --root ${resolve(dir)} (then commit the commitPaths it prints)` };
++  }
++  const commitPaths = Array.isArray(printed.commitPaths) ? printed.commitPaths.filter((path) => typeof path === "string") : [];
++  return { status: printed.status, code: printed.code ?? null, manifestPath: printed.manifestPath ?? null, commitPaths,
++    ...(printed.status === "refused" ? { repair: `node ${script} --root ${resolve(dir)} names the missing artifact or conflict (${printed.code ?? "FPR"})` } : {}) };
++}
++
+ function stateRelativePath(dir) {
+   return relative(resolve(dir), statePath(dir)).split(sep).join("/");
+ }
+@@ -11681,18 +11696,26 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       if (rest.length !== 0) { console.error("materialize-architecture accepts no arguments"); return 2; }
+       const lock = acquireContinuityLock(dir, "architecture-design-materialization");
+       if (!lock.ok) { console.error(JSON.stringify(lock)); return 2; }
++      let result;
+       try {
+-        const result = materializeArchitectureDesign(dir, { lock, gitCandidate: deps.gitCandidate,
++        result = materializeArchitectureDesign(dir, { lock, gitCandidate: deps.gitCandidate,
+           trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
+           verifyReadinessExecution: deps.verifyDesignReadinessHostExecution });
+-        // G20-36: the writer publishes files; while any of them is uncommitted the output names the exact commit step (additive keys).
+-        // The prose lives in `commitStep`, never in `nextAction`: `nextAction` is the structured, executable action every guided driver
+-        // follows (onboarding-init stopped with unsupported-next-action on a prose value).
+-        const commitStep = result.ok && result.status === "materialized" ? architectureCommitStep(dir, result.referencePath ? [result.referencePath] : []) : null;
+-        console.log(JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", status: result.status,
+-          code: result.code ?? null, receipt: result.receipt ?? null, ...(commitStep?.commitStep ? commitStep : {}) }));
+-        return result.ok && result.status === "materialized" ? 0 : 2;
+       } finally { releaseContinuityLock(lock); }
++      const materialized = result.ok && result.status === "materialized";
++      // G20-51 (live Claude greenfield 2026-11-07): the feature package registration is the next mandatory agent step after the
++      // approval (set-phase and every item dispatch refuse CAC-REGISTRATION-INVALID without it), and a Claude Elephant skipped it.
++      // It is done here, right after the architecture, through the unchanged registration CLI (a spawn: no new import cycle into this
++      // writer); its files join the same commit step. Never fatal: a refusal is reported (featurePackage) and the explicit
++      // register-feature-package.mjs route stays available; an existing registration answers already-registered.
++      const featurePackage = materialized ? (deps.registerFeaturePackageAfterArchitecture ?? autoRegisterFeaturePackage)(dir) : null;
++      // G20-36: the writer publishes files; while any of them is uncommitted the output names the exact commit step (additive keys).
++      // The prose lives in `commitStep`, never in `nextAction`: `nextAction` is the structured, executable action every guided driver
++      // follows (onboarding-init stopped with unsupported-next-action on a prose value).
++      const commitStep = materialized ? architectureCommitStep(dir, [...(result.referencePath ? [result.referencePath] : []), ...(featurePackage?.commitPaths ?? [])]) : null;
++      console.log(JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", status: result.status,
++        code: result.code ?? null, receipt: result.receipt ?? null, ...(featurePackage ? { featurePackage } : {}), ...(commitStep?.commitStep ? commitStep : {}) }));
++      return materialized ? 0 : 2;
+     }
+ 
+     case "set-phase": {
+@@ -11757,6 +11780,15 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         // lock before either companion or State mutation.
+         const committed = inspectReplayableCalibrationVerifyLayout({rootDir:dir,verifyCommand:requestedVerifyCommand,phaseEntry:true});
+         if (!["baseline-only","partial-current","configured-current","committed-configured"].includes(committed.status)) {
++          // G20-51 (live Claude greenfield 2026-11-07): the preflight reads the accepted delivery contract, so an unregistered
++          // envelope surfaces here as CAC-*. The generic calibration text sent the agent to commit calibration files that were
++          // already committed, twice; name the registration step instead (agent work, no PO step).
++          if (["CAC-REGISTRATION-INVALID","CAC-ENVELOPE-UNAVAILABLE"].includes(committed.code)) {
++            const register = `node ${fileURLToPath(new URL("./register-feature-package.mjs", import.meta.url))} --root ${dir}`;
++            console.error(`Error: set-phase implementation refused (${committed.code}): the approved plan's accepted delivery contract is not registered in the feature manifest (specs/<feature>/lifecycle.json). State and calibration unchanged.`);
++            console.error(`Repair (agent, no PO step): run \`${register}\`, commit exactly the commitPaths it prints (alone, in one commit), then rerun this set-phase command unchanged.`);
++            return 2;
++          }
+           console.error(`Error: set-phase implementation refused calibration commit preflight (${committed.code ?? committed.status}); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.`);
+           return 2;
+         }
