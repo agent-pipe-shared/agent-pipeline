@@ -834,6 +834,8 @@ export function summarizeOnboardingIntakeGeneratePlan(plan, { runner, intent } =
       code: plan.authoringCopy.code ?? null,
       requiredIgnoreRule: plan.authoringCopy.requiredIgnoreRule,
     },
+    // The summary is the form the next action requests, so a warning left out here reaches nobody. It holds categories and file names only.
+    ...(plan.warnings === undefined ? {} : { warnings: plan.warnings }),
     nextAction: plan.nextAction,
     fullPlanAction: {
       kind: "command", executable: "node", argv: fullArgv,

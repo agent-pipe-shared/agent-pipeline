@@ -86,7 +86,7 @@ import {
   validateKickoffGoal,
 } from "./onboarding-continuity.mjs";
 import { devNull } from "node:os";
-import { derivePatterns } from "../scripts/check-private-identifiers.mjs";
+import { derivePatterns, scanChangedContent } from "../scripts/check-private-identifiers.mjs";
 import { bindRealSessionCleanup, startBoundRequester } from "./test-session-cleanup-requester-fixture.mjs";
 
 const cases = [];
@@ -4018,6 +4018,33 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path 
   assert.equal(failed.planSha256, plainPlan.planSha256);
 });
 
+// Greenfield 2026-11-08 (Codex): a design question quoted the git author identity; design-input.md was generated with the
+// address, bound as provenance, and only then refused by the pre-commit identifier check, with no route left to change it.
+check("applyOnboardingIntakeGenerate: an e-mail address in a design question reaches no tracked target, the commit check passes the generated file, and the private checkpoint keeps the original question", () => {
+  const address = "person.name@example.invalid";
+  const question = `Keep git author Person <${address}> or change it?`;
+  const root = readyToGenerateRoot("intake-generate-email-projection");
+  applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: [{ question, answer: "Keep it." }], replace: true, activate: true });
+  const configured = spawnSync("git", ["config", "user.email", address], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(configured.status, 0, configured.stderr);
+  writeFileSync(join(root, ".gitignore"), "scratch/\n");
+
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal("warnings" in plan, false, "nothing is left for the early warning to report");
+  assert.equal(plan.targets.designInput.content.includes("### Q1: Keep git author Person <[REDACTED EMAIL]> or change it?"), true);
+  for (const key of ["designInput", "prd", "spec"]) assert.equal(plan.targets[key].content.includes(address), false, `${key} must not carry the address`);
+
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const staged = spawnSync("git", ["add", "--", plan.targets.designInput.path], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(staged.status, 0, staged.stderr);
+  assert.deepEqual(scanChangedContent(root, { scopes: ["staged"] }), { ok: true, findings: [] }, "the commit check accepts the generated file");
+  assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).value.designQuestions[0].question, question, "the private intake store stays lossless");
+
+  const clean = planOnboardingIntakeGenerate({ rootDir: readyToGenerateRoot("intake-generate-email-clean") });
+  assert.equal(clean.targets.designInput.content.includes("### Q1: What is the goal?"), true, "a question without an address keeps its bytes");
+  assert.equal(clean.targets.designInput.content.includes("[REDACTED EMAIL]"), false);
+});
+
 // NVA-GF-GREENFIELD-INTAKEPROJ-1: capture remains lossless and private, while
 // intake-generate-apply publishes one deterministic tracked projection. A
 // local operator path must not strand the greenfield flow or ride unchanged
@@ -5607,7 +5634,7 @@ for (const [label, options] of Object.entries({
   });
 }
 
-assert.equal(cases.length, 327,"the complete onboarding continuity corpus must be registered before execution begins");
+assert.equal(cases.length, 328,"the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

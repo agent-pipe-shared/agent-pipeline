@@ -7429,13 +7429,18 @@ const INTAKE_TRACKED_LOCAL_PATH_PATTERNS = [
 ];
 const INTAKE_TRACKED_PATH_TRAILING_PUNCTUATION = /[),.;:!?\]}]+$/u;
 
+// An e-mail address in a design question (the git author identity, for example) would reach the tracked
+// design-input.md, where the pre-commit identifier check refuses it AFTER the file is bound as provenance.
+const INTAKE_TRACKED_EMAIL_MARKER = "[REDACTED EMAIL]";
+const INTAKE_TRACKED_EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/gu;
+
 function trackedIntakeProjectionText(text) {
   return INTAKE_TRACKED_LOCAL_PATH_PATTERNS.reduce((projected, pattern) => (
     projected.replace(pattern, (matched) => {
       const trailing = matched.match(INTAKE_TRACKED_PATH_TRAILING_PUNCTUATION)?.[0] ?? "";
       return INTAKE_TRACKED_LOCAL_PATH_MARKER + trailing;
     })
-  ), text);
+  ), text).replace(INTAKE_TRACKED_EMAIL_PATTERN, INTAKE_TRACKED_EMAIL_MARKER);
 }
 
 // PO decision 2026-10-18 (ALF-H4-PF14-DESIGN-INPUT-PROVENANCE): no tracked design artifact
@@ -7443,7 +7448,7 @@ function trackedIntakeProjectionText(text) {
 // stays the lossless source; the verbatim text is rendered ONLY into the git-ignored
 // authoring copy below (renderIntakeMaterialInputSection, raw chunks, never projected).
 // What remains of the tracked projection is the QUESTION text listed in design-input.md,
-// which still passes through the local-path projection above.
+// which still passes through the local-path and e-mail projection above.
 function renderIntakeDesignQuestionList(designQuestions) {
   if (designQuestions === null) return "(design questions not yet answered)\n";
   if (designQuestions.length === 0) return "No open design questions were affirmed at intake.\n";

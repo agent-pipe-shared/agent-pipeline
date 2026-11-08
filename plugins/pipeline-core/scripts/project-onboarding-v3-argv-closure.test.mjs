@@ -20,7 +20,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { main as onboardingCli, buildPostPromotionHookProvisioningAction, postPromotionActionFor } from "./project-onboarding-v3.mjs";
+import { main as onboardingCli, buildPostPromotionHookProvisioningAction, postPromotionActionFor, summarizeOnboardingIntakeGeneratePlan } from "./project-onboarding-v3.mjs";
 import { captureClaudeIntakePrompt } from "../lib/claude-intake-prompt-capture.mjs";
 import { captureClaudeInitialPromptPointer } from "../lib/claude-initial-prompt-pointer.mjs";
 import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
@@ -564,6 +564,13 @@ test("intake-generate-plan defaults to a digest-stable summary and requires --ve
     assert.equal(conflict.status, 2, conflict.output);
     assert.match(conflict.output, /--summary and --verbose cannot be used together/u);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("the generate plan summary carries a private-identifier warning, and no warnings field when there is none", () => {
+  const plan = { root: "/r", repositoryCapability: "local", featureId: "f", checkpointDataSha256: "c", planSha256: "p", targets: {}, nextAction: null };
+  const warnings = [{ code: "INTAKE-PRIVATE-IDENTIFIER", categories: ["local-pattern"], targets: ["design-input.md"], remedy: "x" }];
+  assert.deepEqual(summarizeOnboardingIntakeGeneratePlan({ ...plan, warnings }).warnings, warnings);
+  assert.equal("warnings" in summarizeOnboardingIntakeGeneratePlan(plan), false);
 });
 
 test("project-onboarding-v3 CLI: mini retains early acknowledgement while feature and epic wait for the final package", () => {
