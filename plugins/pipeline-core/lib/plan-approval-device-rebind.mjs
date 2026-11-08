@@ -15,6 +15,7 @@
 import { join } from "node:path";
 import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
 import { readPrivateJson, writePrivateJsonAtomic } from "./private-boundary.mjs";
+import { parseYaml } from "./yaml-lite.mjs";
 
 export const PLAN_APPROVAL_DEVICE_REBIND_SCHEMA = "pipeline.plan-approval-device-rebind.v1";
 export const DEVICE_LOCAL_AUTHORITY_FIELDS = Object.freeze(["receiptSha256", "repositoryFingerprint"]);
@@ -34,6 +35,28 @@ const sameKeys = (value, keys) => isObject(value)
 const deviceValues = (value, fields = DEVICE_LOCAL_AUTHORITY_FIELDS) => Object.fromEntries(fields.map((key) => [key, value?.[key]]));
 const validDeviceValues = (value, fields = DEVICE_LOCAL_AUTHORITY_FIELDS) => sameKeys(value, fields)
   && fields.every((key) => SHA256.test(value[key] ?? ""));
+
+// G20-58: the only PO profile source keys a plan approval may outlive. Model routing (and the registry digest that is
+// regenerated with it) chooses which model runs a role; it decides no gate, approval, autonomy, export or release value.
+export const REBINDABLE_PROFILE_SOURCE_KEYS = Object.freeze(["core_registry_sha256", "routing"]);
+
+/**
+ * G20-58/G20-64: the top-level keys of the PO profile source (pipeline.user.yaml text) that differ between the approved and
+ * the current text, ignoring only the model routing. Unparseable text or a non-mapping root is a change of everything.
+ */
+export function profileSourceChangedKeys(approvedText, currentText) {
+  let approved;
+  let current;
+  try {
+    approved = parseYaml(String(approvedText));
+    current = parseYaml(String(currentText));
+  } catch { return ["<unparseable>"]; }
+  if (!isObject(approved) || !isObject(current)) return ["<root>"];
+  const keys = [...new Set([...Object.keys(approved), ...Object.keys(current)])].sort();
+  return keys.filter((key) => !REBINDABLE_PROFILE_SOURCE_KEYS.includes(key)
+    && (Object.hasOwn(approved, key) !== Object.hasOwn(current, key)
+      || sha256CanonicalJson(approved[key] ?? null) !== sha256CanonicalJson(current[key] ?? null)));
+}
 
 /** True only when both values carry the same keys and differ in nothing but the given rebindable fields. */
 export function differsOnlyInDeviceFields(stored, current, fields = DEVICE_LOCAL_AUTHORITY_FIELDS) {

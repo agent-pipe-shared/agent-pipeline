@@ -33,9 +33,8 @@ import { verifyFinalDesignWorkflowApproval } from "./architecture-design.mjs";
 import { ensurePrivateDirectory, writePrivateFileNoReplaceAtomic } from "./private-boundary.mjs";
 import { poGateProfileProjectionPaths, validatePoGateAuthorityForRepository, validatePoGateProfileForRepository } from "./po-gate-authority.mjs";
 import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
-import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_SOURCE_REBIND_FIELDS, withOriginDeviceValues,
-  writePlanApprovalDeviceRebindReceipt } from "./plan-approval-device-rebind.mjs";
-import { parseYaml } from "./yaml-lite.mjs";
+import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_SOURCE_REBIND_FIELDS, profileSourceChangedKeys,
+  withOriginDeviceValues, writePlanApprovalDeviceRebindReceipt } from "./plan-approval-device-rebind.mjs";
 import { observeCurrentPlanApprovalForCalibration, readAcceptedDeliveryContract } from "../scripts/pipeline-state.mjs";
 
 export const REBIND_APPROVAL_SCHEMA = "pipeline.rebind-approval.v1";
@@ -160,9 +159,6 @@ function lostArtifactPrerequisite(paths) {
   };
 }
 
-// G20-58: the only PO profile source keys a plan approval may outlive. Model routing (and the registry digest that is
-// regenerated with it) chooses which model runs a role; it decides no gate, approval, autonomy, export or release value.
-export const REBINDABLE_PROFILE_SOURCE_KEYS = Object.freeze(["core_registry_sha256", "routing"]);
 const MAX_PROFILE_SOURCE_HISTORY = 200;
 
 /**
@@ -190,22 +186,7 @@ export function routingOnlyProfileSourceChange({ root, approvedSha256, currentSh
     }
   }
   if (approvedText === null) return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE" };
-  let approved;
-  let current;
-  try {
-    approved = parseYaml(approvedText);
-    current = parseYaml(currentFile.bytes.toString("utf8"));
-  } catch {
-    return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-CHANGED", extra: { changedKeys: ["<unparseable>"] } };
-  }
-  const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
-  if (!plain(approved) || !plain(current)) {
-    return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-CHANGED", extra: { changedKeys: ["<root>"] } };
-  }
-  const keys = [...new Set([...Object.keys(approved), ...Object.keys(current)])].sort();
-  const changedKeys = keys.filter((key) => !REBINDABLE_PROFILE_SOURCE_KEYS.includes(key)
-    && (Object.hasOwn(approved, key) !== Object.hasOwn(current, key)
-      || sha256CanonicalJson(approved[key] ?? null) !== sha256CanonicalJson(current[key] ?? null)));
+  const changedKeys = profileSourceChangedKeys(approvedText, currentFile.bytes.toString("utf8"));
   if (changedKeys.length > 0) return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-CHANGED", extra: { changedKeys } };
   return { ok: true };
 }

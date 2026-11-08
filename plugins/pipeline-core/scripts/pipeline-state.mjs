@@ -467,6 +467,7 @@ import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicabili
 import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
 import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
 import { rebindApproval } from "../lib/rebind-approval.mjs";
+import { profileSourceChangedKeys } from "../lib/plan-approval-device-rebind.mjs";
 import { designWorkflowAdvisorExceptionBinding, readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
 import {
   createDesignWorkflowPackageApprovalRequest,
@@ -10155,7 +10156,12 @@ function acceptedCandidateAt({dir,candidate}) {
 function acceptedOriginalPolicy({dir,candidate,path}, reader) {
   const bytes = acceptedCandidateFile({dir,candidate,path});
   const physical = physicalRebindFile(dir,path);
-  if (!physical || !Buffer.from(physical.bytes).equals(Buffer.from(bytes))) throw Error("current policy differs from original approval policy");
+  if (!physical) throw Error("current policy differs from original approval policy");
+  // G20-64: the PO profile source may differ from the approved bytes in its model routing only (the rule rebind-approval
+  // applies, G20-58); the approval mode, gates and every other key still have to be the approved ones.
+  const routingOnly = path === "pipeline.user.yaml"
+    && profileSourceChangedKeys(Buffer.from(bytes).toString("utf8"), Buffer.from(physical.bytes).toString("utf8")).length === 0;
+  if (!Buffer.from(physical.bytes).equals(Buffer.from(bytes)) && !routingOnly) throw Error("current policy differs from original approval policy");
   return reader(dir);
 }
 function acceptedOriginalMode({dir,candidate}) {

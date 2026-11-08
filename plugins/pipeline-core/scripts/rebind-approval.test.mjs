@@ -82,7 +82,7 @@ import { validPlanSubmission, validPreviousCurrentPlanApproval } from "../lib/pl
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { run, SCHEMA_ID, statePath } from "./pipeline-state.mjs";
-import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_SOURCE_REBIND_FIELDS, readPlanApprovalDeviceRebind,
+import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_SOURCE_REBIND_FIELDS, profileSourceChangedKeys, readPlanApprovalDeviceRebind,
   withOriginDeviceValues, writePlanApprovalDeviceRebindReceipt } from "../lib/plan-approval-device-rebind.mjs";
 import { readPlanApprovalDeviceRebind as readKernelPlanApprovalDeviceRebind } from "../lib/po-gate-authority-read.mjs";
 import { routingOnlyProfileSourceChange } from "../lib/rebind-approval.mjs";
@@ -611,6 +611,17 @@ test("G20-58c: any change outside the model routing, unknown approved bytes or a
     "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE", "approved bytes absent from history are never assumed");
   assert.equal(routingOnlyProfileSourceChange({ root: dir, approvedSha256, currentSha256: h("e") }).code,
     "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE", "the current bytes must be the ones the authority read");
+});
+
+// G20-64 (measured live 2026-11-08 after 20b was installed): rebind-approval passed the routing-only check, then the
+// retained contract readback refused CAC-SOURCE-UNAVAILABLE because acceptedOriginalMode compared the full bytes of the
+// PO profile source with the approved ones a second time. Both places now share one rule.
+test("G20-64: the shared profile-source rule ignores only the model routing, for rebind and contract readback alike", () => {
+  const routed = APPROVED_PROFILE.replace("effort: \"high\"", "effort: \"low\"").replace(h("1"), h("2"));
+  assert.deepEqual(profileSourceChangedKeys(APPROVED_PROFILE, routed), []);
+  assert.deepEqual(profileSourceChangedKeys(APPROVED_PROFILE, APPROVED_PROFILE.replace("\"signature\"", "\"chat\"")), ["gates"]);
+  assert.deepEqual(profileSourceChangedKeys(APPROVED_PROFILE, "gates: [unclosed"), ["<unparseable>"]);
+  assert.deepEqual(profileSourceChangedKeys(APPROVED_PROFILE, "- a\n- b\n"), ["<root>"]);
 });
 
 test("R7-5g: rebind-approval --help and -h answer the question and run nothing; an argument is refused", () => {

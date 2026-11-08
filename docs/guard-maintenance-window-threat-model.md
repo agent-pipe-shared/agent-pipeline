@@ -699,6 +699,14 @@ accepts a receipt only with exactly the device-local fields or exactly those plu
 the source digest. `lib/rebind-approval.mjs` gains one import, `lib/yaml-lite.mjs`,
 already a kernel path.
 
+G20-64 (2026-11-08) moves that routing-only comparison into the kernel module itself:
+`lib/plan-approval-device-rebind.mjs` exports `profileSourceChangedKeys` and gains the
+same one import, `lib/yaml-lite.mjs`, already a kernel path; `lib/rebind-approval.mjs`
+and the contract readback in `scripts/pipeline-state.mjs` (`acceptedOriginalPolicy`)
+both call it, so a PO profile source that differs only in `routing` and
+`core_registry_sha256` is judged by one rule in both places and nothing else is
+widened.
+
 Dispatch-model enforcement (D84, 2026-10-21) adds
 `plugins/pipeline-core/lib/dispatch-model-enforcement.mjs` (decides whether the
 tool-layer `model` of a subagent dispatch is one the configured routing selects,
