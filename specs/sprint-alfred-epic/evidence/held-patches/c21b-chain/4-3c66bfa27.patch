@@ -1,0 +1,64 @@
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs b/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
+index 814cb4407b0153c593fd2b8b7aa0a22b13a166b7..eaf4282eb5f5a0ed03cc99d90c66c12b0f4ad9c0 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
+@@ -45,7 +45,7 @@ export function newDiagnosticPath(root, path) {
+     at = resolve(at, part);
+     if (existsSync(at) && lstatSync(at).isSymbolicLink()) fail("CDI-OUTPUT-PATH");
+   }
+-  if (existsSync(at)) fail("CDI-OUTPUT-EXISTS");
++  if (existsSync(at)) fail("CDI-OUTPUT-EXISTS", `${path} already exists and evidence is never overwritten; pass a new --log or --out name.`);
+   return at;
+ }
+ function git(root, args) {
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+index 8ae71f47baf3d44fdf1f348c738298f77ed5186f..28d4c69dadb50e38cffa777da0e81d9d32ae41e5 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { test } from "node:test";
+-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
++import { existsSync, mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join, resolve } from "node:path";
+ import { spawnSync } from "node:child_process";
+@@ -95,6 +95,17 @@ test("D167-PF78 (1) the producer accepts evidence/ and specs/<id>/evidence/ and
+     assert.throws(() => produceCriticDiagnostic({ ...options(f), logPath: "evidence/t2.log", fullVerifyPath: "spec.md" }), /CDI-PATH|CDI-OUTPUT-PATH/u);
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
++test("C21B a --full-verify path outside the evidence folders is refused before the capture, names the repair, and leaves no log for the retry to trip over", () => {
++  const f = fixture();
++  try {
++    assert.throws(() => produceCriticDiagnostic({ ...options(f), logPath: "evidence/retry.log", fullVerifyPath: "scratch/verify.json" }), /CDI-PATH: --full-verify scratch\/verify\.json must lie under evidence\/.*--pending full-verify/u);
++    assert.equal(existsSync(join(f.root, "evidence/retry.log")), false, "the failed attempt must leave no log");
++    mkdirSync(join(f.root, "evidence"), { recursive: true });
++    writeFileSync(join(f.root, "evidence/taken.log"), "x");
++    assert.throws(() => produceCriticDiagnostic({ ...options(f), logPath: "evidence/taken.log" }), /CDI-OUTPUT-EXISTS: evidence\/taken\.log already exists.*new --log or --out name/u);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("D167-PF78 (4) the shared predicate agrees with the producer for a table of paths and the registrar uses it", () => {
+   const f = fixture();
+   try {
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs b/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
+index 8b37cece377846fe2cc5685c85abbf01dde1343f..d9cd79b7a9d417019b94664eec735d5bd93602ae 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
+@@ -48,13 +48,14 @@ export function produceCriticDiagnostic({ root, candidate = "HEAD", baseRef = un
+   if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") fail("CDI-DIRTY-CANDIDATE");
+   newDiagnosticPath(root, logPath);
+   if (diagnosticEvidenceLocation(logPath) === null || !Array.isArray(command) || command.length === 0) fail("CDI-CAPTURE-INPUT");
++  // C21B: refused BEFORE the capture, otherwise the failed attempt leaves its log behind and the retry with the same names stops on CDI-OUTPUT-EXISTS.
++  if (fullVerifyPath !== null && diagnosticEvidenceLocation(fullVerifyPath) === null) fail("CDI-PATH", `--full-verify ${fullVerifyPath} must lie under evidence/ or specs/<feature-id>/evidence/; move the Verify evidence there, or drop the flag and declare the gap with --pending full-verify. Nothing was written.`);
+   const spec = source(root, bound.commit, specPath);
+   const guardrails = [...new Set(guardrailPaths)].sort().map(path => source(root, bound.commit, path));
+   const captured = captureEvidence({ command, label, out: logPath, cwd: root, repoRoot: root });
+   if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") fail("CDI-DIRTY-CANDIDATE");
+   const fullVerify = { status: "not-run", evidence: null };
+   if (fullVerifyPath !== null) {
+-    if (diagnosticEvidenceLocation(fullVerifyPath) === null) fail("CDI-PATH");
+     const bytes = readDiagnosticArtifact(root, fullVerifyPath);
+     const observed = inspectCriticVerifyDiagnostic(JSON.parse(bytes), bound);
+     if (observed.execution !== "full") fail("CDI-FULL-VERIFY", fullVerifyExecutionRefusal(observed));

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 21b (Antigravity close: Critic verdict return, Result stop before Verify, repair texts): 2 held patches exported from the build clone chain cf73ce22d..6fc14c118
+# PO apply script for candidate 21b (Antigravity close, Critic verdict return, Gitleaks ruleset of an installed plugin, diagnostic evidence refusals): 4 held patches exported from the build clone chain cf73ce22d..3c66bfa27
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -16,10 +16,12 @@ step() {
 }
 step 1-33ad1664d 'fix(critic): send a verdict-less Antigravity Critic message back once so the close needs no PO signature'
 step 2-6fc14c118 'fix(close): stop before Verify when no Result is bound and name the exact repair for caller-authored Critics and proof refusals'
+step 3-3e05ccd30 'fix(security): use the repo-root Gitleaks ruleset only in the source checkout, never a stray file above an installed plugin'
+step 4-3c66bfa27 'fix(critic): refuse a misplaced Verify evidence path before the capture and say what to do'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
-git diff --cached --quiet || git commit --no-verify -m 'chore(inventory): refresh the derived files after candidate 21b (Antigravity close: Critic verdict return, Result stop before Verify, repair texts) (ledger, inventory baseline, Reader inputs)' -m "AI-Assisted: true" -m "Dispatch: stage-0 (elephant)"
+git diff --cached --quiet || git commit --no-verify -m 'chore(inventory): refresh the derived files after candidate 21b (Antigravity close, Critic verdict return, Gitleaks ruleset of an installed plugin, diagnostic evidence refusals) (ledger, inventory baseline, Reader inputs)' -m "AI-Assisted: true" -m "Dispatch: stage-0 (elephant)"
 echo "derived files refreshed"
 git log --oneline -5
 git status --short
