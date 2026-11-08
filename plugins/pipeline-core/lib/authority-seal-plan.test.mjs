@@ -80,8 +80,12 @@ test("LB4-2 a stale review is refused by name with the re-request exit; a matchi
 test("LB4-3 design-input bytes that differ from the capture record are a provenance refusal with the way out", () => {
   const refused = buildSealPlan(base({ designInputCapture: { path: INPUT, sha256: D("1") } }));
   assert.equal(refused.code, "PSP-PROVENANCE");
-  assert.deepEqual(refused.exits, ["reopen-design"]);
+  assert.deepEqual(refused.exits, ["recapture-design-input"]);
+  assert.match(refused.repair, /reopen-design records no new capture/u, "the text no longer offers a route that cannot repair this");
   assert.equal(buildSealPlan(base({ designInputCapture: null })).ok, true, "no capture record: nothing to compare (documented)");
+  const review = { kind: "readiness", ref: RECEIPT, prdSha256: D("a"), specSha256: D("b"), designInputSha256: D("9") };
+  assert.equal(buildSealPlan(base({ reviews: [review], supersededDesignInputs: [D("9")] })).ok, true, "a review of the exact bytes a recapture replaced stays valid");
+  assert.equal(buildSealPlan(base({ reviews: [review], supersededDesignInputs: [D("8")] })).code, "PSP-STALE-REVIEW", "any other design-input bytes stay stale");
 });
 
 test("LB4-4 a sealed package, an invalid authority and a package outside the PRD release scope each get their own typed answer", () => {

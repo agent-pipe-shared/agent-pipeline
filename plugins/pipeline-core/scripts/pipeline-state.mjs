@@ -459,7 +459,7 @@ import {
   SEAL_PLAN_PATH, advisoryBindingFromAdmission, buildSealPlan, checkSealPlanForApply, provenanceUnavailableRefusal, readSealDocuments,
   readinessBindingFromSources, sealPaths, sealPlanNotPresentedRefusal, sealedAuthorityFromPlan, unreadableReviewRefusal,
 } from "../lib/authority-seal-plan.mjs";
-import { readPromotionDesignInputCapture } from "../lib/onboarding-continuity.mjs";
+import { applyDesignInputRecapture, planDesignInputRecapture, readPromotionDesignInputCapture } from "../lib/onboarding-continuity.mjs";
 import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRetirementIntakeLock} from '../lib/onboarding-continuity.mjs';
 import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
 import {coverOnboardingOutput} from '../lib/onboarding-consent-scope.mjs';
@@ -779,7 +779,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 const PIPELINE_STATE_COMMANDS = Object.freeze([
   "materialize-architecture", "afk-project",
   "inspect", "update-public-handover", "rebind-approval",
-  "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "prepare-seal", "seal-plan-approval",
+  "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "prepare-seal", "recapture-design-input", "seal-plan-approval",
   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance", "approve-critic-acknowledgement",
   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
@@ -13465,6 +13465,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       const stop = (refusal) => { printSealRefusal("prepare-seal", refusal); return 2; };
       let documents = null;
       let designInputCapture = null;
+      let supersededDesignInputs = [];
       const reviews = [];
       if (seal.status === "draft" && inSealScope(profile)) {
         const docs = currentSealDocuments(dir, seal);
@@ -13472,7 +13473,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         documents = docs.documents;
         let capture;
         try { capture = (deps.readDesignInputCapture ?? readPromotionDesignInputCapture)({ rootDir: dir }); } catch { capture = { status: "unavailable" }; }
-        if (capture?.status === "present") designInputCapture = { path: capture.path, sha256: capture.sha256 };
+        if (capture?.status === "present") { designInputCapture = { path: capture.path, sha256: capture.sha256 }; supersededDesignInputs = capture.supersededSha256 ?? []; }
         else if (capture?.status === "drift") return stop(provenanceUnavailableRefusal("design-input.md no longer matches the bytes captured when the package was promoted"));
         else if (capture?.status !== "absent" && documents.designInput !== null) return stop(provenanceUnavailableRefusal("the promotion capture record of design-input.md is not readable"));
         const designInputPath = documents.designInput?.path ?? null;
@@ -13491,7 +13492,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         }
         for (const extra of (deps.reviewBindings?.() ?? [])) reviews.push(extra);
       }
-      const built = buildSealPlan({ authority: continuity?.authority, featureId: continuity?.featureId, revision: continuity?.revision, profile, documents, designInputCapture, reviews });
+      const built = buildSealPlan({ authority: continuity?.authority, featureId: continuity?.featureId, revision: continuity?.revision, profile, documents, designInputCapture, reviews, supersededDesignInputs });
       if (!built.ok) {
         // A plan file left on a package that is already sealed is inert but orphaned: this command retires it (it never writes State).
         if (built.code === "PSP-ALREADY-SEALED" && removeSealPlanFile(dir)) console.log("The stray seal plan file (scratch/seal-plan.json) was retired; State was not changed.");
@@ -13503,6 +13504,33 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       console.log(`Seal plan ${built.planSha256.slice(0, 12)}... prepared for State revision ${built.plan.stateRevision}; State was not changed.`);
       console.log("Next: submit-plan if the plan is not submitted yet (the submission changes the State revision, so prepare-seal runs after it), then present-plan --review-receipt (the request the PO signs now covers this plan digest), then approve-plan: the approval seals the PRD and the Spec. Edited a document? Run prepare-seal again; reopen-design stays available at any time.");
       return 0;
+    }
+
+    // Regenerates a generated design-input.md that holds a private identifier and records the new capture (draft packages only). Without
+    // flags it prints the plan and writes nothing; with that plan's digest it applies it. State is not written.
+    case "recapture-design-input": {
+      const applying = rest.length === 2 && rest[0] === "--plan-sha256" && /^[a-f0-9]{64}$/u.test(rest[1] ?? "");
+      if (rest.length !== 0 && !applying) { console.error("Error: recapture-design-input accepts no arguments, or --plan-sha256 <digest> from its plan."); return 2; }
+      const refused = (code, reason) => { console.error(`Error: recapture-design-input refused (${code}): ${reason}. Nothing was changed.`); return 2; };
+      if (readAuthoritySeal(base.continuity?.authority).status !== "draft" || base.planApproved === true) {
+        return refused("DESIGN-INPUT-RECAPTURE-NOT-DRAFT", "only an unapproved draft package may have its design input regenerated");
+      }
+      try {
+        if (!applying) {
+          const plan = planDesignInputRecapture({ rootDir: dir });
+          console.log(JSON.stringify(plan, null, 2));
+          console.log(`Next: review the two digests, then run recapture-design-input --plan-sha256 ${plan.planSha256}. Nothing was changed.`);
+          return 0;
+        }
+        const result = applyDesignInputRecapture({ rootDir: dir, expectedPlanSha256: rest[1] });
+        if (result.mutated) removeSealPlanFile(dir);
+        console.log(JSON.stringify(result, null, 2));
+        console.log(`Next: commit ${result.designInputPath} on its own, then run submit-plan if the plan is not submitted, prepare-seal and present-plan. The PRD, the Spec and their reviews stay unchanged; their Source lines keep the earlier digest, and the private history records the step from it to the new one.`);
+        return 0;
+      } catch (error) {
+        if (error instanceof OnboardingContinuityKickoffError) return refused(error.code, error.message);
+        throw error;
+      }
     }
 
     case "materialize-push-threat-model": {

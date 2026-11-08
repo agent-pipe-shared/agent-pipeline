@@ -190,6 +190,9 @@ const DEFAULT_SESSION_CLEANUP_SCRIPT = join(HERE, "..", "scripts", "session-clea
 const STATE_RELATIVE_PATH = NEUTRAL_STATE;
 const CALIBRATION_RELATIVE_PATH = NEUTRAL_CALIBRATION;
 const HISTORY_BASENAME = "continuity-history.json";
+const DESIGN_INPUT_RECAPTURE_KIND = "design-input-recapture";
+const DESIGN_INPUT_RECAPTURE_PLAN_SCHEMA = "pipeline.design-input-recapture-plan.v1";
+const DESIGN_INPUT_RECAPTURE_APPLY_SCHEMA = "pipeline.design-input-recapture-apply.v1";
 const SESSION_CLEANUP_BINDING_BASENAME = "session-cleanup-binding.json";
 const SESSION_CLEANUP_KEY_BASENAME = "session-cleanup-binding.key";
 const SESSION_CLEANUP_RELEASE_RECEIPT_BASENAME = "session-cleanup-release-receipt.json";
@@ -1037,7 +1040,11 @@ export function readPromotionDesignInputCapture(options = {}) {
   }
   const entries = Array.isArray(observed.history?.transactions) ? observed.history.transactions : [];
   const latest = [...entries].reverse().find((entry) => typeof entry.designInputPath === "string" && SHA256_RE.test(entry.designInputSha256 ?? ""));
-  return latest === undefined ? { status: "absent" } : { status: "present", path: latest.designInputPath, sha256: latest.designInputSha256 };
+  if (latest === undefined) return { status: "absent" };
+  // The exact digests a recorded recapture replaced: a review of those bytes reviewed the same design input before its redaction.
+  const supersededSha256 = entries.filter((entry) => entry.kind === DESIGN_INPUT_RECAPTURE_KIND && entry.designInputPath === latest.designInputPath)
+    .map((entry) => entry.previousDesignInputSha256);
+  return { status: "present", path: latest.designInputPath, sha256: latest.designInputSha256, ...(supersededSha256.length === 0 ? {} : { supersededSha256 }) };
 }
 
 function validateHistory(value) {
@@ -1123,13 +1130,25 @@ function validateHistory(value) {
     // absent-pristine precondition (SSc.3) means the configured handover cannot already exist.
     && entry.handover.beforeSha256 === null
     && SHA256_RE.test(entry.handover.afterSha256);
+  // A recapture is a chained successor of the entry before it; it replaces no earlier record. A bootstrap binding stays the only
+  // non-recapture entry of its history.
+  const validRecapture = (entry, previous) => exactKeys(entry, new Set([
+    "kind", "transactionSha256", "previousTransactionSha256", "featureId", "designInputPath", "designInputSha256", "previousDesignInputSha256",
+  ]))
+    && entry.kind === DESIGN_INPUT_RECAPTURE_KIND
+    && SHA256_RE.test(entry.transactionSha256)
+    && entry.previousTransactionSha256 === previous?.transactionSha256
+    && SAFE_FEATURE_ID.test(entry.featureId)
+    && typeof entry.designInputPath === "string" && safePath(entry.designInputPath)
+    && SHA256_RE.test(entry.designInputSha256) && SHA256_RE.test(entry.previousDesignInputSha256)
+    && entry.designInputSha256 !== entry.previousDesignInputSha256;
   if (!exactKeys(value, new Set(["schema", "transactions"]))
     || value.schema !== KICKOFF_HISTORY_SCHEMA
     || !Array.isArray(value.transactions)
     || value.transactions.length < 1
     || !(validKickoff(value.transactions[0])
-      || (value.transactions.length === 1 && validBootstrapBinding(value.transactions[0])))
-    || !value.transactions.slice(1).every((entry, index) => validPromotion(entry, value.transactions[index]))) {
+      || (value.transactions.slice(1).every((entry) => entry?.kind === DESIGN_INPUT_RECAPTURE_KIND) && validBootstrapBinding(value.transactions[0])))
+    || !value.transactions.slice(1).every((entry, index) => validPromotion(entry, value.transactions[index]) || validRecapture(entry, value.transactions[index]))) {
     fail("KICKOFF-HISTORY-MALFORMED", "private continuity history is malformed");
   }
   return true;
@@ -1318,8 +1337,12 @@ function observeDetailed({
       // a sanctioned edit terminal. Every state the lifecycle has NOT released --
       // which is every state that never reopened its design -- keeps the check.
       const reopened = promotedDesignReopened(stateObservation);
+      // A recapture moved the provenance on: the seal plan compares the current file with the latest capture (PSP-PROVENANCE), and the
+      // capture it replaced no longer describes the file.
+      const recapturedPaths = new Set(history.transactions.filter((entry) => entry.kind === DESIGN_INPUT_RECAPTURE_KIND).map((entry) => entry.designInputPath));
       for (const entry of history.transactions.slice(1)) {
-        if (entry.designInputPath !== undefined && !reopened) {
+        if (entry.kind === DESIGN_INPUT_RECAPTURE_KIND) continue;
+        if (entry.designInputPath !== undefined && !reopened && !recapturedPaths.has(entry.designInputPath)) {
           const evidence = observeOptionalProjectFile(root, entry.designInputPath, "promotion design input");
           if (evidence.status !== "present" || evidence.sha256 !== entry.designInputSha256) {
             fail("KICKOFF-PROMOTION-EVIDENCE-DRIFT", "promotion design input does not match its bound evidence");
@@ -7711,34 +7734,138 @@ function buildOnboardingIntakeGeneratePlan({
 // An early, typed hint -- never a gate -- that a generated text holds what the pre-commit hook
 // (scripts/check-private-identifiers.mjs) will refuse. It reuses that detector's exports and
 // reports category and target names only, never the matched value. Any failure is silent.
-function intakePrivateIdentifierWarnings({ root, targets, spawn, patterns }) {
+function intakePrivateIdentifierFindings({ root, targets, spawn, patterns }) {
+  let active = patterns;
+  if (!active) {
+    const configured = spawn("git", ["config", "--get", "user.email"], { cwd: root, encoding: "utf8", shell: false });
+    const email = configured?.status === 0 ? String(configured.stdout).trim() || null : null;
+    const patternFile = join(root, ".git", "agent-pipeline", "private-identity-patterns.json");
+    active = derivePatterns({
+      email, localPatterns: existsSync(patternFile) ? JSON.parse(readFileSync(patternFile, "utf8")) : [],
+    });
+  }
+  const categories = new Set();
+  const matched = [];
+  for (const target of Object.values(targets)) {
+    const found = inspectAddedLines(target.content.split("\n").map((line) => `+${line}`).join("\n"), active);
+    if (found.size === 0) continue;
+    for (const category of found.keys()) categories.add(category);
+    matched.push(basename(target.path));
+  }
+  if (matched.length === 0) return [];
+  return [{
+    code: "INTAKE-PRIVATE-IDENTIFIER",
+    categories: [...categories].sort(),
+    targets: matched,
+    remedy: "Remove the identifier from the answer or from the question text, or record the answer privately, before the apply step; the pre-commit hook refuses the commit otherwise.",
+  }];
+}
+
+// An advisory reader: an unreadable pattern file costs the warning, never the intake.
+function intakePrivateIdentifierWarnings(options) {
+  try { return intakePrivateIdentifierFindings(options); } catch { return []; }
+}
+
+// Greenfield 2026-11-08 (Codex): a design-input.md generated before the projection removed an address was bound, could not be committed,
+// and no route could replace it (the file is immutable evidence, reopen-design records no capture). This is that one route: the new bytes
+// are never authored, they are regenerated from the lossless private intake by the current projection, and the capture they replace stays
+// in the history. It does not touch the PRD, the Spec or their reviews.
+function designInputRecaptureFacts({ rootDir, repositoryCapability, spawn, privateIdentifierPatterns }) {
+  const observed = observeDetailed({ rootDir, repositoryCapability, spawn });
+  if (observed.error !== undefined) fail("DESIGN-INPUT-RECAPTURE-UNAVAILABLE", `the private onboarding history is not readable (${observed.error.code ?? "unknown"})`);
+  const entries = Array.isArray(observed.history?.transactions) ? observed.history.transactions : [];
+  const captured = [...entries].reverse().find((entry) => typeof entry.designInputPath === "string" && SHA256_RE.test(entry.designInputSha256 ?? ""));
+  if (captured === undefined) fail("DESIGN-INPUT-RECAPTURE-NO-CAPTURE", "no design-input capture is recorded for this project");
+  const intake = readOnboardingIntakeCheckpoint({ rootDir: observed.root, repositoryCapability, spawn });
+  const generated = intake.status === "present" ? intake.value.generated : null;
+  if (!isObject(generated)) fail("DESIGN-INPUT-RECAPTURE-NO-INTAKE", "only a design input generated from the private intake can be regenerated; restore the captured bytes instead");
+  const replaced = entries.filter((entry) => entry.kind === DESIGN_INPUT_RECAPTURE_KIND).map((entry) => entry.previousDesignInputSha256);
+  if (![captured.designInputSha256, ...replaced].includes(generated.designInputSha256)) {
+    fail("DESIGN-INPUT-RECAPTURE-NOT-DERIVED", "the captured design input was not generated from this private intake; restore the captured bytes instead");
+  }
+  const content = buildIntakeDesignInputContent(intake.value, readIntakeMaterialInputChunks(intake.paths, intake.value));
+  // Unlike the advisory intake warning, this writes tracked bytes: a detector that cannot run refuses.
+  let warning;
   try {
-    let active = patterns;
-    if (!active) {
-      const configured = spawn("git", ["config", "--get", "user.email"], { cwd: root, encoding: "utf8", shell: false });
-      const email = configured?.status === 0 ? String(configured.stdout).trim() || null : null;
-      const patternFile = join(root, ".git", "agent-pipeline", "private-identity-patterns.json");
-      active = derivePatterns({
-        email, localPatterns: existsSync(patternFile) ? JSON.parse(readFileSync(patternFile, "utf8")) : [],
-      });
-    }
-    const categories = new Set();
-    const matched = [];
-    for (const target of Object.values(targets)) {
-      const found = inspectAddedLines(target.content.split("\n").map((line) => `+${line}`).join("\n"), active);
-      if (found.size === 0) continue;
-      for (const category of found.keys()) categories.add(category);
-      matched.push(basename(target.path));
-    }
-    if (matched.length === 0) return [];
-    return [{
-      code: "INTAKE-PRIVATE-IDENTIFIER",
-      categories: [...categories].sort(),
-      targets: matched,
-      remedy: "Remove the identifier from the answer or from the question text, or record the answer privately, before the apply step; the pre-commit hook refuses the commit otherwise.",
-    }];
+    [warning] = intakePrivateIdentifierFindings({
+      root: observed.root, targets: { designInput: { path: captured.designInputPath, content } }, spawn, patterns: privateIdentifierPatterns,
+    });
   } catch {
-    return [];
+    fail("DESIGN-INPUT-RECAPTURE-SCAN-UNAVAILABLE", "the private-identifier check could not run, so the regenerated file was not accepted");
+  }
+  if (warning !== undefined) {
+    fail("DESIGN-INPUT-RECAPTURE-STILL-PRIVATE", `the regenerated file still holds a private identifier (${warning.categories.join(", ")}); the projection cannot remove it, so nothing was changed`);
+  }
+  const bytes = Buffer.from(content, "utf8");
+  return { root: observed.root, entries, captured, bytes, designInputSha256: sha256(bytes), current: observeOptionalProjectFile(observed.root, captured.designInputPath, "design input") };
+}
+
+function designInputRecapturePlan(facts) {
+  const { captured, entries, designInputSha256, current } = facts;
+  if (designInputSha256 === captured.designInputSha256) fail("DESIGN-INPUT-RECAPTURE-NOT-NEEDED", "the captured design input already is the current projection of the private intake");
+  if (current.status !== "present" || ![captured.designInputSha256, designInputSha256].includes(current.sha256)) {
+    fail("DESIGN-INPUT-RECAPTURE-FILE-DRIFT", `${captured.designInputPath} is neither the captured nor the regenerated bytes; restore the captured bytes first`);
+  }
+  const body = {
+    schema: DESIGN_INPUT_RECAPTURE_PLAN_SCHEMA, featureId: captured.featureId, designInputPath: captured.designInputPath,
+    previousDesignInputSha256: captured.designInputSha256, designInputSha256, previousTransactionSha256: entries.at(-1).transactionSha256,
+  };
+  return { ...body, planSha256: canonicalSha256(body) };
+}
+
+export function planDesignInputRecapture({ rootDir, repositoryCapability = "local", spawn = defaultGitSpawn, privateIdentifierPatterns = null } = {}) {
+  return designInputRecapturePlan(designInputRecaptureFacts({ rootDir, repositoryCapability, spawn, privateIdentifierPatterns }));
+}
+
+export function applyDesignInputRecapture({
+  rootDir, expectedPlanSha256, repositoryCapability = "local", spawn = defaultGitSpawn, privateIdentifierPatterns = null,
+} = {}) {
+  if (!SHA256_RE.test(expectedPlanSha256 ?? "")) fail("DESIGN-INPUT-RECAPTURE-PLAN-DIGEST", "the plan digest is malformed");
+  const root = physicalRoot(rootDir);
+  const privatePaths = resolvePrivate(root, repositoryCapability, { create: false, spawn });
+  const statePath = absoluteProjectPath(root, authorityPaths(root).state, "Pipeline machine state");
+  const token = `design-input-recapture-${expectedPlanSha256.slice(0, 32)}`;
+  const lockOptions = { nowMs: Date.now, lockStaleMs: 30_000 };
+  const stateLock = acquireLock(`${statePath}.lock`, "pipeline.continuity-lock.v0", token, lockOptions);
+  let privateLock;
+  try {
+    privateLock = acquireLock(join(privatePaths.directory, ".kickoff-writer.lock"), "pipeline.codex-onboarding-kickoff-lock.v1", token, lockOptions);
+    const facts = designInputRecaptureFacts({ rootDir: root, repositoryCapability, spawn, privateIdentifierPatterns });
+    const last = facts.entries.at(-1);
+    const report = (status, mutated, entry) => ({
+      schema: DESIGN_INPUT_RECAPTURE_APPLY_SCHEMA, status, mutated, planSha256: expectedPlanSha256, designInputPath: entry.designInputPath,
+      previousDesignInputSha256: entry.previousDesignInputSha256, designInputSha256: entry.designInputSha256,
+    });
+    if (last?.kind === DESIGN_INPUT_RECAPTURE_KIND && last.transactionSha256 === expectedPlanSha256 && facts.current.sha256 === last.designInputSha256) {
+      return report("replayed", false, last);
+    }
+    const plan = designInputRecapturePlan(facts);
+    if (plan.planSha256 !== expectedPlanSha256) fail("DESIGN-INPUT-RECAPTURE-PLAN-STALE", "the project changed after this plan was made; run recapture-design-input again");
+    const entry = {
+      kind: DESIGN_INPUT_RECAPTURE_KIND, transactionSha256: plan.planSha256, previousTransactionSha256: plan.previousTransactionSha256, featureId: plan.featureId,
+      designInputPath: plan.designInputPath, designInputSha256: plan.designInputSha256, previousDesignInputSha256: plan.previousDesignInputSha256,
+    };
+    const history = { schema: KICKOFF_HISTORY_SCHEMA, transactions: [...facts.entries, entry] };
+    validateHistory(history);
+    const suffix = randomUUID().replaceAll("-", "");
+    // The file first: a stop between the two writes leaves the new bytes with the old capture, which the same plan digest finishes.
+    if (facts.current.sha256 !== plan.designInputSha256) {
+      const target = absoluteProjectPath(root, plan.designInputPath, "design input");
+      assertPhysicalChain(root, target);
+      const temporary = join(dirname(target), `.${basename(target)}.recapture-${suffix}.tmp`);
+      writeExclusiveSynced(temporary, facts.bytes, 0o644);
+      renameSync(temporary, target);
+      fsyncDirectory(dirname(target));
+    }
+    const historyPath = join(privatePaths.directory, HISTORY_BASENAME);
+    const historyTemporary = join(dirname(historyPath), `.${HISTORY_BASENAME}.recapture-${suffix}.tmp`);
+    writeExclusiveSynced(historyTemporary, expectedHistoryBytes(history), 0o600);
+    renameSync(historyTemporary, historyPath);
+    fsyncDirectory(dirname(historyPath));
+    return report("applied", true, entry);
+  } finally {
+    if (privateLock) releaseLock(privateLock);
+    releaseLock(stateLock);
   }
 }
 

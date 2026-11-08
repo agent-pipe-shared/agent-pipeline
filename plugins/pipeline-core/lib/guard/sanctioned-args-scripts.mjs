@@ -452,6 +452,10 @@ export function sanctionedPipelineStateArgs(args, root) {
     }
     return true;
   }
+  // Without flags a read-only plan; with the digest of that plan it regenerates design-input.md from the private intake (draft packages only, the writer refuses the rest).
+  if (args[0] === "recapture-design-input") {
+    return args.length === 1 || (args.length === 3 && args[1] === "--plan-sha256" && /^[a-f0-9]{64}$/u.test(args[2] ?? ""));
+  }
   // D64: the next action `inspect` renders once a plan is approved. The verb takes no flags and writes one governed template
   // file (it refuses when that file exists), the same class as materialize-architecture just above.
   if (args[0] === "materialize-push-threat-model") return args.length === 1;

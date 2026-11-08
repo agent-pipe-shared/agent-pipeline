@@ -72,6 +72,8 @@ import {
   planOnboardingKickoff,
   planOnboardingKickoffPromotion,
   readPromotionDesignInputCapture,
+  planDesignInputRecapture,
+  applyDesignInputRecapture,
   planOnboardingKickoffPromotionCleanupRecovery,
   readOnboardingIntakeCheckpoint,
   observeOnboardingEnrollmentHistory,
@@ -4519,13 +4521,15 @@ function finishPositiveAcknowledgementFixture(root, generatePlan) {
   applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
 }
 
-function bootstrapBindReadyRoot(name) {
+function bootstrapBindReadyRoot(name, { question = null, address = null } = {}) {
   const root = readyToGenerateRoot(`bootstrap-bind-${name}`);
+  if (question !== null) applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: [{ question, answer: "Keep it." }], replace: true, activate: true });
+  if (address !== null) assert.equal(spawnSync("git", ["config", "user.email", address], { cwd: root, encoding: "utf8", shell: false }).status, 0);
   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
   // These five positive binding fixtures require completed design content.
   // Other helper callers retain their original generated-draft setup.
-  if (["happy", "replay", "already-bound", "activation", "po-gate"].includes(name)) {
+  if (["happy", "replay", "already-bound", "activation", "po-gate"].includes(name) || name.startsWith("recapture")) {
     const spec = "# Bootstrap binding specification\n\n## Acceptance criteria\n- AC-01: WHEN a completed package is acknowledged, the system SHALL bind its exact PRD and Spec digests to the active feature.\n- AC-02: WHEN the same binding is applied twice, the system SHALL preserve all stored bytes on replay.\n- AC-03: WHEN activation is absent, the system SHALL refuse binding without publishing authority.\n- AC-04: WHEN binding succeeds, the system SHALL publish authority accepted by the PO gate.\n\n## Architecture\nThe intake checkpoint owns the design paths. The existing acknowledgement writer binds the final documents; the existing promotion writer publishes continuity and profile authority. No new decision is introduced.\n";
     const prd = "<!-- po-language: en -->\n<!-- technical-spec-sha256: " + generatePlan.targets.spec.afterSha256 + " -->\n# Completed bootstrap binding design\n\n## Goal\nBind the reviewed intake design package to a local active feature so implementation can use its exact authority.\n\n## Scope\nPreserve digest checks, explicit activation, byte-null replay and PO profile validation. Refuse re-planning once continuity is bound.\n\n## Acceptance\nThe specification defines observable binding, replay, activation and authority outcomes. The existing writers own these transitions.\n";
     writeFileSync(join(root, generatePlan.targets.spec.path), spec);
@@ -4546,6 +4550,134 @@ function bootstrapBindReadyRoot(name) {
   assert.equal(applied.status, "applied");
   return { root, featureId: generatePlan.featureId };
 }
+
+// Greenfield 2026-11-08 (Codex): the package bound before the projection redacted addresses. Rebuilds exactly that state: the file, the
+// history capture and the intake's generated digest all hold the unredacted bytes.
+function writeGeneratedDesignInputDigest(root, designInputSha256) {
+  const intake = readOnboardingIntakeCheckpoint({ rootDir: root });
+  const { contentSha256: _stale, ...unsigned } = intake.value;
+  unsigned.generated = { ...unsigned.generated, designInputSha256 };
+  writeFileSync(intake.paths.checkpoint, `${JSON.stringify({ ...unsigned, contentSha256: sha256CanonicalJson(unsigned) }, null, 2)}\n`, { mode: 0o600 });
+}
+
+function recaptureRoot(name, address = "person.name@example.invalid") {
+  const question = `Keep git author Person <${address}> or change it?`;
+  const { root, featureId } = bootstrapBindReadyRoot(`recapture-${name}`, { question, address });
+  applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: planOnboardingBootstrapBind({ rootDir: root }).planSha256, activate: true });
+  writeFileSync(join(root, ".gitignore"), "scratch/\n");
+  const capture = readPromotionDesignInputCapture({ rootDir: root });
+  assert.equal(capture.status, "present");
+  const path = join(root, capture.path);
+  const redacted = readFileSync(path, "utf8");
+  assert.equal(redacted.includes("[REDACTED EMAIL]"), true);
+  const legacy = redacted.replaceAll("[REDACTED EMAIL]", address);
+  writeFileSync(path, legacy);
+  const legacySha256 = digest(legacy);
+  const historyPath = promotionHistoryPath(root);
+  const history = JSON.parse(readFileSync(historyPath, "utf8"));
+  history.transactions[0].designInputSha256 = legacySha256;
+  writeFileSync(historyPath, `${JSON.stringify(history, null, 2)}\n`, { mode: 0o600 });
+  writeGeneratedDesignInputDigest(root, legacySha256);
+  return { root, featureId, address, relativePath: capture.path, path, legacy, legacySha256, redacted, redactedSha256: digest(redacted), historyPath };
+}
+
+function recaptureCommand(root, ...args) {
+  return spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url)), ...args], {
+    cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+  });
+}
+
+check("recapture-design-input: a bound design input holding an address is regenerated through the real commands, passes the commit check and the seal, and every earlier record stays", () => {
+  const seed = recaptureRoot("chain");
+  const { root, address, relativePath, path, legacySha256, redactedSha256, historyPath } = seed;
+  assert.equal(spawnSync("git", ["add", "--", relativePath], { cwd: root, encoding: "utf8", shell: false }).status, 0);
+  assert.equal(scanChangedContent(root, { scopes: ["staged"] }).ok, false, "the state this repairs: the commit check refuses the bound file");
+
+  const planned = recaptureCommand(root, "recapture-design-input");
+  assert.equal(planned.status, 0, planned.stderr);
+  assert.equal(planned.stdout.includes(address), false, "a plan never prints the content");
+  const plan = JSON.parse(planned.stdout.slice(0, planned.stdout.lastIndexOf("\nNext:")));
+  assert.equal(plan.previousDesignInputSha256, legacySha256);
+  assert.equal(plan.designInputSha256, redactedSha256);
+  assert.equal(readFileSync(path, "utf8"), seed.legacy, "planning writes nothing");
+
+  const applied = recaptureCommand(root, "recapture-design-input", "--plan-sha256", plan.planSha256);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.match(applied.stdout, /Next: commit .* on its own, then run submit-plan/u);
+  assert.equal(readFileSync(path, "utf8"), seed.redacted);
+  assert.equal(spawnSync("git", ["add", "--", relativePath], { cwd: root, encoding: "utf8", shell: false }).status, 0);
+  assert.deepEqual(scanChangedContent(root, { scopes: ["staged"] }), { ok: true, findings: [] }, "the file can now be committed");
+
+  assert.deepEqual(readPromotionDesignInputCapture({ rootDir: root }), { status: "present", path: relativePath, sha256: redactedSha256, supersededSha256: [legacySha256] });
+  const history = JSON.parse(readFileSync(historyPath, "utf8"));
+  assert.equal(history.transactions.length, 2);
+  assert.equal(history.transactions[0].designInputSha256, legacySha256, "the first capture stays on record");
+  assert.equal(history.transactions[1].kind, "design-input-recapture");
+  assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).value.designQuestions[0].question.includes(address), true, "the private intake stays lossless");
+
+  const seal = recaptureCommand(root, "prepare-seal");
+  assert.equal(seal.status, 0, `${seal.stdout}${seal.stderr}`);
+
+  const historyBytes = readFileSync(historyPath);
+  const replay = recaptureCommand(root, "recapture-design-input", "--plan-sha256", plan.planSha256);
+  assert.equal(replay.status, 0, replay.stderr);
+  assert.match(replay.stdout, /"status": "replayed"/u);
+  assert.deepEqual(readFileSync(historyPath), historyBytes, "a replay writes nothing");
+  const again = recaptureCommand(root, "recapture-design-input");
+  assert.notEqual(again.status, 0);
+  assert.match(again.stderr, /DESIGN-INPUT-RECAPTURE-NOT-NEEDED/u);
+
+  writeFileSync(path, `${seed.redacted}tampered\n`);
+  const tampered = recaptureCommand(root, "prepare-seal");
+  assert.notEqual(tampered.status, 0);
+  assert.match(`${tampered.stdout}${tampered.stderr}`, /PSP-PROVENANCE/u);
+  assert.match(`${tampered.stdout}${tampered.stderr}`, /recapture-design-input/u);
+  assert.equal(`${tampered.stdout}${tampered.stderr}`.includes("reopen-design --by"), false, "the refusal no longer offers a route that cannot repair it");
+});
+
+check("recapture-design-input: a stop between the file and the history finishes with the same plan; anything not derived, not draft, still private or unscannable is refused without a write", () => {
+  const crashed = recaptureRoot("crash");
+  const plan = planDesignInputRecapture({ rootDir: crashed.root });
+  writeFileSync(crashed.path, crashed.redacted);
+  assert.equal(planDesignInputRecapture({ rootDir: crashed.root }).planSha256, plan.planSha256, "the digest survives the file write");
+  assert.equal(applyDesignInputRecapture({ rootDir: crashed.root, expectedPlanSha256: plan.planSha256 }).status, "applied");
+
+  const stale = recaptureRoot("stale");
+  expectKickoffError("DESIGN-INPUT-RECAPTURE-PLAN-STALE", () => applyDesignInputRecapture({ rootDir: stale.root, expectedPlanSha256: "a".repeat(64) }));
+  assert.equal(readFileSync(stale.path, "utf8"), stale.legacy);
+
+  const drifted = recaptureRoot("drift");
+  writeFileSync(drifted.path, `${drifted.legacy}hand edit\n`);
+  expectKickoffError("DESIGN-INPUT-RECAPTURE-FILE-DRIFT", () => planDesignInputRecapture({ rootDir: drifted.root }));
+
+  const foreign = recaptureRoot("foreign");
+  writeGeneratedDesignInputDigest(foreign.root, "b".repeat(64));
+  expectKickoffError("DESIGN-INPUT-RECAPTURE-NOT-DERIVED", () => planDesignInputRecapture({ rootDir: foreign.root }));
+
+  const still = recaptureRoot("still-private");
+  const patterns = derivePatterns({ home: "", username: "", userProfile: "", localPatterns: [{ category: "local-pattern", value: "Keep git author" }] });
+  expectKickoffError("DESIGN-INPUT-RECAPTURE-STILL-PRIVATE", () => planDesignInputRecapture({ rootDir: still.root, privateIdentifierPatterns: patterns }));
+
+  const unscannable = recaptureRoot("unscannable");
+  writeFileSync(join(unscannable.root, ".git", "agent-pipeline", "private-identity-patterns.json"), "{not json");
+  expectKickoffError("DESIGN-INPUT-RECAPTURE-SCAN-UNAVAILABLE", () => planDesignInputRecapture({ rootDir: unscannable.root }));
+
+  const approved = recaptureRoot("not-draft");
+  const statePath = join(approved.root, "project", "pipeline-state.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.planApproved = true;
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  const refused = recaptureCommand(approved.root, "recapture-design-input");
+  assert.notEqual(refused.status, 0);
+  assert.equal(`${refused.stdout}${refused.stderr}`.includes("DESIGN-INPUT-RECAPTURE-NOT-DRAFT"), true, refused.stderr);
+  assert.equal(readFileSync(approved.path, "utf8"), approved.legacy);
+
+  const clean = bootstrapBindReadyRoot("recapture-clean");
+  applyOnboardingBootstrapBind({ rootDir: clean.root, expectedPlanSha256: planOnboardingBootstrapBind({ rootDir: clean.root }).planSha256, activate: true });
+  expectKickoffError("DESIGN-INPUT-RECAPTURE-NOT-NEEDED", () => planDesignInputRecapture({ rootDir: clean.root }));
+  const bare = readyToGenerateRoot("recapture-no-capture");
+  expectKickoffError("DESIGN-INPUT-RECAPTURE-NO-CAPTURE", () => planDesignInputRecapture({ rootDir: bare }));
+});
 
 // NVA-BL-INTAKEBIND-1 (AC-1, reproduce-first): before that fix, a genuinely
 // fresh, unmodified intake-generated staging PRD (no hand-injected markers)
@@ -5634,7 +5766,7 @@ for (const [label, options] of Object.entries({
   });
 }
 
-assert.equal(cases.length, 328,"the complete onboarding continuity corpus must be registered before execution begins");
+assert.equal(cases.length, 330,"the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -94,6 +94,8 @@ const recoveries = [
   ['marker apply', onboardingScript, ['intake-spec-marker-apply', '--root', root, '--plan-sha256', digest, '--activate', '--runner', 'codex'], true, true],
   ['reopen', script, ['reopen-design', '--by', 'fixture-actor'], true, true],
   ['reopen dry-run preview', script, ['reopen-design', '--by', 'fixture-actor', '--dry-run'], false, false],
+  ['recapture plan', script, ['recapture-design-input'], false, false],
+  ['recapture apply', script, ['recapture-design-input', '--plan-sha256', digest], true, true],
 ];
 for (const [name, entry, argv, mutation, requiresConfirmation] of recoveries) {
   for (const executable of [process.execPath, '/opt/producer-node/bin/node']) {

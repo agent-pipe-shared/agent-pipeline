@@ -84,9 +84,10 @@ export function sealPaths(draftPaths) {
   return { prd: draftPaths.prd, spec: draftPaths.spec, designInput: designInputPathOf(draftPaths.spec), result: draftPaths.result ?? null, plan: draftPaths.plan ?? null };
 }
 
-function reviewFault(review, documents) {
+function reviewFault(review, documents, supersededDesignInputs) {
   const compare = [["prd", review.prdSha256, documents.prd.sha256], ["spec", review.specSha256, documents.spec.sha256]];
-  if (review.designInputSha256 !== null && review.designInputSha256 !== undefined) compare.push(["design input", review.designInputSha256, documents.designInput?.sha256 ?? null]);
+  // A review of the exact bytes a recorded recapture replaced read the same design input before its redaction.
+  if (review.designInputSha256 !== null && review.designInputSha256 !== undefined && !supersededDesignInputs.includes(review.designInputSha256)) compare.push(["design input", review.designInputSha256, documents.designInput?.sha256 ?? null]);
   return compare.filter(([, bound, current]) => bound !== null && bound !== undefined && bound !== current).map(([name]) => name);
 }
 
@@ -96,7 +97,7 @@ function reviewFault(review, documents) {
  *   documents: object, designInputCapture: {path:string, sha256:string}|null, reviews: Array<object> }} input
  */
 export function buildSealPlan(input) {
-  const { authority, featureId, revision, profile, documents, designInputCapture, reviews } = input;
+  const { authority, featureId, revision, profile, documents, designInputCapture, reviews, supersededDesignInputs = [] } = input;
   if (!isRecord(authority) || !inSealScope(profile)) {
     return refuse("PSP-OUT-OF-SCOPE", "this package has no PRD release to seal at", [], "nothing is needed: the bind at the end of onboarding applies to a package outside the PRD release scope (EL-19)");
   }
@@ -105,12 +106,12 @@ export function buildSealPlan(input) {
   if (seal.status !== "draft") return refuse("PSP-AUTHORITY-INVALID", seal.reason, ["reopen-design"], "reopen the design and register the package paths again");
   if (!Number.isSafeInteger(revision) || revision < 0) return refuse("PSP-AUTHORITY-INVALID", "the State revision is not readable", ["reopen-design"], "inspect the State");
   if (designInputCapture !== null && documents.designInput !== null && documents.designInput.sha256 !== designInputCapture.sha256) {
-    return refuse("PSP-PROVENANCE", `${documents.designInput.path} differs from the bytes captured when the package was promoted`, ["reopen-design"],
-      "restore design-input.md to the captured bytes, or reopen the design (reopen-design --by <name>) to record a new capture, then run prepare-seal again");
+    return refuse("PSP-PROVENANCE", `${documents.designInput.path} differs from the bytes captured when the package was promoted`, ["recapture-design-input"],
+      "restore design-input.md to the captured bytes and run prepare-seal again; reopen-design records no new capture. When the captured bytes hold a private identifier, restore them first, then run recapture-design-input: it regenerates the file from the private intake and records the new capture");
   }
   const stale = [];
   for (const review of reviews) {
-    const faults = reviewFault(review, documents);
+    const faults = reviewFault(review, documents, supersededDesignInputs);
     if (faults.length > 0) stale.push({ kind: review.kind, ref: review.ref, faults });
   }
   if (stale.length > 0) {
@@ -180,7 +181,7 @@ export function unreadableReviewRefusal(ref) {
 }
 
 export function provenanceUnavailableRefusal(reason) {
-  return refuse("PSP-PROVENANCE", reason, ["reopen-design"], "restore design-input.md to the captured bytes (or repair the private onboarding history), then run prepare-seal again; reopen-design --by <name> stays available");
+  return refuse("PSP-PROVENANCE", reason, ["recapture-design-input"], "restore design-input.md to the captured bytes (or repair the private onboarding history), then run prepare-seal again; when the captured bytes hold a private identifier, run recapture-design-input after restoring them");
 }
 
 /** The sealed `continuity.authority`: digests bound, the `sealed` marker removed (a sealed package is a package without the marker). */

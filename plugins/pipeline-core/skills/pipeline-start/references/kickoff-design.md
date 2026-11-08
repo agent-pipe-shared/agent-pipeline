@@ -240,6 +240,15 @@ If the design input materially changes, create a new safely named evidence
 version and promote/rebind it through the ordinary planning change, rather than
 rewriting an old evidence file and provoking authority-hash drift.
 
+The one exception is privacy. A `design-input.md` generated from the private
+intake that holds a private identifier, and so cannot be committed, is never
+edited by hand: in a draft package run `pipeline-state.mjs
+recapture-design-input`, then the same command with `--plan-sha256 <digest>`
+from its plan. It regenerates the file with the current projection and records
+a new capture beside the old one. `reopen-design` records no capture. The PRD,
+the Spec and their reviews stay as they are, and the changed file appears as an
+unreviewed source delta at the design approval.
+
 For material input, replace the bootstrap placeholders with a useful PRD and
 Spec before a normal plan gate. The PRD covers problem/users, outcomes,
 success measures, scope/non-goals, testable-acceptance requirements,
