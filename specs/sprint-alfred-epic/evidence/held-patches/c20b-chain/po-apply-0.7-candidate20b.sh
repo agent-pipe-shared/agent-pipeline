@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 20b: 19 held patches exported from the build clone chain daae02455..f32debf8d
+# PO apply script for candidate 20b: 21 held patches exported from the build clone chain daae02455..7f2b3b792
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -33,6 +33,8 @@ step 16-87d5abe21 'fix(lifecycle): set-phase implementation moves a registered a
 step 17-bd37ba9ca 'test(pins): examine the registration CLI with the automatic G20-51 step switched off through its seam (QG-04 restatement)'
 step 18-c615f405c 'test(design): decode the native Windows PowerShell signing block in the design approval route e2e'
 step 19-f32debf8d 'test(verify): restate the close-path walk'"'"'s measured descriptor count after G20-54 (86 -> 87)'
+step 20-90675f62a 'fix(guard): the close commit may stage exactly the closed-continuity bytes the close bound, without a PO override (G20-55)'
+step 21-7f2b3b792 'docs(skill): a Claude Elephant continues in the same turn after a Goldfish host commit instead of waiting for the pipeline (G20-57)'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

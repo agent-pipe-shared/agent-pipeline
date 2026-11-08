@@ -1,0 +1,144 @@
+diff --git a/plugins/pipeline-core/lib/protected-baseline.mjs b/plugins/pipeline-core/lib/protected-baseline.mjs
+index b970b7c3fb6cc6edf1554ffe9523f5f0cec984b1..ea4be4240c1c2e491e5740420f0ec97003fb15cb 100644
+--- a/plugins/pipeline-core/lib/protected-baseline.mjs
++++ b/plugins/pipeline-core/lib/protected-baseline.mjs
+@@ -152,6 +152,31 @@ function dynamicContinuityEntries(rootDir, adapters) {
+   }
+ }
+ 
++/**
++ * C20b G20-55 (live Antigravity greenfield 2026-11-08): the sha256 the close bound for one closed-continuity path, or null.
++ * The close itself writes result.md (and the close evidence) and records their digests in closedFeatures[].continuityClose;
++ * the very commit that publishes those bytes was refused as a change to "closed continuity evidence" and cost a PO override
++ * signature at the last step of the happy path. A commit that stages EXACTLY the bound bytes changes nothing the close did not
++ * already bind, so the commit boundary may admit it; any other bytes stay protected. Fail-closed: any read fault is null.
++ */
++export function closedContinuityBoundSha256(rootDir, relPath, { readFileSyncFn = readFileSync, existsSyncFn = existsSync, lstatSyncFn = lstatSync, realpathSyncFn = realpathSync } = {}) {
++  try {
++    const adapters = { readFileSyncFn, existsSyncFn, lstatSyncFn, realpathSyncFn };
++    const state = resolveAuthorityArtifactPath("state", { rootDir });
++    if (!existsSyncFn(state.path)) return null;
++    const parsed = JSON.parse(readFileSyncFn(state.path, "utf8"));
++    const target = canonicalProjectPath(rootDir, relPath, adapters);
++    const bound = new Set();
++    for (const feature of Array.isArray(parsed?.closedFeatures) ? parsed.closedFeatures : []) {
++      for (const binding of Object.values(feature?.continuityClose ?? {})) {
++        if (!binding || typeof binding !== "object" || typeof binding.path !== "string" || !/^[a-f0-9]{64}$/u.test(binding.sha256 ?? "")) continue;
++        if (canonicalProjectPath(rootDir, binding.path, adapters) === target) bound.add(binding.sha256);
++      }
++    }
++    return bound.size === 1 ? [...bound][0] : null;
++  } catch { return null; }
++}
++
+ /** Resolves baseline ∪ project additions ∪ state-bound continuity evidence. */
+ export function resolveProtectedBaseline({ rootDir = process.cwd(), readFileSyncFn = readFileSync, existsSyncFn = existsSync, lstatSyncFn = lstatSync, realpathSyncFn = realpathSync } = {}) {
+   const adapters = { readFileSyncFn, existsSyncFn, lstatSyncFn, realpathSyncFn };
+diff --git a/plugins/pipeline-core/lib/protected-baseline.test.mjs b/plugins/pipeline-core/lib/protected-baseline.test.mjs
+index 85dd8d190af83758cea55fcd9b17f279b8cb66a6..2bf6af8ccdc46b6a14128fb443fa5d580557bfa2 100644
+--- a/plugins/pipeline-core/lib/protected-baseline.test.mjs
++++ b/plugins/pipeline-core/lib/protected-baseline.test.mjs
+@@ -13,10 +13,12 @@ import {
+   PB_DYNAMIC_UNAVAILABLE,
+   PB_SUBTRACTION_ATTEMPT,
+   canonicalProjectPath,
++  closedContinuityBoundSha256,
+   protectedBaselineRuleFor,
+   resolveProtectedBaseline,
+ } from "./protected-baseline.mjs";
+-import { loadProtectedTestPathRules } from "./protected-test-paths.mjs";
++import { loadProtectedTestPathRules, stagedClosedContinuityMatchesBinding } from "./protected-test-paths.mjs";
++import { createHash } from "node:crypto";
+ 
+ function fixture(config, state = undefined) {
+   const root = mkdtempSync(join(tmpdir(), "protected-baseline-"));
+@@ -91,6 +93,26 @@ test("A3 reads continuity-close bindings as a dynamic protected class", () => {
+   assert.ok(protectedBaselineRuleFor(baseline.entries, "evidence/close.md")?.dynamic);
+ });
+ 
++test("G20-55: the close commit may stage exactly the bytes the close bound, never other bytes", () => {
++  const closed = "# Result\n\nClosed by the close coordinator.\n";
++  const bound = createHash("sha256").update(Buffer.from(closed, "utf8")).digest("hex");
++  const root = fixture({}, { closedFeatures: [{ id: "closed-a", continuityClose: { result: { path: "specs/a/result.md", sha256: bound } } }] });
++  const git = (...args) => { const out = spawnSync("git", args, { cwd: root, encoding: "utf8" }); assert.equal(out.status, 0, `git ${args[0]}: ${out.stderr}`); };
++  git("init", "-q"); git("config", "core.autocrlf", "false");
++  mkdirSync(join(root, "specs/a"), { recursive: true });
++  const rule = protectedBaselineRuleFor(resolveProtectedBaseline({ rootDir: root }).entries, "specs/a/result.md");
++  assert.ok(rule?.dynamic, "the closed result is dynamically protected");
++  assert.equal(closedContinuityBoundSha256(root, "specs/a/result.md"), bound);
++  writeFileSync(join(root, "specs/a/result.md"), closed);
++  git("add", "--", "specs/a/result.md");
++  assert.equal(stagedClosedContinuityMatchesBinding(root, rule, "specs/a/result.md"), true, "exactly the bound bytes: admitted");
++  assert.equal(stagedClosedContinuityMatchesBinding(root, { id: "GS-10" }, "specs/a/result.md"), false, "only a closed-continuity rule");
++  writeFileSync(join(root, "specs/a/result.md"), `${closed}edited after the close\n`);
++  git("add", "--", "specs/a/result.md");
++  assert.equal(stagedClosedContinuityMatchesBinding(root, rule, "specs/a/result.md"), false, "other bytes stay protected");
++  assert.equal(closedContinuityBoundSha256(root, "specs/other.md"), null, "an unbound path has no binding");
++});
++
+ test("A3 keeps an unreadable lifecycle state fail-closed", () => {
+   const root = fixture({}, "not-an-object");
+   writeFileSync(join(root, "project/pipeline-state.json"), "{");
+diff --git a/plugins/pipeline-core/lib/protected-test-paths.mjs b/plugins/pipeline-core/lib/protected-test-paths.mjs
+index 33ea8a7b58611940be1b3cf25321384cee03493a..bf868eed6ffe748ed3e4fa87337c80f31faa7465 100644
+--- a/plugins/pipeline-core/lib/protected-test-paths.mjs
++++ b/plugins/pipeline-core/lib/protected-test-paths.mjs
+@@ -70,7 +70,25 @@ import {
+   NEUTRAL_GUARD_CONFIG,
+   resolveProjectAuthorityPaths,
+ } from "./project-authority.mjs";
+-import { resolveProtectedBaseline } from "./protected-baseline.mjs";
++import { closedContinuityBoundSha256, resolveProtectedBaseline } from "./protected-baseline.mjs";
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++
++/**
++ * C20b G20-55: true only when the rule is a closed-continuity rule (PB-CONTINUITY-*) and the STAGED bytes of `relPath` are
++ * exactly the bytes the close bound (closedContinuityBoundSha256). The pre-commit hook then admits that path: committing the
++ * closed evidence the close itself produced is not a change to it. Any fault, any other rule, any other bytes: false.
++ */
++export function stagedClosedContinuityMatchesBinding(rootDir, rule, relPath, { spawn = spawnSync } = {}) {
++  try {
++    if (typeof rule?.id !== "string" || !rule.id.startsWith("PB-CONTINUITY-")) return false;
++    const bound = closedContinuityBoundSha256(rootDir, relPath);
++    if (bound === null) return false;
++    const staged = spawn("git", ["cat-file", "blob", `:${relPath}`], { cwd: rootDir, encoding: "buffer", timeout: 15000, maxBuffer: 64 * 1024 * 1024 });
++    if (staged.status !== 0 || !Buffer.isBuffer(staged.stdout)) return false;
++    return createHash("sha256").update(staged.stdout).digest("hex") === bound;
++  } catch { return false; }
++}
+ 
+ /** Denial code for the shell lane; the write lane keeps guard-testpath's own message shape. */
+ export const TESTPATH_SHELL_DENIAL_CODE = "GUARD-TESTPATH-SHELL";
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+index 950987278476e9766e111f998bea8eb86ff77b55..c12b607e245da4899e8294dfd1a300faf69bcf59 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+@@ -1001,6 +1001,7 @@ async function main() {
+   let gateStrengthRuleFor;
+   let loadProtectedTestPathRules;
+   let protectedTestPathRuleFor;
++  let stagedClosedContinuityMatchesBinding;
+   let defaultHasConsumedCapabilityForPath;
+   let verifyQualityPackageCommitAuthorization;
+   let resolveHandoverConfig;
+@@ -1008,7 +1009,7 @@ async function main() {
+   let windowCoversRule;
+   try {
+     ({ gateStrengthRuleFor } = await import(pathToFileURL(resolve(PLUGIN_HOOKS_DIR, "guard-gate-strength.mjs")).href));
+-    ({ loadProtectedTestPathRules, protectedTestPathRuleFor } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "protected-test-paths.mjs")).href));
++    ({ loadProtectedTestPathRules, protectedTestPathRuleFor, stagedClosedContinuityMatchesBinding } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "protected-test-paths.mjs")).href));
+     ({ defaultHasConsumedCapabilityForPath } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "check-protected-path-integrity.mjs")).href));
+     ({ verifyQualityPackageCommitAuthorization } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "signed-quality-package.mjs")).href));
+     ({ resolveHandoverConfig } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "handover-rotation.mjs")).href));
+@@ -1099,6 +1100,10 @@ async function main() {
+     }
+     if (!rule) continue;
+     if (qualityPackageAuthorized) continue;
++    // C20b G20-55: the close commit publishes exactly the bytes the close bound (result.md, close evidence); not a change to them.
++    let closedEvidenceAsBound = false;
++    try { closedEvidenceAsBound = typeof stagedClosedContinuityMatchesBinding === "function" && stagedClosedContinuityMatchesBinding(projectRoot, rule, relPath) === true; } catch { closedEvidenceAsBound = false; }
++    if (closedEvidenceAsBound) continue;
+     if (sanctionedVerifyPaths.has(relPath) && (rule.id === "GS-10" || rule.id === "GS-11")) continue;
+     let kernelPath = true;
+     try { kernelPath = isNeverLiftableKernelPath(relPath, { rootDir: projectRoot, livePluginRoot: resolve(PLUGIN_LIB_DIR, "..") }); } catch { kernelPath = true; }
