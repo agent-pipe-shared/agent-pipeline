@@ -179,7 +179,8 @@ export function budgetDecision(pkg, budget) {
 export function namedPackagePaths(pkg) {
   const fromTargeted = pkg.targeted.flatMap((command) => [...command.matchAll(NAMED_PATH)].map((match) => match[1]));
   // D195: a `command:<id>` check names a registered command, not a file, so it is not a path that must exist.
-  const checkPath = typeof pkg.check === "string" && pkg.check.startsWith("command:") ? [] : [pkg.check];
+  // G20-65: a `document:<path>` check names a file of the write scope, so the file (not the prefixed spelling) must exist or be declared new.
+  const checkPath = typeof pkg.check === "string" && pkg.check.startsWith("command:") ? [] : [typeof pkg.check === "string" && pkg.check.startsWith("document:") ? pkg.check.slice("document:".length) : pkg.check];
   return [...new Set([...pkg.paths, ...checkPath, ...fromTargeted, ...(pkg.reconNote === undefined ? [] : [pkg.reconNote])])];
 }
 

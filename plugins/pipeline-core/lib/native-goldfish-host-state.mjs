@@ -1776,6 +1776,28 @@ function itemCheckSnapshot(root,itemDelivery,candidate) {
  * opaque observation handle consumed by either real delivery adapter. */
 export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate,baseCommit}={}) {
   try {
+    // G20-65: a documentation-only module's check is one of its owned documents. It is verified from the COMMITTED bytes of the delivery commit
+    // (never from the Goldfish's report) before the usual snapshot: a regular file, non-empty, and (first delivery: the base commit is given) changed by the delivery.
+    const documentChecks=Array.isArray(itemDelivery?.checks)?itemDelivery.checks.filter(check=>check.document!==undefined):[];
+    if(documentChecks.length&&validateItemDeliveryBriefing(itemDelivery).ok&&typeof candidate?.commit==='string'&&/^[0-9a-f]{40,64}$/u.test(candidate.commit)) {
+      const physical=realpathSync(resolve(root)),gitRun=args=>spawnSync('git',['-C',physical,...args],{env:agyHostGitEnvironment(),shell:false,timeout:10000,maxBuffer:4*1024*1024});
+      let delivered=null;
+      if(baseCommit!==undefined) {
+        const diff=gitRun(['diff','--name-only','-z',baseCommit,candidate.commit]);
+        if(diff.error||diff.status!==0)throw nativeManagedFault('item-check-delivery-diff-unavailable');
+        delivered=String(diff.stdout).split('\0');
+      }
+      for(const check of documentChecks) {
+        const listed=gitRun(['ls-tree','-z',candidate.commit,'--',check.document]);
+        if(listed.error||listed.status!==0)throw nativeManagedFault('item-check-document-unreadable');
+        const [meta,name]=String(listed.stdout).split('\0')[0].split('\t');
+        if(name!==check.document||!/^100(?:644|755) blob /u.test(meta??''))throw Object.assign(nativeManagedFault(`document-check-missing: ${check.document} is not a regular file of the delivery commit`),{repair:`write ${check.document} (the document the check names) and commit it as a regular file, then finish the delivery again`});
+        const size=gitRun(['cat-file','-s',`${candidate.commit}:${check.document}`]);
+        if(size.error||size.status!==0)throw nativeManagedFault('item-check-document-unreadable');
+        if(Number(String(size.stdout).trim())===0)throw Object.assign(nativeManagedFault(`document-check-empty: ${check.document} has no content in the delivery commit`),{repair:`give ${check.document} real, non-empty content, commit it, then finish the delivery again`});
+        if(delivered!==null&&!delivered.includes(check.document))throw Object.assign(nativeManagedFault(`document-check-unchanged: the delivery did not change ${check.document}`),{repair:`write or change ${check.document} in this delivery (a document the delivery leaves untouched proves nothing), commit it, then finish the delivery again`});
+      }
+    }
     const before=itemCheckSnapshot(root,itemDelivery,candidate),results=[];
     // D195: a command check is registered in the calibration (its path). First delivery (baseCommit given) refuses a delivery that changed it,
     // the recheck route refuses the same through native-item-check-source-amendment-required; the registry is re-read at execution time.
@@ -1796,6 +1818,11 @@ export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate,b
     // test fails; the verdict of a check must not depend on the runner that happens to host this process.
     delete checkEnv.NODE_TEST_CONTEXT;
     for(const check of itemDelivery.checks) {
+      if(check.document!==undefined) {
+        // G20-65: verified above from the committed bytes; no process runs, the row records the document and its passing status.
+        results.push({id:check.id,path:check.path,document:check.document,status:0,signal:null,error:null,stdoutSha256:digest(Buffer.alloc(0)),stderrSha256:digest(Buffer.alloc(0))});
+        continue;
+      }
       if(check.command!==undefined) {
         const entry=[...registry.baseline,...registry.areas.flatMap(area=>area.commands)].find(row=>row.id===check.command);
         if(!entry)throw nativeManagedFault('item-check-command-unregistered');
@@ -1814,7 +1841,7 @@ export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate,b
       verdict:results.every(row=>row.status===0&&!row.signal&&!row.error)?'passed':'failed'};
     const handle=Object.freeze({});governedCheckHandles.set(handle,{root:before.repository.primaryRoot,evidence});
     return {status:'observed',code:evidence.verdict==='passed'?'SQ-TARGETED-CHECKS-PASSED':'SQ-TARGETED-CHECKS-FAILED',handle,evidence:structuredClone(evidence)};
-  }catch(error){return {status:'refused',code:error.code??'SQ-TARGETED-CHECKS-UNAVAILABLE',reason:error.reason??error.message};}
+  }catch(error){return {status:'refused',code:error.code??'SQ-TARGETED-CHECKS-UNAVAILABLE',reason:error.reason??error.message,...(typeof error.repair==='string'?{repair:error.repair}:{})};}
 }
 export function inspectGovernedItemDeliveryChecks({root,handle,candidate,itemDelivery}={}) {
   const held=governedCheckHandles.get(handle);

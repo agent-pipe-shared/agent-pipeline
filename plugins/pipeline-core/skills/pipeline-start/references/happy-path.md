@@ -64,6 +64,7 @@ command tables.
    declared path reaches another module, and with `DBG-MODULE-NOT-RUNNABLE` while a module it depends on has no accepted result.
    The package `id` of a module dispatch is that module's slice id from the proposal (`slice-<module>`; a further attempt on the same module:
    `slice-<module>-r2`, `-r3`, ...): the waves track a module by this id only, so any other id is refused with `DBG-MODULE-SLICE-ID`.
+   A documentation-only module (every owned path is a document: `docs/` or `.md`, `.mdx`, `.txt`, `.rst`, `.adoc`) names one of its own documents as the check, `document:<owned path>` (package `check`, `--check`), and the host verifies that the delivery changed it as a non-empty committed file; a code module keeps a test it owns or `command:<id>`.
 3. Dispatch by runner:
    - **Claude**: `Agent` / `Task` with the functional `agentType`.
    - **Codex**: Codex runs no PreToolUse hook for `spawn_agent`, so the governed admission is run by hand first. Write the briefing (`dispatch-briefing.mjs build --package <package.json> --out scratch/<briefing>.md`),

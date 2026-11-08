@@ -14,7 +14,8 @@
 import { lstatSync, readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 
-import { architectureDesignFailureCode, parseArchitectureDesign } from "./architecture-design.mjs";
+import { architectureDesignFailureCode, isDocumentOwnedPath, isDocumentationOnlyModule, parseArchitectureDesign } from "./architecture-design.mjs";
+import { DOCUMENT_CHECK_PREFIX } from "./native-goldfish-host-return.mjs";
 import { proposeSlicesFromModules } from "./module-slice-proposal.mjs";
 import { scopesOverlap } from "./slice-queue.mjs";
 
@@ -23,6 +24,11 @@ const MAX_PRD_BYTES = 4 * 1024 * 1024;
 
 const refuse = (code, message, extra = {}) => ({ ok: false, schema: MODULE_DISPATCH_SCOPE_SCHEMA, code, message, ...extra });
 const FURTHER_ATTEMPT_SUFFIX = /^-r(?:[2-9]|[1-9]\d{1,2})$/u;
+/** G20-65: the documents a documentation-only module owns, as exact files when it lists any (else the owned patterns), for the repair text. */
+const ownDocuments = (module) => {
+  const exact = module.ownedPaths.filter((path) => isDocumentOwnedPath(path) && !/[*?]|\/$/u.test(path));
+  return exact.length > 0 ? exact : ["<an owned document>"];
+};
 
 /**
  * G20-59: `id` delivers the plan's slice `sliceId` when it is that id or a numbered further attempt on the same module
@@ -60,19 +66,27 @@ export function readPrdModules(root, prd) {
  */
 export function moduleDispatchScope(input) {
   try {
-    const { modules, moduleId, paths, integratedSliceIds } = input ?? {};
+    const { modules, moduleId, paths, integratedSliceIds, check } = input ?? {};
     const proposal = proposeSlicesFromModules(modules);
     if (!proposal.ok) return refuse("DBG-MODULE-CUT-INVALID", `the module cut cannot be proposed (${proposal.code}: ${proposal.reason}); repair: fix the architecture design of the plan`);
     const slice = proposal.slices.find((entry) => entry.moduleId === moduleId);
     if (slice === undefined) return refuse("DBG-MODULE-UNKNOWN", `module ${JSON.stringify(String(moduleId).slice(0, 64))} is not a module of the plan; repair: use one of ${proposal.slices.map((entry) => entry.moduleId).sort().join(", ")}`);
     const own = modules.find((module) => module.id === moduleId);
+    const documentationOnly = isDocumentationOnlyModule(own);
+    // G20-65: the document check form is judged here, with the module in hand; the generator only sees its syntax.
+    if (typeof check === "string" && check.startsWith(DOCUMENT_CHECK_PREFIX)) {
+      const document = check.slice(DOCUMENT_CHECK_PREFIX.length);
+      if (!documentationOnly) return refuse("DBG-CHECK-DOCUMENT-MODULE", `check ${check} names a document, but module ${moduleId} owns code (${own.ownedPaths.join(", ")}); repair: a code module names a test file it owns (a .test.mjs, .test.cjs or .test.js) or command:<id> of a command the project calibration registers under verifyImpact`, { moduleId });
+      if (!scopesOverlap([document], own.ownedPaths)) return refuse("DBG-CHECK-DOCUMENT-NOT-OWNED", `${document} is not among the owned paths of module ${moduleId}; repair: name one of its own documents as the check: ${ownDocuments(own).map((path) => `${DOCUMENT_CHECK_PREFIX}${path}`).join(" or ")}`, { moduleId, path: document });
+    }
     if (paths !== undefined) {
       if (!Array.isArray(paths) || paths.length === 0 || !paths.every((path) => typeof path === "string" && path !== "")) return refuse("DBG-MODULE-SCOPE-CROSSES", "the declared paths must be a non-empty list of paths; repair: omit them to derive the scope from the module");
       for (const path of paths) {
         for (const other of modules) {
           if (other.id === moduleId || !scopesOverlap([path], other.ownedPaths)) continue;
           if (scopesOverlap([path], own.ownedPaths) && scopesOverlap(own.ownedPaths, other.ownedPaths)) continue;
-          return refuse("DBG-MODULE-SCOPE-CROSSES", `${path} reaches the owned paths of module ${other.id}, not of module ${moduleId}; repair: narrow the path to ${own.ownedPaths.join(", ")}, or dispatch the change to module ${other.id} as its own slice (one module per dispatch)`, { moduleId, path, ownerModule: other.id });
+          const hint = documentationOnly ? `; module ${moduleId} owns only documents, so its check is one of them: ${ownDocuments(own).map((document) => `${DOCUMENT_CHECK_PREFIX}${document}`).join(" or ")}` : "";
+          return refuse("DBG-MODULE-SCOPE-CROSSES", `${path} reaches the owned paths of module ${other.id}, not of module ${moduleId}; repair: narrow the path to ${own.ownedPaths.join(", ")}, or dispatch the change to module ${other.id} as its own slice (one module per dispatch)${hint}`, { moduleId, path, ownerModule: other.id });
         }
       }
     }
@@ -82,7 +96,7 @@ export function moduleDispatchScope(input) {
     if (waiting.length > 0) {
       return refuse("DBG-MODULE-NOT-RUNNABLE", `module ${moduleId} is in wave ${slice.wave} and waits for ${waiting.join(", ")}, which ${waiting.length === 1 ? "has" : "have"} no accepted result yet; repair: deliver and integrate ${waiting.join(", ")} first (wave order: ${proposal.waves.map((wave, index) => `${index}: ${wave.join(", ")}`).join("; ")}), then build this briefing again`, { moduleId, wave: slice.wave, waitingFor: waiting });
     }
-    return { ok: true, schema: MODULE_DISPATCH_SCOPE_SCHEMA, moduleId, sliceId: slice.id, planSliceIds, wave: slice.wave, writeScope: paths === undefined ? [...slice.writeScope] : [...paths] };
+    return { ok: true, schema: MODULE_DISPATCH_SCOPE_SCHEMA, moduleId, sliceId: slice.id, planSliceIds, wave: slice.wave, documentationOnly, writeScope: paths === undefined ? [...slice.writeScope] : [...paths] };
   } catch (error) {
     return refuse("DBG-MODULE-CUT-INVALID", `the module scope could not be derived (${error?.name ?? "error"}); repair: check the module list of the plan`);
   }

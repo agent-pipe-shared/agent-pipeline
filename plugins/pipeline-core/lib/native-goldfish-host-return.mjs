@@ -216,8 +216,16 @@ export function observeCodexGoldfishReturn(input, pending) {
 }
 
 const COMMAND_ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
-/** D195: a check is either the 3-key .test form or the additive 4-key command form (path = the calibration that registers the command). */
+/** G20-65: the document check form of a documentation-only module (`document:<owned path>`); the file kinds are the closed set of
+ * `isDocumentOwnedPath` (lib/architecture-design.mjs), copied here on purpose because this hook-path validator stays lightweight (a test pins the equality). */
+export const DOCUMENT_CHECK_PREFIX='document:';
+export const DOCUMENT_CHECK_FILE=/\.(?:md|mdx|txt|rst|adoc)$/u;
+/** D195: a check is the 3-key .test form, the additive 4-key command form (path = the calibration that registers the command) or, G20-65,
+ * the 4-key document form (path = the owned document, `document` repeats it, so the check names exactly one file of the write scope). */
 function validCheckForm(check){
+  if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'document'))
+    return exact(check,['id','path','document','dependencies'])&&check.document===check.path&&normalizedPath(check.path)&&DOCUMENT_CHECK_FILE.test(check.path)
+      &&Array.isArray(check.dependencies)&&check.dependencies.includes(check.path);
   if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'command'))
     return exact(check,['id','path','command','dependencies'])&&typeof check.command==='string'&&COMMAND_ID.test(check.command)&&normalizedPath(check.path)
       &&Array.isArray(check.dependencies)&&check.dependencies.includes(check.path);

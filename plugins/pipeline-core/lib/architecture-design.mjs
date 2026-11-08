@@ -16,6 +16,7 @@ import { designAdvisoryAdmission } from "./guard-devplan-policy.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { resolveModuleForPath } from "../scripts/module-inventory.mjs";
+import { readConsumerVerifyConfiguration } from "./consumer-verify.mjs";
 import { renderArchitectureOverview } from "../scripts/generate-architecture-overview.mjs";
 const moduleSchema = JSON.parse(readFileSync(new URL("../schemas/pipeline.module-inventory.v1.json", import.meta.url), "utf8"));
 
@@ -66,6 +67,63 @@ function requireScopeCoverage(input, planPath, taskScope) {
   }
 }
 
+/**
+ * G20-65 (AC-108): the closed set of document kinds. An owned path is a document when it is a `docs/` path or a file ending in
+ * `.md`, `.mdx`, `.txt`, `.rst` or `.adoc` (the rule a `kind: "documentation"` module is validated by). A module is DOCUMENTATION-ONLY when every
+ * owned path is a document, judged by the paths and not by the declared kind; such a module names one of its own documents as its item
+ * check (`document:<owned path>`, dispatch-briefing.mjs). A glob outside `docs/` without a document suffix is not provably a document.
+ */
+export const DOCUMENT_OWNED_FILE = /\.(?:md|mdx|txt|rst|adoc)$/u;
+export function isDocumentOwnedPath(path) {
+  if (typeof path !== "string") return false;
+  const stripped = path.replace(/\/\*\*?$/u, "").replace(/\/$/u, "");
+  return stripped === "docs" || stripped.startsWith("docs/") || DOCUMENT_OWNED_FILE.test(stripped);
+}
+export function isDocumentationOnlyModule(module) {
+  return Array.isArray(module?.ownedPaths) && module.ownedPaths.length > 0 && module.ownedPaths.every(isDocumentOwnedPath);
+}
+
+const TEST_FILE = /\.test\.(?:mjs|cjs|js)$/u;
+const isOwnedDirectory = (path) => path.endsWith("/") || /\/\*\*?$/u.test(path);
+/**
+ * G20-65: the modules of a design that own no admissible item check, as `{ index, id, tests }`. A module is admissible when it is documentation-only
+ * (its check is `document:<owned path>`), when the project registers a verifyImpact command (any module may name `command:<id>`), when it owns a
+ * directory (it can hold a test of its own), or when a `.test` file among its entry points and owned paths is not owned by ANOTHER module. A test no
+ * module owns stays admissible because the dispatch cut refuses only a path that reaches another module's owned paths (module-dispatch-scope.mjs).
+ * `tests` are the test files that another module owns, so the report names them.
+ */
+export function modulesWithoutAdmissibleCheck(modules, { registeredCommands = false } = {}) {
+  if (registeredCommands === true || !Array.isArray(modules)) return [];
+  const found = [];
+  modules.forEach((module, index) => {
+    if (isDocumentationOnlyModule(module) || module.ownedPaths.some(isOwnedDirectory)) return;
+    const tests = [...new Set([...module.verificationEntryPoints, ...module.ownedPaths].filter((path) => TEST_FILE.test(path)))];
+    const foreign = tests.filter((path) => { const owner = resolveModuleForPath(path, modules); return owner !== null && owner.id !== module.id; });
+    if (tests.some((path) => !foreign.includes(path))) return;
+    found.push({ index, id: module.id, tests: foreign });
+  });
+  return found;
+}
+
+/** The submit-plan side of the rule: throws ARCHITECTURE-DESIGN-MODULE-NO-CHECK, naming the module, the field and the three repairs. */
+function requireModuleChecks(design, root) {
+  let registeredCommands = false;
+  try {
+    const configuration = readConsumerVerifyConfiguration(root);
+    registeredCommands = configuration.baseline.length > 0 || configuration.areas.some((area) => area.commands.length > 0);
+  } catch { registeredCommands = false; }
+  const [first] = modulesWithoutAdmissibleCheck(design.modules, { registeredCommands });
+  if (first === undefined) return;
+  const owners = first.tests.map((path) => `${path} (owned by module ${resolveModuleForPath(path, design.modules).id})`);
+  const cause = owners.length > 0
+    ? `its test ${owners.join(", ")} cannot be written by a dispatch of ${first.id}`
+    : `it names no test file it can write and owns no directory that could hold one`;
+  rejectField("ARCHITECTURE-DESIGN-MODULE-NO-CHECK", `modules[${first.index}].verificationEntryPoints`,
+    `module ${first.id} owns no admissible check: ${cause}. Repair, any one: move the test under a path module ${first.id} owns (an exact tests/... file or a directory such as src/${first.id}/**) `
+    + `or out of the other module's ownedPaths; register a verifyImpact command in the project calibration (check command:<id>); or, when ${first.id} owns only documents, `
+    + "own only docs/ paths or files ending in .md, .mdx, .txt, .rst or .adoc so it is documentation-only (its check is then document:<owned path>)", first.id);
+}
+
 /** The entire closed package is visible within the PRD and bound by its existing approval. */
 export function parseArchitectureDesign(prd) {
   const blocks = [...prd.matchAll(/^```pipeline-architecture-design\r?\n([\s\S]*?)^```\s*$/gmu)];
@@ -108,8 +166,7 @@ export function parseArchitectureDesign(prd) {
     // A documentation module may omit verification entry points only when every owned path is non-executable.
     if (module.kind === "documentation") {
       module.ownedPaths.forEach((path, pathIndex) => {
-        const stripped = path.replace(/\/\*\*?$/u, "").replace(/\/$/u, "");
-        requireField(stripped === "docs" || stripped.startsWith("docs/") || /\.(?:md|mdx|txt|rst|adoc)$/u.test(stripped),
+        requireField(isDocumentOwnedPath(path),
           "ARCHITECTURE-DESIGN-DOC-MODULE-INVALID", `modules[${index}].ownedPaths[${pathIndex}]`,
           "a documentation module owns only docs/ paths or files ending in .md, .mdx, .txt, .rst or .adoc", path);
       });
@@ -215,6 +272,8 @@ export function inspectArchitectureDesignDraft({ rootDir, planPath, expectedPlan
       const design = parseArchitectureDesign(prdBytes.toString("utf8"));
       // C18-12 / candidate 19: the scope-coverage rule runs here too, before the PO is asked to sign, not only at materialization after the signature.
       requireScopeCoverage(design, planPath, null);
+      // G20-65: a module whose dispatch could never name an admissible check is reported now, not after the signature.
+      requireModuleChecks(design, root);
       return { ok: true, required: true, design, prdPath: planPath };
     } catch (error) {
       const code = architectureDesignFailureCode(error);

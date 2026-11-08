@@ -70,6 +70,8 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
   --check is included in the write scope. Paths are repository-relative.
   --check command:<id> (D195) names a command the project calibration registers under verifyImpact (baseline or an area) instead of a
     .test file; the calibration becomes a dependency of the check and is not writable by the dispatch.
+  --check document:<owned path> (G20-65) names one document a documentation-only module owns (every owned path a document); the host finalize
+    verifies that the delivery changed it as a non-empty committed file. A code module keeps a test it owns or command:<id>.
   --criterion selects a consumer Spec criterion (AC-<n> or AC-E<epic>-<story>-<nn>).
 
 build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
@@ -99,6 +101,8 @@ if (cliHelp) {
 // Help is available before loading builders whose dependency initialization can
 // resolve account paths. Ordinary imports and binding/build retain their owners.
 const {
+  DOCUMENT_CHECK_FILE,
+  DOCUMENT_CHECK_PREFIX,
   NATIVE_GOLDFISH_HOST_DIRECTIVE,
   NATIVE_GOLDFISH_ITEM_BRIEFING_SCHEMA,
   parseNativeGoldfishBriefing,
@@ -702,13 +706,24 @@ export function generateDispatchBinding(options, deps = {}) {
   if (!AGENT_TYPES.includes(agentType)) refuse("DBG-AGENT-TYPE-UNKNOWN", `unknown agent type ${JSON.stringify(agentType)}; expected one of ${AGENT_TYPES.join(", ")}`);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(modelId)) refuse("DBG-MODEL-ID", `model id ${JSON.stringify(modelId)} is not a model identifier`);
   const commandId = check.startsWith(COMMAND_CHECK_PREFIX) ? check.slice(COMMAND_CHECK_PREFIX.length) : null;
-  for (const path of [...(commandId === null ? [check] : []), ...options.paths]) {
+  // G20-65: `document:<owned path>` names one document of a documentation-only module's write scope as the item check.
+  const documentPath = commandId === null && check.startsWith(DOCUMENT_CHECK_PREFIX) ? check.slice(DOCUMENT_CHECK_PREFIX.length) : null;
+  const checkFile = documentPath ?? check;
+  for (const path of [...(commandId === null ? [checkFile] : []), ...options.paths]) {
     if (!validRepoPath(path)) refuse("DBG-PATH-INVALID", `path ${JSON.stringify(path)} must be repository-relative without .., ., .git or backslash segments`);
   }
   if (options.reconNote !== undefined && !isReconNotePath(options.reconNote)) {
     refuse("DBG-PATH-INVALID", `recon note ${JSON.stringify(options.reconNote)} must be a repository-relative file path under ${RECON_NOTE_PREFIXES.join(" or ")} without .., ., .git or backslash segments`);
   }
-  if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) soft("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file (or command:<id> of a command the project calibration registers under verifyImpact)`);
+  if (documentPath !== null) {
+    if (!DOCUMENT_CHECK_FILE.test(documentPath)) soft("DBG-CHECK-DOCUMENT-KIND", `check ${check} must name a document file (a path ending in .md, .mdx, .txt, .rst or .adoc); repair: name one of the documents of the documentation-only module, or use a .test file or command:<id>`);
+    else if (options.documentationModule === undefined) soft("DBG-CHECK-DOCUMENT-MODULE", `check ${check} is the check of a documentation-only module (every owned path a document), and this dispatch names no such module; repair: dispatch through a briefing package that names "module" and "modulePlan" of a documentation-only module, or use a .test.mjs, .test.cjs or .test.js file or command:<id> of a command the project calibration registers under verifyImpact`);
+  } else if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) {
+    // G20-65: the module is documentation-only (it owns only documents), so the repair names the document form.
+    const documentRepair = options.documentationModule !== undefined && DOCUMENT_CHECK_FILE.test(check)
+      ? `; module ${options.documentationModule} owns only documents. repair: name ${check} as the check in the document form ${DOCUMENT_CHECK_PREFIX}${check}` : "";
+    soft("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file (or command:<id> of a command the project calibration registers under verifyImpact)${documentRepair}`);
+  }
   if (commandId !== null && !VERIFY_COMMAND_ID.test(commandId)) refuse("DBG-CHECK-COMMAND-UNKNOWN", `check ${check} does not carry a command id of the shape ${VERIFY_COMMAND_ID}`);
   let root;
   try { root = realpathSync(resolve(options.root ?? process.cwd())); } catch { refuse("DBG-ROOT-UNREADABLE", "--root cannot be resolved to a directory"); }
@@ -725,7 +740,7 @@ export function generateDispatchBinding(options, deps = {}) {
     directoryExpansions.push({ path, files: listed });
     expandedPaths.push(...listed);
   }
-  const allowedPaths = [...new Set([...(commandId === null ? [check] : []), ...expandedPaths])].sort();
+  const allowedPaths = [...new Set([...(commandId === null ? [checkFile] : []), ...expandedPaths])].sort();
   if (allowedPaths.length > MAX_ALLOWED_PATHS) refuse("DBG-SCOPE-TOO-MANY-PATHS", `the write scope holds ${allowedPaths.length} exact files and the native host admits at most ${MAX_ALLOWED_PATHS}${directoryExpansions.length === 0 ? "" : ` (directories expanded: ${directoryExpansions.map((entry) => `${entry.path} -> ${entry.files.length}`).join(", ")})`}; split the work into several dispatches, each with its own exact files`);
   for (const entry of directoryExpansions) {
     warnings.push({ code: "DBG-DIRECTORY-EXPANDED", path: entry.path, files: entry.files, message: `${entry.path} is a directory: the write scope lists its ${entry.files.length} regular file(s) as they exist now. A file created there later is outside the scope; bind it with a new --path (a new binding), never by widening the match` });
@@ -1091,7 +1106,7 @@ export function generateDispatchBinding(options, deps = {}) {
       itemId,
       criterionLocator: locator,
       checks: [commandId === null
-        ? { id: `${dispatchId.toLowerCase()}-check`, path: check, dependencies: [...allowedPaths] }
+        ? { id: `${dispatchId.toLowerCase()}-check`, path: checkFile, ...(documentPath === null ? {} : { document: documentPath }), dependencies: [...allowedPaths] }
         : { id: `${dispatchId.toLowerCase()}-check`, path: commandCheckPath, command: commandId, dependencies: [...new Set([...allowedPaths, commandCheckPath])].sort() }],
     },
   };
@@ -1204,23 +1219,27 @@ function resolveModulePackage(root, pkg, deps) {
     const ids = (deps.integratedSliceIds ?? defaultIntegratedSliceIds)(root);
     if (Array.isArray(ids) || ids instanceof Set) integrated = [...ids];
   } catch { integrated = []; }
-  const declared = [...(pkg.paths ?? []), ...(pkg.newFiles ?? []), ...(pkg.check.startsWith(COMMAND_CHECK_PREFIX) ? [] : [pkg.check])];
+  // G20-65: a `document:<path>` check declares the document itself; the module cut judges the form (documentation-only, owned).
+  const checkFile = pkg.check.startsWith(DOCUMENT_CHECK_PREFIX) ? pkg.check.slice(DOCUMENT_CHECK_PREFIX.length) : pkg.check;
+  const declared = [...(pkg.paths ?? []), ...(pkg.newFiles ?? []), ...(pkg.check.startsWith(COMMAND_CHECK_PREFIX) ? [] : [checkFile])];
   const input = { modules: read.modules, moduleId: pkg.module, integratedSliceIds: integrated };
-  const checked = moduleDispatchScope({ ...input, ...(declared.length === 0 ? {} : { paths: declared }) });
+  const checked = moduleDispatchScope({ ...input, check: pkg.check, ...(declared.length === 0 ? {} : { paths: declared }) });
   if (!checked.ok) throw new BriefingPackageRefusal(checked.code, checked.message);
   // G20-59: the wave order tracks a module by its slice id; a dispatch under another id is delivered and integrated, but the
   // modules waiting for it stay blocked, and the only way out was a second dispatch of the whole module.
   if (!deliversModuleSlice(pkg.id, checked.sliceId, checked.planSliceIds)) {
     throw new BriefingPackageRefusal("DBG-MODULE-SLICE-ID", `dispatch id ${JSON.stringify(String(pkg.id).slice(0, 64))} does not name the slice of module ${pkg.module}; the wave order tracks this module as ${checked.sliceId}, so a delivery under another id never releases the modules that wait for it; repair: set "id" to ${checked.sliceId} (a further attempt on the same module: ${checked.sliceId}-r2, -r3, ...), then build again`);
   }
-  if (pkg.paths !== undefined) return { pkg, warnings: [] };
+  // G20-65: the binding learns from the cut that the module is documentation-only (the generator itself cannot see the module).
+  const withDocumentation = (value) => (checked.documentationOnly === true ? { ...value, documentationModule: pkg.module } : value);
+  if (pkg.paths !== undefined) return { pkg: withDocumentation(pkg), warnings: [] };
   const derived = declared.length === 0 ? checked : moduleDispatchScope(input);
   const files = expandModuleScope(root, derived.writeScope);
   if (files.length === 0 && (pkg.newFiles ?? []).length === 0) {
     throw new BriefingPackageRefusal("DBG-MODULE-SCOPE-EMPTY", `module ${pkg.module} owns ${derived.writeScope.join(", ")}, which holds no file today, so the derived write scope is empty and a write scope is a list of exact files; repair: list the files the dispatch creates under "newFiles", or declare "paths"`);
   }
   return {
-    pkg: { ...pkg, paths: files },
+    pkg: withDocumentation({ ...pkg, paths: files }),
     warnings: [{ code: "DBG-MODULE-SCOPE-DERIVED", moduleId: pkg.module, ownedPaths: derived.writeScope, files, message: `the write scope of module ${pkg.module} (${derived.writeScope.join(", ")}) is listed as the ${files.length} regular file(s) it holds now. A file created there later is outside the scope; add it under "newFiles" in a new briefing, never by widening the match` }],
   };
 }
@@ -1233,6 +1252,7 @@ function packageBindingOptions(root, pkg, agentType) {
     check: pkg.check, paths: [...new Set([...pkg.paths, ...(pkg.newFiles ?? [])])], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote, runner: pkg.runner,
     // The package carries the same escalation act as the --effort-escalation flag; the binding is its only validator.
     ...(pkg.effortEscalation === undefined ? {} : { effortEscalation: pkg.effortEscalation }),
+    ...(pkg.documentationModule === undefined ? {} : { documentationModule: pkg.documentationModule }),
   };
 }
 

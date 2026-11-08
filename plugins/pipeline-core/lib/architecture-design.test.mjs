@@ -517,3 +517,52 @@ test("C19-F1: an accepted predecessor receipt does not relax the target drift ch
   assert.equal(exact.status, "materialized");
   assert.equal(Object.hasOwn(exact, "inheritedFrom"), false);
 });
+
+// --- G20-65 (AC-108): a module that owns no admissible check is reported at design time, before the PO signs, with the move that repairs it ---
+// Measured in the Claude greenfield on candidate 20c: the module user-guide owned two documents and its test belonged to module shell; the dispatch
+// route refused every check only after the design was signed.
+function g2065Design(over = {}) {
+  const base = hf9Design();
+  const module = (id, ownedPaths, verificationEntryPoints, extra = {}) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: ["Network"], ownedPaths,
+    publicContracts: [ownedPaths.find((path) => !path.includes("*"))], allowedDependencies: [], authorityEffects: [], verificationEntryPoints, adrReferences: [], ...extra });
+  const modules = over.modules ?? [module("engine", ["src/engine.mjs"], ["tests/engine.test.mjs"]), module("shell", ["tests/**", "src/shell.mjs"], ["tests/shell.test.mjs"])];
+  const { modules: _omitted, ...fitnessModel } = base.fitnessModel;
+  return { ...base, modules, implementationSurface: over.implementationSurface ?? ["src/engine.mjs", "src/shell.mjs"], fitnessModel };
+}
+
+test("G20-65: the draft inspection reports a module whose only test is owned by another module, naming the module and the move, before any signature", async () => {
+  const { stage, mod } = await hf9Load();
+  const fixture = hf9Fixture(stage, { block: true, scaffold: "exact", designInput: g2065Design() });
+  const draft = mod.inspectArchitectureDesignDraft({ rootDir: fixture.root, planPath: fixture.planPath, expectedPlanSha256: fixture.prdSha });
+  assert.equal(draft.ok, false, JSON.stringify(draft));
+  assert.equal(draft.required, true);
+  assert.equal(draft.code, "ARCHITECTURE-DESIGN-MODULE-NO-CHECK");
+  assert.equal(draft.field, "modules[0].verificationEntryPoints");
+  assert.match(draft.expected, /engine/u);
+  assert.match(draft.expected, /tests\/engine\.test\.mjs/u, "the test that module shell owns is named");
+  assert.match(draft.expected, /move|own/u);
+  assert.match(draft.expected, /documentation/u, "the documentation-only alternative is named");
+  assert.equal(draft.rejectedValue, "engine");
+});
+
+test("G20-65: a module is admissible by an own test, an unowned test, an owned directory, documentation only, or a registered command", async () => {
+  const { stage, mod } = await hf9Load();
+  const module = (id, ownedPaths, verificationEntryPoints, extra = {}) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths, publicContracts: [ownedPaths[0]],
+    allowedDependencies: [], authorityEffects: [], verificationEntryPoints, adrReferences: [], ...extra });
+  const none = (modules, options) => mod.modulesWithoutAdmissibleCheck(modules, options).map((entry) => entry.id);
+  assert.deepEqual(none([module("a", ["src/a.mjs", "tests/a.test.mjs"], ["tests/a.test.mjs"])]), [], "an owned test file");
+  assert.deepEqual(none([module("a", ["src/a.mjs"], ["tests/a.test.mjs"])]), [], "a test no module owns can be created by the dispatch (not a crossing)");
+  assert.deepEqual(none([module("a", ["src/a/**"], [])]), [], "an owned directory can hold the module's own test");
+  assert.deepEqual(none([module("guide", ["app/GUIDE.txt", "docs/manual-checklist.md"], [], { kind: "documentation" })]), [], "documentation only");
+  assert.deepEqual(none([module("guide", ["app/GUIDE.txt"], ["tests/guide.test.mjs"]), module("shell", ["tests/**"], ["tests/shell.test.mjs"])]), [], "documentation-only is judged by the owned paths, not by the declared kind or by the test of another module");
+  assert.deepEqual(none([module("mixed", ["src/a.mjs", "docs/a.md"], ["tests/a.test.mjs"]), module("shell", ["tests/**"], ["tests/shell.test.mjs"])]), ["mixed"], "one code path makes the module a code module");
+  assert.deepEqual(none([module("a", ["src/a.mjs"], ["tests/a.test.mjs"]), module("shell", ["tests/**"], ["tests/s.test.mjs"])]), ["a"]);
+  assert.deepEqual(none([module("a", ["src/a.mjs"], ["tests/a.test.mjs"]), module("shell", ["tests/**"], ["tests/s.test.mjs"])], { registeredCommands: true }), [], "a registered verifyImpact command is an admissible check for every module");
+  assert.deepEqual(none([module("a", ["src/a.mjs"], ["src/a.mjs"]), module("b", ["src/b.mjs"], ["tests/b.test.mjs"])]), ["a"], "an entry point that is not a test file is no check");
+});
+
+test("G20-65: the document suffix set of the check validator equals the one of the design validator", async () => {
+  const { mod } = await hf9Load();
+  const { DOCUMENT_CHECK_FILE } = await import("./native-goldfish-host-return.mjs");
+  assert.equal(DOCUMENT_CHECK_FILE.source, mod.DOCUMENT_OWNED_FILE.source, "the two copies of the document suffix set must not drift");
+});

@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { bindNativeCodexStart, prepareNativeGoldfishHostState,
   readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
-import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
+import { NATIVE_GOLDFISH_HOST_DIRECTIVE, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
 import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices, sessionAuthorityRegistryAbsent, createNativeGoldfishAuthorityProducerPort, heldDependencyReason, cancelUnstartedGovernedItemSlice, rollbackGovernedItemQueue } from "./native-goldfish-host-state.mjs";
 import { createGovernanceScopeController } from "./governance-scope.mjs";
 import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
@@ -1940,7 +1940,46 @@ const cases = [
     }finally{child.kill();}
   })},
 
+  // G20-65 (AC-108): a documentation-only module's item check is one of its own owned documents; the host verifies it from the committed bytes.
+  { id: "NGHS69", name: "G20-65: a document check passes for a changed, non-empty, committed owned document and records no process run", run: () => fixture(({root})=>{
+    const h=documentCheckHarness(root),base=h.commit({'docs/manual-checklist.md':'checklist\n'}),candidate=h.commit({'app/GUIDE.txt':'The guide.\n'});
+    const observed=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery(),candidate,baseCommit:base.commit});
+    assert.equal(observed.code,'SQ-TARGETED-CHECKS-PASSED',JSON.stringify(observed));
+    const [row]=observed.evidence.results;
+    assert.equal(row.document,'app/GUIDE.txt');assert.equal(row.status,0);assert.equal(row.executable,undefined);assert.equal(row.args,undefined);
+    assert.ok(observed.evidence.files.some(file=>file.path==='app/GUIDE.txt'),'the document digest binds the verdict');
+    assert.equal(inspectGovernedItemDeliveryChecks({root,handle:observed.handle,candidate,itemDelivery:h.delivery()}).verdict,'passed');
+    // The recheck route (no base commit) has no delivery to compare with: it still requires the committed, non-empty regular document.
+    assert.equal(executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery(),candidate}).code,'SQ-TARGETED-CHECKS-PASSED');
+  })},
+  { id: "NGHS70", name: "G20-65: a document check is refused with a typed reason and a repair for a missing, empty, unchanged or unlisted document", run: () => fixture(({root})=>{
+    const h=documentCheckHarness(root),base=h.commit({'docs/manual-checklist.md':'checklist\n','app/KEPT.txt':'kept\n'});
+    const missing=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery(),candidate:base,baseCommit:base.commit});
+    assert.equal(missing.status,'refused',JSON.stringify(missing));assert.match(missing.reason,/document-check-missing/u);assert.match(missing.repair,/commit|write/u);
+    const empty=h.commit({'app/GUIDE.txt':''});
+    const emptied=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery(),candidate:empty,baseCommit:base.commit});
+    assert.equal(emptied.status,'refused',JSON.stringify(emptied));assert.match(emptied.reason,/document-check-empty/u);assert.match(emptied.repair,/non-empty|content/u);
+    const kept=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('app/KEPT.txt',['app/KEPT.txt','docs/manual-checklist.md']),candidate:empty,baseCommit:base.commit});
+    assert.equal(kept.status,'refused',JSON.stringify(kept));assert.match(kept.reason,/document-check-unchanged/u);assert.match(kept.repair,/change|write/u);
+    const stranger=h.delivery('app/GUIDE.txt',['docs/manual-checklist.md']);
+    assert.equal(validateItemDeliveryBriefing(stranger).ok,false,'a document that is not among the dependencies (the write scope) is not a valid check');
+    assert.equal(validateItemDeliveryBriefing({...h.delivery(),checks:[{...h.delivery().checks[0],document:'docs/manual-checklist.md'}]}).ok,false,'the document field must name the check path');
+  })},
+
 ];
+
+/** G20-65 fixture: real commits of documents; the check is `{id, path, document, dependencies}` over them. */
+function documentCheckHarness(root){
+  const git=(...args)=>assert.equal(spawnSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c',`core.hooksPath=${devNull}`,'-c','commit.gpgsign=false',...args]).status,0,args.join(' '));
+  const commit=files=>{
+    for(const [path,text] of Object.entries(files)){mkdirSync(dirname(join(root,path)),{recursive:true});writeFileSync(join(root,path),text);}
+    git('add',...Object.keys(files));git('commit','-q','-m','documents');
+    return inspectSignedDescriptorCustodyRepository(root).candidate;
+  };
+  const delivery=(path='app/GUIDE.txt',dependencies=[path,'docs/manual-checklist.md'])=>({schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-A',itemId:'AC-1',criterionLocator:{schema:'pipeline.critic-criterion-locator.v1',sourcePath:'specs/unit/spec.md',sourceSha256:'a'.repeat(64),criterionId:'AC-1',startByte:1,endByte:20,excerptSha256:'b'.repeat(64)},
+    checks:[{id:'doc',path,document:path,dependencies}]});
+  return {commit,delivery};
+}
 
 /** D195 fixture: a real calibration (project name = root basename) registering verifyImpact commands over a committed check script. */
 function commandCheckHarness(root){

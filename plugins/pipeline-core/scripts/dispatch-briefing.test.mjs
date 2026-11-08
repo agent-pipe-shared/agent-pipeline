@@ -2436,3 +2436,102 @@ test("module package: the two reference keys come together, and a package withou
   const legacy = packageFixture();
   assert.equal(runDispatchBriefing(legacy.argv, depsOf(legacy.fx)).ok, true);
 });
+
+// --- G20-65 (AC-108; measured in the Claude greenfield on candidate 20c, 2026-11-08): a module that owns only documents had no executable dispatch route ---
+// The design's module user-guide owned app/ANLEITUNG.txt and docs/manual-checklist.md; its test belonged to module shell. probe refused the package with
+// DBG-CHECK-NOT-TEST (check = the document) and DBG-MODULE-SCOPE-CROSSES (check = the test of shell), so the Elephant wrote both documents itself.
+
+function docModulePackage(over = {}) {
+  const made = packageFixture({
+    paths: undefined, module: "guide", modulePlan: "specs/prd.md", id: "slice-guide", check: "document:app/GUIDE.txt",
+    newFiles: ["app/GUIDE.txt", "docs/manual-checklist.md"], targeted: ["`the guide documents are written`"], ...over,
+  });
+  const row = (id, ownedPaths, publicContracts, verificationEntryPoints, kind) => ({
+    id, ...(kind === undefined ? {} : { kind }), responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths, publicContracts,
+    allowedDependencies: [], authorityEffects: [], verificationEntryPoints, adrReferences: [],
+  });
+  const design = {
+    schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
+    disposition: { decision: "approved-scoped", scope: ["specs/", "src/", "tests/", "app/", "docs/", "architecture/"], rationale: "fixture" },
+    modules: [
+      row("guide", ["app/GUIDE.txt", "docs/manual-checklist.md"], ["app/GUIDE.txt"], [], "documentation"),
+      row("shell", ["src/**", "tests/**"], ["src/index.mjs"], ["tests/user-guide.test.mjs"]),
+    ],
+    implementationSurface: ["src/index.mjs", "app/GUIDE.txt"],
+    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } },
+  };
+  mkdirSync(join(made.fx.root, "specs"), { recursive: true });
+  writeFileSync(join(made.fx.root, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
+  return made;
+}
+const moduleFindingOf = (probed) => probed.findings.find((entry) => entry.check === "module-scope" || entry.check === "binding");
+
+test("G20-65: a documentation-only module package with a document: check probes ready and builds a document check the host parser accepts", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = docModulePackage();
+  const probed = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx));
+  assert.equal(probed.ready, true, JSON.stringify(probed.findings));
+  const built = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 500));
+  const parsed = parseNativeGoldfishBriefing(built.text);
+  assert.equal(parsed.ok, true, parsed.code);
+  const [check] = parsed.binding.itemDelivery.checks;
+  assert.deepEqual(Object.keys(check).sort(), ["dependencies", "document", "id", "path"]);
+  assert.equal(check.path, "app/GUIDE.txt");
+  assert.equal(check.document, "app/GUIDE.txt");
+  assert.deepEqual(parsed.binding.allowedPaths, ["app/GUIDE.txt", "docs/manual-checklist.md"]);
+  assert.ok(parsed.binding.allowedPaths.every((path) => check.dependencies.includes(path)), "every allowed path is a dependency of the check");
+});
+
+test("G20-65: the document form is refused for a code module, without a module, for an unowned document and for a non-document file", async () => {
+  const { runDispatchBriefing } = await lib();
+  const code = docModulePackage({ module: "shell", id: "slice-shell", check: "document:src/NOTES.md", newFiles: ["src/NOTES.md"] });
+  const codeBuilt = runDispatchBriefing(code.argv, depsOf(code.fx));
+  assert.equal(codeBuilt.ok, false);
+  assert.equal(codeBuilt.code, "DBG-CHECK-DOCUMENT-MODULE", codeBuilt.message);
+  assert.match(codeBuilt.message, /repair: /u);
+  assert.match(codeBuilt.message, /\.test\.mjs/u, "a code module is pointed back to a test file or a registered command");
+  assert.equal(moduleFindingOf(runDispatchBriefing(probeArgvOf(code.fx), probeDepsOf(code.fx)))?.code, "DBG-CHECK-DOCUMENT-MODULE");
+
+  const bare = packageFixture({ check: "document:docs/guide.md", paths: ["docs/guide.md"], newFiles: ["docs/guide.md"], targeted: ["`the guide is written`"] });
+  const bareBuilt = runDispatchBriefing(bare.argv, depsOf(bare.fx));
+  assert.equal(bareBuilt.code, "DBG-CHECK-DOCUMENT-MODULE", "without a module reference there is no documentation-only module to judge");
+
+  const foreign = docModulePackage({ check: "document:docs/other.md", newFiles: ["app/GUIDE.txt", "docs/other.md"] });
+  const foreignBuilt = runDispatchBriefing(foreign.argv, depsOf(foreign.fx));
+  assert.equal(foreignBuilt.code, "DBG-CHECK-DOCUMENT-NOT-OWNED", foreignBuilt.message);
+  assert.match(foreignBuilt.message, /app\/GUIDE\.txt/u, "the repair names the documents the module owns");
+
+  const plainFixture = makeFixture();
+  const kind = runDispatchBriefing(argvOf(plainFixture, { "--check": "document:app/run.mjs" }), depsOf(plainFixture));
+  assert.equal(kind.code, "DBG-CHECK-DOCUMENT-KIND", kind.message);
+  assert.match(kind.message, /\.md/u);
+});
+
+test("G20-65: the DBG-CHECK-NOT-TEST and DBG-MODULE-SCOPE-CROSSES repairs name the document form for a documentation-only module, and only for it", async () => {
+  const { runDispatchBriefing } = await lib();
+  const bare = docModulePackage({ check: "app/GUIDE.txt" });
+  const notTest = runDispatchBriefing(bare.argv, depsOf(bare.fx));
+  assert.equal(notTest.code, "DBG-CHECK-NOT-TEST");
+  assert.match(notTest.message, /document:app\/GUIDE\.txt/u);
+  // the probe lists the consequence (DBG-BINDING-INVALID, item delivery shape) before the cause; the repair of the cause names the document form
+  const probedFindings = runDispatchBriefing(probeArgvOf(bare.fx), probeDepsOf(bare.fx)).findings;
+  assert.equal(probedFindings.find((entry) => entry.code === "DBG-CHECK-NOT-TEST")?.repair.includes("document:app/GUIDE.txt"), true, JSON.stringify(probedFindings));
+
+  const crossing = docModulePackage({ check: "tests/user-guide.test.mjs", newFiles: ["app/GUIDE.txt", "tests/user-guide.test.mjs"] });
+  const crosses = runDispatchBriefing(crossing.argv, depsOf(crossing.fx));
+  assert.equal(crosses.code, "DBG-MODULE-SCOPE-CROSSES");
+  assert.match(crosses.message, /document:app\/GUIDE\.txt/u, "the module is documentation-only, so the repair names the document check");
+
+  const codeModule = modulePackage({ paths: ["src/core/a.mjs", "src/api/handler.mjs"], newFiles: ["src/core/a.mjs", "src/api/handler.mjs"] });
+  const codeCrosses = runDispatchBriefing(codeModule.argv, depsOf(codeModule.fx));
+  assert.equal(codeCrosses.code, "DBG-MODULE-SCOPE-CROSSES");
+  assert.doesNotMatch(codeCrosses.message, /document:/u, "a code module keeps the old repair");
+  const plain = packageFixture();
+  assert.doesNotMatch(runDispatchBriefing(argvOf(plain.fx, { "--check": PATH_A }), depsOf(plain.fx)).message, /document:/u);
+});
+
+test("G20-65: the happy-path guide states the document check rule in one sentence", () => {
+  const guide = readFileSync(join(HERE, "..", "skills", "pipeline-start", "references", "happy-path.md"), "utf8");
+  assert.match(guide, /documentation-only module[^\n]*`document:<owned path>`/u);
+});
