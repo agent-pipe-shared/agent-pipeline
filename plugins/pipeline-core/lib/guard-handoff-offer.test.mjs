@@ -327,6 +327,25 @@ test("R-AC-05/R-AC-06: the journaled offer omits the four mandatory classes and 
   }
 });
 
+test("a dispatch the agent can correct itself gets a typed correction, never the external-operator route", () => {
+  const root = fixture();
+  try {
+    const reason = (code) => `BLOCKED (guard-dispatch, plugin pipeline-core): ${code}: the dispatch was refused.`;
+    const plan = (denials) => recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Read", toolInput: { file_path: CANARY }, denials, nowMs: NOW, appendCommandOffer: verifiedAppend([]) });
+    const model = plan([{ guard: "guard-dispatch.mjs", reason: reason("DISPATCH-NO-MODEL") }]);
+    assert.deepEqual([model.status, model.code, model.nextAction.kind], ["narrower-recovery-required", "HGO-DISPATCH-CORRECTION-REQUIRED", "typed-recovery"]);
+    assert.match(model.nextAction.action.requiredChange, /correct the dispatch/u);
+    const digest = plan([{ guard: "guard-dispatch.mjs", reason: reason("DBG-GENERATED-DIGEST-MISMATCH") }]);
+    assert.equal(digest.code, "HGO-DISPATCH-CORRECTION-REQUIRED");
+    assert.match(digest.nextAction.action.requiredChange, /rebuild the briefing[\s\S]*final newline/u);
+    // A set that is not purely dispatch refusals keeps its existing route.
+    const mixed = plan([{ guard: "guard-dispatch.mjs", reason: reason("DISPATCH-NO-MODEL") }, { guard: "guard-other.mjs", reason: "BLOCKED: refused." }]);
+    assert.deepEqual([mixed.status, mixed.code], ["external-operator-required", "HGO-EXTERNAL-ADAPTER-BOUNDARY"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the three non-external route statuses keep their exact current shape and journal nothing", () => {
   const root = fixture();
   try {

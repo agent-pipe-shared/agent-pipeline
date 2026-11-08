@@ -261,7 +261,8 @@ export function generatedBriefingAdmission(prompt, generatorCommand = "node <plu
   const repair = `repair: write the package (${BRIEFING_PACKAGE_SCHEMA}), run \`${generatorCommand} build --package <package.json> --out scratch/briefing-<dispatch-id>.md\`, and dispatch that file's text unchanged`;
   if (prompt.includes("<!-- pipeline-briefing-generator:")) {
     const verified = verifyGeneratedBriefing(prompt);
-    if (!verified.ok) return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; ${repair}` };
+    // Antigravity greenfield 2026-11-08: a missing final newline cost a 13 KB retype; the digest covers it.
+    if (!verified.ok) return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it (a dropped final newline counts: the text must end with the file's own newline); ${repair}` };
     // G20-48: the D78 rule is runner-neutral, so an Antigravity binding is parsed too.
     const parsed = parseNativeGoldfishBriefing(prompt, { runners: DISPATCH_ADMISSION_BRIEFING_RUNNERS });
     if (requireGenerated && (!parsed.ok || parsed.binding.itemDelivery === undefined)) {

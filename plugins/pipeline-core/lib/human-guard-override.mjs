@@ -1776,6 +1776,18 @@ function pushRecoveryTarget(command, depth = 0) {
   return { kind: "branch", remote, destination };
 }
 
+// Antigravity greenfield 2026-11-08: a dispatch the agent could correct itself was sent to an "external operator". Only a set made up
+// entirely of dispatch refusals qualifies; anything else keeps its existing route. The text is closed and carries nothing from the denial.
+function dispatchCorrectionRequired(denials) {
+  if (!Array.isArray(denials) || denials.length === 0) return null;
+  const codes = denials.map((denial) => (String(denial?.guard) === "guard-dispatch.mjs"
+    ? String(denial?.reason ?? "").match(/\b(?:DISPATCH|DBG-GENERATED)-[A-Z0-9-]+\b/u)?.[0] ?? null : null));
+  if (codes.includes(null)) return null;
+  return codes.some((code) => code.startsWith("DBG-GENERATED-"))
+    ? "rebuild the briefing with dispatch-briefing.mjs build at the current commit and pass the file's text unchanged, including its final newline"
+    : "correct the dispatch as the refusal above states and issue it again";
+}
+
 function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
   const { root = null, pluginRoot = null, repository = null } = context;
   const command = String(toolInput?.command ?? "");
@@ -1930,6 +1942,17 @@ function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
           requiredChange: "replace every wildcard with one exact target",
           repositoryRoot: root,
         },
+      },
+    };
+  }
+  const dispatchCorrection = dispatchCorrectionRequired(context.denials);
+  if (dispatchCorrection !== null) {
+    return {
+      status: "narrower-recovery-required",
+      code: "HGO-DISPATCH-CORRECTION-REQUIRED",
+      nextAction: {
+        kind: "typed-recovery",
+        action: { toolName, toolInputSha256: sha(toolInput), requiredChange: dispatchCorrection, repositoryRoot: root },
       },
     };
   }
@@ -3874,6 +3897,7 @@ export function recordHumanGuardDenial({
       root: repo.root,
       pluginRoot,
       repository,
+      denials,
     });
     // Only a route that really hands a human a command needs a journaled offer first (R-AC-08: the offer exists BEFORE a command is
     // handed over). A route that carries no command (a read the adapter cannot attest, sensitive input, a file outside the project)

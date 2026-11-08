@@ -2328,6 +2328,7 @@ test("A18-M1C build --runner antigravity renders a verified briefing that names 
   const built = runDispatchBriefing(argv, depsOf(fx));
   assert.equal(built.ok, true, JSON.stringify(built).slice(0, 500));
   assert.match(built.text, /"runner":"antigravity"/u);
+  assert.match(built.text, /route model `gemini-[0-9a-z.-]+`/u, "the alias alone names no model, so the admission rule MP-05 needs the registered id");
   assert.deepEqual(verifyGeneratedBriefing(built.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
   const optIn = parseNativeGoldfishBriefing(built.text, { runners: ["claude", "codex", "antigravity"] });
   assert.equal(optIn.ok, true, optIn.code);

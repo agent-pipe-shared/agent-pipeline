@@ -150,6 +150,7 @@ test("DME13 G20-43 the Goldfish roles pass Model flash and the Critic passes no 
     assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: "flash", routeSource: source }).ok, true, subagentType);
     assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: "pro", routeSource: source }).findings[0].code, "DISPATCH-MODEL-DUTY-MISMATCH", subagentType);
     assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType, model: undefined, routeSource: source }).findings[0].code, "DISPATCH-MODEL-MISSING", subagentType);
+    assert.match(evaluateDispatchModel({ runner: "antigravity", subagentType, model: undefined, routeSource: source }).findings[0].message, /configured route for pipeline-core:goldfish-[a-z]+ selects "flash"/u, subagentType);
   }
   for (const subagentType of ["critic", "pipeline-core:critic"]) {
     for (const model of [undefined, "", "inherit"]) {

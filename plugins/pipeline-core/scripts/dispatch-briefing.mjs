@@ -249,6 +249,15 @@ function defaultAntigravityRoute(taskRoute) {
   try { return antigravityNativeTierForTaskRoute(taskRoute); } catch { return null; }
 }
 
+/** The concrete model id the registry names for an Antigravity duty, or null. The briefing states it because the alias alone names no model (MP-05). */
+function defaultAntigravityRouteModel(taskRoute) {
+  try {
+    const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "antigravity");
+    const value = scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute)?.selector?.value : null;
+    return typeof value === "string" ? value : null;
+  } catch { return null; }
+}
+
 /** The Claude task route of a duty (read-only registry projection), or null when the registry yields none. */
 function defaultClaudeRoute(taskRoute) {
   try {
@@ -1123,7 +1132,7 @@ export function generateDispatchBinding(options, deps = {}) {
     runner === "codex"
       ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Codex route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`).`
       : runner === "antigravity"
-        ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Antigravity native model alias, route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`).`
+        ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Antigravity native model alias, route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`, route model \`${(deps.antigravityRouteModel ?? defaultAntigravityRouteModel)(DUTY_ROUTE_OF_AGENT[agentType]) ?? "not registered"}\`).`
         : `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; agent definition alias \`${resolved.model}\`${claudeRouteDuty === null ? "" : `; Claude route \`${claudeRouteDuty}\``}).`,
     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
     // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.

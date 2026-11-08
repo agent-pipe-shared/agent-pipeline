@@ -78,7 +78,7 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
       return { ok: false, skipped: null, findings: [{
         code: model === undefined || model === null || model === "" || model === "inherit"
           ? "DISPATCH-MODEL-MISSING" : "DISPATCH-MODEL-UNROUTED",
-        message: `Antigravity Subagents[].Model must be explicitly set to "flash_lite", "flash", or "pro" for each entry; "inherit" and omitted values inherit the session model. Re-issue the same invoke_subagent call with each entry's Model set explicitly.`,
+        message: `Antigravity Subagents[].Model must be explicitly set to "flash_lite", "flash", or "pro" for each entry; "inherit" and omitted values inherit the session model. ${expected.length > 0 ? `The configured route for ${type} selects ${expected.map((value) => `"${value}"`).join(" or ")}. ` : ""}Re-issue the same invoke_subagent call with each entry's Model set explicitly.`,
       }] };
     }
     if (expected.length === 0) {
