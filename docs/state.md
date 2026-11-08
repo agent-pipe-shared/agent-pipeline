@@ -8,6 +8,7 @@ is historical (superseded goals and counts).
 
 | Date range | Summary | Archive |
 |---|---|---|
+| 2026-11-08 | 2026-10-25 transfer-era qualification snapshot (AC168, G24/R3/G27, G9a, Critic preparation, Phoenix entry, Verify checkout, READY guard, dispatch helper); superseded by candidates 13 to 20b. | [docs/state-archive/2026-11-08--committed-source-and-actual-qualification.md](state-archive/2026-11-08--committed-source-and-actual-qualification.md) |
 | 2026-11-02 | WSL PC autonomous round 2026-10-26: held kernel patches for sitting C29 committed, Q22 dispatch lock blocker resolved under D159, report 05 triaged, decisions D160-D162 taken; closed history, superseded by candidates 13 to 17. | [docs/state-archive/2026-11-02--wsl-pc-autonomous-round-2026-10-26-po-away.md](state-archive/2026-11-02--wsl-pc-autonomous-round-2026-10-26-po-away.md) |
 | 2026-10-26 | WSL PC re-entry 2026-10-26: two metadata-only commits from the original machine (64dbc35d0, 6f089c41b) to merge normally, never reset; P1 item push-approval-record-always-trails-the-signed-commit (AC-37) documented not fixed; one-time operator push exception not approved; chat:member-source-drift cleared by the sanctioned move-aside after PO confirmed workers stopped. | [docs/state-archive/2026-10-31--off-machine-follow-up-wsl-pc-re-entry-2026-10-26.md](state-archive/2026-10-31--off-machine-follow-up-wsl-pc-re-entry-2026-10-26.md) |
 
@@ -25,7 +26,8 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
 (`--remote upstream`). Not built, planned for candidate 18 with the draft native Antigravity admission: [candidate 18 plan](../specs/sprint-alfred-epic/plans/candidate-18-plan-2026-11-02.md).
 **Candidate 18 (parallel Goldfish host commits, signing parity on every runner, the Antigravity runner, first greenfield findings) applied, stamped and installed 2026-11-02**: w74-w109 via `po-apply-0.7-candidate18.sh` (`1fb3e5197`), stamp `3cdc6e7a8`, then the fixes w110-w114 via `po-apply-0.7-candidate18-fixes.sh` (`0caf799`) and the second stamp `63d505ca3` (`0.7.0+claude.20261102210630.0caf799`), installed by the PO and read back; implementation complete, PO acceptance pending.
 Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
-**Candidate 20** applied and stamped 2026-11-07; **20b** (fv20 reds, G20-46..54) built 2026-11-08 as `held-patches/c20b-chain/`, rehearsed, not applied; G20-45 waits on a PO profile-receipt repair. Full Verify, Critic, greenfields, PO acceptance pending.
+**Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+**Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 21 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, the fv20 reds, kernel closure. Not applied. G20-45 (Codex consent) not built: every dispatch is refused until the PO repairs the stale PO profile receipt (`po-gate-profile-repair.mjs plan`/`apply --activate`). Full Verify, Critic, greenfields on all runners and PO acceptance pending.
 Details, content list, decisions and open gates: [candidate 18 delivered](../specs/sprint-alfred-epic/plans/candidate-18-delivered-2026-11-02.md); [candidate 19 seed](../specs/sprint-alfred-epic/plans/candidate-19-seed-2026-11-02.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
@@ -231,37 +233,6 @@ P2/P3 and D26 live in `2026-10-26-toolbox-session-friction-and-feature-wishes.md
 first Goldfish dispatch without manual `icacls`, `git mv` or `discard-feature`.
 Toolbox ran on a build before S1-S3/S5/S7a; D2, D3, D5 and the D6 cause need a
 live confirmation on the installed candidate.
-
-## Committed Source and actual qualification
-
-- AC168 `0b80f4f09`:Main66pass/1native skip, stage50. Live10% measurement
-  remains open. The later full guard failure is resolved below.
-- G24/R3/G27 `fb18ac6b0`:Main93pass/2native skips,83pass/8environment
-  skips,57pass and consumers9pass. Their rows are75. Historical scanner
-  findings remain unresolved until reproduction/exact-value review.
-- G9a original signed-plan/delegation course7/7:stage75.
-- Critic preparation `73afcf742`:40original/focused+9consumer pass;
-  manifest reference and immutable diagnostic carry75. Recovery50:
-  unknown/live-owner locks refuse recovery.
-- Phoenix entry `17899cc73`:3actual package cases+9consumers pass, stage75;
-  native Windows remains unmeasured.
-- Verify checkout `183ecfb2d`:87original+3Phoenix+9consumer=99pass.
-  Registered worktree calibration and drift checks are qualified; full
-  lifecycle/Critic/close continuity is open, so its P0 row is50.
-- READY guard `cf1d5c422`:394original cases391pass/3native Windows skips,
-  plus5G23+9consumers; combined405pass/3skip. Literal scratch writes and
-  inventory reads retain pre-ready, physical-path and credential controls.
-  PO applied the protected patch and performed the required operator commit.
-  Full guard and current G23 read rows return to75. Earlier failed physical
-  alias and fixture attempts are retained, not reclassified as passes.
-- Dispatch helper `869dafa52`:88/88 original/focused/consumer pass;
-  standalone help has no account/builder effects, mixed help refuses.
-  Help row is75.
-
-[Latest Source/capture custody](../specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/README.md).
-Earlier qualifications remain linked from matrix snapshots. Final full
-Verify/Security, frozen independent Critic and PO acceptance remain open.
-Retain the single frozen Critic batch/max3correction-review policy.
 
 ## Portable unfinished work and next order
 
