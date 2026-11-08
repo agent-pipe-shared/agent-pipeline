@@ -4,8 +4,9 @@
  * digests that one reader can take in whole, so an audit of a greenfield run sees every refusal and retry instead of an excerpt.
  *
  * Usage (from the repository root, by the operator, because the transcripts live outside the repository):
- *   node scripts/transcript-digest.mjs --sources <list.json> --out <directory>
+ *   node scripts/transcript-digest.mjs --sources <list.json> --out <directory> [--strings-total <bytes>]
  *
+ * --strings-total raises the cap on what one sqlite source may contribute (default 1500000 bytes); a run past the cap stops growing silently.
  * <list.json> is an array of { "label": "<name>", "format": "codex" | "claude" | "sqlite" | "text", "path": "<absolute path>" }. Keep that
  * file and the output under scratch/: both name local paths. Each source gives <out>/<label>.txt. Kept: human messages, the agent's text,
  * every tool call, and tool results (long only when they look like a refusal or an error, otherwise only their start). Dropped: reasoning
@@ -101,7 +102,9 @@ function textDigest(path) {
 async function main(argv) {
   const value = (flag) => { const at = argv.indexOf(flag); return at === -1 ? null : argv[at + 1] ?? null; };
   const sourcesPath = value("--sources"), outDir = value("--out");
-  if (sourcesPath === null || outDir === null) { console.error("Usage: node scripts/transcript-digest.mjs --sources <list.json> --out <directory>"); return 2; }
+  const stringsTotal = value("--strings-total");
+  if (sourcesPath === null || outDir === null || (stringsTotal !== null && !/^[1-9][0-9]{0,9}$/u.test(stringsTotal))) { console.error("Usage: node scripts/transcript-digest.mjs --sources <list.json> --out <directory> [--strings-total <bytes>]"); return 2; }
+  if (stringsTotal !== null) LIMIT.stringsTotal = Number(stringsTotal);
   mkdirSync(outDir, { recursive: true });
   let failed = 0;
   for (const { label, format, path } of JSON.parse(readFileSync(sourcesPath, "utf8"))) {
