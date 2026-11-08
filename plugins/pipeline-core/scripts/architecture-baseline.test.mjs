@@ -665,6 +665,27 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       assert.equal(predecessor.date, "2026-01-01", "the predecessor keeps its own date and scope; only the status changes");
     });
 
+    it("7.13b after a reopen the registrar rebuilds a manifest that lists only earlier approvals and keeps them; any other manifest stays a conflict", async () => {
+      const { f } = await fixtureWalk({ predecessorSidecar: false });
+      const REGISTER = path.join(here, "register-feature-package.mjs");
+      const manifestPath = path.join(f.dir, "specs/e2e/lifecycle.json");
+      const current = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      const envelope = current.artifacts.find((entry) => entry.class === "candidate-evidence");
+      const earlierBytes = "earlier approval\n";
+      const earlierPath = `specs/e2e/evidence/accepted-delivery-contract-${sha(earlierBytes)}.json`;
+      fs.writeFileSync(path.join(f.dir, earlierPath), earlierBytes);
+      const swapped = (entryPath) => ({ ...current, artifacts: current.artifacts.map((entry) => (entry === envelope ? { ...entry, path: entryPath, sha256: sha(earlierBytes) } : entry)) });
+      fs.writeFileSync(manifestPath, `${JSON.stringify(swapped("specs/e2e/evidence/other-record.json"), null, 2)}\n`);
+      const conflict = run(REGISTER, "--root", f.dir);
+      assert.notEqual(conflict.status, 0);
+      assert.match(conflict.stdout, /FPR-MANIFEST-CONFLICT/u);
+      fs.writeFileSync(manifestPath, `${JSON.stringify(swapped(earlierPath), null, 2)}\n`);
+      const rebuilt = JSON.parse(ok(REGISTER, "--root", f.dir).stdout);
+      assert.equal(rebuilt.status, "registered");
+      const evidence = JSON.parse(fs.readFileSync(manifestPath, "utf8")).artifacts.filter((entry) => entry.class === "candidate-evidence").map((entry) => entry.path);
+      assert.deepEqual(evidence, [earlierPath, envelope.path], "the earlier approval is retained and the current one registered");
+    });
+
     it("7.13a the binding step refuses a git-ignored selection and one holding a private identifier before anything is written, and names the repair", () => {
       const root = makeRoot();
       assert.equal(spawnSync("git", ["-C", root, "init", "-q"], { encoding: "utf8" }).status, 0);

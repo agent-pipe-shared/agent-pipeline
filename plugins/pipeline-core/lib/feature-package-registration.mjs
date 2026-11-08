@@ -172,6 +172,16 @@ function resolveRigor(state) {
   return { rigor: PROFILE_RIGOR[top.profile], source: RIGOR_SOURCE, basis: `state:${top.from}=${top.profile}` };
 }
 
+/** The candidate-evidence entries of a manifest that lists only earlier approvals of this feature, or null when it is anything else. */
+function supersededRegistrations(bytes, featureId, envelopePath) {
+  let manifest;
+  try { manifest = JSON.parse(bytes.toString("utf8")); } catch { return null; }
+  if (manifest?.schema !== FEATURE_PACKAGE_SCHEMA || manifest.feature?.id !== featureId || manifest.candidate !== null || manifest.supersedes !== null || !Array.isArray(manifest.artifacts)) return null;
+  const evidence = manifest.artifacts.filter((entry) => entry?.class === "candidate-evidence");
+  const earlier = new RegExp(`^specs/${featureId.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}/evidence/accepted-delivery-contract-[a-f0-9]{64}\\.json$`, "u");
+  return evidence.length > 0 && evidence.every((entry) => typeof entry.path === "string" && earlier.test(entry.path) && entry.path !== envelopePath && SHA256.test(entry.sha256 ?? "")) ? evidence : null;
+}
+
 /** Sources the PO's approval binds, from the envelope that was itself re-derived from the retained approval. */
 function approvalBoundSources(envelope) {
   const bound = new Map();
@@ -225,14 +235,20 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
   // 3. A manifest that already exists is never rewritten.
   const existingRead = inspect(root, manifestPath);
   const existing = existingRead.kind === "file" ? existingRead.bytes : null;
+  let superseded = null;
   if (existingRead.kind !== "absent") {
     if (observed?.code && !READER_BEFORE_REGISTRATION.includes(observed.code) || observed?.ok === true) {
       return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, envelopePath, manifestSha256: digest(existing ?? Buffer.alloc(0)), readerCode: observed?.code ?? null };
     }
-    const checked = existing ? validateFeaturePackage(root, manifestPath) : { ok: false, findings: ["FTP-MANIFEST: not a regular file"] };
-    return refused("FPR-MANIFEST-CONFLICT", checked.ok
-      ? "a valid manifest exists but does not register this envelope as candidate-evidence; it is never overwritten"
-      : "a manifest exists but is invalid; it is never overwritten", { manifestPath, envelopePath, findings: checked.findings });
+    // Antigravity greenfield 2026-11-08: after a reopen the old manifest blocked the new approval and the agent hand-edited it.
+    // A manifest that lists only earlier approvals of this feature is superseded by the current one: rebuilt here, the earlier envelopes retained.
+    superseded = observed?.code === "CAC-REGISTRATION-INVALID" && existing ? supersededRegistrations(existing, featureId, envelopePath) : null;
+    if (superseded === null) {
+      const checked = existing ? validateFeaturePackage(root, manifestPath) : { ok: false, findings: ["FTP-MANIFEST: not a regular file"] };
+      return refused("FPR-MANIFEST-CONFLICT", checked.ok
+        ? "a valid manifest exists but does not register this envelope as candidate-evidence; it is never overwritten"
+        : "a manifest exists but is invalid; it is never overwritten", { manifestPath, envelopePath, findings: checked.findings });
+    }
   }
 
   // 4. The PRD and the Spec are the design course's output: they must exist and are never invented.
@@ -282,6 +298,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
   if (!rigor) return refused("FPR-RIGOR-UNRESOLVED", "the State yields neither a submitted profile nor a retained rigor floor to map to a rigor level");
 
   const artifacts = entries.map((entry) => ({ class: entry.class, path: entry.path, sha256: digest(entry.bytes), authority: entry.authority, mutability: entry.mutability, retention: entry.retention }));
+  for (const entry of superseded ?? []) artifacts.push({ class: "candidate-evidence", path: entry.path, sha256: entry.sha256, authority: false, mutability: "immutable", retention: "retain" });
   artifacts.push({ class: "candidate-evidence", path: envelopePath, sha256: digest(envelopeBytes), authority: false, mutability: "immutable", retention: "retain" });
   const manifest = { schema: FEATURE_PACKAGE_SCHEMA, feature: { id: featureId, rigor: rigor.rigor }, state: lifecycle.status, artifacts, candidate: null, supersedes: null };
   const bytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
@@ -291,12 +308,19 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
   const rollback = () => {
     for (const path of created.reverse()) { try { unlinkSync(join(root, path)); } catch { /* a file this call just created */ } }
     for (const path of createdDirectories.reverse()) { try { rmdirSync(path); } catch { /* a directory this call just created */ } }
+    if (superseded !== null) { try { writeFileSync(join(root, manifestPath), existing); } catch { /* the bytes are in Git */ } }
   };
   for (const [path, content] of [...entries.filter((entry) => entry.generated).map((entry) => [entry.path, entry.bytes]), [manifestPath, bytes]]) {
     try {
       const directory = dirname(join(root, path));
       if (!existsSync(directory)) { mkdirSync(directory, { mode: 0o755 }); createdDirectories.push(directory); }
-      writeFileSync(join(root, path), content, { flag: "wx", mode: 0o644 }); created.push(path);
+      if (path === manifestPath && superseded !== null) {
+        const temporary = `${join(root, path)}.registering-${process.pid}`;
+        writeFileSync(temporary, content, { flag: "wx", mode: 0o644 });
+        renameSync(temporary, join(root, path));
+      } else {
+        writeFileSync(join(root, path), content, { flag: "wx", mode: 0o644 }); created.push(path);
+      }
     }
     catch (error) { rollback(); return refused("FPR-WRITE-FAILED", `${path} could not be created exclusively (${error?.code ?? "error"}); nothing this call created was kept`, { path, manifestPath }); }
   }
