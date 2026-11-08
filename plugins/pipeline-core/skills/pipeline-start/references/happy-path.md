@@ -69,6 +69,8 @@ command tables.
      `status: "prepared"` call `invoke_subagent` with `invocation.Subagents` unchanged. A native implementation consent is not available: read
      `references/antigravity-native-dispatch.md` before the first dispatch and ask the PO when the sanctioned route does not return an authored commit.
 4. Commit what the dispatch produced under the host-commit rules of its runner; never hand-build a record the writer refuses (the refusal names its repair).
+   On Claude the host commit of a background Goldfish lands at its SubagentStop, before its completion report reaches you: read `git log -1` once and
+   continue in the same turn with the next slice. Never end the turn to wait for the pipeline to commit; a turn that ends there waits for the PO.
 
 ## 3. Critic
 
