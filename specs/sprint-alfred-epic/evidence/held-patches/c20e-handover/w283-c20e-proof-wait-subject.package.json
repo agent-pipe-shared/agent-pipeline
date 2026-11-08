@@ -1,0 +1,50 @@
+{
+  "schema": "pipeline.dispatch-briefing-package.v1",
+  "id": "C20E-G2076-PROOF-WAIT-SUBJECT",
+  "item": "c20e-g2076-the-signature-wait-counts-only-a-proof-for-the-expected-subject",
+  "agentType": "goldfish-deep",
+  "modelId": "claude-sonnet-5-5",
+  "effortEscalation": "MP-05",
+  "criterion": "AC-108",
+  "estimatedToolCalls": 120,
+  "budgetRationale": "one additive flag in the wait script and library, the expected subject carried by the signing steps that know it, one typed refusal code, regression cases in the proof-wait, push-prepare and signed-proof-wait suites, restating the tests that pin the old waitAction argv; no grant planned",
+  "check": "specs/sprint-alfred-epic/evidence/held-patches/w283-c20e-proof-wait-subject.check.test.mjs",
+  "title": "The signature wait counts a proof as present only when its mirrored request carries the expected subject, so an old proof file never ends the wait",
+  "ac": "AC-108",
+  "goal": "Candidate 20e, G20-76 (observed live 2026-11-08 at the push of candidate 20d). `po-human-approval.mjs authorize-critical` mirrors request, proof, authority and signer into scratch/critical-<kind>-{request,proof,authority,signer}-<repo fingerprint>.json (criticalScratchArtifactPaths); the name is one fixed fingerprint per repository, so every signature of the same kind writes the SAME names (mirror order: request, proof, authority, signer, each overwritten in place). When an older mirror from an earlier signature still sits in scratch/, `proof-wait.mjs` (lib/signed-proof-wait.mjs observeProofFile) returns `proof-present` at once, because it only checks that a regular file with schema pipeline.po-approval-proof.v1 exists; `pipeline-state.mjs approve-push` then refuses with CRITICAL-PROOF-SUBJECT. Nothing is consumed, but the PO's signing round is wasted. Build, runner-neutral: (1) `awaitSignatureFields` (lib/signed-proof-wait.mjs) gains an optional `subjectSha256` (64 hex). When given, the returned waitAction argv carries a new flag `--subject <sha>` (add it to `proofWaitCommand` and to the closed flag set of `parse()` in scripts/proof-wait.mjs; a malformed value is PROOF-WAIT-ARGS), and `afterSigning` names that the wait ends only for the expected subject. (2) With a subject, `observeProofFile` reports `present` only when the proof file is well formed AND the sibling request (the existing `proof-` -> `request-` file-name mapping of `signCommandForProof`, same directory, scratch kind only) parses and carries exactly that subject, derived with the SAME function approve-push uses (criticalActionSubjectSha256 in lib/critical-action-approval-request.mjs), never a second spelling. A sibling request that is missing, unreadable, not JSON, of another schema or without a subject counts as `stale` (not signed yet): the wait keeps polling. Decide from the code whether the proof file itself also carries the subject and then check it too (the request is written before the proof, so a new request together with a proof file can still pair a new request with an OLD proof for a moment; the proof's own subject, when it has one, closes that window). Without a subject (a caller that does not know it) behaviour is byte-identical to today. A key-directory proof reference needs no change: its file name already contains the intent hash. (3) A timeout where a file existed but never matched ends with a NEW typed refusal code (for example PROOF-WAIT-STALE) whose single `repair` names the cause (an older signature's mirror sits at the path) and the exact recovery: move the scratch/critical-<kind>-* files aside (rename, never delete), have the PO run the one signing command again, then run the same wait; the existing PROOF-WAIT-TIMEOUT / PROOF-WAIT-INVALID texts stay. (4) Audit ALL four call sites of awaitSignatureFields and state per site in the notes whether a subject is available: scripts/push-prepare.mjs (subjectSha256 is already computed just above the call; pass it), scripts/pipeline-state.mjs (design approval), lib/project-onboarding-v3.mjs, lib/human-guard-override.mjs (key-directory form; expected unchanged). Pass the subject wherever the signing step has it and the proof is a scratch mirror; leave the others and say why. (5) docs: update the waitAction wording in docs/push-release-flow.md only if it describes the wait; add the interim hint to the notes (until installed, set old scratch/critical-* files aside before any push-prepare). Restate in place with a G20-76 comment any test that pins the old waitAction argv (QG-04: never weaken another assertion). Regression cases: a stale mirror (older request with another subject, or a request missing) does not end the wait and ends in the new code at timeout; the matching mirror ends it at once; no subject = old behaviour; push-prepare's report carries the subject in waitAction; the flag is parsed and a malformed subject is refused. Developed and tested in the clone named in facts; delivered as the held patch specs/sprint-alfred-epic/evidence/held-patches/w283-c20e-proof-wait-subject.patch.",
+  "paths": ["specs/sprint-alfred-epic/evidence/held-patches/w283-c20e-proof-wait-subject.notes.md"],
+  "newFiles": [
+    "specs/sprint-alfred-epic/evidence/held-patches/w283-c20e-proof-wait-subject.notes.md",
+    "specs/sprint-alfred-epic/evidence/held-patches/w283-c20e-proof-wait-subject.patch",
+    "specs/sprint-alfred-epic/evidence/held-patches/w283-c20e-proof-wait-subject.check.test.mjs"
+  ],
+  "context": [
+    "scratch/agent-out/c20e-pw/plugins/pipeline-core/lib/signed-proof-wait.mjs",
+    "scratch/agent-out/c20e-pw/plugins/pipeline-core/scripts/proof-wait.mjs",
+    "scratch/agent-out/c20e-pw/plugins/pipeline-core/scripts/po-human-approval.mjs (criticalScratchArtifactPaths, mirrorCriticalArtifacts)",
+    "scratch/agent-out/c20e-pw/plugins/pipeline-core/lib/critical-action-approval-request.mjs (criticalActionSubjectSha256)",
+    "scratch/agent-out/c20e-pw/plugins/pipeline-core/scripts/push-prepare.mjs (awaitSignatureFields call, subjectSha256)",
+    "scratch/agent-out/c20e-pw/plugins/pipeline-core/scripts/pipeline-state.mjs, lib/project-onboarding-v3.mjs, lib/human-guard-override.mjs (the other call sites)"
+  ],
+  "facts": [
+    "CLONE-SLICE ROUTE: the clone is scratch/agent-out/c20e-pw (a shared clone of BASE_SHA, the applied and stamped candidate 20d with the 20e part 1 chain); first step: `git -C scratch/agent-out/c20e-pw rev-parse HEAD` must print that SHA, otherwise STOP. Never run a git command that writes; use the helpers: `node scratch/agent-out/test-in.mjs scratch/agent-out/c20e-pw <test file> --private-tmp` (one suite at a time), `node scratch/agent-out/commit-in.mjs scratch/agent-out/c20e-pw \"<conventional message>\"`, `node scratch/agent-out/save-patch.mjs scratch/agent-out/c20e-pw BASE_SHA HEAD specs/sprint-alfred-epic/evidence/held-patches/w283-c20e-proof-wait-subject.patch`. The helper's `apply --check on repo` line is expected to fail: ignore it. A commit message must not contain the name of the version-control tool.",
+    "Write the three deliverables early; commit-in and save-patch after every green step. The final return JSON must carry every schema field including changedPaths (a missing field fails the host commit with NGHR-FINAL-SHAPE).",
+    "The check test is a plain node:test file (60 s, no product run): the .patch exists and is non-empty, every touched file is under plugins/pipeline-core/ or docs/ (docs only when the notes name them).",
+    "Do not use the real files scratch/critical-* of the real checkout as fixtures and do not read them: build the mirror files inside the test's own temporary project with the same naming (critical-push-request-<fp>.json and critical-push-proof-<fp>.json).",
+    "PO rules: never fully blocking; runner and platform neutral; QG-04 restate in place with a comment; never re-pin the Critic preimage; a new kernel import must keep GMWKC01 (guard-maintenance-window-kernel-closure.test.mjs) green with the threat-model doc entry; a new auth verb or kind must keep harness/scripts/check-auth-gate-inventory-drift.test.mjs green.",
+    "Notes follow one existing held-patches *.notes.md (what / why / not changed / not proven); no absolute host paths; AC-108 closest criterion; PRD and Spec unchanged."
+  ],
+  "targeted": [
+    "the suites next to every file you change, one at a time (signed-proof-wait, proof-wait, push-prepare, the suite of each other call site you touch, check-auth-gate-inventory-drift, GMWKC01)",
+    "node --test specs/sprint-alfred-epic/evidence/held-patches/w283-c20e-proof-wait-subject.check.test.mjs"
+  ],
+  "forbidden": [
+    "Do not run refresh-derived-files, the inventory rebaseline or full-verify.",
+    "Never two suites at once.",
+    "Do not edit anything in the real checkout except the three w283 deliverables."
+  ],
+  "stops": [
+    "Binding the wait to the request subject would need the wait to verify a signature or read a private key: write the notes with the smallest design that would not, change no code, and return.",
+    "A file that must change is covered by the Critic preimage pin or is a protected test (report the file; never re-pin, never edit the protected test)."
+  ]
+}
