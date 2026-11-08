@@ -1,0 +1,36 @@
+# w272: the onboarding consent names every agent step up to the design approval, is recorded with its scope and quote, and covered actions say so (candidate 20d, G20-45, AC-108)
+
+Closest criterion: AC-108 (PRD and Spec unchanged). Patch: `w272-c20b-consent-scope.patch` (3 commits on the applied candidate 20c, clone `c20d-cs`). Docs touched, named here as the delivery check requires: `docs/guard-maintenance-window-threat-model.md` (the kernel-closure entry for the new lib file, GMWKC01/GMWKC03).
+
+## What was measured
+
+Live Codex greenfield on candidate 20 (2026-11-07): after the user consented, Codex's escalation reviewer rejected `bootstrap-bind-apply --activate`, `submit-plan` and `prepare-seal` ("the user's approval covered local binding, not this distinct submission"). Nothing the Pipeline printed told the reviewer which consent covers the step.
+
+## What the patch changes
+
+- `lib/onboarding-consent-scope.mjs` (new): ONE exported list of the covered steps (install, hooks, onboarding commits, intake/kickoff, unsealed-draft bind, design review rounds, submit-plan, prepare-seal, present-plan) with the script routes each is recognised by, and the list of what is NOT covered (design approval, push, release, human-guard override). English and German wording. `onboardingConsentQuestion()` renders the question; `readOnboardingConsentRecord()` reads the record (v2, and v1 without a scope); `coverOnboardingOutput()` marks covered actions.
+- `scripts/onboarding-consent-mark.mjs`: schema `pipeline.onboarding-consent-mark.v2` adds `scope`, `notCovered` and a bounded single-line `quote` (400 characters) via an optional `--quote`. A "no" records empty scope lists. A v1 record stays readable but has no scope, so it covers nothing.
+- `lib/guard/sanctioned-args-scripts.mjs`: the guard admits `record ... --answer yes|no` with an optional `--quote <1..400 chars, single line>` and nothing else.
+- `scripts/pipeline-start-preflight.mjs`: the `pipeline-governance-inactive` result carries `consentQuestion` (text, `textByLanguage`, scope ids) and `consentRecordAction` (the record command). The existing `nextAction` is unchanged.
+- Output edges: `scripts/project-onboarding-v3.mjs` (every printed result) and the `inspect` nextAction of `scripts/pipeline-state.mjs`. With a recorded yes whose scope names the step, a covered action prints `requiresConfirmation: false`, `coveredBy` (consent, record path, step, "design-approval") and `escalationJustification`: "covered by the user's recorded onboarding consent (<record path>): <step>; no further approval before the design approval". The review-receipt stop that names prepare-seal/present-plan in prose carries the lines per verb.
+- `SKILL.md`, `references/happy-path.md`, `references/onboarding-recovery.md`: relay `consentQuestion.text` verbatim (never paraphrase), record the answer, give the `escalationJustification` line verbatim when a runner's escalation review asks.
+- `lib/guard-maintenance-window.mjs` + the threat-model doc: the new lib file joins the never-liftable kernel closure (pipeline-state, the onboarding script and the preflight import it).
+
+Tests (restated or added in registered files only): `onboarding-consent-mark.test.mjs` (the old v1 deepEqual restated in place as v2 with a G20-45 comment; 11 new cases: question lists every step in en/de, record round-trip and bounds, v1 still read and covers nothing, covered actions flip with record path and verbatim line, approve-plan / seal / set-phase / push / acknowledge / sign-intent / human override / release keep their gate, no record / "no" / corrupt record claims nothing, CLI `--quote`, guard admission of `--quote`, CLI edge wiring, skill text), `pipeline-start-preflight.test.mjs` (inactive result), `plan-submission-must-not-require-separate-po-approval.test.mjs` (real inspect: submit-plan and present-plan covered, approval step never covered in chat and signature mode).
+
+## Evidence (clone, one suite at a time)
+
+RED first against the original code: `onboarding-consent-mark.test.mjs` (module missing, 1 failed), the pin cases (1 failed), the preflight case (1 failed). GREEN after: onboarding-consent-mark 13/13, plan-submission pin 25/25, pipeline-start-preflight 99/99 (full file), three-runner happy-path pin 27 pass + 1 skipped (pre-existing), guard-maintenance-window-kernel-closure 1/1 (GMWKC01 green after the kernel entry).
+
+## Not changed
+
+- The Codex sandbox, its writable roots and the reviewer (PO decision). `write-scope.mjs`'s `onboardingConsentBlocked` message (it is not called anywhere; left alone). Design approval, push, release and override actions: no gate touched. PRD, Spec.
+- Plan-bound apply actions inside `onboarding-continuity.mjs` (`planBoundApplyAction`, compared by digest at apply time) keep `requiresConfirmation: true` internally; only the printed copy is marked, so no plan digest moves.
+
+## Not proven
+
+- Whether Codex's reviewer accepts the new wording is only provable in a real Codex run.
+- Not run in this dispatch (budget checkpoint): `project-onboarding-v3.test.mjs`, the `pipeline-state*.test.mjs` suites, `onboarding-init.test.mjs`, `guard-lifecycle-ready.test.mjs`, the skill-budget pin, `check-auth-gate-inventory-drift.test.mjs`. Needed by a later chain assembly; any suite that deep-equals a printed result of a project WITH a consent record in `.claude/` could need restating.
+- Completed by the Elephant after the checkpoint (2026-11-08, same clone, one suite at a time): onboarding-init 58/58, onboarding-consent-marker 1/1, guard-onboarding-consent-lock 1/1, catalogue-admit-prescribed-lifecycle-verbs 30/30, plugin and harness pipeline-state 1/1 each, pipeline-state-inspection-contract 1/1, check-auth-gate-inventory-drift 35/35, governance-scope 27/27, project-onboarding-v3 1/1, guard-lifecycle-ready 428/428. Two reds came from the SKILL.md wording and were fixed at the cause (clone commit 776149141): the start skill had grown over its 24 KiB budget, and the sentence pinned by C18-20 ("lists in short what agreeing installs and activates, git hooks included") had been replaced. The skill now keeps that sentence and adds only "relay `consentQuestion` verbatim"; the record guidance stays in the preflight's `consentRecordAction`, the `coveredBy` and escalation wording in `references/happy-path.md` (Escalations). After the fix: greenfield-machine-output-and-skill-budget 15/15, project-onboarding-v3-argv-closure 45/45; the w272 check 3/3.
+- Design choice to confirm: an action is marked covered only when a recorded yes with a scope exists (no record, no claim), so the old flags stay for fixtures without a record. The record is written after the first onboarding apply, because a `.claude/` file in a fresh root makes `inspect` report `partial` (measured with a probe).
+- Journey coverage: question rendering, record, coverage edge for submit/present (real inspect), bind/install (CLI edge) covered; a full Codex onboarding run with a record present, and `onboarding-init.mjs` consuming decorated outputs, not covered.

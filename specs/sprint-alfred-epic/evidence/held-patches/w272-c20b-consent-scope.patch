@@ -1,0 +1,887 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 698e5fa4f..6c2e02e45 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -152,6 +152,11 @@ below assumes it holds and is written to catch a change that would break it.
+   `lib/human-decision-attribution.mjs`, `lib/human-governance-decision.mjs`,
+   `lib/human-governance-ledger.mjs`, `lib/human-role-exception-decision.mjs`,
+   `lib/lifecycle-governance-events.mjs`, `lib/onboarding-consent-marker.mjs`,
++  `lib/onboarding-consent-scope.mjs` (G20-45, 2026-11-08: the one list of steps the
++  onboarding consent covers, imported by `pipeline-state.mjs`,
++  `project-onboarding-v3.mjs` and `pipeline-start-preflight.mjs`; it decides which
++  printed actions are marked as covered by the consent, so a window covering it would
++  let one edit widen that claim),
+   `lib/threat-model-approval-request.mjs`, and `lib/threat-model.mjs`. A third
+   closure gap (NVA-KERNELDYN-1, 2026-08-27 — `pre-push-hook-install.mjs`'s
+   dynamic `import()` edges, resolved via a declared table rather than the
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index e67ee2c27..c0860360a 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -297,6 +297,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/human-role-exception-decision.mjs",
+   "plugins/pipeline-core/lib/lifecycle-governance-events.mjs",
+   "plugins/pipeline-core/lib/onboarding-consent-marker.mjs",
++  "plugins/pipeline-core/lib/onboarding-consent-scope.mjs",
+   "plugins/pipeline-core/lib/threat-model-approval-request.mjs",
+   "plugins/pipeline-core/lib/threat-model.mjs",
+   // NVA-KERNELDYN-1 (2026-08-27): project-onboarding-v3.mjs (already kernel above)
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index 090d058d2..a35f8608b 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -902,7 +902,10 @@ export function sanctionedOnboardingConsentMarkArgs(args, root) {
+   if (!matchesRoot) return false;
+   if (args[3] !== "--session-id" || typeof args[4] !== "string" || args[4].trim() === "") return false;
+   if (args[5] !== "--answer" || (args[6] !== "yes" && args[6] !== "no")) return false;
+-  return args.length === 7;
++  if (args.length === 7) return true;
++  // G20-45: an optional bounded single-line verbatim quote of the user's answer (the record stores it, capped at 400 characters).
++  return args.length === 9 && args[7] === "--quote" && typeof args[8] === "string"
++    && args[8].length >= 1 && args[8].length <= 400 && !/[\u0000-\u001f\u007f]/u.test(args[8]);
+ }
+ 
+ // Reader admission preserves the existing readiness gate; observations are method seams.
+diff --git a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+new file mode 100644
+index 000000000..07c1f1ef4
+--- /dev/null
++++ b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+@@ -0,0 +1,249 @@
++// SPDX-License-Identifier: SUL-1.0
++
++/**
++ * G20-45: ONE shared list of the agent steps the onboarding consent covers, and what it does not.
++ *
++ * Measured in a live Codex run: after the user said yes to installing the Pipeline, the runner's own escalation reviewer
++ * rejected `bootstrap-bind-apply`, `submit-plan` and `prepare-seal` because "the user's approval covered local binding, not
++ * this distinct submission". The operating model is that once the installation is approved, the next human approval is the
++ * design approval. This module is the single place that states that scope, so the question the user is asked, the record
++ * of the answer and the actions the Pipeline hands over all say the same thing.
++ *
++ *  - ONBOARDING_CONSENT_COVERED_STEPS / ONBOARDING_CONSENT_NOT_COVERED: the scope, in English and German (the operator
++ *    language), each covered step with the script routes (script file + first argument) it is recognised by.
++ *  - onboardingConsentQuestion(): the question text the agent relays verbatim (preflight result, start skill).
++ *  - readOnboardingConsentRecord(): reads the session record scripts/onboarding-consent-mark.mjs wrote (v2, and a v1 record
++ *    without a scope, which stays readable but covers nothing).
++ *  - coverOnboardingOutput(): at an output edge, a consent-covered action prints `requiresConfirmation: false` with
++ *    `coveredBy` (the consent, its record path and the step) and a one-line `escalationJustification` usable verbatim. An
++ *    action is marked only when a recorded yes names its step: the design approval, push, release and any human-guard
++ *    override are never in the list, so they keep their gate. No record, no claim.
++ *
++ * Imports node builtins only (it sits on the path of guard-adjacent scripts).
++ */
++import { lstatSync, readdirSync, readFileSync } from "node:fs";
++import { join } from "node:path";
++
++export const ONBOARDING_CONSENT_MARK_SCHEMA_V1 = "pipeline.onboarding-consent-mark.v1";
++export const ONBOARDING_CONSENT_MARK_SCHEMA_V2 = "pipeline.onboarding-consent-mark.v2";
++export const ONBOARDING_CONSENT_QUESTION_SCHEMA = "pipeline.onboarding-consent-question.v1";
++export const ONBOARDING_CONSENT_ID = "onboarding-consent";
++export const ONBOARDING_CONSENT_QUOTE_MAX = 400;
++
++const ONBOARDING = "project-onboarding-v3.mjs";
++const STATE = "pipeline-state.mjs";
++
++export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
++  Object.freeze({
++    id: "install",
++    en: "install the Pipeline into this project (portable authority seed, runtime initialization and readbacks)",
++    de: "die Pipeline in dieses Projekt installieren (portable Authority-Seed, Runtime-Initialisierung und Readbacks)",
++    routes: Object.freeze([
++      { script: ONBOARDING, verbs: ["plan", "apply-portable-seed", "initialize-runtime", "apply-readback"] },
++      { script: "onboarding-init.mjs", verbs: null },
++    ]),
++  }),
++  Object.freeze({
++    id: "hooks",
++    en: "activate and refresh the git hooks, plus the runner's own refresh step",
++    de: "die Git-Hooks aktivieren und aktualisieren, dazu den eigenen Refresh-Schritt des Runners",
++    routes: Object.freeze([
++      { script: "clone-hook-readiness.mjs", verbs: null },
++      { script: "refresh-mandatory-hooks.mjs", verbs: null },
++    ]),
++  }),
++  Object.freeze({
++    id: "onboarding-commits",
++    en: "make the onboarding commits",
++    de: "die Onboarding-Commits anlegen",
++    routes: Object.freeze([]),
++  }),
++  Object.freeze({
++    id: "intake-kickoff",
++    en: "write the intake and kickoff artifacts",
++    de: "die Intake- und Kickoff-Artefakte schreiben",
++    routes: Object.freeze([
++      {
++        script: ONBOARDING,
++        verbs: [
++          "kickoff", "intake-consent-apply", "intake-capture-apply", "intake-design-questions-apply", "intake-design-questions-replace",
++          "intake-generate-plan", "intake-generate-apply", "intake-spec-marker-plan", "intake-spec-marker-apply",
++        ],
++      },
++    ]),
++  }),
++  Object.freeze({
++    id: "bind-draft",
++    en: "bind the PRD and the Spec as an unsealed draft (bootstrap-bind-plan and bootstrap-bind-apply)",
++    de: "PRD und Spec als unversiegelten Entwurf binden (bootstrap-bind-plan und bootstrap-bind-apply)",
++    routes: Object.freeze([
++      { script: ONBOARDING, verbs: ["bootstrap-bind-plan", "bootstrap-bind-apply", "kickoff-promote-plan", "kickoff-promote-apply"] },
++    ]),
++  }),
++  Object.freeze({
++    id: "design-review",
++    en: "run the design review, readiness and advisor rounds and record their receipts",
++    de: "die Design-Review-, Readiness- und Advisor-Runden durchführen und ihre Belege festhalten",
++    routes: Object.freeze([
++      { script: "design-review-receipt.mjs", verbs: null },
++      { script: "design-course-session.mjs", verbs: null },
++    ]),
++  }),
++  Object.freeze({
++    id: "submit-plan",
++    en: "register the feature and submit the plan (set-feature, submit-plan)",
++    de: "das Feature registrieren und den Plan einreichen (set-feature, submit-plan)",
++    routes: Object.freeze([{ script: STATE, verbs: ["set-feature", "submit-plan"] }]),
++  }),
++  Object.freeze({
++    id: "prepare-seal",
++    en: "prepare the seal plan (prepare-seal)",
++    de: "den Siegelplan vorbereiten (prepare-seal)",
++    routes: Object.freeze([{ script: STATE, verbs: ["prepare-seal"] }]),
++  }),
++  Object.freeze({
++    id: "present-plan",
++    en: "present the design to you for approval (present-plan)",
++    de: "Ihnen das Design zur Freigabe vorlegen (present-plan)",
++    routes: Object.freeze([{ script: STATE, verbs: ["present-plan"] }]),
++  }),
++]);
++
++export const ONBOARDING_CONSENT_NOT_COVERED = Object.freeze([
++  Object.freeze({ id: "design-approval", en: "your approval of the design", de: "Ihre Freigabe des Designs" }),
++  Object.freeze({ id: "push", en: "any push", de: "jeder Push" }),
++  Object.freeze({ id: "release", en: "any release", de: "jedes Release" }),
++  Object.freeze({ id: "guard-override", en: "any human-guard override", de: "jede menschliche Guard-Freigabe (Override)" }),
++]);
++
++const QUESTION_FRAME = Object.freeze({
++  en: (covered, excluded) => `Should this project use Agent Pipeline? If you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval: ${covered}. Your yes does not cover ${excluded}; those stay your own decisions.`,
++  de: (covered, excluded) => `Soll dieses Projekt Agent Pipeline nutzen? Wenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird: ${covered}. Ihr Ja deckt nicht ab: ${excluded}; das bleiben Ihre eigenen Entscheidungen.`,
++});
++
++/**
++ * The consent question, in the operator language (`en`/`de`; anything else is English). `text` is relayed verbatim by the
++ * agent, never paraphrased; `scope`/`notCovered` are the step ids the record of a yes will carry.
++ */
++export function onboardingConsentQuestion({ language = "en" } = {}) {
++  const textFor = (lang) => QUESTION_FRAME[lang](
++    ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step[lang]).join("; "),
++    ONBOARDING_CONSENT_NOT_COVERED.map((step) => step[lang]).join("; "),
++  );
++  const chosen = language === "de" ? "de" : "en";
++  return {
++    schema: ONBOARDING_CONSENT_QUESTION_SCHEMA,
++    language: chosen,
++    text: textFor(chosen),
++    textByLanguage: { en: textFor("en"), de: textFor("de") },
++    scope: ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step.id),
++    notCovered: ONBOARDING_CONSENT_NOT_COVERED.map((step) => step.id),
++  };
++}
++
++function scriptBase(path) {
++  return String(path).split(/[\\/]/u).pop();
++}
++
++/** The covered step an action argv belongs to (`[script, verb, ...]`), or null. The design approval, push and release are never covered. */
++export function coveringStepForArgv(argv) {
++  if (!Array.isArray(argv) || argv.length === 0 || !argv.every((entry) => typeof entry === "string")) return null;
++  const base = scriptBase(argv[0]);
++  const verb = argv[1];
++  for (const step of ONBOARDING_CONSENT_COVERED_STEPS) {
++    for (const route of step.routes) {
++      if (route.script !== base) continue;
++      if (route.verbs === null || (typeof verb === "string" && route.verbs.includes(verb))) return step;
++    }
++  }
++  return null;
++}
++
++const RECORD_FILE = /^\.pipeline-install-consent-(.+)\.json$/u;
++
++function normalizeRecord(raw, path) {
++  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
++  if (raw.schema !== ONBOARDING_CONSENT_MARK_SCHEMA_V1 && raw.schema !== ONBOARDING_CONSENT_MARK_SCHEMA_V2) return null;
++  if (raw.answer !== "yes" && raw.answer !== "no") return null;
++  if (typeof raw.recordedAt !== "string" || !Number.isFinite(Date.parse(raw.recordedAt))) return null;
++  const strings = (value) => (Array.isArray(value) && value.every((entry) => typeof entry === "string") ? value : null);
++  return {
++    path,
++    schema: raw.schema,
++    sessionId: typeof raw.sessionId === "string" ? raw.sessionId : null,
++    answer: raw.answer,
++    recordedAt: raw.recordedAt,
++    scope: raw.schema === ONBOARDING_CONSENT_MARK_SCHEMA_V2 ? strings(raw.scope) : null,
++    notCovered: raw.schema === ONBOARDING_CONSENT_MARK_SCHEMA_V2 ? strings(raw.notCovered) : null,
++    quote: raw.schema === ONBOARDING_CONSENT_MARK_SCHEMA_V2 && typeof raw.quote === "string" ? raw.quote : null,
++  };
++}
++
++/** The newest readable onboarding-consent record of the project (any session), or null. Never throws. */
++export function readOnboardingConsentRecord(rootDir) {
++  if (typeof rootDir !== "string" || rootDir === "") return null;
++  let names;
++  try { names = readdirSync(join(rootDir, ".claude")); } catch { return null; }
++  let newest = null;
++  for (const name of names) {
++    if (!RECORD_FILE.test(name)) continue;
++    const full = join(rootDir, ".claude", name);
++    try {
++      const info = lstatSync(full);
++      if (!info.isFile() || info.size > 16_384) continue;
++      const record = normalizeRecord(JSON.parse(readFileSync(full, "utf8")), `.claude/${name}`);
++      if (record !== null && (newest === null || Date.parse(record.recordedAt) >= Date.parse(newest.recordedAt))) newest = record;
++    } catch { /* an unreadable record claims nothing */ }
++  }
++  return newest;
++}
++
++export function onboardingConsentEscalationJustification(recordPath, step) {
++  return `covered by the user's recorded onboarding consent (${recordPath}): ${step.en}; no further approval before the design approval`;
++}
++
++const COLLECT_INPUT_NAMED_VERBS = Object.freeze({ "DAB-REVIEW-RECEIPT-REQUIRED": Object.freeze(["prepare-seal", "present-plan"]) });
++
++function isPlain(value) {
++  if (value === null || typeof value !== "object") return false;
++  const proto = Object.getPrototypeOf(value);
++  return proto === Object.prototype || proto === null;
++}
++
++function cover(value, record, depth) {
++  if (depth > 10) return value;
++  if (Array.isArray(value)) return value.map((entry) => cover(entry, record, depth + 1));
++  if (!isPlain(value)) return value;
++  const copy = {};
++  for (const [key, entry] of Object.entries(value)) copy[key] = cover(entry, record, depth + 1);
++  // The review-receipt stop names prepare-seal / present-plan in its guidance text only; it carries their lines by verb.
++  const named = value.kind === "collect-input" ? COLLECT_INPUT_NAMED_VERBS[value.code] : undefined;
++  if (named !== undefined) {
++    const steps = named.map((verb) => [verb, coveringStepForArgv([STATE, verb])]).filter(([, step]) => step !== null && record.scope.includes(step.id));
++    if (steps.length > 0) {
++      copy.coveredBy = { consent: ONBOARDING_CONSENT_ID, record: record.path, steps: steps.map(([, step]) => step.id), noFurtherApprovalBefore: "design-approval" };
++      copy.escalationJustifications = Object.fromEntries(steps.map(([verb, step]) => [verb, onboardingConsentEscalationJustification(record.path, step)]));
++    }
++  }
++  if (value.kind === "command" && value.invocation !== "user-copy-only") {
++    const step = coveringStepForArgv(value.argv);
++    if (step !== null && record.scope.includes(step.id)) {
++      copy.requiresConfirmation = false;
++      copy.coveredBy = { consent: ONBOARDING_CONSENT_ID, record: record.path, step: step.id, noFurtherApprovalBefore: "design-approval" };
++      copy.escalationJustification = onboardingConsentEscalationJustification(record.path, step);
++    }
++  }
++  return copy;
++}
++
++/**
++ * Mark every consent-covered action inside `output` (any depth) as covered by the recorded yes. Pure: returns a copy.
++ * With no record, a recorded no, a v1 record (no scope) or an unreadable one the output is returned unchanged.
++ * `readRecord` is a test seam.
++ */
++export function coverOnboardingOutput(output, { rootDir, readRecord = readOnboardingConsentRecord } = {}) {
++  let record = null;
++  try { record = readRecord(rootDir); } catch { record = null; }
++  if (record === null || record === undefined || record.answer !== "yes" || !Array.isArray(record.scope) || typeof record.path !== "string") return output;
++  return cover(output, record, 0);
++}
+diff --git a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+index 6ecdb931d..135529eb1 100644
+--- a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
++++ b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
+ 
+ import { run, statePath } from "../../scripts/pipeline-state.mjs";
+ import { applyOnboardingIntakeConsent } from "../onboarding-continuity.mjs";
++import { recordOnboardingConsent } from "../../scripts/onboarding-consent-mark.mjs";
+ import { initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
+ import { designWorkflowAdvisorExceptionRationale, designWorkflowAdvisorQuestionSha256, validateDesignWorkflowPackage } from "../design-workflow-package.mjs";
+ import { createAdvisoryAttemptTrail } from "../advisory-attempt-trail.mjs";
+@@ -151,6 +152,39 @@ test("AC1/AC4: the post-submission next-action is the mechanical present-plan co
+   assert.equal(payload.nextAction.requiresConfirmation, false);
+ });
+ 
++// G20-45: the Pipeline states, in the action it hands over, that the user's recorded onboarding consent covers the step; the design approval stays gated.
++test("G20-45: with a recorded onboarding consent the inspect next-action for submit-plan and present-plan is covered by it, with a verbatim escalation line", () => {
++  const f = fixture("pin-covered", { intake: true });
++  assert.equal(JSON.parse(capture(["inspect"], f.deps).out).nextAction.coveredBy, undefined, "no record, no claim");
++  recordOnboardingConsent(f.root, "s1", "yes", "2026-11-08T10:00:00.000Z", "ja bitte installieren");
++  const draft = JSON.parse(capture(["inspect"], f.deps).out).nextAction;
++  assert.deepEqual(draft.argv.slice(1, 2), ["submit-plan"]);
++  assert.equal(draft.requiresConfirmation, false);
++  assert.equal(draft.coveredBy.record, ".claude/.pipeline-install-consent-s1.json");
++  assert.equal(draft.coveredBy.step, "submit-plan");
++  assert.match(draft.escalationJustification, /^covered by the user's recorded onboarding consent \(\.claude\/\.pipeline-install-consent-s1\.json\): .+; no further approval before the design approval$/u);
++  assert.equal(capture(draft.argv.slice(1), f.deps).status, 0);
++  const present = JSON.parse(capture(["inspect"], f.deps).out).nextAction;
++  assert.deepEqual(present.argv.slice(1, 2), ["present-plan"]);
++  assert.equal(present.requiresConfirmation, false);
++  assert.equal(present.coveredBy.step, "present-plan");
++});
++
++test("G20-45: the design approval step is never marked covered by the onboarding consent, in either approval mode", () => {
++  for (const mode of ["chat", "signature"]) {
++    const f = fixture(`pin-covered-gate-${mode}`);
++    recordOnboardingConsent(f.root, "s1", "yes", "2026-11-08T10:00:00.000Z");
++    assert.equal(capture(submitArgs(), f.deps).status, 0);
++    assert.equal(capture(["present-plan", "--by", "coordinator"], f.deps).status, 0);
++    const deps = { ...f.deps, readHumanApprovalMode: () => ({ mode, source: "pipeline.user.yaml", key: "human_approval", scope: "global" }) };
++    const payload = JSON.parse(capture(["inspect"], deps).out);
++    assert.equal(payload.status, "awaiting-approval");
++    assert.ok(!JSON.stringify(payload.nextAction).includes("coveredBy"), `mode ${mode}: ${JSON.stringify(payload.nextAction)}`);
++    const approve = payload.nextAction.applyAction ?? payload.nextAction;
++    if (approve.argv?.includes("approve-plan")) assert.equal(approve.requiresConfirmation, true);
++  }
++});
++
+ test("AC4: submission and presentation grant no implementation authority; approval is a separate final step", () => {
+   const f = fixture("pin-no-authority");
+   assert.equal(capture(submitArgs(), f.deps).status, 0);
+diff --git a/plugins/pipeline-core/scripts/onboarding-consent-mark.mjs b/plugins/pipeline-core/scripts/onboarding-consent-mark.mjs
+index c0358cee0..bf6ef8e67 100644
+--- a/plugins/pipeline-core/scripts/onboarding-consent-mark.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-consent-mark.mjs
+@@ -13,7 +13,18 @@ import {
+ import { dirname, join, resolve } from "node:path";
+ import { randomBytes } from "node:crypto";
+ 
+-export const ONBOARDING_CONSENT_MARK_SCHEMA = "pipeline.onboarding-consent-mark.v1";
++import {
++  ONBOARDING_CONSENT_COVERED_STEPS,
++  ONBOARDING_CONSENT_MARK_SCHEMA_V1,
++  ONBOARDING_CONSENT_MARK_SCHEMA_V2,
++  ONBOARDING_CONSENT_NOT_COVERED,
++  ONBOARDING_CONSENT_QUOTE_MAX,
++} from "../lib/onboarding-consent-scope.mjs";
++
++// G20-45: the record is schema v2 -- it additionally carries the scope the question named and a bounded verbatim quote of
++// the user's answer. A v1 record (no scope) stays readable (lib/onboarding-consent-scope.mjs) but covers nothing.
++export const ONBOARDING_CONSENT_MARK_SCHEMA = ONBOARDING_CONSENT_MARK_SCHEMA_V2;
++export { ONBOARDING_CONSENT_MARK_SCHEMA_V1 };
+ 
+ export function onboardingConsentMarkerPath(rootDir, sessionId) {
+   if (typeof rootDir !== "string" || typeof sessionId !== "string" || sessionId === "") {
+@@ -36,7 +47,13 @@ function writeAtomic(path, bytes) {
+   renameSync(temporary, path);
+ }
+ 
+-export function recordOnboardingConsent(rootDir, sessionId, answer, now = new Date().toISOString()) {
++function boundedQuote(quote) {
++  if (typeof quote !== "string") return null;
++  const flat = quote.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim();
++  return flat === "" ? null : Array.from(flat).slice(0, ONBOARDING_CONSENT_QUOTE_MAX).join("");
++}
++
++export function recordOnboardingConsent(rootDir, sessionId, answer, now = new Date().toISOString(), quote = null) {
+   if (answer !== "yes" && answer !== "no") throw new Error("answer must be yes or no");
+   const markerPath = onboardingConsentMarkerPath(rootDir, sessionId);
+   const record = {
+@@ -44,13 +61,17 @@ export function recordOnboardingConsent(rootDir, sessionId, answer, now = new Da
+     sessionId,
+     answer,
+     recordedAt: now,
++    // A "no" covers nothing; a "yes" covers exactly the steps the question named.
++    scope: answer === "yes" ? ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step.id) : [],
++    notCovered: answer === "yes" ? ONBOARDING_CONSENT_NOT_COVERED.map((step) => step.id) : [],
++    quote: boundedQuote(quote),
+   };
+   writeAtomic(markerPath, `${JSON.stringify(record)}\n`);
+   return { markerPath, record };
+ }
+ 
+ function parseArgs(argv) {
+-  if (argv[0] !== "record") throw new Error("usage: record --root <root> --session-id <id> --answer yes|no");
++  if (argv[0] !== "record") throw new Error("usage: record --root <root> --session-id <id> --answer yes|no [--quote <the user's answer, verbatim>]");
+   const values = {};
+   for (let index = 1; index < argv.length; index += 2) {
+     const key = argv[index];
+@@ -65,7 +86,7 @@ function parseArgs(argv) {
+ if (import.meta.url === `file://${process.argv[1]}`) {
+   try {
+     const args = parseArgs(process.argv.slice(2));
+-    const result = recordOnboardingConsent(args.root, args["session-id"], args.answer);
++    const result = recordOnboardingConsent(args.root, args["session-id"], args.answer, undefined, args.quote);
+     process.stdout.write(`${JSON.stringify(result.record)}\n`);
+   } catch (error) {
+     process.stderr.write(`${error.message}\n`);
+diff --git a/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs b/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs
+index f23954aeb..e67e18fae 100644
+--- a/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs
+@@ -2,29 +2,272 @@
+ // SPDX-License-Identifier: SUL-1.0
+ 
+ import assert from "node:assert/strict";
+-import { existsSync, readFileSync, rmSync } from "node:fs";
++import { spawnSync } from "node:child_process";
++import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { mkdtempSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
++import { fileURLToPath } from "node:url";
+ 
+ import {
+   ONBOARDING_CONSENT_MARK_SCHEMA,
++  ONBOARDING_CONSENT_MARK_SCHEMA_V1,
+   onboardingConsentMarkerPath,
+   recordOnboardingConsent,
+ } from "./onboarding-consent-mark.mjs";
++import {
++  ONBOARDING_CONSENT_COVERED_STEPS,
++  ONBOARDING_CONSENT_NOT_COVERED,
++  coverOnboardingOutput,
++  coveringStepForArgv,
++  onboardingConsentQuestion,
++  readOnboardingConsentRecord,
++} from "../lib/onboarding-consent-scope.mjs";
++import { sanctionedOnboardingConsentMarkArgs } from "../lib/guard/sanctioned-args-scripts.mjs";
+ 
+-test("records a session-scoped yes/no marker atomically", () => {
++const MARK_SCRIPT = fileURLToPath(new URL("./onboarding-consent-mark.mjs", import.meta.url));
++const STATE_SCRIPT = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
++const ONBOARDING_SCRIPT = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
++const HOOK_SCRIPT = fileURLToPath(new URL("./clone-hook-readiness.mjs", import.meta.url));
++const REFRESH_SCRIPT = fileURLToPath(new URL("./refresh-mandatory-hooks.mjs", import.meta.url));
++const SHA = "a".repeat(64);
++
++function withRoot(body) {
+   const root = mkdtempSync(join(tmpdir(), "onboarding-consent-mark-"));
+-  try {
++  try { return body(root); } finally { rmSync(root, { recursive: true, force: true }); }
++}
++
++const action = (script, ...rest) => ({
++  kind: "command", executable: "node", argv: [script, ...rest], mutation: true, requiresConfirmation: true,
++  expected: { schema: "x", statuses: ["ok"] },
++});
++
++test("records a session-scoped yes/no marker atomically", () => {
++  withRoot((root) => {
+     const result = recordOnboardingConsent(root, "session-1", "no", "2026-08-20T00:00:00.000Z");
+     assert.equal(result.markerPath, onboardingConsentMarkerPath(root, "session-1"));
+     assert.equal(existsSync(result.markerPath), true);
++    // G20-45 (restated in place, QG-04): the record is schema v2 and additionally carries the consent scope and a bounded quote of the
++    // answer. A "no" covers nothing, so its scope lists are empty and its quote is absent; sessionId, answer and recordedAt are unchanged.
+     assert.deepEqual(JSON.parse(readFileSync(result.markerPath, "utf8")), {
+       schema: ONBOARDING_CONSENT_MARK_SCHEMA,
+       sessionId: "session-1",
+       answer: "no",
+       recordedAt: "2026-08-20T00:00:00.000Z",
++      scope: [],
++      notCovered: [],
++      quote: null,
++    });
++    assert.equal(ONBOARDING_CONSENT_MARK_SCHEMA, "pipeline.onboarding-consent-mark.v2");
++  });
++});
++
++test("G20-45: a yes record round-trips the scope list and a bounded verbatim quote, and the reader returns them with the repo-relative path", () => {
++  withRoot((root) => {
++    recordOnboardingConsent(root, "session-1", "yes", "2026-11-08T10:00:00.000Z", "ja bitte installieren");
++    const record = readOnboardingConsentRecord(root);
++    assert.equal(record.schema, ONBOARDING_CONSENT_MARK_SCHEMA);
++    assert.equal(record.answer, "yes");
++    assert.equal(record.path, ".claude/.pipeline-install-consent-session-1.json");
++    assert.deepEqual(record.scope, ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step.id));
++    assert.deepEqual(record.notCovered, ONBOARDING_CONSENT_NOT_COVERED.map((step) => step.id));
++    assert.equal(record.quote, "ja bitte installieren");
++    // The quote is bounded and single-line: control characters collapse, an over-long answer is cut.
++    recordOnboardingConsent(root, "session-2", "yes", "2026-11-08T11:00:00.000Z", `x\ny${"z".repeat(2000)}`);
++    const bounded = JSON.parse(readFileSync(onboardingConsentMarkerPath(root, "session-2"), "utf8"));
++    assert.ok(bounded.quote.length <= 400 && !/[\u0000-\u001f]/u.test(bounded.quote), bounded.quote.length);
++    assert.ok(bounded.quote.startsWith("x y"));
++    assert.throws(() => recordOnboardingConsent(root, "session-3", "maybe"), /answer must be yes or no/u);
++  });
++});
++
++test("G20-45: an old v1 record is still read, but it recorded no scope, so it covers nothing", () => {
++  withRoot((root) => {
++    const path = onboardingConsentMarkerPath(root, "old");
++    mkdirSync(join(root, ".claude"), { recursive: true });
++    writeFileSync(path, `${JSON.stringify({ schema: ONBOARDING_CONSENT_MARK_SCHEMA_V1, sessionId: "old", answer: "yes", recordedAt: "2026-08-20T00:00:00.000Z" })}\n`);
++    const record = readOnboardingConsentRecord(root);
++    assert.equal(record.schema, "pipeline.onboarding-consent-mark.v1");
++    assert.equal(record.answer, "yes");
++    assert.equal(record.scope, null);
++    assert.equal(record.quote, null);
++    const output = { nextAction: action(STATE_SCRIPT, "submit-plan", "--by", "x", "--profile", "mini") };
++    assert.deepEqual(coverOnboardingOutput(output, { rootDir: root }), output);
++    assert.equal(readOnboardingConsentRecord(mkdtempSync(join(root, "empty-"))), null);
++  });
++});
++
++test("G20-45: the rendered consent question names every covered step and every excluded decision, in English and German", () => {
++  assert.ok(ONBOARDING_CONSENT_COVERED_STEPS.length >= 8);
++  for (const language of ["en", "de"]) {
++    const question = onboardingConsentQuestion({ language });
++    assert.equal(question.schema, "pipeline.onboarding-consent-question.v1");
++    assert.equal(question.language, language);
++    for (const step of ONBOARDING_CONSENT_COVERED_STEPS) assert.ok(question.text.includes(step[language]), `${language}: ${step.id}`);
++    for (const step of ONBOARDING_CONSENT_NOT_COVERED) assert.ok(question.text.includes(step[language]), `${language}: ${step.id}`);
++    assert.deepEqual(question.scope, ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step.id));
++    assert.deepEqual(question.notCovered, ONBOARDING_CONSENT_NOT_COVERED.map((step) => step.id));
++  }
++  // The required scope: hooks, onboarding commits, intake/kickoff, the unsealed draft bind, the review rounds, submit, seal, present.
++  const ids = ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step.id);
++  for (const id of ["hooks", "onboarding-commits", "intake-kickoff", "bind-draft", "design-review", "submit-plan", "prepare-seal", "present-plan"]) assert.ok(ids.includes(id), id);
++  const excluded = ONBOARDING_CONSENT_NOT_COVERED.map((step) => step.id);
++  for (const id of ["design-approval", "push", "release", "guard-override"]) assert.ok(excluded.includes(id), id);
++  assert.equal(onboardingConsentQuestion({ language: "fr" }).language, "en");
++  assert.equal(onboardingConsentQuestion().textByLanguage.de, onboardingConsentQuestion({ language: "de" }).text);
++});
++
++test("G20-45: with a recorded yes, every consent-covered action prints requiresConfirmation false, coveredBy with the record path and a verbatim escalation line", () => {
++  withRoot((root) => {
++    recordOnboardingConsent(root, "session-1", "yes", "2026-11-08T10:00:00.000Z", "ich folge deinen empfehlungen");
++    const output = {
++      schema: "x",
++      nextAction: action(ONBOARDING_SCRIPT, "bootstrap-bind-apply", "--root", root, "--runner", "codex", "--plan-sha256", SHA, "--activate"),
++      applyAction: action(STATE_SCRIPT, "submit-plan", "--by", "Jordan", "--profile", "mini"),
++      nested: { items: [action(STATE_SCRIPT, "present-plan", "--by", "Jordan"), action(HOOK_SCRIPT, "--root", root, "--apply")] },
++      sealing: action(STATE_SCRIPT, "prepare-seal", "--review-receipt", "scratch/r.json"),
++      refresh: action(REFRESH_SCRIPT, "--root", root),
++    };
++    const covered = coverOnboardingOutput(output, { rootDir: root });
++    const all = [covered.nextAction, covered.applyAction, ...covered.nested.items, covered.sealing, covered.refresh];
++    const stepIds = ["bind-draft", "submit-plan", "present-plan", "hooks", "prepare-seal", "hooks"];
++    all.forEach((entry, index) => {
++      assert.equal(entry.requiresConfirmation, false, entry.argv.join(" "));
++      assert.equal(entry.mutation, true);
++      assert.equal(entry.coveredBy.consent, "onboarding-consent");
++      assert.equal(entry.coveredBy.record, ".claude/.pipeline-install-consent-session-1.json");
++      assert.equal(entry.coveredBy.step, [stepIds[0], stepIds[1], stepIds[2], stepIds[3], stepIds[4], stepIds[5]][index]);
++      const step = ONBOARDING_CONSENT_COVERED_STEPS.find((candidate) => candidate.id === entry.coveredBy.step);
++      assert.equal(entry.escalationJustification,
++        `covered by the user's recorded onboarding consent (.claude/.pipeline-install-consent-session-1.json): ${step.en}; no further approval before the design approval`);
+     });
+-  } finally { rmSync(root, { recursive: true, force: true }); }
++    // Pure: the input was not mutated, and no further field leaks into the action.
++    assert.equal(output.nextAction.requiresConfirmation, true);
++    assert.equal(output.nextAction.coveredBy, undefined);
++    assert.deepEqual(Object.keys(covered.nextAction).sort(), [...Object.keys(output.nextAction), "coveredBy", "escalationJustification"].sort());
++  });
++});
++
++test("G20-45: the review-receipt stop that names prepare-seal and present-plan carries their escalation lines, and only with a recorded yes", () => {
++  withRoot((root) => {
++    const stop = { kind: "collect-input", mutation: false, requiresConfirmation: false, code: "DAB-REVIEW-RECEIPT-REQUIRED", guidance: "Run present-plan --review-receipt" };
++    assert.deepEqual(coverOnboardingOutput({ nextAction: stop }, { rootDir: root }), { nextAction: stop });
++    recordOnboardingConsent(root, "session-1", "yes", "2026-11-08T10:00:00.000Z");
++    const covered = coverOnboardingOutput({ nextAction: stop }, { rootDir: root }).nextAction;
++    assert.deepEqual(covered.coveredBy.steps, ["prepare-seal", "present-plan"]);
++    assert.match(covered.escalationJustifications["prepare-seal"], /^covered by the user's recorded onboarding consent \(\.claude\/\.pipeline-install-consent-session-1\.json\): prepare the seal plan \(prepare-seal\); no further approval before the design approval$/u);
++    assert.match(covered.escalationJustifications["present-plan"], /present the design to you for approval \(present-plan\); no further approval/u);
++    const other = { kind: "collect-input", code: "SOMETHING-ELSE" };
++    assert.deepEqual(coverOnboardingOutput({ nextAction: other }, { rootDir: root }), { nextAction: other });
++  });
++});
++
++test("G20-45: the design approval, push, release and a human-guard override keep their gate unchanged even with a recorded yes", () => {
++  withRoot((root) => {
++    recordOnboardingConsent(root, "session-1", "yes", "2026-11-08T10:00:00.000Z");
++    const gated = [
++      action(STATE_SCRIPT, "approve-plan", "--by", "po", "--design-approval-request", "scratch/request.json"),
++      action(STATE_SCRIPT, "seal-plan-approval"),
++      action(STATE_SCRIPT, "set-phase", "--phase", "implementation"),
++      action(STATE_SCRIPT, "approve-push"),
++      action(ONBOARDING_SCRIPT, "bootstrap-acknowledge-chat-apply", "--root", root, "--plan-sha256", SHA, "--activate"),
++      action(ONBOARDING_SCRIPT, "bootstrap-acknowledge-apply", "--root", root, "--plan-sha256", SHA, "--proof", "p", "--activate"),
++      action(fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "sign-intent", "--repo-root", root),
++      action(fileURLToPath(new URL("./guard-human-override.mjs", import.meta.url)), "authorize-by-signature"),
++      action(fileURLToPath(new URL("./push-init.mjs", import.meta.url)), "--root", root),
++      action(fileURLToPath(new URL("./publication-executor.mjs", import.meta.url)), "release"),
++    ];
++    for (const entry of gated) {
++      assert.equal(coveringStepForArgv(entry.argv), null, entry.argv.join(" "));
++      assert.deepEqual(coverOnboardingOutput({ nextAction: entry }, { rootDir: root }).nextAction, entry, entry.argv.join(" "));
++    }
++    // An action that never named a covered route is left alone even when it nests a covered one as data.
++    const wrapper = { kind: "collect-input", requiresConfirmation: false, applyAction: gated[0] };
++    assert.deepEqual(coverOnboardingOutput(wrapper, { rootDir: root }), wrapper);
++  });
++});
++
++test("G20-45: no recorded yes means nothing is claimed as covered (absent record, a recorded no, an unreadable record)", () => {
++  withRoot((root) => {
++    const output = { nextAction: action(STATE_SCRIPT, "submit-plan", "--by", "x", "--profile", "mini") };
++    assert.deepEqual(coverOnboardingOutput(output, { rootDir: root }), output);
++    recordOnboardingConsent(root, "session-no", "no", "2026-11-08T10:00:00.000Z");
++    assert.deepEqual(coverOnboardingOutput(output, { rootDir: root }), output);
++    writeFileSync(onboardingConsentMarkerPath(root, "session-bad"), "{not json");
++    assert.deepEqual(coverOnboardingOutput(output, { rootDir: root }), output);
++    assert.deepEqual(coverOnboardingOutput(output, { rootDir: root, readRecord: () => ({ answer: "yes", scope: ["submit-plan"], path: ".claude/r.json" }) }).nextAction.coveredBy.step, "submit-plan");
++  });
++});
++
++test("G20-45: the record command accepts an optional --quote on the command line and prints the stored record", () => {
++  withRoot((root) => {
++    const run = spawnSync(process.execPath, [MARK_SCRIPT, "record", "--root", root, "--session-id", "s1", "--answer", "yes", "--quote", "ja bitte installieren"], { encoding: "utf8" });
++    assert.equal(run.status, 0, run.stderr);
++    const printed = JSON.parse(run.stdout);
++    assert.equal(printed.schema, ONBOARDING_CONSENT_MARK_SCHEMA);
++    assert.equal(printed.quote, "ja bitte installieren");
++    assert.deepEqual(printed.scope, ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step.id));
++    const legacy = spawnSync(process.execPath, [MARK_SCRIPT, "record", "--root", root, "--session-id", "s2", "--answer", "no"], { encoding: "utf8" });
++    assert.equal(legacy.status, 0, legacy.stderr);
++    assert.equal(JSON.parse(legacy.stdout).quote, null);
++  });
++});
++
++test("G20-45: the guard admits the record command with an optional bounded single-line --quote and nothing else", () => {
++  const root = tmpdir();
++  const base = ["record", "--root", root, "--session-id", "s1", "--answer", "yes"];
++  assert.equal(sanctionedOnboardingConsentMarkArgs(base, root), true);
++  assert.equal(sanctionedOnboardingConsentMarkArgs([...base, "--quote", "ja bitte installieren"], root), true);
++  assert.equal(sanctionedOnboardingConsentMarkArgs([...base, "--quote", ""], root), false);
++  assert.equal(sanctionedOnboardingConsentMarkArgs([...base, "--quote", "x".repeat(401)], root), false);
++  assert.equal(sanctionedOnboardingConsentMarkArgs([...base, "--quote", "a\nb"], root), false);
++  assert.equal(sanctionedOnboardingConsentMarkArgs([...base, "--quote"], root), false);
++  assert.equal(sanctionedOnboardingConsentMarkArgs([...base, "--note", "x"], root), false);
++  assert.equal(sanctionedOnboardingConsentMarkArgs([...base, "--quote", "x", "--extra", "y"], root), false);
++});
++
++test("G20-45: the onboarding CLI output passes through the coverage edge (recorded yes: covered; no record: untouched)", async () => {
++  const { main } = await import("./project-onboarding-v3.mjs");
++  withRoot((root) => {
++    const run = (deps) => {
++      let out = "";
++      main(["inspect", "--root", root, "--runner", "claude"], { write: (text) => { out += text; }, writeError: (text) => { out += text; }, deps });
++      return JSON.parse(out);
++    };
++    const plain = run(undefined);
++    assert.equal(plain.nextAction.argv[1], "plan");
++    assert.equal(plain.nextAction.coveredBy, undefined);
++    const covered = run({ readOnboardingConsentRecord: () => ({ answer: "yes", scope: ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step.id), path: ".claude/.pipeline-install-consent-s1.json" }) });
++    assert.equal(covered.nextAction.coveredBy.step, "install");
++    assert.equal(covered.nextAction.requiresConfirmation, false);
++    assert.match(covered.nextAction.escalationJustification, /^covered by the user's recorded onboarding consent \(\.claude\/\.pipeline-install-consent-s1\.json\): .+; no further approval before the design approval$/u);
++  });
++});
++
++test("G20-45: the start skill and its happy-path reference tell the agent to relay the question verbatim and to use the escalation line", () => {
++  const skills = fileURLToPath(new URL("../skills/pipeline-start/", import.meta.url));
++  const skill = readFileSync(join(skills, "SKILL.md"), "utf8");
++  assert.match(skill, /relaying `consentQuestion\.text` verbatim/u);
++  assert.match(skill, /never paraphrased/u);
++  assert.match(skill, /`consentRecordAction`/u);
++  assert.match(skill, /`escalationJustification` line verbatim/u);
++  assert.match(skill, /design approval, push, release and any human-guard override are never covered/u);
++  const happy = readFileSync(join(skills, "references", "happy-path.md"), "utf8");
++  assert.match(happy, /`escalationJustification`: when a runner's escalation review asks for a reason/u);
++  assert.match(happy, /give that line verbatim/u);
++  const recovery = readFileSync(join(skills, "references", "onboarding-recovery.md"), "utf8");
++  assert.match(recovery, /lib\/onboarding-consent-scope\.mjs/u);
++});
++
++test("G20-45: the covering step is decided by the script and verb, not by a loose substring", () => {
++  assert.equal(coveringStepForArgv([STATE_SCRIPT, "submit-plan", "--by", "x"]).id, "submit-plan");
++  assert.equal(coveringStepForArgv([STATE_SCRIPT, "prepare-seal"]).id, "prepare-seal");
++  assert.equal(coveringStepForArgv([STATE_SCRIPT, "present-plan", "--by", "x"]).id, "present-plan");
++  assert.equal(coveringStepForArgv([ONBOARDING_SCRIPT, "bootstrap-bind-plan", "--root", "r"]).id, "bind-draft");
++  assert.equal(coveringStepForArgv([ONBOARDING_SCRIPT, "intake-generate-apply", "--root", "r"]).id, "intake-kickoff");
++  assert.equal(coveringStepForArgv([join(tmpdir(), "other.mjs"), "submit-plan"]), null);
++  assert.equal(coveringStepForArgv([STATE_SCRIPT, "--note", "submit-plan"]), null);
++  assert.equal(coveringStepForArgv([]), null);
++  assert.equal(coveringStepForArgv(null), null);
+ });
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 2f05e2a86..a1122c71b 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -8,6 +8,8 @@ import { existsSync, readFileSync, readdirSync, realpathSync, statSync, lstatSyn
+ import { homedir } from "node:os";
+ import { dirname, isAbsolute, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { loadManifestSafe, resolveHumanFacingLanguage } from "../lib/manifest.mjs";
++import { onboardingConsentQuestion } from "../lib/onboarding-consent-scope.mjs";
+ 
+ import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
+ import { attachRunbookLink } from "../lib/runbook-link.mjs";
+@@ -1112,6 +1114,31 @@ export function resolveCodexAttestationSourceForPreflight({
+   };
+ }
+ 
++// G20-45: the consent question (operator language: the project's human-facing language, English when unknown) and the command that
++// records the answer. The record is written right after the first onboarding apply, never before: a `.claude/` file in a fresh root
++// makes the onboarding inspection read it as a partial authority.
++function onboardingConsentFields({ rootDir, scriptUrl }) {
++  let language = "en";
++  try {
++    const manifest = loadManifestSafe(rootDir);
++    const resolved = manifest ? resolveHumanFacingLanguage(manifest) : null;
++    if (resolved?.ok) language = resolved.value;
++  } catch { /* an unreadable manifest keeps English */ }
++  return {
++    consentQuestion: onboardingConsentQuestion({ language }),
++    consentRecordAction: {
++      kind: "command",
++      executable: process.execPath,
++      argv: [resolve(dirname(fileURLToPath(scriptUrl)), "onboarding-consent-mark.mjs"), "record", "--root", rootDir, "--session-id", "onboarding", "--answer", "yes", "--quote", "<the-user-answer-verbatim>"],
++      mutation: true,
++      requiresConfirmation: false,
++      executionBoundary: "host",
++      expected: { schema: "pipeline.onboarding-consent-mark.v2", answer: "yes" },
++      guidance: "Relay consentQuestion.text to the user verbatim, never paraphrased. After an affirmative answer, run this record command once the first onboarding apply (the portable seed) has completed, replacing <the-user-answer-verbatim> with the user's answer word for word; a file written into .claude/ earlier makes a fresh root read as partial. The record is what lets later actions print coveredBy instead of asking again. A decline is recorded with --answer no and leaves the project inactive.",
++    },
++  };
++}
++
+ export function observePipelineStartPreflight({
+   env = process.env,
+   pluginList,
+@@ -1174,6 +1201,9 @@ export function observePipelineStartPreflight({
+       status: state === "inactive" ? "pipeline-governance-inactive" : state === "declined" ? "pipeline-governance-declined" : "pipeline-governance-unverifiable",
+       governanceScope: validScope ? governanceScope : null,
+       ...(diagnostic ? { cause: diagnostic.cause, topologyDiagnostic: diagnostic.topologyDiagnostic } : {}),
++      // G20-45: the question the agent relays verbatim, naming every step the user's yes covers (and what it does not), plus the
++      // action that records the answer with its verbatim quote. Only for the inactive project the hint is allowed for.
++      ...(!diagnostic && state === "inactive" && governanceScope.hintAllowed ? onboardingConsentFields({ rootDir: resolve(cwd), scriptUrl }) : {}),
+       pipelineWorkPerformed: false,
+       nextAction: diagnostic ? governanceScopeDiagnosticAction({ rootDir: resolve(cwd) }) : state === "inactive" && governanceScope.hintAllowed
+         ? {
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index a98385ad5..4b8472218 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -2554,3 +2554,33 @@ test("K139 MP-04 readback: the readback is the Elephant's duty, a Goldfish or Cr
+   }
+   assert.deepEqual(runPreflightProcess({ [MP04_VARIABLE]: MP04_VALUE_SENTINEL }, ["--role", "elephant"]).line.subagentModelEnv, { status: "set" });
+ });
++
++// G20-45: the question the Pipeline renders for the inactive project names every agent step the "yes" covers (and what it does not).
++test("G20-45: the pipeline-governance-inactive result carries the consent question with the full scope and the record command", async () => {
++  const { ONBOARDING_CONSENT_COVERED_STEPS, ONBOARDING_CONSENT_NOT_COVERED } = await import("../lib/onboarding-consent-scope.mjs");
++  const result = preflight({
++    cwd: ROOT_CURRENT,
++    observeGovernanceScopeFn: ({ rootDir }) => ({ schema: "pipeline.governance-scope.v1", state: "inactive", root: rootDir, scopeKey: "b".repeat(64), repositoryKind: "git", provenance: { kind: "none", refs: [] }, diagnostics: [], requiresEnforcement: false, hintAllowed: true }),
++  });
++  assert.equal(result.status, "pipeline-governance-inactive");
++  const question = result.consentQuestion;
++  assert.equal(question.schema, "pipeline.onboarding-consent-question.v1");
++  assert.equal(question.language, "en");
++  for (const step of ONBOARDING_CONSENT_COVERED_STEPS) assert.ok(question.text.includes(step.en), step.id);
++  for (const step of ONBOARDING_CONSENT_NOT_COVERED) assert.ok(question.text.includes(step.en), step.id);
++  assert.ok(question.textByLanguage.de.includes(ONBOARDING_CONSENT_COVERED_STEPS[0].de));
++  const record = result.consentRecordAction;
++  assert.equal(record.kind, "command");
++  assert.deepEqual(record.argv.slice(1, 7), ["record", "--root", ROOT_CURRENT, "--session-id", "onboarding", "--answer"]);
++  assert.ok(record.argv[0].endsWith(join("scripts", "onboarding-consent-mark.mjs")), record.argv[0]);
++  assert.ok(record.argv.includes("--quote"));
++  assert.equal(record.mutation, true);
++  assert.equal(record.requiresConfirmation, false);
++  assert.match(record.guidance, /once the first onboarding apply \(the portable seed\) has completed/u);
++  assert.match(record.guidance, /verbatim, never paraphrased/u);
++  // The existing guided onboarding action is unchanged.
++  assert.ok(result.nextAction.argv[0].endsWith(join("scripts", "onboarding-init.mjs")));
++  assert.deepEqual(result.nextAction.argv.slice(1, 4), ["--root", ROOT_CURRENT, "--runner"]);
++  assert.equal(result.nextAction.mutation, false);
++  assert.equal(result.nextAction.requiresConfirmation, false);
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 2e834249b..c04666650 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -462,6 +462,7 @@ import {
+ import { readPromotionDesignInputCapture } from "../lib/onboarding-continuity.mjs";
+ import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRetirementIntakeLock} from '../lib/onboarding-continuity.mjs';
+ import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
++import {coverOnboardingOutput} from '../lib/onboarding-consent-scope.mjs';
+ import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
+ import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
+ import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
+@@ -14293,7 +14294,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         pushApproval: inspectPushApproval(withPrivateCriticalApprovals(base, dir), () => gitHead(dir)),
+         closedFeaturesCount: Array.isArray(base.closedFeatures) ? base.closedFeatures.length : 0,
+         phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),
+-        nextAction: buildInspectNextAction(dir, base, lifecycle, deps) ?? drift?.recovery ?? null,
++        // G20-45: with a recorded onboarding consent, submit-plan / prepare-seal / present-plan print requiresConfirmation false with
++        // coveredBy and a verbatim escalation line; approve-plan, push and release are not in the consent scope and keep their gate.
++        nextAction: coverOnboardingOutput(buildInspectNextAction(dir, base, lifecycle, deps) ?? drift?.recovery ?? null, { rootDir: dir, readRecord: deps.readOnboardingConsentRecord }),
+         nextActionText: lifecycle.nextAction === "reopen-design"
+           ? reopenDesignNextActionText(dir)
+           : nextActionSection(base),
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-v3.mjs b/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
+index fce82d203..37900d198 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-v3.mjs
+@@ -15,6 +15,7 @@ import { inspectConfirmedIntakeLanguageProjection, projectConfirmedIntakeLanguag
+ import { chatAttributionRecord, requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
+ import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+ import { loadManifestSafe, resolveHumanFacingLanguage, gateConfig } from "../lib/manifest.mjs";
++import { coverOnboardingOutput } from "../lib/onboarding-consent-scope.mjs";
+ import { planInstall as planPrePushHookInstall, MARKER_SCHEMA as PRE_PUSH_HOOK_MARKER_SCHEMA, DECLINE_MARKER_SCHEMA as PRE_PUSH_HOOK_DECLINE_MARKER_SCHEMA } from "./pre-push-hook-install.mjs";
+ import { resolveActiveRunner } from "./pipeline-start-preflight.mjs";
+ import { readIntakeMaterialReference } from "../lib/intake-material-reference.mjs";
+@@ -1128,7 +1129,11 @@ export function main(args = process.argv.slice(2), {
+       }),
+     };
+   }
+-  write(`${JSON.stringify(output, null, 2)}\n`);
++  // G20-45: with a recorded onboarding consent, the actions the consent covers print requiresConfirmation false with coveredBy and a
++  // verbatim escalation line. The exit code below reads the unmarked `output`; only the printed copy is marked.
++  write(`${JSON.stringify(output !== null && typeof output === "object"
++    ? coverOnboardingOutput(output, { rootDir: options.root, readRecord: deps?.readOnboardingConsentRecord })
++    : output, null, 2)}\n`);
+   if (output.schema === EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA) return output.ok === true ? 0 : 1;
+   if(output.schema===ENROLLMENT_GIT_CREATION_SCHEMA)return ["planned","created","retained","refused"].includes(output.status)?0:1;
+   // Wave 4 step 4 (NVA-W4-COORD-2): intake-generate-plan is `{ schema, root,
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 96af6fd4d..3987c8389 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -28,7 +28,7 @@ conflicting or unknown carriers stop — Critic is closed, never Elephant.
+ 
+ For `pipeline-governance-inactive`, ask the human once whether this project
+ should use the Pipeline. That question lists in short what agreeing
+-installs and activates, git hooks included. Only after an affirmative answer, execute the exact
++installs and activates, git hooks included: relay `consentQuestion` verbatim. Only after an affirmative answer, execute the exact
+ read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
+ subsequent consent and mutations. A decline leaves the project inactive.
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 33c103448..2aca3e746 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -14,6 +14,12 @@ The first call of a standard command returns a typed `runbook` field `{ path, di
+ session and path, and always on a refusal); follow that runbook when this guide and the command's own output differ, because it is regenerated from the
+ command tables.
+ 
++Escalations (G20-45). The user's recorded onboarding consent covers every agent step up to presenting the design (hooks, onboarding commits, intake and
++kickoff artifacts, the unsealed-draft bind, the review rounds, `submit-plan`, `prepare-seal`, `present-plan`); the design approval, push, release and any
++human-guard override are not covered. An action the consent covers prints `requiresConfirmation: false`, `coveredBy` (the record path and the step) and
++`escalationJustification`: when a runner's escalation review asks for a reason to run it (Codex mounts `.git` read-only, so every lifecycle write is
++escalated), give that line verbatim. Without a record nothing is marked covered.
++
+ ## 1. Design
+ 
+ 1. `pipeline-state.mjs set-feature --id <id> --plan-path <path>` (agent). Both flags are required.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+index fc0890475..66a378408 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+@@ -15,7 +15,11 @@ or material design input exists, a configured plan/acceptance gate is reached,
+ an action is external or irreversible, or a typed hard block has no supplied
+ safe recovery. Never treat this consent as approval for unrelated adoption,
+ remote operations, deployment, publication, destructive work, or a scope
+-change.
++change. The consent's scope is one list (`lib/onboarding-consent-scope.mjs`),
++named in the question the user answered and stored in the consent record
++(`scripts/onboarding-consent-mark.mjs`, schema v2: scope and the user's answer
++as a bounded quote); the design approval, push, release and any human-guard
++override stay outside it.
+ 
+ For inherited handoff run `codex-project-runtime-readback-host.mjs --root
+ "$PWD"`; accept only `pipeline.codex-project-runtime-readback-status.v1`,
