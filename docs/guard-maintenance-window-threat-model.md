@@ -688,6 +688,17 @@ accounts for dispatch fan-out), and
 `plugins/pipeline-core/lib/plan-approval-device-rebind.mjs` (rebinds a plan
 approval to a device, so it decides what an approval still covers).
 
+G20-58 (2026-11-08) widens what that receipt may rebind by exactly one field: the
+PO profile source digest. Only `lib/rebind-approval.mjs` writes such a receipt, and
+only after it found the approved source bytes in the repository's own history by
+digest and verified that they differ from the current bytes in nothing but the
+top-level keys `routing` and `core_registry_sha256`. Every gate, approval, autonomy,
+export and release key, the runtime manifest digest, the operator language, the PRD
+and the Spec stay bound; the kernel reader in `lib/po-gate-authority-read.mjs`
+accepts a receipt only with exactly the device-local fields or exactly those plus
+the source digest. `lib/rebind-approval.mjs` gains one import, `lib/yaml-lite.mjs`,
+already a kernel path.
+
 Dispatch-model enforcement (D84, 2026-10-21) adds
 `plugins/pipeline-core/lib/dispatch-model-enforcement.mjs` (decides whether the
 tool-layer `model` of a subagent dispatch is one the configured routing selects,

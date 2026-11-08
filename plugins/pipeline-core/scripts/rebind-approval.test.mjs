@@ -82,8 +82,10 @@ import { validPlanSubmission, validPreviousCurrentPlanApproval } from "../lib/pl
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { run, SCHEMA_ID, statePath } from "./pipeline-state.mjs";
-import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, readPlanApprovalDeviceRebind,
+import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_SOURCE_REBIND_FIELDS, readPlanApprovalDeviceRebind,
   withOriginDeviceValues, writePlanApprovalDeviceRebindReceipt } from "../lib/plan-approval-device-rebind.mjs";
+import { readPlanApprovalDeviceRebind as readKernelPlanApprovalDeviceRebind } from "../lib/po-gate-authority-read.mjs";
+import { routingOnlyProfileSourceChange } from "../lib/rebind-approval.mjs";
 
 const ONBOARDING = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 const REBIND_SCHEMA = "pipeline.rebind-approval.v1";
@@ -521,6 +523,94 @@ test("R7-5f: a device rebind never matches another approval, device or tampered 
   writePlanApprovalDeviceRebindReceipt(common, tampered);
   assert.equal(readPlanApprovalDeviceRebind({ gitCommonDir: common, planApproval: drApproval(), current: DR_CURRENT }), null,
     "a receipt whose origin values differ from the approval's is ignored");
+});
+
+// G20-58 (PO 2026-11-08, "Baue dafür einen heal für den agent"): a committed model-routing change in the PO profile
+// source (pipeline.user.yaml, G20-43) staled the plan approval, and every dispatch was refused CVCT-AUTHORITY-STALE
+// with only a full re-approval as repair. The profile source digest is now rebindable through the same receipt, but
+// only when rebind-approval verified that nothing outside the model routing changed.
+const DR_SOURCE_CURRENT = Object.freeze({ ...DR_CURRENT, sourceSha256: h("f") });
+
+test("G20-58a: a profile-source receipt maps the approved source digest back, and only through its own field set", () => {
+  assert.deepEqual([...PROFILE_SOURCE_REBIND_FIELDS], ["receiptSha256", "repositoryFingerprint", "sourceSha256"]);
+  assert.equal(differsOnlyInDeviceFields(DR_STORED, DR_SOURCE_CURRENT, PROFILE_SOURCE_REBIND_FIELDS), true);
+  assert.equal(differsOnlyInDeviceFields(DR_STORED, { ...DR_SOURCE_CURRENT, runtimeSha256: h("a") }, PROFILE_SOURCE_REBIND_FIELDS), false,
+    "the runtime manifest digest stays bound");
+  assert.equal(differsOnlyInDeviceFields(DR_STORED, { ...DR_SOURCE_CURRENT, humanFacing: "de" }, PROFILE_SOURCE_REBIND_FIELDS), false,
+    "the operator language stays bound");
+  assert.equal(createPlanApprovalDeviceRebindReceipt({ planApproval: drApproval(), current: DR_SOURCE_CURRENT, envelopeSha256: h("9"), verifiedAt: "t" }), null,
+    "without the verified routing-only flag a changed source gets no receipt");
+  assert.equal(createPlanApprovalDeviceRebindReceipt({ planApproval: drApproval(), current: DR_CURRENT, envelopeSha256: h("9"), verifiedAt: "t", profileSourceRebound: true }), null,
+    "the flag never produces a source receipt when the source did not change");
+  const common = drCommon();
+  const deviceOnly = createPlanApprovalDeviceRebindReceipt({ planApproval: drApproval(), current: DR_CURRENT, envelopeSha256: h("9"), verifiedAt: "t" });
+  writePlanApprovalDeviceRebindReceipt(common, deviceOnly);
+  for (const reader of [readPlanApprovalDeviceRebind, readKernelPlanApprovalDeviceRebind]) {
+    assert.equal(reader({ gitCommonDir: common, planApproval: drApproval(), current: DR_SOURCE_CURRENT }), null,
+      "a device-local-only receipt never covers a changed profile source");
+  }
+  const receipt = createPlanApprovalDeviceRebindReceipt({ planApproval: drApproval(), current: DR_SOURCE_CURRENT, envelopeSha256: h("9"),
+    verifiedAt: "t", profileSourceRebound: true });
+  assert.deepEqual(receipt.origin, { receiptSha256: h("3"), repositoryFingerprint: h("4"), sourceSha256: h("1") });
+  writePlanApprovalDeviceRebindReceipt(common, receipt);
+  for (const reader of [readPlanApprovalDeviceRebind, readKernelPlanApprovalDeviceRebind]) {
+    const rebind = reader({ gitCommonDir: common, planApproval: drApproval(), current: DR_SOURCE_CURRENT });
+    assert.ok(rebind, "the writer's receipt is honoured by both the lib and the kernel reader");
+    assert.deepEqual(withOriginDeviceValues(DR_SOURCE_CURRENT, rebind), DR_STORED, "consumers see the approved values again");
+    assert.equal(reader({ gitCommonDir: common, planApproval: drApproval(), current: { ...DR_SOURCE_CURRENT, sourceSha256: h("0") } }), null,
+      "a further source change after the receipt is not covered");
+    assert.equal(reader({ gitCommonDir: common, planApproval: drApproval(), current: { ...DR_SOURCE_CURRENT, planSha256: h("d") } }), null,
+      "a changed PRD digest never matches");
+  }
+});
+
+function profileSourceRepo(text) {
+  const dir = mkdtempSync(join(tmpdir(), "profile-source-"));
+  roots.push(dir);
+  const git = (...args) => {
+    const result = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  git("init", "-q");
+  git("config", "user.name", "Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+  git("config", "core.autocrlf", "false");
+  writeFileSync(join(dir, "pipeline.user.yaml"), text);
+  git("add", "pipeline.user.yaml");
+  git("commit", "-q", "-m", "approved profile");
+  return dir;
+}
+const APPROVED_PROFILE = [
+  "gates:", "  push_approval: \"signature\"", "core_registry_sha256: \"" + h("1") + "\"",
+  "routing:", "  roles:", "    critic:", "      effort: \"high\"", "",
+].join("\n");
+
+test("G20-58b: a routing-only profile source change is verified against the approved bytes from history", () => {
+  const dir = profileSourceRepo(APPROVED_PROFILE);
+  const approvedSha256 = hash(APPROVED_PROFILE);
+  const routed = APPROVED_PROFILE.replace("effort: \"high\"", "effort: \"low\"").replace(h("1"), h("2"));
+  writeFileSync(join(dir, "pipeline.user.yaml"), routed);
+  assert.deepEqual(routingOnlyProfileSourceChange({ root: dir, approvedSha256, currentSha256: hash(routed) }), { ok: true });
+  const crlfApproved = hash(APPROVED_PROFILE.replace(/\n/gu, "\r\n"));
+  assert.deepEqual(routingOnlyProfileSourceChange({ root: dir, approvedSha256: crlfApproved, currentSha256: hash(routed) }), { ok: true },
+    "an approval taken on a CRLF checkout finds the same committed version");
+});
+
+test("G20-58c: any change outside the model routing, unknown approved bytes or a foreign current file are refused", () => {
+  const dir = profileSourceRepo(APPROVED_PROFILE);
+  const approvedSha256 = hash(APPROVED_PROFILE);
+  const weakened = APPROVED_PROFILE.replace("\"signature\"", "\"chat\"").replace("effort: \"high\"", "effort: \"low\"");
+  writeFileSync(join(dir, "pipeline.user.yaml"), weakened);
+  assert.deepEqual(routingOnlyProfileSourceChange({ root: dir, approvedSha256, currentSha256: hash(weakened) }),
+    { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-CHANGED", extra: { changedKeys: ["gates"] } });
+  const added = `${APPROVED_PROFILE}autonomy:\n  wip_limit: 9\n`;
+  writeFileSync(join(dir, "pipeline.user.yaml"), added);
+  assert.deepEqual(routingOnlyProfileSourceChange({ root: dir, approvedSha256, currentSha256: hash(added) }).extra, { changedKeys: ["autonomy"] },
+    "a new top-level key is a change");
+  assert.equal(routingOnlyProfileSourceChange({ root: dir, approvedSha256: h("e"), currentSha256: hash(added) }).code,
+    "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE", "approved bytes absent from history are never assumed");
+  assert.equal(routingOnlyProfileSourceChange({ root: dir, approvedSha256, currentSha256: h("e") }).code,
+    "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE", "the current bytes must be the ones the authority read");
 });
 
 test("R7-5g: rebind-approval --help and -h answer the question and run nothing; an argument is refused", () => {

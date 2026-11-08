@@ -18,6 +18,12 @@ import { readPrivateJson, writePrivateJsonAtomic } from "./private-boundary.mjs"
 
 export const PLAN_APPROVAL_DEVICE_REBIND_SCHEMA = "pipeline.plan-approval-device-rebind.v1";
 export const DEVICE_LOCAL_AUTHORITY_FIELDS = Object.freeze(["receiptSha256", "repositoryFingerprint"]);
+// G20-58: the PO profile source digest may be rebound too, but only by rebind-approval after it verified that the
+// approved and the current source bytes differ in nothing but the model routing. A receipt carries either exactly the
+// device-local fields or exactly these three; every reader accepts nothing else.
+export const PROFILE_SOURCE_REBIND_FIELD = "sourceSha256";
+export const PROFILE_SOURCE_REBIND_FIELDS = Object.freeze([...DEVICE_LOCAL_AUTHORITY_FIELDS, PROFILE_SOURCE_REBIND_FIELD]);
+const REBIND_FIELD_SETS = [DEVICE_LOCAL_AUTHORITY_FIELDS, PROFILE_SOURCE_REBIND_FIELDS];
 const RECEIPT_DIRECTORY = ["agent-pipeline", "rebind-approval"];
 const SHA256 = /^[a-f0-9]{64}$/u;
 const RECEIPT_KEYS = ["schema", "approvalSha256", "origin", "device", "envelopeSha256", "verifiedAt"];
@@ -25,17 +31,17 @@ const RECEIPT_KEYS = ["schema", "approvalSha256", "origin", "device", "envelopeS
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const sameKeys = (value, keys) => isObject(value)
   && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
-const deviceValues = (value) => Object.fromEntries(DEVICE_LOCAL_AUTHORITY_FIELDS.map((key) => [key, value?.[key]]));
-const validDeviceValues = (value) => sameKeys(value, DEVICE_LOCAL_AUTHORITY_FIELDS)
-  && DEVICE_LOCAL_AUTHORITY_FIELDS.every((key) => SHA256.test(value[key] ?? ""));
+const deviceValues = (value, fields = DEVICE_LOCAL_AUTHORITY_FIELDS) => Object.fromEntries(fields.map((key) => [key, value?.[key]]));
+const validDeviceValues = (value, fields = DEVICE_LOCAL_AUTHORITY_FIELDS) => sameKeys(value, fields)
+  && fields.every((key) => SHA256.test(value[key] ?? ""));
 
-/** True only when both values carry the same keys and differ in nothing but the device-local fields. */
-export function differsOnlyInDeviceFields(stored, current) {
+/** True only when both values carry the same keys and differ in nothing but the given rebindable fields. */
+export function differsOnlyInDeviceFields(stored, current, fields = DEVICE_LOCAL_AUTHORITY_FIELDS) {
   if (!isObject(stored) || !isObject(current)) return false;
   const keys = Object.keys(stored).sort();
   if (JSON.stringify(keys) !== JSON.stringify(Object.keys(current).sort())) return false;
-  if (!DEVICE_LOCAL_AUTHORITY_FIELDS.every((key) => keys.includes(key))) return false;
-  return keys.every((key) => DEVICE_LOCAL_AUTHORITY_FIELDS.includes(key)
+  if (!fields.every((key) => keys.includes(key))) return false;
+  return keys.every((key) => fields.includes(key)
     || JSON.stringify(stored[key]) === JSON.stringify(current[key]));
 }
 
@@ -48,13 +54,18 @@ export function planApprovalDeviceRebindPath(gitCommonDir, approvalSha256, devic
   return join(gitCommonDir, ...RECEIPT_DIRECTORY, `plan-approval-${approvalSha256}-${deviceFingerprint}.json`);
 }
 
-/** Build the receipt for the caller's verified facts; the caller decides when they are verified. */
-export function createPlanApprovalDeviceRebindReceipt({ planApproval, current, envelopeSha256, verifiedAt }) {
+/**
+ * Build the receipt for the caller's verified facts; the caller decides when they are verified.
+ * `profileSourceRebound` is set only by rebind-approval after its routing-only check of the profile source.
+ */
+export function createPlanApprovalDeviceRebindReceipt({ planApproval, current, envelopeSha256, verifiedAt, profileSourceRebound = false }) {
   const stored = planApproval?.poGateAuthority;
-  if (!differsOnlyInDeviceFields(stored, current) || !SHA256.test(envelopeSha256 ?? "")) return null;
-  const origin = deviceValues(stored), device = deviceValues(current);
-  if (!validDeviceValues(origin) || !validDeviceValues(device)) return null;
-  if (DEVICE_LOCAL_AUTHORITY_FIELDS.every((key) => origin[key] === device[key])) return null;
+  const fields = profileSourceRebound === true ? PROFILE_SOURCE_REBIND_FIELDS : DEVICE_LOCAL_AUTHORITY_FIELDS;
+  if (!differsOnlyInDeviceFields(stored, current, fields) || !SHA256.test(envelopeSha256 ?? "")) return null;
+  const origin = deviceValues(stored, fields), device = deviceValues(current, fields);
+  if (!validDeviceValues(origin, fields) || !validDeviceValues(device, fields)) return null;
+  if (fields.every((key) => origin[key] === device[key])) return null;
+  if (profileSourceRebound === true && origin[PROFILE_SOURCE_REBIND_FIELD] === device[PROFILE_SOURCE_REBIND_FIELD]) return null;
   return { schema: PLAN_APPROVAL_DEVICE_REBIND_SCHEMA, approvalSha256: sha256CanonicalJson(planApproval),
     origin, device, envelopeSha256, verifiedAt: String(verifiedAt) };
 }
@@ -73,17 +84,19 @@ export function writePlanApprovalDeviceRebindReceipt(gitCommonDir, receipt) {
 export function readPlanApprovalDeviceRebind({ gitCommonDir, planApproval, current }) {
   try {
     const stored = planApproval?.poGateAuthority;
-    if (!differsOnlyInDeviceFields(stored, current)) return null;
+    if (!differsOnlyInDeviceFields(stored, current, PROFILE_SOURCE_REBIND_FIELDS)) return null;
     const approvalSha256 = sha256CanonicalJson(planApproval);
-    const device = deviceValues(current);
-    if (!validDeviceValues(device)) return null;
-    const receipt = readPrivateJson(planApprovalDeviceRebindPath(gitCommonDir, approvalSha256, device.repositoryFingerprint),
+    if (!SHA256.test(current?.repositoryFingerprint ?? "")) return null;
+    const receipt = readPrivateJson(planApprovalDeviceRebindPath(gitCommonDir, approvalSha256, current.repositoryFingerprint),
       "plan approval device rebind receipt");
     if (!sameKeys(receipt, RECEIPT_KEYS) || receipt.schema !== PLAN_APPROVAL_DEVICE_REBIND_SCHEMA
-      || receipt.approvalSha256 !== approvalSha256 || !SHA256.test(receipt.envelopeSha256 ?? "")
-      || !validDeviceValues(receipt.origin) || !validDeviceValues(receipt.device)) return null;
-    const origin = deviceValues(stored);
-    if (DEVICE_LOCAL_AUTHORITY_FIELDS.some((key) => receipt.origin[key] !== origin[key] || receipt.device[key] !== device[key])) return null;
+      || receipt.approvalSha256 !== approvalSha256 || !SHA256.test(receipt.envelopeSha256 ?? "")) return null;
+    const fields = REBIND_FIELD_SETS.find((set) => sameKeys(receipt.origin, set));
+    if (!fields || !validDeviceValues(receipt.origin, fields) || !validDeviceValues(receipt.device, fields)) return null;
+    // A device-local-only receipt never covers a changed profile source: the field set decides what may differ.
+    if (!differsOnlyInDeviceFields(stored, current, fields)) return null;
+    const origin = deviceValues(stored, fields), device = deviceValues(current, fields);
+    if (fields.some((key) => receipt.origin[key] !== origin[key] || receipt.device[key] !== device[key])) return null;
     return { origin: receipt.origin, device: receipt.device, envelopeSha256: receipt.envelopeSha256 };
   } catch {
     return null;
