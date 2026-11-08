@@ -30,7 +30,7 @@ For `pipeline-governance-inactive`, ask the human once whether this project
 should use the Pipeline. That question lists in short what agreeing
 installs and activates, git hooks included: relay `consentQuestion` verbatim. Only after an affirmative answer, execute the exact
 read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
-subsequent consent and mutations. A decline leaves the project inactive.
+mutations; then run `consentRecordAction`. A decline leaves the project inactive.
 
 Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
 carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`
