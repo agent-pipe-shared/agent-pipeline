@@ -24,6 +24,15 @@ test("the guide tells when to call the architecture-decision skill: at design pr
   assert.ok(existsSync(join(PLUGIN, "skills", "architecture-decision", "SKILL.md")));
 });
 
+// G20-61 (Claude greenfield 2026-11-08 06:03 -> 06:59 UTC): the hand-back arrived before the host commit, the session reported
+// and ended its turn, and the completion notification a minute later produced no action until the PO asked.
+test("G20-61: the guide makes the Goldfish completion notification the cue to continue and forbids a status-report turn end", () => {
+  const guide = readFileSync(GUIDE, "utf8");
+  assert.match(guide, /hand-back message can arrive before that commit/u);
+  assert.match(guide, /act on that notification, read `git log -1` and dispatch the next ready slice in the same turn/u);
+  assert.match(guide, /never end a turn with a status report/u);
+});
+
 test("the guide keeps its honesty markers and holds no host path", () => {
   const guide = readFileSync(GUIDE, "utf8");
   assert.match(guide, /## Gaps this guide does not close/u);
