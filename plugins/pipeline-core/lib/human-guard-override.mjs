@@ -1543,6 +1543,17 @@ export function classifyNonLiftableGuardDenials(denials) {
     : null);
   const humanOnly = codes.includes("PO-DISCARD-HUMAN-ONLY");
   const diagnosticOnly = codes.every(code => code === "GUARD-READ-COMMAND-UNSUPPORTED" || code === "GUARD-READ-TARGET-MISSING");
+  // Antigravity greenfield 2026-11-08: GIT-03 says "no override for this rule" and an override block followed it. The message is the repair.
+  if (denials.every(denial => String(denial?.guard) === "guard-git.mjs" && String(denial?.reason ?? "").startsWith("BLOCKED (git-guard GIT-03, plugin pipeline-core):"))) {
+    return {
+      status: "non-liftable-recovery-required",
+      code: "GIT-03-MESSAGE-REFUSED",
+      cause: denials.map(denial => String(denial.reason)).join("\n"),
+      recoveryGuidance: [],
+      coDenialSummary: null,
+      nextAction: { kind: "repair-required", reason: "Rewrite the commit message as the refusal states and commit again. This refusal does not offer an override." },
+    };
+  }
   if (!humanOnly && !diagnosticOnly) return null;
   return {
     status: "non-liftable-recovery-required",

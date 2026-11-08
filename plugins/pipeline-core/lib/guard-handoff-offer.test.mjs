@@ -346,6 +346,20 @@ test("a dispatch the agent can correct itself gets a typed correction, never the
   }
 });
 
+test("a commit message refusal offers no override, and a mixed set keeps its existing route", () => {
+  const root = fixture();
+  try {
+    const git03 = { guard: "guard-git.mjs", reason: "BLOCKED (git-guard GIT-03, plugin pipeline-core): this commit message carries a session URL." };
+    const plan = (denials) => recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Read", toolInput: { file_path: CANARY }, denials, nowMs: NOW, appendCommandOffer: verifiedAppend([]) });
+    const refused = plan([git03]);
+    assert.deepEqual([refused.status, refused.code, refused.nextAction.kind], ["non-liftable-recovery-required", "GIT-03-MESSAGE-REFUSED", "repair-required"]);
+    assert.match(refused.nextAction.reason, /does not offer an override/u);
+    assert.notEqual(plan([git03, { guard: "guard-other.mjs", reason: "BLOCKED: refused." }]).code, "GIT-03-MESSAGE-REFUSED");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("the three non-external route statuses keep their exact current shape and journal nothing", () => {
   const root = fixture();
   try {

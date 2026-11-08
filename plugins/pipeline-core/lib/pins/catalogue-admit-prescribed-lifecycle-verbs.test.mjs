@@ -733,6 +733,25 @@ test("C20 w257 security-gate-configure: exactly `--root <this root>` is admitted
   });
 });
 
+test("C20j the three read-only diagnostics are admitted in their closed shapes, every near-miss is not", () => {
+  withFixture("feature", f => {
+    const capabilities = join(scriptsDir, "runner-capabilities.mjs");
+    const detector = join(scriptsDir, "check-private-identifiers.mjs");
+    const authority = join(scriptsDir, "check-po-gate-authority.mjs");
+    bothAdmit(scriptAction(capabilities), f, "capabilities bare");
+    bothAdmit(scriptAction(capabilities, "--runner", "antigravity"), f, "capabilities runner");
+    for (const script of [detector, authority]) {
+      bothAdmit(scriptAction(script), f, "bare");
+      bothAdmit(scriptAction(script, "--root", f.root), f, "exact root");
+      bothRefuse(scriptAction(script, "--root", join(f.root, "..")), f, "foreign root");
+      bothRefuse(scriptAction(script, "--root", f.root, "extra"), f, "extra positional");
+    }
+    bothRefuse(scriptAction(detector, "--patterns-file", "x.json"), f, "patterns file");
+    bothRefuse(scriptAction(capabilities, "--runner", "other"), f, "unknown runner");
+    bothRefuse(scriptAction(capabilities, "--write"), f, "unknown flag");
+  });
+});
+
 // ---- C20 w260 (G20-29): `durable-evidence.mjs`, the repair every AUDIT-* finding names, in its two closed shapes ----
 test("C20 w260 durable-evidence: exactly `sync|check --root <this root>` is admitted, every near-miss is not", () => {
   withFixture("feature", f => {

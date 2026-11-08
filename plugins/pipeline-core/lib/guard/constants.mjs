@@ -226,6 +226,10 @@ export const AGY_NATIVE_INTEGRATE_SCRIPT = fileURLToPath(new URL("../../scripts/
 export const SESSION_AUTHORITY_REPAIR_SCRIPT = fileURLToPath(new URL("../../scripts/session-authority-repair.mjs", import.meta.url));
 // C20 G20-30: the agent's bounded, read-only wait for the PO's signed proof file (admitted by an exact grammar in command-catalogue.mjs).
 export const PROOF_WAIT_SCRIPT = fileURLToPath(new URL("../../scripts/proof-wait.mjs", import.meta.url));
+// Greenfields 2026-11-08: three read-only diagnostics ran into the opaque-script lane and offered a signature (admitted by exact grammar in command-catalogue.mjs).
+export const RUNNER_CAPABILITIES_SCRIPT = fileURLToPath(new URL("../../scripts/runner-capabilities.mjs", import.meta.url));
+export const CHECK_PRIVATE_IDENTIFIERS_SCRIPT = fileURLToPath(new URL("../../scripts/check-private-identifiers.mjs", import.meta.url));
+export const CHECK_PO_GATE_AUTHORITY_SCRIPT = fileURLToPath(new URL("../../scripts/check-po-gate-authority.mjs", import.meta.url));
 
 export const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/design-course-session.mjs", import.meta.url));
 

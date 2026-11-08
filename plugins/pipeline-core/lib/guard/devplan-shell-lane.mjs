@@ -175,9 +175,13 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
         // G20-21: the scratch-script advice only fits a scratch script with extra words; for a Pipeline script it sent agents the wrong way.
         const absoluteNode = lane === "opaque-script-execution" && words !== null && words.length > 2
           && isNodeInterpreterWord(words[0]) && scratchScriptRelative(words[1], root) !== null;
-        const reason = absoluteNode && typeof result.reason === "string"
-          ? `${result.reason}\nUse the bare \`node\` (not an absolute path to it): \`node scratch/<name>.mjs\` is the admitted draft-phase scratch-script shape.`
+        // Codex greenfield 2026-11-08: the placeholder read like a real file and sent the agent looking for it.
+        const named = typeof result.reason === "string"
+          ? result.reason.replace("File: .pipeline-opaque-execution", "File: none (the command runs inline code or a script outside this project, which this gate cannot inspect)")
           : result.reason;
+        const reason = absoluteNode && typeof named === "string"
+          ? `${named}\nUse the bare \`node\` (not an absolute path to it): \`node scratch/<name>.mjs\` is the admitted draft-phase scratch-script shape.`
+          : named;
         return { ...result, ...(reason === undefined ? {} : { reason }), candidate, lane };
       }
       // D117 / BI: the first advisory is remembered, a later block still wins, and one command yields ONE advisory.
@@ -309,7 +313,7 @@ export function devPlanShellBlocked(hit, overrideGuidance) {
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
       + `${DEVPLAN_SHELL_DENIAL_CODE}: ${hit.reason}\n`
       + `Detected as a shell write to a dev-plan-gated path (lane: ${hit.lane}).\n`
-      + "Why: an implementing Goldfish MUST NOT write implementation before the plan is approved "
+      + "Why: implementation is written only once the approved design has entered the implementation phase "
       + "(roles/goldfish.md GF-04-adjacent discipline, enforced here as a technical gate). This "
       + "gate is authority-bearing (guardrails/global.md GL-09) -- so which write tool you reach "
       + "for cannot decide whether it applies.\n"

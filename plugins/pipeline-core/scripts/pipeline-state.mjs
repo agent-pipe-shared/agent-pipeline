@@ -12976,7 +12976,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       if(!aggregateArchitecture.ok || !aggregateModel.ok) {
         const recheckCode = aggregateArchitecture.code ?? aggregateModel.code ?? 'DDB-RECHECK';
         console.error(`Plan approval was committed, but aggregate design binding recheck is incomplete (${recheckCode}); no aggregate authority is inferred.`);
-        console.error(`This is NOT a successful approval yet: materialize-architecture and set-phase implementation will refuse until it is repaired. Repair: ${entryGateRepair(recheckCode) ?? `run check-po-gate-authority.mjs --root <root> for the cause of ${recheckCode}`}. Do not continue to set-phase before that.`);
+        console.error(`This is NOT a successful approval yet: materialize-architecture and set-phase implementation will refuse until it is repaired. Repair: ${entryGateRepair(recheckCode) ?? `run node <plugin-root>/scripts/check-po-gate-authority.mjs --root <root> for the cause of ${recheckCode}`}. Do not continue to set-phase before that.`);
       } else if(aggregateModel.required) {
         const modelDecision=readApprovedDesignDecisionBindingsHandle(aggregateModel.handle);
         if(!modelDecision.ok) console.error(`Plan approval was committed, but model-policy recheck failed (${modelDecision.code}); model authority is unavailable.`);
