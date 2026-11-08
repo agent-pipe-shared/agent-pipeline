@@ -124,6 +124,25 @@ function requireModuleChecks(design, root) {
     + "own only docs/ paths or files ending in .md, .mdx, .txt, .rst or .adoc so it is documentation-only (its check is then document:<owned path>)", first.id);
 }
 
+/** Every reason one module row is refused, each with its repair, so a single refusal names every open point at once (live greenfield: the bare code sent the agent into the plugin's code). */
+function moduleProblems(module, seenIds) {
+  const { errors } = validateAgainstSchema(module, moduleSchema);
+  if (errors.length > 0) return errors.map(error => error.slice(0, 200));
+  const problems = [];
+  if (module.provisional) problems.push("remove provisional, a design module is final");
+  if (module.candidateBinding) problems.push("remove candidateBinding, the approval binds the design");
+  if (!/^[a-z][a-z0-9-]*$/u.test(module.id)) problems.push("id must be lowercase letters, digits and hyphens, starting with a letter");
+  if (module.id === "index") problems.push("the id index is reserved for the map index, choose another");
+  if (seenIds.has(module.id)) problems.push("this id is used by an earlier module, ids must be unique");
+  if (!module.responsibility.trim()) problems.push("responsibility is empty, state what the module is responsible for");
+  if (module.ownedPaths.length === 0) problems.push("ownedPaths is empty, name at least one path the module owns");
+  if (module.publicContracts.length === 0) problems.push("publicContracts is empty, name at least one contract file");
+  if (module.verificationEntryPoints.length === 0 && module.kind !== "documentation") {
+    problems.push("verificationEntryPoints is empty, name at least one test file, or set kind to documentation when the module owns only documents");
+  }
+  return problems;
+}
+
 /** The entire closed package is visible within the PRD and bound by its existing approval. */
 export function parseArchitectureDesign(prd) {
   const blocks = [...prd.matchAll(/^```pipeline-architecture-design\r?\n([\s\S]*?)^```\s*$/gmu)];
@@ -150,14 +169,16 @@ export function parseArchitectureDesign(prd) {
   ));
   requireValue(Array.isArray(input.modules) && input.modules.length > 0, "ARCHITECTURE-DESIGN-MODULES-REQUIRED");
   const ids = new Set();
+  const moduleFailures = input.modules.flatMap((module, index) => {
+    const problems = moduleProblems(module, ids);
+    if (typeof module?.id === "string") ids.add(module.id);
+    return problems.length > 0 ? [{ index, id: module?.id, problems }] : [];
+  });
+  if (moduleFailures.length > 0) {
+    const named = moduleFailures.map(failure => `modules[${failure.index}]${typeof failure.id === "string" ? ` (${failure.id.slice(0, 48)})` : ""}: ${failure.problems.join("; ")}`);
+    rejectField("ARCHITECTURE-DESIGN-MODULE-INVALID", `modules[${moduleFailures[0].index}]`, named.join(" | ").slice(0, 2400), moduleFailures[0].id);
+  }
   for (const [index, module] of input.modules.entries()) {
-    requireValue(validateAgainstSchema(module, moduleSchema).valid && !module.provisional && !module.candidateBinding
-      && /^[a-z][a-z0-9-]*$/u.test(module.id)
-      && module.id !== "index" && !ids.has(module.id) && module.responsibility.trim()
-      && module.ownedPaths.length > 0 && module.publicContracts.length > 0
-      && (module.verificationEntryPoints.length > 0 || module.kind === "documentation"),
-    "ARCHITECTURE-DESIGN-MODULE-INVALID");
-    ids.add(module.id);
     module.ownedPaths.forEach((path, pathIndex) => requireField(
       typeof path === "string" && bounded(path.replace(/\/\*\*?$/u, "")),
       "ARCHITECTURE-DESIGN-PATH-INVALID", `modules[${index}].ownedPaths[${pathIndex}]`,

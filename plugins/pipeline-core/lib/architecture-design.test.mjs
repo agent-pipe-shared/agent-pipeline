@@ -456,6 +456,19 @@ test("W7 documentation module: without the declaration an empty entry point list
   const odd = docDesign(); odd.modules[0].kind = "other";
   assert.throws(() => parseArchitectureDesign(prd(odd)), error => error.message === "ARCHITECTURE-DESIGN-MODULE-INVALID");
 });
+test("live greenfield: one refusal names every invalid module and every reason, each with its repair", () => {
+  const input = docDesign(); delete input.modules[0].kind;
+  input.modules.push({ ...input.modules[0], id: "Bad_Id", responsibility: "  ", kind: "documentation" });
+  input.modules.push({ ...input.modules[0], id: input.modules[0].id, verificationEntryPoints: ["tests/a.test.mjs"] });
+  assert.throws(() => parseArchitectureDesign(prd(input)), error => {
+    assert.equal(error.message, "ARCHITECTURE-DESIGN-MODULE-INVALID");
+    assert.equal(error.field, "modules[0]");
+    assert.match(error.expected, /modules\[0\] \([^)]*\): verificationEntryPoints is empty, name at least one test file/u);
+    assert.match(error.expected, /modules\[1\] \(Bad_Id\): id must be lowercase[^|]*responsibility is empty/u);
+    assert.match(error.expected, /modules\[2\] \([^)]*\): this id is used by an earlier module/u);
+    return true;
+  });
+});
 test("W7 documentation module: kind absent leaves the derived rows byte-identical, and an explicit row must match kind", () => {
   const input = design(); delete input.fitnessModel.modules;
   const rows = parseArchitectureDesign(prd(input)).fitnessModel.modules;
