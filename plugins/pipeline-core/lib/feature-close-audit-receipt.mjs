@@ -43,6 +43,7 @@ export function validateFeatureCloseAuditReceipt({ repositoryRoot, lifecycleId, 
     const manifest = JSON.parse(bytes);
     if (!Array.isArray(manifest.artifacts)) throw new Error("FCA-BUNDLE-INVALID");
     for (const item of manifest.artifacts) physicalAuditPath(root, `${plan.outputPath}/${item.path}`);
+    for (const item of manifest.proofs ?? []) physicalAuditPath(root, `${plan.outputPath}/${item.path}`);
     physicalAuditPath(root, `${plan.outputPath}/README.md`);
     const artifacts = plan.bundlePlan.artifacts.map(a => ({ path: a.bundlePath, sourcePath: a.sourcePath, sha256: a.sha256 }));
     if (!manifest.readmeSha256 || manifest.bundleId !== plan.featureId || !same(manifest.candidate, plan.candidate) || manifest.effectivePolicySha256 !== plan.bundlePlan.effectivePolicySha256 || !same(manifest.artifacts, artifacts) || verifyAuditBundleSync({ bundleRoot: target }).status !== "verified") throw new Error("FCA-BUNDLE-INVALID");

@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
 import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs";
 import { executeFeatureCloseAudit } from "../lib/feature-close-audit-executor.mjs";
+import { collectAuditProofs } from "../lib/audit-proof-collection.mjs";
 import { CORE_BASELINE_PACK_ID, resolveNamedOrganizationPolicyPack } from "../lib/organization-policy.mjs";
 import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
 import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
@@ -747,6 +748,9 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
         packs: request.value.packs,
         ...(request.value.evidence !== undefined ? { evidence: request.value.evidence } : {}),
       };
+      // P3: the signed approval proofs that authorized this candidate travel in the bundle's proofs/ directory (public proof objects only).
+      const collectedProofs = collectAuditProofs({ common, candidate: options.candidate, state: snapshot.state });
+      if (collectedProofs.proofs.length > 0) options.proofs = collectedProofs.proofs;
       const auditPlan = await planFeatureCloseAudit(options);
       if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
       if (auditPlan.result.sha256 !== observed.authority.implementationResultSha256) fail("CLOSE-AUDIT-RESULT", "audit Result differs from active feature authority");

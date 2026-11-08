@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign as cryptoSign } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -209,6 +209,37 @@ test("Q3 verification rejects a carried trace that is bound to another commit th
   const forged = Buffer.from(`${JSON.stringify({ schema: "pipeline.human-approval-trace.v1", candidate: { commit: "e".repeat(40), tree: "f".repeat(40) }, status: "traced", rows: [] })}\n`); writeFileSync(join(bundle, tracePath), forged);
   manifest.artifacts = manifest.artifacts.map((entry) => entry.path === tracePath ? { ...entry, sha256: hash(forged) } : entry); writeFileSync(join(bundle, "manifest.json"), `${JSON.stringify(manifest)}\n`);
   assert.ok((await verifyAuditBundle({ bundleRoot: bundle })).findings.includes("AB-EVIDENCE-TRACE-CANDIDATE"));
+});
+// P3 (C20D-P3-ONE-SHOT-CLOSE, AC-108): the signed approval proof envelopes live in the private store, outside the repository; the audit bundle copies
+// the PUBLIC proof objects (never a key) into proofs/ with their digests in the manifest, and the offline verifier checks bytes, intent and signature.
+function signedProof(intentSha256 = "d".repeat(64)) {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  return { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: "po-key-1", publicKey: publicKey.export({ type: "spki", format: "pem" }), signatureBase64: cryptoSign(null, Buffer.from(intentSha256, "utf8"), privateKey).toString("base64") };
+}
+test("P3 the bundle carries every signed proof envelope in proofs/ with matching digests, verifies offline, and a bundle without proofs keeps its old shape", async () => {
+  const input = fixture(); const plan0 = planWith(input, { candidate: CANDIDATE }); assert.equal(Object.hasOwn(plan0, "proofs"), false);
+  const plan = planWith(input, { candidate: CANDIDATE, proofs: [{ kind: "plan-approval", proof: signedProof("1".repeat(64)) }, { kind: "push", proof: signedProof("2".repeat(64)) }] });
+  assert.deepEqual(plan.proofs.map((entry) => entry.bundlePath), ["proofs/001-plan-approval.json", "proofs/002-push.json"]);
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }); const bundle = join(input.root, "bundle"); const manifest = JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8"));
+  assert.deepEqual(manifest.proofs.map((entry) => `${entry.kind}:${entry.path}:${entry.intentSha256}`), [`plan-approval:proofs/001-plan-approval.json:${"1".repeat(64)}`, `push:proofs/002-push.json:${"2".repeat(64)}`]);
+  for (const entry of manifest.proofs) { const bytes = readFileSync(join(bundle, entry.path)); assert.equal(hash(bytes), entry.sha256); assert.doesNotMatch(bytes.toString("utf8"), /PRIVATE KEY/u); }
+  assert.match(readFileSync(join(bundle, "README.md"), "utf8"), /proofs\/001-plan-approval\.json/u);
+  assert.equal((await verifyAuditBundle({ bundleRoot: bundle })).status, "verified");
+  const plain = join(input.root, "plain"); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "plain", plan: plan0 }); assert.equal(Object.hasOwn(JSON.parse(readFileSync(join(plain, "manifest.json"), "utf8")), "proofs"), false);
+});
+test("P3 the verifier refuses a tampered proof at every level: bytes, the intent it names and the signature", async () => {
+  const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, proofs: [{ kind: "plan-approval", proof: signedProof() }] }); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  const bundle = join(input.root, "bundle"); const manifestPath = join(bundle, "manifest.json"); const original = readFileSync(manifestPath); const proofPath = join(bundle, "proofs", "001-plan-approval.json"); const proofBytes = readFileSync(proofPath);
+  writeFileSync(proofPath, `${proofBytes.toString("utf8")} `); assert.ok((await verifyAuditBundle({ bundleRoot: bundle })).findings.some((finding) => finding.startsWith("AB-DIGEST proofs/")));
+  // the manifest and the proof rewritten together keep every digest consistent: the signature check is what refuses
+  const rewrite = (mutate) => { const proof = mutate(JSON.parse(proofBytes.toString("utf8"))); const bytes = Buffer.from(`${JSON.stringify(proof)}\n`); writeFileSync(proofPath, bytes); const manifest = JSON.parse(original.toString("utf8")); manifest.proofs[0].sha256 = hash(bytes); writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`); };
+  rewrite((proof) => ({ ...proof, signatureBase64: Buffer.alloc(64, 7).toString("base64") })); assert.ok((await verifyAuditBundle({ bundleRoot: bundle })).findings.includes("AB-PROOF-SIGNATURE proofs/001-plan-approval.json"));
+  rewrite((proof) => ({ ...proof, intentSha256: "e".repeat(64) })); assert.ok((await verifyAuditBundle({ bundleRoot: bundle })).findings.includes("AB-PROOF-INTENT proofs/001-plan-approval.json"));
+});
+test("P3 planning refuses a proof that does not verify, or one that carries anything beyond the public proof fields", () => {
+  const input = fixture(); const good = signedProof();
+  assert.throws(() => planWith(input, { candidate: CANDIDATE, proofs: [{ kind: "push", proof: { ...good, signatureBase64: Buffer.alloc(64, 1).toString("base64") } }] }), (error) => error.code === "AB-PROOF-INVALID");
+  assert.throws(() => planWith(input, { candidate: CANDIDATE, proofs: [{ kind: "push", proof: { ...good, privateKey: "-----BEGIN PRIVATE KEY-----" } }] }), (error) => error.code === "AB-PROOF-INVALID");
 });
 // E-AC-20: export metadata is never source authority -- a bundle whose export metadata is
 // internally inconsistent with the rest of the bundle (arbitrary digest, unrelated receipt values)

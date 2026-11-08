@@ -50,11 +50,12 @@ export async function executeFeatureCloseAudit({ options, lifecycleId, expectedP
     const current = await planFeatureCloseAudit(options);
     if (current.status !== "reuse-verified" || current.planSha256 !== expectedPlanSha256) return blocked("FCA-POSTBUILD-DRIFT", "Bundle remains local; source or candidate drifted and the feature remains unclosed.");
     // A durable receipt must not precede persistence of the bytes it references.
-    for (const file of ["manifest.json", "README.md", ...plan.bundlePlan.artifacts.map(a => a.bundlePath)]) {
+    for (const file of ["manifest.json", "README.md", ...plan.bundlePlan.artifacts.map(a => a.bundlePath), ...(plan.bundlePlan.proofs ?? []).map(p => p.bundlePath)]) {
       syncAuditBundleFile(physicalAuditPath(root, `${plan.outputPath}/${file}`));
     }
     const bundleRoot = physicalAuditPath(root, plan.outputPath);
     syncPublicationCloseDirectory(join(bundleRoot, "artifacts"));
+    if (plan.bundlePlan.proofs !== undefined) syncPublicationCloseDirectory(join(bundleRoot, "proofs"));
     syncPublicationCloseDirectory(bundleRoot);
     syncPublicationCloseDirectory(dirname(bundleRoot));
     const receipt = makeFeatureCloseAuditReceipt(plan, lifecycleId, auditHash(readFileSync(physicalAuditPath(root, `${plan.outputPath}/manifest.json`))));

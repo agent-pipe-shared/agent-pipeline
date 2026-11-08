@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Candidate-bound, offline-verifiable audit bundle service. */
-import { createHash } from "node:crypto";
+import { createHash, verify as cryptoVerify } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { copyFile, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -34,7 +34,7 @@ This directory is a candidate-bound audit bundle. It contains the copied artifac
 ## Artifacts
 
 ${artifactLines}
-${evidenceSection(manifest)}
+${evidenceSection(manifest)}${proofsSection(manifest)}
 ## Offline verification
 
 Prerequisites: Node.js and a copy of the repository containing \`plugins/pipeline-core/scripts/audit-bundle.mjs\`; no network, provider, key, or deployment access is required.
@@ -73,7 +73,47 @@ function sanitizeExportEvidence(exportEvidence) {
 }
 // Q3: the optional top-level keys a plan or manifest may carry, each validated when present. The absent case keeps the
 // exact key list it always had, so old bundles and plans stay byte-identical and verifiable.
-const OPTIONAL_KEYS = ["exportMetadata", "evidence"];
+const OPTIONAL_KEYS = ["exportMetadata", "evidence", "proofs"];
+// P3 (C20D-P3-ONE-SHOT-CLOSE): the signed approval proof envelopes that authorized the feature live in the private approval store, outside the
+// repository. The bundle copies the PUBLIC proof objects (schema, signed digest, key reference, public key, signature; never a private key) into
+// proofs/ and binds each by file digest and by the signed intent digest; the offline verifier re-checks the bytes, the intent and the Ed25519 signature.
+const PROOF_FIELDS = ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"]; const PROOF_KIND = /^[a-z-]{1,40}$/u; const PROOF_PATH = /^proofs\/[0-9]{3}-[a-z-]{1,40}\.json$/u;
+function proofSignatureHolds(proof) {
+  try { return cryptoVerify(null, Buffer.from(proof.intentSha256, "utf8"), proof.publicKey, Buffer.from(proof.signatureBase64, "base64")) === true; } catch { return false; }
+}
+function proofObjectValid(proof) {
+  return exact(proof, PROOF_FIELDS) && proof.schema === PROOF_SCHEMA && SHA.test(proof.intentSha256) && typeof proof.keyReference === "string" && proof.keyReference.length > 0 && proof.keyReference.length <= 128
+    && typeof proof.publicKey === "string" && proof.publicKey.includes("PUBLIC KEY") && !/PRIVATE KEY/u.test(JSON.stringify(proof)) && typeof proof.signatureBase64 === "string" && /^[A-Za-z0-9+/=]{16,4096}$/u.test(proof.signatureBase64) && proofSignatureHolds(proof);
+}
+/** True when `proof` is a public proof object whose Ed25519 signature verifies over its own signed intent digest (what the bundle can carry). */
+export function isCarriableProof(proof) { return proofObjectValid(proof); }
+const proofBytes = (proof) => Buffer.from(`${canonicalizeJson(proof)}\n`, "utf8");
+function planProofs(proofs) {
+  if (!Array.isArray(proofs) || proofs.length === 0 || proofs.length > 16) fail("AB-PROOF-INVALID", "Proofs must be one to sixteen { kind, proof } entries.");
+  return proofs.map((entry, index) => {
+    if (!exact(entry, ["kind", "proof"]) || !PROOF_KIND.test(entry.kind) || !proofObjectValid(entry.proof)) fail("AB-PROOF-INVALID", "A signed proof envelope is not a verifiable public proof object.");
+    return Object.freeze({ kind: entry.kind, bundlePath: `proofs/${String(index + 1).padStart(3, "0")}-${entry.kind}.json`, sha256: digest(proofBytes(entry.proof)), intentSha256: entry.proof.intentSha256, proof: Object.freeze({ ...entry.proof }) });
+  });
+}
+function proofsPlanShape(proofs) { return Array.isArray(proofs) && proofs.length > 0 && proofs.length <= 16 && proofs.every((entry) => exact(entry, ["kind", "bundlePath", "sha256", "intentSha256", "proof"]) && PROOF_KIND.test(entry.kind) && PROOF_PATH.test(entry.bundlePath) && SHA.test(entry.sha256) && proofObjectValid(entry.proof) && entry.proof.intentSha256 === entry.intentSha256 && digest(proofBytes(entry.proof)) === entry.sha256); }
+const proofsManifest = (proofs) => proofs.map((entry) => ({ kind: entry.kind, path: entry.bundlePath, sha256: entry.sha256, intentSha256: entry.intentSha256 }));
+function proofsManifestShape(proofs) { return Array.isArray(proofs) && proofs.length > 0 && proofs.length <= 16 && proofs.every((entry) => exact(entry, ["kind", "path", "sha256", "intentSha256"]) && PROOF_KIND.test(entry.kind) && PROOF_PATH.test(entry.path) && SHA.test(entry.sha256) && SHA.test(entry.intentSha256)); }
+function proofsSection(manifest) {
+  if (!Object.hasOwn(manifest, "proofs")) return "";
+  return `\n## Signed approval proofs\n\nThe detached, public proof objects of the human approvals that authorized this candidate (no private key is ever copied). Each is bound by file digest and by the signed intent digest, and the offline verification re-checks both and the Ed25519 signature:\n\n${manifest.proofs.map((entry) => `- ${entry.kind}: \`${entry.path}\` (SHA-256: \`${entry.sha256}\`, signed intent: \`${entry.intentSha256}\`)`).join("\n")}\n`;
+}
+function proofFindings(root, manifest) {
+  const findings = [];
+  for (const entry of manifest.proofs) {
+    let bytes; try { bytes = readFileSync(join(root, entry.path)); } catch { findings.push(`AB-MISSING ${entry.path}`); continue; }
+    if (digest(bytes) !== entry.sha256) { findings.push(`AB-DIGEST ${entry.path}`); continue; }
+    const proof = jsonOrNull(bytes);
+    if (!exact(proof, PROOF_FIELDS) || proof.schema !== PROOF_SCHEMA || !SHA.test(proof.intentSha256 ?? "")) { findings.push(`AB-PROOF-INVALID ${entry.path}`); continue; }
+    if (proof.intentSha256 !== entry.intentSha256) findings.push(`AB-PROOF-INTENT ${entry.path}`);
+    if (!proofSignatureHolds(proof)) findings.push(`AB-PROOF-SIGNATURE ${entry.path}`);
+  }
+  return findings;
+}
 function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
 const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan"]);
 const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan" });
@@ -87,7 +127,7 @@ function evidenceShape(value) {
       && (entry.bundlePath === null || /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath)) && (entry.status === "gap" ? entry.code !== null && entry.bundlePath === null : entry.bundlePath !== null));
 }
 function planShape(plan) { return exact(plan, ["schema", "status", "bundleId", "candidate", "effectivePolicy", "effectivePolicySha256", "artifacts", ...optionalKeys(plan)])
-  && plan.schema === "pipeline.audit-bundle-plan.v1" && plan.status === "preview" && BUNDLE_ID.test(plan.bundleId) && exact(plan.candidate, ["commit", "tree"]) && OID.test(plan.candidate.commit) && OID.test(plan.candidate.tree) && SHA.test(plan.effectivePolicySha256) && canonicalSha256(plan.effectivePolicy) === plan.effectivePolicySha256 && Array.isArray(plan.artifacts) && plan.artifacts.length > 0 && plan.artifacts.every((entry) => exact(entry, ["sourcePath", "bundlePath", "sha256"]) && typeof entry.sourcePath === "string" && /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath) && SHA.test(entry.sha256)) && (!hasExportMetadata(plan) || exportMetadataShape(plan.exportMetadata)) && (!Object.hasOwn(plan, "evidence") || evidenceShape(plan.evidence)); }
+  && plan.schema === "pipeline.audit-bundle-plan.v1" && plan.status === "preview" && BUNDLE_ID.test(plan.bundleId) && exact(plan.candidate, ["commit", "tree"]) && OID.test(plan.candidate.commit) && OID.test(plan.candidate.tree) && SHA.test(plan.effectivePolicySha256) && canonicalSha256(plan.effectivePolicy) === plan.effectivePolicySha256 && Array.isArray(plan.artifacts) && plan.artifacts.length > 0 && plan.artifacts.every((entry) => exact(entry, ["sourcePath", "bundlePath", "sha256"]) && typeof entry.sourcePath === "string" && /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath) && SHA.test(entry.sha256)) && (!hasExportMetadata(plan) || exportMetadataShape(plan.exportMetadata)) && (!Object.hasOwn(plan, "evidence") || evidenceShape(plan.evidence)) && (!Object.hasOwn(plan, "proofs") || proofsPlanShape(plan.proofs)); }
 
 function readEvidenceFile(root, path) {
   let source; try { source = rootPath(root, path, "AB-EVIDENCE-PATH"); } catch { return null; }
@@ -152,7 +192,7 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
  * candidate exactly, so a bundle is never labelled with the parent of the commit it was asked to audit (Q3).
  * `evidence` (optional) carries the approval trace, detached proofs, release Verify record and security scan; see `collectEvidence`.
  */
-export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVersion, packs, exportEvidence, candidate, evidence } = {}) {
+export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVersion, packs, exportEvidence, candidate, evidence, proofs } = {}) {
   const root = resolve(repositoryRoot ?? ""); if (!BUNDLE_ID.test(bundleId ?? "")) fail("AB-BUNDLE-ID");
   const packageCheck = validateFeaturePackage(root, manifestPath); if (!packageCheck.ok || !packageCheck.receipt?.candidate) fail("AB-PACKAGE");
   if (candidate !== undefined && !(exact(candidate, ["commit", "tree"]) && OID.test(candidate.commit) && OID.test(candidate.tree) && candidate.commit === packageCheck.receipt.candidate.commit && candidate.tree === packageCheck.receipt.candidate.tree)) fail("AB-CANDIDATE-MISMATCH", "The audited candidate is not the feature package candidate.");
@@ -162,7 +202,8 @@ export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVe
   const exportMetadata = sanitizeExportEvidence(exportEvidence);
   const carried = evidence === undefined ? null : collectEvidence(root, packageCheck.receipt.candidate, evidence, artifacts.length);
   if (carried !== null) artifacts.push(...carried.artifacts);
-  return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}), ...(carried !== null ? { evidence: carried.evidence } : {}) });
+  const carriedProofs = proofs === undefined ? undefined : Object.freeze(planProofs(proofs));
+  return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}), ...(carried !== null ? { evidence: carried.evidence } : {}), ...(carriedProofs !== undefined ? { proofs: carriedProofs } : {}) });
 }
 
 export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}) {
@@ -170,7 +211,8 @@ export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}
   try { await lstat(output); fail("AB-OUTPUT-EXISTS"); } catch (error) { if (error?.code !== "ENOENT") throw error; }
   await mkdir(output, { recursive: false }); await mkdir(join(output, "artifacts"));
   for (const artifact of plan.artifacts) { const source = rootPath(root, artifact.sourcePath, "AB-SOURCE"); const bytes = await readFile(source); if (digest(bytes) !== artifact.sha256) fail("AB-SOURCE-DIGEST"); await copyFile(source, join(output, artifact.bundlePath)); }
-  const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}), ...(Object.hasOwn(plan, "evidence") ? { evidence: plan.evidence } : {}) };
+  const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}), ...(Object.hasOwn(plan, "evidence") ? { evidence: plan.evidence } : {}), ...(Object.hasOwn(plan, "proofs") ? { proofs: proofsManifest(plan.proofs) } : {}) };
+  if (Object.hasOwn(plan, "proofs")) { await mkdir(join(output, "proofs")); for (const entry of plan.proofs) await writeFile(join(output, entry.bundlePath), proofBytes(entry.proof), { flag: "wx", mode: 0o644 }); }
   const readmeBytes = Buffer.from(auditorReadme(baseManifest), "utf8");
   const manifest = { ...baseManifest, readmeSha256: digest(readmeBytes) };
   const bytes = `${canonicalizeJson(manifest)}\n`; await writeFile(join(output, "manifest.json"), bytes, { encoding: "utf8", flag: "wx", mode: 0o644 }); await writeFile(join(output, "README.md"), readmeBytes, { flag: "wx", mode: 0o644 });
@@ -185,6 +227,7 @@ export function verifyAuditBundleSync({ bundleRoot } = {}) {
   if (hasReadme) { try { if (digest(readFileSync(join(root, "README.md"))) !== manifest.readmeSha256) findings.push("AB-README-DIGEST"); } catch { findings.push("AB-README"); } }
   for (const artifact of manifest.artifacts ?? []) { if (!exact(artifact, ["path", "sourcePath", "sha256"]) || typeof artifact.sourcePath !== "string" || !/^artifacts\/[0-9]{3}-[a-z-]+$/u.test(artifact.path) || !SHA.test(artifact.sha256)) { findings.push("AB-ARTIFACT"); continue; } try { if (digest(readFileSync(join(root, artifact.path))) !== artifact.sha256) findings.push(`AB-DIGEST ${artifact.path}`); } catch { findings.push(`AB-MISSING ${artifact.path}`); } }
   if (hasEvidence && evidenceShape(manifest.evidence)) findings.push(...evidenceFindings(root, manifest));
+  if (Object.hasOwn(manifest, "proofs")) { if (proofsManifestShape(manifest.proofs)) findings.push(...proofFindings(root, manifest)); else findings.push("AB-PROOFS"); }
   return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: findings.length ? "invalid" : "verified", candidate: manifest.candidate ?? null, findings: Object.freeze(findings) });
 }
 function manifestKeys(manifest, hasReadme) { return ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", ...optionalKeys(manifest), ...(hasReadme ? ["readmeSha256"] : [])]; }

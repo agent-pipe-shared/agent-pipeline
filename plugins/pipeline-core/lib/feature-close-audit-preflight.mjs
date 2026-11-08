@@ -27,7 +27,7 @@ function blocked(code, remedy) { return { schema: "pipeline.feature-close-audit-
 
 // Q3: `evidence` (optional) names the approval trace report, detached proofs, release Verify record and security scan the
 // bundle carries (see lib/audit-bundle.mjs); the bundle is always bound to the exact `candidate` asked for.
-export async function planFeatureCloseAudit({ repositoryRoot, featureId, candidate, manifestPath, coreVersion, packs, outputPath, evidence } = {}) {
+export async function planFeatureCloseAudit({ repositoryRoot, featureId, candidate, manifestPath, coreVersion, packs, outputPath, evidence, proofs } = {}) {
   if (!ID.test(featureId ?? "")) return blocked("FCA-FEATURE-ID", "Supply the exact active feature ID as one safe path component.");
   if (!candidate || Object.keys(candidate).sort().join() !== "commit,tree" || !OID.test(candidate.commit ?? "") || !OID.test(candidate.tree ?? "") || candidate.commit === candidate.tree || /^0+$/u.test(candidate.commit) || /^0+$/u.test(candidate.tree)) return blocked("FCA-CANDIDATE", "Resolve the qualified source candidate commit and tree before planning its snapshot.");
   if (!Array.isArray(packs) || packs.length === 0) return blocked("FCA-POLICY-REQUIRED", "Resolve the applicable organization policy packs and core version through the existing policy workflow; do not invent a policy to complete closure. The shipped core baseline pack can be named by id in the audit request: \"packs\":[\"pipeline-core-baseline\"] (docs/organization-policy-packs.md).");
@@ -70,7 +70,7 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
       return blocked("FCA-QUALIFICATION", `Produce passing candidate-bound Verify evidence (--mode candidate, full) and bind it into the package. Diagnostic or stale evidence is not qualification. Examined: ${seen}.`);
     }
     let bundlePlan;
-    try { bundlePlan = planAuditBundle({ repositoryRoot: root, manifestPath, bundleId: featureId, coreVersion, packs, candidate, ...(evidence !== undefined ? { evidence } : {}) }); }
+    try { bundlePlan = planAuditBundle({ repositoryRoot: root, manifestPath, bundleId: featureId, coreVersion, packs, candidate, ...(evidence !== undefined ? { evidence } : {}), ...(proofs !== undefined ? { proofs } : {}) }); }
     catch (error) { return blocked(error.code ?? "FCA-POLICY-INVALID", "Validate the package and applicable organization policy using their existing preparation workflows."); }
     const destination = outputPath ?? `audit-bundles/${featureId}/${candidate.commit}`;
     const target = safePath(root, destination);
@@ -88,7 +88,7 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
       safePath(root, `${destination}/README.md`);
       const verification = await verifyAuditBundle({ bundleRoot: target });
       const expectedArtifacts = bundlePlan.artifacts.map(a => ({ path: a.bundlePath, sourcePath: a.sourcePath, sha256: a.sha256 }));
-      if (verification.status !== "verified" || !prior.readmeSha256 || prior.bundleId !== featureId || !same(prior.candidate, candidate) || prior.effectivePolicySha256 !== bundlePlan.effectivePolicySha256 || !same(prior.artifacts, expectedArtifacts) || !same(prior.evidence ?? null, bundlePlan.evidence ?? null)) return blocked("FCA-OUTPUT-COLLISION", "Existing snapshot is incomplete, changed or differently bound. Preserve it; inspect and use a distinct explicit output if recovery requires it.");
+      if (verification.status !== "verified" || !prior.readmeSha256 || prior.bundleId !== featureId || !same(prior.candidate, candidate) || prior.effectivePolicySha256 !== bundlePlan.effectivePolicySha256 || !same(prior.artifacts, expectedArtifacts) || !same(prior.evidence ?? null, bundlePlan.evidence ?? null) || !same(prior.proofs ?? null, bundlePlan.proofs?.map(p => ({ kind: p.kind, path: p.bundlePath, sha256: p.sha256, intentSha256: p.intentSha256 })) ?? null)) return blocked("FCA-OUTPUT-COLLISION", "Existing snapshot is incomplete, changed or differently bound. Preserve it; inspect and use a distinct explicit output if recovery requires it.");
       status = "reuse-verified";
       existingManifestSha256 = hash(bytes);
     }
