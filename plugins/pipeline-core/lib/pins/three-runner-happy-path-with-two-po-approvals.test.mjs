@@ -35,7 +35,7 @@ import { readState, run } from "../../scripts/pipeline-state.mjs";
 import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../critical-action-approval-request.mjs";
-import { awaitSignatureFields } from "../signed-proof-wait.mjs";
+import { awaitSignatureFields, commandText } from "../signed-proof-wait.mjs";
 import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
 import { createGovernanceScopeController } from "../governance-scope.mjs";
 import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
@@ -852,11 +852,14 @@ test("G20-76: --subject is a closed flag; a malformed or repeated value is PROOF
 test("G20-76: awaitSignatureFields adds --subject after --timeout only when it is given, and says the wait ends only for that subject", () => {
   const subject = g2076Subject("refs/heads/new");
   const plain = awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json" });
-  assert.deepEqual(plain.waitAction.argv.slice(1), ["--root", "/p", "--proof", "scratch/critical-push-proof-0123456789ab.json", "--timeout", "120"], "no subject: the argv is unchanged");
+  assert.deepEqual(plain.waitAction.argv.slice(1), ["--root", "/p", "--proof", "scratch/critical-push-proof-0123456789ab.json", "--timeout", "570"], "no subject: the argv is unchanged");
   assert.doesNotMatch(plain.afterSigning, /subject/iu);
+  assert.match(plain.afterSigning, /PROOF-WAIT-TIMEOUT only means[\s\S]*never that it happens automatically/u);
+  assert.equal(commandText({ executable: "C:\\Program Files\\nodejs\\node.exe", argv: ["x.mjs"] }, "win32").startsWith("& \""), true, "PowerShell needs the call operator before a quoted executable");
+  assert.equal(commandText({ executable: "node", argv: ["x.mjs"] }, "win32"), "node x.mjs");
   const bound = awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json", subjectSha256: subject });
   assert.deepEqual(bound.waitAction.argv.slice(1, 5), ["--root", "/p", "--proof", "scratch/critical-push-proof-0123456789ab.json"], "the first four argv entries keep their place");
-  assert.deepEqual(bound.waitAction.argv.slice(5), ["--timeout", "120", "--subject", subject]);
+  assert.deepEqual(bound.waitAction.argv.slice(5), ["--timeout", "570", "--subject", subject]);
   assert.match(bound.afterSigning, /only for the expected subject/u);
   assert.throws(() => awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json", subjectSha256: "nope" }), /subject/iu);
 });

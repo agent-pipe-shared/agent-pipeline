@@ -102,7 +102,11 @@ export function selectModelRoleForTask({ rootDir, runner, taskRoute,
       : parts.length === 2 && parts[0] === "duty"
         ? registry.duties?.[parts[1]]?.[runner] : null
     : null;
-  if (!cell || cell.state === "unavailable") return fail("MODEL-ROLE-SELECT-ROUTE-UNAVAILABLE");
+  // Codex greenfield 2026-11-08: the refusal named no valid route, so the agent guessed. The admitted task routes of this runner come with it.
+  if (!cell || cell.state === "unavailable") {
+    const availableTaskRoutes = Object.entries(registry.duties ?? {}).filter(([, cells]) => cells?.[runner] && cells[runner].state !== "unavailable").map(([duty]) => `duty.${duty}`).sort();
+    return { ...fail("MODEL-ROLE-SELECT-ROUTE-UNAVAILABLE"), availableTaskRoutes };
+  }
   // V3 is the authorized non-blocking fallback. Return its exact selector and
   // effort with every optional-selection failure so dispatch construction can
   // use the fallback directly instead of silently inheriting or guessing.

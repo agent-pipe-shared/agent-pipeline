@@ -20,7 +20,8 @@ import { fileURLToPath } from "node:url";
 import { CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA } from "./critical-action-approval-request.mjs";
 
 export const PROOF_WAIT_SCHEMA = "pipeline.signed-proof-wait.v1";
-export const PROOF_WAIT_DEFAULT_SECONDS = 120;
+// Greenfields 2026-11-08: 120 s ended every wait before a human had signed (8 and 39 minutes measured). Below the 600 s cap of a foreground shell call.
+export const PROOF_WAIT_DEFAULT_SECONDS = 570;
 export const PROOF_WAIT_MAX_SECONDS = 600;
 export const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
 export const PROOF_WAIT_SCRIPT = fileURLToPath(new URL("../scripts/proof-wait.mjs", import.meta.url));
@@ -81,7 +82,11 @@ export function observeProofFile(root, reference, subjectSha256 = null) {
 }
 
 const quote = (part) => (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(part) ? part : JSON.stringify(part));
-export const commandText = ({ executable, argv }) => [executable, ...argv].map(quote).join(" ");
+/** PowerShell runs a quoted executable only behind its call operator (Claude greenfield 2026-11-08: the repair text could not be pasted). */
+export const commandText = ({ executable, argv }, platform = process.platform) => {
+  const rendered = [executable, ...argv].map(quote).join(" ");
+  return platform === "win32" && rendered.startsWith('"') ? `& ${rendered}` : rendered;
+};
 const text = commandText;
 
 /** The exact bounded wait for a proof reference; `--subject` (G20-76) follows `--timeout` and appears only when a subject is given. */
@@ -117,7 +122,7 @@ export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEF
       kind: "command", ...wait, mutation: false, requiresConfirmation: false,
       expected: { schema: PROOF_WAIT_SCHEMA, statuses: ["proof-present"] },
     },
-    afterSigning: `Do not ask the PO to report back. After handing over the one signing command, run waitAction (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback.`
+    afterSigning: `Do not ask the PO to report back. After handing over the one signing command, run waitAction with a shell-tool timeout above ${seconds} seconds (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback. Signing is a human step and can take many minutes: PROOF-WAIT-TIMEOUT only means the file is not there yet, so run waitAction again. Tell the PO which command to run, never that it happens automatically.`
       + (subjectSha256 === null ? "" : ` The wait ends only for the expected subject ${subjectSha256}: an older signature's file at that path does not end it.`),
   };
 }

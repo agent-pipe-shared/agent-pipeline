@@ -27,6 +27,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 import {
   canonicalJson,
@@ -250,6 +251,6 @@ async function main() {
   process.exitCode = result.outcome === "available-attested" || result.outcome === "transient-unavailable" || result.outcome === "terminal-unavailable" ? 0 : 1;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectInvocation(import.meta.url)) {
   await main();
 }

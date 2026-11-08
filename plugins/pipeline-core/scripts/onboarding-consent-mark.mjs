@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 import {
   ONBOARDING_CONSENT_COVERED_STEPS,
@@ -83,7 +84,7 @@ function parseArgs(argv) {
   return values;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectInvocation(import.meta.url)) {
   try {
     const args = parseArgs(process.argv.slice(2));
     const result = recordOnboardingConsent(args.root, args["session-id"], args.answer, undefined, args.quote);

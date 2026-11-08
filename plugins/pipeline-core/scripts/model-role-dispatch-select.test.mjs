@@ -178,6 +178,7 @@ test("a defective optional role source keeps an independently valid V3 route usa
   assert.equal(absentProjection.status, "legacy-v3");
   assert.equal(selectModelRoleForTask({ ...base, routeSource: broken,
     taskRoute: "duty.unknown" }).code, "MODEL-ROLE-SELECT-ROUTE-UNAVAILABLE");
+  assert.ok(selectModelRoleForTask({ ...base, routeSource: broken, taskRoute: "duty.unknown" }).availableTaskRoutes.includes("duty.implement"), "the refusal lists the routes that exist");
   assert.equal(selectModelRoleForTask({ ...base, routeSource: broken,
     readRegistry: () => ({ ...loadRunnerProfilesV3Registry(), duties: {} }) }).code,
   "MODEL-ROLE-SELECT-SOURCE");

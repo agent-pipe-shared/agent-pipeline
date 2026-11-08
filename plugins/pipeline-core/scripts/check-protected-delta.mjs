@@ -3,6 +3,7 @@
 /** Candidate-time protected-surface delta detector (Sprint Alfred A3 / #101). */
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { protectedBaselineReadback, protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
 
 function git(rootDir, args) {
@@ -57,7 +58,7 @@ function parse(argv) {
 function printHelp() {
   console.log("Usage: check-protected-delta.mjs [--root <dir>] [--base <git-ref>] [--candidate <git-ref>] [--format text|json]");
 }
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectInvocation(import.meta.url)) {
   try {
     const options = parse(process.argv.slice(2));
     if (!options) { printHelp(); process.exit(0); }

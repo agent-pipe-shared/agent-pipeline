@@ -6,6 +6,7 @@ import { appendFileSync, mkdirSync, readFileSync, realpathSync, renameSync, writ
 import { execFileSync } from "node:child_process";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import { validateGovernanceExportOutbox } from "../lib/governance-export-outbox.mjs";
 import { executePushBatch } from "../lib/push-batch-execution.mjs";
@@ -56,4 +57,4 @@ export async function run(argv = process.argv.slice(2)) {
   });
   return result;
 }
-if (import.meta.url === `file://${process.argv[1]}`) { run().then((result) => process.stdout.write(`${JSON.stringify(result)}\n`)).catch((error) => { process.stderr.write(`PUSH-BATCH-EXECUTOR-FAILED: ${error.code ?? "PBE"}: ${error.message}\n`); process.exitCode = 2; }); }
+if (isDirectInvocation(import.meta.url)) { run().then((result) => process.stdout.write(`${JSON.stringify(result)}\n`)).catch((error) => { process.stderr.write(`PUSH-BATCH-EXECUTOR-FAILED: ${error.code ?? "PBE"}: ${error.message}\n`); process.exitCode = 2; }); }
