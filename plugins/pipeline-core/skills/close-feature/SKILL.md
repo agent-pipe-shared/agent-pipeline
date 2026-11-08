@@ -2,7 +2,7 @@
 name: close-feature
 description: "Feature-lifecycle close: ends the CURRENT activeFeature in .claude/pipeline-state.json via the sanctioned pipeline-state.mjs writer (close-feature subcommand) -- appends an audit entry to closedFeatures, clears activeFeature/planApproval/planRevocation, sets planApproved=false, silences the stop-suggest nudge. Invoke when a feature's work is done and its plan/phase tracking should stop, independent of any session boundary."
 argument-hint: "<name performing the close>"
-allowed-tools: Bash(node plugins/pipeline-core/scripts/usage-ledger.mjs:*), Bash(node plugins/pipeline-core/scripts/pipeline-state.mjs:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*)
+allowed-tools: Bash(node plugins/pipeline-core/scripts/usage-ledger.mjs:*), Bash(node plugins/pipeline-core/scripts/pipeline-state.mjs:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*), Bash(node plugins/pipeline-core/scripts/finish-feature.mjs:*)
 ---
 
 # close-feature — end a feature's lifecycle tracking
@@ -12,6 +12,20 @@ digest-bound transition, obtain confirmation, then apply only that action with
 `--activate`. The sanctioned State writer is an atomic sub-effect bound to the
 canonical coordinator lifecycle and state digest. This path never implies push
 or release.
+
+## Start here: the one command (P3, runner- and platform-neutral)
+
+The agent closes the active feature with ONE command, up to the one commit it prints; a second call continues to `closed-local`:
+
+```
+node plugins/pipeline-core/scripts/finish-feature.mjs --one-shot --by "<name>" --architecture-impact "<impact>" [--critic-packet-id <32-hex>]
+```
+
+It produces the Verify evidence in candidate mode bound to the Critic packet (found on disk when exactly one exists, else pass `--critic-packet-id`), registers it, takes the package to `verifying` and `completed`, writes the audit request and, with Continuity, the Result close block and the close request, then runs the close-feature stage (start, checkpoint, `feature-close-prepared`, `pipeline-state.mjs close-feature`) and the `tracked-close-finalized` evidence. The audit bundle it writes under `audit-bundles/<feature>/<stamp>/proofs/` copies the signed approval proof envelopes that authorized the feature (the plan approval and, when it exists for the candidate commit, the critical push approval), with their digests in the bundle manifest; the bundle verifier checks every digest and every Ed25519 signature, and refuses a tampered proof. A human guard override keeps no proof (it is listed as a typed gap, never blocking). Nothing it does signs or pushes.
+
+The command stops at `commit-required` and prints the paths and the commit message (`git add -- <paths>`, then `git commit`; the pre-commit hook admits exactly the bytes the stages wrote, G20-66). Run that commit, then run the printed `next` command (the same command with `--resume-lifecycle-id <id>`): it freezes the candidate, runs the final Verify and the Security scan, writes the final-verification and cleanup evidence and ends at `closed-local`. Exit code 2 and `status: "stopped"` mean one typed stop with its exact repair on stderr: `ONESHOT-CRITIC-PACKET-MISSING` (finish the Critic review; pass `--critic-packet-id`), `ONESHOT-VERIFY-RED` (fix what the Verify prints, rerun), `ONESHOT-COMMIT-PENDING` (the close outputs are not committed yet), `ONESHOT-SECURITY-BLOCKING`, `ONESHOT-OWNER-ROUTE-REQUIRED` (a project with a session-authority catalogue runs the Result close through `continuity-owner-route.mjs`), or the coordinator's own typed refusal (for example `CLOSE-CRITIC-CALLER-AUTHORED`). Rerunning the identical command is always safe. Publication, push and release stay separate human-gated steps.
+
+Everything below is the per-stage recovery reference: use it when the one command stops and the repair needs a single stage by hand.
 
 Closes the feature currently tracked in `.claude/pipeline-state.json` (`activeFeature`). This is a
 **feature-lifecycle** transition in the same coordinator. `close-block` requests
