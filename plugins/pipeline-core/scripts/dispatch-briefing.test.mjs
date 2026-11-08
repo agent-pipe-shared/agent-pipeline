@@ -2339,7 +2339,9 @@ test("A18-M1C build --runner antigravity renders a verified briefing that names 
 // --- M1.4 (candidate 19): a package may name a module of the approved architecture design; the write scope is derived from the cut and the cut is enforced ---
 
 function modulePackage(over = {}) {
-  const made = packageFixture({ paths: undefined, module: "core", modulePlan: "specs/prd.md", ...over });
+  // G20-59 (QG-04, restated in place): a module package's dispatch id is the module's slice id; the fixture used the generic
+  // "ALF-T1", which build now refuses with DBG-MODULE-SLICE-ID (pinned below). Every assertion of these cases is unchanged.
+  const made = packageFixture({ paths: undefined, module: "core", modulePlan: "specs/prd.md", id: `slice-${over.module ?? "core"}`, ...over });
   const design = {
     schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
     disposition: { decision: "approved-scoped", scope: ["specs/", "src/", "tests/", "architecture/"], rationale: "fixture" },
@@ -2398,6 +2400,31 @@ test("module package: a module whose dependency has no accepted result is refuse
   assert.match(refused.message, /slice-core/u);
   const released = runDispatchBriefing(argv, depsOf(fx, { integratedSliceIds: () => ["slice-core"] }));
   assert.equal(released.ok, true, JSON.stringify(released));
+});
+
+// G20-59 (measured in the Claude greenfield on candidate 20, 2026-11-08): module storage was dispatched as "slice-1a-storage",
+// delivered and integrated; module family then stayed refused DBG-MODULE-NOT-RUNNABLE ("waits for slice-storage") and the agent
+// dispatched the whole storage module a second time under "slice-storage".
+test("G20-59: a module package under another dispatch id is refused before dispatch, naming the module's slice id", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = modulePackage({ id: "slice-1a-core" });
+  const refused = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "DBG-MODULE-SLICE-ID");
+  assert.match(refused.message, /repair: set "id" to slice-core/u);
+  const probed = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx));
+  const finding = probed.findings.find((entry) => entry.check === "module-scope");
+  assert.equal(finding?.code, "DBG-MODULE-SLICE-ID", JSON.stringify(probed.findings));
+  const retry = modulePackage({ id: "slice-core-r2" });
+  assert.equal(runDispatchBriefing(retry.argv, depsOf(retry.fx)).ok, true, "a numbered further attempt on the same module is admitted");
+});
+
+test("G20-59: a further attempt on a dependency releases the waiting module like the first delivery", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = modulePackage({ module: "api" });
+  assert.equal(runDispatchBriefing(argv, depsOf(fx, { integratedSliceIds: () => ["slice-core-r2"] })).ok, true);
+  assert.equal(runDispatchBriefing(argv, depsOf(fx, { integratedSliceIds: () => ["slice-1a-core"] })).code, "DBG-MODULE-NOT-RUNNABLE",
+    "an unrelated id never stands in for the module's slice");
 });
 
 test("module package: the two reference keys come together, and a package without them keeps the old shape and the old paths rule", async () => {

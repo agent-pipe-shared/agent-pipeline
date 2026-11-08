@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { moduleDispatchScope, readPrdModules } from "./module-dispatch-scope.mjs";
+import { deliversModuleSlice, moduleDispatchScope, readPrdModules } from "./module-dispatch-scope.mjs";
 import { MODULE_SLICE_PROPOSAL_SCHEMA, proposeSlicesFromModules } from "./module-slice-proposal.mjs";
 import { run as runProposal } from "../scripts/module-slice-proposal.mjs";
 import { runCli } from "../scripts/slice-queue.mjs";
@@ -173,6 +173,19 @@ test("MDS3: a module whose dependency module has no accepted result is not runna
   assert.match(blocked.message, /repair:/u);
   assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "api", integratedSliceIds: ["slice-core"] }).ok, true);
   assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "docs", integratedSliceIds: [] }).ok, true, "a wave-0 module needs no result");
+});
+
+test("G20-59: a numbered further attempt delivers its module's slice; another module's slice id or a free id never does", () => {
+  assert.equal(deliversModuleSlice("slice-core", "slice-core"), true);
+  assert.equal(deliversModuleSlice("slice-core-r2", "slice-core"), true);
+  assert.equal(deliversModuleSlice("slice-core-r12", "slice-core"), true);
+  assert.equal(deliversModuleSlice("slice-core-r1", "slice-core"), false, "the first attempt is the plain id");
+  assert.equal(deliversModuleSlice("slice-1a-core", "slice-core"), false);
+  assert.equal(deliversModuleSlice("slice-core-x", "slice-core"), false);
+  assert.equal(deliversModuleSlice("slice-core-r2", "slice-core", ["slice-core", "slice-core-r2"]), false,
+    "a module whose own id looks like an attempt keeps its own slice");
+  assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "api", integratedSliceIds: ["slice-core-r2"] }).ok, true);
+  assert.equal(moduleDispatchScope({ modules: SCOPE_MODULES, moduleId: "api", integratedSliceIds: ["slice-1a-core"] }).code, "DBG-MODULE-NOT-RUNNABLE");
 });
 
 test("MDS4: an unknown module, an invalid cut and a malformed call are typed refusals that never throw", () => {

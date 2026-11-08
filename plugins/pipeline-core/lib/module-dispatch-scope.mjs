@@ -22,6 +22,18 @@ export const MODULE_DISPATCH_SCOPE_SCHEMA = "pipeline.module-dispatch-scope.v1";
 const MAX_PRD_BYTES = 4 * 1024 * 1024;
 
 const refuse = (code, message, extra = {}) => ({ ok: false, schema: MODULE_DISPATCH_SCOPE_SCHEMA, code, message, ...extra });
+const FURTHER_ATTEMPT_SUFFIX = /^-r(?:[2-9]|[1-9]\d{1,2})$/u;
+
+/**
+ * G20-59: `id` delivers the plan's slice `sliceId` when it is that id or a numbered further attempt on the same module
+ * (`<sliceId>-r2`, `-r3`, ...) that is not itself the slice id of another module of the plan. The wave order tracks a module
+ * by this id alone, so a delivery under any other id never releases the modules that wait for it.
+ */
+export function deliversModuleSlice(id, sliceId, planSliceIds = []) {
+  if (typeof id !== "string" || typeof sliceId !== "string") return false;
+  if (id === sliceId) return true;
+  return id.startsWith(sliceId) && FURTHER_ATTEMPT_SUFFIX.test(id.slice(sliceId.length)) && !planSliceIds.includes(id);
+}
 
 /** The modules of an approved architecture design in a PRD under `root` (repository-relative path); never throws. */
 export function readPrdModules(root, prd) {
@@ -64,12 +76,13 @@ export function moduleDispatchScope(input) {
         }
       }
     }
-    const accepted = new Set(integratedSliceIds ?? []);
-    const waiting = slice.dependsOn.filter((sliceId) => !accepted.has(sliceId));
+    const accepted = [...new Set(integratedSliceIds ?? [])];
+    const planSliceIds = proposal.slices.map((entry) => entry.id);
+    const waiting = slice.dependsOn.filter((sliceId) => !accepted.some((id) => deliversModuleSlice(id, sliceId, planSliceIds)));
     if (waiting.length > 0) {
       return refuse("DBG-MODULE-NOT-RUNNABLE", `module ${moduleId} is in wave ${slice.wave} and waits for ${waiting.join(", ")}, which ${waiting.length === 1 ? "has" : "have"} no accepted result yet; repair: deliver and integrate ${waiting.join(", ")} first (wave order: ${proposal.waves.map((wave, index) => `${index}: ${wave.join(", ")}`).join("; ")}), then build this briefing again`, { moduleId, wave: slice.wave, waitingFor: waiting });
     }
-    return { ok: true, schema: MODULE_DISPATCH_SCOPE_SCHEMA, moduleId, sliceId: slice.id, wave: slice.wave, writeScope: paths === undefined ? [...slice.writeScope] : [...paths] };
+    return { ok: true, schema: MODULE_DISPATCH_SCOPE_SCHEMA, moduleId, sliceId: slice.id, planSliceIds, wave: slice.wave, writeScope: paths === undefined ? [...slice.writeScope] : [...paths] };
   } catch (error) {
     return refuse("DBG-MODULE-CUT-INVALID", `the module scope could not be derived (${error?.name ?? "error"}); repair: check the module list of the plan`);
   }

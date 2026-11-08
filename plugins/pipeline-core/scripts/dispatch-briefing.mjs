@@ -136,7 +136,7 @@ const { observeContinuityAuthorityDrift, observePipelineStartPreflight } = cliHe
 const { continuityAuthorityDriftRefusalText, continuityAuthorityDriftSources } = cliHelp ? {} : await import("../lib/continuity-authority-drift.mjs");
 const sessionAuthorityRegistry = cliHelp ? {} : await import("../lib/session-authority-registry.mjs");
 const { inspectSignedDescriptorCustodyRepository } = cliHelp ? {} : await import("../lib/worktree-lifecycle.mjs");
-const { moduleDispatchScope, readPrdModules } = cliHelp ? {} : await import("../lib/module-dispatch-scope.mjs");
+const { deliversModuleSlice, moduleDispatchScope, readPrdModules } = cliHelp ? {} : await import("../lib/module-dispatch-scope.mjs");
 const { loadMapBundle } = cliHelp ? {} : await import("./module-inventory.mjs");
 const { owningModules } = cliHelp ? {} : await import("./architecture-boundary-check.mjs");
 
@@ -1208,6 +1208,11 @@ function resolveModulePackage(root, pkg, deps) {
   const input = { modules: read.modules, moduleId: pkg.module, integratedSliceIds: integrated };
   const checked = moduleDispatchScope({ ...input, ...(declared.length === 0 ? {} : { paths: declared }) });
   if (!checked.ok) throw new BriefingPackageRefusal(checked.code, checked.message);
+  // G20-59: the wave order tracks a module by its slice id; a dispatch under another id is delivered and integrated, but the
+  // modules waiting for it stay blocked, and the only way out was a second dispatch of the whole module.
+  if (!deliversModuleSlice(pkg.id, checked.sliceId, checked.planSliceIds)) {
+    throw new BriefingPackageRefusal("DBG-MODULE-SLICE-ID", `dispatch id ${JSON.stringify(String(pkg.id).slice(0, 64))} does not name the slice of module ${pkg.module}; the wave order tracks this module as ${checked.sliceId}, so a delivery under another id never releases the modules that wait for it; repair: set "id" to ${checked.sliceId} (a further attempt on the same module: ${checked.sliceId}-r2, -r3, ...), then build again`);
+  }
   if (pkg.paths !== undefined) return { pkg, warnings: [] };
   const derived = declared.length === 0 ? checked : moduleDispatchScope(input);
   const files = expandModuleScope(root, derived.writeScope);

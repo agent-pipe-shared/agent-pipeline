@@ -62,6 +62,8 @@ command tables.
    The cut is enforced by `dispatch-briefing.mjs build` and `probe`: a briefing package that names `module` and `modulePlan` (the PRD with the design) takes its
    write scope from the module (the exact files its owned paths hold now, warning `DBG-MODULE-SCOPE-DERIVED`), is refused with `DBG-MODULE-SCOPE-CROSSES` when a
    declared path reaches another module, and with `DBG-MODULE-NOT-RUNNABLE` while a module it depends on has no accepted result.
+   The package `id` of a module dispatch is that module's slice id from the proposal (`slice-<module>`; a further attempt on the same module:
+   `slice-<module>-r2`, `-r3`, ...): the waves track a module by this id only, so any other id is refused with `DBG-MODULE-SLICE-ID`.
 3. Dispatch by runner:
    - **Claude**: `Agent` / `Task` with the functional `agentType`.
    - **Codex**: `spawn_agent` with `nativeAgentType: "worker"`, keeping the `pipeline-core:goldfish-implementor` (or `-mechanic`) role.
