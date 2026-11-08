@@ -20,7 +20,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { gateStrengthRuleFor } from "../hooks/guard-gate-strength.mjs";
 import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
@@ -29,6 +29,7 @@ import { loadProtectedTestPathRules, protectedTestPathRuleFor, writerCommitMac, 
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const KEY_FILE = "mac.key";
+const MAX_SNAPSHOT_FILE_BYTES = 16 * 1024 * 1024;
 const sha256Of = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 function writerCommitError(code, message, heal) {
@@ -127,7 +128,8 @@ export function captureWorktree(rootDir, { spawn = spawnSync } = {}) {
       const code = token.slice(0, 2); const path = token.slice(3);
       if (/[RC]/u.test(code)) index += 1; // the original path of a rename follows as its own token
       let digest = null;
-      try { digest = sha256Of(readFileSync(resolve(root, path))); } catch { digest = null; }
+      // A writer's protected outputs are small JSON and Markdown files; a large dirty file is never one of them and is not hashed.
+      try { digest = statSync(resolve(root, path)).size > MAX_SNAPSHOT_FILE_BYTES ? null : sha256Of(readFileSync(resolve(root, path))); } catch { digest = null; }
       snapshot.set(path, digest);
     }
     return { root, files: snapshot };
