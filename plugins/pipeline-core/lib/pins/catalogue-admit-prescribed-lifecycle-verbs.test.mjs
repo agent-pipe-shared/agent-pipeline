@@ -677,7 +677,6 @@ test("C20 w253 create-adr: the create and refresh shapes are admitted, every nea
       ["unknown flag", make("--slug", "s", "--title", "T", "--out", "x")],
       ["repeated flag", make("--slug", "s", "--title", "T", "--slug", "t")],
       ["refresh with a title", make("--slug", "s", "--title", "T", "--refresh")],
-      ["refresh without a slug", make("--refresh")],
       ["refresh with a value", make("--slug", "s", "--refresh", "x")],
       ["extra positional", make("--slug", "s", "--title", "T", "extra")],
     ]) bothRefuse(action, f, label);

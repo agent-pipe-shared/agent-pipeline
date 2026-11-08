@@ -1154,20 +1154,6 @@ for (const [name, prepare] of [
 // Fixture shape mirrors acknowledgeFixture() above: a state/continuity pair
 // already bound to a plan/spec pair, deps mocking poGateAuthority/poGateProfile
 // so no real onboarded project tree is needed.
-test("a second reopen of a new submission records its own time, not the first reopen's", () => {
-  const featureId = "reopen-own-time";
-  const planPath = `specs/${featureId}/prd_${featureId}.md`;
-  const specPath = `specs/${featureId}/spec.md`;
-  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-08-27T10:00:00.000Z" });
-  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
-  assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], deps)).result, 0);
-  const laterDeps = { ...deps, now: () => "2026-08-27T11:00:00.000Z" };
-  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], laterDeps)).result, 0);
-  assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], laterDeps)).result, 0);
-  const recorded = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
-  assert.equal(recorded.planInvalidation.invalidatedAt, "2026-08-27T11:00:00.000Z");
-});
-
 function planAuthorityFixture({ featureId, planPath, specPath, advisorUnavailable = false, now = "2026-08-27T10:00:00.000Z" }) {
   const root = mktempProjectDir();
   mkdirSync(join(root, "project"), { recursive: true });
@@ -1328,6 +1314,20 @@ function assertPresentRetired(root, deps) {
   assert.ok(attempt.lines.some((line) => line.includes("present-plan --review-receipt")),
     `refusal must name the replacement route: ${attempt.lines.join(" ")}`);
   assert.equal(readFileSync(statePath(root), "utf8"), before, "a retired-route refusal must not mutate state");
+}
+
+// Claude greenfield 2026-11-08: a second reopen of a NEW submission records its own time, not the first reopen's.
+{
+  const featureId = "reopen-own-time";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-08-27T10:00:00.000Z" });
+  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
+  assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], deps)).result, 0);
+  const laterDeps = { ...deps, now: () => "2026-08-27T11:00:00.000Z" };
+  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], laterDeps)).result, 0);
+  assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], laterDeps)).result, 0);
+  assert.equal(JSON.parse(readFileSync(statePath(root), "utf8")).planInvalidation.invalidatedAt, "2026-08-27T11:00:00.000Z");
 }
 
 function approveFeaturePlanArgs(root, by = "po-test") {
