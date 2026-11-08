@@ -1,0 +1,594 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 61016a525..5001e636b 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -16,6 +16,7 @@ import { designAdvisoryAdmission } from "./guard-devplan-policy.mjs";
+ import { validateAgainstSchema } from "./schema-lite.mjs";
+ import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
+ import { resolveModuleForPath } from "../scripts/module-inventory.mjs";
++import { readConsumerVerifyConfiguration } from "./consumer-verify.mjs";
+ import { renderArchitectureOverview } from "../scripts/generate-architecture-overview.mjs";
+ const moduleSchema = JSON.parse(readFileSync(new URL("../schemas/pipeline.module-inventory.v1.json", import.meta.url), "utf8"));
+ 
+@@ -66,6 +67,63 @@ function requireScopeCoverage(input, planPath, taskScope) {
+   }
+ }
+ 
++/**
++ * G20-65 (AC-108): the closed set of document kinds. An owned path is a document when it is a `docs/` path or a file ending in
++ * `.md`, `.mdx`, `.txt`, `.rst` or `.adoc` (the rule a `kind: "documentation"` module is validated by). A module is DOCUMENTATION-ONLY when every
++ * owned path is a document, judged by the paths and not by the declared kind; such a module names one of its own documents as its item
++ * check (`document:<owned path>`, dispatch-briefing.mjs). A glob outside `docs/` without a document suffix is not provably a document.
++ */
++export const DOCUMENT_OWNED_FILE = /\.(?:md|mdx|txt|rst|adoc)$/u;
++export function isDocumentOwnedPath(path) {
++  if (typeof path !== "string") return false;
++  const stripped = path.replace(/\/\*\*?$/u, "").replace(/\/$/u, "");
++  return stripped === "docs" || stripped.startsWith("docs/") || DOCUMENT_OWNED_FILE.test(stripped);
++}
++export function isDocumentationOnlyModule(module) {
++  return Array.isArray(module?.ownedPaths) && module.ownedPaths.length > 0 && module.ownedPaths.every(isDocumentOwnedPath);
++}
++
++const TEST_FILE = /\.test\.(?:mjs|cjs|js)$/u;
++const isOwnedDirectory = (path) => path.endsWith("/") || /\/\*\*?$/u.test(path);
++/**
++ * G20-65: the modules of a design that own no admissible item check, as `{ index, id, tests }`. A module is admissible when it is documentation-only
++ * (its check is `document:<owned path>`), when the project registers a verifyImpact command (any module may name `command:<id>`), when it owns a
++ * directory (it can hold a test of its own), or when a `.test` file among its entry points and owned paths is not owned by ANOTHER module. A test no
++ * module owns stays admissible because the dispatch cut refuses only a path that reaches another module's owned paths (module-dispatch-scope.mjs).
++ * `tests` are the test files that another module owns, so the report names them.
++ */
++export function modulesWithoutAdmissibleCheck(modules, { registeredCommands = false } = {}) {
++  if (registeredCommands === true || !Array.isArray(modules)) return [];
++  const found = [];
++  modules.forEach((module, index) => {
++    if (isDocumentationOnlyModule(module) || module.ownedPaths.some(isOwnedDirectory)) return;
++    const tests = [...new Set([...module.verificationEntryPoints, ...module.ownedPaths].filter((path) => TEST_FILE.test(path)))];
++    const foreign = tests.filter((path) => { const owner = resolveModuleForPath(path, modules); return owner !== null && owner.id !== module.id; });
++    if (tests.some((path) => !foreign.includes(path))) return;
++    found.push({ index, id: module.id, tests: foreign });
++  });
++  return found;
++}
++
++/** The submit-plan side of the rule: throws ARCHITECTURE-DESIGN-MODULE-NO-CHECK, naming the module, the field and the three repairs. */
++function requireModuleChecks(design, root) {
++  let registeredCommands = false;
++  try {
++    const configuration = readConsumerVerifyConfiguration(root);
++    registeredCommands = configuration.baseline.length > 0 || configuration.areas.some((area) => area.commands.length > 0);
++  } catch { registeredCommands = false; }
++  const [first] = modulesWithoutAdmissibleCheck(design.modules, { registeredCommands });
++  if (first === undefined) return;
++  const owners = first.tests.map((path) => `${path} (owned by module ${resolveModuleForPath(path, design.modules).id})`);
++  const cause = owners.length > 0
++    ? `its test ${owners.join(", ")} cannot be written by a dispatch of ${first.id}`
++    : `it names no test file it can write and owns no directory that could hold one`;
++  rejectField("ARCHITECTURE-DESIGN-MODULE-NO-CHECK", `modules[${first.index}].verificationEntryPoints`,
++    `module ${first.id} owns no admissible check: ${cause}. Repair, any one: move the test under a path module ${first.id} owns (an exact tests/... file or a directory such as src/${first.id}/**) `
++    + `or out of the other module's ownedPaths; register a verifyImpact command in the project calibration (check command:<id>); or, when ${first.id} owns only documents, `
++    + "own only docs/ paths or files ending in .md, .mdx, .txt, .rst or .adoc so it is documentation-only (its check is then document:<owned path>)", first.id);
++}
++
+ /** The entire closed package is visible within the PRD and bound by its existing approval. */
+ export function parseArchitectureDesign(prd) {
+   const blocks = [...prd.matchAll(/^```pipeline-architecture-design\r?\n([\s\S]*?)^```\s*$/gmu)];
+@@ -108,8 +166,7 @@ export function parseArchitectureDesign(prd) {
+     // A documentation module may omit verification entry points only when every owned path is non-executable.
+     if (module.kind === "documentation") {
+       module.ownedPaths.forEach((path, pathIndex) => {
+-        const stripped = path.replace(/\/\*\*?$/u, "").replace(/\/$/u, "");
+-        requireField(stripped === "docs" || stripped.startsWith("docs/") || /\.(?:md|mdx|txt|rst|adoc)$/u.test(stripped),
++        requireField(isDocumentOwnedPath(path),
+           "ARCHITECTURE-DESIGN-DOC-MODULE-INVALID", `modules[${index}].ownedPaths[${pathIndex}]`,
+           "a documentation module owns only docs/ paths or files ending in .md, .mdx, .txt, .rst or .adoc", path);
+       });
+@@ -215,6 +272,8 @@ export function inspectArchitectureDesignDraft({ rootDir, planPath, expectedPlan
+       const design = parseArchitectureDesign(prdBytes.toString("utf8"));
+       // C18-12 / candidate 19: the scope-coverage rule runs here too, before the PO is asked to sign, not only at materialization after the signature.
+       requireScopeCoverage(design, planPath, null);
++      // G20-65: a module whose dispatch could never name an admissible check is reported now, not after the signature.
++      requireModuleChecks(design, root);
+       return { ok: true, required: true, design, prdPath: planPath };
+     } catch (error) {
+       const code = architectureDesignFailureCode(error);
+diff --git a/plugins/pipeline-core/lib/architecture-design.test.mjs b/plugins/pipeline-core/lib/architecture-design.test.mjs
+index 7e09e2692..b15a89def 100644
+--- a/plugins/pipeline-core/lib/architecture-design.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.test.mjs
+@@ -517,3 +517,52 @@ test("C19-F1: an accepted predecessor receipt does not relax the target drift ch
+   assert.equal(exact.status, "materialized");
+   assert.equal(Object.hasOwn(exact, "inheritedFrom"), false);
+ });
++
++// --- G20-65 (AC-108): a module that owns no admissible check is reported at design time, before the PO signs, with the move that repairs it ---
++// Measured in the Claude greenfield on candidate 20c: the module user-guide owned two documents and its test belonged to module shell; the dispatch
++// route refused every check only after the design was signed.
++function g2065Design(over = {}) {
++  const base = hf9Design();
++  const module = (id, ownedPaths, verificationEntryPoints, extra = {}) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: ["Network"], ownedPaths,
++    publicContracts: [ownedPaths.find((path) => !path.includes("*"))], allowedDependencies: [], authorityEffects: [], verificationEntryPoints, adrReferences: [], ...extra });
++  const modules = over.modules ?? [module("engine", ["src/engine.mjs"], ["tests/engine.test.mjs"]), module("shell", ["tests/**", "src/shell.mjs"], ["tests/shell.test.mjs"])];
++  const { modules: _omitted, ...fitnessModel } = base.fitnessModel;
++  return { ...base, modules, implementationSurface: over.implementationSurface ?? ["src/engine.mjs", "src/shell.mjs"], fitnessModel };
++}
++
++test("G20-65: the draft inspection reports a module whose only test is owned by another module, naming the module and the move, before any signature", async () => {
++  const { stage, mod } = await hf9Load();
++  const fixture = hf9Fixture(stage, { block: true, scaffold: "exact", designInput: g2065Design() });
++  const draft = mod.inspectArchitectureDesignDraft({ rootDir: fixture.root, planPath: fixture.planPath, expectedPlanSha256: fixture.prdSha });
++  assert.equal(draft.ok, false, JSON.stringify(draft));
++  assert.equal(draft.required, true);
++  assert.equal(draft.code, "ARCHITECTURE-DESIGN-MODULE-NO-CHECK");
++  assert.equal(draft.field, "modules[0].verificationEntryPoints");
++  assert.match(draft.expected, /engine/u);
++  assert.match(draft.expected, /tests\/engine\.test\.mjs/u, "the test that module shell owns is named");
++  assert.match(draft.expected, /move|own/u);
++  assert.match(draft.expected, /documentation/u, "the documentation-only alternative is named");
++  assert.equal(draft.rejectedValue, "engine");
++});
++
++test("G20-65: a module is admissible by an own test, an unowned test, an owned directory, documentation only, or a registered command", async () => {
++  const { stage, mod } = await hf9Load();
++  const module = (id, ownedPaths, verificationEntryPoints, extra = {}) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths, publicContracts: [ownedPaths[0]],
++    allowedDependencies: [], authorityEffects: [], verificationEntryPoints, adrReferences: [], ...extra });
++  const none = (modules, options) => mod.modulesWithoutAdmissibleCheck(modules, options).map((entry) => entry.id);
++  assert.deepEqual(none([module("a", ["src/a.mjs", "tests/a.test.mjs"], ["tests/a.test.mjs"])]), [], "an owned test file");
++  assert.deepEqual(none([module("a", ["src/a.mjs"], ["tests/a.test.mjs"])]), [], "a test no module owns can be created by the dispatch (not a crossing)");
++  assert.deepEqual(none([module("a", ["src/a/**"], [])]), [], "an owned directory can hold the module's own test");
++  assert.deepEqual(none([module("guide", ["app/GUIDE.txt", "docs/manual-checklist.md"], [], { kind: "documentation" })]), [], "documentation only");
++  assert.deepEqual(none([module("guide", ["app/GUIDE.txt"], ["tests/guide.test.mjs"]), module("shell", ["tests/**"], ["tests/shell.test.mjs"])]), [], "documentation-only is judged by the owned paths, not by the declared kind or by the test of another module");
++  assert.deepEqual(none([module("mixed", ["src/a.mjs", "docs/a.md"], ["tests/a.test.mjs"]), module("shell", ["tests/**"], ["tests/shell.test.mjs"])]), ["mixed"], "one code path makes the module a code module");
++  assert.deepEqual(none([module("a", ["src/a.mjs"], ["tests/a.test.mjs"]), module("shell", ["tests/**"], ["tests/s.test.mjs"])]), ["a"]);
++  assert.deepEqual(none([module("a", ["src/a.mjs"], ["tests/a.test.mjs"]), module("shell", ["tests/**"], ["tests/s.test.mjs"])], { registeredCommands: true }), [], "a registered verifyImpact command is an admissible check for every module");
++  assert.deepEqual(none([module("a", ["src/a.mjs"], ["src/a.mjs"]), module("b", ["src/b.mjs"], ["tests/b.test.mjs"])]), ["a"], "an entry point that is not a test file is no check");
++});
++
++test("G20-65: the document suffix set of the check validator equals the one of the design validator", async () => {
++  const { mod } = await hf9Load();
++  const { DOCUMENT_CHECK_FILE } = await import("./native-goldfish-host-return.mjs");
++  assert.equal(DOCUMENT_CHECK_FILE.source, mod.DOCUMENT_OWNED_FILE.source, "the two copies of the document suffix set must not drift");
++});
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index ae83791b4..53d8477ff 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -179,7 +179,8 @@ export function budgetDecision(pkg, budget) {
+ export function namedPackagePaths(pkg) {
+   const fromTargeted = pkg.targeted.flatMap((command) => [...command.matchAll(NAMED_PATH)].map((match) => match[1]));
+   // D195: a `command:<id>` check names a registered command, not a file, so it is not a path that must exist.
+-  const checkPath = typeof pkg.check === "string" && pkg.check.startsWith("command:") ? [] : [pkg.check];
++  // G20-65: a `document:<path>` check names a file of the write scope, so the file (not the prefixed spelling) must exist or be declared new.
++  const checkPath = typeof pkg.check === "string" && pkg.check.startsWith("command:") ? [] : [typeof pkg.check === "string" && pkg.check.startsWith("document:") ? pkg.check.slice("document:".length) : pkg.check];
+   return [...new Set([...pkg.paths, ...checkPath, ...fromTargeted, ...(pkg.reconNote === undefined ? [] : [pkg.reconNote])])];
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/module-dispatch-scope.mjs b/plugins/pipeline-core/lib/module-dispatch-scope.mjs
+index 70d93970f..67c7ecb1c 100644
+--- a/plugins/pipeline-core/lib/module-dispatch-scope.mjs
++++ b/plugins/pipeline-core/lib/module-dispatch-scope.mjs
+@@ -14,7 +14,8 @@
+ import { lstatSync, readFileSync } from "node:fs";
+ import { isAbsolute, relative, resolve } from "node:path";
+ 
+-import { architectureDesignFailureCode, parseArchitectureDesign } from "./architecture-design.mjs";
++import { architectureDesignFailureCode, isDocumentOwnedPath, isDocumentationOnlyModule, parseArchitectureDesign } from "./architecture-design.mjs";
++import { DOCUMENT_CHECK_PREFIX } from "./native-goldfish-host-return.mjs";
+ import { proposeSlicesFromModules } from "./module-slice-proposal.mjs";
+ import { scopesOverlap } from "./slice-queue.mjs";
+ 
+@@ -23,6 +24,11 @@ const MAX_PRD_BYTES = 4 * 1024 * 1024;
+ 
+ const refuse = (code, message, extra = {}) => ({ ok: false, schema: MODULE_DISPATCH_SCOPE_SCHEMA, code, message, ...extra });
+ const FURTHER_ATTEMPT_SUFFIX = /^-r(?:[2-9]|[1-9]\d{1,2})$/u;
++/** G20-65: the documents a documentation-only module owns, as exact files when it lists any (else the owned patterns), for the repair text. */
++const ownDocuments = (module) => {
++  const exact = module.ownedPaths.filter((path) => isDocumentOwnedPath(path) && !/[*?]|\/$/u.test(path));
++  return exact.length > 0 ? exact : ["<an owned document>"];
++};
+ 
+ /**
+  * G20-59: `id` delivers the plan's slice `sliceId` when it is that id or a numbered further attempt on the same module
+@@ -60,19 +66,27 @@ export function readPrdModules(root, prd) {
+  */
+ export function moduleDispatchScope(input) {
+   try {
+-    const { modules, moduleId, paths, integratedSliceIds } = input ?? {};
++    const { modules, moduleId, paths, integratedSliceIds, check } = input ?? {};
+     const proposal = proposeSlicesFromModules(modules);
+     if (!proposal.ok) return refuse("DBG-MODULE-CUT-INVALID", `the module cut cannot be proposed (${proposal.code}: ${proposal.reason}); repair: fix the architecture design of the plan`);
+     const slice = proposal.slices.find((entry) => entry.moduleId === moduleId);
+     if (slice === undefined) return refuse("DBG-MODULE-UNKNOWN", `module ${JSON.stringify(String(moduleId).slice(0, 64))} is not a module of the plan; repair: use one of ${proposal.slices.map((entry) => entry.moduleId).sort().join(", ")}`);
+     const own = modules.find((module) => module.id === moduleId);
++    const documentationOnly = isDocumentationOnlyModule(own);
++    // G20-65: the document check form is judged here, with the module in hand; the generator only sees its syntax.
++    if (typeof check === "string" && check.startsWith(DOCUMENT_CHECK_PREFIX)) {
++      const document = check.slice(DOCUMENT_CHECK_PREFIX.length);
++      if (!documentationOnly) return refuse("DBG-CHECK-DOCUMENT-MODULE", `check ${check} names a document, but module ${moduleId} owns code (${own.ownedPaths.join(", ")}); repair: a code module names a test file it owns (a .test.mjs, .test.cjs or .test.js) or command:<id> of a command the project calibration registers under verifyImpact`, { moduleId });
++      if (!scopesOverlap([document], own.ownedPaths)) return refuse("DBG-CHECK-DOCUMENT-NOT-OWNED", `${document} is not among the owned paths of module ${moduleId}; repair: name one of its own documents as the check: ${ownDocuments(own).map((path) => `${DOCUMENT_CHECK_PREFIX}${path}`).join(" or ")}`, { moduleId, path: document });
++    }
+     if (paths !== undefined) {
+       if (!Array.isArray(paths) || paths.length === 0 || !paths.every((path) => typeof path === "string" && path !== "")) return refuse("DBG-MODULE-SCOPE-CROSSES", "the declared paths must be a non-empty list of paths; repair: omit them to derive the scope from the module");
+       for (const path of paths) {
+         for (const other of modules) {
+           if (other.id === moduleId || !scopesOverlap([path], other.ownedPaths)) continue;
+           if (scopesOverlap([path], own.ownedPaths) && scopesOverlap(own.ownedPaths, other.ownedPaths)) continue;
+-          return refuse("DBG-MODULE-SCOPE-CROSSES", `${path} reaches the owned paths of module ${other.id}, not of module ${moduleId}; repair: narrow the path to ${own.ownedPaths.join(", ")}, or dispatch the change to module ${other.id} as its own slice (one module per dispatch)`, { moduleId, path, ownerModule: other.id });
++          const hint = documentationOnly ? `; module ${moduleId} owns only documents, so its check is one of them: ${ownDocuments(own).map((document) => `${DOCUMENT_CHECK_PREFIX}${document}`).join(" or ")}` : "";
++          return refuse("DBG-MODULE-SCOPE-CROSSES", `${path} reaches the owned paths of module ${other.id}, not of module ${moduleId}; repair: narrow the path to ${own.ownedPaths.join(", ")}, or dispatch the change to module ${other.id} as its own slice (one module per dispatch)${hint}`, { moduleId, path, ownerModule: other.id });
+         }
+       }
+     }
+@@ -82,7 +96,7 @@ export function moduleDispatchScope(input) {
+     if (waiting.length > 0) {
+       return refuse("DBG-MODULE-NOT-RUNNABLE", `module ${moduleId} is in wave ${slice.wave} and waits for ${waiting.join(", ")}, which ${waiting.length === 1 ? "has" : "have"} no accepted result yet; repair: deliver and integrate ${waiting.join(", ")} first (wave order: ${proposal.waves.map((wave, index) => `${index}: ${wave.join(", ")}`).join("; ")}), then build this briefing again`, { moduleId, wave: slice.wave, waitingFor: waiting });
+     }
+-    return { ok: true, schema: MODULE_DISPATCH_SCOPE_SCHEMA, moduleId, sliceId: slice.id, planSliceIds, wave: slice.wave, writeScope: paths === undefined ? [...slice.writeScope] : [...paths] };
++    return { ok: true, schema: MODULE_DISPATCH_SCOPE_SCHEMA, moduleId, sliceId: slice.id, planSliceIds, wave: slice.wave, documentationOnly, writeScope: paths === undefined ? [...slice.writeScope] : [...paths] };
+   } catch (error) {
+     return refuse("DBG-MODULE-CUT-INVALID", `the module scope could not be derived (${error?.name ?? "error"}); repair: check the module list of the plan`);
+   }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+index fe30d0a41..078957825 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+@@ -216,8 +216,16 @@ export function observeCodexGoldfishReturn(input, pending) {
+ }
+ 
+ const COMMAND_ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+-/** D195: a check is either the 3-key .test form or the additive 4-key command form (path = the calibration that registers the command). */
++/** G20-65: the document check form of a documentation-only module (`document:<owned path>`); the file kinds are the closed set of
++ * `isDocumentOwnedPath` (lib/architecture-design.mjs), copied here on purpose because this hook-path validator stays lightweight (a test pins the equality). */
++export const DOCUMENT_CHECK_PREFIX='document:';
++export const DOCUMENT_CHECK_FILE=/\.(?:md|mdx|txt|rst|adoc)$/u;
++/** D195: a check is the 3-key .test form, the additive 4-key command form (path = the calibration that registers the command) or, G20-65,
++ * the 4-key document form (path = the owned document, `document` repeats it, so the check names exactly one file of the write scope). */
+ function validCheckForm(check){
++  if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'document'))
++    return exact(check,['id','path','document','dependencies'])&&check.document===check.path&&normalizedPath(check.path)&&DOCUMENT_CHECK_FILE.test(check.path)
++      &&Array.isArray(check.dependencies)&&check.dependencies.includes(check.path);
+   if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'command'))
+     return exact(check,['id','path','command','dependencies'])&&typeof check.command==='string'&&COMMAND_ID.test(check.command)&&normalizedPath(check.path)
+       &&Array.isArray(check.dependencies)&&check.dependencies.includes(check.path);
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index db2bdf7a2..7017152fc 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -1723,6 +1723,28 @@ function itemCheckSnapshot(root,itemDelivery,candidate) {
+  * opaque observation handle consumed by either real delivery adapter. */
+ export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate,baseCommit}={}) {
+   try {
++    // G20-65: a documentation-only module's check is one of its owned documents. It is verified from the COMMITTED bytes of the delivery commit
++    // (never from the Goldfish's report) before the usual snapshot: a regular file, non-empty, and (first delivery: the base commit is given) changed by the delivery.
++    const documentChecks=Array.isArray(itemDelivery?.checks)?itemDelivery.checks.filter(check=>check.document!==undefined):[];
++    if(documentChecks.length&&validateItemDeliveryBriefing(itemDelivery).ok&&typeof candidate?.commit==='string'&&/^[0-9a-f]{40,64}$/u.test(candidate.commit)) {
++      const physical=realpathSync(resolve(root)),gitRun=args=>spawnSync('git',['-C',physical,...args],{env:agyHostGitEnvironment(),shell:false,timeout:10000,maxBuffer:4*1024*1024});
++      let delivered=null;
++      if(baseCommit!==undefined) {
++        const diff=gitRun(['diff','--name-only','-z',baseCommit,candidate.commit]);
++        if(diff.error||diff.status!==0)throw nativeManagedFault('item-check-delivery-diff-unavailable');
++        delivered=String(diff.stdout).split('\0');
++      }
++      for(const check of documentChecks) {
++        const listed=gitRun(['ls-tree','-z',candidate.commit,'--',check.document]);
++        if(listed.error||listed.status!==0)throw nativeManagedFault('item-check-document-unreadable');
++        const [meta,name]=String(listed.stdout).split('\0')[0].split('\t');
++        if(name!==check.document||!/^100(?:644|755) blob /u.test(meta??''))throw Object.assign(nativeManagedFault(`document-check-missing: ${check.document} is not a regular file of the delivery commit`),{repair:`write ${check.document} (the document the check names) and commit it as a regular file, then finish the delivery again`});
++        const size=gitRun(['cat-file','-s',`${candidate.commit}:${check.document}`]);
++        if(size.error||size.status!==0)throw nativeManagedFault('item-check-document-unreadable');
++        if(Number(String(size.stdout).trim())===0)throw Object.assign(nativeManagedFault(`document-check-empty: ${check.document} has no content in the delivery commit`),{repair:`give ${check.document} real, non-empty content, commit it, then finish the delivery again`});
++        if(delivered!==null&&!delivered.includes(check.document))throw Object.assign(nativeManagedFault(`document-check-unchanged: the delivery did not change ${check.document}`),{repair:`write or change ${check.document} in this delivery (a document the delivery leaves untouched proves nothing), commit it, then finish the delivery again`});
++      }
++    }
+     const before=itemCheckSnapshot(root,itemDelivery,candidate),results=[];
+     // D195: a command check is registered in the calibration (its path). First delivery (baseCommit given) refuses a delivery that changed it,
+     // the recheck route refuses the same through native-item-check-source-amendment-required; the registry is re-read at execution time.
+@@ -1743,6 +1765,11 @@ export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate,b
+     // test fails; the verdict of a check must not depend on the runner that happens to host this process.
+     delete checkEnv.NODE_TEST_CONTEXT;
+     for(const check of itemDelivery.checks) {
++      if(check.document!==undefined) {
++        // G20-65: verified above from the committed bytes; no process runs, the row records the document and its passing status.
++        results.push({id:check.id,path:check.path,document:check.document,status:0,signal:null,error:null,stdoutSha256:digest(Buffer.alloc(0)),stderrSha256:digest(Buffer.alloc(0))});
++        continue;
++      }
+       if(check.command!==undefined) {
+         const entry=[...registry.baseline,...registry.areas.flatMap(area=>area.commands)].find(row=>row.id===check.command);
+         if(!entry)throw nativeManagedFault('item-check-command-unregistered');
+@@ -1761,7 +1788,7 @@ export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate,b
+       verdict:results.every(row=>row.status===0&&!row.signal&&!row.error)?'passed':'failed'};
+     const handle=Object.freeze({});governedCheckHandles.set(handle,{root:before.repository.primaryRoot,evidence});
+     return {status:'observed',code:evidence.verdict==='passed'?'SQ-TARGETED-CHECKS-PASSED':'SQ-TARGETED-CHECKS-FAILED',handle,evidence:structuredClone(evidence)};
+-  }catch(error){return {status:'refused',code:error.code??'SQ-TARGETED-CHECKS-UNAVAILABLE',reason:error.reason??error.message};}
++  }catch(error){return {status:'refused',code:error.code??'SQ-TARGETED-CHECKS-UNAVAILABLE',reason:error.reason??error.message,...(typeof error.repair==='string'?{repair:error.repair}:{})};}
+ }
+ export function inspectGovernedItemDeliveryChecks({root,handle,candidate,itemDelivery}={}) {
+   const held=governedCheckHandles.get(handle);
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 921c63cc4..633926046 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ import { bindNativeCodexStart, prepareNativeGoldfishHostState,
+   readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
+-import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
++import { NATIVE_GOLDFISH_HOST_DIRECTIVE, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
+ import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices, sessionAuthorityRegistryAbsent, createNativeGoldfishAuthorityProducerPort, heldDependencyReason, cancelUnstartedGovernedItemSlice, rollbackGovernedItemQueue } from "./native-goldfish-host-state.mjs";
+ import { createGovernanceScopeController } from "./governance-scope.mjs";
+ import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+@@ -1940,8 +1940,47 @@ const cases = [
+     }finally{child.kill();}
+   })},
+ 
++  // G20-65 (AC-108): a documentation-only module's item check is one of its own owned documents; the host verifies it from the committed bytes.
++  { id: "NGHS69", name: "G20-65: a document check passes for a changed, non-empty, committed owned document and records no process run", run: () => fixture(({root})=>{
++    const h=documentCheckHarness(root),base=h.commit({'docs/manual-checklist.md':'checklist\n'}),candidate=h.commit({'app/GUIDE.txt':'The guide.\n'});
++    const observed=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery(),candidate,baseCommit:base.commit});
++    assert.equal(observed.code,'SQ-TARGETED-CHECKS-PASSED',JSON.stringify(observed));
++    const [row]=observed.evidence.results;
++    assert.equal(row.document,'app/GUIDE.txt');assert.equal(row.status,0);assert.equal(row.executable,undefined);assert.equal(row.args,undefined);
++    assert.ok(observed.evidence.files.some(file=>file.path==='app/GUIDE.txt'),'the document digest binds the verdict');
++    assert.equal(inspectGovernedItemDeliveryChecks({root,handle:observed.handle,candidate,itemDelivery:h.delivery()}).verdict,'passed');
++    // The recheck route (no base commit) has no delivery to compare with: it still requires the committed, non-empty regular document.
++    assert.equal(executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery(),candidate}).code,'SQ-TARGETED-CHECKS-PASSED');
++  })},
++  { id: "NGHS70", name: "G20-65: a document check is refused with a typed reason and a repair for a missing, empty, unchanged or unlisted document", run: () => fixture(({root})=>{
++    const h=documentCheckHarness(root),base=h.commit({'docs/manual-checklist.md':'checklist\n','app/KEPT.txt':'kept\n'});
++    const missing=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery(),candidate:base,baseCommit:base.commit});
++    assert.equal(missing.status,'refused',JSON.stringify(missing));assert.match(missing.reason,/document-check-missing/u);assert.match(missing.repair,/commit|write/u);
++    const empty=h.commit({'app/GUIDE.txt':''});
++    const emptied=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery(),candidate:empty,baseCommit:base.commit});
++    assert.equal(emptied.status,'refused',JSON.stringify(emptied));assert.match(emptied.reason,/document-check-empty/u);assert.match(emptied.repair,/non-empty|content/u);
++    const kept=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('app/KEPT.txt',['app/KEPT.txt','docs/manual-checklist.md']),candidate:empty,baseCommit:base.commit});
++    assert.equal(kept.status,'refused',JSON.stringify(kept));assert.match(kept.reason,/document-check-unchanged/u);assert.match(kept.repair,/change|write/u);
++    const stranger=h.delivery('app/GUIDE.txt',['docs/manual-checklist.md']);
++    assert.equal(validateItemDeliveryBriefing(stranger).ok,false,'a document that is not among the dependencies (the write scope) is not a valid check');
++    assert.equal(validateItemDeliveryBriefing({...h.delivery(),checks:[{...h.delivery().checks[0],document:'docs/manual-checklist.md'}]}).ok,false,'the document field must name the check path');
++  })},
++
+ ];
+ 
++/** G20-65 fixture: real commits of documents; the check is `{id, path, document, dependencies}` over them. */
++function documentCheckHarness(root){
++  const git=(...args)=>assert.equal(spawnSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c',`core.hooksPath=${devNull}`,'-c','commit.gpgsign=false',...args]).status,0,args.join(' '));
++  const commit=files=>{
++    for(const [path,text] of Object.entries(files)){mkdirSync(dirname(join(root,path)),{recursive:true});writeFileSync(join(root,path),text);}
++    git('add',...Object.keys(files));git('commit','-q','-m','documents');
++    return inspectSignedDescriptorCustodyRepository(root).candidate;
++  };
++  const delivery=(path='app/GUIDE.txt',dependencies=[path,'docs/manual-checklist.md'])=>({schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-A',itemId:'AC-1',criterionLocator:{schema:'pipeline.critic-criterion-locator.v1',sourcePath:'specs/unit/spec.md',sourceSha256:'a'.repeat(64),criterionId:'AC-1',startByte:1,endByte:20,excerptSha256:'b'.repeat(64)},
++    checks:[{id:'doc',path,document:path,dependencies}]});
++  return {commit,delivery};
++}
++
+ /** D195 fixture: a real calibration (project name = root basename) registering verifyImpact commands over a committed check script. */
+ function commandCheckHarness(root){
+   const name=root.split('/').pop();
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 8455faee5..d6fccb5e4 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -70,6 +70,8 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
+   --check is included in the write scope. Paths are repository-relative.
+   --check command:<id> (D195) names a command the project calibration registers under verifyImpact (baseline or an area) instead of a
+     .test file; the calibration becomes a dependency of the check and is not writable by the dispatch.
++  --check document:<owned path> (G20-65) names one document a documentation-only module owns (every owned path a document); the host finalize
++    verifies that the delivery changed it as a non-empty committed file. A code module keeps a test it owns or command:<id>.
+   --criterion selects a consumer Spec criterion (AC-<n> or AC-E<epic>-<story>-<nn>).
+ 
+ build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
+@@ -99,6 +101,8 @@ if (cliHelp) {
+ // Help is available before loading builders whose dependency initialization can
+ // resolve account paths. Ordinary imports and binding/build retain their owners.
+ const {
++  DOCUMENT_CHECK_FILE,
++  DOCUMENT_CHECK_PREFIX,
+   NATIVE_GOLDFISH_HOST_DIRECTIVE,
+   NATIVE_GOLDFISH_ITEM_BRIEFING_SCHEMA,
+   parseNativeGoldfishBriefing,
+@@ -702,13 +706,24 @@ export function generateDispatchBinding(options, deps = {}) {
+   if (!AGENT_TYPES.includes(agentType)) refuse("DBG-AGENT-TYPE-UNKNOWN", `unknown agent type ${JSON.stringify(agentType)}; expected one of ${AGENT_TYPES.join(", ")}`);
+   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(modelId)) refuse("DBG-MODEL-ID", `model id ${JSON.stringify(modelId)} is not a model identifier`);
+   const commandId = check.startsWith(COMMAND_CHECK_PREFIX) ? check.slice(COMMAND_CHECK_PREFIX.length) : null;
+-  for (const path of [...(commandId === null ? [check] : []), ...options.paths]) {
++  // G20-65: `document:<owned path>` names one document of a documentation-only module's write scope as the item check.
++  const documentPath = commandId === null && check.startsWith(DOCUMENT_CHECK_PREFIX) ? check.slice(DOCUMENT_CHECK_PREFIX.length) : null;
++  const checkFile = documentPath ?? check;
++  for (const path of [...(commandId === null ? [checkFile] : []), ...options.paths]) {
+     if (!validRepoPath(path)) refuse("DBG-PATH-INVALID", `path ${JSON.stringify(path)} must be repository-relative without .., ., .git or backslash segments`);
+   }
+   if (options.reconNote !== undefined && !isReconNotePath(options.reconNote)) {
+     refuse("DBG-PATH-INVALID", `recon note ${JSON.stringify(options.reconNote)} must be a repository-relative file path under ${RECON_NOTE_PREFIXES.join(" or ")} without .., ., .git or backslash segments`);
+   }
+-  if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) soft("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file (or command:<id> of a command the project calibration registers under verifyImpact)`);
++  if (documentPath !== null) {
++    if (!DOCUMENT_CHECK_FILE.test(documentPath)) soft("DBG-CHECK-DOCUMENT-KIND", `check ${check} must name a document file (a path ending in .md, .mdx, .txt, .rst or .adoc); repair: name one of the documents of the documentation-only module, or use a .test file or command:<id>`);
++    else if (options.documentationModule === undefined) soft("DBG-CHECK-DOCUMENT-MODULE", `check ${check} is the check of a documentation-only module (every owned path a document), and this dispatch names no such module; repair: dispatch through a briefing package that names "module" and "modulePlan" of a documentation-only module, or use a .test.mjs, .test.cjs or .test.js file or command:<id> of a command the project calibration registers under verifyImpact`);
++  } else if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) {
++    // G20-65: the module is documentation-only (it owns only documents), so the repair names the document form.
++    const documentRepair = options.documentationModule !== undefined && DOCUMENT_CHECK_FILE.test(check)
++      ? `; module ${options.documentationModule} owns only documents. repair: name ${check} as the check in the document form ${DOCUMENT_CHECK_PREFIX}${check}` : "";
++    soft("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file (or command:<id> of a command the project calibration registers under verifyImpact)${documentRepair}`);
++  }
+   if (commandId !== null && !VERIFY_COMMAND_ID.test(commandId)) refuse("DBG-CHECK-COMMAND-UNKNOWN", `check ${check} does not carry a command id of the shape ${VERIFY_COMMAND_ID}`);
+   let root;
+   try { root = realpathSync(resolve(options.root ?? process.cwd())); } catch { refuse("DBG-ROOT-UNREADABLE", "--root cannot be resolved to a directory"); }
+@@ -725,7 +740,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     directoryExpansions.push({ path, files: listed });
+     expandedPaths.push(...listed);
+   }
+-  const allowedPaths = [...new Set([...(commandId === null ? [check] : []), ...expandedPaths])].sort();
++  const allowedPaths = [...new Set([...(commandId === null ? [checkFile] : []), ...expandedPaths])].sort();
+   if (allowedPaths.length > MAX_ALLOWED_PATHS) refuse("DBG-SCOPE-TOO-MANY-PATHS", `the write scope holds ${allowedPaths.length} exact files and the native host admits at most ${MAX_ALLOWED_PATHS}${directoryExpansions.length === 0 ? "" : ` (directories expanded: ${directoryExpansions.map((entry) => `${entry.path} -> ${entry.files.length}`).join(", ")})`}; split the work into several dispatches, each with its own exact files`);
+   for (const entry of directoryExpansions) {
+     warnings.push({ code: "DBG-DIRECTORY-EXPANDED", path: entry.path, files: entry.files, message: `${entry.path} is a directory: the write scope lists its ${entry.files.length} regular file(s) as they exist now. A file created there later is outside the scope; bind it with a new --path (a new binding), never by widening the match` });
+@@ -1091,7 +1106,7 @@ export function generateDispatchBinding(options, deps = {}) {
+       itemId,
+       criterionLocator: locator,
+       checks: [commandId === null
+-        ? { id: `${dispatchId.toLowerCase()}-check`, path: check, dependencies: [...allowedPaths] }
++        ? { id: `${dispatchId.toLowerCase()}-check`, path: checkFile, ...(documentPath === null ? {} : { document: documentPath }), dependencies: [...allowedPaths] }
+         : { id: `${dispatchId.toLowerCase()}-check`, path: commandCheckPath, command: commandId, dependencies: [...new Set([...allowedPaths, commandCheckPath])].sort() }],
+     },
+   };
+@@ -1204,23 +1219,27 @@ function resolveModulePackage(root, pkg, deps) {
+     const ids = (deps.integratedSliceIds ?? defaultIntegratedSliceIds)(root);
+     if (Array.isArray(ids) || ids instanceof Set) integrated = [...ids];
+   } catch { integrated = []; }
+-  const declared = [...(pkg.paths ?? []), ...(pkg.newFiles ?? []), ...(pkg.check.startsWith(COMMAND_CHECK_PREFIX) ? [] : [pkg.check])];
++  // G20-65: a `document:<path>` check declares the document itself; the module cut judges the form (documentation-only, owned).
++  const checkFile = pkg.check.startsWith(DOCUMENT_CHECK_PREFIX) ? pkg.check.slice(DOCUMENT_CHECK_PREFIX.length) : pkg.check;
++  const declared = [...(pkg.paths ?? []), ...(pkg.newFiles ?? []), ...(pkg.check.startsWith(COMMAND_CHECK_PREFIX) ? [] : [checkFile])];
+   const input = { modules: read.modules, moduleId: pkg.module, integratedSliceIds: integrated };
+-  const checked = moduleDispatchScope({ ...input, ...(declared.length === 0 ? {} : { paths: declared }) });
++  const checked = moduleDispatchScope({ ...input, check: pkg.check, ...(declared.length === 0 ? {} : { paths: declared }) });
+   if (!checked.ok) throw new BriefingPackageRefusal(checked.code, checked.message);
+   // G20-59: the wave order tracks a module by its slice id; a dispatch under another id is delivered and integrated, but the
+   // modules waiting for it stay blocked, and the only way out was a second dispatch of the whole module.
+   if (!deliversModuleSlice(pkg.id, checked.sliceId, checked.planSliceIds)) {
+     throw new BriefingPackageRefusal("DBG-MODULE-SLICE-ID", `dispatch id ${JSON.stringify(String(pkg.id).slice(0, 64))} does not name the slice of module ${pkg.module}; the wave order tracks this module as ${checked.sliceId}, so a delivery under another id never releases the modules that wait for it; repair: set "id" to ${checked.sliceId} (a further attempt on the same module: ${checked.sliceId}-r2, -r3, ...), then build again`);
+   }
+-  if (pkg.paths !== undefined) return { pkg, warnings: [] };
++  // G20-65: the binding learns from the cut that the module is documentation-only (the generator itself cannot see the module).
++  const withDocumentation = (value) => (checked.documentationOnly === true ? { ...value, documentationModule: pkg.module } : value);
++  if (pkg.paths !== undefined) return { pkg: withDocumentation(pkg), warnings: [] };
+   const derived = declared.length === 0 ? checked : moduleDispatchScope(input);
+   const files = expandModuleScope(root, derived.writeScope);
+   if (files.length === 0 && (pkg.newFiles ?? []).length === 0) {
+     throw new BriefingPackageRefusal("DBG-MODULE-SCOPE-EMPTY", `module ${pkg.module} owns ${derived.writeScope.join(", ")}, which holds no file today, so the derived write scope is empty and a write scope is a list of exact files; repair: list the files the dispatch creates under "newFiles", or declare "paths"`);
+   }
+   return {
+-    pkg: { ...pkg, paths: files },
++    pkg: withDocumentation({ ...pkg, paths: files }),
+     warnings: [{ code: "DBG-MODULE-SCOPE-DERIVED", moduleId: pkg.module, ownedPaths: derived.writeScope, files, message: `the write scope of module ${pkg.module} (${derived.writeScope.join(", ")}) is listed as the ${files.length} regular file(s) it holds now. A file created there later is outside the scope; add it under "newFiles" in a new briefing, never by widening the match` }],
+   };
+ }
+@@ -1233,6 +1252,7 @@ function packageBindingOptions(root, pkg, agentType) {
+     check: pkg.check, paths: [...new Set([...pkg.paths, ...(pkg.newFiles ?? [])])], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote, runner: pkg.runner,
+     // The package carries the same escalation act as the --effort-escalation flag; the binding is its only validator.
+     ...(pkg.effortEscalation === undefined ? {} : { effortEscalation: pkg.effortEscalation }),
++    ...(pkg.documentationModule === undefined ? {} : { documentationModule: pkg.documentationModule }),
+   };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 185730b3b..65fdae0b2 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -2436,3 +2436,102 @@ test("module package: the two reference keys come together, and a package withou
+   const legacy = packageFixture();
+   assert.equal(runDispatchBriefing(legacy.argv, depsOf(legacy.fx)).ok, true);
+ });
++
++// --- G20-65 (AC-108; measured in the Claude greenfield on candidate 20c, 2026-11-08): a module that owns only documents had no executable dispatch route ---
++// The design's module user-guide owned app/ANLEITUNG.txt and docs/manual-checklist.md; its test belonged to module shell. probe refused the package with
++// DBG-CHECK-NOT-TEST (check = the document) and DBG-MODULE-SCOPE-CROSSES (check = the test of shell), so the Elephant wrote both documents itself.
++
++function docModulePackage(over = {}) {
++  const made = packageFixture({
++    paths: undefined, module: "guide", modulePlan: "specs/prd.md", id: "slice-guide", check: "document:app/GUIDE.txt",
++    newFiles: ["app/GUIDE.txt", "docs/manual-checklist.md"], targeted: ["`the guide documents are written`"], ...over,
++  });
++  const row = (id, ownedPaths, publicContracts, verificationEntryPoints, kind) => ({
++    id, ...(kind === undefined ? {} : { kind }), responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths, publicContracts,
++    allowedDependencies: [], authorityEffects: [], verificationEntryPoints, adrReferences: [],
++  });
++  const design = {
++    schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
++    disposition: { decision: "approved-scoped", scope: ["specs/", "src/", "tests/", "app/", "docs/", "architecture/"], rationale: "fixture" },
++    modules: [
++      row("guide", ["app/GUIDE.txt", "docs/manual-checklist.md"], ["app/GUIDE.txt"], [], "documentation"),
++      row("shell", ["src/**", "tests/**"], ["src/index.mjs"], ["tests/user-guide.test.mjs"]),
++    ],
++    implementationSurface: ["src/index.mjs", "app/GUIDE.txt"],
++    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } },
++  };
++  mkdirSync(join(made.fx.root, "specs"), { recursive: true });
++  writeFileSync(join(made.fx.root, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
++  return made;
++}
++const moduleFindingOf = (probed) => probed.findings.find((entry) => entry.check === "module-scope" || entry.check === "binding");
++
++test("G20-65: a documentation-only module package with a document: check probes ready and builds a document check the host parser accepts", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = docModulePackage();
++  const probed = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx));
++  assert.equal(probed.ready, true, JSON.stringify(probed.findings));
++  const built = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 500));
++  const parsed = parseNativeGoldfishBriefing(built.text);
++  assert.equal(parsed.ok, true, parsed.code);
++  const [check] = parsed.binding.itemDelivery.checks;
++  assert.deepEqual(Object.keys(check).sort(), ["dependencies", "document", "id", "path"]);
++  assert.equal(check.path, "app/GUIDE.txt");
++  assert.equal(check.document, "app/GUIDE.txt");
++  assert.deepEqual(parsed.binding.allowedPaths, ["app/GUIDE.txt", "docs/manual-checklist.md"]);
++  assert.ok(parsed.binding.allowedPaths.every((path) => check.dependencies.includes(path)), "every allowed path is a dependency of the check");
++});
++
++test("G20-65: the document form is refused for a code module, without a module, for an unowned document and for a non-document file", async () => {
++  const { runDispatchBriefing } = await lib();
++  const code = docModulePackage({ module: "shell", id: "slice-shell", check: "document:src/NOTES.md", newFiles: ["src/NOTES.md"] });
++  const codeBuilt = runDispatchBriefing(code.argv, depsOf(code.fx));
++  assert.equal(codeBuilt.ok, false);
++  assert.equal(codeBuilt.code, "DBG-CHECK-DOCUMENT-MODULE", codeBuilt.message);
++  assert.match(codeBuilt.message, /repair: /u);
++  assert.match(codeBuilt.message, /\.test\.mjs/u, "a code module is pointed back to a test file or a registered command");
++  assert.equal(moduleFindingOf(runDispatchBriefing(probeArgvOf(code.fx), probeDepsOf(code.fx)))?.code, "DBG-CHECK-DOCUMENT-MODULE");
++
++  const bare = packageFixture({ check: "document:docs/guide.md", paths: ["docs/guide.md"], newFiles: ["docs/guide.md"], targeted: ["`the guide is written`"] });
++  const bareBuilt = runDispatchBriefing(bare.argv, depsOf(bare.fx));
++  assert.equal(bareBuilt.code, "DBG-CHECK-DOCUMENT-MODULE", "without a module reference there is no documentation-only module to judge");
++
++  const foreign = docModulePackage({ check: "document:docs/other.md", newFiles: ["app/GUIDE.txt", "docs/other.md"] });
++  const foreignBuilt = runDispatchBriefing(foreign.argv, depsOf(foreign.fx));
++  assert.equal(foreignBuilt.code, "DBG-CHECK-DOCUMENT-NOT-OWNED", foreignBuilt.message);
++  assert.match(foreignBuilt.message, /app\/GUIDE\.txt/u, "the repair names the documents the module owns");
++
++  const plainFixture = makeFixture();
++  const kind = runDispatchBriefing(argvOf(plainFixture, { "--check": "document:app/run.mjs" }), depsOf(plainFixture));
++  assert.equal(kind.code, "DBG-CHECK-DOCUMENT-KIND", kind.message);
++  assert.match(kind.message, /\.md/u);
++});
++
++test("G20-65: the DBG-CHECK-NOT-TEST and DBG-MODULE-SCOPE-CROSSES repairs name the document form for a documentation-only module, and only for it", async () => {
++  const { runDispatchBriefing } = await lib();
++  const bare = docModulePackage({ check: "app/GUIDE.txt" });
++  const notTest = runDispatchBriefing(bare.argv, depsOf(bare.fx));
++  assert.equal(notTest.code, "DBG-CHECK-NOT-TEST");
++  assert.match(notTest.message, /document:app\/GUIDE\.txt/u);
++  // the probe lists the consequence (DBG-BINDING-INVALID, item delivery shape) before the cause; the repair of the cause names the document form
++  const probedFindings = runDispatchBriefing(probeArgvOf(bare.fx), probeDepsOf(bare.fx)).findings;
++  assert.equal(probedFindings.find((entry) => entry.code === "DBG-CHECK-NOT-TEST")?.repair.includes("document:app/GUIDE.txt"), true, JSON.stringify(probedFindings));
++
++  const crossing = docModulePackage({ check: "tests/user-guide.test.mjs", newFiles: ["app/GUIDE.txt", "tests/user-guide.test.mjs"] });
++  const crosses = runDispatchBriefing(crossing.argv, depsOf(crossing.fx));
++  assert.equal(crosses.code, "DBG-MODULE-SCOPE-CROSSES");
++  assert.match(crosses.message, /document:app\/GUIDE\.txt/u, "the module is documentation-only, so the repair names the document check");
++
++  const codeModule = modulePackage({ paths: ["src/core/a.mjs", "src/api/handler.mjs"], newFiles: ["src/core/a.mjs", "src/api/handler.mjs"] });
++  const codeCrosses = runDispatchBriefing(codeModule.argv, depsOf(codeModule.fx));
++  assert.equal(codeCrosses.code, "DBG-MODULE-SCOPE-CROSSES");
++  assert.doesNotMatch(codeCrosses.message, /document:/u, "a code module keeps the old repair");
++  const plain = packageFixture();
++  assert.doesNotMatch(runDispatchBriefing(argvOf(plain.fx, { "--check": PATH_A }), depsOf(plain.fx)).message, /document:/u);
++});
++
++test("G20-65: the happy-path guide states the document check rule in one sentence", () => {
++  const guide = readFileSync(join(HERE, "..", "skills", "pipeline-start", "references", "happy-path.md"), "utf8");
++  assert.match(guide, /documentation-only module[^\n]*`document:<owned path>`/u);
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 33c103448..7cc97be6d 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -64,6 +64,7 @@ command tables.
+    declared path reaches another module, and with `DBG-MODULE-NOT-RUNNABLE` while a module it depends on has no accepted result.
+    The package `id` of a module dispatch is that module's slice id from the proposal (`slice-<module>`; a further attempt on the same module:
+    `slice-<module>-r2`, `-r3`, ...): the waves track a module by this id only, so any other id is refused with `DBG-MODULE-SLICE-ID`.
++   A documentation-only module (every owned path is a document: `docs/` or `.md`, `.mdx`, `.txt`, `.rst`, `.adoc`) names one of its own documents as the check, `document:<owned path>` (package `check`, `--check`), and the host verifies that the delivery changed it as a non-empty committed file; a code module keeps a test it owns or `command:<id>`.
+ 3. Dispatch by runner:
+    - **Claude**: `Agent` / `Task` with the functional `agentType`.
+    - **Codex**: `spawn_agent` with `nativeAgentType: "worker"`, keeping the `pipeline-core:goldfish-implementor` (or `-mechanic`) role.
