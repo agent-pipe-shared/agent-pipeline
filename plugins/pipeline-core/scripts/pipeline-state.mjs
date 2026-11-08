@@ -13525,7 +13525,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         const result = applyDesignInputRecapture({ rootDir: dir, expectedPlanSha256: rest[1] });
         if (result.mutated) removeSealPlanFile(dir);
         console.log(JSON.stringify(result, null, 2));
-        console.log(`Next: commit ${result.designInputPath} on its own, then run submit-plan if the plan is not submitted, prepare-seal and present-plan. The PRD, the Spec and their reviews stay unchanged; their Source lines keep the earlier digest, and the private history records the step from it to the new one.`);
+        console.log(`Next: commit ${result.designInputPath} on its own, then run submit-plan if the plan is not submitted, prepare-seal with the same --review-receipt paths as before, and present-plan. The PRD, the Spec and their reviews stay unchanged; their Source lines keep the earlier digest, and the private history records the step from it to the new one.`);
         return 0;
       } catch (error) {
         if (error instanceof OnboardingContinuityKickoffError) return refused(error.code, error.message);

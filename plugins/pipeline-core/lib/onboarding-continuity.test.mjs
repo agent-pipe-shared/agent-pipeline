@@ -4593,6 +4593,10 @@ check("recapture-design-input: a bound design input holding an address is regene
   assert.equal(spawnSync("git", ["add", "--", relativePath], { cwd: root, encoding: "utf8", shell: false }).status, 0);
   assert.equal(scanChangedContent(root, { scopes: ["staged"] }).ok, false, "the state this repairs: the commit check refuses the bound file");
 
+  const onboardingStatus = () => JSON.parse(spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url)), "inspect", "--root", root], {
+    cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+  }).stdout).status;
+  const statusBefore = onboardingStatus();
   const planned = recaptureCommand(root, "recapture-design-input");
   assert.equal(planned.status, 0, planned.stderr);
   assert.equal(planned.stdout.includes(address), false, "a plan never prints the content");
@@ -4604,6 +4608,7 @@ check("recapture-design-input: a bound design input holding an address is regene
   const applied = recaptureCommand(root, "recapture-design-input", "--plan-sha256", plan.planSha256);
   assert.equal(applied.status, 0, applied.stderr);
   assert.match(applied.stdout, /Next: commit .* on its own, then run submit-plan/u);
+  assert.equal(onboardingStatus(), statusBefore, "the onboarding reader treats the recorded recapture as the same project state");
   assert.equal(readFileSync(path, "utf8"), seed.redacted);
   assert.equal(spawnSync("git", ["add", "--", relativePath], { cwd: root, encoding: "utf8", shell: false }).status, 0);
   assert.deepEqual(scanChangedContent(root, { scopes: ["staged"] }), { ok: true, findings: [] }, "the file can now be committed");
