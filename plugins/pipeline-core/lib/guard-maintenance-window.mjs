@@ -130,6 +130,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
   "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
   "project/critical-human-proof.json",
+  // Candidate 20j: pipeline-state.mjs imports the implementation entry gate.
+  "plugins/pipeline-core/lib/implementation-entry-gate.mjs",
   // F2 (NVA-A7FIX-1): the two modules THIS file itself imports and calls
   // (createPoApprovalIntent above; readCriticalHumanProofPolicy/
   // verifyAgainstTrustAnchors above) to actually verify a window and every

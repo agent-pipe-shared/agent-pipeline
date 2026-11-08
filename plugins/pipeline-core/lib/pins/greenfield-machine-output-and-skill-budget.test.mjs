@@ -55,7 +55,9 @@ for (const runner of RUNNERS) {
       const firstAskMarker = JSON.stringify(parsed.pendingAsks[0].applyAction ?? parsed.pendingAsks[0].input);
       assert.equal(stdout.split(firstAskMarker).length - 1, 1, `${runner}: first ask serialized more than once`);
     } else {
-      assert.ok(["collect-input", "ready", "external-operator"].includes(parsed.outcome), `${runner}: unexpected ${parsed.outcome}`);
+      // Restated 2026-11-08 (QG-04, candidate 21): on Antigravity onboarding that created the repository stops for a restart before the first asks.
+      const expectedOutcomes = runner === "antigravity" ? ["collect-input", "ready", "external-operator", "runner-restart-required"] : ["collect-input", "ready", "external-operator"];
+      assert.ok(expectedOutcomes.includes(parsed.outcome), `${runner}: unexpected ${parsed.outcome}`);
     }
   });
 }

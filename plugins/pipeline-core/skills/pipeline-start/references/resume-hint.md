@@ -5,6 +5,12 @@ session cut or Compact after kickoff, or when `resume-hint.mjs inspect` reports
 an available card. This is a capture and consumption duty, never a new
 readiness gate.
 
+A short goal with no further material input needs no card. Interpret user intent
+rather than keywords: an intended restart or session cut captures the card;
+changed scope or constraints refresh it; canonised or revoked information is
+discarded. When no restart follows a capture, use the card as context for the
+current kickoff or planning step.
+
 The pre-restart guard admits exactly one command shape: card at
 `<root>/project/.resume-hint-input.json`, `--consume-card`, no extra flags.
 Write the card first. A ready session may use any `--card-file <json>`.

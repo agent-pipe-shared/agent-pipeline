@@ -190,7 +190,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["claude-task-output-read-scope-tests","plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs","top-level-assertions",20],
     ["claude-task-output-scope-posttool-tests","plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs","top-level-assertions",9],
     ["clone-hook-readiness-rollback-tests","plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs","top-level-assertions",86],
-    ["close-path-e2e-tests","plugins/pipeline-core/scripts/close-path-e2e.test.mjs","node-test-single",98], // cand. 20b (QG-04: extension only): the legacy-process-only row of candidate 20 step 54, measured 86; 87 after G20-54 (the fixture asserts materialize-architecture registered the package); 89 after the two set-phase output assertions (package step named, "below" only when the tiers follow)
+    ["close-path-e2e-tests","plugins/pipeline-core/scripts/close-path-e2e.test.mjs","node-test-single",99], // cand. 21 (QG-04: restated, measured): 98->99, the briefing-binds-HEAD line; cand. 20b (QG-04: extension only): the legacy-process-only row of candidate 20 step 54, measured 86; 87 after G20-54 (the fixture asserts materialize-architecture registered the package); 89 after the two set-phase output assertions (package step named, "below" only when the tiers follow)
     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
@@ -267,7 +267,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["schema-lite-alternatives-tests","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs","top-level-assertions",49],
     ["scratch-package-staging-tests","plugins/pipeline-core/lib/scratch-package-staging.test.mjs","top-level-assertions",42],
     ["security-scan-large-inventory-tests","plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs","node-test-single",4],
-    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",324], // cand. 19g (QG-04: extension only): 295->319, the four cross-process memo cases SAS21-SAS24; cand. 19h w235: 319->324, SAS25 (byte-less observations persisted)
+    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",326], // cand. 21 (QG-04: restated, measured): 324->326, two cases added in 20j; cand. 19g (QG-04: extension only): 295->319, the four cross-process memo cases SAS21-SAS24; cand. 19h w235: 319->324, SAS25 (byte-less observations persisted)
     ["shared-pool-bounds-tests","plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","top-level-assertions",4],
     ["shared-pool-occupancy-tests","plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","top-level-assertions",19],
     ["shell-grammar-capability-placement-tests","harness/scripts/shell-grammar-capability-placement.test.mjs","top-level-assertions",21],

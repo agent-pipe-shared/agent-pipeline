@@ -650,8 +650,8 @@ export const ALLOWLIST = Object.freeze([
   // (generate-vendored-canon.mjs UNIVERSAL_STANDALONE_FILES); its two harness/ mentions
   // (§7, English and its German reference-translation counterpart) are inherited unchanged
   // from the source, same class as the pre-existing VENDORED_CANON_ALLOWLIST entries above.
-  { file: "plugins/pipeline-core/docs/operating-model.md", match: "harness/scripts/check-po-gate-authority.mjs`; user-facing", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // L350 (EN)
-  { file: "plugins/pipeline-core/docs/operating-model.md", match: "harness/scripts/check-po-gate-authority.mjs`; Nutzertexte", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // L696 (DE reference translation)
+  { file: "plugins/pipeline-core/docs/operating-model.md", match: "`node harness/scripts/check-po-gate-authority.mjs`;", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // EN, the sentence was rewrapped
+  { file: "plugins/pipeline-core/docs/operating-model.md", match: "a hosted project has no `harness/`", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // EN, second mention
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "SOURCE_READER_CHECKER_PATH = \"harness/scripts/check-doc-reader-binding.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/verify.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/check-doc-contracts.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },

@@ -83,7 +83,7 @@ function matchLength(pattern, file) {
 
 /**
  * The changed paths a Critic must never read: exactly the exclusions of the range's correction-input bindings (project-state record, finding-disposition record, retained prior
- * result; harness/review-protocol.md §2.2). A path is here only because the derivation bound it.
+ * result; review protocol §2.2). A path is here only because the derivation bound it.
  * The preflight has already judged this derivation, so a failure here excludes nothing and the path stays visible to its Critic.
  */
 function boundExclusions(root, base, candidate) {
@@ -98,7 +98,7 @@ function boundExclusions(root, base, candidate) {
 }
 
 /**
- * The one directory exception of harness/review-protocol.md §2.2, for split rounds only: delivery records (run evidence of a feature, backlog notes) are left out of the parts,
+ * The one directory exception of the review protocol §2.2, for split rounds only: delivery records (run evidence of a feature, backlog notes) are left out of the parts,
  * a file with a script extension in those folders stays review source. Keep this list and that section identical.
  */
 const DELIVERY_RECORD_PATH = /^(?:specs\/[^/]+\/evidence\/|backlog\/(?:items|evidence|dispatch-specs)\/)/u;

@@ -186,7 +186,9 @@ export function materializeArchitectureDesignFixture({
   // commits a protected proof-policy mutation.  The physical design artifacts
   // still get a real candidate commit, while the actual signature is verified
   // against the temporary policy bytes for this isolated fixture.
-  git(root, ["add", "--", "architecture", ...(createdAgentEntry ? ["AGENTS.md"] : []), ...(sourceAlreadyTracked ? [] : [sourcePath]), planPath]);
+  git(root, ["add", "--", "architecture", ...(createdAgentEntry ? ["AGENTS.md"] : []), ...(sourceAlreadyTracked ? [] : [sourcePath]), planPath,
+    // submit-plan refuses an uncommitted Spec (PLAN-SUBMIT-UNCOMMITTED), and the fixture has just authored one.
+    ...(admitSpecCriterion ? [`${dirname(planPath)}/spec.md`] : [])]);
   commitIfStaged(root, "test fixture architecture design");
 
   const scope = decisionScope ?? [

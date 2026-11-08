@@ -277,7 +277,8 @@ test('(v) a design revision on the replacement route is one delta receipt and on
 test('(v-doc) the documented revision route is mechanical agent work and names no Advisor course',()=>{
  const doc=readFileSync(new URL('../../skills/pipeline-start/references/design-course.md',import.meta.url),'utf8');
  assert.match(doc,/mechanical agent work, not another PO permission/u);
- assert.match(doc,/correct the\s+sources with `reopen-design`, `submit-plan`, `present-plan`/u);
+ // Restated 2026-11-08 (QG-04, candidate 21): 20j made a correction before submit-plan an ordinary edit; reopen-design stays for a submitted package.
+ assert.match(doc,/correct the\s+sources now\. Before `submit-plan` this is an ordinary edit and commit;\s+`reopen-design` exists only for a package that was already submitted/u);
  assert.match(doc,/There is no\s+mandatory initial Advisor course/u);
  const state=readFileSync(new URL('../../scripts/pipeline-state.mjs',import.meta.url),'utf8');
  assert.match(state,/present-plan accepts only --by <name> and --review-receipt <repo-relative-json-path>/u,'present-plan takes no dispatch, course or override argument');

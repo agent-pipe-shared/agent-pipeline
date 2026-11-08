@@ -313,6 +313,8 @@ below assumes it holds and is written to catch a change that would break it.
   never-liftable Source root. Its direct first-party import
   `scripts/publication-gate-evidence.mjs` is also never liftable. GMWKC01 walks
   their import closure; the other direct dependencies were already protected.
+- The implementation entry gate of candidate 20j adds `lib/implementation-entry-gate.mjs`:
+  `scripts/pipeline-state.mjs` imports it, so GMWKC01 walks it too.
 - The 2026-09-20 Alfred candidate architecture adoption, design advisory, and rigor closure adds:
   `lib/advisory-receipt.mjs`, `lib/architecture-adoption-authority.mjs`,
   `lib/architecture-adoption-orientation.mjs`, `lib/architecture-design.mjs`,
