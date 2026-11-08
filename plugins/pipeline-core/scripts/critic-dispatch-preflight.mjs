@@ -26,6 +26,7 @@ import { evaluateReviewAdmission } from "../lib/review-admission-read.mjs";
 import { criticCoverageAdvisory, listUncoveredCriticRecords, terminalAuthoredDelivery, walkDispatchRecordsForReview } from "../lib/review-admission-read.mjs";
 import { criticDisposition } from "../lib/critic-skip-decision.mjs";
 import { SAFE_ID, admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
+import { buildCriticSplit } from "../lib/critic-split.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import {
   CriticGuardrailDerivationError,
@@ -702,15 +703,18 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
     event: fillPlaceholder("event", "null, or an object with eventOutPath and featureId"),
   };
   const promptLines = opusCriticPromptLines({ root, result, env: deps.env ?? process.env, registry: deps.registry, trigger });
+  // G20-72: a range above the one named bound is split per module; `admit` rebuilds the identical object and binds its digest.
+  const split = buildCriticSplit({ root, result });
   const nextStep = [
     `Write admitRequest verbatim as ${ADMIT_REQUEST_FILE} (JSON), replace only its placeholders (${admitRequestPlaceholderPaths(request).join(", ")}), then run admitCommand; admit refuses an unfilled placeholder by name.`,
     `trigger ${trigger} is ${trigger === appliedRow ? "the applied Critic row of the matched dispatch record" : "the strictest default (no matched record row of T1 to T3)"}; change it only if your Critic-required decision says otherwise.`,
     ...(taskIdResolution === null ? [] : [`taskId: ${taskIdResolution.reason}.`]),
     ...(course ? [] : ["This review is no feature package, so it needs a registered generic batch: run session-critic-finalizer.mjs register-batch first and copy its batchRef and memberSha256 into review.genericBatchRef."]),
     ...(promptLines === null ? [] : ["The Critic route is Opus: put criticDispatchPromptLines into the Critic dispatch prompt (MP-07), or the dispatch policy refuses it."]),
+    ...(split === null ? [] : [`SPLIT: this range has ${split.changedFileCount} changed files, above the bound of ${split.maxChangedFiles} one Critic can read, so it is split (split.entries, ${split.entries.length} entries, plan ${split.plan.status}). Dispatch one Critic per split entry from the template, each with its entry's reviewerInput, its entry's batchScopeLine as the Batch scope (MP-07) line${promptLines === null ? "" : " (in place of criticDispatchPromptLines[0]; keep the rationale line)"} and the instruction to begin trajectory_evidence with its scopeMarker; run each entry's Critic once (a second run for an entry makes finalize refuse the round). Save split as a JSON file under scratch/, then merge the returned verdicts: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-split-merge.mjs --root <repo> --split <split file> --child <entryId>=<verdict file> (one per entry) --out <merged verdict file>; admit binds the split, finalize takes the merged verdict as verdictPath and labels it source-issued only when every child returned through the Critic stop.`]),
   ].join(" ");
   return { ...result, admitRequest: request, admitCommand: ["node", ADMIT_SCRIPT, "admit", "--root", input.root, "--request", ADMIT_REQUEST_FILE], nextStep,
-    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }) };
+    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(split === null ? {} : { split }) };
 }
 
 /**

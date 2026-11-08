@@ -695,7 +695,10 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
   const printedRun = directCli(fx, producerArgv(value));
   assert.equal(printedRun.status, 0);
   assert.equal(printedRun.stderr, "");
-  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, ...printedRest } = JSON.parse(printedRun.stdout);
+  // G20-72 (same criterion, same strictness): a range above the split bound also prints the additive `split`; it is stripped like the other additive fields, and this fixture's
+  // one-file range is below the bound so the printed line is compared byte for byte without it.
+  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, split: _printedSplit, ...printedRest } = JSON.parse(printedRun.stdout);
+  assert.equal(_printedSplit, undefined, "a one-file range carries no split");
   assert.equal(JSON.stringify(printedRest) + "\n", JSON.stringify(expected) + "\n");
   assert.equal(printedAdmitRequest.schema, "pipeline.session-critic-finalization-request.v3");
   assert.equal(printedAdmitCommand.at(-1), "scratch/session-critic-finalization-request.json");
@@ -2124,6 +2127,99 @@ test("G20-69 the request trigger is the applied Critic row of the matched dispat
     // The duty follows the trigger as admit's does: the normal Critic duty for T3, the high-risk one for T1 and T2 (both are Opus on the registered Claude route).
     assert.match(g2069Printed(fx, { taskId: "G2069-R3" }).criticDispatchPromptLines[1], /duty\.critic_normal/u);
     assert.match(g2069Printed(fx, { taskId: "G2069-R2" }).criticDispatchPromptLines[1], /duty\.critic_high_risk/u);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+// G20-72 (candidate 20e, AC-108): a review range too large for one Critic is split per module. The printed result carries an additive `split` (one entry per module of the
+// approved architecture plan, one shared entry for every changed path no module owns); the library result the finalizer binds stays byte-identical, and a range at or below the
+// one named bound prints exactly what it printed before. Criterion-bound cases, written before the implementation existed.
+function g2072Design() {
+  return { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
+    disposition: { decision: "approved-scoped", scope: ["specs/", "src/"], rationale: "fixture" },
+    modules: ["core", "api"].map((id) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`],
+      allowedDependencies: id === "api" ? ["core"] : [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [] })),
+    implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
+    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } } };
+}
+function g2072Fixture({ core = 12, api = 12, loose = 4, plan = true } = {}) {
+  const root = mkdtempSync(join(tmpdir(), "critic-split-preflight-"));
+  for (const dir of [".claude", "governance/guidelines", "governance/policies", "specs/feat", "evidence", "src/core", "src/api", "docs"]) mkdirSync(join(root, dir), { recursive: true });
+  git(root, ["init", "-q"]);
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
+  writeFileSync(join(root, "governance", "guidelines", "review.md"), "Review changed code.\n");
+  writeFileSync(join(root, "governance", "policies", "checklist.md"), "- verify\n");
+  writeFileSync(join(root, "specs", "feat", "spec.md"), "# Spec\n");
+  const base = commit(root, "base");
+  writeFileSync(join(root, "specs", "feat", "spec.md"), "# Spec\n\nchanged\n");
+  if (plan) writeFileSync(join(root, "specs", "feat", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(g2072Design(), null, 2)}\n\`\`\`\n`);
+  for (let index = 0; index < core; index += 1) writeFileSync(join(root, "src", "core", `c${index}.mjs`), `export const c${index} = ${index};\n`);
+  for (let index = 0; index < api; index += 1) writeFileSync(join(root, "src", "api", `a${index}.mjs`), `export const a${index} = ${index};\n`);
+  for (let index = 0; index < loose; index += 1) writeFileSync(join(root, "docs", `note${index}.md`), `note ${index}\n`);
+  const candidate = commit(root, "candidate");
+  const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
+  writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
+  return { root, base, candidate, tree };
+}
+const g2072Input = (fx) => ({ root: fx.root, base: fx.base, candidate: fx.candidate, specPath: "specs/feat/spec.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"], priorCriticEvidencePath: null });
+const g2072Changed = (fx) => git(fx.root, ["diff", "--name-only", fx.base, fx.candidate]).split("\n").filter((line) => line !== "");
+test("G20-72 above SPLIT_MAX_CHANGED_FILES the printed result carries one split entry per module plus a shared entry, disjoint and covering every changed path; the library result is unchanged", async () => {
+  const { CRITIC_SPLIT_SCHEMA, SPLIT_MAX_CHANGED_FILES, SPLIT_SHARED_ENTRY_ID } = await import("../lib/critic-split.mjs");
+  const fx = g2072Fixture();
+  try {
+    const changed = g2072Changed(fx);
+    assert.ok(changed.length > SPLIT_MAX_CHANGED_FILES, `${changed.length} changed files`);
+    const library = preflightCriticDispatch(g2072Input(fx));
+    assert.equal(Object.hasOwn(library, "split"), false, "the library result is digest-bound by the session finalizer");
+    const printed = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
+    assert.equal(printed.status, "packet-ready", JSON.stringify(printed));
+    const { split } = printed;
+    assert.equal(split.schema, CRITIC_SPLIT_SCHEMA);
+    assert.equal(split.changedFileCount, changed.length);
+    assert.deepEqual(split.entries.map((entry) => entry.id), ["api", "core", SPLIT_SHARED_ENTRY_ID]);
+    const all = split.entries.flatMap((entry) => entry.paths);
+    assert.deepEqual([...all].sort(), [...changed].sort(), "every changed path is in exactly one entry, none dropped");
+    assert.equal(new Set(all).size, all.length, "the entry scopes are disjoint");
+    assert.deepEqual(split.entries.find((entry) => entry.id === "core").paths.every((path) => path.startsWith("src/core/")), true);
+    assert.ok(split.entries.find((entry) => entry.id === SPLIT_SHARED_ENTRY_ID).paths.includes("docs/note0.md"), "a path no module owns lands in the shared entry");
+    for (const entry of split.entries) {
+      assert.match(entry.batchScopeLine, /^Batch scope \(MP-07\):\s*\S/u);
+      assert.ok(entry.batchScopeLine.includes(entry.id), entry.batchScopeLine);
+      assert.equal(entry.scopeMarker, `scope:${entry.id}`);
+      assert.deepEqual(entry.reviewerInput, { ...printed.dispatch.reviewerInput, changedPaths: entry.paths }, "an exact path-only reviewer input: the parent's plus the entry's own changed paths");
+      assert.equal(dispatchFindings({ subagentType: "critic", prompt: ["Model/effort for this run: claude-sonnet-5-5 / high", `Ruleset SHA: ${fx.candidate}`, entry.batchScopeLine].join("\n") })
+        .findings.some(({ code }) => code.startsWith("DISPATCH-RECRITIC")), false);
+    }
+    assert.match(printed.nextStep, /one Critic per split entry/u);
+    assert.match(printed.nextStep, /critic-split-merge\.mjs/u);
+    const { admitRequest: _a, admitCommand: _c, nextStep: _n, criticDispatchPromptLines: _l, taskIdResolution: _t, split: _s, ...rest } = printed;
+    assert.deepEqual(rest, preflightModule.preflightCriticDispatchWithCoverage(g2072Input(fx)), "the admit fields and the split are the only additions");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("G20-72 a range at the bound prints no split and a next step without a merge; one file more prints it", async () => {
+  const { SPLIT_MAX_CHANGED_FILES } = await import("../lib/critic-split.mjs");
+  const small = g2072Fixture({ core: 10, api: 9, loose: 4 });
+  const big = g2072Fixture({ core: 10, api: 10, loose: 4 });
+  try {
+    assert.equal(g2072Changed(small).length, SPLIT_MAX_CHANGED_FILES);
+    const atBound = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(small), { env: {} });
+    assert.equal(atBound.status, "packet-ready");
+    assert.equal(Object.hasOwn(atBound, "split"), false);
+    assert.equal(/critic-split-merge|split entry/u.test(atBound.nextStep), false, "a range below the bound keeps today's next step");
+    assert.equal(g2072Changed(big).length, SPLIT_MAX_CHANGED_FILES + 1);
+    assert.equal(Object.hasOwn(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(big), { env: {} }), "split"), true);
+    const plain = fixture();
+    try { assert.equal(Object.hasOwn(g2069Printed(plain), "split"), false); } finally { rmSync(plain.root, { recursive: true, force: true }); }
+  } finally { rmSync(small.root, { recursive: true, force: true }); rmSync(big.root, { recursive: true, force: true }); }
+});
+
+test("G20-72 without an approved architecture plan the split is the one shared entry, flagged; it never drops a path", async () => {
+  const fx = g2072Fixture({ plan: false });
+  try {
+    const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
+    assert.deepEqual(split.entries.map((entry) => entry.id), ["shared"]);
+    assert.equal(split.plan.status, "none");
+    assert.deepEqual([...split.entries[0].paths].sort(), g2072Changed(fx).sort());
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 

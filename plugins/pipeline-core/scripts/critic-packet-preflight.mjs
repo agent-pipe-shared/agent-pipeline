@@ -16,7 +16,8 @@ import { CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA, deriveCriticPacketGovernance, va
 import { validateCriticLineagePacketAdmission } from "../lib/critic-review-lineage.mjs";
 import { createLocalDispatchEvidenceBinding, evaluateReviewAdmission, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import { createDiagnosticBundle, materializeDiagnosticBundle, revalidateDiagnosticBundle } from "../lib/critic-diagnostic-packet.mjs";
-import { PACKET_SCHEMA, RECORD_SCHEMA, SESSION_ADMISSION_SCHEMA, SESSION_REVIEW_TTL_SECONDS, SAFE_ID, PACKET_ID, SHA256, OID, CriticPacketError, fail, isObject, exactKeys, canonicalJson, sha256, inside, assertRealPrivateDir, assertNoSymlinkPath, readJson, normalizeSessionBinding, bindingsFor, recordBody, normalizeCoordinatorOnly, packetContext, currentState, normalizedPacketView } from "../lib/critic-packet-preflight-read.mjs";
+import { criticSplitDigest, criticSplitProblem } from "../lib/critic-split.mjs";
+import { SPLIT_FILE, admissionKeys, PACKET_SCHEMA, RECORD_SCHEMA, SESSION_ADMISSION_SCHEMA, SESSION_REVIEW_TTL_SECONDS, SAFE_ID, PACKET_ID, SHA256, OID, CriticPacketError, fail, isObject, exactKeys, canonicalJson, sha256, inside, assertRealPrivateDir, assertNoSymlinkPath, readJson, normalizeSessionBinding, bindingsFor, recordBody, normalizeCoordinatorOnly, packetContext, currentState, normalizedPacketView } from "../lib/critic-packet-preflight-read.mjs";
 export { PACKET_SCHEMA, STATE_SCHEMA, RECORD_SCHEMA, SESSION_PACKET_BINDING_SCHEMA, SESSION_ADMISSION_SCHEMA, CriticPacketError, canonicalJson, sha256, normalizedPacketView, packetDigestMatches, readConsumedCandidateReceipt, readConsumedCandidateResult, readConsumedSessionAdmission } from "../lib/critic-packet-preflight-read.mjs";
 
 /**
@@ -489,7 +490,9 @@ export function inspectClaimedCandidatePacket({ controlRoot, packetId }, { now =
 }
 
 /** Publish one session-only prelaunch admission bound to the durable claim. */
-export function publishClaimedSessionAdmission({ controlRoot, packetId, preflightSha256, courseSourceSha256, courseDecisionSha256 }, { now = new Date() } = {}) {
+// G20-72: a split round binds the digest of its split object into the admission (optional key) and keeps the object itself next to it (split.json), so the Critic stop hook and the
+// finalizer read exactly what admit bound. An admission without the key is byte for byte the admission of today.
+export function publishClaimedSessionAdmission({ controlRoot, packetId, preflightSha256, courseSourceSha256, courseDecisionSha256, split = null }, { now = new Date() } = {}) {
   if (![preflightSha256, courseSourceSha256, courseDecisionSha256].every((value) => typeof value === "string" && SHA256.test(value))) {
     fail("CPP-SESSION-ADMISSION", "Admission digests are invalid.");
   }
@@ -499,6 +502,12 @@ export function publishClaimedSessionAdmission({ controlRoot, packetId, prefligh
   if (!binding || binding.preflightSha256 !== preflightSha256
     || packet.route.projectionDigest !== preflightSha256) fail("CPP-SESSION-ADMISSION", "Session preflight binding differs.");
   const { packetDir } = packetContext(controlRoot, packetId);
+  if (split !== null) {
+    if (criticSplitProblem(split) !== null) fail("CPP-SESSION-ADMISSION", "The split is invalid.");
+    const splitPath = join(packetDir, SPLIT_FILE);
+    if (!existsSync(splitPath)) publishExclusive(splitPath, split);
+    else if (criticSplitDigest(readJson(splitPath, "CPP-SESSION-ADMISSION")) !== criticSplitDigest(split)) fail("CPP-SESSION-ADMISSION", "A different split is already bound to this packet.");
+  }
   const admission = {
     schema: SESSION_ADMISSION_SCHEMA,
     packetId,
@@ -508,6 +517,7 @@ export function publishClaimedSessionAdmission({ controlRoot, packetId, prefligh
     preflightSha256,
     courseSourceSha256,
     courseDecisionSha256,
+    ...(split === null ? {} : { splitSha256: criticSplitDigest(split) }),
     createdAt: nowIso(now),
   };
   publishExclusive(join(packetDir, "session-admission.json"), admission);
@@ -522,14 +532,14 @@ export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now 
   if (!existsSync(admissionPath)) fail("CPP-SESSION-ADMISSION", "Session admission is absent.");
   const admission = readJson(admissionPath, "CPP-SESSION-ADMISSION");
   const binding = packet.request.sessionBinding;
-  if (!exactKeys(admission, ["schema", "packetId", "packetDigest", "claimSha256", "sessionId", "preflightSha256", "courseSourceSha256", "courseDecisionSha256", "createdAt"])
+  if (!exactKeys(admission, admissionKeys(admission))
     || admission.schema !== SESSION_ADMISSION_SCHEMA || admission.packetId !== packetId
     || admission.packetDigest !== sha256(canonicalJson(packet))
     || admission.claimSha256 !== sha256(canonicalJson(claim))
     || !binding || admission.sessionId !== binding.sessionId
     || admission.preflightSha256 !== binding.preflightSha256
     || admission.preflightSha256 !== packet.route.projectionDigest
-    || !SHA256.test(admission.courseSourceSha256) || !SHA256.test(admission.courseDecisionSha256)
+    || !SHA256.test(admission.courseSourceSha256) || !SHA256.test(admission.courseDecisionSha256) || !(admission.splitSha256 === undefined || SHA256.test(admission.splitSha256))
     || typeof admission.createdAt !== "string" || !Number.isFinite(Date.parse(admission.createdAt))) {
     fail("CPP-SESSION-ADMISSION", "Session admission is absent or drifted.");
   }

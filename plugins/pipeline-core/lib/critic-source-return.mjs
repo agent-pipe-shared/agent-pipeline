@@ -17,10 +17,13 @@
  */
 import { closeSync, existsSync, openSync, readFileSync, readdirSync, writeSync } from "node:fs";
 import { join } from "node:path";
-import { PACKET_ID, SESSION_REVIEW_TTL_SECONDS, canonicalJson, currentState, packetContext, readJson, sha256 } from "./critic-packet-preflight-read.mjs";
+import { PACKET_ID, SESSION_REVIEW_TTL_SECONDS, SPLIT_FILE, canonicalJson, currentState, packetContext, readJson, sha256 } from "./critic-packet-preflight-read.mjs";
+import { attributeVerdict, criticSplitDigest, criticSplitProblem } from "./critic-split.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 
 export const CRITIC_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return.v1";
+/** G20-72: the record of one child of a split round: the nine keys of the single record plus the split digest, the entry and the child's verdict itself. */
+export const CRITIC_SPLIT_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return-split.v1";
 export const CRITIC_SOURCE_RETURN_FILE = "source-return.json";
 const VERDICT_SCHEMA = JSON.parse(readFileSync(new URL("../scripts/critic-verdict.schema.json", import.meta.url), "utf8"));
 const MAX_PACKETS = 4096;
@@ -61,9 +64,12 @@ function openAdmittedPackets(controlRoot, runner, nowMs) {
       if (admission?.packetId !== packetId || admission.packetDigest !== packetDigest || admission.sessionId !== binding.sessionId
         || claim?.packetDigest !== packetDigest || !Number.isFinite(claimedAtMs)
         || nowMs < claimedAtMs || nowMs > claimedAtMs + SESSION_REVIEW_TTL_SECONDS * 1000) continue;
-      if (existsSync(join(packetDir, CRITIC_SOURCE_RETURN_FILE))) { open.push({ packetId, issued: true }); continue; }
+      // G20-72: a split packet stays open for every child; only a packet WITHOUT a split is closed by its one record.
+      const split = admission.splitSha256 === undefined ? null : readAdmittedSplit(packetDir, admission.splitSha256);
+      if (split === undefined) continue;
+      if (split === null && existsSync(join(packetDir, CRITIC_SOURCE_RETURN_FILE))) { open.push({ packetId, issued: true }); continue; }
       open.push({ packetId, packetDir, packetDigest, sessionId: binding.sessionId, claimant: { runner: packet.route.runner, adapter: packet.route.adapter },
-        issuedAtMs: nowMs, expiresAtMs: claimedAtMs + SESSION_REVIEW_TTL_SECONDS * 1000 });
+        issuedAtMs: nowMs, expiresAtMs: claimedAtMs + SESSION_REVIEW_TTL_SECONDS * 1000, split });
     } catch { /* an unreadable or foreign entry is never a match */ }
   }
   return open;
@@ -110,11 +116,42 @@ function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
   if (open.length > 1) return { status: "ambiguous", count: open.length };
   const [target] = open;
   if (target.issued === true) return { status: "already-issued", packetId: target.packetId };
+  if (target.split !== null) {
+    // G20-72: one record per returning child, bound to the split the admission carries and to the entry the verdict names. A verdict that names no entry issues nothing.
+    const entryId = attributeVerdict(target.split, verdict);
+    if (entryId === null) return { status: "unattributed", packetId: target.packetId, entries: target.split.entries.map((entry) => entry.scopeMarker) };
+    const verdictSha256 = sha256(canonicalJson(verdict));
+    const splitRecord = { schema: CRITIC_SPLIT_SOURCE_RETURN_SCHEMA, issuer: "source", packetId: target.packetId, packetDigest: target.packetDigest, claimant: target.claimant,
+      sessionId: target.sessionId, verdictSha256, issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs, splitSha256: criticSplitDigest(target.split), entryId, verdict };
+    let splitFd;
+    try { splitFd = openSync(join(target.packetDir, `source-return-${verdictSha256}.json`), "wx", 0o600); }
+    catch (error) { if (error?.code === "EEXIST") return { status: "already-issued", packetId: target.packetId, entryId }; throw error; }
+    try { writeSync(splitFd, canonicalJson(splitRecord)); } finally { closeSync(splitFd); }
+    return { status: "issued", packetId: target.packetId, entryId };
+  }
   const record = { schema: CRITIC_SOURCE_RETURN_SCHEMA, issuer: "source", packetId: target.packetId, packetDigest: target.packetDigest, claimant: target.claimant,
     sessionId: target.sessionId, verdictSha256: sha256(canonicalJson(verdict)), issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs };
   const fd = openSync(join(target.packetDir, CRITIC_SOURCE_RETURN_FILE), "wx", 0o600);
   try { writeSync(fd, canonicalJson(record)); } finally { closeSync(fd); }
   return { status: "issued", packetId: target.packetId };
+}
+
+/**
+ * G20-72: the split object an admission bound, read from the packet (`split.json`), or null/undefined: `undefined` when the file is absent, its digest differs from the
+ * admission's `splitSha256`, or it is not a split (such a packet is never a match for a stop and the finalizer refuses it).
+ */
+export function readAdmittedSplit(packetDir, splitSha256) {
+  try {
+    const split = readJson(join(packetDir, SPLIT_FILE), "SCF-SPLIT-READ");
+    return criticSplitProblem(split) === null && criticSplitDigest(split) === splitSha256 ? split : undefined;
+  } catch { return undefined; }
+}
+
+/** G20-72: every per-child record of a split packet exactly as stored (so a present-but-wrong record reaches the finalizer's checks), in file-name order. */
+export function readCriticSplitSourceReturns({ controlRoot, packetId } = {}) {
+  if (typeof controlRoot !== "string" || !PACKET_ID.test(packetId ?? "")) return [];
+  const dir = join(controlRoot, packetId);
+  return readdirSync(dir).filter((name) => /^source-return-[a-f0-9]{64}\.json$/u.test(name)).sort().map((name) => readJson(join(dir, name), "SCF-ORIGINAL-SOURCE-RECORD"));
 }
 
 /** The issued record of a packet exactly as stored (so a present-but-wrong record reaches the finalizer's binding check), or null when none exists. */

@@ -2594,3 +2594,214 @@ test("G20-69 the printed feature-package admit request is a v2 request carrying 
     assert.equal(admitted.output.status, "admitted");
   } finally { cleanup(fx); }
 });
+
+// G20-72 (candidate 20e, AC-108): a review range too large for one Critic is split per module. Every module Critic has its own Source return; the merged verdict is
+// the merge of exactly those children, so a whole-feature review still ends in one SOURCE-issued verdict. Criterion-bound cases, written before the implementation existed.
+const MERGE_SCRIPT = fileURLToPath(new URL("./critic-split-merge.mjs", import.meta.url));
+const NATIVE_HOOK = fileURLToPath(new URL("../hooks/native-goldfish-host.mjs", import.meta.url));
+function g2072Fixture() {
+  const fx = fixture();
+  // The fixture leaves its diagnostic untracked; the split candidate carries 28 module files, a PRD with the approved architecture design and its own diagnostic.
+  rmSync(join(fx.root, "evidence", "verify.json"), { force: true });
+  rmSync(join(fx.root, "evidence", "targeted.log"), { force: true });
+  const design = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield", disposition: { decision: "approved-scoped", scope: ["specs/", "src/"], rationale: "fixture" },
+    modules: ["core", "api"].map((id) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`],
+      allowedDependencies: [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [] })),
+    implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
+    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } } };
+  writeFileSync(join(fx.root, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
+  for (const dir of ["core", "api"]) {
+    mkdirSync(join(fx.root, "src", dir), { recursive: true });
+    for (let index = 0; index < 14; index += 1) writeFileSync(join(fx.root, "src", dir, `m${index}.mjs`), `export const m${index} = ${index};\n`);
+  }
+  fx.candidate = commit(fx.root, "split candidate");
+  fx.tree = git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`]);
+  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root: fx.root, candidate: fx.candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", "process.exit(0)"], logPath: "evidence/targeted.log" }))}\n`);
+  return fx;
+}
+const g2072Child = (id, overrides = {}) => verdict({ deliberately_not_flagged: [`reviewed ${id}`], trajectory_evidence: `scope:${id} read the diff of ${id}`, ...overrides });
+const g2072Finding = (overrides = {}) => ({ gap: "a gap", risk: "a risk", severity: "major", evidence: "src/core/m0.mjs:1", spec_ref: "AC-1", ...overrides });
+// Prints (the real wrapper), fills the placeholders, admits through the real CLI; returns the printed split and the packet.
+function g2072Admit(fx) {
+  const printed = preflightCriticDispatchWithAdmitRequest(options(fx).preflightInput, { env: {} });
+  assert.equal(printed.status, "packet-ready", JSON.stringify(printed));
+  assert.ok(printed.split, "the range is above the bound");
+  const request = structuredClone(printed.admitRequest);
+  Object.assign(request, { projectId: "pipeline", sessionId: "session-g2072-1", route: options(fx).route, verdictPath: "evidence/critic-verdict.json", event: null });
+  request.review.genericBatchRef = batchFor(fx);
+  const requestPath = writeScratchRequest(fx, "g2072-request.json", request);
+  const admitted = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]);
+  assert.equal(admitted.exitCode, 0, JSON.stringify(admitted.output));
+  const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
+  return { printed, split: printed.split, requestPath, controlRoot, packetId: printed.admitRequest.packetId, packetDir: join(controlRoot, printed.admitRequest.packetId) };
+}
+function g2072Hook(fx, text, extra = {}) {
+  // The hook entry exits silently outside a governed project; the onboarding consent marker is the smallest real enrolment (an untracked file, so the reviewed range is unchanged).
+  mkdirSync(join(fx.root, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(fx.root, ".agent-pipeline", "onboarding-consent.json"), `${JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-11-08T10:00:00.000Z" })}\n`);
+  const run = spawnSync(process.execPath, [NATIVE_HOOK, "--runner", "codex"], { input: JSON.stringify(stopInput(text, { cwd: fx.root, ...extra })), encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: fx.root } });
+  assert.equal(run.status, 0, run.stderr);
+  return run;
+}
+const g2072Records = (admitted) => readdirSync(admitted.packetDir).filter((name) => /^source-return-[a-f0-9]{64}\.json$/u.test(name)).sort();
+const g2072Merge = async (admitted, children) => (await import("../lib/critic-split.mjs")).mergeSplitVerdicts(admitted.split, children.map(([entryId, value]) => ({ entryId, verdict: value })));
+function g2072MergeCli(fx, admitted, children, out = "evidence/critic-verdict.json") {
+  mkdirSync(join(fx.root, "scratch"), { recursive: true });
+  writeFileSync(join(fx.root, "scratch", "g2072-split.json"), JSON.stringify(admitted.split));
+  const argv = [MERGE_SCRIPT, "--root", fx.root, "--split", "scratch/g2072-split.json"];
+  children.forEach(([entryId, value], index) => { writeFileSync(join(fx.root, "scratch", `g2072-child-${index}.json`), JSON.stringify(value)); argv.push("--child", `${entryId}=scratch/g2072-child-${index}.json`); });
+  if (out !== null) argv.push("--out", out);
+  const run = spawnSync(process.execPath, argv, { encoding: "utf8" });
+  return { status: run.status, stdout: run.stdout, stderr: run.stderr, json: JSON.parse(run.status === 0 ? run.stdout : run.stderr) };
+}
+
+test("G20-72 the merge script: pass is the AND, findings and briefing violations the union, the trajectory the worst; the merged verdict is a valid verdict", () => {
+  const fx = g2072Fixture();
+  try {
+    const admitted = g2072Admit(fx);
+    const kids = [["api", g2072Child("api", { trajectory_verdict: "not verifiable" , pass: false, findings: [g2072Finding({ evidence: "src/api/m1.mjs:2", spec_ref: "AC-2", severity: "minor" })] })],
+      ["core", g2072Child("core", { trajectory_verdict: "inconsistent", pass: false, briefing_violations: ["the diff range was widened"], findings: [g2072Finding()] })],
+      ["shared", g2072Child("shared")]];
+    const run = g2072MergeCli(fx, admitted, kids);
+    assert.equal(run.status, 0, run.stderr);
+    const merged = run.json.verdict;
+    assert.equal(merged.pass, false);
+    assert.equal(merged.trajectory_verdict, "inconsistent", "the worst of inconsistent > not verifiable > consistent");
+    assert.deepEqual(merged.findings.map((finding) => finding.severity), ["major", "minor"], "the union, ordered by severity");
+    assert.deepEqual(merged.briefing_violations, ["the diff range was widened"]);
+    assert.deepEqual(merged.deliberately_not_flagged, ["reviewed api", "reviewed core", "reviewed shared"]);
+    assert.ok(["api", "core", "shared"].every((id) => merged.trajectory_evidence.includes(`scope:${id}`)));
+    assert.equal(run.json.verdictSha256, verdictDigest(merged));
+    assert.deepEqual(JSON.parse(readFileSync(join(fx.root, "evidence", "critic-verdict.json"), "utf8")), merged, "--out writes the merged verdict the finalizer takes");
+    const allPass = g2072MergeCli(fx, admitted, ["api", "core", "shared"].map((id) => [id, g2072Child(id)]), null);
+    assert.equal(allPass.json.verdict.pass, true);
+    assert.equal(allPass.json.verdict.trajectory_verdict, "consistent");
+  } finally { cleanup(fx); }
+});
+
+test("G20-72 the merge script refuses a missing child, an unknown or duplicated entry, an unattributed child, a child outside its scope and a duplicate finding id, each with a typed code and a repair", () => {
+  const fx = g2072Fixture();
+  try {
+    const admitted = g2072Admit(fx);
+    const all = ["api", "core", "shared"].map((id) => [id, g2072Child(id)]);
+    const refused = (children, code) => { const run = g2072MergeCli(fx, admitted, children, null); assert.equal(run.status, 1, run.stdout); assert.equal(run.json.status, "rejected"); assert.equal(run.json.code, code, JSON.stringify(run.json)); assert.match(run.json.message, /repair:/u); };
+    refused(all.slice(0, 2), "CSM-CHILD-MISSING");
+    refused([...all, ["ghost", g2072Child("ghost")]], "CSM-CHILD-UNKNOWN");
+    refused([...all, ["core", g2072Child("core", { deliberately_not_flagged: ["a second run"] })]], "CSM-CHILD-DUPLICATE");
+    refused([all[0], ["core", verdict()], all[2]], "CSM-CHILD-UNATTRIBUTED");
+    refused([all[0], ["core", g2072Child("api")], all[2]], "CSM-CHILD-UNATTRIBUTED");
+    refused([all[0], ["core", g2072Child("core", { pass: false, findings: [g2072Finding({ evidence: "src/api/m3.mjs:9" })] })], all[2]], "CSM-CHILD-OUT-OF-SCOPE");
+    const same = g2072Finding({ evidence: "the quoted line", spec_ref: "AC-1" });
+    refused([["api", g2072Child("api", { pass: false, findings: [same] })], ["core", g2072Child("core", { pass: false, findings: [same] })], all[2]], "CSM-FINDING-DUPLICATE");
+  } finally { cleanup(fx); }
+});
+
+test("G20-72 admit binds the split; the Critic stop hook issues one Source return per returning child; the whole chain ends in one source-issued verdict whose receipt carries the split digest", async () => {
+  const { criticSplitDigest } = await import("../lib/critic-split.mjs");
+  const fx = g2072Fixture();
+  try {
+    const admitted = g2072Admit(fx);
+    const { admission } = inspectClaimedSessionAdmission({ controlRoot: admitted.controlRoot, packetId: admitted.packetId });
+    assert.equal(admission.splitSha256, criticSplitDigest(admitted.split), "admit binds the digest of the split object");
+    assert.deepEqual(JSON.parse(readFileSync(join(admitted.packetDir, "split.json"), "utf8")), admitted.split);
+    const kids = ["api", "core", "shared"].map((id) => [id, g2072Child(id)]);
+    for (const [id, value] of kids) {
+      const run = g2072Hook(fx, criticReturn(value));
+      assert.match(run.stderr, new RegExp(`Source return issued for packet ${admitted.packetId}.*${id}`, "u"), run.stderr);
+    }
+    assert.equal(existsSync(join(admitted.packetDir, SOURCE_RETURN_FILE)), false, "a split packet has no single source-return.json");
+    const names = g2072Records(admitted);
+    assert.deepEqual(names, kids.map(([, value]) => `source-return-${verdictDigest(value)}.json`).sort(), "one record per returning child, named by the verdict digest");
+    const record = JSON.parse(readFileSync(join(admitted.packetDir, names[0]), "utf8"));
+    assert.equal(record.packetId, admitted.packetId);
+    assert.equal(record.packetDigest, admission.packetDigest);
+    assert.equal(record.sessionId, admission.sessionId);
+    assert.deepEqual(record.claimant, { runner: "codex", adapter: "session-functional-equivalent" });
+    assert.equal(record.splitSha256, admission.splitSha256);
+    assert.equal(g2072Hook(fx, criticReturn(kids[0][1])).stderr.includes("already"), true, "the same child verdict again never overwrites");
+    assert.equal(g2072Records(admitted).length, 3);
+    const merged = g2072MergeCli(fx, admitted, kids);
+    assert.equal(merged.status, 0, merged.stderr);
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
+    assert.equal(result.exitCode, 0, JSON.stringify(result.output));
+    assert.equal(result.output.status, "completed");
+    assert.equal(result.output.independence, "source-issued-origin");
+    assert.equal(result.output.receipt.independence, "source-issued-origin");
+    assert.equal(result.output.receipt.splitSha256, admission.splitSha256);
+    const { receipt } = readConsumedCandidateReceipt({ controlRoot: admitted.controlRoot, packetId: admitted.packetId });
+    assert.equal(validateSessionCriticReceipt(receipt), receipt, "the receipt with the optional split digest verifies");
+    const { splitSha256: _split, ...legacy } = receipt;
+    assert.equal(validateSessionCriticReceipt(legacy), legacy, "a receipt without it verifies exactly as before");
+    assert.throws(() => validateSessionCriticReceipt({ ...receipt, splitSha256: "not-a-digest" }), codeIs("SCF-RECEIPT"));
+  } finally { cleanup(fx); }
+});
+
+test("G20-72 a child verdict that names no split entry issues nothing; a packet without a split keeps the single source-return.json", async () => {
+  const fx = g2072Fixture();
+  try {
+    const admitted = g2072Admit(fx);
+    const run = g2072Hook(fx, criticReturn(verdict()));
+    assert.match(run.stderr, /not issued[\s\S]*scope:/u, "the hook names the scope marker the child must start trajectory_evidence with");
+    assert.equal(g2072Records(admitted).length, 0);
+    assert.equal(existsSync(join(admitted.packetDir, SOURCE_RETURN_FILE)), false);
+  } finally { cleanup(fx); }
+  const plain = fixture();
+  try {
+    const plainAdmitted = admitViaCli(plain);
+    g2072Hook(plain, criticReturn(verdict()));
+    assert.equal(existsSync(join(plainAdmitted.controlRoot, plainAdmitted.packetId, SOURCE_RETURN_FILE)), true, "byte for byte the single record of today");
+    assert.deepEqual(readdirSync(join(plainAdmitted.controlRoot, plainAdmitted.packetId)).filter((name) => name.startsWith("source-return")), [SOURCE_RETURN_FILE]);
+    assert.equal(Object.hasOwn(inspectClaimedSessionAdmission({ controlRoot: plainAdmitted.controlRoot, packetId: plainAdmitted.packetId }).admission, "splitSha256"), false);
+  } finally { cleanup(plain); }
+});
+
+// The origin gate refuses every shape of a split round that is not exactly the merge of one returned verdict per entry. Verdict shopping (BINDING CORRECTION 1): a second
+// record for an entry refuses, so a caller can never run a child twice and keep the better verdict. Stray or unattributable records (BINDING CORRECTION 2) refuse too.
+test("G20-72 finalize refuses a split round with a missing child, two records for one entry, a stray or unattributable record, and a merged verdict that differs by one finding", async () => {
+  const kids = ["api", "core", "shared"].map((id) => [id, g2072Child(id)]);
+  const finalize = async (mutate) => {
+    const fx = g2072Fixture();
+    try {
+      const admitted = g2072Admit(fx);
+      const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
+      const issue = (value) => assert.equal(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(value)) }).status, "issued");
+      const final = await mutate({ fx, admitted, issue });
+      writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(final)}\n`);
+      return runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
+    } finally { cleanup(fx); }
+  };
+  const merge = async (admitted, children) => { const merged = await g2072Merge(admitted, children); assert.equal(merged.ok, true, JSON.stringify(merged)); return merged.verdict; };
+  const missing = await finalize(async ({ admitted, issue }) => { issue(kids[0][1]); issue(kids[1][1]); return merge(admitted, kids); });
+  assert.equal(missing.exitCode, 2); assert.equal(missing.output.code, "SCF-SPLIT-CHILD-MISSING");
+  const shopped = await finalize(async ({ admitted, issue }) => {
+    const better = g2072Child("core", { deliberately_not_flagged: ["reviewed core", "a better second run"] });
+    issue(kids[0][1]); issue(kids[1][1]); issue(better); issue(kids[2][1]);
+    return merge(admitted, [kids[0], ["core", better], kids[2]]);
+  });
+  assert.equal(shopped.exitCode, 2); assert.equal(shopped.output.code, "SCF-SPLIT-DUPLICATE-ENTRY");
+  assert.match(shopped.output.detail, /repair:[\s\S]*release/u, "the repair names the existing next-round route");
+  const stray = await finalize(async ({ admitted, issue }) => {
+    for (const [, value] of kids) issue(value);
+    const [name] = g2072Records(admitted); const original = JSON.parse(readFileSync(join(admitted.packetDir, name), "utf8"));
+    const ghost = g2072Child("ghost"); const record = { ...original, entryId: "ghost", verdict: ghost, verdictSha256: verdictDigest(ghost) };
+    writeFileSync(join(admitted.packetDir, `source-return-${record.verdictSha256}.json`), JSON.stringify(record), { mode: 0o600 });
+    return merge(admitted, kids);
+  });
+  assert.equal(stray.exitCode, 2); assert.equal(stray.output.code, "SCF-SPLIT-RECORD-STRAY");
+  const unattributable = await finalize(async ({ admitted, issue }) => {
+    for (const [, value] of kids) issue(value);
+    const [name] = g2072Records(admitted); const { entryId: _entry, ...original } = JSON.parse(readFileSync(join(admitted.packetDir, name), "utf8"));
+    writeFileSync(join(admitted.packetDir, name), JSON.stringify(original));
+    return merge(admitted, kids);
+  });
+  assert.equal(unattributable.exitCode, 2); assert.equal(unattributable.output.code, "SCF-SPLIT-RECORD-STRAY");
+  const differs = await finalize(async ({ admitted, issue }) => {
+    for (const [, value] of kids) issue(value);
+    const merged = await merge(admitted, kids);
+    return { ...merged, findings: [g2072Finding({ severity: "minor", evidence: "added by the caller" })] };
+  });
+  assert.equal(differs.exitCode, 2); assert.equal(differs.output.code, "SCF-SPLIT-MERGE-MISMATCH");
+  const none = await finalize(async ({ admitted }) => merge(admitted, kids));
+  assert.equal(none.exitCode, 0, "no record at all keeps today's honest label");
+  assert.equal(none.output.independence, "caller-authored-fallback");
+});

@@ -10,7 +10,8 @@ import { recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs"
 import * as organizationPolicy from "../lib/organization-policy.mjs";
 import { canonicalSha256 } from "../lib/governance-event.mjs";
 import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";import { planVerifySelection } from "../lib/verify-selection.mjs";
-import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
+import { admitSessionCriticReview, finalizeSessionCriticReview, runSessionCriticFinalizerCli } from "./session-critic-finalizer.mjs";
+import { preflightCriticDispatchWithAdmitRequest } from "./critic-dispatch-preflight.mjs";
 import { finishFeature } from "./finish-feature.mjs";
 import { readConsumedCandidateReceipt } from "../lib/critic-packet-preflight-read.mjs";
 import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
@@ -18,6 +19,8 @@ import { writeCriticalApproval } from "../lib/critical-action-authorization.mjs"
 
 const ROOT = process.cwd();
 const CLI = new URL("./close-coordinator.mjs", import.meta.url).pathname;
+const NATIVE_HOOK = new URL("../hooks/native-goldfish-host.mjs", import.meta.url).pathname;
+const MERGE = new URL("./critic-split-merge.mjs", import.meta.url).pathname;
 const FINISH = new URL("./finish-feature.mjs", import.meta.url).pathname;
 const STATE = new URL("./pipeline-state.mjs", import.meta.url).pathname;
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -47,7 +50,42 @@ const FIXTURE_PACK = { schema: "pipeline.organization-policy-pack.v1", packId: "
 const sourceReturn = (query) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: query.packetId,
   packetDigest: query.packetDigest, claimant: query.claimant, sessionId: query.sessionId, verdictSha256: query.verdictSha256,
   issuedAtMs: 1, expiresAtMs: Date.now() + 3_600_000 });
-function fixture(t, { packs = [FIXTURE_PACK], origin = "source" } = {}) {
+// G20-72: the approved architecture design of the whole-feature walk (a PRD-named file next to the spec, found by the split).
+const SPLIT_DESIGN = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield", disposition: { decision: "approved-scoped", scope: ["specs/", "src/"], rationale: "fixture" },
+  modules: ["core", "api"].map((id) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`],
+    allowedDependencies: [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [] })),
+  implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
+  fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } } };
+const SPLIT_DESIGN_PRD = `# PRD design\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(SPLIT_DESIGN, null, 2)}\n\`\`\`\n`;
+// G20-72: the real chain for a range above the split bound, with real commands and real state: the preflight prints the split, admit, one Critic stop per entry through the
+// real hook entry, the merge script, finalize. Returns nothing; the consumed receipt is what the close reads.
+function splitChain(root, review, packetId) {
+  const printed = preflightCriticDispatchWithAdmitRequest(review.preflightInput, { env: {} });
+  assert.ok(printed.split, "the walk's range is above the split bound");
+  const request = structuredClone(printed.admitRequest);
+  Object.assign(request, { taskId: review.taskId, projectId: review.projectId, sessionId: review.sessionId, packetId, route: review.route, verdictPath: "evidence/critic-verdict.json", event: null });
+  request.review.genericBatchRef = review.genericBatchRef;
+  put(root, "scratch/split-request.json", JSON.stringify(request));
+  put(root, "scratch/split.json", JSON.stringify(printed.split));
+  // The hook entry exits silently outside a governed project; the onboarding consent marker is the smallest real enrolment (untracked, the reviewed range is unchanged).
+  put(root, ".agent-pipeline/onboarding-consent.json", JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-11-08T10:00:00.000Z" }));
+  const run = (argv) => { const result = runSessionCriticFinalizerCli(argv); assert.equal(result.exitCode, 0, JSON.stringify(result.output)); return result.output; };
+  run(["admit", "--root", root, "--request", "scratch/split-request.json"]);
+  const children = printed.split.entries.map((entry) => [entry.id, { ...review.verdict, deliberately_not_flagged: [`reviewed ${entry.id}`], trajectory_evidence: `${entry.scopeMarker} read the diff of ${entry.id}` }]);
+  const argv = [MERGE, "--root", root, "--split", "scratch/split.json", "--out", "evidence/critic-verdict.json"];
+  children.forEach(([id, value], index) => {
+    const stop = spawnSync(process.execPath, [NATIVE_HOOK, "--runner", "codex"], { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root }, input: JSON.stringify({
+      hook_event_name: "SubagentStop", session_id: "33333333-aaaa-bbbb-cccc-444444444444", agent_type: "critic", stop_hook_active: false, cwd: root,
+      last_assistant_message: `\`\`\`json\n${JSON.stringify(value)}\n\`\`\`\n` }) });
+    assert.match(stop.stderr, /Source return issued/u, stop.stderr);
+    put(root, `scratch/split-child-${index}.json`, JSON.stringify(value));
+    argv.push("--child", `${id}=scratch/split-child-${index}.json`);
+  });
+  const merged = spawnSync(process.execPath, argv, { encoding: "utf8" });
+  assert.equal(merged.status, 0, merged.stderr);
+  run(["finalize", "--root", root, "--request", "scratch/split-request.json"]);
+}
+function fixture(t, { packs = [FIXTURE_PACK], origin = "source", split = false } = {}) {
   mkdirSync(join(ROOT, "scratch/test-tmp"), { recursive: true });
   const root = mkdtempSync(join(ROOT, "scratch/test-tmp/close-audit-lifecycle-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -56,12 +94,14 @@ function fixture(t, { packs = [FIXTURE_PACK], origin = "source" } = {}) {
     specPath: "specs/audit-feature/spec.md", logicalWorkIds: ["AC-1", "AC-2"], criterionIds: ["AC-1", "AC-2"],
     deliveryBoundary: { mainRef: "refs/heads/main" }, singletonRationale: null };
   for (const [path, text] of [["specs/audit-feature/prd.md", "# PRD\n"], ["specs/audit-feature/spec.md", "# Spec\nAC-1 AC-2\n"], ["specs/audit-feature/result.md", "# Result\n"], ["specs/review-unit.json", JSON.stringify(reviewUnit)], ["evidence/close.txt", "close\n"], ["docs/state.md", "# State\n"]]) put(root, path, text);
+  if (split) put(root, "specs/audit-feature/prd-design.md", SPLIT_DESIGN_PRD);
   mkdirSync(join(root, ".claude"));
   git(root, ["init", "-q", "-b", "main"]); git(root, ["add", "."]); git(root, ["commit", "-qm", "base"]);
   const baseCommit = git(root, ["rev-parse", "HEAD"]);
   put(root, "specs/audit-feature/spec.md", "# Spec\nQualified candidate\n");
   put(root, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\n");
-  git(root, ["add", "specs/audit-feature/spec.md", ".claude/pipeline.yaml"]);
+  if (split) for (const dir of ["core", "api"]) for (let index = 0; index < 14; index += 1) put(root, `src/${dir}/m${index}.mjs`, `export const m${index} = ${index};\n`);
+  git(root, ["add", "specs/audit-feature/spec.md", ".claude/pipeline.yaml", ...(split ? ["src"] : [])]);
   git(root, ["commit", "-qm", "work"]);
   const work = git(root, ["rev-parse", "HEAD"]);
   // The authored record is committed between the base and the reviewed candidate, as the batch producer reads it.
@@ -91,7 +131,7 @@ function fixture(t, { packs = [FIXTURE_PACK], origin = "source" } = {}) {
   const criticDiagnostic = { schema: "pipeline.verify-evidence.v0", commit: candidate.commit,
     tree: candidate.tree, candidate, exitCode: 0,
     selection: planVerifySelection({ mode: "critic", baseCommit, candidateCommit: candidate.commit,
-      changedPaths: [".claude/pipeline.yaml", "evidence/dispatch-record-close-audit-review.json", "specs/audit-feature/spec.md"],
+      changedPaths: split ? git(root, ["diff", "--name-only", baseCommit, candidate.commit]).split("\n") : [".claude/pipeline.yaml", "evidence/dispatch-record-close-audit-review.json", "specs/audit-feature/spec.md"],
       registeredSuiteIds: ["test"], policy: { schema: "pipeline.verify-selection.v1",
         baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }),
     steps: [{ name: "test", exitCode: 0 }] };
@@ -115,9 +155,12 @@ function fixture(t, { packs = [FIXTURE_PACK], origin = "source" } = {}) {
     taskId: "close-audit-review", baseCommit, candidateCommit: candidate.commit, logicalWorkIds: ["AC-1", "AC-2"],
     specPath: "specs/audit-feature/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
   review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
-  admitSessionCriticReview(review);
-  if (origin === "fallback") finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
-  else finalizeSessionCriticReview(review, { readOriginalSourceReturnFn: sourceReturn });
+  if (split) splitChain(root, review, criticPacketId);
+  else {
+    admitSessionCriticReview(review);
+    if (origin === "fallback") finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
+    else finalizeSessionCriticReview(review, { readOriginalSourceReturnFn: sourceReturn });
+  }
   const lifecycle = recordCriticVerifyLifecycle({ gitCommonDir: join(root, common),
     criticPacketId, candidate, evidencePath: "specs/audit-feature/verify.json", evidence: verify });
   const request = { schema: "pipeline.feature-close-audit-request.v1", manifestPath: "specs/audit-feature/lifecycle.json", coreVersion: "0.7.0", packs, criticVerifyLifecycleId: lifecycle.receipt.id };
@@ -189,6 +232,15 @@ test("D2b a Source-issued Critic verdict closes at rigor 1 and its consumed rece
   const { receipt } = readConsumedCandidateReceipt({ controlRoot: join(f.root, ".git", "agent-pipeline", "critic-packets"), packetId: "1".repeat(32) });
   assert.equal(receipt.independence, "source-issued-origin");
   assert.equal(existsSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), true);
+});
+// G20-72 (candidate 20e, AC-108), the whole chain with real commands and real state: preflight prints the split, admit, one Critic stop per entry through the real hook
+// entry, the merge script, finalize, the receipt verifies, and the feature close accepts the source-issued label at rigor 1 and high risk with NO PO acknowledgement.
+test("G20-72 a whole-feature Critic round split per module closes at rigor 1 and high risk with no PO acknowledgement; its receipt is source-issued and carries the split digest", t => {
+  const f = prepare(t, { split: true });
+  const { receipt } = readConsumedCandidateReceipt({ controlRoot: join(f.root, ".git", "agent-pipeline", "critic-packets"), packetId: "1".repeat(32) });
+  assert.equal(receipt.independence, "source-issued-origin");
+  assert.match(receipt.splitSha256, /^[a-f0-9]{64}$/u);
+  assert.equal(existsSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), true, "the identical close built the audit bundle");
 });
 test("D229 an audit request that names the shipped core baseline pack plans, builds the README audit bundle with that pack in the effective policy and closes", t => {
   const f = prepare(t, { packs: ["pipeline-core-baseline"] });

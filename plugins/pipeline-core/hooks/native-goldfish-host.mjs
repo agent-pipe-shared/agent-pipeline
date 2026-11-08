@@ -203,8 +203,10 @@ function nativeGoldfishHookBaseMessage(result) {
 export function criticSourceReturnMessage(outcome) {
   const finalizeAs = "the verdict then finalizes as caller-authored-fallback, which the feature close admits only at rigor 0 and low risk (repair: a PO acknowledgement of the caller-authored Critic for this packet and candidate)";
   switch (outcome?.status) {
-    case "issued": return `Critic Source return issued for packet ${outcome.packetId}: finalize reads it from the private control area and labels the verdict source-issued-origin when the verdict file is the returned JSON verbatim.`;
-    case "already-issued": return `Critic Source return not issued: packet ${outcome.packetId} already holds one; it is never overwritten.`;
+    case "unattributed": return `Critic Source return not issued: packet ${outcome.packetId} is a split round and the verdict names none of its entries; the child must begin trajectory_evidence with its scope marker (${outcome.entries.join(", ")}) and run again; ${finalizeAs}.`;
+    case "issued": if (outcome.entryId !== undefined) return `Critic Source return issued for packet ${outcome.packetId}, split entry ${outcome.entryId}: merge the children with critic-split-merge.mjs, then finalize reads one record per entry.`;
+      return `Critic Source return issued for packet ${outcome.packetId}: finalize reads it from the private control area and labels the verdict source-issued-origin when the verdict file is the returned JSON verbatim.`;
+    case "already-issued": return `Critic Source return not issued: packet ${outcome.packetId} already holds ${outcome.entryId === undefined ? "one" : `this verdict for split entry ${outcome.entryId}`}; it is never overwritten.`;
     case "no-verdict": return `Critic Source return not issued: the Critic's final message carries no schema-shaped verdict JSON (return it as the whole message or as the last fenced json block); ${finalizeAs}.`;
     case "no-open-packet": return `Critic Source return not issued: no claimed, admitted, unresulted session packet of this runner is open; ${finalizeAs}.`;
     case "ambiguous": return `Critic Source return not issued: ${outcome.count} session packets of this runner are open and the stop names none of them; release the stale ones (session-critic-finalizer.mjs release) and finalize; ${finalizeAs}.`;

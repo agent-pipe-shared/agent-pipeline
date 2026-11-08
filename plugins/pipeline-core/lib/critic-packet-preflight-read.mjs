@@ -17,6 +17,10 @@ export const STATE_SCHEMA = "pipeline.critic-candidate-state.v1";
 export const RECORD_SCHEMA = "pipeline.critic-candidate-record.v1";
 export const SESSION_PACKET_BINDING_SCHEMA = "pipeline.session-critic-packet-binding.v1";
 export const SESSION_ADMISSION_SCHEMA = "pipeline.session-critic-admission.v1";
+// G20-72: the closed key set of a session admission; `splitSha256` is present only for a split round (the split object itself is split.json next to it).
+export const SPLIT_FILE = "split.json";
+export const admissionKeys = (admission) => ["schema", "packetId", "packetDigest", "claimSha256", "sessionId", "preflightSha256", "courseSourceSha256", "courseDecisionSha256",
+  ...(admission !== null && typeof admission === "object" && Object.hasOwn(admission, "splitSha256") ? ["splitSha256"] : []), "createdAt"];
 export const SAFE_ID = /^[a-z0-9][a-z0-9._-]{1,79}$/;
 export const PACKET_ID = /^[a-f0-9]{32}$/;
 export const SHA256 = /^[a-f0-9]{64}$/;
@@ -293,14 +297,14 @@ export function readConsumedSessionAdmission({ controlRoot, packetId }) {
     || resultRecord.priorStateDigest !== sha256(canonicalJson(recordBody(packet, 2, claim.priorStateDigest, "claimed", claim.body, claim.timestamp)))
     || canonicalJson(resultRecord.body) !== canonicalJson(consumed.result)) fail("CPP-CLAIM-READ", "Consumed journal claim binding differs.");
   const binding = packet.request.sessionBinding;
-  if (!exactKeys(admission, ["schema", "packetId", "packetDigest", "claimSha256", "sessionId", "preflightSha256", "courseSourceSha256", "courseDecisionSha256", "createdAt"])
+  if (!exactKeys(admission, admissionKeys(admission))
     || admission.schema !== SESSION_ADMISSION_SCHEMA || admission.packetId !== packetId
     || admission.packetDigest !== sha256(canonicalJson(packet))
     || admission.claimSha256 !== sha256(canonicalJson(claim))
     || admission.sessionId !== binding.sessionId
     || admission.preflightSha256 !== binding.preflightSha256
     || admission.preflightSha256 !== packet.route.projectionDigest
-    || !SHA256.test(admission.courseSourceSha256) || !SHA256.test(admission.courseDecisionSha256)
+    || !SHA256.test(admission.courseSourceSha256) || !SHA256.test(admission.courseDecisionSha256) || !(admission.splitSha256 === undefined || SHA256.test(admission.splitSha256))
     || typeof admission.createdAt !== "string" || !Number.isFinite(Date.parse(admission.createdAt))) {
     fail("CPP-SESSION-ADMISSION", "Consumed session admission is drifted.");
   }

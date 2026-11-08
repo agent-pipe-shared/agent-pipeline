@@ -615,6 +615,7 @@ kernel authority, so a maintenance window cannot lift them:
 `plugins/pipeline-core/lib/answered-intake-values.mjs`,
 `plugins/pipeline-core/lib/signed-proof-wait.mjs`,
 `plugins/pipeline-core/lib/critic-source-return.mjs`,
+`plugins/pipeline-core/lib/critic-split.mjs`,
 `plugins/pipeline-core/lib/critic-acknowledgement.mjs`,
 `plugins/pipeline-core/lib/consumer-release.mjs`,
 `plugins/pipeline-core/lib/critic-diagnostic-producer.mjs`,

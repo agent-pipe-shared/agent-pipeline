@@ -52,7 +52,10 @@ export function independenceFlagsConsistent(independence, session) {
   return false;
 }
 export function validateSessionCriticReceipt(receipt) {
-  if (!exact(receipt, Object.hasOwn(receipt ?? {}, "independence") ? [...RECEIPT_KEYS, "independence"] : RECEIPT_KEYS) || receipt.schema !== SESSION_CRITIC_RECEIPT_SCHEMA
+  // G20-72: a split round's receipt also carries the digest of the split its admission bound; a receipt without it verifies exactly as before.
+  const optionalKeys = ["independence", "splitSha256"].filter((key) => Object.hasOwn(receipt ?? {}, key));
+  if (!exact(receipt, [...RECEIPT_KEYS, ...optionalKeys]) || receipt.schema !== SESSION_CRITIC_RECEIPT_SCHEMA
+    || !(receipt.splitSha256 === undefined || SHA256.test(receipt.splitSha256))
     || !PACKET_ID.test(receipt.packetId) || !SHA256.test(receipt.packetDigest)
     || !exact(receipt.session, ["id", "freshContext", "historyInherited", "mayDelegate"])
     || !SAFE_ID.test(receipt.session.id) || !independenceFlagsConsistent(receipt.independence, receipt.session)

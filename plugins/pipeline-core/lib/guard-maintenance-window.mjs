@@ -835,6 +835,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // acknowledgement of a caller-authored Critic the close gate and pipeline-state read. Their first-party imports
   // (critic-packet-preflight-read.mjs, schema-lite.mjs, critical-action-authorization.mjs) are already listed.
   "plugins/pipeline-core/lib/critic-source-return.mjs",
+  // C20e G20-72 (GMWKC01): the read-only split/merge library the Critic preflight, the packet admission, the Source-return producer and the finalizer's origin gate import.
+  // Its first-party imports (review-economy.mjs, schema-lite.mjs) are already listed.
+  "plugins/pipeline-core/lib/critic-split.mjs",
   "plugins/pipeline-core/lib/critic-acknowledgement.mjs",
   // C20 G20-42 (GMWKC01): the consumer release route project-onboarding-v3.mjs imports (VERSION target, release preflight,
   // annotated version tag). Its first-party imports are already listed.

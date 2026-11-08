@@ -13,7 +13,8 @@ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { reserveFeatureCriticReviewUnitOwnership, republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore, inspectFeatureCourseTakeover, supersedeFeatureCourseTakeover, readCriticReviewUnit } from "../lib/critic-generic-batch.mjs";
 import { releaseCriticPacket } from "../lib/critic-packet-release.mjs";
-import { readCriticSourceReturn } from "../lib/critic-source-return.mjs";
+import { CRITIC_SPLIT_SOURCE_RETURN_SCHEMA, readAdmittedSplit, readCriticSourceReturn, readCriticSplitSourceReturns } from "../lib/critic-source-return.mjs";
+import { SPLIT_NEXT_ROUND_REPAIR, attributeVerdict, buildCriticSplit, criticSplitDigest, mergeSplitVerdicts } from "../lib/critic-split.mjs";
 import { GOVERNANCE_REVIEW_SOURCE_SCHEMA, buildGovernanceReviewAction, buildGovernanceReviewRetry, preflightGovernanceReviewActionOutput, writeGovernanceReviewAction } from "../lib/governance-review-action.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
@@ -132,7 +133,37 @@ const ORIGINAL_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return.v1"
 const ORIGINAL_SOURCE_RETURN_KEYS = Object.freeze(["schema", "issuer", "packetId", "packetDigest", "claimant", "sessionId", "verdictSha256", "issuedAtMs", "expiresAtMs"]);
 // G20-39: the default reader is the private control area. The Critic subagent's stop hook (hooks/native-goldfish-host.mjs ->
 // lib/critic-source-return.mjs) issues the record there; a missing record reads as null, a present one is returned as stored.
-function originGate(query, options, deps, controlRoot) {
+// G20-72: the origin gate of a SPLIT round. Every module Critic has its own record (the nine keys plus the split digest, the entry and the child's verdict). The round is
+// source-issued only when there is exactly one bound record per split entry and the finalized verdict is the merge of exactly those verdicts; the children of a split packet
+// cannot be re-run inside it (a second record for an entry refuses, so a caller can never keep the better of two runs), and a record that names no entry of the split refuses too.
+const SPLIT_RECORD_KEYS = Object.freeze([...ORIGINAL_SOURCE_RETURN_KEYS, "splitSha256", "entryId", "verdict"]);
+function splitOriginGate(query, context, deps, controlRoot) {
+  let records = [];
+  try { records = (deps.readSplitSourceReturnsFn ?? ((q) => readCriticSplitSourceReturns({ controlRoot, packetId: q.packetId })))(query) ?? []; } catch { records = []; }
+  if (records.length === 0) return Object.freeze({ independence: "caller-authored-fallback", origin: "caller-authored", nativeAttestation: false });
+  const now = (deps.originNowMsFn ?? Date.now)();
+  const byEntry = new Map();
+  for (const record of records) {
+    if (!exact(record, SPLIT_RECORD_KEYS) || typeof record.entryId !== "string") fail("SCF-SPLIT-RECORD-STRAY", `a Source return record names no split entry; repair: ${SPLIT_NEXT_ROUND_REPAIR}`);
+    if (record.schema !== CRITIC_SPLIT_SOURCE_RETURN_SCHEMA || record.issuer !== "source" || record.packetId !== query.packetId || record.packetDigest !== query.packetDigest
+      || canonicalJson(record.claimant) !== canonicalJson(query.claimant) || record.sessionId !== query.sessionId || record.splitSha256 !== context.splitSha256
+      || sha256(canonicalJson(record.verdict)) !== record.verdictSha256
+      || !Number.isSafeInteger(record.issuedAtMs) || !Number.isSafeInteger(record.expiresAtMs) || record.issuedAtMs > now || now >= record.expiresAtMs) fail("SCF-ORIGINAL-SOURCE-BINDING");
+    if (!context.split.entries.some((entry) => entry.id === record.entryId) || attributeVerdict(context.split, record.verdict) !== record.entryId) {
+      fail("SCF-SPLIT-RECORD-STRAY", `a Source return record names entry ${JSON.stringify(record.entryId.slice(0, 40))}, which is no entry of the split or does not match its verdict; repair: ${SPLIT_NEXT_ROUND_REPAIR}`);
+    }
+    if (byEntry.has(record.entryId)) fail("SCF-SPLIT-DUPLICATE-ENTRY", `two Source return records exist for split entry ${record.entryId}; repair: ${SPLIT_NEXT_ROUND_REPAIR}`);
+    byEntry.set(record.entryId, record.verdict);
+  }
+  const missing = context.split.entries.filter((entry) => !byEntry.has(entry.id)).map((entry) => entry.id);
+  if (missing.length > 0) fail("SCF-SPLIT-CHILD-MISSING", `no Source return record for split entry ${missing.join(", ")}; repair: run that entry's Critic, or ${SPLIT_NEXT_ROUND_REPAIR}`);
+  const merged = mergeSplitVerdicts(context.split, [...byEntry].map(([entryId, verdict]) => ({ entryId, verdict })));
+  if (!merged.ok) fail("SCF-SPLIT-MERGE", `${merged.code}: ${merged.message}`);
+  if (criticSplitDigest(merged.verdict) !== criticSplitDigest(context.verdict)) fail("SCF-SPLIT-MERGE-MISMATCH", "the verdict is not the merge of exactly the returned child verdicts; repair: finalize the output of critic-split-merge.mjs unchanged");
+  return Object.freeze({ independence: "source-issued-origin", origin: "source", nativeAttestation: false });
+}
+function originGate(query, options, deps, controlRoot, splitContext = null) {
+  if (splitContext !== null) return splitOriginGate(query, splitContext, deps, controlRoot);
   let record = null;
   try { record = (deps.readOriginalSourceReturnFn ?? ((q) => readCriticSourceReturn({ controlRoot, packetId: q.packetId })))(query); } catch { record = null; }
   // G20-24 (PO decision 2026-11-07): no runner issues a Source return record, so requiring one made the normal finalize path
@@ -443,6 +474,8 @@ export function admitSessionCriticReview(options, deps = {}) {
   const packetId = options.packetId;
   if (!PACKET_ID.test(packetId ?? "")) fail("SCF-PACKET-ID");
   const preflightSha256 = sha256(canonicalJson(preflight));
+  // G20-72: the split of a range above the bound is rebuilt here from the repository, never taken from the request, and bound into the admission.
+  const split = buildCriticSplit({ root, result: preflight });
   const signedImportAnchor = signedImportAnchorFor(preflight, options.signedQualityImportAnchor, options.taskId);
   const modelRole = selectedSessionCriticModelRole(root, options.trigger ?? "T1", options.route, deps);
   const route = routeFor(modelRole === null ? options.route
@@ -463,11 +496,12 @@ export function admitSessionCriticReview(options, deps = {}) {
       try { ({ packet: held } = inspectClaimedCandidatePacket({ controlRoot, packetId }, deps.packetDependencies)); } catch { throw error; }
       if (held.candidate?.commit !== preflight.candidate.commit || held.request?.taskId !== options.taskId
         || held.request?.sessionBinding?.preflightSha256 !== preflightSha256) throw error;
-      const admission = (deps.publishClaimedSessionAdmissionFn ?? publishClaimedSessionAdmission)({ controlRoot, packetId, preflightSha256, ...course }, deps.packetDependencies);
+      const admission = (deps.publishClaimedSessionAdmissionFn ?? publishClaimedSessionAdmission)({ controlRoot, packetId, preflightSha256, ...course, ...(split === null ? {} : { split }) }, deps.packetDependencies);
       return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA, status: "admitted", packetId,
         packetDigest: sha256(canonicalJson(held)), admissionSha256: sha256(canonicalJson(admission.admission)), resumed: true });
     }
-    if (current.admission.courseSourceSha256 !== course.courseSourceSha256 || current.admission.courseDecisionSha256 !== course.courseDecisionSha256) fail("SCF-PRELAUNCH-BINDING");
+    if (current.admission.courseSourceSha256 !== course.courseSourceSha256 || current.admission.courseDecisionSha256 !== course.courseDecisionSha256
+      || (current.admission.splitSha256 ?? null) !== (split === null ? null : criticSplitDigest(split))) fail("SCF-PRELAUNCH-BINDING");
     return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA, status: "already-admitted", packetId,
       packetDigest: current.admission.packetDigest, admissionSha256: sha256(canonicalJson(current.admission)), replay: true });
   }
@@ -504,15 +538,16 @@ export function admitSessionCriticReview(options, deps = {}) {
   if(genericBatch===null)featureReservationFor(options,preflight,root,controlRoot,packetId,preflightSha256);
   const course = genericReservation === null ? courseDigestsFor(preflight) : genericCourseFor(genericReservation.reservation);
   const admission = (deps.publishClaimedSessionAdmissionFn ?? publishClaimedSessionAdmission)({
-    controlRoot, packetId, preflightSha256, ...course,
+    controlRoot, packetId, preflightSha256, ...course, ...(split === null ? {} : { split }),
   }, deps.packetDependencies);
   return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA,
     status: "admitted", packetId, packetDigest: prepared.packetDigest,
     admissionSha256: sha256(canonicalJson(admission.admission)) });
 }
-function buildResult({ packet, packetDigest, session, verdict, independence }) {
+function buildResult({ packet, packetDigest, session, verdict, independence, splitSha256 = undefined }) {
   const fallback = independence === "caller-authored-fallback";
   return Object.freeze({
+    ...(splitSha256 === undefined ? {} : { splitSha256 }),
     schema: SESSION_CRITIC_RESULT_SCHEMA,
     packetId: packet.packetId,
     packetDigest,
@@ -527,7 +562,7 @@ function buildResult({ packet, packetDigest, session, verdict, independence }) {
 }
 function validateResult(result, packet, packetDigest = sha256(canonicalJson(packet))) {
   const sessionBinding = packet.request.sessionBinding;
-  if (!exact(result, Object.hasOwn(result ?? {}, "independence") ? [...RESULT_KEYS, "independence"] : RESULT_KEYS) || result.schema !== SESSION_CRITIC_RESULT_SCHEMA
+  if (!exact(result, [...RESULT_KEYS, ...["independence", "splitSha256"].filter((key) => Object.hasOwn(result ?? {}, key))]) || !(result.splitSha256 === undefined || SHA256.test(result.splitSha256)) || result.schema !== SESSION_CRITIC_RESULT_SCHEMA
     || result.packetId !== packet.packetId || result.packetDigest !== packetDigest
     || !exact(sessionBinding, Object.hasOwn(sessionBinding ?? {}, "modelRole")
       ? ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate", "modelRole"]
@@ -558,6 +593,7 @@ function receiptFor(result) {
     findingCount: result.verdict.findings.length,
     reviewPass: result.verdict.pass,
     ...(Object.hasOwn(result, "independence") ? { independence: result.independence } : {}),
+    ...(Object.hasOwn(result, "splitSha256") ? { splitSha256: result.splitSha256 } : {}),
   });
 }
 
@@ -677,10 +713,19 @@ export function finalizeSessionCriticReview(options, deps = {}) {
   const prepared = { packet, packetDigest: admitted.admission?.packetDigest ?? sha256(canonicalJson(packet)) };
 
   let event = null;
+  // G20-72: an admission that carries a split bound it; finalize reads exactly that split, checks it against the repository, and gates the origin over every child.
+  let splitContext = null;
+  if (admitted.admission.splitSha256 !== undefined) {
+    const split = readAdmittedSplit(join(controlRoot, packetId), admitted.admission.splitSha256);
+    const rebuilt = buildCriticSplit({ root, result: preflight });
+    if (split === undefined || rebuilt === null || criticSplitDigest(rebuilt) !== admitted.admission.splitSha256) fail("SCF-PRELAUNCH-BINDING");
+    splitContext = { split, splitSha256: admitted.admission.splitSha256, verdict: options.verdict };
+  }
   const independence = originGate({ packetId, packetDigest: prepared.packetDigest,
     claimant: { runner: options.route?.runner, adapter: options.route?.adapter },
-    sessionId: id, verdictSha256: sha256(canonicalJson(assertVerdict(options.verdict))) }, options, deps, controlRoot);
-  const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict, independence: independence.independence });
+    sessionId: id, verdictSha256: sha256(canonicalJson(assertVerdict(options.verdict))) }, options, deps, controlRoot, splitContext);
+  const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict, independence: independence.independence,
+    splitSha256: splitContext?.splitSha256 });
   validateResult(result, prepared.packet, prepared.packetDigest);
   const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
   const recorded = (deps.recordCandidateResultFn ?? recordCandidateResult)({ controlRoot: controlRootFor(root), packetId, result }, deps.packetDependencies);
