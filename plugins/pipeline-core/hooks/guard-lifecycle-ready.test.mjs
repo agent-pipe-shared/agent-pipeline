@@ -8695,7 +8695,19 @@ test("DEVPLANSHELL-5: indirect script/package writes and the hook-disable settin
     const powershellInspect = `& '${onboardingNode}' '${stateScript}' inspect`;
     const powershellInspectResult = devPlanShellRun(path, powershellInspect, "PowerShell");
     assert.equal(powershellInspectResult.exitCode, 0, `${powershellInspect}: ${powershellInspectResult.stderr}`);
+    // Live Windows run: the bare spelling of the same call must pass as well, an email in an answer flag included.
+    const bareConsent = `node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email 'ops@example.test' --activate`;
+    const bareConsentResult = devPlanShellRun(path, bareConsent, "PowerShell");
+    assert.equal(bareConsentResult.exitCode, 0, `${bareConsent}: ${bareConsentResult.stderr}`);
+    const unquotedEmail = `node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email ops@example.test --activate`;
+    assert.equal(devPlanShellRun(path, unquotedEmail, "PowerShell").exitCode, 0, unquotedEmail);
     for (const rejected of [
+      `${bareConsent}; Remove-Item game.js`,
+      `${bareConsent} & Remove-Item game.js`,
+      `node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email $env:EMAIL --activate`,
+      `node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email @values --activate`,
+      `node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email (Remove-Item game.js) --activate`,
+      `& '${onboardingNode}' '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email (Remove-Item game.js) --activate`,
       `${powershellConsent}; Remove-Item game.js`,
       `& '${onboardingNode}' '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email $env:EMAIL --activate`,
       `& @node '${onboardingScript}' intake-consent-apply --root '${path}' --granted --git-author-email 'ops@example.test' --activate`,

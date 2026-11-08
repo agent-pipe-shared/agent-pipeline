@@ -46,6 +46,7 @@ const SHAPE_DISPOSITION = [
   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
   { bashOnly: "the dialect admits one literal command per call (the one literal $env: assignment folded into it is the single exception)" },
+  { bashOnly: "a dollar sign is refused outright in the dialect, quoted or not, because PowerShell expands it" },
 ];
 
 test("every shape of the Bash grammar table has a disposition, and a Bash-only shape is refused by the PowerShell dialect", () => withRoot(({ root, ps }) => {

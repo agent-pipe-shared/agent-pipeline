@@ -53,10 +53,13 @@ function powerShellScratchPath(target, root, dependencies, allowScratchRoot = fa
 // that one prefix when the remainder parses as a single literal Node invocation that the
 // existing closed lifecycle argv validator already recognizes. This does not admit PowerShell
 // composition, variables, splatting, or a general-purpose call operator.
+// The bare `node <script> ...` spelling gets the same check, so a literal email in an answer flag does not depend on which spelling the agent chose (live
+// Windows run: the bare form was refused for its `@`, the same argv passed in Bash). PowerShell evaluates an unquoted (...) argument, so one is refused outright.
 export function sanctionedPowerShellNodeCall(command, root) {
-  if (typeof command !== "string" || !/^\s*&\s+/u.test(command)) return false;
+  if (typeof command !== "string") return false;
   const body = command.replace(/^\s*&\s+/u, "");
   if (/[\r\n;$`|<>]/u.test(body)) return false;
+  if (/[()]/u.test(body.replace(/'[^']*'|"[^"]*"/gu, ""))) return false;
   const parsed = parseGuardCommand(body, root, { platform: "win32" });
   if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
     || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
