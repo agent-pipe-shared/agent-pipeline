@@ -1,0 +1,440 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 109d10ba6c8decddd4bc3406810742b827ba7bfd..0461e69398bea865b3f58cf69340dcf8512c4778 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -625,15 +625,24 @@ function sanctionedSessionAuthorityRepairReadArgs(args, root) {
+ }
+ 
+ // C20 G20-30: scripts/proof-wait.mjs observes one named proof file (read-only, never prints it, never verifies it). Exact argv only:
+-// `--root <root> --proof <scratch/<name>proof<name>.json | /abs/proof-<64 hex>.json> [--timeout <1-600>]`, no dot segment, no backslash.
++// `--root <root> --proof <scratch/<name>proof<name>.json | /abs/proof-<64 hex>.json> [--timeout <1-600>] [--subject <64 hex>]`, no dot segment, no backslash.
+ function sanctionedProofWaitArgs(args, root) {
+   if (args[0] !== "--root" || args[1] !== root || args[2] !== "--proof" || typeof args[3] !== "string") return false;
+   const proof = args[3];
+   if (proof.length > 400 || /[\u0000-\u001f\u007f\\]/u.test(proof) || proof.split("/").some((part) => part === "." || part === "..")) return false;
+   const shaped = proof.startsWith("/") ? /\/proof-[a-f0-9]{64}\.json$/u.test(proof) : /^scratch\/[A-Za-z0-9._-]*proof[A-Za-z0-9._-]*\.json$/u.test(proof);
+   if (!shaped) return false;
+-  if (args.length === 4) return true;
+-  return args.length === 6 && args[4] === "--timeout" && /^(?:[1-9][0-9]{0,2})$/u.test(args[5] ?? "") && Number(args[5]) <= 600;
++  // C20e G20-76: optionally `--subject <64 lowercase hex>` (the subject the wait ends for), only after `--timeout` when both are given.
++  let at = 4;
++  if (args[at] === "--timeout") {
++    if (!/^(?:[1-9][0-9]{0,2})$/u.test(args[at + 1] ?? "") || Number(args[at + 1]) > 600) return false;
++    at += 2;
++  }
++  if (args[at] === "--subject") {
++    if (!/^[a-f0-9]{64}$/u.test(args[at + 1] ?? "")) return false;
++    at += 2;
++  }
++  return args.length === at;
+ }
+ 
+ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 8ae56fb99f67a89df00fd6fe88ef2ae686b333e6..a5ade8bd6de01af8bbe427aefe56fce78f9d4c2f 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -34,6 +34,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { readState, run } from "../../scripts/pipeline-state.mjs";
+ import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
++import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../critical-action-approval-request.mjs";
++import { awaitSignatureFields } from "../signed-proof-wait.mjs";
+ import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
+ import { createGovernanceScopeController } from "../governance-scope.mjs";
+ import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
+@@ -748,6 +750,137 @@ test("G20-30: the proof wait is admitted by exact argv only, and only for the pl
+   for (const [label, command] of Object.entries(refused)) assert.equal(isSanctionedLifecycleCommand(command, root), false, label);
+ });
+ 
++// ---------------------------------------------------------------------------------------------------------------------
++// C20e G20-76 (AC-108): authorize-critical mirrors request/proof into ONE fixed name per repository and kind, so an older
++// signature's mirror still sitting in scratch/ must not end the wait for a new signature. With the expected subject the wait
++// counts a proof as present only when its sibling request carries exactly that subject AND the proof signs that request's
++// intent. The mirror files below are built in the test's own temporary project, with the real naming.
++// ---------------------------------------------------------------------------------------------------------------------
++const G2076_CANDIDATE = { commit: "a".repeat(40), tree: "b".repeat(40) };
++function g2076Subject(destination) {
++  return criticalActionSubjectSha256({ kind: "push", candidate: G2076_CANDIDATE, subject: { sourceCommit: G2076_CANDIDATE.commit, remote: "origin", destination } });
++}
++function g2076Request(destination, expiresAt) {
++  return createCriticalActionApprovalRequest({
++    candidate: G2076_CANDIDATE, featureId: "f20e", planBytes: Buffer.from("plan\n"), specBytes: Buffer.from("spec\n"),
++    action: { kind: "push", subjectSha256: g2076Subject(destination), expiresAt },
++  });
++}
++function g2076Proof(request) {
++  return { schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "fixture-key", publicKey: "fixture-public-key", signatureBase64: "Zml4dHVyZQ==" };
++}
++function g2076Project() {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "g2076-")));
++  mkdirSync(join(root, "scratch"));
++  const write = (name, value) => writeFileSync(join(root, "scratch", name), `${JSON.stringify(value, null, 2)}\n`);
++  return { root, requestRel: "scratch/critical-push-request-0123456789ab.json", proofRel: "scratch/critical-push-proof-0123456789ab.json",
++    mirror: (request, proof = g2076Proof(request)) => { write("critical-push-request-0123456789ab.json", request); write("critical-push-proof-0123456789ab.json", proof); },
++    writeRequest: (request) => write("critical-push-request-0123456789ab.json", request),
++    writeProof: (proof) => write("critical-push-proof-0123456789ab.json", proof) };
++}
++function waitWithSubjectCli(root, proofRel, extra, seconds = 1) {
++  const child = spawnSync(process.execPath, [PROOF_WAIT_SCRIPT, "--root", root, "--proof", proofRel, "--timeout", String(seconds), ...extra], { encoding: "utf8", timeout: 60000 });
++  return { status: child.status, out: child.stdout.trim() === "" ? null : JSON.parse(child.stdout), stderr: child.stderr };
++}
++
++test("G20-76: an older signature's mirror never ends the wait for the expected subject; the typed timeout names the move-aside recovery", () => {
++  const wanted = g2076Subject("refs/heads/new");
++  const older = g2076Request("refs/heads/old", "2026-11-08T10:00:00.000Z");
++  // (a) request and proof both from the older signature: another subject.
++  const bothOld = g2076Project();
++  bothOld.mirror(older);
++  const staleBoth = waitWithSubjectCli(bothOld.root, bothOld.proofRel, ["--subject", wanted]);
++  assert.equal(staleBoth.status, 2, staleBoth.stderr);
++  assert.equal(staleBoth.out.code, "PROOF-WAIT-STALE", "a file existed at the path but never matched the expected subject");
++  assert.match(staleBoth.out.repair, /critical-push-/u, "the repair names the mirror files of the older signature");
++  assert.match(staleBoth.out.repair, /rename|move/iu);
++  assert.doesNotMatch(staleBoth.out.repair, /delete|\brm\b/iu, "set aside, never deleted");
++  assert.match(staleBoth.out.repair, /sign-intent/u, "then the one signing command again");
++  assert.match(staleBoth.out.repair, /proof-wait\.mjs/u, "then the same wait");
++  assert.ok(staleBoth.out.repair.includes(wanted), "the same wait keeps the expected subject");
++  // (b) a proof file with its sibling request missing: not signed yet.
++  const noRequest = g2076Project();
++  noRequest.writeProof(g2076Proof(older));
++  assert.equal(waitWithSubjectCli(noRequest.root, noRequest.proofRel, ["--subject", wanted]).out.code, "PROOF-WAIT-STALE");
++  // (c) the new request is already written but the proof is still the older one (request is mirrored before proof).
++  const window = g2076Project();
++  window.mirror(g2076Request("refs/heads/new", "2026-11-08T11:00:00.000Z"), g2076Proof(older));
++  assert.equal(waitWithSubjectCli(window.root, window.proofRel, ["--subject", wanted]).out.code, "PROOF-WAIT-STALE", "the proof's own intent must belong to the matching request");
++  // (d) a sibling request that is not a critical-action request, not JSON, or has no subject is not signed yet either.
++  for (const [label, content] of [["other schema", JSON.stringify({ schema: "pipeline.other.v1", action: { subjectSha256: wanted } })],
++    ["not JSON", "not json at all"], ["no subject", JSON.stringify({ schema: "pipeline.critical-action-approval-request.v1", action: { kind: "push" }, approvalIntent: { sha256: older.approvalIntent.sha256 } })]]) {
++    const odd = g2076Project();
++    odd.writeProof(g2076Proof(older));
++    writeFileSync(join(odd.root, odd.requestRel), content);
++    assert.equal(waitWithSubjectCli(odd.root, odd.proofRel, ["--subject", wanted]).out.code, "PROOF-WAIT-STALE", label);
++  }
++  // A path with nothing at all is still the plain timeout: no file existed, so there is no older signature to move aside.
++  const empty = g2076Project();
++  assert.equal(waitWithSubjectCli(empty.root, empty.proofRel, ["--subject", wanted]).out.code, "PROOF-WAIT-TIMEOUT");
++});
++
++test("G20-76: the matching mirror ends the wait at once; without a subject the wait behaves exactly as before", () => {
++  const wanted = g2076Subject("refs/heads/new");
++  const matching = g2076Project();
++  matching.mirror(g2076Request("refs/heads/new", "2026-11-08T11:00:00.000Z"));
++  const present = waitWithSubjectCli(matching.root, matching.proofRel, ["--subject", wanted], 5);
++  assert.equal(present.status, 0, present.stderr);
++  assert.equal(present.out.status, "proof-present");
++  // No subject: a caller that does not know it still gets the old behaviour, an older mirror included.
++  const older = g2076Project();
++  older.mirror(g2076Request("refs/heads/old", "2026-11-08T10:00:00.000Z"));
++  const legacy = waitWithSubjectCli(older.root, older.proofRel, [], 5);
++  assert.equal(legacy.status, 0, legacy.stderr);
++  assert.equal(legacy.out.status, "proof-present");
++  const none = g2076Project();
++  assert.equal(waitWithSubjectCli(none.root, none.proofRel, []).out.code, "PROOF-WAIT-TIMEOUT");
++  // A file that is not a proof stays PROOF-WAIT-INVALID with a subject, too.
++  const invalid = g2076Project();
++  invalid.writeProof({ schema: "something-else" });
++  assert.equal(waitWithSubjectCli(invalid.root, invalid.proofRel, ["--subject", wanted]).out.code, "PROOF-WAIT-INVALID");
++});
++
++test("G20-76: --subject is a closed flag; a malformed or repeated value is PROOF-WAIT-ARGS", () => {
++  const project = g2076Project();
++  for (const extra of [["--subject", "abc"], ["--subject", "A".repeat(64)], ["--subject", "a".repeat(63)], ["--subject", "a".repeat(64), "--subject", "a".repeat(64)]]) {
++    const refused = waitWithSubjectCli(project.root, project.proofRel, extra);
++    assert.equal(refused.status, 2, extra.join(" "));
++    assert.equal(refused.out.code, "PROOF-WAIT-ARGS", extra.join(" "));
++  }
++});
++
++test("G20-76: awaitSignatureFields adds --subject after --timeout only when it is given, and says the wait ends only for that subject", () => {
++  const subject = g2076Subject("refs/heads/new");
++  const plain = awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json" });
++  assert.deepEqual(plain.waitAction.argv.slice(1), ["--root", "/p", "--proof", "scratch/critical-push-proof-0123456789ab.json", "--timeout", "120"], "no subject: the argv is unchanged");
++  assert.doesNotMatch(plain.afterSigning, /subject/iu);
++  const bound = awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json", subjectSha256: subject });
++  assert.deepEqual(bound.waitAction.argv.slice(1, 5), ["--root", "/p", "--proof", "scratch/critical-push-proof-0123456789ab.json"], "the first four argv entries keep their place");
++  assert.deepEqual(bound.waitAction.argv.slice(5), ["--timeout", "120", "--subject", subject]);
++  assert.match(bound.afterSigning, /only for the expected subject/u);
++  assert.throws(() => awaitSignatureFields({ root: "/p", proofPath: "scratch/critical-push-proof-0123456789ab.json", subjectSha256: "nope" }), /subject/iu);
++});
++
++test("G20-76: the shell grammar admits the proof wait with --subject only as a 64 hex value after --timeout", async () => {
++  const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
++  const root = join(DESIGN_REPO_ROOT, "scratch", ".proof-wait-fixture");
++  const subject = "c".repeat(64);
++  const proof = `scratch/critical-push-proof-0123456789ab.json`;
++  const wait = (...args) => `node ${PROOF_WAIT_SCRIPT} ${args.join(" ")}`;
++  for (const command of [wait("--root", root, "--proof", proof, "--timeout", "120", "--subject", subject), wait("--root", root, "--proof", proof, "--subject", subject)]) {
++    assert.equal(isSanctionedLifecycleCommand(command, root), true, command);
++  }
++  const refused = {
++    "short subject": wait("--root", root, "--proof", proof, "--timeout", "120", "--subject", "c".repeat(63)),
++    "uppercase subject": wait("--root", root, "--proof", proof, "--timeout", "120", "--subject", "C".repeat(64)),
++    "subject before timeout": wait("--root", root, "--proof", proof, "--subject", subject, "--timeout", "120"),
++    "repeated subject": wait("--root", root, "--proof", proof, "--timeout", "120", "--subject", subject, "--subject", subject),
++    "subject without value": wait("--root", root, "--proof", proof, "--timeout", "120", "--subject"),
++    "timeout over bound with subject": wait("--root", root, "--proof", proof, "--timeout", "601", "--subject", subject),
++  };
++  for (const [label, command] of Object.entries(refused)) assert.equal(isSanctionedLifecycleCommand(command, root), false, label);
++});
++
+ // The runtime refusal: the last step of the onboarding envelope refuses (by type, never silently drops) an ask of an answered key.
+ test("G20-30: the onboarding envelope refuses, by type, an ask for a key the intake record already answers", () => {
+   const { withReaskRefusals } = planHandoffModuleOnboarding;
+diff --git a/plugins/pipeline-core/lib/signed-proof-wait.mjs b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+index cfd5f1929e5e5f592244a284d9128ede7697d921..6c292fd5d6d8ddf6d7c86de9da8a67e48bf8888d 100644
+--- a/plugins/pipeline-core/lib/signed-proof-wait.mjs
++++ b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+@@ -7,10 +7,17 @@
+  *
+  * A proof reference is exactly one of: `scratch/<name>.json` below the project root (sign-intent --request writes its sibling proof
+  * there), or an absolute path whose file name is `proof-<64 hex>.json` (the guard-override signature writes it into the key directory).
++ *
++ * C20e G20-76: authorize-critical mirrors request, proof, authority and signer into scratch/ under ONE fixed name per repository and
++ * kind, so an older signature's mirror can already sit at the proof path. A caller that knows the subject it prepared passes
++ * `subjectSha256`; the wait then counts a scratch proof as present only when its sibling request (the `proof-` -> `request-` name)
++ * carries exactly that subject (the comparison pipeline-state approve-push makes) AND the proof signs that request's own intent.
++ * Still no signature is verified and no key is read: the wait compares two strings the files already carry.
+  */
+ import { lstatSync, readFileSync, realpathSync } from "node:fs";
+ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA } from "./critical-action-approval-request.mjs";
+ 
+ export const PROOF_WAIT_SCHEMA = "pipeline.signed-proof-wait.v1";
+ export const PROOF_WAIT_DEFAULT_SECONDS = 120;
+@@ -29,8 +36,34 @@ export function proofReferenceKind(reference) {
+   return SCRATCH_PROOF.test(reference) ? "scratch" : null;
+ }
+ 
+-/** `present` (a regular, well-formed proof file), `absent`, or `invalid` (something else sits at the path). */
+-export function observeProofFile(root, reference) {
++export const isProofSubjectSha256 = (value) => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
++
++/** The mirrored request that sits beside a scratch proof (the `proof-` -> `request-` mapping sign-intent itself writes under), or null. */
++function siblingRequestName(reference) {
++  const name = basename(reference);
++  return name.includes("proof-") ? name.replace("proof-", "request-") : null;
++}
++
++/** True only when the sibling request is a critical-action request for exactly `subjectSha256` and `proof` signs that request's intent. */
++function proofBelongsToSubject(root, reference, proof, subjectSha256) {
++  const requestName = siblingRequestName(reference);
++  if (requestName === null) return false;
++  const target = join(root, "scratch", requestName);
++  try {
++    const stat = lstatSync(target);
++    if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 1 || stat.size > 1024 * 1024) return false;
++    const request = JSON.parse(readFileSync(target, "utf8"));
++    const intentSha256 = request?.approvalIntent?.sha256;
++    return request?.schema === CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA && request?.action?.subjectSha256 === subjectSha256
++      && isProofSubjectSha256(intentSha256) && proof.intentSha256 === intentSha256;
++  } catch { return false; }
++}
++
++/**
++ * `present` (a regular, well-formed proof file), `absent`, or `invalid` (something else sits at the path). With a subject (scratch
++ * proofs only) a well-formed proof that does not belong to it is `stale`: an older signature's file, not signed yet for this subject.
++ */
++export function observeProofFile(root, reference, subjectSha256 = null) {
+   const kind = proofReferenceKind(reference);
+   if (kind === null) return { state: "invalid", reason: "not a proof reference" };
+   const target = kind === "scratch" ? resolve(root, reference) : reference;
+@@ -40,19 +73,21 @@ export function observeProofFile(root, reference) {
+   if (kind === "scratch") {
+     try { if (dirname(realpathSync(target)) !== realpathSync(join(root, "scratch"))) return { state: "invalid", reason: "outside scratch/" }; } catch { return { state: "invalid", reason: "unreadable" }; }
+   }
+-  try {
+-    const proof = JSON.parse(readFileSync(target, "utf8"));
+-    return proof?.schema === PROOF_SCHEMA ? { state: "present" } : { state: "invalid", reason: "not a po-approval proof" };
+-  } catch { return { state: "invalid", reason: "not JSON" }; }
++  let proof;
++  try { proof = JSON.parse(readFileSync(target, "utf8")); } catch { return { state: "invalid", reason: "not JSON" }; }
++  if (proof?.schema !== PROOF_SCHEMA) return { state: "invalid", reason: "not a po-approval proof" };
++  if (subjectSha256 === null || subjectSha256 === undefined || kind !== "scratch") return { state: "present" };
++  return proofBelongsToSubject(root, reference, proof, subjectSha256) ? { state: "present" } : { state: "stale", reason: "its request does not carry the expected subject" };
+ }
+ 
+ const quote = (part) => (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(part) ? part : JSON.stringify(part));
+ export const commandText = ({ executable, argv }) => [executable, ...argv].map(quote).join(" ");
+ const text = commandText;
+ 
+-/** The exact bounded wait for a proof reference. */
+-export function proofWaitCommand(root, proof, seconds = PROOF_WAIT_DEFAULT_SECONDS) {
+-  return { executable: process.execPath, argv: [PROOF_WAIT_SCRIPT, "--root", root, "--proof", proof, "--timeout", String(seconds)] };
++/** The exact bounded wait for a proof reference; `--subject` (G20-76) follows `--timeout` and appears only when a subject is given. */
++export function proofWaitCommand(root, proof, seconds = PROOF_WAIT_DEFAULT_SECONDS, subjectSha256 = null) {
++  if (subjectSha256 !== null && !isProofSubjectSha256(subjectSha256)) throw new TypeError("the proof wait subject must be 64 lowercase hex characters");
++  return { executable: process.execPath, argv: [PROOF_WAIT_SCRIPT, "--root", root, "--proof", proof, "--timeout", String(seconds), ...(subjectSha256 === null ? [] : ["--subject", subjectSha256])] };
+ }
+ 
+ /** The PO's one signing command for a proof reference, derived by the naming convention sign-intent itself writes under. */
+@@ -73,8 +108,8 @@ export function signCommandForProof(root, proof) {
+  * The fields every signing step carries beside its sign command (one builder for all of them): the exact proof path, the bounded
+  * wait the agent runs itself, and the explicit statement that the PO reports nothing back.
+  */
+-export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEFAULT_SECONDS }) {
+-  const wait = proofWaitCommand(root, proofPath, seconds);
++export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEFAULT_SECONDS, subjectSha256 = null }) {
++  const wait = proofWaitCommand(root, proofPath, seconds, subjectSha256);
+   return {
+     proofPath,
+     reportBackRequired: false,
+@@ -82,27 +117,44 @@ export function awaitSignatureFields({ root, proofPath, seconds = PROOF_WAIT_DEF
+       kind: "command", ...wait, mutation: false, requiresConfirmation: false,
+       expected: { schema: PROOF_WAIT_SCHEMA, statuses: ["proof-present"] },
+     },
+-    afterSigning: `Do not ask the PO to report back. After handing over the one signing command, run waitAction (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback.`,
++    afterSigning: `Do not ask the PO to report back. After handing over the one signing command, run waitAction (it returns as soon as ${proofPath} exists, or after ${seconds}s with one recovery), then read the next step from the same inspect readback.`
++      + (subjectSha256 === null ? "" : ` The wait ends only for the expected subject ${subjectSha256}: an older signature's file at that path does not end it.`),
+   };
+ }
+ 
+ const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+ 
++/** The mirror files of one signing kind (request, proof, authority, signer share one fixed name per repository), derived from the proof's own name. */
++function staleMirrorNames(proof) {
++  const name = basename(proof);
++  const at = name.indexOf("proof-");
++  if (at < 0) return [proof];
++  const roles = name.startsWith("critical-") ? ["request", "proof", "authority", "signer"] : ["request", "proof"];
++  return roles.map((role) => `scratch/${name.slice(0, at)}${role}-${name.slice(at + "proof-".length)}`);
++}
++
+ /** A bounded poll. Result: `{ status: "proof-present" }` or a typed `refused` whose single `repair` is the recovery. */
+-export function waitForSignedProof({ root, proof, timeoutSeconds = PROOF_WAIT_DEFAULT_SECONDS, now = Date.now, pause = sleep, observe = observeProofFile }) {
++export function waitForSignedProof({ root, proof, timeoutSeconds = PROOF_WAIT_DEFAULT_SECONDS, subjectSha256 = null, now = Date.now, pause = sleep, observe = observeProofFile }) {
+   if (proofReferenceKind(proof) === null) {
+     return { status: "refused", code: "PROOF-WAIT-ARGS", reason: "--proof must be scratch/<name>.json below the project, or an absolute proof-<64 hex>.json written by sign-intent", repair: "pass the proofPath the signing step printed, unchanged" };
+   }
++  if (subjectSha256 !== null && !isProofSubjectSha256(subjectSha256)) {
++    return { status: "refused", code: "PROOF-WAIT-ARGS", reason: "--subject must be 64 lowercase hex characters", repair: "pass the subject sha256 the signing step printed, unchanged, or leave --subject out" };
++  }
+   const deadline = now() + timeoutSeconds * 1000;
+   let last;
+   for (;;) {
+-    last = observe(root, proof);
++    last = observe(root, proof, subjectSha256);
+     if (last.state === "present") return { status: "proof-present", proofPath: proof };
+     if (now() >= deadline) break;
+     pause(Math.min(500, Math.max(1, deadline - now())));
+   }
+   const sign = signCommandForProof(root, proof);
+-  const again = text(proofWaitCommand(root, proof, timeoutSeconds));
++  const again = text(proofWaitCommand(root, proof, timeoutSeconds, subjectSha256));
++  if (last.state === "stale") {
++    return { status: "refused", code: "PROOF-WAIT-STALE", proofPath: proof, reason: `a signed proof sits at ${proof} but it is an older signature's mirror, not one for the expected subject (${last.reason})`,
++      repair: `rename (do not remove) the older mirror files ${staleMirrorNames(proof).join(", ")}; ${sign === null ? "sign again" : `then ask the PO once to run exactly this signing command: ${text(sign)}`}; then run ${again}` };
++  }
+   return last.state === "invalid"
+     ? { status: "refused", code: "PROOF-WAIT-INVALID", proofPath: proof, reason: `a file sits at ${proof} but it is not a signed proof (${last.reason})`,
+       repair: `${sign === null ? "sign again" : `have the PO run the one signing command again: ${text(sign)}`}; then run ${again}` }
+diff --git a/plugins/pipeline-core/scripts/proof-wait.mjs b/plugins/pipeline-core/scripts/proof-wait.mjs
+index 33e485c90e7bfbb2d284c2f8ac6c967c109f7301..a25257c54a61c5c1df178c9224199949372d935c 100644
+--- a/plugins/pipeline-core/scripts/proof-wait.mjs
++++ b/plugins/pipeline-core/scripts/proof-wait.mjs
+@@ -1,24 +1,27 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ //
+-// proof-wait.mjs --root <project> --proof <scratch/<name>.json | /abs/proof-<64 hex>.json> [--timeout <1-600, default 120>]
++// proof-wait.mjs --root <project> --proof <scratch/<name>.json | /abs/proof-<64 hex>.json> [--timeout <1-600, default 120>] [--subject <64 hex>]
++//
++// C20e G20-76: with --subject the wait ends only for a scratch proof whose sibling request carries exactly that subject (an older
++// signature's mirror at the same fixed name does not end it); a timeout where such a file existed is PROOF-WAIT-STALE.
+ //
+ // C20 G20-30 (AC-108): the agent's own bounded wait for the PO's signature. A signing step names the exact proof path; after the PO
+ // runs the one signing command the agent runs this, and it returns as soon as that file exists as a well-formed signed proof, so the
+ // PO is never asked to "tell me when you have signed". Read-only: it observes one file, never verifies a signature (the import step
+ // does that), never prints the file. Prints one JSON `pipeline.signed-proof-wait.v1`. Exit 0: proof-present. Exit 2: refused, with a
+-// typed code (PROOF-WAIT-ARGS | PROOF-WAIT-ROOT | PROOF-WAIT-TIMEOUT | PROOF-WAIT-INVALID) and the one recovery in `repair`.
++// typed code (PROOF-WAIT-ARGS | PROOF-WAIT-ROOT | PROOF-WAIT-TIMEOUT | PROOF-WAIT-INVALID | PROOF-WAIT-STALE) and the one recovery in `repair`.
+ import { realpathSync, statSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { PROOF_WAIT_DEFAULT_SECONDS, PROOF_WAIT_MAX_SECONDS, PROOF_WAIT_SCHEMA, waitForSignedProof } from "../lib/signed-proof-wait.mjs";
++import { isProofSubjectSha256, PROOF_WAIT_DEFAULT_SECONDS, PROOF_WAIT_MAX_SECONDS, PROOF_WAIT_SCHEMA, waitForSignedProof } from "../lib/signed-proof-wait.mjs";
+ 
+ function parse(argv) {
+   const flags = {};
+   for (let index = 0; index < argv.length; index += 2) {
+     const name = argv[index]?.startsWith("--") ? argv[index].slice(2) : null;
+     const value = argv[index + 1];
+-    if (!["root", "proof", "timeout"].includes(name) || typeof value !== "string" || value === "" || value.startsWith("--") || Object.hasOwn(flags, name)) {
++    if (!["root", "proof", "timeout", "subject"].includes(name) || typeof value !== "string" || value === "" || value.startsWith("--") || Object.hasOwn(flags, name)) {
+       return { error: `unexpected argument ${String(argv[index]).slice(0, 40)}` };
+     }
+     flags[name] = value;
+@@ -26,6 +29,7 @@ function parse(argv) {
+   if (!flags.root || !flags.proof) return { error: "--root and --proof are required" };
+   const timeout = flags.timeout === undefined ? PROOF_WAIT_DEFAULT_SECONDS : Number(flags.timeout);
+   if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > PROOF_WAIT_MAX_SECONDS) return { error: `--timeout needs whole seconds from 1 to ${PROOF_WAIT_MAX_SECONDS}` };
++  if (flags.subject !== undefined && !isProofSubjectSha256(flags.subject)) return { error: "--subject needs 64 lowercase hex characters" };
+   return { flags: { ...flags, timeout } };
+ }
+ 
+@@ -36,7 +40,7 @@ export function runProofWait(argv, out = (line) => process.stdout.write(line), d
+   let root;
+   try { root = realpathSync(resolve(parsed.flags.root)); if (!statSync(root).isDirectory()) throw new Error("not a directory"); }
+   catch { return emit({ status: "refused", code: "PROOF-WAIT-ROOT", reason: "--root is not a directory", repair: "pass the project root the signing step printed" }, 2); }
+-  const result = waitForSignedProof({ root, proof: parsed.flags.proof, timeoutSeconds: parsed.flags.timeout, ...deps });
++  const result = waitForSignedProof({ root, proof: parsed.flags.proof, timeoutSeconds: parsed.flags.timeout, subjectSha256: parsed.flags.subject ?? null, ...deps });
+   return emit(result, result.status === "proof-present" ? 0 : 2);
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 05e17c05f126e0bd11e90bf02ec3c9eb002b7c8c..bb6fe87691060a1496c9fa668c2a67fc8ecf721d 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -40,7 +40,7 @@
+ import { spawnSync } from "node:child_process";
+ import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+ import { dirname, join, relative, resolve, sep } from "node:path";
+-import { awaitSignatureFields } from "../lib/signed-proof-wait.mjs";
++import { awaitSignatureFields, isProofSubjectSha256 } from "../lib/signed-proof-wait.mjs";
+ import { fileURLToPath } from "node:url";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+@@ -1001,9 +1001,10 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+ 
+   report.subjectSha256 = subjectSha256;
+   // G20-30: the signature lands in the scratch mirror this report already names; the agent waits for that one file itself
+-  // (the PO reports nothing back) and then runs the approve-push line below.
++  // (the PO reports nothing back) and then runs the approve-push line below. G20-76: the mirror name is one fixed fingerprint per
++  // repository, so the wait carries the prepared subject and ends only for a proof whose request carries exactly it.
+   const proofRelative = relative(dir, artifacts.proof).split(sep).join("/");
+-  const awaitFields = /^scratch\//u.test(proofRelative) ? awaitSignatureFields({ root: resolve(dir), proofPath: proofRelative }) : null;
++  const awaitFields = /^scratch\//u.test(proofRelative) ? awaitSignatureFields({ root: resolve(dir), proofPath: proofRelative, subjectSha256: isProofSubjectSha256(subjectSha256) ? subjectSha256 : null }) : null;
+   if (awaitFields !== null) report.awaitSignature = awaitFields;
+   return {
+     ok: true,
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index 0bf38f35524888322db2d4f46db98757072c632e..c65be9121aa20bb5ce2dd888322cda192d0786fd 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -824,6 +824,25 @@ test("G20-30 pushPrepareReport: the signing step names the scratch proof and the
+   assert.doesNotMatch(result.lines.awaitProof, /tell me|let me know|report back to/iu);
+ });
+ 
++// C20e G20-76: the scratch mirror names are one fixed fingerprint per repository, so an older signature's mirror can sit at the proof path;
++// the report's wait therefore carries the prepared subject and ends only for a proof whose request carries exactly it.
++test("G20-76 pushPrepareReport: the wait action carries the prepared subject", () => {
++  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({
++    criticalPushScratchArtifactPaths: () => ({
++      request: `${FIXTURE_DIR}/scratch/critical-push-request-0123456789ab.json`,
++      proof: `${FIXTURE_DIR}/scratch/critical-push-proof-0123456789ab.json`,
++      authority: `${FIXTURE_DIR}/scratch/critical-push-authority-0123456789ab.json`,
++      signer: `${FIXTURE_DIR}/scratch/critical-push-signer-0123456789ab.json`,
++    }),
++  }));
++  assert.equal(result.report.ready, true);
++  const subject = result.report.subjectSha256;
++  assert.match(subject, /^[a-f0-9]{64}$/u);
++  const argv = result.report.awaitSignature.waitAction.argv;
++  assert.deepEqual(argv.slice(-2), ["--subject", subject], "the wait ends only for the subject the report prepared");
++  assert.match(result.report.awaitSignature.afterSigning, /only for the expected subject/u);
++});
++
+ test("pushPrepareReport: all preconditions met -> ready:true, all three commands rendered", () => {
+   const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps());
+   assert.equal(result.ok, true);

@@ -14,6 +14,13 @@ BUILDS candidate 20e first and only then runs the greenfields. Everything 20e ne
 | `w282-c20e-audit-push-proof-followup.package.json` | audit bundle: the push and release approval proofs reach the remote in one evidence-only follow-up commit with the release tag | Goldfish package, not built |
 | `w283-c20e-proof-wait-subject.package.json` | G20-76 (the signature wait accepts an old proof: `authorize-critical` mirrors to `scratch/critical-<kind>-{request,proof,authority,signer}-<repo fingerprint>.json`, one fixed name per repository, and `proof-wait.mjs` only checks the file schema, so a mirror from an earlier signature ends the wait at once and `approve-push` then refuses with CRITICAL-PROOF-SUBJECT) | Goldfish package, not built; added after the first handover |
 
+**State 2026-11-08:** every row above is built and exported as ONE chain of 9 patches in `../c20e-chain/`
+(`po-apply-0.7-candidate20e.sh`; part 1 is included, so `chain/po-apply-0.7-candidate20e-part1.sh` is NOT run separately). Commit 9
+registers the new cases and restates four measured counts (QG-04). Targeted suites green; the Critic preimage suite stays red for exactly
+its two known entries, by design. Known limits of G20-72: the bound of 25 files is a first estimate; a generic-batch packet resumed after
+a failed first admit binds no split and refuses a split round at finalize; no live N-Critic run on any runner. Full Verify, Critic, the
+greenfields and PO acceptance are open.
+
 G20-76 interim, until the fix is installed: before every `push-prepare`, move any old `scratch/critical-*` files aside
 (rename, never delete).
 

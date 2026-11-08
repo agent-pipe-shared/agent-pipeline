@@ -1,0 +1,1162 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index db6753856067bc33f86bf1c17a177b5810de6ad1..da1f862b60cc627d2ed6a8f30dc0e7df7d4db286 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -615,6 +615,7 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/lib/answered-intake-values.mjs`,
+ `plugins/pipeline-core/lib/signed-proof-wait.mjs`,
+ `plugins/pipeline-core/lib/critic-source-return.mjs`,
++`plugins/pipeline-core/lib/critic-split.mjs`,
+ `plugins/pipeline-core/lib/critic-acknowledgement.mjs`,
+ `plugins/pipeline-core/lib/consumer-release.mjs`,
+ `plugins/pipeline-core/lib/critic-diagnostic-producer.mjs`,
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index 9294b7132b495c9811a3fbccc333b7fba5a030ea..c520100e8ce589a9e2a34c0f6b57799f2971aa55 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -203,8 +203,10 @@ function nativeGoldfishHookBaseMessage(result) {
+ export function criticSourceReturnMessage(outcome) {
+   const finalizeAs = "the verdict then finalizes as caller-authored-fallback, which the feature close admits only at rigor 0 and low risk (repair: a PO acknowledgement of the caller-authored Critic for this packet and candidate)";
+   switch (outcome?.status) {
+-    case "issued": return `Critic Source return issued for packet ${outcome.packetId}: finalize reads it from the private control area and labels the verdict source-issued-origin when the verdict file is the returned JSON verbatim.`;
+-    case "already-issued": return `Critic Source return not issued: packet ${outcome.packetId} already holds one; it is never overwritten.`;
++    case "unattributed": return `Critic Source return not issued: packet ${outcome.packetId} is a split round and the verdict names none of its entries; the child must begin trajectory_evidence with its scope marker (${outcome.entries.join(", ")}) and run again; ${finalizeAs}.`;
++    case "issued": if (outcome.entryId !== undefined) return `Critic Source return issued for packet ${outcome.packetId}, split entry ${outcome.entryId}: merge the children with critic-split-merge.mjs, then finalize reads one record per entry.`;
++      return `Critic Source return issued for packet ${outcome.packetId}: finalize reads it from the private control area and labels the verdict source-issued-origin when the verdict file is the returned JSON verbatim.`;
++    case "already-issued": return `Critic Source return not issued: packet ${outcome.packetId} already holds ${outcome.entryId === undefined ? "one" : `this verdict for split entry ${outcome.entryId}`}; it is never overwritten.`;
+     case "no-verdict": return `Critic Source return not issued: the Critic's final message carries no schema-shaped verdict JSON (return it as the whole message or as the last fenced json block); ${finalizeAs}.`;
+     case "no-open-packet": return `Critic Source return not issued: no claimed, admitted, unresulted session packet of this runner is open; ${finalizeAs}.`;
+     case "ambiguous": return `Critic Source return not issued: ${outcome.count} session packets of this runner are open and the stop names none of them; release the stale ones (session-critic-finalizer.mjs release) and finalize; ${finalizeAs}.`;
+diff --git a/plugins/pipeline-core/lib/critic-packet-preflight-read.mjs b/plugins/pipeline-core/lib/critic-packet-preflight-read.mjs
+index 39e5c85c5e8f4647277f7251a0a13fe7c656fc1b..39dec7df29c8a679cfe21815e33c6125f4a80fdf 100644
+--- a/plugins/pipeline-core/lib/critic-packet-preflight-read.mjs
++++ b/plugins/pipeline-core/lib/critic-packet-preflight-read.mjs
+@@ -17,6 +17,10 @@ export const STATE_SCHEMA = "pipeline.critic-candidate-state.v1";
+ export const RECORD_SCHEMA = "pipeline.critic-candidate-record.v1";
+ export const SESSION_PACKET_BINDING_SCHEMA = "pipeline.session-critic-packet-binding.v1";
+ export const SESSION_ADMISSION_SCHEMA = "pipeline.session-critic-admission.v1";
++// G20-72: the closed key set of a session admission; `splitSha256` is present only for a split round (the split object itself is split.json next to it).
++export const SPLIT_FILE = "split.json";
++export const admissionKeys = (admission) => ["schema", "packetId", "packetDigest", "claimSha256", "sessionId", "preflightSha256", "courseSourceSha256", "courseDecisionSha256",
++  ...(admission !== null && typeof admission === "object" && Object.hasOwn(admission, "splitSha256") ? ["splitSha256"] : []), "createdAt"];
+ export const SAFE_ID = /^[a-z0-9][a-z0-9._-]{1,79}$/;
+ export const PACKET_ID = /^[a-f0-9]{32}$/;
+ export const SHA256 = /^[a-f0-9]{64}$/;
+@@ -293,14 +297,14 @@ export function readConsumedSessionAdmission({ controlRoot, packetId }) {
+     || resultRecord.priorStateDigest !== sha256(canonicalJson(recordBody(packet, 2, claim.priorStateDigest, "claimed", claim.body, claim.timestamp)))
+     || canonicalJson(resultRecord.body) !== canonicalJson(consumed.result)) fail("CPP-CLAIM-READ", "Consumed journal claim binding differs.");
+   const binding = packet.request.sessionBinding;
+-  if (!exactKeys(admission, ["schema", "packetId", "packetDigest", "claimSha256", "sessionId", "preflightSha256", "courseSourceSha256", "courseDecisionSha256", "createdAt"])
++  if (!exactKeys(admission, admissionKeys(admission))
+     || admission.schema !== SESSION_ADMISSION_SCHEMA || admission.packetId !== packetId
+     || admission.packetDigest !== sha256(canonicalJson(packet))
+     || admission.claimSha256 !== sha256(canonicalJson(claim))
+     || admission.sessionId !== binding.sessionId
+     || admission.preflightSha256 !== binding.preflightSha256
+     || admission.preflightSha256 !== packet.route.projectionDigest
+-    || !SHA256.test(admission.courseSourceSha256) || !SHA256.test(admission.courseDecisionSha256)
++    || !SHA256.test(admission.courseSourceSha256) || !SHA256.test(admission.courseDecisionSha256) || !(admission.splitSha256 === undefined || SHA256.test(admission.splitSha256))
+     || typeof admission.createdAt !== "string" || !Number.isFinite(Date.parse(admission.createdAt))) {
+     fail("CPP-SESSION-ADMISSION", "Consumed session admission is drifted.");
+   }
+diff --git a/plugins/pipeline-core/lib/critic-source-return.mjs b/plugins/pipeline-core/lib/critic-source-return.mjs
+index e11ae82d2544b09aceecd98a89cce3d9c7862000..d2014a9a1facde0057257ef6712b53a34ac6eb2a 100644
+--- a/plugins/pipeline-core/lib/critic-source-return.mjs
++++ b/plugins/pipeline-core/lib/critic-source-return.mjs
+@@ -17,10 +17,13 @@
+  */
+ import { closeSync, existsSync, openSync, readFileSync, readdirSync, writeSync } from "node:fs";
+ import { join } from "node:path";
+-import { PACKET_ID, SESSION_REVIEW_TTL_SECONDS, canonicalJson, currentState, packetContext, readJson, sha256 } from "./critic-packet-preflight-read.mjs";
++import { PACKET_ID, SESSION_REVIEW_TTL_SECONDS, SPLIT_FILE, canonicalJson, currentState, packetContext, readJson, sha256 } from "./critic-packet-preflight-read.mjs";
++import { attributeVerdict, criticSplitDigest, criticSplitProblem } from "./critic-split.mjs";
+ import { validateAgainstSchema } from "./schema-lite.mjs";
+ 
+ export const CRITIC_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return.v1";
++/** G20-72: the record of one child of a split round: the nine keys of the single record plus the split digest, the entry and the child's verdict itself. */
++export const CRITIC_SPLIT_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return-split.v1";
+ export const CRITIC_SOURCE_RETURN_FILE = "source-return.json";
+ const VERDICT_SCHEMA = JSON.parse(readFileSync(new URL("../scripts/critic-verdict.schema.json", import.meta.url), "utf8"));
+ const MAX_PACKETS = 4096;
+@@ -61,9 +64,12 @@ function openAdmittedPackets(controlRoot, runner, nowMs) {
+       if (admission?.packetId !== packetId || admission.packetDigest !== packetDigest || admission.sessionId !== binding.sessionId
+         || claim?.packetDigest !== packetDigest || !Number.isFinite(claimedAtMs)
+         || nowMs < claimedAtMs || nowMs > claimedAtMs + SESSION_REVIEW_TTL_SECONDS * 1000) continue;
+-      if (existsSync(join(packetDir, CRITIC_SOURCE_RETURN_FILE))) { open.push({ packetId, issued: true }); continue; }
++      // G20-72: a split packet stays open for every child; only a packet WITHOUT a split is closed by its one record.
++      const split = admission.splitSha256 === undefined ? null : readAdmittedSplit(packetDir, admission.splitSha256);
++      if (split === undefined) continue;
++      if (split === null && existsSync(join(packetDir, CRITIC_SOURCE_RETURN_FILE))) { open.push({ packetId, issued: true }); continue; }
+       open.push({ packetId, packetDir, packetDigest, sessionId: binding.sessionId, claimant: { runner: packet.route.runner, adapter: packet.route.adapter },
+-        issuedAtMs: nowMs, expiresAtMs: claimedAtMs + SESSION_REVIEW_TTL_SECONDS * 1000 });
++        issuedAtMs: nowMs, expiresAtMs: claimedAtMs + SESSION_REVIEW_TTL_SECONDS * 1000, split });
+     } catch { /* an unreadable or foreign entry is never a match */ }
+   }
+   return open;
+@@ -110,6 +116,19 @@ function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
+   if (open.length > 1) return { status: "ambiguous", count: open.length };
+   const [target] = open;
+   if (target.issued === true) return { status: "already-issued", packetId: target.packetId };
++  if (target.split !== null) {
++    // G20-72: one record per returning child, bound to the split the admission carries and to the entry the verdict names. A verdict that names no entry issues nothing.
++    const entryId = attributeVerdict(target.split, verdict);
++    if (entryId === null) return { status: "unattributed", packetId: target.packetId, entries: target.split.entries.map((entry) => entry.scopeMarker) };
++    const verdictSha256 = sha256(canonicalJson(verdict));
++    const splitRecord = { schema: CRITIC_SPLIT_SOURCE_RETURN_SCHEMA, issuer: "source", packetId: target.packetId, packetDigest: target.packetDigest, claimant: target.claimant,
++      sessionId: target.sessionId, verdictSha256, issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs, splitSha256: criticSplitDigest(target.split), entryId, verdict };
++    let splitFd;
++    try { splitFd = openSync(join(target.packetDir, `source-return-${verdictSha256}.json`), "wx", 0o600); }
++    catch (error) { if (error?.code === "EEXIST") return { status: "already-issued", packetId: target.packetId, entryId }; throw error; }
++    try { writeSync(splitFd, canonicalJson(splitRecord)); } finally { closeSync(splitFd); }
++    return { status: "issued", packetId: target.packetId, entryId };
++  }
+   const record = { schema: CRITIC_SOURCE_RETURN_SCHEMA, issuer: "source", packetId: target.packetId, packetDigest: target.packetDigest, claimant: target.claimant,
+     sessionId: target.sessionId, verdictSha256: sha256(canonicalJson(verdict)), issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs };
+   const fd = openSync(join(target.packetDir, CRITIC_SOURCE_RETURN_FILE), "wx", 0o600);
+@@ -117,6 +136,24 @@ function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
+   return { status: "issued", packetId: target.packetId };
+ }
+ 
++/**
++ * G20-72: the split object an admission bound, read from the packet (`split.json`), or null/undefined: `undefined` when the file is absent, its digest differs from the
++ * admission's `splitSha256`, or it is not a split (such a packet is never a match for a stop and the finalizer refuses it).
++ */
++export function readAdmittedSplit(packetDir, splitSha256) {
++  try {
++    const split = readJson(join(packetDir, SPLIT_FILE), "SCF-SPLIT-READ");
++    return criticSplitProblem(split) === null && criticSplitDigest(split) === splitSha256 ? split : undefined;
++  } catch { return undefined; }
++}
++
++/** G20-72: every per-child record of a split packet exactly as stored (so a present-but-wrong record reaches the finalizer's checks), in file-name order. */
++export function readCriticSplitSourceReturns({ controlRoot, packetId } = {}) {
++  if (typeof controlRoot !== "string" || !PACKET_ID.test(packetId ?? "")) return [];
++  const dir = join(controlRoot, packetId);
++  return readdirSync(dir).filter((name) => /^source-return-[a-f0-9]{64}\.json$/u.test(name)).sort().map((name) => readJson(join(dir, name), "SCF-ORIGINAL-SOURCE-RECORD"));
++}
++
+ /** The issued record of a packet exactly as stored (so a present-but-wrong record reaches the finalizer's binding check), or null when none exists. */
+ export function readCriticSourceReturn({ controlRoot, packetId } = {}) {
+   if (typeof controlRoot !== "string" || !PACKET_ID.test(packetId ?? "")) return null;
+diff --git a/plugins/pipeline-core/lib/critic-split.mjs b/plugins/pipeline-core/lib/critic-split.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..7007d66fb064d746d749ef205bed153c766e498d
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-split.mjs
+@@ -0,0 +1,211 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * G20-72 (candidate 20e, AC-108): a review range too large for ONE Critic is split per module, and the merged verdict still ends in one SOURCE-issued verdict.
++ *
++ * Measured (greenfield, 2026-11-08): a whole-feature Critic reached its budget checkpoint at call 40 of 50 while still reading, and no Critic can exceed
++ * `maxTurns - CLOSING_ALLOWANCE - 1` working calls whatever is granted. So the range is cut per module of the approved architecture plan; each module gets its own fresh Critic
++ * (an ordinary Critic dispatch from the same template), and this module holds the three pure pieces every runner shares:
++ *
++ *   1. `buildCriticSplit`   the additive `split` the Critic preflight prints and `admit` binds (null when the range fits one Critic);
++ *   2. `mergeSplitVerdicts` the merge (pass is the AND, findings and briefing violations the union, the trajectory the worst) with typed refusals;
++ *   3. `attributeVerdict`   which entry a returned verdict belongs to (the first words of its `trajectory_evidence`: `scope:<entryId>`).
++ *
++ * Read-only on purpose: the Critic preflight imports it, and its import closure names no write API (critic-dispatch-preflight.test.mjs, D216A). The origin evidence
++ * for the children lives in lib/critic-source-return.mjs; the gate over it in scripts/session-critic-finalizer.mjs. The verdict schema gets no new field.
++ */
++import { spawnSync } from "node:child_process";
++import { readFileSync } from "node:fs";
++import { sha256Canonical } from "./review-economy.mjs";
++import { validateAgainstSchema } from "./schema-lite.mjs";
++
++export const CRITIC_SPLIT_SCHEMA = "pipeline.critic-review-split.v1";
++/**
++ * The ONE size bound. A Critic has `dispatchWorkingCap(65) = 65 - (CLOSING_ALLOWANCE 5 + SAFETY_MARGIN 10) = 50` working calls (lib/dispatch-budget-core.mjs), of which about half
++ * are left for reading before the verdict is composed; at one read per changed file that is 25 files. FIRST ESTIMATE, to be calibrated: it comes from one measured run (about 10
++ * modules, 287 tests, call 40 of 50 still in Phase 1), not from a distribution of reviews. Change it here and nowhere else.
++ */
++export const SPLIT_MAX_CHANGED_FILES = 25;
++export const SPLIT_SHARED_ENTRY_ID = "shared";
++export const SPLIT_SCOPE_PREFIX = "scope:";
++export const splitScopeMarker = (id) => `${SPLIT_SCOPE_PREFIX}${id}`;
++
++const ENTRY_ID = /^[a-z][a-z0-9-]*$/u;
++const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
++const MAX_ENTRIES = 64;
++const MAX_PRD_BYTES = 4 * 1024 * 1024;
++const SPLIT_KEYS = ["schema", "base", "candidate", "maxChangedFiles", "changedFileCount", "plan", "entries"];
++const ENTRY_KEYS = ["id", "moduleId", "paths", "scopeMarker", "reviewerInput", "batchScopeLine"];
++const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
++const closed = (value, keys) => isObject(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
++const VERDICT_SCHEMA = JSON.parse(readFileSync(new URL("../scripts/critic-verdict.schema.json", import.meta.url), "utf8"));
++
++/** The digest `admit` binds and every reader recomputes: key-order independent. */
++export const criticSplitDigest = (split) => sha256Canonical(split);
++
++function gitLines(root, args) {
++  const run = spawnSync("git", ["-C", root, "-c", "core.quotepath=false", ...args], { encoding: "utf8", shell: false, timeout: 15_000, maxBuffer: 64 * 1024 * 1024 });
++  return run.status === 0 && typeof run.stdout === "string" ? run.stdout.split("\0").filter((line) => line !== "") : null;
++}
++
++/** The modules (id and owned paths only) of the one PRD under the spec's directory that holds an approved architecture design block, read from the candidate commit. */
++function readPlan(root, candidate, specPath) {
++  const slash = specPath.lastIndexOf("/");
++  const dir = slash < 0 ? "" : specPath.slice(0, slash + 1);
++  const files = gitLines(root, ["ls-tree", "-r", "--name-only", "-z", candidate, "--", dir === "" ? "." : dir]);
++  const plans = [];
++  for (const file of files ?? []) {
++    const rest = file.slice(dir.length);
++    if (rest.split("/").length > 3 || !/^prd[^/]*\.md$/iu.test(rest.slice(rest.lastIndexOf("/") + 1))) continue;
++    const shown = spawnSync("git", ["-C", root, "show", `${candidate}:${file}`], { encoding: "utf8", shell: false, timeout: 15_000, maxBuffer: MAX_PRD_BYTES });
++    if (shown.status !== 0 || typeof shown.stdout !== "string") continue;
++    const blocks = [...shown.stdout.matchAll(/^```pipeline-architecture-design\r?\n([\s\S]*?)^```\s*$/gmu)];
++    if (blocks.length !== 1) continue;
++    let design;
++    try { design = JSON.parse(blocks[0][1]); } catch { continue; }
++    const modules = design?.modules;
++    if (!Array.isArray(modules) || modules.length === 0 || new Set(modules.map((module) => module?.id)).size !== modules.length
++      || !modules.every((module) => isObject(module) && ENTRY_ID.test(module.id ?? "") && module.id !== SPLIT_SHARED_ENTRY_ID && Array.isArray(module.ownedPaths) && module.ownedPaths.length > 0
++        && module.ownedPaths.every((path) => typeof path === "string" && path !== "" && !path.startsWith("/") && !path.includes("..")))) continue;
++    plans.push({ path: file, modules: modules.map(({ id, ownedPaths }) => ({ id, ownedPaths })) });
++  }
++  if (plans.length === 1) return { status: "approved", path: plans[0].path, modules: plans[0].modules };
++  return { status: plans.length === 0 ? "none" : "ambiguous", path: null, modules: [] };
++}
++
++/** How specifically an owned-path pattern matches a changed file: the pattern length, or -1 for no match. `dir/**`, `dir/*` and `dir/` are prefixes; anything else is exact. */
++function matchLength(pattern, file) {
++  const prefix = /^(.*\/)\*{1,2}$/u.exec(pattern)?.[1] ?? (pattern.endsWith("/") ? pattern : null);
++  if (prefix !== null) return file.startsWith(prefix) ? prefix.length : -1;
++  return file === pattern ? pattern.length + 1 : -1;
++}
++
++/**
++ * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES changed files).
++ * One entry per module of the approved architecture plan that owns a changed path (disjoint scopes: a path goes to the module whose owned-path pattern matches it most
++ * specifically, ties by module id), plus ONE shared entry for every changed path no module owns, which is never dropped. Without exactly one approved plan only the shared
++ * entry exists and `plan.status` says why. Deterministic from the repository and the result alone, so `admit` rebuilds the identical object.
++ * @param {{ root: string, result: object }} input `result` is the library preflight result (status packet-ready, exact range).
++ */
++export function buildCriticSplit({ root, result }) {
++  if (result?.status !== "packet-ready" || result.reviewScope !== undefined || typeof result.candidate?.commit !== "string") return null;
++  const base = result.base?.commit ?? result.base?.tree;
++  const candidate = result.candidate.commit;
++  const changed = typeof base === "string" ? gitLines(root, ["diff", "--name-only", "--no-renames", "-z", base, candidate]) : null;
++  if (changed === null || changed.length <= SPLIT_MAX_CHANGED_FILES) return null;
++  const plan = readPlan(root, candidate, result.spec?.path ?? "");
++  const owned = new Map(plan.modules.map((module) => [module.id, []]));
++  const shared = [];
++  for (const file of [...changed].sort()) {
++    let best = null;
++    for (const module of plan.modules) {
++      const length = Math.max(...module.ownedPaths.map((pattern) => matchLength(pattern, file)));
++      if (length >= 0 && (best === null || length > best.length || (length === best.length && module.id < best.id))) best = { id: module.id, length };
++    }
++    (best === null ? shared : owned.get(best.id)).push(file);
++  }
++  const groups = [...plan.modules.map((module) => module.id).sort().map((id) => ({ id, moduleId: id, paths: owned.get(id), label: `module ${id}` })),
++    { id: SPLIT_SHARED_ENTRY_ID, moduleId: null, paths: shared, label: "the shared entry (every changed path no module owns)" }].filter((group) => group.paths.length > 0);
++  const range = `${base.slice(0, 12)}..${candidate.slice(0, 12)}`;
++  return {
++    schema: CRITIC_SPLIT_SCHEMA, base, candidate, maxChangedFiles: SPLIT_MAX_CHANGED_FILES, changedFileCount: changed.length,
++    plan: { status: plan.status, path: plan.path },
++    entries: groups.map((group, index) => ({
++      id: group.id, moduleId: group.moduleId, paths: group.paths, scopeMarker: splitScopeMarker(group.id),
++      reviewerInput: { ...result.dispatch.reviewerInput, changedPaths: group.paths },
++      batchScopeLine: `Batch scope (MP-07): ${group.label} of the reviewed range ${range} (${group.paths.length} of ${changed.length} changed files), part ${index + 1} of ${groups.length} of one split review round.`,
++    })),
++  };
++}
++
++/** Why a value is not a split this module produced (null when it is one). Closed shapes; the entry scopes are disjoint. */
++export function criticSplitProblem(split) {
++  if (!closed(split, SPLIT_KEYS) || split.schema !== CRITIC_SPLIT_SCHEMA || !OID.test(split.base ?? "") || !OID.test(split.candidate ?? "")
++    || !Number.isSafeInteger(split.maxChangedFiles) || !Number.isSafeInteger(split.changedFileCount)
++    || !closed(split.plan, ["status", "path"]) || !["approved", "none", "ambiguous"].includes(split.plan.status)
++    || !(split.plan.path === null || typeof split.plan.path === "string")
++    || !Array.isArray(split.entries) || split.entries.length === 0 || split.entries.length > MAX_ENTRIES) return "the split does not have the closed shape of a Critic review split";
++  const ids = new Set(), paths = new Set();
++  for (const entry of split.entries) {
++    if (!closed(entry, ENTRY_KEYS) || !ENTRY_ID.test(entry.id ?? "") || ids.has(entry.id) || entry.scopeMarker !== splitScopeMarker(entry.id)
++      || !(entry.moduleId === null || entry.moduleId === entry.id) || !isObject(entry.reviewerInput) || typeof entry.batchScopeLine !== "string"
++      || !Array.isArray(entry.paths) || entry.paths.length === 0 || !entry.paths.every((path) => typeof path === "string" && path !== "")) return `split entry ${JSON.stringify(String(entry?.id).slice(0, 40))} is not well formed or repeats an id`;
++    ids.add(entry.id);
++    for (const path of entry.paths) { if (paths.has(path)) return `path ${JSON.stringify(path.slice(0, 120))} is in two split entries`; paths.add(path); }
++  }
++  return null;
++}
++
++/** The entry a returned verdict belongs to: its `trajectory_evidence` starts with `scope:<entryId>` (the marker the dispatch prompt asks for); null when it names none of the split. */
++export function attributeVerdict(split, verdict) {
++  const text = verdict?.trajectory_evidence;
++  const id = typeof text === "string" ? /^scope:([a-z][a-z0-9-]*)(?=\s|$)/u.exec(text)?.[1] : undefined;
++  return id !== undefined && split.entries.some((entry) => entry.id === id) ? id : null;
++}
++
++const SEVERITY_RANK = { blocker: 0, major: 1, minor: 2 };
++const TRAJECTORY_RANK = { consistent: 0, "not verifiable": 1, inconsistent: 2 };
++const NEXT_ROUND = "release this packet (session-critic-finalizer.mjs release) and open the next round of the batch with a new packet id";
++const fail = (code, what, repair) => ({ ok: false, code, message: `${what}; repair: ${repair}` });
++/** The id of a finding: the schema has none, so it is the digest of what makes a finding the same finding. */
++export const splitFindingId = (finding) => sha256Canonical({ spec_ref: finding.spec_ref, evidence: finding.evidence });
++const unique = (items) => [...new Set(items)];
++const cites = (text, path) => {
++  for (let at = text.indexOf(path); at >= 0; at = text.indexOf(path, at + 1)) {
++    if (!/[\w./-]/u.test(text[at - 1] ?? "") && !/^(?:[\w-]|\.\w)/u.test(text.slice(at + path.length, at + path.length + 2))) return true;
++  }
++  return false;
++};
++
++/**
++ * The merge. Pure: `children` are `{ entryId, verdict }`. Refuses (typed code, repair in the message) a child for an entry the split does not have, two children for one entry
++ * (a caller must never run a child twice and keep the better verdict), a missing child, a child that is not a valid verdict, whose scope marker is not its own entry, or whose
++ * findings cite only paths of another entry, and a finding id that appears twice. Never throws.
++ * @returns `{ ok: true, verdict, findingIds }` or `{ ok: false, code, message }`
++ */
++export function mergeSplitVerdicts(split, children) {
++  try {
++    const problem = criticSplitProblem(split);
++    if (problem !== null) return fail("CSM-SPLIT-INVALID", problem, "pass the split object exactly as the Critic preflight printed it");
++    if (!Array.isArray(children)) return fail("CSM-CHILD-MISSING", "no child verdicts were given", "pass one --child <entryId>=<verdict file> per split entry");
++    const byEntry = new Map();
++    for (const { entryId, verdict } of children) {
++      if (!split.entries.some((entry) => entry.id === entryId)) return fail("CSM-CHILD-UNKNOWN", `entry ${JSON.stringify(String(entryId).slice(0, 40))} is not an entry of the split (${split.entries.map((entry) => entry.id).join(", ")})`, "use only the entry ids of the printed split");
++      if (byEntry.has(entryId)) return fail("CSM-CHILD-DUPLICATE", `two child verdicts were given for entry ${entryId}`, `one Critic per entry decides; ${NEXT_ROUND}`);
++      byEntry.set(entryId, verdict);
++    }
++    const missing = split.entries.filter((entry) => !byEntry.has(entry.id)).map((entry) => entry.id);
++    if (missing.length > 0) return fail("CSM-CHILD-MISSING", `no child verdict for entry ${missing.join(", ")}`, `dispatch one Critic per split entry and pass every verdict (${missing.join(", ")} still missing)`);
++    const seen = new Map();
++    for (const entry of split.entries) {
++      const verdict = byEntry.get(entry.id);
++      if (!validateAgainstSchema(verdict, VERDICT_SCHEMA).valid) return fail("CSM-CHILD-INVALID", `the child verdict of entry ${entry.id} is not a Critic verdict`, "pass the Critic's returned JSON verbatim");
++      if (verdict.pass && (verdict.findings.some(({ severity }) => severity === "blocker" || severity === "major") || verdict.briefing_violations.length > 0 || verdict.trajectory_verdict !== "consistent")) {
++        return fail("CSM-CHILD-INVALID", `the child verdict of entry ${entry.id} passes although it has a blocker or major finding, a briefing violation or an unconsistent trajectory`, "pass the Critic's returned JSON verbatim");
++      }
++      if (attributeVerdict(split, verdict) !== entry.id) return fail("CSM-CHILD-UNATTRIBUTED", `the child verdict given for entry ${entry.id} does not start its trajectory_evidence with ${entry.scopeMarker}`, `dispatch the entry's Critic with the instruction to begin trajectory_evidence with "${entry.scopeMarker} " and run that entry again`);
++      const others = split.entries.filter((other) => other.id !== entry.id);
++      for (const finding of verdict.findings) {
++        if (!entry.paths.some((path) => cites(finding.evidence, path)) && others.some((other) => other.paths.some((path) => cites(finding.evidence, path)))) {
++          return fail("CSM-CHILD-OUT-OF-SCOPE", `a finding of entry ${entry.id} cites only paths of another entry (${JSON.stringify(finding.evidence.slice(0, 80))})`, `a child reviews only its own entry's paths; give the finding to the Critic of the entry that owns the path`);
++        }
++        const id = splitFindingId(finding);
++        if (seen.has(id)) return fail("CSM-FINDING-DUPLICATE", `the same finding (spec_ref and evidence) is in entry ${seen.get(id)} and entry ${entry.id}`, "report a finding in exactly one entry");
++        seen.set(id, entry.id);
++      }
++    }
++    const ordered = split.entries.map((entry) => byEntry.get(entry.id));
++    const findings = ordered.flatMap((verdict) => verdict.findings).map((finding, index) => ({ finding, index }))
++      .sort((left, right) => SEVERITY_RANK[left.finding.severity] - SEVERITY_RANK[right.finding.severity] || left.index - right.index).map(({ finding }) => finding);
++    return { ok: true, findingIds: [...seen.keys()], verdict: {
++      findings,
++      deliberately_not_flagged: unique(ordered.flatMap((verdict) => verdict.deliberately_not_flagged)),
++      trajectory_verdict: ordered.map((verdict) => verdict.trajectory_verdict).sort((left, right) => TRAJECTORY_RANK[right] - TRAJECTORY_RANK[left])[0],
++      trajectory_evidence: ordered.map((verdict) => verdict.trajectory_evidence).join("\n"),
++      briefing_violations: unique(ordered.flatMap((verdict) => verdict.briefing_violations)),
++      pass: ordered.every((verdict) => verdict.pass),
++    } };
++  } catch { return fail("CSM-SPLIT-INVALID", "the split or a child verdict could not be read", "pass the split and the verdicts exactly as printed and returned"); }
++}
++
++/** The repair every origin refusal of a split round names: the children of a split packet cannot be re-run inside it. */
++export const SPLIT_NEXT_ROUND_REPAIR = NEXT_ROUND;
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 9c7ba002dd8bc957f6c5e2449ef9e094b2273677..2e8772cdd8dfa2ea4fd07430e3ecbf734970bc38 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -835,6 +835,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // acknowledgement of a caller-authored Critic the close gate and pipeline-state read. Their first-party imports
+   // (critic-packet-preflight-read.mjs, schema-lite.mjs, critical-action-authorization.mjs) are already listed.
+   "plugins/pipeline-core/lib/critic-source-return.mjs",
++  // C20e G20-72 (GMWKC01): the read-only split/merge library the Critic preflight, the packet admission, the Source-return producer and the finalizer's origin gate import.
++  // Its first-party imports (review-economy.mjs, schema-lite.mjs) are already listed.
++  "plugins/pipeline-core/lib/critic-split.mjs",
+   "plugins/pipeline-core/lib/critic-acknowledgement.mjs",
+   // C20 G20-42 (GMWKC01): the consumer release route project-onboarding-v3.mjs imports (VERSION target, release preflight,
+   // annotated version tag). Its first-party imports are already listed.
+diff --git a/plugins/pipeline-core/lib/session-critic-finalizer-read.mjs b/plugins/pipeline-core/lib/session-critic-finalizer-read.mjs
+index 330f881c7cd997877284e08dec7a5106a54461c3..b53caa7c1231deb98b32da592c54953fc8652988 100644
+--- a/plugins/pipeline-core/lib/session-critic-finalizer-read.mjs
++++ b/plugins/pipeline-core/lib/session-critic-finalizer-read.mjs
+@@ -52,7 +52,10 @@ export function independenceFlagsConsistent(independence, session) {
+   return false;
+ }
+ export function validateSessionCriticReceipt(receipt) {
+-  if (!exact(receipt, Object.hasOwn(receipt ?? {}, "independence") ? [...RECEIPT_KEYS, "independence"] : RECEIPT_KEYS) || receipt.schema !== SESSION_CRITIC_RECEIPT_SCHEMA
++  // G20-72: a split round's receipt also carries the digest of the split its admission bound; a receipt without it verifies exactly as before.
++  const optionalKeys = ["independence", "splitSha256"].filter((key) => Object.hasOwn(receipt ?? {}, key));
++  if (!exact(receipt, [...RECEIPT_KEYS, ...optionalKeys]) || receipt.schema !== SESSION_CRITIC_RECEIPT_SCHEMA
++    || !(receipt.splitSha256 === undefined || SHA256.test(receipt.splitSha256))
+     || !PACKET_ID.test(receipt.packetId) || !SHA256.test(receipt.packetDigest)
+     || !exact(receipt.session, ["id", "freshContext", "historyInherited", "mayDelegate"])
+     || !SAFE_ID.test(receipt.session.id) || !independenceFlagsConsistent(receipt.independence, receipt.session)
+diff --git a/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs b/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs
+index 4def3984aa8ddcf99a2f8082a774abac9030bc2f..3f77ceb81beca4024d6d8525c019fbf178f4e8f3 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs
+@@ -10,7 +10,8 @@ import { recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs"
+ import * as organizationPolicy from "../lib/organization-policy.mjs";
+ import { canonicalSha256 } from "../lib/governance-event.mjs";
+ import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";import { planVerifySelection } from "../lib/verify-selection.mjs";
+-import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
++import { admitSessionCriticReview, finalizeSessionCriticReview, runSessionCriticFinalizerCli } from "./session-critic-finalizer.mjs";
++import { preflightCriticDispatchWithAdmitRequest } from "./critic-dispatch-preflight.mjs";
+ import { finishFeature } from "./finish-feature.mjs";
+ import { readConsumedCandidateReceipt } from "../lib/critic-packet-preflight-read.mjs";
+ import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+@@ -18,6 +19,8 @@ import { writeCriticalApproval } from "../lib/critical-action-authorization.mjs"
+ 
+ const ROOT = process.cwd();
+ const CLI = new URL("./close-coordinator.mjs", import.meta.url).pathname;
++const NATIVE_HOOK = new URL("../hooks/native-goldfish-host.mjs", import.meta.url).pathname;
++const MERGE = new URL("./critic-split-merge.mjs", import.meta.url).pathname;
+ const FINISH = new URL("./finish-feature.mjs", import.meta.url).pathname;
+ const STATE = new URL("./pipeline-state.mjs", import.meta.url).pathname;
+ const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+@@ -47,7 +50,42 @@ const FIXTURE_PACK = { schema: "pipeline.organization-policy-pack.v1", packId: "
+ const sourceReturn = (query) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: query.packetId,
+   packetDigest: query.packetDigest, claimant: query.claimant, sessionId: query.sessionId, verdictSha256: query.verdictSha256,
+   issuedAtMs: 1, expiresAtMs: Date.now() + 3_600_000 });
+-function fixture(t, { packs = [FIXTURE_PACK], origin = "source" } = {}) {
++// G20-72: the approved architecture design of the whole-feature walk (a PRD-named file next to the spec, found by the split).
++const SPLIT_DESIGN = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield", disposition: { decision: "approved-scoped", scope: ["specs/", "src/"], rationale: "fixture" },
++  modules: ["core", "api"].map((id) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`],
++    allowedDependencies: [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [] })),
++  implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
++  fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } } };
++const SPLIT_DESIGN_PRD = `# PRD design\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(SPLIT_DESIGN, null, 2)}\n\`\`\`\n`;
++// G20-72: the real chain for a range above the split bound, with real commands and real state: the preflight prints the split, admit, one Critic stop per entry through the
++// real hook entry, the merge script, finalize. Returns nothing; the consumed receipt is what the close reads.
++function splitChain(root, review, packetId) {
++  const printed = preflightCriticDispatchWithAdmitRequest(review.preflightInput, { env: {} });
++  assert.ok(printed.split, "the walk's range is above the split bound");
++  const request = structuredClone(printed.admitRequest);
++  Object.assign(request, { taskId: review.taskId, projectId: review.projectId, sessionId: review.sessionId, packetId, route: review.route, verdictPath: "evidence/critic-verdict.json", event: null });
++  request.review.genericBatchRef = review.genericBatchRef;
++  put(root, "scratch/split-request.json", JSON.stringify(request));
++  put(root, "scratch/split.json", JSON.stringify(printed.split));
++  // The hook entry exits silently outside a governed project; the onboarding consent marker is the smallest real enrolment (untracked, the reviewed range is unchanged).
++  put(root, ".agent-pipeline/onboarding-consent.json", JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-11-08T10:00:00.000Z" }));
++  const run = (argv) => { const result = runSessionCriticFinalizerCli(argv); assert.equal(result.exitCode, 0, JSON.stringify(result.output)); return result.output; };
++  run(["admit", "--root", root, "--request", "scratch/split-request.json"]);
++  const children = printed.split.entries.map((entry) => [entry.id, { ...review.verdict, deliberately_not_flagged: [`reviewed ${entry.id}`], trajectory_evidence: `${entry.scopeMarker} read the diff of ${entry.id}` }]);
++  const argv = [MERGE, "--root", root, "--split", "scratch/split.json", "--out", "evidence/critic-verdict.json"];
++  children.forEach(([id, value], index) => {
++    const stop = spawnSync(process.execPath, [NATIVE_HOOK, "--runner", "codex"], { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root }, input: JSON.stringify({
++      hook_event_name: "SubagentStop", session_id: "33333333-aaaa-bbbb-cccc-444444444444", agent_type: "critic", stop_hook_active: false, cwd: root,
++      last_assistant_message: `\`\`\`json\n${JSON.stringify(value)}\n\`\`\`\n` }) });
++    assert.match(stop.stderr, /Source return issued/u, stop.stderr);
++    put(root, `scratch/split-child-${index}.json`, JSON.stringify(value));
++    argv.push("--child", `${id}=scratch/split-child-${index}.json`);
++  });
++  const merged = spawnSync(process.execPath, argv, { encoding: "utf8" });
++  assert.equal(merged.status, 0, merged.stderr);
++  run(["finalize", "--root", root, "--request", "scratch/split-request.json"]);
++}
++function fixture(t, { packs = [FIXTURE_PACK], origin = "source", split = false } = {}) {
+   mkdirSync(join(ROOT, "scratch/test-tmp"), { recursive: true });
+   const root = mkdtempSync(join(ROOT, "scratch/test-tmp/close-audit-lifecycle-"));
+   t.after(() => rmSync(root, { recursive: true, force: true }));
+@@ -56,12 +94,14 @@ function fixture(t, { packs = [FIXTURE_PACK], origin = "source" } = {}) {
+     specPath: "specs/audit-feature/spec.md", logicalWorkIds: ["AC-1", "AC-2"], criterionIds: ["AC-1", "AC-2"],
+     deliveryBoundary: { mainRef: "refs/heads/main" }, singletonRationale: null };
+   for (const [path, text] of [["specs/audit-feature/prd.md", "# PRD\n"], ["specs/audit-feature/spec.md", "# Spec\nAC-1 AC-2\n"], ["specs/audit-feature/result.md", "# Result\n"], ["specs/review-unit.json", JSON.stringify(reviewUnit)], ["evidence/close.txt", "close\n"], ["docs/state.md", "# State\n"]]) put(root, path, text);
++  if (split) put(root, "specs/audit-feature/prd-design.md", SPLIT_DESIGN_PRD);
+   mkdirSync(join(root, ".claude"));
+   git(root, ["init", "-q", "-b", "main"]); git(root, ["add", "."]); git(root, ["commit", "-qm", "base"]);
+   const baseCommit = git(root, ["rev-parse", "HEAD"]);
+   put(root, "specs/audit-feature/spec.md", "# Spec\nQualified candidate\n");
+   put(root, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\n");
+-  git(root, ["add", "specs/audit-feature/spec.md", ".claude/pipeline.yaml"]);
++  if (split) for (const dir of ["core", "api"]) for (let index = 0; index < 14; index += 1) put(root, `src/${dir}/m${index}.mjs`, `export const m${index} = ${index};\n`);
++  git(root, ["add", "specs/audit-feature/spec.md", ".claude/pipeline.yaml", ...(split ? ["src"] : [])]);
+   git(root, ["commit", "-qm", "work"]);
+   const work = git(root, ["rev-parse", "HEAD"]);
+   // The authored record is committed between the base and the reviewed candidate, as the batch producer reads it.
+@@ -91,7 +131,7 @@ function fixture(t, { packs = [FIXTURE_PACK], origin = "source" } = {}) {
+   const criticDiagnostic = { schema: "pipeline.verify-evidence.v0", commit: candidate.commit,
+     tree: candidate.tree, candidate, exitCode: 0,
+     selection: planVerifySelection({ mode: "critic", baseCommit, candidateCommit: candidate.commit,
+-      changedPaths: [".claude/pipeline.yaml", "evidence/dispatch-record-close-audit-review.json", "specs/audit-feature/spec.md"],
++      changedPaths: split ? git(root, ["diff", "--name-only", baseCommit, candidate.commit]).split("\n") : [".claude/pipeline.yaml", "evidence/dispatch-record-close-audit-review.json", "specs/audit-feature/spec.md"],
+       registeredSuiteIds: ["test"], policy: { schema: "pipeline.verify-selection.v1",
+         baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }),
+     steps: [{ name: "test", exitCode: 0 }] };
+@@ -115,9 +155,12 @@ function fixture(t, { packs = [FIXTURE_PACK], origin = "source" } = {}) {
+     taskId: "close-audit-review", baseCommit, candidateCommit: candidate.commit, logicalWorkIds: ["AC-1", "AC-2"],
+     specPath: "specs/audit-feature/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
+   review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
+-  admitSessionCriticReview(review);
+-  if (origin === "fallback") finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
+-  else finalizeSessionCriticReview(review, { readOriginalSourceReturnFn: sourceReturn });
++  if (split) splitChain(root, review, criticPacketId);
++  else {
++    admitSessionCriticReview(review);
++    if (origin === "fallback") finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
++    else finalizeSessionCriticReview(review, { readOriginalSourceReturnFn: sourceReturn });
++  }
+   const lifecycle = recordCriticVerifyLifecycle({ gitCommonDir: join(root, common),
+     criticPacketId, candidate, evidencePath: "specs/audit-feature/verify.json", evidence: verify });
+   const request = { schema: "pipeline.feature-close-audit-request.v1", manifestPath: "specs/audit-feature/lifecycle.json", coreVersion: "0.7.0", packs, criticVerifyLifecycleId: lifecycle.receipt.id };
+@@ -190,6 +233,15 @@ test("D2b a Source-issued Critic verdict closes at rigor 1 and its consumed rece
+   assert.equal(receipt.independence, "source-issued-origin");
+   assert.equal(existsSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), true);
+ });
++// G20-72 (candidate 20e, AC-108), the whole chain with real commands and real state: preflight prints the split, admit, one Critic stop per entry through the real hook
++// entry, the merge script, finalize, the receipt verifies, and the feature close accepts the source-issued label at rigor 1 and high risk with NO PO acknowledgement.
++test("G20-72 a whole-feature Critic round split per module closes at rigor 1 and high risk with no PO acknowledgement; its receipt is source-issued and carries the split digest", t => {
++  const f = prepare(t, { split: true });
++  const { receipt } = readConsumedCandidateReceipt({ controlRoot: join(f.root, ".git", "agent-pipeline", "critic-packets"), packetId: "1".repeat(32) });
++  assert.equal(receipt.independence, "source-issued-origin");
++  assert.match(receipt.splitSha256, /^[a-f0-9]{64}$/u);
++  assert.equal(existsSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), true, "the identical close built the audit bundle");
++});
+ test("D229 an audit request that names the shipped core baseline pack plans, builds the README audit bundle with that pack in the effective policy and closes", t => {
+   const f = prepare(t, { packs: ["pipeline-core-baseline"] });
+   // The request bytes keep the NAME; only the plan and its stored options carry the resolved pack object.
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 3e5b1fd7be77b77a5225bf0d61cb057615e7ab1a..df3ec40a333c2db1a5a16904542155652c203782 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -26,6 +26,7 @@ import { evaluateReviewAdmission } from "../lib/review-admission-read.mjs";
+ import { criticCoverageAdvisory, listUncoveredCriticRecords, terminalAuthoredDelivery, walkDispatchRecordsForReview } from "../lib/review-admission-read.mjs";
+ import { criticDisposition } from "../lib/critic-skip-decision.mjs";
+ import { SAFE_ID, admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
++import { buildCriticSplit } from "../lib/critic-split.mjs";
+ import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+ import {
+   CriticGuardrailDerivationError,
+@@ -702,15 +703,18 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
+     event: fillPlaceholder("event", "null, or an object with eventOutPath and featureId"),
+   };
+   const promptLines = opusCriticPromptLines({ root, result, env: deps.env ?? process.env, registry: deps.registry, trigger });
++  // G20-72: a range above the one named bound is split per module; `admit` rebuilds the identical object and binds its digest.
++  const split = buildCriticSplit({ root, result });
+   const nextStep = [
+     `Write admitRequest verbatim as ${ADMIT_REQUEST_FILE} (JSON), replace only its placeholders (${admitRequestPlaceholderPaths(request).join(", ")}), then run admitCommand; admit refuses an unfilled placeholder by name.`,
+     `trigger ${trigger} is ${trigger === appliedRow ? "the applied Critic row of the matched dispatch record" : "the strictest default (no matched record row of T1 to T3)"}; change it only if your Critic-required decision says otherwise.`,
+     ...(taskIdResolution === null ? [] : [`taskId: ${taskIdResolution.reason}.`]),
+     ...(course ? [] : ["This review is no feature package, so it needs a registered generic batch: run session-critic-finalizer.mjs register-batch first and copy its batchRef and memberSha256 into review.genericBatchRef."]),
+     ...(promptLines === null ? [] : ["The Critic route is Opus: put criticDispatchPromptLines into the Critic dispatch prompt (MP-07), or the dispatch policy refuses it."]),
++    ...(split === null ? [] : [`SPLIT: this range has ${split.changedFileCount} changed files, above the bound of ${split.maxChangedFiles} one Critic can read, so it is split (split.entries, ${split.entries.length} entries, plan ${split.plan.status}). Dispatch one Critic per split entry from the template, each with its entry's reviewerInput, its entry's batchScopeLine as the Batch scope (MP-07) line${promptLines === null ? "" : " (in place of criticDispatchPromptLines[0]; keep the rationale line)"} and the instruction to begin trajectory_evidence with its scopeMarker; run each entry's Critic once (a second run for an entry makes finalize refuse the round). Save split as a JSON file under scratch/, then merge the returned verdicts: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-split-merge.mjs --root <repo> --split <split file> --child <entryId>=<verdict file> (one per entry) --out <merged verdict file>; admit binds the split, finalize takes the merged verdict as verdictPath and labels it source-issued only when every child returned through the Critic stop.`]),
+   ].join(" ");
+   return { ...result, admitRequest: request, admitCommand: ["node", ADMIT_SCRIPT, "admit", "--root", input.root, "--request", ADMIT_REQUEST_FILE], nextStep,
+-    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }) };
++    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(split === null ? {} : { split }) };
+ }
+ 
+ /**
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 7db9ce0d6220bd58654f3c6e82d9dc16bd7bfab1..3584324a8a71548d27eec74eccbfad6a1598c242 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -695,7 +695,10 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
+   const printedRun = directCli(fx, producerArgv(value));
+   assert.equal(printedRun.status, 0);
+   assert.equal(printedRun.stderr, "");
+-  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, ...printedRest } = JSON.parse(printedRun.stdout);
++  // G20-72 (same criterion, same strictness): a range above the split bound also prints the additive `split`; it is stripped like the other additive fields, and this fixture's
++  // one-file range is below the bound so the printed line is compared byte for byte without it.
++  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, split: _printedSplit, ...printedRest } = JSON.parse(printedRun.stdout);
++  assert.equal(_printedSplit, undefined, "a one-file range carries no split");
+   assert.equal(JSON.stringify(printedRest) + "\n", JSON.stringify(expected) + "\n");
+   assert.equal(printedAdmitRequest.schema, "pipeline.session-critic-finalization-request.v3");
+   assert.equal(printedAdmitCommand.at(-1), "scratch/session-critic-finalization-request.json");
+@@ -2127,4 +2130,97 @@ test("G20-69 the request trigger is the applied Critic row of the matched dispat
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++// G20-72 (candidate 20e, AC-108): a review range too large for one Critic is split per module. The printed result carries an additive `split` (one entry per module of the
++// approved architecture plan, one shared entry for every changed path no module owns); the library result the finalizer binds stays byte-identical, and a range at or below the
++// one named bound prints exactly what it printed before. Criterion-bound cases, written before the implementation existed.
++function g2072Design() {
++  return { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
++    disposition: { decision: "approved-scoped", scope: ["specs/", "src/"], rationale: "fixture" },
++    modules: ["core", "api"].map((id) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`],
++      allowedDependencies: id === "api" ? ["core"] : [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [] })),
++    implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
++    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } } };
++}
++function g2072Fixture({ core = 12, api = 12, loose = 4, plan = true } = {}) {
++  const root = mkdtempSync(join(tmpdir(), "critic-split-preflight-"));
++  for (const dir of [".claude", "governance/guidelines", "governance/policies", "specs/feat", "evidence", "src/core", "src/api", "docs"]) mkdirSync(join(root, dir), { recursive: true });
++  git(root, ["init", "-q"]);
++  writeFileSync(join(root, ".claude", "pipeline.yaml"), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
++  writeFileSync(join(root, "governance", "guidelines", "review.md"), "Review changed code.\n");
++  writeFileSync(join(root, "governance", "policies", "checklist.md"), "- verify\n");
++  writeFileSync(join(root, "specs", "feat", "spec.md"), "# Spec\n");
++  const base = commit(root, "base");
++  writeFileSync(join(root, "specs", "feat", "spec.md"), "# Spec\n\nchanged\n");
++  if (plan) writeFileSync(join(root, "specs", "feat", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(g2072Design(), null, 2)}\n\`\`\`\n`);
++  for (let index = 0; index < core; index += 1) writeFileSync(join(root, "src", "core", `c${index}.mjs`), `export const c${index} = ${index};\n`);
++  for (let index = 0; index < api; index += 1) writeFileSync(join(root, "src", "api", `a${index}.mjs`), `export const a${index} = ${index};\n`);
++  for (let index = 0; index < loose; index += 1) writeFileSync(join(root, "docs", `note${index}.md`), `note ${index}\n`);
++  const candidate = commit(root, "candidate");
++  const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
++  writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
++  return { root, base, candidate, tree };
++}
++const g2072Input = (fx) => ({ root: fx.root, base: fx.base, candidate: fx.candidate, specPath: "specs/feat/spec.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"], priorCriticEvidencePath: null });
++const g2072Changed = (fx) => git(fx.root, ["diff", "--name-only", fx.base, fx.candidate]).split("\n").filter((line) => line !== "");
++test("G20-72 above SPLIT_MAX_CHANGED_FILES the printed result carries one split entry per module plus a shared entry, disjoint and covering every changed path; the library result is unchanged", async () => {
++  const { CRITIC_SPLIT_SCHEMA, SPLIT_MAX_CHANGED_FILES, SPLIT_SHARED_ENTRY_ID } = await import("../lib/critic-split.mjs");
++  const fx = g2072Fixture();
++  try {
++    const changed = g2072Changed(fx);
++    assert.ok(changed.length > SPLIT_MAX_CHANGED_FILES, `${changed.length} changed files`);
++    const library = preflightCriticDispatch(g2072Input(fx));
++    assert.equal(Object.hasOwn(library, "split"), false, "the library result is digest-bound by the session finalizer");
++    const printed = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
++    assert.equal(printed.status, "packet-ready", JSON.stringify(printed));
++    const { split } = printed;
++    assert.equal(split.schema, CRITIC_SPLIT_SCHEMA);
++    assert.equal(split.changedFileCount, changed.length);
++    assert.deepEqual(split.entries.map((entry) => entry.id), ["api", "core", SPLIT_SHARED_ENTRY_ID]);
++    const all = split.entries.flatMap((entry) => entry.paths);
++    assert.deepEqual([...all].sort(), [...changed].sort(), "every changed path is in exactly one entry, none dropped");
++    assert.equal(new Set(all).size, all.length, "the entry scopes are disjoint");
++    assert.deepEqual(split.entries.find((entry) => entry.id === "core").paths.every((path) => path.startsWith("src/core/")), true);
++    assert.ok(split.entries.find((entry) => entry.id === SPLIT_SHARED_ENTRY_ID).paths.includes("docs/note0.md"), "a path no module owns lands in the shared entry");
++    for (const entry of split.entries) {
++      assert.match(entry.batchScopeLine, /^Batch scope \(MP-07\):\s*\S/u);
++      assert.ok(entry.batchScopeLine.includes(entry.id), entry.batchScopeLine);
++      assert.equal(entry.scopeMarker, `scope:${entry.id}`);
++      assert.deepEqual(entry.reviewerInput, { ...printed.dispatch.reviewerInput, changedPaths: entry.paths }, "an exact path-only reviewer input: the parent's plus the entry's own changed paths");
++      assert.equal(dispatchFindings({ subagentType: "critic", prompt: ["Model/effort for this run: claude-sonnet-5-5 / high", `Ruleset SHA: ${fx.candidate}`, entry.batchScopeLine].join("\n") })
++        .findings.some(({ code }) => code.startsWith("DISPATCH-RECRITIC")), false);
++    }
++    assert.match(printed.nextStep, /one Critic per split entry/u);
++    assert.match(printed.nextStep, /critic-split-merge\.mjs/u);
++    const { admitRequest: _a, admitCommand: _c, nextStep: _n, criticDispatchPromptLines: _l, taskIdResolution: _t, split: _s, ...rest } = printed;
++    assert.deepEqual(rest, preflightModule.preflightCriticDispatchWithCoverage(g2072Input(fx)), "the admit fields and the split are the only additions");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("G20-72 a range at the bound prints no split and a next step without a merge; one file more prints it", async () => {
++  const { SPLIT_MAX_CHANGED_FILES } = await import("../lib/critic-split.mjs");
++  const small = g2072Fixture({ core: 10, api: 9, loose: 4 });
++  const big = g2072Fixture({ core: 10, api: 10, loose: 4 });
++  try {
++    assert.equal(g2072Changed(small).length, SPLIT_MAX_CHANGED_FILES);
++    const atBound = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(small), { env: {} });
++    assert.equal(atBound.status, "packet-ready");
++    assert.equal(Object.hasOwn(atBound, "split"), false);
++    assert.equal(/critic-split-merge|split entry/u.test(atBound.nextStep), false, "a range below the bound keeps today's next step");
++    assert.equal(g2072Changed(big).length, SPLIT_MAX_CHANGED_FILES + 1);
++    assert.equal(Object.hasOwn(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(big), { env: {} }), "split"), true);
++    const plain = fixture();
++    try { assert.equal(Object.hasOwn(g2069Printed(plain), "split"), false); } finally { rmSync(plain.root, { recursive: true, force: true }); }
++  } finally { rmSync(small.root, { recursive: true, force: true }); rmSync(big.root, { recursive: true, force: true }); }
++});
++
++test("G20-72 without an approved architecture plan the split is the one shared entry, flagged; it never drops a path", async () => {
++  const fx = g2072Fixture({ plan: false });
++  try {
++    const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
++    assert.deepEqual(split.entries.map((entry) => entry.id), ["shared"]);
++    assert.equal(split.plan.status, "none");
++    assert.deepEqual([...split.entries[0].paths].sort(), g2072Changed(fx).sort());
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+index 4ddcd0dd613c946bcbae7a55676a46a0ddfcde90..84bf21fdaf77fd98ae7cdb9a88a6f54c67696d80 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+@@ -16,7 +16,8 @@ import { CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA, deriveCriticPacketGovernance, va
+ import { validateCriticLineagePacketAdmission } from "../lib/critic-review-lineage.mjs";
+ import { createLocalDispatchEvidenceBinding, evaluateReviewAdmission, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
+ import { createDiagnosticBundle, materializeDiagnosticBundle, revalidateDiagnosticBundle } from "../lib/critic-diagnostic-packet.mjs";
+-import { PACKET_SCHEMA, RECORD_SCHEMA, SESSION_ADMISSION_SCHEMA, SESSION_REVIEW_TTL_SECONDS, SAFE_ID, PACKET_ID, SHA256, OID, CriticPacketError, fail, isObject, exactKeys, canonicalJson, sha256, inside, assertRealPrivateDir, assertNoSymlinkPath, readJson, normalizeSessionBinding, bindingsFor, recordBody, normalizeCoordinatorOnly, packetContext, currentState, normalizedPacketView } from "../lib/critic-packet-preflight-read.mjs";
++import { criticSplitDigest, criticSplitProblem } from "../lib/critic-split.mjs";
++import { SPLIT_FILE, admissionKeys, PACKET_SCHEMA, RECORD_SCHEMA, SESSION_ADMISSION_SCHEMA, SESSION_REVIEW_TTL_SECONDS, SAFE_ID, PACKET_ID, SHA256, OID, CriticPacketError, fail, isObject, exactKeys, canonicalJson, sha256, inside, assertRealPrivateDir, assertNoSymlinkPath, readJson, normalizeSessionBinding, bindingsFor, recordBody, normalizeCoordinatorOnly, packetContext, currentState, normalizedPacketView } from "../lib/critic-packet-preflight-read.mjs";
+ export { PACKET_SCHEMA, STATE_SCHEMA, RECORD_SCHEMA, SESSION_PACKET_BINDING_SCHEMA, SESSION_ADMISSION_SCHEMA, CriticPacketError, canonicalJson, sha256, normalizedPacketView, packetDigestMatches, readConsumedCandidateReceipt, readConsumedCandidateResult, readConsumedSessionAdmission } from "../lib/critic-packet-preflight-read.mjs";
+ 
+ /**
+@@ -489,7 +490,9 @@ export function inspectClaimedCandidatePacket({ controlRoot, packetId }, { now =
+ }
+ 
+ /** Publish one session-only prelaunch admission bound to the durable claim. */
+-export function publishClaimedSessionAdmission({ controlRoot, packetId, preflightSha256, courseSourceSha256, courseDecisionSha256 }, { now = new Date() } = {}) {
++// G20-72: a split round binds the digest of its split object into the admission (optional key) and keeps the object itself next to it (split.json), so the Critic stop hook and the
++// finalizer read exactly what admit bound. An admission without the key is byte for byte the admission of today.
++export function publishClaimedSessionAdmission({ controlRoot, packetId, preflightSha256, courseSourceSha256, courseDecisionSha256, split = null }, { now = new Date() } = {}) {
+   if (![preflightSha256, courseSourceSha256, courseDecisionSha256].every((value) => typeof value === "string" && SHA256.test(value))) {
+     fail("CPP-SESSION-ADMISSION", "Admission digests are invalid.");
+   }
+@@ -499,6 +502,12 @@ export function publishClaimedSessionAdmission({ controlRoot, packetId, prefligh
+   if (!binding || binding.preflightSha256 !== preflightSha256
+     || packet.route.projectionDigest !== preflightSha256) fail("CPP-SESSION-ADMISSION", "Session preflight binding differs.");
+   const { packetDir } = packetContext(controlRoot, packetId);
++  if (split !== null) {
++    if (criticSplitProblem(split) !== null) fail("CPP-SESSION-ADMISSION", "The split is invalid.");
++    const splitPath = join(packetDir, SPLIT_FILE);
++    if (!existsSync(splitPath)) publishExclusive(splitPath, split);
++    else if (criticSplitDigest(readJson(splitPath, "CPP-SESSION-ADMISSION")) !== criticSplitDigest(split)) fail("CPP-SESSION-ADMISSION", "A different split is already bound to this packet.");
++  }
+   const admission = {
+     schema: SESSION_ADMISSION_SCHEMA,
+     packetId,
+@@ -508,6 +517,7 @@ export function publishClaimedSessionAdmission({ controlRoot, packetId, prefligh
+     preflightSha256,
+     courseSourceSha256,
+     courseDecisionSha256,
++    ...(split === null ? {} : { splitSha256: criticSplitDigest(split) }),
+     createdAt: nowIso(now),
+   };
+   publishExclusive(join(packetDir, "session-admission.json"), admission);
+@@ -522,14 +532,14 @@ export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now
+   if (!existsSync(admissionPath)) fail("CPP-SESSION-ADMISSION", "Session admission is absent.");
+   const admission = readJson(admissionPath, "CPP-SESSION-ADMISSION");
+   const binding = packet.request.sessionBinding;
+-  if (!exactKeys(admission, ["schema", "packetId", "packetDigest", "claimSha256", "sessionId", "preflightSha256", "courseSourceSha256", "courseDecisionSha256", "createdAt"])
++  if (!exactKeys(admission, admissionKeys(admission))
+     || admission.schema !== SESSION_ADMISSION_SCHEMA || admission.packetId !== packetId
+     || admission.packetDigest !== sha256(canonicalJson(packet))
+     || admission.claimSha256 !== sha256(canonicalJson(claim))
+     || !binding || admission.sessionId !== binding.sessionId
+     || admission.preflightSha256 !== binding.preflightSha256
+     || admission.preflightSha256 !== packet.route.projectionDigest
+-    || !SHA256.test(admission.courseSourceSha256) || !SHA256.test(admission.courseDecisionSha256)
++    || !SHA256.test(admission.courseSourceSha256) || !SHA256.test(admission.courseDecisionSha256) || !(admission.splitSha256 === undefined || SHA256.test(admission.splitSha256))
+     || typeof admission.createdAt !== "string" || !Number.isFinite(Date.parse(admission.createdAt))) {
+     fail("CPP-SESSION-ADMISSION", "Session admission is absent or drifted.");
+   }
+diff --git a/plugins/pipeline-core/scripts/critic-split-merge.mjs b/plugins/pipeline-core/scripts/critic-split-merge.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..42f1046fbb69a7488c72b73e78ea1a4f47eb74a9
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/critic-split-merge.mjs
+@@ -0,0 +1,82 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * G20-72 (candidate 20e, AC-108): merge the verdicts of the module Critics of one split review round into the one verdict the session finalizer takes.
++ *
++ * Usage: node critic-split-merge.mjs --root <repo> --split <split file> --child <entryId>=<verdict file> [--child ...] [--out <merged verdict file>]
++ *
++ * The split is the object `critic-dispatch-preflight.mjs` printed (the file may also be the whole printed result, which holds it under `split`); each child file is the JSON a
++ * module Critic returned, verbatim. Pure JSON in, JSON out: stdout `{ schema, status: "merged", verdictSha256, verdict, verdictPath }`; a refusal prints one line
++ * `{ schema, status: "rejected", code, message }` on stderr and exits 1 (codes CSM-*, each message ends in its repair). `--out` creates the file exclusively. The finalizer does not
++ * trust this script: it re-derives the merge from the child Source returns, so a merged verdict that differs from the returned children is refused at finalize.
++ * All files are repository-relative regular files (no symlink, at most 1 MiB).
++ */
++import { closeSync, lstatSync, openSync, readFileSync, realpathSync, writeSync } from "node:fs";
++import { isAbsolute, relative, resolve } from "node:path";
++import { createHash } from "node:crypto";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { mergeSplitVerdicts } from "../lib/critic-split.mjs";
++
++export const CRITIC_SPLIT_MERGE_RESULT_SCHEMA = "pipeline.critic-split-merge-result.v1";
++const MAX_BYTES = 1024 * 1024;
++const USAGE = "node critic-split-merge.mjs --root <repo> --split <split file> --child <entryId>=<verdict file> (one per entry) [--out <merged verdict file>]";
++
++class MergeUsageError extends Error { constructor(message) { super(message); this.code = "CSM-USAGE"; } }
++
++function repoFile(root, path, label) {
++  if (typeof path !== "string" || path === "" || isAbsolute(path)) throw new MergeUsageError(`${label} must be a repository-relative path; repair: ${USAGE}`);
++  const target = resolve(root, path);
++  const inside = relative(root, target);
++  if (inside === "" || inside.startsWith("..") || isAbsolute(inside)) throw new MergeUsageError(`${label} must stay inside the repository; repair: ${USAGE}`);
++  return target;
++}
++function readJsonFile(root, path, label) {
++  const target = repoFile(root, path, label);
++  let info;
++  try { info = lstatSync(target); } catch { throw new MergeUsageError(`${label} could not be read; repair: ${USAGE}`); }
++  if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_BYTES) throw new MergeUsageError(`${label} must be a regular file of at most 1 MiB; repair: ${USAGE}`);
++  try { return JSON.parse(readFileSync(target, "utf8")); } catch { throw new MergeUsageError(`${label} is not JSON; repair: ${USAGE}`); }
++}
++
++/** Pure-ish entry for tests and the CLI: parse argv, read the files, merge, optionally write. Returns `{ exitCode, stdout, stderr }`. */
++export function runCriticSplitMergeCli(argv) {
++  try {
++    const flags = { child: [] };
++    for (let index = 0; index < argv.length; index += 2) {
++      const flag = argv[index], value = argv[index + 1];
++      if (!["--root", "--split", "--child", "--out"].includes(flag) || typeof value !== "string") throw new MergeUsageError(`unknown or valueless argument ${JSON.stringify(String(flag).slice(0, 40))}; repair: ${USAGE}`);
++      if (flag === "--child") flags.child.push(value);
++      else if (Object.hasOwn(flags, flag.slice(2))) throw new MergeUsageError(`${flag} was given twice; repair: ${USAGE}`);
++      else flags[flag.slice(2)] = value;
++    }
++    if (flags.root === undefined || flags.split === undefined) throw new MergeUsageError(`--root and --split are required; repair: ${USAGE}`);
++    const root = realpathSync(resolve(flags.root));
++    const given = readJsonFile(root, flags.split, "--split");
++    const split = given !== null && typeof given === "object" && !Array.isArray(given) && typeof given.split === "object" && given.split !== null ? given.split : given;
++    const children = flags.child.map((spec) => {
++      const at = spec.indexOf("=");
++      if (at <= 0) throw new MergeUsageError(`--child takes <entryId>=<verdict file>; repair: ${USAGE}`);
++      return { entryId: spec.slice(0, at), verdict: readJsonFile(root, spec.slice(at + 1), `--child ${spec.slice(0, at)}`) };
++    });
++    const merged = mergeSplitVerdicts(split, children);
++    if (!merged.ok) return { exitCode: 1, stdout: "", stderr: `${JSON.stringify({ schema: CRITIC_SPLIT_MERGE_RESULT_SCHEMA, status: "rejected", code: merged.code, message: merged.message })}\n` };
++    if (flags.out !== undefined) {
++      const out = repoFile(root, flags.out, "--out");
++      let fd;
++      try { fd = openSync(out, "wx", 0o644); } catch { throw new MergeUsageError(`--out must name a new file in an existing directory of the repository; repair: ${USAGE}`); }
++      try { writeSync(fd, `${JSON.stringify(merged.verdict)}\n`); } finally { closeSync(fd); }
++    }
++    return { exitCode: 0, stderr: "", stdout: `${JSON.stringify({ schema: CRITIC_SPLIT_MERGE_RESULT_SCHEMA, status: "merged", verdict: merged.verdict,
++      verdictSha256: createHash("sha256").update(`${JSON.stringify(merged.verdict, null, 2)}\n`).digest("hex"), verdictPath: flags.out ?? null })}\n` };
++  } catch (error) {
++    const code = error instanceof MergeUsageError ? error.code : "CSM-INTERNAL";
++    return { exitCode: 1, stdout: "", stderr: `${JSON.stringify({ schema: CRITIC_SPLIT_MERGE_RESULT_SCHEMA, status: "rejected", code, message: error instanceof MergeUsageError ? error.message : `the merge could not run; repair: ${USAGE}` })}\n` };
++  }
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  const result = runCriticSplitMergeCli(process.argv.slice(2));
++  process.stdout.write(result.stdout);
++  process.stderr.write(result.stderr);
++  process.exitCode = result.exitCode;
++}
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index 6c192582f0b82d0e575e328feaf8ddfee68e1b7d..193a444f3ab475e0199aeb3f361eb5062bcd9061 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -13,7 +13,8 @@ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { reserveFeatureCriticReviewUnitOwnership, republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore, inspectFeatureCourseTakeover, supersedeFeatureCourseTakeover, readCriticReviewUnit } from "../lib/critic-generic-batch.mjs";
+ import { releaseCriticPacket } from "../lib/critic-packet-release.mjs";
+-import { readCriticSourceReturn } from "../lib/critic-source-return.mjs";
++import { CRITIC_SPLIT_SOURCE_RETURN_SCHEMA, readAdmittedSplit, readCriticSourceReturn, readCriticSplitSourceReturns } from "../lib/critic-source-return.mjs";
++import { SPLIT_NEXT_ROUND_REPAIR, attributeVerdict, buildCriticSplit, criticSplitDigest, mergeSplitVerdicts } from "../lib/critic-split.mjs";
+ import { GOVERNANCE_REVIEW_SOURCE_SCHEMA, buildGovernanceReviewAction, buildGovernanceReviewRetry, preflightGovernanceReviewActionOutput, writeGovernanceReviewAction } from "../lib/governance-review-action.mjs";
+ import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+@@ -132,7 +133,37 @@ const ORIGINAL_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return.v1"
+ const ORIGINAL_SOURCE_RETURN_KEYS = Object.freeze(["schema", "issuer", "packetId", "packetDigest", "claimant", "sessionId", "verdictSha256", "issuedAtMs", "expiresAtMs"]);
+ // G20-39: the default reader is the private control area. The Critic subagent's stop hook (hooks/native-goldfish-host.mjs ->
+ // lib/critic-source-return.mjs) issues the record there; a missing record reads as null, a present one is returned as stored.
+-function originGate(query, options, deps, controlRoot) {
++// G20-72: the origin gate of a SPLIT round. Every module Critic has its own record (the nine keys plus the split digest, the entry and the child's verdict). The round is
++// source-issued only when there is exactly one bound record per split entry and the finalized verdict is the merge of exactly those verdicts; the children of a split packet
++// cannot be re-run inside it (a second record for an entry refuses, so a caller can never keep the better of two runs), and a record that names no entry of the split refuses too.
++const SPLIT_RECORD_KEYS = Object.freeze([...ORIGINAL_SOURCE_RETURN_KEYS, "splitSha256", "entryId", "verdict"]);
++function splitOriginGate(query, context, deps, controlRoot) {
++  let records = [];
++  try { records = (deps.readSplitSourceReturnsFn ?? ((q) => readCriticSplitSourceReturns({ controlRoot, packetId: q.packetId })))(query) ?? []; } catch { records = []; }
++  if (records.length === 0) return Object.freeze({ independence: "caller-authored-fallback", origin: "caller-authored", nativeAttestation: false });
++  const now = (deps.originNowMsFn ?? Date.now)();
++  const byEntry = new Map();
++  for (const record of records) {
++    if (!exact(record, SPLIT_RECORD_KEYS) || typeof record.entryId !== "string") fail("SCF-SPLIT-RECORD-STRAY", `a Source return record names no split entry; repair: ${SPLIT_NEXT_ROUND_REPAIR}`);
++    if (record.schema !== CRITIC_SPLIT_SOURCE_RETURN_SCHEMA || record.issuer !== "source" || record.packetId !== query.packetId || record.packetDigest !== query.packetDigest
++      || canonicalJson(record.claimant) !== canonicalJson(query.claimant) || record.sessionId !== query.sessionId || record.splitSha256 !== context.splitSha256
++      || sha256(canonicalJson(record.verdict)) !== record.verdictSha256
++      || !Number.isSafeInteger(record.issuedAtMs) || !Number.isSafeInteger(record.expiresAtMs) || record.issuedAtMs > now || now >= record.expiresAtMs) fail("SCF-ORIGINAL-SOURCE-BINDING");
++    if (!context.split.entries.some((entry) => entry.id === record.entryId) || attributeVerdict(context.split, record.verdict) !== record.entryId) {
++      fail("SCF-SPLIT-RECORD-STRAY", `a Source return record names entry ${JSON.stringify(record.entryId.slice(0, 40))}, which is no entry of the split or does not match its verdict; repair: ${SPLIT_NEXT_ROUND_REPAIR}`);
++    }
++    if (byEntry.has(record.entryId)) fail("SCF-SPLIT-DUPLICATE-ENTRY", `two Source return records exist for split entry ${record.entryId}; repair: ${SPLIT_NEXT_ROUND_REPAIR}`);
++    byEntry.set(record.entryId, record.verdict);
++  }
++  const missing = context.split.entries.filter((entry) => !byEntry.has(entry.id)).map((entry) => entry.id);
++  if (missing.length > 0) fail("SCF-SPLIT-CHILD-MISSING", `no Source return record for split entry ${missing.join(", ")}; repair: run that entry's Critic, or ${SPLIT_NEXT_ROUND_REPAIR}`);
++  const merged = mergeSplitVerdicts(context.split, [...byEntry].map(([entryId, verdict]) => ({ entryId, verdict })));
++  if (!merged.ok) fail("SCF-SPLIT-MERGE", `${merged.code}: ${merged.message}`);
++  if (criticSplitDigest(merged.verdict) !== criticSplitDigest(context.verdict)) fail("SCF-SPLIT-MERGE-MISMATCH", "the verdict is not the merge of exactly the returned child verdicts; repair: finalize the output of critic-split-merge.mjs unchanged");
++  return Object.freeze({ independence: "source-issued-origin", origin: "source", nativeAttestation: false });
++}
++function originGate(query, options, deps, controlRoot, splitContext = null) {
++  if (splitContext !== null) return splitOriginGate(query, splitContext, deps, controlRoot);
+   let record = null;
+   try { record = (deps.readOriginalSourceReturnFn ?? ((q) => readCriticSourceReturn({ controlRoot, packetId: q.packetId })))(query); } catch { record = null; }
+   // G20-24 (PO decision 2026-11-07): no runner issues a Source return record, so requiring one made the normal finalize path
+@@ -443,6 +474,8 @@ export function admitSessionCriticReview(options, deps = {}) {
+   const packetId = options.packetId;
+   if (!PACKET_ID.test(packetId ?? "")) fail("SCF-PACKET-ID");
+   const preflightSha256 = sha256(canonicalJson(preflight));
++  // G20-72: the split of a range above the bound is rebuilt here from the repository, never taken from the request, and bound into the admission.
++  const split = buildCriticSplit({ root, result: preflight });
+   const signedImportAnchor = signedImportAnchorFor(preflight, options.signedQualityImportAnchor, options.taskId);
+   const modelRole = selectedSessionCriticModelRole(root, options.trigger ?? "T1", options.route, deps);
+   const route = routeFor(modelRole === null ? options.route
+@@ -463,11 +496,12 @@ export function admitSessionCriticReview(options, deps = {}) {
+       try { ({ packet: held } = inspectClaimedCandidatePacket({ controlRoot, packetId }, deps.packetDependencies)); } catch { throw error; }
+       if (held.candidate?.commit !== preflight.candidate.commit || held.request?.taskId !== options.taskId
+         || held.request?.sessionBinding?.preflightSha256 !== preflightSha256) throw error;
+-      const admission = (deps.publishClaimedSessionAdmissionFn ?? publishClaimedSessionAdmission)({ controlRoot, packetId, preflightSha256, ...course }, deps.packetDependencies);
++      const admission = (deps.publishClaimedSessionAdmissionFn ?? publishClaimedSessionAdmission)({ controlRoot, packetId, preflightSha256, ...course, ...(split === null ? {} : { split }) }, deps.packetDependencies);
+       return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA, status: "admitted", packetId,
+         packetDigest: sha256(canonicalJson(held)), admissionSha256: sha256(canonicalJson(admission.admission)), resumed: true });
+     }
+-    if (current.admission.courseSourceSha256 !== course.courseSourceSha256 || current.admission.courseDecisionSha256 !== course.courseDecisionSha256) fail("SCF-PRELAUNCH-BINDING");
++    if (current.admission.courseSourceSha256 !== course.courseSourceSha256 || current.admission.courseDecisionSha256 !== course.courseDecisionSha256
++      || (current.admission.splitSha256 ?? null) !== (split === null ? null : criticSplitDigest(split))) fail("SCF-PRELAUNCH-BINDING");
+     return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA, status: "already-admitted", packetId,
+       packetDigest: current.admission.packetDigest, admissionSha256: sha256(canonicalJson(current.admission)), replay: true });
+   }
+@@ -504,15 +538,16 @@ export function admitSessionCriticReview(options, deps = {}) {
+   if(genericBatch===null)featureReservationFor(options,preflight,root,controlRoot,packetId,preflightSha256);
+   const course = genericReservation === null ? courseDigestsFor(preflight) : genericCourseFor(genericReservation.reservation);
+   const admission = (deps.publishClaimedSessionAdmissionFn ?? publishClaimedSessionAdmission)({
+-    controlRoot, packetId, preflightSha256, ...course,
++    controlRoot, packetId, preflightSha256, ...course, ...(split === null ? {} : { split }),
+   }, deps.packetDependencies);
+   return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA,
+     status: "admitted", packetId, packetDigest: prepared.packetDigest,
+     admissionSha256: sha256(canonicalJson(admission.admission)) });
+ }
+-function buildResult({ packet, packetDigest, session, verdict, independence }) {
++function buildResult({ packet, packetDigest, session, verdict, independence, splitSha256 = undefined }) {
+   const fallback = independence === "caller-authored-fallback";
+   return Object.freeze({
++    ...(splitSha256 === undefined ? {} : { splitSha256 }),
+     schema: SESSION_CRITIC_RESULT_SCHEMA,
+     packetId: packet.packetId,
+     packetDigest,
+@@ -527,7 +562,7 @@ function buildResult({ packet, packetDigest, session, verdict, independence }) {
+ }
+ function validateResult(result, packet, packetDigest = sha256(canonicalJson(packet))) {
+   const sessionBinding = packet.request.sessionBinding;
+-  if (!exact(result, Object.hasOwn(result ?? {}, "independence") ? [...RESULT_KEYS, "independence"] : RESULT_KEYS) || result.schema !== SESSION_CRITIC_RESULT_SCHEMA
++  if (!exact(result, [...RESULT_KEYS, ...["independence", "splitSha256"].filter((key) => Object.hasOwn(result ?? {}, key))]) || !(result.splitSha256 === undefined || SHA256.test(result.splitSha256)) || result.schema !== SESSION_CRITIC_RESULT_SCHEMA
+     || result.packetId !== packet.packetId || result.packetDigest !== packetDigest
+     || !exact(sessionBinding, Object.hasOwn(sessionBinding ?? {}, "modelRole")
+       ? ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate", "modelRole"]
+@@ -558,6 +593,7 @@ function receiptFor(result) {
+     findingCount: result.verdict.findings.length,
+     reviewPass: result.verdict.pass,
+     ...(Object.hasOwn(result, "independence") ? { independence: result.independence } : {}),
++    ...(Object.hasOwn(result, "splitSha256") ? { splitSha256: result.splitSha256 } : {}),
+   });
+ }
+ 
+@@ -677,10 +713,19 @@ export function finalizeSessionCriticReview(options, deps = {}) {
+   const prepared = { packet, packetDigest: admitted.admission?.packetDigest ?? sha256(canonicalJson(packet)) };
+ 
+   let event = null;
++  // G20-72: an admission that carries a split bound it; finalize reads exactly that split, checks it against the repository, and gates the origin over every child.
++  let splitContext = null;
++  if (admitted.admission.splitSha256 !== undefined) {
++    const split = readAdmittedSplit(join(controlRoot, packetId), admitted.admission.splitSha256);
++    const rebuilt = buildCriticSplit({ root, result: preflight });
++    if (split === undefined || rebuilt === null || criticSplitDigest(rebuilt) !== admitted.admission.splitSha256) fail("SCF-PRELAUNCH-BINDING");
++    splitContext = { split, splitSha256: admitted.admission.splitSha256, verdict: options.verdict };
++  }
+   const independence = originGate({ packetId, packetDigest: prepared.packetDigest,
+     claimant: { runner: options.route?.runner, adapter: options.route?.adapter },
+-    sessionId: id, verdictSha256: sha256(canonicalJson(assertVerdict(options.verdict))) }, options, deps, controlRoot);
+-  const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict, independence: independence.independence });
++    sessionId: id, verdictSha256: sha256(canonicalJson(assertVerdict(options.verdict))) }, options, deps, controlRoot, splitContext);
++  const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict, independence: independence.independence,
++    splitSha256: splitContext?.splitSha256 });
+   validateResult(result, prepared.packet, prepared.packetDigest);
+   const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
+   const recorded = (deps.recordCandidateResultFn ?? recordCandidateResult)({ controlRoot: controlRootFor(root), packetId, result }, deps.packetDependencies);
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 9ab5dc6e8fe04009b949f7465bfd104d9b533fdc..a056608e65ba95f5689be4d73f9369f183eab3ff 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -2594,3 +2594,214 @@ test("G20-69 the printed feature-package admit request is a v2 request carrying
+     assert.equal(admitted.output.status, "admitted");
+   } finally { cleanup(fx); }
+ });
++
++// G20-72 (candidate 20e, AC-108): a review range too large for one Critic is split per module. Every module Critic has its own Source return; the merged verdict is
++// the merge of exactly those children, so a whole-feature review still ends in one SOURCE-issued verdict. Criterion-bound cases, written before the implementation existed.
++const MERGE_SCRIPT = fileURLToPath(new URL("./critic-split-merge.mjs", import.meta.url));
++const NATIVE_HOOK = fileURLToPath(new URL("../hooks/native-goldfish-host.mjs", import.meta.url));
++function g2072Fixture() {
++  const fx = fixture();
++  // The fixture leaves its diagnostic untracked; the split candidate carries 28 module files, a PRD with the approved architecture design and its own diagnostic.
++  rmSync(join(fx.root, "evidence", "verify.json"), { force: true });
++  rmSync(join(fx.root, "evidence", "targeted.log"), { force: true });
++  const design = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield", disposition: { decision: "approved-scoped", scope: ["specs/", "src/"], rationale: "fixture" },
++    modules: ["core", "api"].map((id) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`],
++      allowedDependencies: [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [] })),
++    implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
++    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } } };
++  writeFileSync(join(fx.root, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
++  for (const dir of ["core", "api"]) {
++    mkdirSync(join(fx.root, "src", dir), { recursive: true });
++    for (let index = 0; index < 14; index += 1) writeFileSync(join(fx.root, "src", dir, `m${index}.mjs`), `export const m${index} = ${index};\n`);
++  }
++  fx.candidate = commit(fx.root, "split candidate");
++  fx.tree = git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`]);
++  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root: fx.root, candidate: fx.candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", "process.exit(0)"], logPath: "evidence/targeted.log" }))}\n`);
++  return fx;
++}
++const g2072Child = (id, overrides = {}) => verdict({ deliberately_not_flagged: [`reviewed ${id}`], trajectory_evidence: `scope:${id} read the diff of ${id}`, ...overrides });
++const g2072Finding = (overrides = {}) => ({ gap: "a gap", risk: "a risk", severity: "major", evidence: "src/core/m0.mjs:1", spec_ref: "AC-1", ...overrides });
++// Prints (the real wrapper), fills the placeholders, admits through the real CLI; returns the printed split and the packet.
++function g2072Admit(fx) {
++  const printed = preflightCriticDispatchWithAdmitRequest(options(fx).preflightInput, { env: {} });
++  assert.equal(printed.status, "packet-ready", JSON.stringify(printed));
++  assert.ok(printed.split, "the range is above the bound");
++  const request = structuredClone(printed.admitRequest);
++  Object.assign(request, { projectId: "pipeline", sessionId: "session-g2072-1", route: options(fx).route, verdictPath: "evidence/critic-verdict.json", event: null });
++  request.review.genericBatchRef = batchFor(fx);
++  const requestPath = writeScratchRequest(fx, "g2072-request.json", request);
++  const admitted = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]);
++  assert.equal(admitted.exitCode, 0, JSON.stringify(admitted.output));
++  const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
++  return { printed, split: printed.split, requestPath, controlRoot, packetId: printed.admitRequest.packetId, packetDir: join(controlRoot, printed.admitRequest.packetId) };
++}
++function g2072Hook(fx, text, extra = {}) {
++  // The hook entry exits silently outside a governed project; the onboarding consent marker is the smallest real enrolment (an untracked file, so the reviewed range is unchanged).
++  mkdirSync(join(fx.root, ".agent-pipeline"), { recursive: true });
++  writeFileSync(join(fx.root, ".agent-pipeline", "onboarding-consent.json"), `${JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-11-08T10:00:00.000Z" })}\n`);
++  const run = spawnSync(process.execPath, [NATIVE_HOOK, "--runner", "codex"], { input: JSON.stringify(stopInput(text, { cwd: fx.root, ...extra })), encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: fx.root } });
++  assert.equal(run.status, 0, run.stderr);
++  return run;
++}
++const g2072Records = (admitted) => readdirSync(admitted.packetDir).filter((name) => /^source-return-[a-f0-9]{64}\.json$/u.test(name)).sort();
++const g2072Merge = async (admitted, children) => (await import("../lib/critic-split.mjs")).mergeSplitVerdicts(admitted.split, children.map(([entryId, value]) => ({ entryId, verdict: value })));
++function g2072MergeCli(fx, admitted, children, out = "evidence/critic-verdict.json") {
++  mkdirSync(join(fx.root, "scratch"), { recursive: true });
++  writeFileSync(join(fx.root, "scratch", "g2072-split.json"), JSON.stringify(admitted.split));
++  const argv = [MERGE_SCRIPT, "--root", fx.root, "--split", "scratch/g2072-split.json"];
++  children.forEach(([entryId, value], index) => { writeFileSync(join(fx.root, "scratch", `g2072-child-${index}.json`), JSON.stringify(value)); argv.push("--child", `${entryId}=scratch/g2072-child-${index}.json`); });
++  if (out !== null) argv.push("--out", out);
++  const run = spawnSync(process.execPath, argv, { encoding: "utf8" });
++  return { status: run.status, stdout: run.stdout, stderr: run.stderr, json: JSON.parse(run.status === 0 ? run.stdout : run.stderr) };
++}
++
++test("G20-72 the merge script: pass is the AND, findings and briefing violations the union, the trajectory the worst; the merged verdict is a valid verdict", () => {
++  const fx = g2072Fixture();
++  try {
++    const admitted = g2072Admit(fx);
++    const kids = [["api", g2072Child("api", { trajectory_verdict: "not verifiable" , pass: false, findings: [g2072Finding({ evidence: "src/api/m1.mjs:2", spec_ref: "AC-2", severity: "minor" })] })],
++      ["core", g2072Child("core", { trajectory_verdict: "inconsistent", pass: false, briefing_violations: ["the diff range was widened"], findings: [g2072Finding()] })],
++      ["shared", g2072Child("shared")]];
++    const run = g2072MergeCli(fx, admitted, kids);
++    assert.equal(run.status, 0, run.stderr);
++    const merged = run.json.verdict;
++    assert.equal(merged.pass, false);
++    assert.equal(merged.trajectory_verdict, "inconsistent", "the worst of inconsistent > not verifiable > consistent");
++    assert.deepEqual(merged.findings.map((finding) => finding.severity), ["major", "minor"], "the union, ordered by severity");
++    assert.deepEqual(merged.briefing_violations, ["the diff range was widened"]);
++    assert.deepEqual(merged.deliberately_not_flagged, ["reviewed api", "reviewed core", "reviewed shared"]);
++    assert.ok(["api", "core", "shared"].every((id) => merged.trajectory_evidence.includes(`scope:${id}`)));
++    assert.equal(run.json.verdictSha256, verdictDigest(merged));
++    assert.deepEqual(JSON.parse(readFileSync(join(fx.root, "evidence", "critic-verdict.json"), "utf8")), merged, "--out writes the merged verdict the finalizer takes");
++    const allPass = g2072MergeCli(fx, admitted, ["api", "core", "shared"].map((id) => [id, g2072Child(id)]), null);
++    assert.equal(allPass.json.verdict.pass, true);
++    assert.equal(allPass.json.verdict.trajectory_verdict, "consistent");
++  } finally { cleanup(fx); }
++});
++
++test("G20-72 the merge script refuses a missing child, an unknown or duplicated entry, an unattributed child, a child outside its scope and a duplicate finding id, each with a typed code and a repair", () => {
++  const fx = g2072Fixture();
++  try {
++    const admitted = g2072Admit(fx);
++    const all = ["api", "core", "shared"].map((id) => [id, g2072Child(id)]);
++    const refused = (children, code) => { const run = g2072MergeCli(fx, admitted, children, null); assert.equal(run.status, 1, run.stdout); assert.equal(run.json.status, "rejected"); assert.equal(run.json.code, code, JSON.stringify(run.json)); assert.match(run.json.message, /repair:/u); };
++    refused(all.slice(0, 2), "CSM-CHILD-MISSING");
++    refused([...all, ["ghost", g2072Child("ghost")]], "CSM-CHILD-UNKNOWN");
++    refused([...all, ["core", g2072Child("core", { deliberately_not_flagged: ["a second run"] })]], "CSM-CHILD-DUPLICATE");
++    refused([all[0], ["core", verdict()], all[2]], "CSM-CHILD-UNATTRIBUTED");
++    refused([all[0], ["core", g2072Child("api")], all[2]], "CSM-CHILD-UNATTRIBUTED");
++    refused([all[0], ["core", g2072Child("core", { pass: false, findings: [g2072Finding({ evidence: "src/api/m3.mjs:9" })] })], all[2]], "CSM-CHILD-OUT-OF-SCOPE");
++    const same = g2072Finding({ evidence: "the quoted line", spec_ref: "AC-1" });
++    refused([["api", g2072Child("api", { pass: false, findings: [same] })], ["core", g2072Child("core", { pass: false, findings: [same] })], all[2]], "CSM-FINDING-DUPLICATE");
++  } finally { cleanup(fx); }
++});
++
++test("G20-72 admit binds the split; the Critic stop hook issues one Source return per returning child; the whole chain ends in one source-issued verdict whose receipt carries the split digest", async () => {
++  const { criticSplitDigest } = await import("../lib/critic-split.mjs");
++  const fx = g2072Fixture();
++  try {
++    const admitted = g2072Admit(fx);
++    const { admission } = inspectClaimedSessionAdmission({ controlRoot: admitted.controlRoot, packetId: admitted.packetId });
++    assert.equal(admission.splitSha256, criticSplitDigest(admitted.split), "admit binds the digest of the split object");
++    assert.deepEqual(JSON.parse(readFileSync(join(admitted.packetDir, "split.json"), "utf8")), admitted.split);
++    const kids = ["api", "core", "shared"].map((id) => [id, g2072Child(id)]);
++    for (const [id, value] of kids) {
++      const run = g2072Hook(fx, criticReturn(value));
++      assert.match(run.stderr, new RegExp(`Source return issued for packet ${admitted.packetId}.*${id}`, "u"), run.stderr);
++    }
++    assert.equal(existsSync(join(admitted.packetDir, SOURCE_RETURN_FILE)), false, "a split packet has no single source-return.json");
++    const names = g2072Records(admitted);
++    assert.deepEqual(names, kids.map(([, value]) => `source-return-${verdictDigest(value)}.json`).sort(), "one record per returning child, named by the verdict digest");
++    const record = JSON.parse(readFileSync(join(admitted.packetDir, names[0]), "utf8"));
++    assert.equal(record.packetId, admitted.packetId);
++    assert.equal(record.packetDigest, admission.packetDigest);
++    assert.equal(record.sessionId, admission.sessionId);
++    assert.deepEqual(record.claimant, { runner: "codex", adapter: "session-functional-equivalent" });
++    assert.equal(record.splitSha256, admission.splitSha256);
++    assert.equal(g2072Hook(fx, criticReturn(kids[0][1])).stderr.includes("already"), true, "the same child verdict again never overwrites");
++    assert.equal(g2072Records(admitted).length, 3);
++    const merged = g2072MergeCli(fx, admitted, kids);
++    assert.equal(merged.status, 0, merged.stderr);
++    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
++    assert.equal(result.exitCode, 0, JSON.stringify(result.output));
++    assert.equal(result.output.status, "completed");
++    assert.equal(result.output.independence, "source-issued-origin");
++    assert.equal(result.output.receipt.independence, "source-issued-origin");
++    assert.equal(result.output.receipt.splitSha256, admission.splitSha256);
++    const { receipt } = readConsumedCandidateReceipt({ controlRoot: admitted.controlRoot, packetId: admitted.packetId });
++    assert.equal(validateSessionCriticReceipt(receipt), receipt, "the receipt with the optional split digest verifies");
++    const { splitSha256: _split, ...legacy } = receipt;
++    assert.equal(validateSessionCriticReceipt(legacy), legacy, "a receipt without it verifies exactly as before");
++    assert.throws(() => validateSessionCriticReceipt({ ...receipt, splitSha256: "not-a-digest" }), codeIs("SCF-RECEIPT"));
++  } finally { cleanup(fx); }
++});
++
++test("G20-72 a child verdict that names no split entry issues nothing; a packet without a split keeps the single source-return.json", async () => {
++  const fx = g2072Fixture();
++  try {
++    const admitted = g2072Admit(fx);
++    const run = g2072Hook(fx, criticReturn(verdict()));
++    assert.match(run.stderr, /not issued[\s\S]*scope:/u, "the hook names the scope marker the child must start trajectory_evidence with");
++    assert.equal(g2072Records(admitted).length, 0);
++    assert.equal(existsSync(join(admitted.packetDir, SOURCE_RETURN_FILE)), false);
++  } finally { cleanup(fx); }
++  const plain = fixture();
++  try {
++    const plainAdmitted = admitViaCli(plain);
++    g2072Hook(plain, criticReturn(verdict()));
++    assert.equal(existsSync(join(plainAdmitted.controlRoot, plainAdmitted.packetId, SOURCE_RETURN_FILE)), true, "byte for byte the single record of today");
++    assert.deepEqual(readdirSync(join(plainAdmitted.controlRoot, plainAdmitted.packetId)).filter((name) => name.startsWith("source-return")), [SOURCE_RETURN_FILE]);
++    assert.equal(Object.hasOwn(inspectClaimedSessionAdmission({ controlRoot: plainAdmitted.controlRoot, packetId: plainAdmitted.packetId }).admission, "splitSha256"), false);
++  } finally { cleanup(plain); }
++});
++
++// The origin gate refuses every shape of a split round that is not exactly the merge of one returned verdict per entry. Verdict shopping (BINDING CORRECTION 1): a second
++// record for an entry refuses, so a caller can never run a child twice and keep the better verdict. Stray or unattributable records (BINDING CORRECTION 2) refuse too.
++test("G20-72 finalize refuses a split round with a missing child, two records for one entry, a stray or unattributable record, and a merged verdict that differs by one finding", async () => {
++  const kids = ["api", "core", "shared"].map((id) => [id, g2072Child(id)]);
++  const finalize = async (mutate) => {
++    const fx = g2072Fixture();
++    try {
++      const admitted = g2072Admit(fx);
++      const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
++      const issue = (value) => assert.equal(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(value)) }).status, "issued");
++      const final = await mutate({ fx, admitted, issue });
++      writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(final)}\n`);
++      return runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
++    } finally { cleanup(fx); }
++  };
++  const merge = async (admitted, children) => { const merged = await g2072Merge(admitted, children); assert.equal(merged.ok, true, JSON.stringify(merged)); return merged.verdict; };
++  const missing = await finalize(async ({ admitted, issue }) => { issue(kids[0][1]); issue(kids[1][1]); return merge(admitted, kids); });
++  assert.equal(missing.exitCode, 2); assert.equal(missing.output.code, "SCF-SPLIT-CHILD-MISSING");
++  const shopped = await finalize(async ({ admitted, issue }) => {
++    const better = g2072Child("core", { deliberately_not_flagged: ["reviewed core", "a better second run"] });
++    issue(kids[0][1]); issue(kids[1][1]); issue(better); issue(kids[2][1]);
++    return merge(admitted, [kids[0], ["core", better], kids[2]]);
++  });
++  assert.equal(shopped.exitCode, 2); assert.equal(shopped.output.code, "SCF-SPLIT-DUPLICATE-ENTRY");
++  assert.match(shopped.output.detail, /repair:[\s\S]*release/u, "the repair names the existing next-round route");
++  const stray = await finalize(async ({ admitted, issue }) => {
++    for (const [, value] of kids) issue(value);
++    const [name] = g2072Records(admitted); const original = JSON.parse(readFileSync(join(admitted.packetDir, name), "utf8"));
++    const ghost = g2072Child("ghost"); const record = { ...original, entryId: "ghost", verdict: ghost, verdictSha256: verdictDigest(ghost) };
++    writeFileSync(join(admitted.packetDir, `source-return-${record.verdictSha256}.json`), JSON.stringify(record), { mode: 0o600 });
++    return merge(admitted, kids);
++  });
++  assert.equal(stray.exitCode, 2); assert.equal(stray.output.code, "SCF-SPLIT-RECORD-STRAY");
++  const unattributable = await finalize(async ({ admitted, issue }) => {
++    for (const [, value] of kids) issue(value);
++    const [name] = g2072Records(admitted); const { entryId: _entry, ...original } = JSON.parse(readFileSync(join(admitted.packetDir, name), "utf8"));
++    writeFileSync(join(admitted.packetDir, name), JSON.stringify(original));
++    return merge(admitted, kids);
++  });
++  assert.equal(unattributable.exitCode, 2); assert.equal(unattributable.output.code, "SCF-SPLIT-RECORD-STRAY");
++  const differs = await finalize(async ({ admitted, issue }) => {
++    for (const [, value] of kids) issue(value);
++    const merged = await merge(admitted, kids);
++    return { ...merged, findings: [g2072Finding({ severity: "minor", evidence: "added by the caller" })] };
++  });
++  assert.equal(differs.exitCode, 2); assert.equal(differs.output.code, "SCF-SPLIT-MERGE-MISMATCH");
++  const none = await finalize(async ({ admitted }) => merge(admitted, kids));
++  assert.equal(none.exitCode, 0, "no record at all keeps today's honest label");
++  assert.equal(none.output.independence, "caller-authored-fallback");
++});

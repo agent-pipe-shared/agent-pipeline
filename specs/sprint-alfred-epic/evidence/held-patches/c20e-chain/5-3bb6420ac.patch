@@ -1,0 +1,447 @@
+diff --git a/plugins/pipeline-core/lib/session-critic-finalizer-read.mjs b/plugins/pipeline-core/lib/session-critic-finalizer-read.mjs
+index 1f621d359b72ec2521467510323142d4863fff89..330f881c7cd997877284e08dec7a5106a54461c3 100644
+--- a/plugins/pipeline-core/lib/session-critic-finalizer-read.mjs
++++ b/plugins/pipeline-core/lib/session-critic-finalizer-read.mjs
+@@ -26,6 +26,25 @@ export function record(value) { return value !== null && typeof value === "objec
+ export function exact(value, keys) {
+   return record(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+ }
++// G20-69: the Critic preflight prints the complete admit request; a value only the caller can supply is an explicit typed placeholder
++// `<FILL path: hint>`. Both the printer and the admit/finalize validation read this one definition, so a placeholder left in the file is refused
++// BY NAME instead of failing the generic closed-key-set check.
++export const ADMIT_REQUEST_PLACEHOLDER = /^<FILL [^>]+>$/u;
++export function admitRequestPlaceholderPaths(value, prefix = "", depth = 0) {
++  if (typeof value === "string") return ADMIT_REQUEST_PLACEHOLDER.test(value) ? [prefix] : [];
++  if (depth > 6 || value === null || typeof value !== "object") return [];
++  return Object.entries(value).flatMap(([key, item]) => admitRequestPlaceholderPaths(item, prefix === "" ? key : `${prefix}.${key}`, depth + 1));
++}
++/** The open placeholder paths as one short line (the CLI cuts a detail at 200 characters): siblings under one parent are written `parent.*`. */
++export function describeOpenPlaceholders(paths) {
++  const groups = new Map();
++  for (const path of paths) {
++    const parent = path.includes(".") ? path.slice(0, path.lastIndexOf(".")) : null;
++    const key = parent ?? path;
++    groups.set(key, [...(groups.get(key) ?? []), path]);
++  }
++  return [...groups].map(([key, members]) => (members.length > 1 ? `${key}.*` : members[0])).join(", ");
++}
+ // D2a: the session flags of a result/receipt must agree with its independence label; no label is the legacy true/false pair.
+ export function independenceFlagsConsistent(independence, session) {
+   if (independence === "caller-authored-fallback") return session.freshContext === false && session.historyInherited === true;
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 66fdd5f4c9e52dd875a00d282fcc9404ec517fe3..3e5b1fd7be77b77a5225bf0d61cb057615e7ab1a 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -13,7 +13,7 @@ import { CriticCorrectionInputBindingsError, PROJECT_STATE_CONVENTION_DIRECTORIE
+  * Critic is asked to spend a turn on it.  It does not probe or select a
+  * runner, so a packet-ready result is deliberately not a spawn authorization.
+  */
+-import { createHash } from "node:crypto";
++import { createHash, randomBytes } from "node:crypto";
+ import { CRITIC_DIAGNOSTIC_SCHEMA, inspectCriticVerifyDiagnostic, validateCriticDiagnostic } from "../lib/critic-diagnostic-evidence.mjs";
+ import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+ import { isAbsolute, relative, resolve, sep } from "node:path";
+@@ -23,7 +23,10 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { describeArchitectureCurrencyRefusal, inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
+ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+ import { evaluateReviewAdmission } from "../lib/review-admission-read.mjs";
+-import { criticCoverageAdvisory, listUncoveredCriticRecords } from "../lib/review-admission-read.mjs";
++import { criticCoverageAdvisory, listUncoveredCriticRecords, terminalAuthoredDelivery, walkDispatchRecordsForReview } from "../lib/review-admission-read.mjs";
++import { criticDisposition } from "../lib/critic-skip-decision.mjs";
++import { SAFE_ID, admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
++import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+ import {
+   CriticGuardrailDerivationError,
+   deriveRequiredCriticGuardrails,
+@@ -576,6 +579,140 @@ export function preflightCriticDispatchWithCoverage(input, observer = null) {
+   return advisory === null ? result : { ...result, criticCoverageAdvisory: advisory };
+ }
+ 
++// ---------------------------------------------------------------------------------------------------------------------------------------
++// G20-69 / G20-71 (candidate 20e, AC-108). Measured in a greenfield run: after `packet-ready` the coordinator spent about 15 tool calls reading the
++// session finalizer's source to hand-build the request file `admit` takes (a closed key set, a lower-case project id, a 32-hex packet id, then the
++// task id of the last slice's dispatch record), and a default-route (Opus) Critic dispatch was refused for lacking the MP-07 prompt lines.
++// The PRINTED result now carries both. They live in this wrapper and not in `preflightCriticDispatch` for the same reason the coverage advisory does:
++// the finalizer binds the library result by digest at admit and again at finalize, and a fresh packet id inside it would change that digest on every
++// call. Everything stays read-only (no packet, no file, no state); the coordinator writes the request file itself.
++// ---------------------------------------------------------------------------------------------------------------------------------------
++const ADMIT_REQUEST_FILE = "scratch/session-critic-finalization-request.json";
++const ADMIT_SCRIPT = "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs";
++const ADMIT_REQUEST_V2 = "pipeline.session-critic-finalization-request.v2";
++const ADMIT_REQUEST_V3 = "pipeline.session-critic-finalization-request.v3";
++const TASK_ID_CANDIDATE_LIMIT = 25;
++const fillPlaceholder = (path, hint) => `<FILL ${path}: ${hint}>`;
++
++/** The calibration project name in the form admit accepts (SAFE_ID, lower case), or null. Read-only. */
++function calibrationProjectId(root) {
++  for (const relativePath of ["project/pipeline.json", ".claude/pipeline.json"]) {
++    try {
++      const project = JSON.parse(readFileSync(resolve(root, relativePath), "utf8"))?.project;
++      if (typeof project === "string" && SAFE_ID.test(project.toLowerCase())) return project.toLowerCase();
++    } catch { /* no readable calibration at this path */ }
++  }
++  return null;
++}
++
++/**
++ * The task ids the review admission would accept for this candidate: `matching` pass the same admission `--task-id` asks for (skipped when the
++ * caller gave one). `appliedRows` maps each Critic-required record's task id to its applied Critic row, which is the trigger admit should carry.
++ */
++function reviewAdmissionTaskIds({ root, baseCommit, candidateCommit, given = null }) {
++  let scan;
++  try { scan = walkDispatchRecordsForReview(root, []); } catch { return { matching: [], considered: [], appliedRows: new Map() }; }
++  const exactIds = [], laterIds = [], appliedRows = new Map();
++  for (const { record } of scan.records) {
++    if (typeof record?.taskId !== "string" || !isSafeTaskId(record.taskId)) continue;
++    let required = false;
++    try { required = criticDisposition(record) === "required"; } catch { required = false; }
++    if (!required) continue;
++    appliedRows.set(record.taskId, record.criticRequired?.appliedRow);
++    if (record.candidateCommit === candidateCommit) exactIds.push(record.taskId);
++    else if (terminalAuthoredDelivery(record)) laterIds.push(record.taskId);
++  }
++  const considered = [...new Set([...exactIds, ...laterIds.slice(-TASK_ID_CANDIDATE_LIMIT)])].sort(compare);
++  const matching = given !== null ? [] : considered.filter((taskId) => {
++    try { return evaluateReviewAdmission({ root, taskId, baseCommit, candidateCommit }).ok === true; } catch { return false; }
++  });
++  return { matching, considered, appliedRows };
++}
++
++/** MP-07 prompt lines for a Critic route that resolves to an Opus model; null for any other route. T1 and T2 select the high-risk Critic duty (as admit does). */
++function opusCriticPromptLines({ root, result, env, registry, trigger }) {
++  const runner = env.CODEX_SESSION_ID !== undefined || env.CODEX_THREAD_ID !== undefined ? "codex" : "claude";
++  const duty = trigger === "T1" || trigger === "T2" ? "critic_high_risk" : "critic_normal";
++  let cell;
++  try { cell = (registry ?? loadRunnerProfilesV3Registry()).duties?.[duty]?.[runner]; } catch { return null; }
++  if (!isObject(cell) || cell.state === "unavailable" || !isObject(cell.selector) || typeof cell.selector.value !== "string" || !/opus/iu.test(cell.selector.value)) return null;
++  const base = result.base.commit ?? result.base.tree, head = result.candidate.commit;
++  const names = gitOrNull(root, ["diff", "--name-only", base, head]);
++  const files = names === null ? [] : names.split("\n").filter((line) => line !== "");
++  const modules = new Set(files.map((file) => file.split("/")[0]));
++  const counts = names === null ? "" : ` (${files.length} changed file${files.length === 1 ? "" : "s"} in ${modules.size} top-level path${modules.size === 1 ? "" : "s"})`;
++  return [
++    `Batch scope (MP-07): the reviewed range ${base.slice(0, 12)}..${head.slice(0, 12)}${counts}, one batch.`,
++    `Rationale (MP-07): the registered Critic route duty.${duty} is ${cell.selector.value} at effort ${cell.effort}; it is used for critical architecture or security review of this one batch only.`,
++  ];
++}
++
++/**
++ * The printed packet-ready result: the coverage result plus `admitRequest` (the complete closed request for `session-critic-finalizer.mjs admit`),
++ * `admitCommand` (argv), `nextStep`, `taskIdResolution` when the task id could not be resolved, and `criticDispatchPromptLines` for an Opus route.
++ * Only values the caller alone owns stay `<FILL path: hint>` placeholders, which admit refuses by name. A current-artifact review scope (admit
++ * takes an exact range only) and every refusal are returned as they are. `deps` ({ env, registry, randomBytesFn }) is for tests.
++ */
++export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
++  const result = preflightCriticDispatchWithCoverage(input);
++  if (result?.status !== "packet-ready" || result.reviewScope !== undefined || typeof result.candidate?.commit !== "string") return result;
++  const root = realpathSync(input.root);
++  const course = result.coordinatorOnly.courseAdmission;
++  // admit re-runs the preflight over the range the CALLER gave; an effective full round reports the course genesis as its base instead.
++  const requestBase = course?.fallbackFull === true ? course.courseBase : (result.base.commit ?? result.base.tree);
++  const reviewer = result.dispatch.reviewerInput;
++  let taskId = result.reviewAdmission?.taskId ?? null;
++  let taskIdResolution = null;
++  const found = reviewAdmissionTaskIds({ root, baseCommit: course?.fallbackFull === true ? course.courseBase : result.base.commit, candidateCommit: result.candidate.commit, given: taskId });
++  if (taskId === null) {
++    if (found.matching.length === 1) taskId = found.matching[0];
++    else {
++      const candidateTaskIds = found.matching.length > 1 ? found.matching : found.considered;
++      taskIdResolution = { status: "unresolved", candidateTaskIds,
++        reason: `${found.matching.length > 1 ? "several dispatch records match" : "no single dispatch record matches"} this review candidate; rerun this preflight with --task-id <id> (the review admission is then checked here, before admit) or fill taskId; candidate task ids: ${candidateTaskIds.length === 0 ? "none found" : candidateTaskIds.join(", ")}` };
++    }
++  }
++  // The trigger is the matched record's applied Critic row where admit has that trigger (T1 to T3); otherwise the strictest row, which admit itself
++  // defaults to and which selects the high-risk Critic duty, so it can never lower a check.
++  const appliedRow = taskId === null ? undefined : found.appliedRows.get(taskId);
++  const trigger = ["T1", "T2", "T3"].includes(appliedRow) ? appliedRow : "T1";
++  const request = {
++    schema: course ? ADMIT_REQUEST_V2 : ADMIT_REQUEST_V3,
++    taskId: taskId ?? fillPlaceholder("taskId", "the dispatch record task id, see taskIdResolution"),
++    projectId: calibrationProjectId(root) ?? fillPlaceholder("projectId", "a lower-case project id, for example the calibration project name"),
++    sessionId: fillPlaceholder("sessionId", "id of the fresh Critic session, lower case [a-z0-9._-]"),
++    packetId: (deps.randomBytesFn ?? randomBytes)(16).toString("hex"),
++    trigger,
++    route: Object.fromEntries([["routeId", "route id of the Critic route, for example session-critic"], ["runner", "claude, codex or antigravity"], ["adapter", "route adapter of the runner"],
++      ["provider", "model provider"], ["modelTier", "model tier of the Critic route"], ["effortTier", "effort tier of the Critic route"]].map(([key, hint]) => [key, fillPlaceholder(`route.${key}`, hint)])),
++    review: {
++      base: requestBase,
++      candidate: result.candidate.commit,
++      specPath: reviewer.specPath,
++      guardrailPaths: reviewer.guardrailPaths,
++      evidencePaths: reviewer.evidencePaths,
++      priorCriticEvidencePath: result.coordinatorOnly.priorCriticEvidence?.path ?? null,
++      ...(course
++        ? { courseContext: input.courseContext ?? null }
++        : { genericBatchRef: Object.fromEntries([["batchId", "batchRef.batchId printed by register-batch"], ["registrationSha256", "batchRef.registrationSha256 printed by register-batch"], ["memberSha256", "memberSha256 printed by register-batch"]]
++          .map(([key, hint]) => [key, fillPlaceholder(`review.genericBatchRef.${key}`, hint)])) }),
++      ...(typeof result.correctionInputBindings?.path === "string" ? { correctionInputBindings: result.correctionInputBindings.path } : {}),
++    },
++    verdictPath: fillPlaceholder("verdictPath", "repository-relative path of the JSON verdict the fresh Critic returns"),
++    event: fillPlaceholder("event", "null, or an object with eventOutPath and featureId"),
++  };
++  const promptLines = opusCriticPromptLines({ root, result, env: deps.env ?? process.env, registry: deps.registry, trigger });
++  const nextStep = [
++    `Write admitRequest verbatim as ${ADMIT_REQUEST_FILE} (JSON), replace only its placeholders (${admitRequestPlaceholderPaths(request).join(", ")}), then run admitCommand; admit refuses an unfilled placeholder by name.`,
++    `trigger ${trigger} is ${trigger === appliedRow ? "the applied Critic row of the matched dispatch record" : "the strictest default (no matched record row of T1 to T3)"}; change it only if your Critic-required decision says otherwise.`,
++    ...(taskIdResolution === null ? [] : [`taskId: ${taskIdResolution.reason}.`]),
++    ...(course ? [] : ["This review is no feature package, so it needs a registered generic batch: run session-critic-finalizer.mjs register-batch first and copy its batchRef and memberSha256 into review.genericBatchRef."]),
++    ...(promptLines === null ? [] : ["The Critic route is Opus: put criticDispatchPromptLines into the Critic dispatch prompt (MP-07), or the dispatch policy refuses it."]),
++  ].join(" ");
++  return { ...result, admitRequest: request, admitCommand: ["node", ADMIT_SCRIPT, "admit", "--root", input.root, "--request", ADMIT_REQUEST_FILE], nextStep,
++    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }) };
++}
++
+ /**
+  * Advisory, non-failing enumeration of evidence-shaped artifacts for a given
+  * task id, across every location ADR-0063 names as an evidence home. This is
+@@ -702,7 +839,7 @@ if (isDirectInvocation(import.meta.url)) {
+       const result = enumerateEvidenceArtifacts({ root: args.root, taskId: args.sweepEvidenceTaskId });
+       process.stdout.write(`${JSON.stringify(result)}\n`);
+     } else {
+-      const result = preflightCriticDispatchWithCoverage(args);
++      const result = preflightCriticDispatchWithAdmitRequest(args);
+       process.stdout.write(`${JSON.stringify(result)}\n`);
+       if (result.status !== "packet-ready") process.exitCode = 1;
+     }
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 53aaca6dfce1b030b50ddc5dd6471ba4149e8b79..7db9ce0d6220bd58654f3c6e82d9dc16bd7bfab1 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -23,6 +23,9 @@ import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
+ import { runCriticDiagnosticCli, CRITIC_DIAGNOSTIC_EVIDENCE_HELP } from "./critic-diagnostic-evidence.mjs";
+ import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
+ import { admitSessionCriticReview } from "./session-critic-finalizer.mjs";
++import * as readModule from "../lib/session-critic-finalizer-read.mjs";
++import { dispatchFindings } from "../lib/dispatch-policy.mjs";
++import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+ import { sha256Canonical } from "../lib/review-economy.mjs";
+ import { CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA, CriticCorrectionInputBindingsError, FINDING_RECORDS_FIELD, bindingsRoleCounts, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
+ 
+@@ -686,7 +689,17 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
+   const fx = captureFixture(t), value = input(fx);
+   const before = git(fx.root, ["status", "--porcelain", "--untracked-files=all"]);
+   const expected = preflightCriticDispatch(value);
+-  assert.deepEqual(directCli(fx, producerArgv(value)), { status: 0, stdout: JSON.stringify(expected) + "\n", stderr: "" });
++  // G20-69 restatement, criterion kept (the printed packet-ready protocol is the library result, exit 0, empty stderr): the printed line now ALSO carries the
++  // additive admit fields (admitRequest, admitCommand, nextStep and, for an Opus route, criticDispatchPromptLines). The assertion compares the printed line
++  // WITHOUT those fields byte for byte against the library result and requires the admit fields separately.
++  const printedRun = directCli(fx, producerArgv(value));
++  assert.equal(printedRun.status, 0);
++  assert.equal(printedRun.stderr, "");
++  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, ...printedRest } = JSON.parse(printedRun.stdout);
++  assert.equal(JSON.stringify(printedRest) + "\n", JSON.stringify(expected) + "\n");
++  assert.equal(printedAdmitRequest.schema, "pipeline.session-critic-finalization-request.v3");
++  assert.equal(printedAdmitCommand.at(-1), "scratch/session-critic-finalization-request.json");
++  assert.ok(printedNextStep.includes("admitRequest"));
+   // Candidate 17: this rejection now carries its reason (the producers and the flag), like the evidence-mode rejection does.
+   const evidenceRequired = directCli(fx, producerArgv(input(fx, { evidencePaths: [] })));
+   assert.equal(evidenceRequired.status, 1);
+@@ -2004,4 +2017,114 @@ test("D216A the hardened read of po-gate-authority-read refuses a file that chan
+   }
+ });
+ 
++// G20-69 / G20-71 (candidate 20e, AC-108): the PRINTED packet-ready result carries the complete closed request for `session-critic-finalizer.mjs admit`, so the
++// coordinator never reads the finalizer source to learn its keys; for an Opus Critic route it also carries the MP-07 prompt lines. The library result the
++// finalizer binds by digest stays byte-identical (a fresh packet id inside it would change that digest on every call).
++const G2069_REQUEST_FILE = "scratch/session-critic-finalization-request.json";
++const G2069_KEYS = ["schema", "taskId", "projectId", "sessionId", "packetId", "trigger", "route", "review", "verdictPath", "event"];
++function g2069Printed(fx, overrides = {}, deps = { env: {} }) {
++  return preflightModule.preflightCriticDispatchWithAdmitRequest(input(fx, overrides), deps);
++}
++test("G20-69 the printed packet-ready result carries the complete admit request, its command and the next-step text; the library result is unchanged", () => {
++  const fx = fixture();
++  try {
++    mkdirSync(join(fx.root, "project"), { recursive: true });
++    writeFileSync(join(fx.root, "project", "pipeline.json"), `${JSON.stringify({ project: "Agent-Pipeline" })}\n`);
++    n33bRequiredRecord(fx.root, "G2069-ONE", fx.candidate);
++    const covered = preflightModule.preflightCriticDispatchWithCoverage(input(fx));
++    assert.equal(Object.hasOwn(covered, "admitRequest"), false, "the coverage entry point stays as it was");
++    assert.equal(Object.hasOwn(preflightCriticDispatch(input(fx)), "admitRequest"), false, "the library result is digest-bound by the session finalizer");
++    const printed = g2069Printed(fx);
++    const { admitRequest, admitCommand, nextStep, criticDispatchPromptLines: _lines, ...rest } = printed;
++    assert.deepEqual(rest, covered, "the admit fields are the only difference");
++    assert.deepEqual(Object.keys(admitRequest), G2069_KEYS);
++    assert.equal(admitRequest.schema, "pipeline.session-critic-finalization-request.v3", "a review that is no feature package is a generic batch request");
++    assert.equal(admitRequest.taskId, "G2069-ONE", "the one dispatch record the review admission matches");
++    assert.equal(admitRequest.projectId, "agent-pipeline", "the calibration project, in the form admit accepts (lower case)");
++    assert.equal(admitRequest.trigger, "T1");
++    assert.match(admitRequest.packetId, /^[a-f0-9]{32}$/u);
++    assert.notEqual(g2069Printed(fx).admitRequest.packetId, admitRequest.packetId, "a fresh packet id per call");
++    assert.deepEqual(Object.keys(admitRequest.review), ["base", "candidate", "specPath", "guardrailPaths", "evidencePaths", "priorCriticEvidencePath", "genericBatchRef"]);
++    const reviewerInput = printed.dispatch.reviewerInput;
++    assert.deepEqual({ ...admitRequest.review, genericBatchRef: undefined }, { base: reviewerInput.baseCommit, candidate: reviewerInput.candidateCommit, specPath: reviewerInput.specPath,
++      guardrailPaths: reviewerInput.guardrailPaths, evidencePaths: reviewerInput.evidencePaths, priorCriticEvidencePath: "evidence/prior-critic.json", genericBatchRef: undefined });
++    assert.deepEqual(readModule.admitRequestPlaceholderPaths(admitRequest).sort(), ["event", "review.genericBatchRef.batchId", "review.genericBatchRef.memberSha256", "review.genericBatchRef.registrationSha256",
++      "route.adapter", "route.effortTier", "route.modelTier", "route.provider", "route.routeId", "route.runner", "sessionId", "verdictPath"]);
++    assert.deepEqual(admitCommand, ["node", "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs", "admit", "--root", fx.root, "--request", G2069_REQUEST_FILE]);
++    for (const needle of ["admitRequest", "admitCommand", G2069_REQUEST_FILE, "verbatim", "register-batch"]) assert.ok(nextStep.includes(needle), `the next-step text names ${needle}: ${nextStep}`);
++    assert.equal(Object.hasOwn(printed, "taskIdResolution"), false);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("G20-69 --task-id is taken as given; zero or several matching admission targets name --task-id and the candidate ids instead of leaving it to admit", () => {
++  const fx = fixture();
++  try {
++    const none = g2069Printed(fx);
++    assert.equal(none.status, "packet-ready", "never refuses");
++    assert.equal(none.taskIdResolution.status, "unresolved");
++    assert.deepEqual(none.taskIdResolution.candidateTaskIds, []);
++    assert.match(none.taskIdResolution.reason, /--task-id/u);
++    assert.ok(readModule.admitRequestPlaceholderPaths(none.admitRequest).includes("taskId"), "an unresolved task id stays an explicit placeholder");
++    assert.match(none.nextStep, /--task-id/u);
++    n33bRequiredRecord(fx.root, "G2069-A", fx.candidate);
++    n33bRequiredRecord(fx.root, "G2069-B", fx.candidate);
++    const several = g2069Printed(fx);
++    assert.equal(several.taskIdResolution.status, "unresolved");
++    assert.deepEqual(several.taskIdResolution.candidateTaskIds, ["G2069-A", "G2069-B"]);
++    assert.match(several.taskIdResolution.reason, /--task-id/u);
++    assert.ok(several.nextStep.includes("--task-id") && several.nextStep.includes("G2069-A") && several.nextStep.includes("G2069-B"), several.nextStep);
++    const given = g2069Printed(fx, { taskId: "G2069-B" });
++    assert.equal(given.admitRequest.taskId, "G2069-B", "a given --task-id was admission-checked and is used as given");
++    assert.equal(given.reviewAdmission.taskId, "G2069-B");
++    assert.equal(Object.hasOwn(given, "taskIdResolution"), false);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("G20-71 an Opus Critic route carries the MP-07 prompt lines the dispatch policy admits unchanged; a non-Opus route carries none", () => {
++  const fx = fixture();
++  try {
++    const claude = { env: { CLAUDE_CODE_SESSION_ID: "session-g2071" } };
++    const printed = g2069Printed(fx, {}, claude);
++    const lines = printed.criticDispatchPromptLines;
++    assert.equal(lines.length, 2);
++    assert.match(lines[0], /^Batch scope \(MP-07\):\s*\S/u);
++    assert.ok(lines[0].includes(`${fx.base.slice(0, 12)}..${fx.candidate.slice(0, 12)}`) && /1 changed file/u.test(lines[0]), lines[0]);
++    assert.match(lines[1], /rationale/iu);
++    const prompt = (extra) => ["Model/effort for this run: claude-opus-4-1 / max", `Ruleset SHA: ${fx.candidate}`, ...extra].join("\n");
++    const codes = (extra) => dispatchFindings({ subagentType: "critic", prompt: prompt(extra) }).findings.map(({ code }) => code);
++    assert.ok(codes([]).includes("DISPATCH-OPUS-NO-BATCH-RATIONALE"), "control: an Opus prompt without the lines is refused");
++    const withLines = codes(lines);
++    assert.equal(withLines.includes("DISPATCH-OPUS-NO-BATCH-RATIONALE"), false, `the generated lines pass the dispatch policy unchanged: ${withLines}`);
++    assert.deepEqual(withLines.filter((code) => code.startsWith("DISPATCH-CONTAMINATION") || code.startsWith("DISPATCH-RECRITIC")), []);
++    const registry = structuredClone(loadRunnerProfilesV3Registry());
++    registry.duties.critic_high_risk.claude.selector = { kind: "alias", value: "sonnet" };
++    assert.equal(Object.hasOwn(g2069Printed(fx, {}, { ...claude, registry }), "criticDispatchPromptLines"), false, "a non-Opus route carries no such lines");
++    assert.equal(Object.hasOwn(g2069Printed(fx, {}, { env: { CODEX_SESSION_ID: "session-g2071" } }), "criticDispatchPromptLines"), false, "the registered Codex Critic route is not Opus");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("G20-69 the request trigger is the applied Critic row of the matched dispatch record where admit has that trigger, else the strictest default", () => {
++  const fx = fixture();
++  try {
++    const rows = { "G2069-R2": ["T2", { rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }],
++      "G2069-R3": ["T3", { rigorLevel: 2, riskClass: "medium", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }],
++      "G2069-R4": ["T4", { rigorLevel: 1, riskClass: "medium", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }] };
++    for (const [taskId, [appliedRow, trigger]] of Object.entries(rows)) {
++      n33bRequiredRecord(fx.root, taskId, fx.candidate);
++      const recordPath = join(fx.root, `evidence/dispatch-record-${taskId}.json`);
++      const record = JSON.parse(readFileSync(recordPath, "utf8"));
++      record.criticRequired = { ...record.criticRequired, trigger: { ...record.criticRequired.trigger, ...trigger }, appliedRow };
++      writeFileSync(recordPath, `${JSON.stringify(record)}\n`);
++    }
++    assert.equal(g2069Printed(fx, { taskId: "G2069-R2" }).admitRequest.trigger, "T2");
++    assert.equal(g2069Printed(fx, { taskId: "G2069-R3" }).admitRequest.trigger, "T3");
++    assert.equal(g2069Printed(fx, { taskId: "G2069-R4" }).admitRequest.trigger, "T1", "admit has no T4: the strictest default");
++    assert.match(g2069Printed(fx, { taskId: "G2069-R2" }).nextStep, /trigger T2 is the applied Critic row/u);
++    assert.match(g2069Printed(fx, { taskId: "G2069-R4" }).nextStep, /trigger T1 is the strictest default/u);
++    // The duty follows the trigger as admit's does: the normal Critic duty for T3, the high-risk one for T1 and T2 (both are Opus on the registered Claude route).
++    assert.match(g2069Printed(fx, { taskId: "G2069-R3" }).criticDispatchPromptLines[1], /duty\.critic_normal/u);
++    assert.match(g2069Printed(fx, { taskId: "G2069-R2" }).criticDispatchPromptLines[1], /duty\.critic_high_risk/u);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index f9b61ee4432fa072aa148c4ee3a2808afac08247..6c192582f0b82d0e575e328feaf8ddfee68e1b7d 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -21,7 +21,7 @@ import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admi
+ import { addCriticReviewLineage } from "../lib/feature-package-registration.mjs";
+ import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
+ import { registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission, SESSION_PACKET_BINDING_SCHEMA, canonicalJson, claimCandidatePacket, cleanupCandidatePacket, consumeCandidatePacket, inspectClaimedSessionAdmission, inspectClaimedCandidatePacket, inspectCandidatePacket, packetDigestMatches, prepareCandidatePacket, publishClaimedSessionAdmission, readConsumedCandidateReceipt, recordCandidateResult, sha256 } from "./critic-packet-preflight.mjs";
+-import { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, PACKET_ID, SHA256, OID, SAFE_ID, SessionCriticFinalizerError, fail, record, exact, validateSessionCriticReceipt, independenceFlagsConsistent } from "../lib/session-critic-finalizer-read.mjs";
++import { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, PACKET_ID, SHA256, OID, SAFE_ID, SessionCriticFinalizerError, fail, record, exact, validateSessionCriticReceipt, independenceFlagsConsistent, admitRequestPlaceholderPaths, describeOpenPlaceholders } from "../lib/session-critic-finalizer-read.mjs";
+ export { SESSION_CRITIC_RECEIPT_SCHEMA, SESSION_CRITIC_ASSURANCE, SessionCriticFinalizerError, validateSessionCriticReceipt } from "../lib/session-critic-finalizer-read.mjs";
+ /** Durable, runner-neutral acceptance boundary for the ordinary fresh-session Critic. */
+ 
+@@ -268,7 +268,10 @@ function featureReservationFor(options,preflight,root,controlRoot,packetId,prefl
+     sourceSha256:course.sourceSha256,decisionSha256:course.decisionSha256});
+ }
+ function validateCliRequest(value) {
+-  const version3 = value?.schema === SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA;
++  // G20-69: a `<FILL ...>` placeholder the preflight printed and the caller left in the file is named, not reported as a shape mismatch.
++  const openPlaceholders = admitRequestPlaceholderPaths(value);
++  if (openPlaceholders.length > 0) fail("SCF-REQUEST-PLACEHOLDER", `unfilled placeholders: ${describeOpenPlaceholders(openPlaceholders)}; put each real value into the request file`);
++  const version3 =value?.schema === SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA;
+   const version2 = value?.schema === SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA;
+   const hasSignedImportAnchor = record(value) && Object.hasOwn(value, "signedQualityImportAnchor");
+   if (!exact(value, hasSignedImportAnchor ? [...REQUEST_KEYS, "signedQualityImportAnchor"] : REQUEST_KEYS) || ![SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA, SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA, SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA].includes(value.schema)
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index d36eee50622b56bfc1ee79fe324e631e02b3476a..9ab5dc6e8fe04009b949f7465bfd104d9b533fdc 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -23,7 +23,8 @@ import { readReservedGenericCriticBatchAdmission, registerGenericCriticBatch } f
+ import * as CGB from "../lib/critic-generic-batch.mjs";
+ import * as CCA from "../lib/critic-course-admission.mjs";
+ import { readBoundConsumedCriticReceipt, readConsumedCriticCourseResult } from "../lib/critic-verify-lifecycle.mjs";
+-import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
++import { preflightCriticDispatch, preflightCriticDispatchWithAdmitRequest } from "./critic-dispatch-preflight.mjs";
++import { admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
+ 
+ import {
+   SESSION_CRITIC_ASSURANCE,
+@@ -2542,3 +2543,54 @@ test("W7 round takeover CLI: a consumed round whose lineage cannot be registered
+     assert.equal(takeoverVerb(fx, "supersede-course-takeover", { schema: TAKEOVER_SUPERSEDE_SCHEMA, featureId: fx.featureId, digestSha256: inspected.out.digestSha256, reason: "round could not be registered; rerun it" }).out.replay, true);
+   } finally { cleanup(fx); }
+ });
++
++// G20-69 (candidate 20e, AC-108): the request the preflight prints is the request admit accepts once only its placeholders are filled; an unfilled
++// placeholder is refused by NAME (it used to fail the generic closed-key-set check), so nothing is guessed from the finalizer source.
++test("G20-69 an unfilled placeholder is refused by name, and the printed generic-batch admit request admits once only its placeholders are filled", () => {
++  const fx = fixture();
++  try {
++    const printed = preflightCriticDispatchWithAdmitRequest(options(fx).preflightInput, { env: {} });
++    assert.equal(printed.status, "packet-ready");
++    const request = structuredClone(printed.admitRequest);
++    assert.equal(request.schema, SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA);
++    assert.equal(request.taskId, fx.taskId, "the one dispatch record the review admission matches (a descendant candidate of the delivered record)");
++    const unfilled = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, "g2069-unfilled.json", request)]);
++    assert.equal(unfilled.exitCode, 2);
++    assert.equal(unfilled.output.code, "SCF-REQUEST-PLACEHOLDER");
++    for (const name of ["projectId", "sessionId", "route.*", "verdictPath", "event", "review.genericBatchRef.*"]) assert.ok(unfilled.output.detail.includes(name), `${name}: ${unfilled.output.detail}`);
++    assert.equal(unfilled.output.detail.includes("taskId"), false, "only the open placeholders are named");
++    request.projectId = "pipeline";
++    request.sessionId = "session-g2069-1";
++    request.route = options(fx).route;
++    request.verdictPath = "evidence/critic-verdict.json";
++    request.event = null;
++    request.review.genericBatchRef = batchFor(fx);
++    assert.deepEqual(admitRequestPlaceholderPaths(request), []);
++    const admitted = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, "g2069-filled.json", request)]);
++    assert.equal(admitted.exitCode, 0, JSON.stringify(admitted.output));
++    assert.equal(admitted.output.status, "admitted");
++    assert.equal(admitted.output.packetId, printed.admitRequest.packetId);
++  } finally { cleanup(fx); }
++});
++
++test("G20-69 the printed feature-package admit request is a v2 request carrying the course context, and admits once only its placeholders are filled", () => {
++  const fx = featureCourseFixture();
++  try {
++    const printed = preflightCriticDispatchWithAdmitRequest(fx.request.preflightInput, { env: {} });
++    assert.equal(printed.status, "packet-ready", JSON.stringify(printed));
++    const request = structuredClone(printed.admitRequest);
++    assert.equal(request.schema, SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA);
++    assert.deepEqual(request.review.courseContext, fx.request.preflightInput.courseContext, "the course context the preflight ran with, so admit reproduces the same preflight");
++    assert.equal(request.taskId, "feature-held-task");
++    assert.equal(Object.hasOwn(request.review, "genericBatchRef"), false);
++    assert.deepEqual(admitRequestPlaceholderPaths(request).sort(), ["event", "projectId", "route.adapter", "route.effortTier", "route.modelTier", "route.provider", "route.routeId", "route.runner", "sessionId", "verdictPath"]);
++    request.projectId = "pipeline";
++    request.sessionId = "session-g2069-2";
++    request.route = options({ taskId: "feature-held-task" }).route;
++    request.verdictPath = "evidence/critic-verdict.json";
++    request.event = null;
++    const admitted = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, "g2069-feature.json", request)]);
++    assert.equal(admitted.exitCode, 0, JSON.stringify(admitted.output));
++    assert.equal(admitted.output.status, "admitted");
++  } finally { cleanup(fx); }
++});

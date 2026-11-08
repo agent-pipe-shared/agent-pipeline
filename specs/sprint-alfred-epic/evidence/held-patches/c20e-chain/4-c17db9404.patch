@@ -1,0 +1,91 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 53d8477ffed6c7b27ccdfd81972a9e92ebda6e08..7414fa22eaae98c29b2a3f552bff4ccdee027c60 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -297,7 +297,15 @@ export function smallestChangeParagraph(pkg) {
+ }
+ 
+ /** Renders the full briefing; `generated` is the binding builder's result for this package. */
+-export function renderGoldfishBriefing(pkg, generated, calibration, budget = { raised: false, exceeds: false }) {
++// G20-75: the build knows whether the project carries its own copy of the obligations file. Naming the one that exists saves
++// every dispatched Goldfish a refused read (GUARD-READ-TARGET-MISSING) of the repository-root path in a consumer project.
++export function obligationsReadSentence(obligationsPath) {
++  return typeof obligationsPath === "string" && obligationsPath !== ""
++    ? `Read \`${obligationsPath.replace(/\\/gu, "/")}\` first (the obligations file that exists for this project)`
++    : "Read `templates/prompts/agent-obligations.md` at the repository root first (a project that has no such file reads the identical copy at `${PIPELINE_PLUGIN_ROOT}/templates/prompts/agent-obligations.md`)";
++}
++
++export function renderGoldfishBriefing(pkg, generated, calibration, budget = { raised: false, exceeds: false }, obligationsPath = null) {
+   const estimateLines = pkg.estimatedToolCalls === undefined ? "" : [
+     `- Estimated tool calls for the whole test-first cycle: ${pkg.estimatedToolCalls}${budget.raised ? ` (above the requested tier's cap, so this dispatch is bound to ${generated.binding.agentType})` : ""}.`,
+     ...(budget.exceeds ? [`- Budget grant expected at the 80 % checkpoint: ${pkg.budgetRationale}.`] : []),
+@@ -308,7 +316,7 @@ export function renderGoldfishBriefing(pkg, generated, calibration, budget = { r
+   const verify = calibration.verify === null
+     ? "- Final integrated Verify: this project calibrates no Verify command."
+     : `- Final integrated Verify — Coordinator owner, after the local candidate exists: \`${calibration.verify}\`; not yours to run.`;
+-  const body = `Read \`templates/prompts/agent-obligations.md\` at the repository root first (a project that has no such file reads the identical copy at \`\${PIPELINE_PLUGIN_ROOT}/templates/prompts/agent-obligations.md\`) and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
++  const body = `${obligationsReadSentence(obligationsPath)} and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+ 
+ ${generated.block}
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index a16c045720c7927a8608d5869c3e2dd81c758134..0efe3c07852d99e808884e33e1c650f36c04881b 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -1272,6 +1272,18 @@ function estimateWarningsOf(pkg, budget) {
+   return estimateWarnings;
+ }
+ 
++// G20-75: the obligations file the dispatched agent reads first: the project's own copy when it has one (repository-relative),
++// otherwise the plugin's copy (absolute, below the plugin root this script runs from). Null keeps the generic two-path sentence.
++const OBLIGATIONS_RELATIVE = "templates/prompts/agent-obligations.md";
++function obligationsPathFor(root, deps) {
++  const exists = deps.obligationsExists ?? existsSync;
++  try {
++    if (exists(resolve(root, OBLIGATIONS_RELATIVE))) return OBLIGATIONS_RELATIVE;
++    const pluginCopy = resolve(dirname(fileURLToPath(import.meta.url)), "..", OBLIGATIONS_RELATIVE);
++    return exists(pluginCopy) ? pluginCopy : null;
++  } catch { return null; }
++}
++
+ /** Renders the complete briefing of one closed package (PO decision D78); writes only the --out file. */
+ export function buildDispatchBriefing(options, deps = {}) {
+   let root;
+@@ -1292,7 +1304,7 @@ export function buildDispatchBriefing(options, deps = {}) {
+   const decision = budgetDecision(pkg, budget);
+   // D196 (R4): warnings only. An estimate above the base cap with no planned grant, and one far above a single grant step.
+   const estimateWarnings = estimateWarningsOf(pkg, budget);
+-  const rendered = renderGoldfishBriefing(pkg, generated, calibration, decision);
++  const rendered = renderGoldfishBriefing(pkg, generated, calibration, decision, obligationsPathFor(root, deps));
+   if (options.out !== undefined) {
+     const target = resolve(root, options.out);
+     mkdirSync(dirname(target), { recursive: true });
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 65fdae0b24cf403975aa77e3e298cde4198255e7..2575ecbcf1ab0abc2dd1f490d2a3acbc3b8212c4 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -763,11 +763,21 @@ test("the generated briefing prescribes the test-first order in one dispatch (AC
+ test("PF-100 the generated briefing names the readable copy of the obligations file when the project has none at its root", async () => {
+   const { runDispatchBriefing } = await lib();
+   const { fx, argv } = packageFixture();
++  // G20-75 restated in place (QG-04): the build now resolves which copy exists, so a project without its own copy is told
++  // the plugin copy's absolute path directly (greenfield 070-3: every Goldfish first read the missing root path and was
++  // refused GUARD-READ-TARGET-MISSING). The generic two-path sentence stays the fallback when neither copy is found.
+   const { text } = runDispatchBriefing(argv, depsOf(fx));
+-  const line = text.split("\n").find((l) => l.startsWith("Read `templates/prompts/agent-obligations.md`")) ?? "";
+-  assert.match(line, /at the repository root first/u);
+-  assert.match(line, /\$\{PIPELINE_PLUGIN_ROOT\}\/templates\/prompts\/agent-obligations\.md/u);
++  const pluginCopy = join(dirname(fileURLToPath(import.meta.url)), "..", "templates", "prompts", "agent-obligations.md").replace(/\\/gu, "/");
++  const line = text.split("\n").find((l) => l.startsWith("Read `")) ?? "";
++  assert.ok(line.startsWith(`Read \`${pluginCopy}\` first (the obligations file that exists for this project)`), line);
+   assert.match(line, /follow it: it carries the closed shell grammar/u);
++  assert.doesNotMatch(line, /at the repository root first/u);
++  const own = runDispatchBriefing(argv, { ...depsOf(fx), obligationsExists: (path) => path.replace(/\\/gu, "/").startsWith(fx.root.replace(/\\/gu, "/")) });
++  assert.ok(own.text.includes("Read `templates/prompts/agent-obligations.md` first (the obligations file that exists for this project) and follow it"), "a project with its own copy is told the repository-relative path");
++  const neither = runDispatchBriefing(argv, { ...depsOf(fx), obligationsExists: () => false });
++  const fallback = neither.text.split("\n").find((l) => l.startsWith("Read `templates/prompts/agent-obligations.md`")) ?? "";
++  assert.match(fallback, /at the repository root first/u);
++  assert.match(fallback, /\$\{PIPELINE_PLUGIN_ROOT\}\/templates\/prompts\/agent-obligations\.md/u);
+ });
+ 
+ // AC-187 (item goldfish-test-briefs-lack-targeted-and-quick-command-routes): the emitted briefing carries the three
