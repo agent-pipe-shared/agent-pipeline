@@ -763,11 +763,21 @@ test("the generated briefing prescribes the test-first order in one dispatch (AC
 test("PF-100 the generated briefing names the readable copy of the obligations file when the project has none at its root", async () => {
   const { runDispatchBriefing } = await lib();
   const { fx, argv } = packageFixture();
+  // G20-75 restated in place (QG-04): the build now resolves which copy exists, so a project without its own copy is told
+  // the plugin copy's absolute path directly (greenfield 070-3: every Goldfish first read the missing root path and was
+  // refused GUARD-READ-TARGET-MISSING). The generic two-path sentence stays the fallback when neither copy is found.
   const { text } = runDispatchBriefing(argv, depsOf(fx));
-  const line = text.split("\n").find((l) => l.startsWith("Read `templates/prompts/agent-obligations.md`")) ?? "";
-  assert.match(line, /at the repository root first/u);
-  assert.match(line, /\$\{PIPELINE_PLUGIN_ROOT\}\/templates\/prompts\/agent-obligations\.md/u);
+  const pluginCopy = join(dirname(fileURLToPath(import.meta.url)), "..", "templates", "prompts", "agent-obligations.md").replace(/\\/gu, "/");
+  const line = text.split("\n").find((l) => l.startsWith("Read `")) ?? "";
+  assert.ok(line.startsWith(`Read \`${pluginCopy}\` first (the obligations file that exists for this project)`), line);
   assert.match(line, /follow it: it carries the closed shell grammar/u);
+  assert.doesNotMatch(line, /at the repository root first/u);
+  const own = runDispatchBriefing(argv, { ...depsOf(fx), obligationsExists: (path) => path.replace(/\\/gu, "/").startsWith(fx.root.replace(/\\/gu, "/")) });
+  assert.ok(own.text.includes("Read `templates/prompts/agent-obligations.md` first (the obligations file that exists for this project) and follow it"), "a project with its own copy is told the repository-relative path");
+  const neither = runDispatchBriefing(argv, { ...depsOf(fx), obligationsExists: () => false });
+  const fallback = neither.text.split("\n").find((l) => l.startsWith("Read `templates/prompts/agent-obligations.md`")) ?? "";
+  assert.match(fallback, /at the repository root first/u);
+  assert.match(fallback, /\$\{PIPELINE_PLUGIN_ROOT\}\/templates\/prompts\/agent-obligations\.md/u);
 });
 
 // AC-187 (item goldfish-test-briefs-lack-targeted-and-quick-command-routes): the emitted briefing carries the three

@@ -297,7 +297,15 @@ export function smallestChangeParagraph(pkg) {
 }
 
 /** Renders the full briefing; `generated` is the binding builder's result for this package. */
-export function renderGoldfishBriefing(pkg, generated, calibration, budget = { raised: false, exceeds: false }) {
+// G20-75: the build knows whether the project carries its own copy of the obligations file. Naming the one that exists saves
+// every dispatched Goldfish a refused read (GUARD-READ-TARGET-MISSING) of the repository-root path in a consumer project.
+export function obligationsReadSentence(obligationsPath) {
+  return typeof obligationsPath === "string" && obligationsPath !== ""
+    ? `Read \`${obligationsPath.replace(/\\/gu, "/")}\` first (the obligations file that exists for this project)`
+    : "Read `templates/prompts/agent-obligations.md` at the repository root first (a project that has no such file reads the identical copy at `${PIPELINE_PLUGIN_ROOT}/templates/prompts/agent-obligations.md`)";
+}
+
+export function renderGoldfishBriefing(pkg, generated, calibration, budget = { raised: false, exceeds: false }, obligationsPath = null) {
   const estimateLines = pkg.estimatedToolCalls === undefined ? "" : [
     `- Estimated tool calls for the whole test-first cycle: ${pkg.estimatedToolCalls}${budget.raised ? ` (above the requested tier's cap, so this dispatch is bound to ${generated.binding.agentType})` : ""}.`,
     ...(budget.exceeds ? [`- Budget grant expected at the 80 % checkpoint: ${pkg.budgetRationale}.`] : []),
@@ -308,7 +316,7 @@ export function renderGoldfishBriefing(pkg, generated, calibration, budget = { r
   const verify = calibration.verify === null
     ? "- Final integrated Verify: this project calibrates no Verify command."
     : `- Final integrated Verify — Coordinator owner, after the local candidate exists: \`${calibration.verify}\`; not yours to run.`;
-  const body = `Read \`templates/prompts/agent-obligations.md\` at the repository root first (a project that has no such file reads the identical copy at \`\${PIPELINE_PLUGIN_ROOT}/templates/prompts/agent-obligations.md\`) and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+  const body = `${obligationsReadSentence(obligationsPath)} and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
 
 ${generated.block}
 

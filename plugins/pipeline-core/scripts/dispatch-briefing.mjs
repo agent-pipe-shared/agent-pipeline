@@ -1272,6 +1272,18 @@ function estimateWarningsOf(pkg, budget) {
   return estimateWarnings;
 }
 
+// G20-75: the obligations file the dispatched agent reads first: the project's own copy when it has one (repository-relative),
+// otherwise the plugin's copy (absolute, below the plugin root this script runs from). Null keeps the generic two-path sentence.
+const OBLIGATIONS_RELATIVE = "templates/prompts/agent-obligations.md";
+function obligationsPathFor(root, deps) {
+  const exists = deps.obligationsExists ?? existsSync;
+  try {
+    if (exists(resolve(root, OBLIGATIONS_RELATIVE))) return OBLIGATIONS_RELATIVE;
+    const pluginCopy = resolve(dirname(fileURLToPath(import.meta.url)), "..", OBLIGATIONS_RELATIVE);
+    return exists(pluginCopy) ? pluginCopy : null;
+  } catch { return null; }
+}
+
 /** Renders the complete briefing of one closed package (PO decision D78); writes only the --out file. */
 export function buildDispatchBriefing(options, deps = {}) {
   let root;
@@ -1292,7 +1304,7 @@ export function buildDispatchBriefing(options, deps = {}) {
   const decision = budgetDecision(pkg, budget);
   // D196 (R4): warnings only. An estimate above the base cap with no planned grant, and one far above a single grant step.
   const estimateWarnings = estimateWarningsOf(pkg, budget);
-  const rendered = renderGoldfishBriefing(pkg, generated, calibration, decision);
+  const rendered = renderGoldfishBriefing(pkg, generated, calibration, decision, obligationsPathFor(root, deps));
   if (options.out !== undefined) {
     const target = resolve(root, options.out);
     mkdirSync(dirname(target), { recursive: true });
