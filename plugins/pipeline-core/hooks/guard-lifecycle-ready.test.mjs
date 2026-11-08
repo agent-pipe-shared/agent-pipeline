@@ -13256,3 +13256,63 @@ test("D197/D203 a producer still reconcile-refused after heal (native-authority-
     assert.ok(!refusedCalls.includes("move-aside"));
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
+
+// C21 (AC-108, live findings 12 and 16 of the three greenfield runs on 20j): the recursive listing a worker reaches for first is admitted under the
+// same path scope as the one-level listing, in the native Glob tool and in the shell, and the shell listings of a project directory that does not
+// exist yet (a greenfield tree) are an existence probe like the one-file reads of G20-67.
+test("C21 Glob <directory>/**/* and a <directory>/**/* pattern are admitted under the one-level listing's scope; the project root, hidden directories and wider wildcards stay refused", () => {
+  const path = qp4HiddenFixture();
+  const outside = qp4Fixture();
+  try {
+    const tool = (input) => qp4Verdict({ tool_name: "Glob", tool_input: input }, path);
+    qp4WithoutAppDataRoots(() => {
+      for (const input of [
+        { pattern: "**/*", path: join(path, "src") }, { pattern: "**/*", path: qp4Fwd(join(path, "src", "sub")) }, { pattern: "src/**/*", path },
+        { pattern: "docs/**/*", path }, { pattern: "src/sub/**/*", path }, { pattern: "**/*", path: join(path, "shallow") }, { pattern: "*", path: join(path, "src") },
+      ]) assert.equal(tool(input).exitCode, 0, JSON.stringify(input));
+      for (const input of [
+        { pattern: "**/*", path }, { pattern: "**/*" }, { pattern: "**", path }, { pattern: "*", path }, { pattern: "**", path: join(path, "src") },
+        { pattern: "**/*", path: join(path, ".git") }, { pattern: ".git/**/*", path }, { pattern: "**/*", path: join(path, ".claude") },
+        { pattern: "**/*", path: join(path, "nest") }, { pattern: "nest/**/*", path }, { pattern: "top/**/*", path }, { pattern: "deep/**/*", path },
+        { pattern: "src/**", path }, { pattern: "**/src/*", path }, { pattern: "src/*/**/*", path }, { pattern: "src/**/*/*", path }, { pattern: "**/**/*", path },
+        { pattern: "../**/*", path }, { pattern: "src/../nest/**/*", path }, { pattern: "/**/*", path }, { pattern: "src\\**\\*", path }, { pattern: "**/*", path: outside },
+        { pattern: "**/*", path: join(outside, "scratch") }, { pattern: "scratch/**/*", path: outside }, { pattern: "**/*", path: join(outside, "vault") },
+      ]) {
+        const r = tool(input);
+        assert.equal(r.exitCode, 2, JSON.stringify(input));
+        assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+      }
+      assert.match(tool({ pattern: "**/*", path }).text, /<directory>\/\*\*\/\*/u, "the refusal names the admitted recursive form");
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("C21 a shell listing or rg --files of a project directory that does not exist yet is an existence probe; credentials, hidden and outside paths keep refusing", () => {
+  const path = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      const shell = (command) => qp4Verdict(bash(command), path);
+      for (const command of [
+        "ls -R scratch scratch/sub scratch/missing-dir", "ls -la scratch/missing-dir", "ls scratch/missing-dir", "ls -lah scratch/missing-dir/deeper",
+        "rg --files scratch/missing-dir", "rg --files scratch/missing-dir scratch", "rg --files scratch scratch/missing-dir", "rg --files -g '*.md' scratch/missing-dir scratch",
+        // The existing listings the findings name stay admitted.
+        "ls -R scratch scratch/sub", "ls -1 scratch", "rg --files scratch scratch/sub",
+        // A names-only `ls vault` is admitted at the base, so the existence probe of a missing child under it follows the same rule (it reads nothing).
+        "ls vault/missing",
+      ]) {
+        const r = shell(command);
+        assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
+      }
+      for (const command of [
+        "ls -R vault", "ls -R vault/missing", "ls -R .git/missing", "ls scratch/id_rsa", "ls ../missing-dir", "rg --files vault", "rg --files .git/missing", "rg --files ../missing-dir",
+        "ls -R scratch/missing-dir > out.txt", "ls -R scratch/missing-dir; rm -r scratch", "rg --files scratch/missing-dir > out.txt", "rg --files --pre cat scratch/missing-dir",
+      ]) {
+        const r = shell(command);
+        assert.equal(r.exitCode, 2, command);
+      }
+    });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});

@@ -565,9 +565,22 @@ function qp4InRootWildcardListing(raw, selector, root, extraRoots) {
     || isAbsolute(selector) || win32.isAbsolute(selector)) return false;
   const parts = selector.split("/");
   if (!parts.every((part) => part !== "" && !part.startsWith("."))) return false;
-  if (parts[parts.length - 1] !== "*" || parts.slice(0, -1).some((part) => /[?*]/u.test(part))) return false;
-  const directory = parts.length === 1 ? raw : join(raw, ...parts.slice(0, -1));
+  // C21 (AC-108): `<literal directories>/**/*` lists the entry names of the whole subtree of one such directory. It is judged by exactly the same checks
+  // (the whole-tree secret screen, the hidden-directory walk with its entry and depth bounds); the only addition is that the recursive form never names
+  // the project root itself, which always holds hidden directories. `**` anywhere else, a second wildcard segment and a trailing `**` alone stay refused.
+  const recursive = parts.length >= 2 && parts[parts.length - 2] === "**" && parts[parts.length - 1] === "*";
+  const literal = parts.slice(0, recursive ? -2 : -1);
+  if ((!recursive && parts[parts.length - 1] !== "*") || literal.some((part) => /[?*]/u.test(part))) return false;
+  const directory = literal.length === 0 ? raw : join(raw, ...literal);
+  if (recursive && qp4IsProjectRoot(directory, root)) return false;
   return qp4InRootDirectory(directory, root, extraRoots) && qp4NoHiddenDirectoryAtOrBelow(passiveCandidate(directory, root), root);
+}
+
+function qp4IsProjectRoot(raw, root) {
+  try {
+    const candidate = passiveCandidate(raw, root);
+    return resolve(candidate) === resolve(root) || realpathSync(candidate) === realpathSync(resolve(root));
+  } catch { return false; }
 }
 
 // R2-1: bounded, fail-closed subtree walk. True ONLY when no directory at or below `directory` has a name starting with "." -- every directory entry is
@@ -704,7 +717,8 @@ export function missingSingleReadTargetOperand(parsed) {
 // Label selection only, by asking the grammar itself: the missing path is the fault when putting an existing in-root
 // stand-in (its nearest existing directory, else a file in it) in place of every missing operand makes the grammar admit
 // the command. The rg/grep pattern (the first operand) is never replaced, so a bad pattern is never reported as a path.
-const QP4_MISSING_DIAGNOSED = new Set(["rg", "grep", "cat", "wc", "stat", "file", "head", "tail"]);
+// C21 (AC-108): `ls` joins the set (a listing of a directory a greenfield project does not have yet read nothing and failed with a flag-or-spelling text).
+const QP4_MISSING_DIAGNOSED = new Set(["rg", "grep", "cat", "wc", "stat", "file", "head", "tail", "ls"]);
 const shellWord = (word) => `'${String(word).replaceAll("'", "'\\''")}'`;
 
 function existingInRootStandIns(raw, root) {
@@ -726,7 +740,9 @@ function existsDirectory(path) {
 function missingOperandIsTheOnlyFault(name, executable, argv, root) {
   if (!QP4_MISSING_DIAGNOSED.has(name)) return false;
   const endOfOptions = argv.indexOf("--");
-  let patternSeen = !["rg", "grep"].includes(name);
+  // C21: `rg --files` takes no pattern, so its first operand is a path (it was skipped as the pattern, and a missing first directory stayed refused).
+  const listsFiles = name === "rg" && (endOfOptions === -1 ? argv : argv.slice(0, endOfOptions)).includes("--files");
+  let patternSeen = !["rg", "grep"].includes(name) || listsFiles;
   const missing = [];
   argv.forEach((token, index) => {
     if (typeof token !== "string" || ((endOfOptions === -1 || index < endOfOptions) && token.startsWith("-"))) return;
@@ -828,7 +844,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
     + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
     + (toolName === "Glob"
-      ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or is <directory>/*; a bare ** or * over the project root is not, because the root holds hidden directories.\n"
+      ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or lists one non-hidden project directory: <directory>/* or <directory>/**/* (a subtree), either with path set to that directory and the pattern * or **/*, or with the directory inside the pattern; a bare ** or * over the project root is not, because the root holds hidden directories.\n"
       : ""));
 }
 

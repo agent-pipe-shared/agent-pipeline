@@ -46,6 +46,9 @@ const SHAPE_DISPOSITION = [
   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
   { bashOnly: "a PowerShell pipeline passes objects, not text; the dialect admits no pipe at all" },
   { bashOnly: "the dialect admits one literal command per call (the one literal $env: assignment folded into it is the single exception)" },
+  // C21 (AC-108): the table example is a grep context read; grep and ls are not PowerShell commands and stay refused there. The read-only rg forms of the
+  // same row (rg --files, rg -C N) are admitted by the dialect like Bash (E7); the C21 case below asserts both halves.
+  { bashOnly: "grep and ls are not PowerShell commands (the rg forms of the row are admitted by the dialect, E7)" },
   { bashOnly: "a dollar sign is refused outright in the dialect, quoted or not, because PowerShell expands it" },
 ];
 
@@ -57,6 +60,21 @@ test("every shape of the Bash grammar table has a disposition, and a Bash-only s
     const expected = SHAPE_DISPOSITION[index].psExitCode ?? 2;
     assert.equal(ps(shape.example).exitCode, expected, expected === 2 ? `Bash-only shape stays refused: ${shape.example}` : `shape the PowerShell dialect admits like Bash: ${shape.example}`);
   });
+}));
+
+// C21 (AC-108): the listing and context forms a worker tries first are named in the printed grammar, every printed example is admitted by Bash, and the
+// PowerShell dialect gives the verdict it always gave (it admits a read-only rg like Bash, and none of grep or ls, which are not PowerShell commands).
+test("C21 the printed grammar names rg --files, the grep and rg context flags and the ls listing flags; each printed example is admitted by Bash and judged by PowerShell as before", () => withRoot(({ root, ps }) => {
+  const printed = denials.GRAMMAR_DENIAL_REMEDY.join("\n");
+  for (const needle of ["rg --files", "-A N", "-B N", "-C N", "\"ls\" with -l -a -R -1 -h"]) assert.ok(printed.includes(needle), `the grammar text names ${needle}`);
+  const listing = ADMITTED_GRAMMAR_SHAPES.filter((shape) => /rg --files/u.test(shape.spelling));
+  assert.ok(listing.length >= 1, "a shape row names the listing and context forms");
+  for (const shape of listing) assert.equal(isReadOnlyDiagnosticCommand(shape.example, root), true, shape.example);
+  for (const command of ["grep -n -C 5 needle probe.txt", "grep -C5 needle probe.txt", "ls -la docs", "ls -R docs", "rg --files docs", "rg -n -C 2 needle probe.txt"]) {
+    assert.equal(isReadOnlyDiagnosticCommand(command, root), true, `Bash admits ${command}`);
+  }
+  for (const command of ["grep -n -C 5 needle probe.txt", "ls -la docs", "ls -R docs"]) assert.equal(ps(command).exitCode, 2, `PowerShell keeps refusing ${command}`);
+  for (const command of ["rg --files docs", "rg -n -C 2 needle probe.txt"]) assert.equal(ps(command).exitCode, 0, `PowerShell admits the read-only rg ${command}`);
 }));
 
 test("read-only git observations get the Bash verdict in the PowerShell dialect, mutating git stays refused", () => withRoot(({ root, ps }) => {
@@ -143,11 +161,15 @@ test("a native read of a project directory that is not a protected root states w
   assert.match(grep.stderr, /not a protected root/u, grep.stderr);
   assert.match(grep.stderr, /Glob/u);
   assert.match(grep.stderr, /exact file/u);
-  const glob = run("Glob", { pattern: "**/*", path: join(root, "project") });
+  // QG-04 restated in place (C21, AC-108): `**/*` over a contained, non-hidden SUBDIRECTORY is now admitted (the one-level `*` always was), so this case no
+  // longer refuses it. The refusal whose text it reads is the same listing over the project root, which holds hidden directories and stays refused; the
+  // subdirectory form is asserted admitted on the line after the refusal's own assertions.
+  const glob = run("Glob", { pattern: "**/*", path: root });
   assert.equal(glob.exitCode, 2);
   assert.match(glob.stderr, /GUARD-READ-TARGET:/u);
   assert.match(glob.stderr, /literal non-credential extension/u, glob.stderr);
   assert.match(glob.stderr, /Protected roots:/u);
+  assert.equal(run("Glob", { pattern: "**/*", path: join(root, "project") }).exitCode, 0);
   assert.equal(run("Grep", { pattern: "x", path: join(root, "project", "pipeline.json") }).exitCode, 0);
   assert.equal(run("Glob", { pattern: "*.json", path: join(root, "project") }).exitCode, 0);
   // the PowerShell read refusal says the same, and the project-relative directory read itself is admitted

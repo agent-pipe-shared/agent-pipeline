@@ -891,12 +891,25 @@ export function isSafeExactPassiveFile(raw, root, extraRoots = []) {
   catch { return false; }
 }
 
+const GREP_CONTEXT_FLAG = /^-([ABC])([0-9]{1,3})?$/u;
+
 function isSafeExactGrepArgs(args, root, extraRoots = []) {
   const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename", "-o", "--only-matching"]); // TR-B-F (T74): match-output spellings; the operand loop below is unchanged.
   let index = 0;
   let maxCountSeen = false;
-  while (flags.has(args[index]) || args[index] === "-m" || args[index] === "--max-count") {
+  const contextSeen = new Set();
+  while (flags.has(args[index]) || args[index] === "-m" || args[index] === "--max-count" || GREP_CONTEXT_FLAG.test(args[index] ?? "")) {
     if (flags.has(args[index])) { index += 1; continue; }
+    // C21 (AC-108): -A, -B and -C only print neighbouring lines of an operand the checks below already admit. One bounded value (1..3 digits) each, in the
+    // separate (`-C 5`) or the attached (`-C5`) spelling; a repeated letter, a clustered flag (`-nC5`) and the long spellings stay refused.
+    const context = GREP_CONTEXT_FLAG.exec(args[index] ?? "");
+    if (context !== null) {
+      const value = context[2] ?? args[index + 1];
+      if (contextSeen.has(context[1]) || !/^[0-9]{1,3}$/u.test(value ?? "")) return false;
+      contextSeen.add(context[1]);
+      index += context[2] === undefined ? 2 : 1;
+      continue;
+    }
     if (maxCountSeen || !/^[1-9][0-9]{0,2}$/u.test(args[index + 1] ?? "")
       || Number(args[index + 1]) > 500) return false;
     maxCountSeen = true;
