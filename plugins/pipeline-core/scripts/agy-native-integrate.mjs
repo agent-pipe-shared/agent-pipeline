@@ -16,11 +16,14 @@
  */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { realpathSync } from "node:fs";
-import { posix, resolve, isAbsolute, relative } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { join, posix, resolve, isAbsolute, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 
 export const PLAN_SCHEMA = "pipeline.agy-native-integrate-plan.v1";
+export const INTEGRATED_SCHEMA = "pipeline.agy-native-integrated.v1";
+const integratedDirectory = (commonDir) => join(commonDir, "agent-pipeline", "run", "agy-native-integrated");
 const SELF = fileURLToPath(import.meta.url);
 const RECOVER = fileURLToPath(new URL("./goldfish-host-commit-recover.mjs", import.meta.url));
 const BRANCH = /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u;
@@ -121,6 +124,43 @@ export function plan(options) {
     next: ["node", SELF, "apply", "--root", root, "--branch", options.branch, ...allowed.flatMap((p) => ["--allowed-path", p]), "--expect-sha256", planSha256].map(shellWord).join(" ") };
 }
 
+/**
+ * What the child's branch delivered, per path: the blob at its tip, null for a deletion. Written before the working tree changes, so a failed
+ * write leaves nothing applied; an apply that fails afterwards leaves a record no working tree matches. The commit route requires a match.
+ */
+function recordIntegration(planned) {
+  const commonDir = resolveGitCommonDir(planned.root);
+  if (!commonDir) throw new Error("the git common directory is not resolvable");
+  const blobs = {};
+  for (const path of planned.paths) {
+    const blob = git(planned.root, ["rev-parse", "--verify", "--quiet", `${planned.tip}:${path}`]);
+    blobs[path] = blob.ok ? blob.out.trim() : null;
+  }
+  const directory = integratedDirectory(commonDir);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, `${planned.tip}.json`), `${JSON.stringify({ schema: INTEGRATED_SCHEMA, branch: planned.branch, tip: planned.tip, base: planned.base, blobs }, null, 2)}\n`, "utf8");
+}
+
+/** True when one taken-over child branch delivered exactly the working-tree content of every path. Unreadable records never match. */
+export function integratedResultCovers({ root, commonDir, paths }) {
+  let names;
+  try { names = readdirSync(integratedDirectory(commonDir)); } catch { return false; }
+  return names.filter((name) => /^[a-f0-9]{40,64}\.json$/u.test(name)).some((name) => {
+    let blobs;
+    try {
+      const record = JSON.parse(readFileSync(join(integratedDirectory(commonDir), name), "utf8"));
+      if (record?.schema !== INTEGRATED_SCHEMA || record.blobs === null || typeof record.blobs !== "object") return false;
+      blobs = record.blobs;
+    } catch { return false; }
+    return paths.every((path) => {
+      if (!Object.hasOwn(blobs, path)) return false;
+      if (blobs[path] === null) return !existsSync(join(root, path));
+      const current = git(root, ["hash-object", "--", path]);
+      return current.ok && current.out.trim() === blobs[path];
+    });
+  });
+}
+
 export function apply(options) {
   if (!options.expect || !/^[a-f0-9]{64}$/u.test(options.expect)) {
     return { schema: PLAN_SCHEMA, status: "refused", code: "AGYI-EXPECT-SHA256-REQUIRED", paths: [],
@@ -131,6 +171,10 @@ export function apply(options) {
   if (planned.planSha256 !== options.expect) {
     return { ...planned, status: "refused", code: "AGYI-PLAN-DIGEST-MISMATCH", paths: [],
       refusals: [refuse("AGYI-PLAN-DIGEST-MISMATCH", "HEAD, the branch or the change moved since plan", `run plan again and use its new planSha256: ${["node", SELF, "plan", "--root", planned.root, "--branch", planned.branch, ...options.allowed.flatMap((p) => ["--allowed-path", p])].map(shellWord).join(" ")}`)] };
+  }
+  try { recordIntegration(planned); } catch (error) {
+    return { ...planned, status: "refused", code: "AGYI-RECORD-FAILED", paths: [],
+      refusals: [refuse("AGYI-RECORD-FAILED", `the take-over record could not be written (${error?.code ?? error?.name ?? "Error"})`, "nothing was written to the working tree; repair the git directory's permissions and plan again")] };
   }
   const patch = git(planned.root, ["diff", "--binary", "--full-index", "--no-renames", planned.base, planned.tip]);
   const applied = patch.ok ? git(planned.root, ["apply", "-"], patch.out) : { ok: false, err: patch.err };

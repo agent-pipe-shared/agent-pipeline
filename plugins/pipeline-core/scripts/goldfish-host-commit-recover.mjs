@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { readNativeGoldfishStopFailure } from "../hooks/native-goldfish-host.mjs";
 import { attestedInputPath, readAttestedBriefingBlock, runAttestedRequest } from "./dispatch-record-write.mjs";
+import { integratedResultCovers } from "./agy-native-integrate.mjs";
 
 export const PLAN_SCHEMA = "pipeline.goldfish-host-commit-recover-plan.v1";
 const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u;
@@ -267,6 +268,12 @@ export function plan(options) {
       paths = [...new Set(paths)].sort();
       if (paths.length === 0) refusals.push(refuse("GHCR-NO-CHANGES", "none of the briefed allowed paths has a change in the tree", "nothing to land; check whether the result was already committed"));
     }
+  }
+  // On Antigravity a code-writing child commits on its own branch and agy-native-integrate carries the result here. Without that take-over the
+  // tree holds what the session wrote itself, and the record would attest a Goldfish that never ran (AGY greenfield 2026-11-08).
+  if (inputs && inputs.block.runner === "antigravity" && paths.length > 0 && !integratedResultCovers({ root, commonDir, paths })) {
+    refusals.push(refuse("GHCR-NO-NATIVE-RESULT", "these paths do not hold what a taken-over Antigravity child branch delivered, so no Goldfish result exists to land",
+      "run the dispatch and take its branch over with scripts/agy-native-integrate.mjs plan|apply, leaving the result unchanged. If the host refuses the dispatch, follow references/antigravity-native-dispatch.md; the slice is not written in this session"));
   }
   if (candidateCommit && candidateCommit !== headSha) refusals.push(refuse("GHCR-HEAD-MOVED", "HEAD differs from the pending binding's candidateCommit", `restore HEAD to ${candidateCommit} or land the result by the ordinary commit route`));
   const staged = git(root, ["diff", "--cached", "--name-only"]);

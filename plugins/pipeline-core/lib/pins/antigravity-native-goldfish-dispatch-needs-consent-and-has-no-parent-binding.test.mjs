@@ -457,6 +457,12 @@ test("M4b: the Elephant takes over a finished child's branch with plan then appl
     const recovered = recover.plan({ verb: "plan", root: fx.workspace, dispatchId: "C20-G208B-AGY-ISOLATION", allowed: ["src/a.mjs"], paths: [], expect: null, briefing: null, handback: null });
     assert.equal(recovered.status, "ready", JSON.stringify(recovered));
     assert.deepEqual(recovered.paths, ["src/a.mjs"]);
+    // The take-over leaves a record of what the branch delivered; the commit route compares the tree with it.
+    const commonDir = join(fx.workspace, ".git");
+    assert.equal(integrate.integratedResultCovers({ root: fx.workspace, commonDir, paths: ["src/a.mjs"] }), true);
+    writeFileSync(join(fx.workspace, "src", "a.mjs"), "export const a = 2;\n");
+    assert.equal(integrate.integratedResultCovers({ root: fx.workspace, commonDir, paths: ["src/a.mjs"] }), false, "changed after the take-over");
+    assert.equal(integrate.integratedResultCovers({ root: fx.workspace, commonDir, paths: ["src/other.mjs"] }), false, "a path the branch never delivered");
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
 });
 

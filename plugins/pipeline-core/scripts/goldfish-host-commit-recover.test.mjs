@@ -123,6 +123,34 @@ test("GHCR-CAUSE plan: the stop-failure pointer carries the recorded reason and 
   } finally { cleanup(bare.root); }
 });
 
+test("GHCR-NO-NATIVE-RESULT: an Antigravity briefing lands only what a taken-over child branch delivered", () => {
+  const { root, head } = fixture({ pending: false, stop: false });
+  try {
+    const briefing = (runner) => `<!-- pipeline-native-goldfish-host-commit: fixture\n${JSON.stringify({
+      dispatchId: DISPATCH, runner, agentType: "goldfish-implementor", model: "fixture-model", effort: "medium", rulesetSha: "abc1234", candidateCommit: head,
+      allowedPaths: ["allowed/x.txt"], criticDecision: { schema: "pipeline.critic-required-decision.v1" } })}\n-->\n`;
+    mkdirSync(join(root, "scratch"), { recursive: true });
+    writeFileSync(join(root, "scratch", "handback.txt"), "the Goldfish returned this\n");
+    const planFor = (runner) => {
+      writeFileSync(join(root, "scratch", "briefing.md"), briefing(runner));
+      return run(root, "plan", "--briefing", "scratch/briefing.md", "--handback", "scratch/handback.txt").json;
+    };
+    assert.equal(planFor("claude").status, "ready", "the check is Antigravity only");
+    const refused = planFor("antigravity");
+    assert.equal(refused.code, "GHCR-NO-NATIVE-RESULT", JSON.stringify(refused));
+    assert.match(refused.refusals[0].next, /agy-native-integrate\.mjs plan\|apply/u);
+
+    const directory = join(root, ".git", "agent-pipeline", "run", "agy-native-integrated");
+    mkdirSync(directory, { recursive: true });
+    const tip = "a".repeat(40);
+    writeFileSync(join(directory, `${tip}.json`), `${JSON.stringify({ schema: "pipeline.agy-native-integrated.v1", branch: "subagent-x", tip, base: head,
+      blobs: { "allowed/x.txt": git(root, "hash-object", "--", "allowed/x.txt") } })}\n`);
+    assert.equal(planFor("antigravity").status, "ready", "the tree holds exactly what the branch delivered");
+    writeFileSync(join(root, "allowed", "x.txt"), "edited after the take-over\n");
+    assert.equal(planFor("antigravity").code, "GHCR-NO-NATIVE-RESULT", "an edit after the take-over is not the child's result");
+  } finally { cleanup(root); }
+});
+
 test("plan without a stop-failure record is ready with stopFailure null and says the stop left no diagnostic", () => {
   const { root } = fixture({ stop: false });
   try {
