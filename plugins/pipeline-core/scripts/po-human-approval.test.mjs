@@ -1146,6 +1146,84 @@ test("NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scra
   }
 });
 
+import { signCommandForProof as c21fSignCommand, waitForSignedProof as c21fWaitForProof } from "../lib/signed-proof-wait.mjs";
+import { PO_APPROVAL_DIRECTORY_ENV as C21F_DIRECTORY_ENV } from "../lib/po-human-approval-read.mjs";
+
+// The printed line carries no --directory: the PO's terminal resolves the key directory itself, so the run does the same.
+function c21fRunPrinted(command, directory, dependencies) {
+  const previous = process.env[C21F_DIRECTORY_ENV];
+  process.env[C21F_DIRECTORY_ENV] = directory;
+  try { return runHumanApproval(command.argv.slice(1), dependencies); } finally {
+    if (previous === undefined) delete process.env[C21F_DIRECTORY_ENV]; else process.env[C21F_DIRECTORY_ENV] = previous;
+  }
+}
+
+test("C21F: the printed signing command runs unchanged and ends the agent's wait, for a scratch request and for a key-directory proof", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
+    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+    const scratchIntent = createHash("sha256").update("c21f-printed-scratch").digest("hex");
+    writeFileSync(join(dirs.repoRoot, "scratch", "reconcile-request-42.json"), `${JSON.stringify({ intentSha256: scratchIntent })}\n`);
+    const dependencies = { readConfirmation: () => "approve" };
+
+    const scratchProof = "scratch/reconcile-proof-42.json";
+    const scratchRun = c21fRunPrinted(c21fSignCommand(dirs.repoRoot, scratchProof), dirs.directory, dependencies);
+    assert.equal(scratchRun.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(c21fWaitForProof({ root: dirs.repoRoot, proof: scratchProof, timeoutSeconds: 0 }).status, "proof-present");
+
+    const keyIntent = createHash("sha256").update("c21f-printed-key-directory").digest("hex");
+    const keyProof = join(dirs.directory, `proof-${keyIntent}.json`);
+    const keyRun = c21fRunPrinted(c21fSignCommand(dirs.repoRoot, keyProof), dirs.directory, dependencies);
+    assert.equal(keyRun.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(c21fWaitForProof({ root: dirs.repoRoot, proof: keyProof, timeoutSeconds: 0 }).status, "proof-present");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("C21F: a critical mirror has no sign-intent line, because sign-intent refuses its request; the wait names authorize-critical instead", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
+    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+    const proof = "scratch/critical-push-proof-0123456789ab.json";
+    assert.equal(c21fSignCommand(dirs.repoRoot, proof), null);
+    const waited = c21fWaitForProof({ root: dirs.repoRoot, proof, timeoutSeconds: 0 });
+    assert.equal(waited.code, "PROOF-WAIT-TIMEOUT");
+    assert.match(waited.repair, /authorize-critical/u);
+    assert.doesNotMatch(waited.repair, /po-human-approval\.mjs/u, "the fixture directory's own name also contains sign-intent");
+
+    writeFileSync(join(dirs.repoRoot, "scratch", "critical-push-request-0123456789ab.json"), `${JSON.stringify({ approvalIntent: { sha256: "a".repeat(64) } })}\n`);
+    assert.throws(
+      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/critical-push-request-0123456789ab.json"], { readConfirmation: () => "approve" }),
+      /must carry an intentSha256/u,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("C21F: the printed authorize-critical line runs unchanged and its mirror ends the wait for exactly that subject", { skip: REQUIRES_OPENSSL }, () => {
+  for (const kind of ["push", "feature-package-reconcile"]) {
+    const dirs = criticalDirs();
+    try {
+      keyFixture(dirs.directory);
+      const subjectSha256 = subjectDigest(`c21f-printed-${kind}`);
+      const printed = authorizeCriticalActionCommand({ kind, repoRoot: dirs.repoRoot, featureId: FEATURE_ID, plan: PLAN, spec: SPEC, subjectSha256, expiresAt: futureExpiry() });
+      const run = c21fRunPrinted(printed, dirs.directory, { observeCandidate: () => ({ ...CANDIDATE }), readConfirmation: () => "approve" });
+      assert.equal(run.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", kind);
+      const proof = `scratch/${basename(run.paths.proof)}`;
+      assert.equal(c21fWaitForProof({ root: dirs.repoRoot, proof, timeoutSeconds: 0, subjectSha256 }).status, "proof-present", kind);
+      assert.equal(c21fWaitForProof({ root: dirs.repoRoot, proof, timeoutSeconds: 0, subjectSha256: subjectDigest("another-subject") }).code, "PROOF-WAIT-STALE", kind);
+    } finally {
+      cleanup(dirs);
+    }
+  }
+});
+
 function portableAgySigningFixture() {
   const subject = { schema: PORTABLE_AGY_AUTHORSHIP_SUBJECT_SCHEMA,
     purpose: "portable-agy-authorship", taskId: "AGY-SIGN-1", runner: "antigravity",

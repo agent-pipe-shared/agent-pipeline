@@ -95,12 +95,19 @@ export function proofWaitCommand(root, proof, seconds = PROOF_WAIT_DEFAULT_SECON
   return { executable: process.execPath, argv: [PROOF_WAIT_SCRIPT, "--root", root, "--proof", proof, "--timeout", String(seconds), ...(subjectSha256 === null ? [] : ["--subject", subjectSha256])] };
 }
 
-/** The PO's one signing command for a proof reference, derived by the naming convention sign-intent itself writes under. */
+/**
+ * authorize-critical owns the `critical-*` mirror: its request appears only after that command ran and carries the digest under
+ * approvalIntent, so sign-intent can never sign it. The wait has no plan, spec or expiry to rebuild that command from.
+ */
+const isCriticalMirrorProof = (proof) => basename(proof).startsWith("critical-");
+const CRITICAL_SIGNING_STEP = "exactly the authorize-critical command the signing step printed (if it is gone, rerun the step that printed it)";
+
+/** The PO's one signing command for a proof reference, derived by the naming convention sign-intent itself writes under; null when sign-intent cannot sign it. */
 export function signCommandForProof(root, proof) {
   const kind = proofReferenceKind(proof);
   if (kind === "scratch") {
     const name = basename(proof);
-    if (!name.includes("proof-")) return null;
+    if (!name.includes("proof-") || isCriticalMirrorProof(proof)) return null;
     return { executable: process.execPath, argv: [PO_HUMAN_APPROVAL_SCRIPT, "sign-intent", "--repo-root", root, "--request", `scratch/${name.replace("proof-", "request-")}`] };
   }
   if (kind === "key-directory") {
@@ -156,13 +163,14 @@ export function waitForSignedProof({ root, proof, timeoutSeconds = PROOF_WAIT_DE
   }
   const sign = signCommandForProof(root, proof);
   const again = text(proofWaitCommand(root, proof, timeoutSeconds, subjectSha256));
+  const critical = isCriticalMirrorProof(proof) ? `ask the PO once to run ${CRITICAL_SIGNING_STEP}` : null;
   if (last.state === "stale") {
     return { status: "refused", code: "PROOF-WAIT-STALE", proofPath: proof, reason: `a signed proof sits at ${proof} but it is an older signature's mirror, not one for the expected subject (${last.reason})`,
-      repair: `rename (do not remove) the older mirror files ${staleMirrorNames(proof).join(", ")}; ${sign === null ? "sign again" : `then ask the PO once to run exactly this signing command: ${text(sign)}`}; then run ${again}` };
+      repair: `rename (do not remove) the older mirror files ${staleMirrorNames(proof).join(", ")}; ${critical ?? (sign === null ? "sign again" : `then ask the PO once to run exactly this signing command: ${text(sign)}`)}; then run ${again}` };
   }
   return last.state === "invalid"
     ? { status: "refused", code: "PROOF-WAIT-INVALID", proofPath: proof, reason: `a file sits at ${proof} but it is not a signed proof (${last.reason})`,
-      repair: `${sign === null ? "sign again" : `have the PO run the one signing command again: ${text(sign)}`}; then run ${again}` }
+      repair: `${critical ?? (sign === null ? "sign again" : `have the PO run the one signing command again: ${text(sign)}`)}; then run ${again}` }
     : { status: "refused", code: "PROOF-WAIT-TIMEOUT", proofPath: proof, reason: `no signed proof appeared at ${proof} within ${timeoutSeconds}s`,
-      repair: `${sign === null ? "the signing step has not been run" : `ask the PO once to run exactly this signing command: ${text(sign)}`}; then run ${again}` };
+      repair: `${critical ?? (sign === null ? "the signing step has not been run" : `ask the PO once to run exactly this signing command: ${text(sign)}`)}; then run ${again}` };
 }

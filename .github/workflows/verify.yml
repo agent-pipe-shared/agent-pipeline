@@ -52,6 +52,8 @@ jobs:
         run: node --test --test-name-pattern="external reports stay readable|greenfield passive PowerShell" plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
       - name: Existing signing key reuse
         run: node --test --test-name-pattern="signature anchor reuses a key" plugins/pipeline-core/scripts/onboarding-init.test.mjs
+      - name: Printed signing commands run unchanged
+        run: node --test --test-name-pattern="C21F:" plugins/pipeline-core/scripts/po-human-approval.test.mjs
       - name: Language transaction and attended anchor recovery
         run: node --test plugins/pipeline-core/lib/onboarding-initial-answers-transaction.test.mjs plugins/pipeline-core/scripts/bootstrap-trust-recovery.test.mjs
       - name: Consumer pre-push installation

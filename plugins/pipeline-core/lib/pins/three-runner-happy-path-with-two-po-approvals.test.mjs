@@ -795,7 +795,8 @@ test("G20-76: an older signature's mirror never ends the wait for the expected s
   assert.match(staleBoth.out.repair, /critical-push-/u, "the repair names the mirror files of the older signature");
   assert.match(staleBoth.out.repair, /rename|move/iu);
   assert.doesNotMatch(staleBoth.out.repair, /delete|\brm\b/iu, "set aside, never deleted");
-  assert.match(staleBoth.out.repair, /sign-intent/u, "then the one signing command again");
+  assert.match(staleBoth.out.repair, /authorize-critical/u, "then the one signing command again");
+  assert.doesNotMatch(staleBoth.out.repair, /sign-intent/u, "sign-intent cannot sign a critical mirror");
   assert.match(staleBoth.out.repair, /proof-wait\.mjs/u, "then the same wait");
   assert.ok(staleBoth.out.repair.includes(wanted), "the same wait keeps the expected subject");
   // (b) a proof file with its sibling request missing: not signed yet.
