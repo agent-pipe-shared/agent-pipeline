@@ -27,6 +27,7 @@ import {
   planOrphanDescriptorArchive,
   planSessionCleanupRecovery,
 } from "../session-cleanup-recovery.mjs";
+import { partialCleanupRecoveryResultCore } from "../project-onboarding-v3.mjs";
 import { main as sessionCleanupMain } from "../../scripts/session-cleanup.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
@@ -172,6 +173,32 @@ test("AC-203 own session: the library entry points honour requesterSessionId at 
     (error) => error.code === "WT-ORPHAN-ARCHIVE-OWN-SESSION",
   );
   assert.deepEqual(readFileSync(own.path), own.bytes);
+}));
+
+// Candidate 21d (live Codex greenfield 2026-11-09): after a closed feature, the hook anchor of the session that closed it read as residue and its
+// re-entry after a plugin update stopped at `orphan-recovery-unavailable`. The PF-50 filter covered only `claude-`; every runner hook creates the same anchor.
+const CLOSED_FEATURE = { readOnboardingSessionCleanupBindingFn: ({ rootDir }) => ({ status: "closed-unbound", root: rootDir }) };
+for (const [runner, id, env] of [
+  ["codex", `codex-${OWN_UUID}`, { CODEX_THREAD_ID: OWN_UUID }],
+  ["antigravity", `antigravity-${OWN_UUID}`, {}],
+]) {
+  test(`C21D ${runner}: the hook anchor of the running session is no residue after a close, and onboarding stays open for it`, () => withFixture((root) => {
+    const anchor = hookDescriptor(root, id);
+    assert.equal(planSessionCleanupRecovery({ rootDir: root, deps: CLOSED_FEATURE }).status, "not-needed");
+    const onboarding = partialCleanupRecoveryResultCore({
+      root, runner, intent: "onboarding", repository: {},
+      deps: { planSessionCleanupRecovery: (input) => planSessionCleanupRecovery({ ...input, deps: CLOSED_FEATURE }) },
+    });
+    assert.equal(onboarding, null, "no partial result: nothing blocks the re-entry");
+    assert.equal(run(["plan-recovery", "--repo", root, "--runner", runner], env).status, "not-needed");
+    assert.deepEqual(readFileSync(anchor.path), anchor.bytes, "the anchor stays untouched");
+    assert.deepEqual(listActiveSessionDescriptors(root).map((descriptor) => descriptor.sessionId), [id], "an unfiltered listing still reports it");
+  }));
+}
+
+test("C21D: a descriptor that is not a runner hook anchor still counts after a close", () => withFixture((root) => {
+  hookDescriptor(root, `other-${OWN_UUID}`);
+  assert.notEqual(planSessionCleanupRecovery({ rootDir: root, deps: CLOSED_FEATURE }).status, "not-needed");
 }));
 
 const NOT_OWN_ENVS = [

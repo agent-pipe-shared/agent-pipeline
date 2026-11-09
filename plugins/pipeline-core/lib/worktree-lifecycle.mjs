@@ -930,7 +930,7 @@ export function listActiveSessionDescriptors(startPath, options = {}) {
     const loaded = loadListedSessionDescriptor(repo.primaryRoot, sessionId, options);
     // Retired by its owner between the directory read and this load: absent, not an error.
     if (loaded === null) return [];
-    if (options.excludeClaudeHookIdentity === true && isClaudeHookIdentityDescriptor(repo, loaded)) return [];
+    if (options.excludeHookIdentity === true && isHookIdentityDescriptor(repo, loaded)) return [];
     return [{
       sessionId: loaded.sessionId,
       descriptorSha256: loaded.descriptorSha256,
@@ -939,14 +939,16 @@ export function listActiveSessionDescriptors(startPath, options = {}) {
 }
 
 /**
- * PF-50: the identity anchor a Claude hook process creates for its own session (claude-hook-session-owner.mjs,
- * id `claude-<session_id>`, no owner process by design) is not a cleanup session: it has no cleanup manifest,
+ * PF-50: the identity anchor a runner hook process creates for its own session (claude-hook-session-owner.mjs,
+ * id `<runner>-<session id>`, no owner process by design) is not a cleanup session: it has no cleanup manifest,
  * holds no resource and grants nothing by itself. Cleanup recovery and session start skip it instead of planning
  * a continuity bind for it that no hook-less process can ever perform. Any other descriptor is unaffected.
+ * The Codex and Antigravity hooks create the same anchor; a filter limited to `claude-` made the session that had
+ * just closed a feature on Codex a residue of its own close, and its re-entry after a plugin update was refused.
  */
-const CLAUDE_HOOK_IDENTITY_ID = /^claude-[A-Za-z0-9][A-Za-z0-9-]{7,71}$/u;
-export function isClaudeHookIdentityDescriptor(repo, loaded) {
-  return CLAUDE_HOOK_IDENTITY_ID.test(loaded?.sessionId ?? "") && loaded.descriptorSchema === SESSION_DESCRIPTOR_SCHEMA
+const HOOK_IDENTITY_ID = /^(?:claude|codex|antigravity)-[A-Za-z0-9][A-Za-z0-9-]{7,71}$/u;
+export function isHookIdentityDescriptor(repo, loaded) {
+  return HOOK_IDENTITY_ID.test(loaded?.sessionId ?? "") && loaded.descriptorSchema === SESSION_DESCRIPTOR_SCHEMA
     && loaded.ownerRuntime === null && !existsSync(cleanupManifestPath(repo, loaded.sessionId));
 }
 

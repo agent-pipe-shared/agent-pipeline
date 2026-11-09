@@ -730,9 +730,9 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       ?? readOnboardingSessionCleanupBinding;
     const bindCleanup = dependencies.bindOnboardingSessionCleanupFn
       ?? bindOnboardingSessionCleanup;
-    // PF-50: a Claude hook identity anchor (no owner process, no cleanup manifest) is not a cleanup session.
+    // PF-50: a runner hook identity anchor (no owner process, no cleanup manifest) is not a cleanup session.
     const listDescriptors = dependencies.listActiveSessionDescriptorsFn
-      ?? ((root) => listActiveSessionDescriptors(root, { excludeClaudeHookIdentity: true }));
+      ?? ((root) => listActiveSessionDescriptors(root, { excludeHookIdentity: true }));
     const loadDescriptor = dependencies.loadSessionDescriptorFn
       ?? loadSessionDescriptor;
     const retireDescriptor = dependencies.retireSessionDescriptorFn
