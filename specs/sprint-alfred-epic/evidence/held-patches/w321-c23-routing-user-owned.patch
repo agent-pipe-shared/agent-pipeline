@@ -1,0 +1,965 @@
+diff --git a/pipeline.user.yaml b/pipeline.user.yaml
+index 0726504b6..0a0e98ecc 100644
+--- a/pipeline.user.yaml
++++ b/pipeline.user.yaml
+@@ -5,7 +5,7 @@ autonomy:
+   branch_model: "feature-branch"
+   push_policy: "gated"
+   wip_limit: 3
+-core_registry_sha256: "20ee1ddb3fc4d717cc3fd93e6f22898611cb1737c41601fda1ed0d48cb4a9d4a"
++core_registry_sha256: "4514c3fd02184102b46206a5e01ce6eab4edbc6756206fab3aeab47287ed9ea7"
+ critic_export:
+   mode: "allowlisted"
+   rules:
+@@ -154,7 +154,7 @@ routing:
+         state: "unavailable"
+         unavailable: "defer"
+       claude:
+-        effort: "medium"
++        effort: "high"
+         evidence: "dispatch-receipt"
+         selector:
+           kind: "alias"
+diff --git a/plugins/pipeline-core/config/runner-profiles-v3.json b/plugins/pipeline-core/config/runner-profiles-v3.json
+index 5ab85421b..7dcb23c7d 100644
+--- a/plugins/pipeline-core/config/runner-profiles-v3.json
++++ b/plugins/pipeline-core/config/runner-profiles-v3.json
+@@ -281,7 +281,7 @@
+           "kind": "alias",
+           "value": "sonnet"
+         },
+-        "effort": "medium",
++        "effort": "high",
+         "unavailable": "defer",
+         "evidence": "dispatch-receipt"
+       },
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index fdbf4ff45..dd8fe3494 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -804,9 +804,11 @@ if (isDirectInvocation(import.meta.url)) {
+   // D84: Claude's direct model parameter is checked here. K152B checks each native
+   // Antigravity Subagents[].Model separately below, before any child is launched.
+   if (["Task", "Agent"].includes(input?.tool_name)) {
++    // The route is the PROJECT's own routing (draft ADR "a project's pipeline.user.yaml owns its routing"), read from the project root.
++    const modelRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
+     const modelCheck = Array.isArray(toolInput.Subagents)
+-      ? toolInput.Subagents.map((entry) => evaluateDispatchModel({ runner: "antigravity", subagentType: entry?.TypeName, model: entry?.Model }))
+-      : [evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model })];
++      ? toolInput.Subagents.map((entry) => evaluateDispatchModel({ runner: "antigravity", subagentType: entry?.TypeName, model: entry?.Model, root: modelRoot }))
++      : [evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model, root: modelRoot })];
+     for (const check of modelCheck) {
+       const modelWarnings = dispatchModelWarningText(check);
+       if (modelWarnings !== "") process.stderr.write(modelWarnings);
+diff --git a/plugins/pipeline-core/hooks/post-compact-reground.mjs b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+index c6fa13835..a5db031c0 100644
+--- a/plugins/pipeline-core/hooks/post-compact-reground.mjs
++++ b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+@@ -11,6 +11,7 @@ import {
+ } from "../lib/continuity-state.mjs";
+ import { buildContinuationLine } from "../lib/interaction-continuity.mjs";
+ import { reconcileMainSessionRoute } from "../lib/main-session-route.mjs";
++import { loadProjectRoutingRegistry } from "../lib/runner-profiles-v3.mjs";
+ import { readModelIdentityObservation } from "../lib/main-session-route-attestation.mjs";
+ import {
+   boundedNarrativeExcerpt,
+@@ -203,6 +204,8 @@ function mainSessionRouteProjection(input, phase, rootDir = null) {
+     observed: context.observed ?? null,
+     reportedEventIds: context.reportedEventIds ?? [],
+     poException: context.poException ?? null,
++    // C23: the desired route is the PROJECT's own (its pipeline.user.yaml); without a root the registry seed answers.
++    registry: rootDir ? loadProjectRoutingRegistry(rootDir) : undefined,
+   });
+   const sessionId = typeof input?.session_id === "string"
+     ? input.session_id
+diff --git a/plugins/pipeline-core/lib/agy-session-dispatch.mjs b/plugins/pipeline-core/lib/agy-session-dispatch.mjs
+index 7ac09d086..3c5738700 100644
+--- a/plugins/pipeline-core/lib/agy-session-dispatch.mjs
++++ b/plugins/pipeline-core/lib/agy-session-dispatch.mjs
+@@ -21,7 +21,7 @@ import { AGY_FINAL_RETURN_JSON_SCHEMA, validateAgyFinalReturn, validateAgyFamily
+ import { parseStrictJson } from "./governance-event.mjs";
+ import { bindStoredModelRoleDispatch } from "./model-role-host-session.mjs";
+ import { ROLE_DISPATCH_PREFLIGHT_SCHEMA, preflightRoleDispatch } from "./role-dispatch-preflight.mjs";
+-import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
++import { loadProjectRoutingRegistry, validateRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
+ import { recheckAgyFamilyConsentBinding, AGY_FAMILY_BINDING_SCHEMA, releaseSourceOwnedAgyConsentAdmission, loadStoredConsent, validateConsentRecord } from "./agy-session-authority.mjs";
+ import { observeModelFamilyActivation } from "./model-family-runtime-host.mjs";
+ import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
+@@ -642,7 +642,7 @@ export async function dispatchAgySession({
+   fallbackPolicy,
+   requestedModel,
+   modelRoleStore,
+-  readRegistry = loadRunnerProfilesV3Registry,
++  readRegistry = undefined,
+   effort = "high",
+   scope,
+   inputSha256,
+@@ -716,8 +716,10 @@ export async function dispatchAgySession({
+   if (modelRoleStore !== undefined) {
+     const taskRoute = packet.role === "pipeline-core:goldfish-mechanic" ? "duty.mechanic" : "duty.implement";
+     let registry;
+-    try { registry = readRegistry(); } catch { return rejected("AGY-SESSION-MODEL-ROLE-NOT-BOUND", "modelRoleStore"); }
+-    if (!validateRunnerProfilesV3Registry(registry).ok)
++    // C23: the route is the PROJECT's own (its pipeline.user.yaml, validated by shape when read); an injected registry is still
++    // validated against the frozen contract.
++    try { registry = readRegistry ? readRegistry() : loadProjectRoutingRegistry(root); } catch { return rejected("AGY-SESSION-MODEL-ROLE-NOT-BOUND", "modelRoleStore"); }
++    if (readRegistry && !validateRunnerProfilesV3Registry(registry).ok)
+       return rejected("AGY-SESSION-MODEL-ROLE-NOT-BOUND", "modelRoleStore");
+     // Both bounded implementation agent types have the same productive V3
+     // base duty. The mechanic-specific functional role is optional and may
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+index 3c51d13b7..71fa946b2 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+@@ -8,7 +8,7 @@
+  * selectors the configuration allows. An unreadable route source gives no opinion, so a broken
+  * configuration can never leave a dispatch that no caller can repair.
+  */
+-import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
++import { projectFunctionalTaskRoutes, registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
+ import { isShippedPipelineAgentType } from "./dispatch-policy.mjs";
+ 
+ /** Runners whose dispatch tool carries a tool-layer `model` parameter this guard can observe. */
+@@ -47,7 +47,19 @@ function selectorMatches(selector, model) {
+   return selector.kind === "alias" && new RegExp(`^claude-${wanted}(?:-|$)`, "u").test(given);
+ }
+ 
+-export function evaluateDispatchModel({ runner, subagentType, model, routeSource = registeredFunctionalTaskRoutes() } = {}) {
++/**
++ * The route source is the project's own routing for `root` unless a caller injects one (draft ADR "a project's pipeline.user.yaml
++ * owns its routing"). A fallback to the registry is reported through `warn`, else as a warning on the returned evaluation.
++ */
++export function evaluateDispatchModel({ root, warn, routeSource, ...rest } = {}) {
++  const notes = [];
++  const source = routeSource ?? projectFunctionalTaskRoutes(root, { warn: warn ?? ((text) => notes.push(text)) });
++  const result = decideDispatchModel({ ...rest, routeSource: source });
++  return notes.length === 0 ? result
++    : { ...result, warnings: [...(result.warnings ?? []), ...notes.map((message) => ({ code: "DISPATCH-ROUTING-SOURCE-FALLBACK", message }))] };
++}
++
++function decideDispatchModel({ runner, subagentType, model, routeSource } = {}) {
+   if (runner === "antigravity") {
+     // Antigravity's enum is routed through the explicit PO-approved nativeTier projection
+     // in model-role-route-source. Concrete V3 model IDs remain a separate CLI route.
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+index 329626f49..2f2ca9833 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+@@ -163,3 +163,43 @@ test("DME13 G20-43 the Goldfish roles pass Model flash and the Critic passes no
+     assert.match(dispatchModelRefusalText(refused), /omit Model/u);
+   }
+ });
++
++// C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 4): the dispatch route reader returns the project's own value.
++test("DME-C23 the dispatch model check reads the project's routing for its root, and falls back to the registry with a warning", async () => {
++  const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
++  const { tmpdir } = await import("node:os");
++  const { join } = await import("node:path");
++  const { loadRunnerProfilesV3Registry, RUNNER_PROFILES_V3_REGISTRY_SHA256 } = await import("./runner-profiles-v3.mjs");
++  const registry = loadRunnerProfilesV3Registry();
++  const render = (value, indent = "") => Object.keys(value).map((key) => {
++    const item = value[key];
++    if (Array.isArray(item)) return item.length === 0 ? `${indent}${key}: []\n` : `${indent}${key}:\n${item.map((entry) => (entry !== null && typeof entry === "object"
++      ? `${indent}  -\n${render(entry, `${indent}    `)}` : `${indent}  - ${JSON.stringify(entry)}\n`)).join("")}`;
++    return item !== null && typeof item === "object" ? `${indent}${key}:\n${render(item, `${indent}  `)}` : `${indent}${key}: ${JSON.stringify(item)}\n`;
++  }).join("");
++  const intent = {
++    schema: "pipeline.user.v3", core_registry_sha256: RUNNER_PROFILES_V3_REGISTRY_SHA256,
++    language: { human_facing: "en", agent_facing: "en" }, agent_runtime: "other", runners: { enabled: ["claude"], default: "claude" },
++    routing: { profiles: registry.profiles, duties: structuredClone(registry.duties) },
++    usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
++    autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
++    gates: { dev_plan: "blocking", push: "blocking", security: "warn", claude_md_max_lines: 300 }, critic_export: registry.criticExportPolicy,
++  };
++  intent.routing.duties.mechanic.claude.selector = { kind: "model-id", value: "my-local-model" };
++  const root = mkdtempSync(join(tmpdir(), "c23-enforce-"));
++  try {
++    const ask = (model, extra = {}) => evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-mechanic", model, root, ...extra });
++    const absent = [];
++    // No configuration yet: the registry answers, so the project's model id is not known and is refused as unrouted.
++    assert.equal(ask("my-local-model", { warn: (text) => absent.push(text) }).findings[0].code, "DISPATCH-MODEL-UNROUTED");
++    assert.equal(absent.length, 1);
++    writeFileSync(join(root, "pipeline.user.yaml"), render(intent));
++    assert.equal(ask("my-local-model").ok, true);
++    assert.equal(ask("my-local-model").findings.length, 0);
++    // The project's own value is the one the check names, the registry's alias is no longer the route.
++    assert.equal(ask(undefined).findings[0].code, "DISPATCH-MODEL-MISSING");
++    assert.match(ask(undefined).findings[0].message, /duty\.mechanic = "my-local-model"/u);
++    // An explicit routeSource still wins (the pure decision stays injectable).
++    assert.equal(ask("my-local-model", { routeSource: routes() }).findings[0].code, "DISPATCH-MODEL-UNROUTED");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/lib/model-role-route-source.mjs b/plugins/pipeline-core/lib/model-role-route-source.mjs
+index c60f512d1..d6a2923f9 100644
+--- a/plugins/pipeline-core/lib/model-role-route-source.mjs
++++ b/plugins/pipeline-core/lib/model-role-route-source.mjs
+@@ -4,7 +4,7 @@
+  * routing registry. Product-name similarity never assigns a functional role.
+  * This is a read-only projection, not bootstrap admission or a model approval.
+  */
+-import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
++import { loadProjectRoutingRegistry, loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
+ 
+ const RUNNERS = ["claude", "codex", "antigravity"];
+ const PROFILES = ["epic", "feature", "mini"];
+@@ -163,6 +163,15 @@ export function registeredFunctionalTaskRoutes(registry = loadRunnerProfilesV3Re
+   };
+ }
+ 
++/**
++ * The task routes a run of the project at `root` selects: the project's own validated routing, or the registry (with a warning
++ * through `warn`, or on stderr) when its `pipeline.user.yaml` is absent or invalid. Every reader that SELECTS a route for a run
++ * uses this; a reader that needs only the seed or the shape keeps `loadRunnerProfilesV3Registry()`.
++ */
++export function projectFunctionalTaskRoutes(root, { warn } = {}) {
++  return registeredFunctionalTaskRoutes(loadProjectRoutingRegistry(root, { warn }));
++}
++
+ /** A session observes only its installed runner; the full source remains the approval subject. */
+ export function functionalTaskRoutesForRunner(source, runner) {
+   if (!source?.ok || !RUNNERS.includes(runner) || !Array.isArray(source.taskRoutes)
+diff --git a/plugins/pipeline-core/lib/runner-profile-migration-v3.mjs b/plugins/pipeline-core/lib/runner-profile-migration-v3.mjs
+index 9ffa7373e..840f4e108 100644
+--- a/plugins/pipeline-core/lib/runner-profile-migration-v3.mjs
++++ b/plugins/pipeline-core/lib/runner-profile-migration-v3.mjs
+@@ -76,10 +76,13 @@ const READ_DUTY_PREDECESSOR_REGISTRY_SHA256 = "12ec7be9e63630f0c3621761b2efb41f5
+ // critic_export are Core-owned (the validator compares them byte-exact with the registry), so a project bound to one of these
+ // digests is refreshed wholesale to the current registry: nothing a project owns is discarded. `c1641d49...` is the registry every
+ // 0.7 candidate shipped from 2026-09-27 until G20-43 changed the Antigravity cells; without this entry every project onboarded on
+-// it was refused (`frozen_mapping`) with no runnable repair. An UNKNOWN digest (possibly a newer Core) keeps the refusal, so an
++// it was refused (`frozen_mapping`) with no runnable repair. Since C23 routing is project-owned, so the refresh only fills what such a
++// project lacks and keeps its values. An UNKNOWN digest (possibly a newer Core) keeps the refusal, so an
+ // older installed plugin still never rewrites a newer project's routes. Add the outgoing digest here whenever the registry changes.
+ const KNOWN_OLDER_REGISTRY_SHA256 = Object.freeze(new Set([
+   "c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac",
++  // C23: the registry before the shipped default of the Claude deep duty became `high`.
++  "20ee1ddb3fc4d717cc3fd93e6f22898611cb1737c41601fda1ed0d48cb4a9d4a",
+ ]));
+ const OID = /^[0-9a-f]{40}$/u;
+ const PLUGIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
+@@ -474,10 +477,9 @@ function v3IntentFromV2(v2) {
+ // Recovers a V3 source that has fallen behind the current Public-Core
+ // registry -- as opposed to one that is genuinely invalid -- by refreshing
+ // every Core-owned surface named in CORE_OWNED_V3_SURFACES (runner-profiles-
+-// v3.mjs, next to the registry it describes). Each surface is refreshed
+-// wholesale, never merged field-by-field: a closed Public-Core authority can
+-// only be replaced as one whole registered value, the same way a routing
+-// entry always was. Nothing outside that table is ever read, written, or
++// v3.mjs, next to the registry it describes). A Core-owned surface is
++// refreshed wholesale; `routing` is project-owned and only gains the cells it
++// lacks (`refresh` on its table entry). Nothing outside that table is ever read, written, or
+ // compared here -- a future Core-owned surface needs exactly one new table
+ // entry, never a new branch in this function.
+ function refreshKnownV3RegistryDelta(parsed) {
+@@ -494,10 +496,8 @@ function refreshKnownV3RegistryDelta(parsed) {
+     && previousBinding !== RUNNER_PROFILES_V3_REGISTRY_SHA256
+     && !boundToKnownOlderRegistry) {
+     if (!boundToReadDutyPredecessor || !Object.hasOwn(registry.duties, "read")) return null;
+-    const oldDuties = clone(registry.duties);
+-    delete oldDuties.read;
+-    if (!same(parsed.routing, { profiles: registry.profiles, duties: oldDuties })
+-      || !same(parsed.critic_export, registry.criticExportPolicy)) return null;
++    // Routing is project-owned: the predecessor's project values are kept and the additive refresh below fills the new duty.
++    if (!same(parsed.critic_export, registry.criticExportPolicy)) return null;
+   }
+   const candidate = clone(parsed);
+   const compatibilityDeltas = [];
+@@ -510,7 +510,8 @@ function refreshKnownV3RegistryDelta(parsed) {
+ 
+   for (const surface of CORE_OWNED_V3_SURFACES) {
+     const present = Object.hasOwn(parsed, surface.path);
+-    const refreshedValue = surface.registryValue(registry);
++    // A surface with a `refresh` is project-owned: it only gains what it lacks. Any other surface is Core-owned and replaced.
++    const refreshedValue = present && surface.refresh ? surface.refresh(parsed[surface.path], registry) : surface.registryValue(registry);
+     if (present && same(parsed[surface.path], refreshedValue)) continue;
+     candidate[surface.path] = refreshedValue;
+     const delta = present ? surface.staleDelta : surface.absentDelta;
+diff --git a/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs b/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
+index b3ff50881..999055384 100644
+--- a/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
++++ b/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
+@@ -361,7 +361,9 @@ record("a V3 authority update refreshes every frozen routing mapping as one regi
+     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+     const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+     const registry = loadRunnerProfilesV3Registry();
+-    assert.deepEqual(refreshed.routing, { profiles: registry.profiles, duties: registry.duties });
++    // QG-04 restated (C23, routing is project-owned): the refresh keeps every value the project holds (the low efforts and the
++    // changed model ids above) and restores only the advisory duty, whose frozen contract the validator still compares exactly.
++    assert.deepEqual(refreshed.routing, { profiles: source.routing.profiles, duties: { ...source.routing.duties, advisory: registry.duties.advisory } });
+     assert.doesNotMatch(JSON.stringify(refreshed.routing), /fable/u);
+     assert.equal(validatePipelineUserV3(refreshed).ok, true);
+     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /advisor_epic:\n    model: opus/u);
+@@ -371,7 +373,10 @@ record("a V3 authority update refreshes every frozen routing mapping as one regi
+ 
+ record("v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection", () => {
+   const source = v3Intent();
++  // QG-04 restated (C23, routing is project-owned): a low effort is the project's own value and no longer makes a source stale, so
++  // the source is made stale by a missing cell instead; the project's low effort must survive the refresh.
+   source.routing.duties.implement.codex.effort = "low";
++  delete source.routing.duties.read.claude;
+   const root = fixture(yaml(source));
+   try {
+     const advisor = join(root, ".codex/agents/consult-advisor.toml");
+@@ -393,7 +398,7 @@ record("v3-refresh initializes a missing advisor target only with explicit opt-i
+     const fresh = planRunnerProfileMigrationV3({ rootDir: root, initializeMissingRuntimeForSlimV3: true });
+     assert.equal(applyRunnerProfileMigrationV3(fresh, { rootDir: root, activate: true }).status, "applied");
+     assert.equal(existsSync(advisor), true);
+-    assert.equal(parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).routing.duties.implement.codex.effort, loadRunnerProfilesV3Registry().duties.implement.codex.effort);
++    assert.equal(parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).routing.duties.implement.codex.effort, "low");
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
+@@ -666,7 +671,11 @@ record("the exact prior V3 registry upgrades its pure-read duty without weakenin
+   altered.core_registry_sha256 = "12ec7be9e63630f0c3621761b2efb41f52e94bcd002c431655161befa6864ee5";
+   const alteredRoot = fixture(yaml(altered));
+   try {
+-    assert.equal(inspectRunnerProfileMigrationV3({ rootDir: alteredRoot }).status, "invalid-source");
++    // QG-04 restated (C23, routing is project-owned): a model the project names is its own value, not a tampered registry, so the
++    // predecessor-bound project is refreshed (the new duty filled) and keeps its model; only an unknown binding stays refused.
++    const alteredInspection = inspectRunnerProfileMigrationV3({ rootDir: alteredRoot });
++    assert.equal(alteredInspection.status, "ready");
++    assert.equal(alteredInspection.sourceKind, "v3-refresh");
+   } finally { rmSync(alteredRoot, { recursive: true, force: true }); }
+ });
+ 
+@@ -692,16 +701,17 @@ record("a project bound to a known older shipped registry is refreshed to the cu
+     }
+     assert.equal(inspection.status, "ready");
+     assert.equal(inspection.sourceKind, "v3-refresh");
++    // QG-04 restated (C23, routing is project-owned): the digest binding is upgraded, the project's own cells (the older Antigravity
++    // cells above) are valid values and are kept, so no routing delta is recorded.
+     assert.deepEqual(inspection.compatibilityDeltas.map((delta) => [delta.name, delta.path]),
+-      [["known-v3-older-registry-upgrade", "core_registry_sha256"], ["closed-v3-routing-registry-refresh", "routing"]]);
++      [["known-v3-older-registry-upgrade", "core_registry_sha256"]]);
+     const plan = planRunnerProfileMigrationV3({ rootDir: root });
+     assert.equal(plan.status, "ready");
+     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root }).status, "activation-required");
+     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+     const upgraded = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+     assert.equal(upgraded.core_registry_sha256, RUNNER_PROFILES_V3_REGISTRY_SHA256);
+-    const registry = loadRunnerProfilesV3Registry();
+-    assert.deepEqual(upgraded.routing, { profiles: registry.profiles, duties: registry.duties });
++    assert.deepEqual(upgraded.routing, intent.routing);
+     assert.equal(validatePipelineUserV3(upgraded).ok, true);
+     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+   } finally { rmSync(root, { recursive: true, force: true }); }
+@@ -1375,10 +1385,12 @@ record("legacy V3 Critic route and runnerRoutes refresh through sanctioned re-ap
+     assert.equal(plan.sourceKind, "v3-refresh");
+     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+     const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+-    assert.equal(refreshed.routing.duties.critic_normal.codex.selector.value, "gpt-6-sol");
+-    assert.equal(refreshed.routing.duties.critic_normal.codex.effort, "medium");
++    // QG-04 restated (C23, routing is project-owned): the refresh fills critic_export (Core-owned) and keeps the project's own
++    // Critic route (gpt-5.6-terra / xhigh); the projected Codex Critic file carries that project value.
++    assert.equal(refreshed.routing.duties.critic_normal.codex.selector.value, "gpt-5.6-terra");
++    assert.equal(refreshed.routing.duties.critic_normal.codex.effort, "xhigh");
+     assert.equal(refreshed.critic_export.schema, "pipeline.critic-export-policy.v1");
+-    assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /model = "gpt-6-sol"/u);
++    assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /model = "gpt-5\.6-terra"/u);
+     assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /^# critic-prefix-sentinel\n[\s\S]*name = "keep-critic"\nsandbox_mode = "read-only"\n\[metadata\]\nmodel_reasoning_effort = "nested-must-stay"\n$/u);
+     assert.match(readFileSync(join(root, ".codex/agents/critic-high-risk.toml"), "utf8"), /name = "keep-critic-high-risk"\nsandbox_mode = "read-only"\n\[metadata\]\n/u);
+     assert.doesNotMatch(readFileSync(join(root, ".codex/agents/critic-high-risk.toml"), "utf8"), /workspace-write/u);
+@@ -1420,7 +1432,10 @@ record("the registry-refresh table covers every declared Core-owned V3 surface g
+ 
+ record("a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded", () => {
+   const intent = v3Intent();
++  // QG-04 restated (C23, routing is project-owned): a low effort no longer makes routing stale; a missing cell does, and the
++  // project's low effort must survive next to the filled cell.
+   intent.routing.duties.critic_normal.codex.effort = "low";
++  delete intent.routing.duties.read.claude;
+   intent.critic_export.rules.pop();
+   const root = fixture(yaml(intent));
+   try {
+@@ -1447,13 +1462,53 @@ record("a source stale in both routing and critic_export classifies as v3-refres
+     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+     const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+     const registry = loadRunnerProfilesV3Registry();
+-    assert.deepEqual(refreshed.routing, { profiles: registry.profiles, duties: registry.duties });
++    assert.deepEqual(refreshed.routing, { profiles: registry.profiles, duties: { ...registry.duties, critic_normal: { ...registry.duties.critic_normal, codex: { ...registry.duties.critic_normal.codex, effort: "low" } } } });
+     assert.deepEqual(refreshed.critic_export, registry.criticExportPolicy);
+     assert.equal(validatePipelineUserV3(refreshed).ok, true);
+     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 3): a refresh is additive for routing.
++record("a refresh keeps every changed routing value and fills a removed cell from the registry", () => {
++  const intent = v3Intent();
++  intent.routing.duties.deep.claude.effort = "xhigh";
++  intent.routing.duties.mechanic.claude.selector = { kind: "alias", value: "sonnet" };
++  intent.routing.profiles.mini.execution_phase.codex.effort = "low";
++  delete intent.routing.duties.read.claude;
++  delete intent.routing.profiles.mini.design_phase.antigravity;
++  const root = fixture(yaml(intent));
++  try {
++    const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
++    assert.equal(inspection.status, "ready");
++    assert.equal(inspection.sourceKind, "v3-refresh");
++    assert.deepEqual(inspection.compatibilityDeltas.map((delta) => [delta.name, delta.path]), [["closed-v3-routing-registry-refresh", "routing"]]);
++    const plan = planRunnerProfileMigrationV3({ rootDir: root });
++    assert.equal(plan.status, "ready");
++    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
++    const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
++    const registry = loadRunnerProfilesV3Registry();
++    assert.equal(refreshed.routing.duties.deep.claude.effort, "xhigh");
++    assert.deepEqual(refreshed.routing.duties.mechanic.claude.selector, { kind: "alias", value: "sonnet" });
++    assert.equal(refreshed.routing.profiles.mini.execution_phase.codex.effort, "low");
++    assert.deepEqual(refreshed.routing.duties.read.claude, registry.duties.read.claude);
++    assert.deepEqual(refreshed.routing.profiles.mini.design_phase.antigravity, registry.profiles.mini.design_phase.antigravity);
++    assert.equal(validatePipelineUserV3(refreshed).ok, true);
++    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++record("a valid project whose routing differs from the registry needs no refresh and is not rewritten", () => {
++  const intent = v3Intent();
++  intent.routing.duties.deep.claude.effort = "xhigh";
++  const source = yaml(intent);
++  const root = fixture(source);
++  try {
++    assert.equal(inspectRunnerProfileMigrationV3({ rootDir: root }).sourceKind, "v3");
++    assert.equal(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), source);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ record("a source stale only in critic_export classifies as v3-refresh", () => {
+   const intent = v3Intent();
+   intent.critic_export.mode = "audit-only";
+@@ -2022,7 +2077,9 @@ record("a later Codex activation adds only the Codex targets and shows no false
+ });
+ 
+ // QG-04 restated (C20 G20-44): 60 -> 61, the known-older-registry refresh case was added; no case removed.
+-assert.equal(cases.length, 61, "the complete runner profile migration corpus must be registered before execution begins");
++// QG-04 restated (C23): 61 -> 63, two additive-refresh cases were added (a refresh keeps changed values and fills a removed cell; a
++// valid project that differs from the registry is not rewritten); no case removed.
++assert.equal(cases.length, 63, "the complete runner profile migration corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/runner-profiles-v3.mjs b/plugins/pipeline-core/lib/runner-profiles-v3.mjs
+index a64c48797..797b9fd40 100644
+--- a/plugins/pipeline-core/lib/runner-profiles-v3.mjs
++++ b/plugins/pipeline-core/lib/runner-profiles-v3.mjs
+@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { validateHumanDecisionLabel } from "./human-role-labels.mjs";
++import { parseYaml } from "./yaml-lite.mjs";
+ 
+ const HERE = dirname(fileURLToPath(import.meta.url));
+ const CONFIG_DIR = join(HERE, "..", "config");
+@@ -20,6 +21,7 @@ const SCRIPTS_DIR = join(HERE, "..", "scripts");
+ const REGISTRY_PATH = join(CONFIG_DIR, "runner-profiles-v3.json");
+ const USER_SCHEMA_PATH = join(SCRIPTS_DIR, "pipeline-user-v3.schema.json");
+ const MAX_ERRORS = 100;
++const PROJECT_USER_FILE = "pipeline.user.yaml";
+ 
+ function readJson(path) {
+   return JSON.parse(readFileSync(path, "utf8"));
+@@ -73,29 +75,39 @@ export function registeredCriticExportPolicy(registry = FROZEN_REGISTRY) {
+ }
+ 
+ /**
+- * Core-owned V3 source surfaces: top-level `pipeline.user.v3` keys the
+- * validator below requires to equal the frozen registry byte-for-byte
+- * (`compareExact(value.routing.profiles, registry.profiles, ...)`,
+- * `compareExact(value.routing.duties, registry.duties, ...)` and
+- * `compareExact(value.critic_export, FROZEN_REGISTRY.criticExportPolicy, ...)`
+- * a few lines further down). A surface the validator compares exactly against
+- * the registry is Core-owned by construction: refreshing it wholesale from
+- * the registry can never discard something a project owns. This table is the
+- * single source `refreshKnownV3RegistryDelta()` in runner-profile-migration-
+- * v3.mjs drives its recovery refresh from, by iteration -- adding a future
+- * Core-owned surface needs exactly one new entry here, never a new branch in
+- * that function. Deliberately NOT wired into the validator itself in this
+- * change: unifying the two risks a validator behavior change, which is a
+- * separate decision from "make the refresh table-driven".
++ * Add the cells of the registry that a project's routing lacks, and change nothing the project holds. The advisory duty keeps its
++ * own frozen contract (the validator compares it exactly), so it is the one duty restored from the registry. Pure.
++ */
++export function fillAbsentRouting(current, registry = FROZEN_REGISTRY) {
++  const seed = registeredRouting(registry);
++  if (!isObject(current)) return seed;
++  const merge = (held, base, levels) => {
++    if (held === undefined) return clone(base);
++    if (levels === 0 || !isObject(held) || !isObject(base)) return held;
++    const merged = { ...held };
++    for (const key of Object.keys(base)) merged[key] = merge(held[key], base[key], levels - 1);
++    return merged;
++  };
++  const duties = merge(current.duties, seed.duties, 2);
++  if (isObject(duties) && Object.hasOwn(seed.duties, "advisory")) duties.advisory = clone(seed.duties.advisory);
++  return { ...current, profiles: merge(current.profiles, seed.profiles, 3), duties };
++}
++
++/**
++ * Core-owned V3 source surfaces: top-level `pipeline.user.v3` keys a recovery refresh may fill from the registry.
++ * `critic_export` is compared exactly against the frozen registry by the validator, so it is Core-owned by construction and is
++ * refreshed wholesale. `routing` is project-owned (draft ADR "a project's pipeline.user.yaml owns its routing"): the validator
++ * checks its shape only, and the refresh fills absent cells through `refresh` and never overwrites a value the project holds. This
++ * table is the single source `refreshKnownV3RegistryDelta()` in runner-profile-migration-v3.mjs drives its recovery refresh from,
++ * by iteration -- adding a future Core-owned surface needs exactly one new entry here, never a new branch in that function.
+  */
+ export const CORE_OWNED_V3_SURFACES = Object.freeze([
+   Object.freeze({
+     path: "routing",
+     registryValue: registeredRouting,
+-    // Routing is refreshed as one whole registry, not per-route: an absent
+-    // and a present-but-stale `routing` key are reported under the same
+-    // compatibility-delta name, because both replace the identical whole
+-    // subtree with the identical registered replacement.
++    // Additive: the project's own value wins, only absent duties, profiles and runner cells are filled. An absent and a
++    // present-but-incomplete `routing` key are reported under the same compatibility-delta name.
++    refresh: fillAbsentRouting,
+     absentDelta: Object.freeze({ name: "closed-v3-routing-registry-refresh", from: "previous-public-core-registry", to: "current-public-core-registry" }),
+     staleDelta: Object.freeze({ name: "closed-v3-routing-registry-refresh", from: "previous-public-core-registry", to: "current-public-core-registry" }),
+   }),
+@@ -316,10 +328,67 @@ function validateRoot(value, errors) {
+   compareExact(value.critic_export, FROZEN_REGISTRY.criticExportPolicy, "$.critic_export", errors, "export_policy");
+ }
+ 
++const ROUTE_EFFORTS = Object.freeze(["low", "medium", "high", "xhigh", "max", "not-applicable"]);
++const ROUTE_STATES = Object.freeze(["default", "opt-in", "unavailable"]);
++const SELECTOR_KINDS = Object.freeze(["alias", "model-id"]);
++
++/** The key set of `actual` must be exactly the key set of `expected`; reports a missing and an unregistered key. */
++function closedKeysOf(actual, expected, path, errors) {
++  if (!isObject(actual)) {
++    add(errors, path, "type", `${path} must be an object`, "restore the registered routing structure");
++    return false;
++  }
++  for (const key of Object.keys(expected)) if (!Object.hasOwn(actual, key)) add(errors, `${path}.${key}`, "required", "registered entry is missing", "restore every registered entry");
++  for (const key of Object.keys(actual)) if (!Object.hasOwn(expected, key)) add(errors, `${path}.${key}`, "additional_property", "entry is not registered", "remove the unregistered entry");
++  return true;
++}
++
++/** One route cell: its keys stay closed, state/selector kind/effort stay enumerated, the selector value is any non-empty string. */
++function validateRouteCell(cell, seed, path, errors) {
++  if (!closedKeysOf(cell, seed, path, errors)) return;
++  if (Object.hasOwn(cell, "state") && !ROUTE_STATES.includes(cell.state)) add(errors, `${path}.state`, "enum", `state must be one of ${ROUTE_STATES.join(", ")}`, "use a registered state");
++  if (Object.hasOwn(cell, "effort") && !ROUTE_EFFORTS.includes(cell.effort)) add(errors, `${path}.effort`, "enum", `effort must be one of ${ROUTE_EFFORTS.join(", ")}`, "use a listed effort");
++  if (Object.hasOwn(cell, "selector")) {
++    if (closedKeysOf(cell.selector, seed.selector, `${path}.selector`, errors)) {
++      if (Object.hasOwn(cell.selector, "kind") && !SELECTOR_KINDS.includes(cell.selector.kind)) add(errors, `${path}.selector.kind`, "enum", `selector kind must be one of ${SELECTOR_KINDS.join(", ")}`, "use alias or model-id");
++      if (Object.hasOwn(cell.selector, "value") && (typeof cell.selector.value !== "string" || cell.selector.value.trim() === "")) add(errors, `${path}.selector.value`, "type", "selector value must be a non-empty string", "name a model id or alias");
++    }
++  }
++  // Everything else on a cell (what happens when it is unavailable, which evidence it leaves) is not a model or an effort choice.
++  for (const key of Object.keys(seed)) if (!["state", "effort", "selector"].includes(key) && Object.hasOwn(cell, key)) compareExact(cell[key], seed[key], `${path}.${key}`, errors);
++}
++
++/** Shape of a project's routing against the registry's structure; values are the project's own. Advisory keeps its frozen contract. */
++function validateRoutingShape(routing, registry, errors) {
++  if (closedKeysOf(routing.profiles, registry.profiles, "$.routing.profiles", errors)) {
++    for (const [profile, phases] of Object.entries(registry.profiles)) {
++      const path = `$.routing.profiles.${profile}`;
++      if (!Object.hasOwn(routing.profiles, profile) || !closedKeysOf(routing.profiles[profile], phases, path, errors)) continue;
++      for (const [phase, runners] of Object.entries(phases)) {
++        if (!Object.hasOwn(routing.profiles[profile], phase) || !closedKeysOf(routing.profiles[profile][phase], runners, `${path}.${phase}`, errors)) continue;
++        for (const [runner, seed] of Object.entries(runners)) {
++          if (Object.hasOwn(routing.profiles[profile][phase], runner)) validateRouteCell(routing.profiles[profile][phase][runner], seed, `${path}.${phase}.${runner}`, errors);
++        }
++      }
++    }
++  }
++  if (closedKeysOf(routing.duties, registry.duties, "$.routing.duties", errors)) {
++    for (const [duty, runners] of Object.entries(registry.duties)) {
++      const path = `$.routing.duties.${duty}`;
++      if (!Object.hasOwn(routing.duties, duty)) continue;
++      if (duty === "advisory") { validateAdvisorContract(routing.duties.advisory, path, errors); continue; }
++      if (!closedKeysOf(routing.duties[duty], runners, path, errors)) continue;
++      for (const [runner, seed] of Object.entries(runners)) {
++        if (Object.hasOwn(routing.duties[duty], runner)) validateRouteCell(routing.duties[duty][runner], seed, `${path}.${runner}`, errors);
++      }
++    }
++  }
++}
++
+ /**
+- * Validates a complete pipeline.user.v3 intent. Routing is deliberately exact:
+- * V3 is a one-way authority cutover, not another compatibility layer for the
+- * old `design.advisor` phase.
++ * Validates a complete pipeline.user.v3 intent. A project owns the VALUES of its routing (draft ADR "a project's pipeline.user.yaml
++ * owns its routing"): the closed sets of profiles, phases, duties, runners and cell keys, the enumerations and the advisory
++ * contract are checked, any model id or alias and any listed effort is valid. `critic_export` stays exact.
+  */
+ export function validatePipelineUserV3(value, { source = "pipeline.user.v3", registry = FROZEN_REGISTRY } = {}) {
+   const errors = [];
+@@ -335,13 +404,40 @@ export function validatePipelineUserV3(value, { source = "pipeline.user.v3", reg
+   if (isObject(value)) {
+     const routingIsClosed = validateClosedObject(value.routing, "$.routing", ["profiles", "duties"], errors, "restore exactly the registered routing object");
+     if (routingIsClosed) {
+-      compareExact(value.routing.profiles, registry.profiles, "$.routing.profiles", errors);
+-      compareExact(value.routing.duties, registry.duties, "$.routing.duties", errors);
++      validateRoutingShape(value.routing, registry, errors);
+     }
+   }
+   return result(errors, source, { advisoryExport });
+ }
+ 
++/**
++ * The project's validated routing for a root, read from its `pipeline.user.yaml`; the registry (the seed) with a warning when the
++ * file is absent, unreadable or invalid. Pure apart from the read; one parser (yaml-lite), no second copy of the contract.
++ */
++export function readProjectRouting(root = process.cwd(), { readText = (path) => readFileSync(path, "utf8") } = {}) {
++  const fallback = (why) => ({ source: "registry", routing: registeredRouting(), warnings: [`${PROJECT_USER_FILE} ${why}; the plugin registry routes this run`] });
++  let intent;
++  try { intent = parseYaml(readText(join(String(root), PROJECT_USER_FILE))); }
++  catch (error) { return fallback(error?.code === "ENOENT" ? "was not found" : `could not be read (${error?.name === "YamlLiteError" ? error.message : "unreadable"})`); }
++  const checked = validatePipelineUserV3(intent, { source: PROJECT_USER_FILE });
++  if (!checked.ok) return fallback(`is not a valid pipeline.user.v3 (${checked.errors[0]?.path ?? "$"}: ${checked.errors[0]?.code ?? "invalid"})`);
++  return { source: "project", routing: { profiles: clone(intent.routing.profiles), duties: clone(intent.routing.duties) }, warnings: [] };
++}
++
++const WARNED = new Set();
++/**
++ * The registry-shaped object route readers hand to `registeredFunctionalTaskRoutes`: the registry with the project's own routing in
++ * place of the seed's. A fallback is announced once per process on stderr (or through `warn`), never silently.
++ */
++export function loadProjectRoutingRegistry(root = process.cwd(), { readText, warn } = {}) {
++  const read = readProjectRouting(root, readText ? { readText } : {});
++  for (const text of read.warnings) {
++    if (warn) warn(text);
++    else if (!WARNED.has(`${root}\0${text}`)) { WARNED.add(`${root}\0${text}`); process.stderr.write(`WARNING (project-routing): ${text}\n`); }
++  }
++  return { ...loadRunnerProfilesV3Registry(), profiles: read.routing.profiles, duties: read.routing.duties };
++}
++
+ export function validatePipelineUserV3Json(text, options = {}) {
+   try {
+     return validatePipelineUserV3(JSON.parse(text), options);
+diff --git a/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs b/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs
+index 7b767254b..beb6dd856 100644
+--- a/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs
++++ b/plugins/pipeline-core/lib/runner-profiles-v3.test.mjs
+@@ -2,6 +2,10 @@
+ // SPDX-License-Identifier: SUL-1.0
+ 
+ import assert from "node:assert/strict";
++import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import * as profiles from "./runner-profiles-v3.mjs";
+ import {
+   loadPipelineUserV3Schema,
+   loadRunnerProfilesV3Registry,
+@@ -100,7 +104,9 @@ const cases = [
+       "critic-high-risk.antigravity": "inherit / high",
+       "critic-normal.codex": "gpt-6-sol / medium", "critic-normal.claude": "opus / medium",
+       "critic-normal.antigravity": "inherit / high",
+-      "deep.codex": "gpt-6-sol / medium", "deep.claude": "sonnet / medium",
++      // QG-04 restated (C23, PO tile 2026-11-09, D184): the shipped default effort of the Claude deep duty is high (was medium). A
++      // project keeps its own value; this pin is the seed a new project starts from.
++      "deep.codex": "gpt-6-sol / medium", "deep.claude": "sonnet / high",
+       "deep.antigravity": "gemini-3.8-flash-high / high",
+       "implement.codex": "gpt-6-luna / high", "implement.claude": "sonnet / medium",
+       "implement.antigravity": "gemini-3.8-flash-medium / medium",
+@@ -269,6 +275,100 @@ const cases = [
+     assert.equal(checked.ok, false);
+     assert.ok(has(checked, "$.gates.reconcile_approval", "contract"));
+   }],
++  // C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decisions 1-4): the routing of a project is validated by
++  // shape only; any model id or alias and any listed effort is valid, the closed sets of duties, runners and keys stay closed.
++  ["a project with a changed effort and a changed model id validates", () => {
++    const value = completeIntent();
++    value.routing.duties.deep.claude.effort = "xhigh";
++    value.routing.duties.mechanic.claude.selector = { kind: "model-id", value: "claude-haiku-9" };
++    value.routing.duties.implement.codex.selector = { kind: "alias", value: "any-alias-the-project-names" };
++    value.routing.profiles.mini.execution_phase.codex.effort = "low";
++    const checked = validatePipelineUserV3(value);
++    assert.equal(checked.ok, true, JSON.stringify(checked.errors));
++  }],
++  ["a project value equal to the previous shipped registry stays valid", () => {
++    const value = completeIntent();
++    value.routing.duties.deep.claude.effort = "medium";
++    assert.equal(validatePipelineUserV3(value).ok, true);
++    value.routing.duties.deep.claude.effort = "high";
++    assert.equal(validatePipelineUserV3(value).ok, true);
++  }],
++  ["the shape of a project's routing stays closed", () => {
++    const unknownDuty = completeIntent(); unknownDuty.routing.duties.invented = clone(unknownDuty.routing.duties.implement);
++    assert.ok(has(validatePipelineUserV3(unknownDuty), "$.routing.duties.invented", "additional_property"));
++    const unknownRunner = completeIntent(); unknownRunner.routing.duties.deep.invented = clone(unknownRunner.routing.duties.deep.claude);
++    assert.ok(has(validatePipelineUserV3(unknownRunner), "$.routing.duties.deep.invented", "additional_property"));
++    const extraKey = completeIntent(); extraKey.routing.duties.deep.claude.extra = "x";
++    assert.ok(has(validatePipelineUserV3(extraKey), "$.routing.duties.deep.claude.extra", "additional_property"));
++    const missingKey = completeIntent(); delete missingKey.routing.duties.deep.claude.effort;
++    assert.ok(has(validatePipelineUserV3(missingKey), "$.routing.duties.deep.claude.effort", "required"));
++    const badEffort = completeIntent(); badEffort.routing.duties.deep.claude.effort = "turbo";
++    assert.ok(has(validatePipelineUserV3(badEffort), "$.routing.duties.deep.claude.effort", "enum"));
++    const badState = completeIntent(); badState.routing.duties.deep.claude.state = "maybe";
++    assert.ok(has(validatePipelineUserV3(badState), "$.routing.duties.deep.claude.state", "enum"));
++    const badKind = completeIntent(); badKind.routing.duties.deep.claude.selector.kind = "guess";
++    assert.ok(has(validatePipelineUserV3(badKind), "$.routing.duties.deep.claude.selector.kind", "enum"));
++    const emptyValue = completeIntent(); emptyValue.routing.duties.deep.claude.selector.value = "";
++    assert.ok(has(validatePipelineUserV3(emptyValue), "$.routing.duties.deep.claude.selector.value", "type"));
++    const missingDuty = completeIntent(); delete missingDuty.routing.duties.deep;
++    assert.ok(has(validatePipelineUserV3(missingDuty), "$.routing.duties.deep", "required"));
++    const profileCell = completeIntent(); profileCell.routing.profiles.epic.design_phase.codex.effort = "turbo";
++    assert.ok(has(validatePipelineUserV3(profileCell), "$.routing.profiles.epic.design_phase.codex.effort", "enum"));
++  }],
++  ["the critic export policy stays exactly the registry's", () => {
++    const value = completeIntent(); value.critic_export = { ...value.critic_export, extra: true };
++    assert.equal(validatePipelineUserV3(value).ok, false);
++  }],
++  ["the reader returns the project's own routing, and falls back to the registry with a visible warning", () => {
++    const render = (value, indent = "") => Object.keys(value).map((key) => {
++      const item = value[key];
++      if (Array.isArray(item)) return item.length === 0 ? `${indent}${key}: []\n` : `${indent}${key}:\n${item.map((entry) => (entry !== null && typeof entry === "object"
++        ? `${indent}  -\n${render(entry, `${indent}    `)}` : `${indent}  - ${JSON.stringify(entry)}\n`)).join("")}`;
++      return item !== null && typeof item === "object" ? `${indent}${key}:\n${render(item, `${indent}  `)}` : `${indent}${key}: ${JSON.stringify(item)}\n`;
++    }).join("");
++    const root = mkdtempSync(join(tmpdir(), "c23-reader-"));
++    try {
++      const warnings = [];
++      const absent = profiles.readProjectRouting(root);
++      assert.equal(absent.source, "registry");
++      assert.ok(absent.warnings.length > 0);
++      assert.deepEqual(absent.routing, { profiles: registry.profiles, duties: registry.duties });
++
++      const changed = completeIntent();
++      changed.core_registry_sha256 = profiles.RUNNER_PROFILES_V3_REGISTRY_SHA256;
++      changed.routing.duties.deep.claude.effort = "xhigh";
++      changed.routing.duties.mechanic.claude.selector = { kind: "model-id", value: "claude-haiku-9" };
++      writeFileSync(join(root, "pipeline.user.yaml"), render(changed));
++      const project = profiles.readProjectRouting(root);
++      assert.equal(project.source, "project");
++      assert.deepEqual(project.warnings, []);
++      assert.equal(project.routing.duties.deep.claude.effort, "xhigh");
++      assert.equal(project.routing.duties.mechanic.claude.selector.value, "claude-haiku-9");
++      const merged = profiles.loadProjectRoutingRegistry(root, { warn: (text) => warnings.push(text) });
++      assert.equal(merged.duties.deep.claude.effort, "xhigh");
++      assert.deepEqual(merged.criticExportPolicy, registry.criticExportPolicy);
++      assert.deepEqual(warnings, []);
++
++      const invalid = clone(changed); invalid.routing.duties.deep.claude.effort = "turbo";
++      writeFileSync(join(root, "pipeline.user.yaml"), render(invalid));
++      const fallback = profiles.readProjectRouting(root);
++      assert.equal(fallback.source, "registry");
++      assert.ok(fallback.warnings.length > 0);
++      assert.equal(fallback.routing.duties.deep.claude.effort, registry.duties.deep.claude.effort);
++      profiles.loadProjectRoutingRegistry(root, { warn: (text) => warnings.push(text) });
++      assert.equal(warnings.length, 1);
++      assert.match(warnings[0], /pipeline\.user\.yaml/u);
++    } finally { rmSync(root, { recursive: true, force: true }); }
++  }],
++  ["the reader joins a backslash drive-letter root to the project file", () => {
++    let seen = null;
++    const result = profiles.readProjectRouting("C:\\work\\project", { readText: (path) => { seen = path; throw new Error("not here"); } });
++    assert.match(String(seen), /^C:\\work\\project[\\/]pipeline\.user\.yaml$/u);
++    assert.equal(result.source, "registry");
++  }],
++  ["the shipped default for the Claude deep duty is high", () => {
++    assert.equal(registry.duties.deep.claude.effort, "high");
++  }],
+ ];
+ 
+ let passed = 0;
+diff --git a/plugins/pipeline-core/scripts/critic-claude-host.mjs b/plugins/pipeline-core/scripts/critic-claude-host.mjs
+index 76ab17d96..7238aa9da 100644
+--- a/plugins/pipeline-core/scripts/critic-claude-host.mjs
++++ b/plugins/pipeline-core/scripts/critic-claude-host.mjs
+@@ -10,7 +10,7 @@ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+ import { checkCriticExport, deriveCriticExportView } from "../lib/critic-export-policy.mjs";
+ import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
+ import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
+-import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
++import { loadProjectRoutingRegistry, loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+ import { diagnosticReviewerReferences } from "../lib/critic-diagnostic-packet.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+ import {
+@@ -182,8 +182,10 @@ function validateClaudeCriticModelRoute(packet, deps) {
+   }
+   const taskRoute = trigger === "T1" || trigger === "T2"
+     ? "duty.critic_high_risk" : "duty.critic_normal";
+-  const registry = (deps.readRunnerProfilesV3RegistryFn ?? loadRunnerProfilesV3Registry)();
+-  if (!validateRunnerProfilesV3Registry(registry).ok) fail("CLH-MODEL-ROLE-V3", "Claude V3 Critic routing source is invalid.");
++  // C23: the Critic route is the PROJECT's own (its pipeline.user.yaml, validated by shape when read); an injected registry is
++  // still validated against the frozen contract.
++  const registry = (deps.readRunnerProfilesV3RegistryFn ?? (() => loadProjectRoutingRegistry(packet.checkout?.realPath)))();
++  if (deps.readRunnerProfilesV3RegistryFn && !validateRunnerProfilesV3Registry(registry).ok) fail("CLH-MODEL-ROLE-V3", "Claude V3 Critic routing source is invalid.");
+   const dutyId = taskRoute === "duty.critic_high_risk" ? "critic_high_risk" : "critic_normal";
+   const v3 = registry.duties?.[dutyId]?.claude;
+   if (!v3 || v3.state !== "default" || !v3.selector
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index eb4c8da9a..263199eaa 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -27,7 +27,7 @@ import { criticCoverageAdvisory, listUncoveredCriticRecords, terminalAuthoredDel
+ import { criticDisposition } from "../lib/critic-skip-decision.mjs";
+ import { SAFE_ID, admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
+ import { SPLIT_MAX_ENTRIES, buildCriticSplit } from "../lib/critic-split.mjs";
+-import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
++import { loadProjectRoutingRegistry } from "../lib/runner-profiles-v3.mjs";
+ import {
+   CriticGuardrailDerivationError,
+   deriveRequiredCriticGuardrails,
+@@ -648,7 +648,10 @@ function opusCriticPromptLines({ root, result, env, registry, trigger }) {
+   const runner = env.CODEX_SESSION_ID !== undefined || env.CODEX_THREAD_ID !== undefined ? "codex" : "claude";
+   const duty = trigger === "T1" || trigger === "T2" ? "critic_high_risk" : "critic_normal";
+   let cell;
+-  try { cell = (registry ?? loadRunnerProfilesV3Registry()).duties?.[duty]?.[runner]; } catch { return null; }
++  // C23: the Critic route of the PROJECT (its pipeline.user.yaml), not the shipped registry. This CLI's stderr protocol is closed
++  // (a complete packet-ready result prints nothing there), so a fallback to the registry is not announced here; the line below only
++  // quotes the route it found.
++  try { cell = (registry ?? loadProjectRoutingRegistry(root, { warn: () => {} })).duties?.[duty]?.[runner]; } catch { return null; }
+   if (!isObject(cell) || cell.state === "unavailable" || !isObject(cell.selector) || typeof cell.selector.value !== "string" || !/opus/iu.test(cell.selector.value)) return null;
+   const base = result.base.commit ?? result.base.tree, head = result.candidate.commit;
+   const names = gitOrNull(root, ["diff", "--name-only", base, head]);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index a4c00648b..9ad20b0e4 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -110,7 +110,7 @@ const {
+ } = cliHelp ? {} : await import("../lib/native-goldfish-host-return.mjs");
+ const { acceptedFamilyForms, modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } = cliHelp ? {} : await import("../lib/agent-model-registry.mjs");
+ const { ANTIGRAVITY_NATIVE_MODELS, antigravityNativeTierForTaskRoute } = cliHelp ? {} : await import("../lib/dispatch-model-enforcement.mjs");
+-const { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } = cliHelp ? {} : await import("../lib/model-role-route-source.mjs");
++const { functionalTaskRoutesForRunner, projectFunctionalTaskRoutes } = cliHelp ? {} : await import("../lib/model-role-route-source.mjs");
+ const {
+   BRIEFING_BUILD_SCHEMA,
+   BriefingPackageRefusal,
+@@ -237,31 +237,33 @@ function listDirectoryFiles(root, path, limit = MAX_ALLOWED_PATHS) {
+ }
+ 
+ /** The Codex task route of a duty (read-only registry projection), or null when the registry yields none. */
+-function defaultCodexRoute(taskRoute) {
++// C23 (draft ADR "a project's pipeline.user.yaml owns its routing"): the four default route readers below read the PROJECT's own
++// routing for `root` (the registry, with a warning on stderr, only when its pipeline.user.yaml is absent or invalid).
++function defaultCodexRoute(taskRoute, root) {
+   try {
+-    const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "codex");
++    const scoped = functionalTaskRoutesForRunner(projectFunctionalTaskRoutes(root), "codex");
+     return scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute) ?? null : null;
+   } catch { return null; }
+ }
+ 
+-/** The Antigravity native model alias of a duty (read-only registry projection), or null when the registry yields none. */
+-function defaultAntigravityRoute(taskRoute) {
+-  try { return antigravityNativeTierForTaskRoute(taskRoute); } catch { return null; }
++/** The Antigravity native model alias of a duty (read-only projection of the project's routing), or null when it yields none. */
++function defaultAntigravityRoute(taskRoute, root) {
++  try { return antigravityNativeTierForTaskRoute(taskRoute, projectFunctionalTaskRoutes(root)); } catch { return null; }
+ }
+ 
+-/** The concrete model id the registry names for an Antigravity duty, or null. The briefing states it because the alias alone names no model (MP-05). */
+-function defaultAntigravityRouteModel(taskRoute) {
++/** The concrete model id the project's routing names for an Antigravity duty, or null. The briefing states it because the alias alone names no model (MP-05). */
++function defaultAntigravityRouteModel(taskRoute, root) {
+   try {
+-    const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "antigravity");
++    const scoped = functionalTaskRoutesForRunner(projectFunctionalTaskRoutes(root), "antigravity");
+     const value = scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute)?.selector?.value : null;
+     return typeof value === "string" ? value : null;
+   } catch { return null; }
+ }
+ 
+-/** The Claude task route of a duty (read-only registry projection), or null when the registry yields none. */
+-function defaultClaudeRoute(taskRoute) {
++/** The Claude task route of a duty (read-only projection of the project's routing), or null when it yields none. */
++function defaultClaudeRoute(taskRoute, root) {
+   try {
+-    const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "claude");
++    const scoped = functionalTaskRoutesForRunner(projectFunctionalTaskRoutes(root), "claude");
+     return scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute) ?? null : null;
+   } catch { return null; }
+ }
+@@ -945,7 +947,7 @@ export function generateDispatchBinding(options, deps = {}) {
+   let codexRoute = null;
+   if (runner === "codex") {
+     const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
+-    codexRoute = (deps.codexRoute ?? defaultCodexRoute)(taskRoute);
++    codexRoute = (deps.codexRoute ?? defaultCodexRoute)(taskRoute, root);
+     if (!codexRoute || codexRoute.state === "unavailable" || typeof codexRoute.selector?.value !== "string") {
+       refuse("DBG-MODEL-ROUTE-UNAVAILABLE", `the Codex route ${taskRoute} for ${agentType} is ${codexRoute?.state === "unavailable" ? "unavailable" : "not registered"} in the runner profile registry, so model id ${modelId} cannot be checked against it; repair: pick the --agent-type whose Codex route is available (${Object.entries(DUTY_ROUTE_OF_AGENT).map(([type, route]) => `${type} = ${route}`).join(", ")}; \`node <plugin-root>/scripts/model-role-dispatch-select.mjs --repo-root <repo> --runner codex --task-route ${taskRoute}\` shows the route), or dispatch with --runner claude`);
+     }
+@@ -956,7 +958,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     }
+   } else if (runner === "antigravity") {
+     const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
+-    const expected = (deps.antigravityRoute ?? defaultAntigravityRoute)(taskRoute);
++    const expected = (deps.antigravityRoute ?? defaultAntigravityRoute)(taskRoute, root);
+     if (typeof expected !== "string" || !ANTIGRAVITY_NATIVE_MODELS.includes(expected)) {
+       refuse("DBG-MODEL-ROUTE-UNAVAILABLE", `the Antigravity route ${taskRoute} for ${agentType} is not registered in the runner profile registry, so model id ${modelId} cannot be checked against it; repair: pick the --agent-type whose Antigravity route is registered (${Object.entries(DUTY_ROUTE_OF_AGENT).map(([type, route]) => `${type} = ${route}`).join(", ")}), or dispatch with --runner claude`);
+     }
+@@ -980,7 +982,7 @@ export function generateDispatchBinding(options, deps = {}) {
+   // Antigravity: the agent definition's effort is the briefed effort (no Antigravity effort is selectable; the Claude route is not read).
+   if (runner === "claude") {
+     const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
+-    const route = (deps.claudeRoute ?? defaultClaudeRoute)(taskRoute);
++    const route = (deps.claudeRoute ?? defaultClaudeRoute)(taskRoute, root);
+     const routeEffort = route && route.state !== "unavailable" && typeof route.effort === "string" && route.effort !== "" ? route.effort : null;
+     if (routeEffort === null) {
+       warnings.push({ code: "DBG-EFFORT-ROUTE-UNKNOWN", message: `the Claude route ${taskRoute} for ${agentType} could not be read from the runner profile registry, so the effort ${resolved.effort} of the agent definition was not checked against the configured route` });
+@@ -1137,7 +1139,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     runner === "codex"
+       ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Codex route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`).`
+       : runner === "antigravity"
+-        ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Antigravity native model alias, route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`, route model \`${(deps.antigravityRouteModel ?? defaultAntigravityRouteModel)(DUTY_ROUTE_OF_AGENT[agentType]) ?? "not registered"}\`).`
++        ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Antigravity native model alias, route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`, route model \`${(deps.antigravityRouteModel ?? defaultAntigravityRouteModel)(DUTY_ROUTE_OF_AGENT[agentType], root) ?? "not registered"}\`).`
+         : `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; agent definition alias \`${resolved.model}\`${claudeRouteDuty === null ? "" : `; Claude route \`${claudeRouteDuty}\``}).`,
+     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
+     // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.
+diff --git a/plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs b/plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs
+index fae4d4f88..8360ecec2 100644
+--- a/plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs
+@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
+ import { AGY_ERROR_TAXONOMY, invokeAgy, parseAgyOutput } from "../lib/antigravity-execution-host.mjs";
+ import { bindStoredModelRoleDispatch } from "../lib/model-role-host-session.mjs";
+ import { createModelRoleHostStore } from "../lib/model-role-host-store.mjs";
+-import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
++import { loadProjectRoutingRegistry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+ import { ROLE_DISPATCH_PREFLIGHT_SCHEMA, ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
+ import { validateControlPlacement } from "./control-placement.mjs";
+ import { validateRecord } from "./enforcement-conformance.mjs";
+@@ -338,9 +338,11 @@ export async function dispatchGoldfishToAntigravity({
+     const baseRoute = packet.role === "pipeline-core:goldfish-mechanic"
+       ? "duty.implement" : taskRoute;
+     let registry;
+-    try { registry = dependencies.readRegistry?.() ?? loadRunnerProfilesV3Registry(); }
++    // C23: the route is the PROJECT's own (its pipeline.user.yaml, validated by shape when read); an injected registry is still
++    // validated against the frozen contract.
++    try { registry = dependencies.readRegistry ? dependencies.readRegistry() : loadProjectRoutingRegistry(root); }
+     catch { return refused(E3_CODES.MODEL_ROLE_NOT_BOUND, "sessionId"); }
+-    if (!validateRunnerProfilesV3Registry(registry).ok)
++    if (dependencies.readRegistry && !validateRunnerProfilesV3Registry(registry).ok)
+       return refused(E3_CODES.MODEL_ROLE_NOT_BOUND, "sessionId");
+     const cell = baseRoute?.startsWith("duty.")
+       ? registry.duties?.[baseRoute.slice(5)]?.antigravity : null;
+diff --git a/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs b/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs
+index 82054de69..ec03093ea 100644
+--- a/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs
++++ b/plugins/pipeline-core/scripts/model-role-dispatch-select.mjs
+@@ -13,7 +13,7 @@ import { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } from ".
+ import { createModelFamilyInvocationEntry } from "../lib/model-family-invocation.mjs";
+ import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
+ import { CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE } from "../lib/model-role-route-source.mjs";
+-import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
++import { loadProjectRoutingRegistry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+ 
+ const fail = (code) => ({ ok: false, code, status: "unavailable" });
+ const legacy = ({ runner, taskRoute, sessionId = null, diagnostic = null, v3Route }) => ({
+@@ -66,7 +66,7 @@ export function selectModelRoleForTask({ rootDir, runner, taskRoute,
+   familyInvocationEntry = null,
+   makeInvocationId = randomUUID,
+   readCandidate = readGitCandidate,
+-  routeSource = undefined, readRegistry = loadRunnerProfilesV3Registry,
++  routeSource = undefined, readRegistry = undefined,
+   readCommonDir = readGitCommonDir, makeStore = createModelRoleHostStore } = {}) {
+   if (typeof rootDir !== "string" || !isAbsolute(rootDir)) return fail("MODEL-ROLE-SELECT-SOURCE");
+   familyInvocationEntry ??= createModelFamilyInvocationEntry({
+@@ -90,9 +90,11 @@ export function selectModelRoleForTask({ rootDir, runner, taskRoute,
+   // registered V3 route before considering its derived role projection: a
+   // damaged projection may not strand an otherwise usable approved route.
+   let registry;
+-  try { registry = readRegistry(); }
++  // C23: the route is the PROJECT's own routing for rootDir (already validated by shape, the registry with a warning when its
++  // pipeline.user.yaml is absent or invalid). An injected registry is still validated against the frozen contract.
++  try { registry = readRegistry ? readRegistry() : loadProjectRoutingRegistry(rootDir); }
+   catch { return fail("MODEL-ROLE-SELECT-SOURCE"); }
+-  if (!validateRunnerProfilesV3Registry(registry).ok) return fail("MODEL-ROLE-SELECT-SOURCE");
++  if (readRegistry && !validateRunnerProfilesV3Registry(registry).ok) return fail("MODEL-ROLE-SELECT-SOURCE");
+   const parts = typeof taskRoute === "string" ? taskRoute.split(".") : [];
+   const cell = ["claude", "codex", "antigravity"].includes(runner)
+     ? parts.length === 3 && parts[0] === "profile"
