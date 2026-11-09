@@ -1,0 +1,129 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 3aa6c08978c041bd033ffeabebe45e13f8d00993..114aeba4f86bab95305e1fe287d09334e9384ddf 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -307,6 +307,33 @@ export function inspectArchitectureDesignDraft({ rootDir, planPath, expectedPlan
+   }
+ }
+ 
++/**
++ * A feature close clears the plan approval, not the architecture that plan accepted. With no plan approval in force, the receipt of a
++ * closed feature still names the approved design while its plan and every materialized target are byte-equal. Read-only orientation:
++ * it is never authority for new work, the planning gate and implementation entry keep their own check.
++ */
++export function inspectClosedFeatureArchitecture(rootDir) {
++  const root = resolve(rootDir);
++  try {
++    const state = JSON.parse(bytes(root, selectedArchitectureState(root).state));
++    requireValue(!state.planApproval?.poGateAuthority, "ARCHITECTURE-DESIGN-APPROVAL-IN-FORCE");
++    const receipt = JSON.parse(bytes(root, "architecture/design-materialization.json"));
++    requireValue(receipt?.schema === "pipeline.architecture-design-materialization.v1" && typeof receipt.featureId === "string"
++      && Array.isArray(state.closedFeatures) && state.closedFeatures.some(entry => entry?.id === receipt.featureId), "ARCHITECTURE-DESIGN-RECEIPT-STALE");
++    const prd = bytes(root, receipt.planPath);
++    requireValue(hash(prd) === receipt.planSha256, "ARCHITECTURE-DESIGN-RECEIPT-STALE");
++    const input = parseArchitectureDesign(prd);
++    const targets = architectureDesignTargets(input);
++    requireValue(hash(json(input)) === receipt.designSha256
++      && JSON.stringify(targets.map(target => ({ path: target.path, sha256: hash(target.bytes) }))) === JSON.stringify(receipt.targets), "ARCHITECTURE-DESIGN-RECEIPT-STALE");
++    requireValue(targets.every(target => bytes(root, target.path) === target.bytes), "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
++    return { ok: true, status: "closed-feature-design", featureId: receipt.featureId, designSha256: receipt.designSha256,
++      scope: input.disposition.scope, rationale: input.disposition.rationale };
++  } catch (error) {
++    return { ok: false, status: "unavailable", code: architectureDesignFailureCode(error) };
++  }
++}
++
+ /** Read-only authority projection: no adoption record or second PO decision is fabricated. */
+ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) {
+   const root = resolve(rootDir);
+diff --git a/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs b/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
+index 4bc417c8d94b4361ee7f9df4b1469f4a1c576e56..c833a4c74b1a64432d06ad46cd4ff07600973072 100644
+--- a/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
+@@ -6,7 +6,9 @@ import { join } from 'node:path';
+ import test from 'node:test';
+ import * as fixture from './architecture-prospective-materialization.fixture.mjs';
+ import { inspectArchitectureEntryReadiness } from './architecture-entry-readiness.mjs';
+-import { architectureCommitStep, inspectArchitectureDesign } from './architecture-design.mjs';
++import { architectureCommitStep, inspectArchitectureDesign, inspectClosedFeatureArchitecture } from './architecture-design.mjs';
++import { observeArchitectureAdoptionOrientation } from './architecture-adoption-orientation.mjs';
++import { checkPlanningAdoptionDisposition, resolveAdoptionState } from '../scripts/architecture-adoption.mjs';
+ 
+ const readiness = f => inspectArchitectureEntryReadiness({ rootDir: f.dir, taskScope: fixture.PLAN,
+   deps: { readCheckpointArchitectureDebt: () => ({ ok: true, debt: [], resolvedDebt: [] }) } });
+@@ -114,6 +116,47 @@ test('G20-36 materialize-architecture names the exact commit step while the mate
+   assert.deepEqual(architectureCommitStep(f.dir), { uncommittedPaths: [], commitStep: null });
+ });
+ 
++function closeFeatureInState(f) {
++  const statePath = join(f.dir, fixture.stateRelative(f));
++  const { activeFeature, planApproval, ...rest } = JSON.parse(readFileSync(statePath, 'utf8'));
++  assert(activeFeature?.id && planApproval);
++  writeFileSync(statePath, JSON.stringify({ ...rest, planApproved: false, closedFeatures: [{ id: activeFeature.id, planPath: activeFeature.planPath }] }, null, 2));
++}
++
++test('CGF-30 a feature close does not turn the accepted architecture into adoption-required, and grants no new authority', () => {
++  const f = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
++  const executed = fixture.invoke(f, ['materialize-architecture']);
++  assert.equal(executed.status, 0, executed.text);
++  closeFeatureInState(f);
++  const receipt = JSON.parse(readFileSync(join(f.dir, 'architecture/design-materialization.json'), 'utf8'));
++  const adoption = resolveAdoptionState(f.dir);
++  assert.equal(adoption.state, 'approved-scoped', JSON.stringify(adoption));
++  assert.equal(adoption.decisionRef, `approved-design-package:${receipt.designSha256}`);
++  assert.equal(adoption.closedFeature, receipt.featureId);
++  assert.equal(observeArchitectureAdoptionOrientation({ rootDir: f.dir }).status, 'decision-recorded');
++  assert.equal(checkPlanningAdoptionDisposition(f.dir, fixture.PLAN).ok, false, 'the planning gate still needs an approval in force');
++  writeFileSync(join(f.dir, fixture.PLAN), Buffer.concat([readFileSync(join(f.dir, fixture.PLAN)), Buffer.from('\nDrift.\n')]));
++  assert.equal(resolveAdoptionState(f.dir).state, 'adoption-required', 'an edited plan no longer names the accepted design');
++});
++
++test('CGF-30 a drifted target or an unclosed receipt keeps adoption-required after the approval is gone', () => {
++  const drifted = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
++  assert.equal(fixture.invoke(drifted, ['materialize-architecture']).status, 0);
++  const receipt = JSON.parse(readFileSync(join(drifted.dir, 'architecture/design-materialization.json'), 'utf8'));
++  closeFeatureInState(drifted);
++  writeFileSync(join(drifted.dir, receipt.targets[0].path), Buffer.concat([readFileSync(join(drifted.dir, receipt.targets[0].path)), Buffer.from('\ndrift\n')]));
++  assert.equal(inspectClosedFeatureArchitecture(drifted.dir).code, 'ARCHITECTURE-DESIGN-ARTIFACT-DRIFT');
++  assert.equal(resolveAdoptionState(drifted.dir).state, 'adoption-required');
++
++  const unclosed = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
++  assert.equal(fixture.invoke(unclosed, ['materialize-architecture']).status, 0);
++  assert.equal(inspectClosedFeatureArchitecture(unclosed.dir).code, 'ARCHITECTURE-DESIGN-APPROVAL-IN-FORCE');
++  closeFeatureInState(unclosed);
++  const statePath = join(unclosed.dir, fixture.stateRelative(unclosed));
++  writeFileSync(statePath, JSON.stringify({ ...JSON.parse(readFileSync(statePath, 'utf8')), closedFeatures: [] }, null, 2));
++  assert.equal(inspectClosedFeatureArchitecture(unclosed.dir).code, 'ARCHITECTURE-DESIGN-RECEIPT-STALE');
++});
++
+ test('G27-PUBLIC-007 wrong source root has no Greenfield materialization authority', () => {
+   const f = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
+   const wrongRoot = join(f.dir, 'scratch', 'wrong-root');
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.mjs b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+index 4f5a0fcc52b0f326a56db24af151669c5e077b1c..0af6d2fb79a807aefa5588ae1b295fcd79c0a9c1 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
+ import { loadBaseline } from "./architecture-fitness.mjs";
+ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+ const stateSchema = JSON.parse(fs.readFileSync(new URL("../schemas/pipeline.adoption-state.v1.json", import.meta.url), "utf8"));
+-import { inspectArchitectureDesign } from "../lib/architecture-design.mjs";
++import { inspectArchitectureDesign, inspectClosedFeatureArchitecture } from "../lib/architecture-design.mjs";
+ const proposalSchema = JSON.parse(fs.readFileSync(new URL("../schemas/pipeline.adoption-proposal.v1.json", import.meta.url), "utf8"));
+ import {
+   buildAdoptionSubject,
+@@ -137,6 +137,14 @@ export function resolveAdoptionState(rootDir = DEFAULT_ROOT, now = new Date()) {
+     }
+   }
+ 
++  const closed = inspectClosedFeatureArchitecture(rootDir);
++  if (closed.ok) return {
++    schema: SCHEMA_ADOPTION_STATE, state: STATE_APPROVED_SCOPED, scope: closed.scope,
++    decidedAt: null, expiresAt: null, reviewDate: null,
++    decisionRef: "approved-design-package:" + closed.designSha256,
++    rationale: closed.rationale, coverageClass: "evaluated", confidence: "measured", closedFeature: closed.featureId,
++  };
++
+   return {
+     schema: SCHEMA_ADOPTION_STATE,
+     state: STATE_ADOPTION_REQUIRED,

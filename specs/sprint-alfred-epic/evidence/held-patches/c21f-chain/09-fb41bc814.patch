@@ -1,0 +1,154 @@
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+index a4aa6c39e17edc2d5ab9c982cb83ca132e0c923e..b4b2b9179c345cf72a29878ad24f5974d3ad3d44 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+@@ -1342,7 +1342,7 @@ check("outer Codex routing admits the exact bounded diagnostic pipeline while no
+   ]) {
+     const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
+     assert.equal(output.permissionDecision, "deny", command);
+-    assert.match(output.permissionDecisionReason, /GUARD-(?:REDIRECT|OPERATOR|LIFECYCLE)/u, command);
++    assert.match(output.permissionDecisionReason, /GUARD-(?:REDIRECT|OPERATOR|LIFECYCLE|READ-COMMAND)/u, command);
+   }
+ });
+ 
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 2c70d5b8828367d5cfb4ac165683de4d95a88387..51295dfe22e1d33361740858f4957970a2e1f5c7 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -17,7 +17,7 @@ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS,
+ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+ import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+-import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
++import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+ import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
+ import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
+ import { evaluateBootstrapReceiptGate, recordBootstrapPreflightReceipt } from "./bootstrap-receipt.mjs";
+@@ -617,6 +617,10 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       // (a `|`-joined pipeline) always is.
+       const readScope = isOutsideRootBoundedDiagnosticRead(parsed, root)
+         || isOutsideRootSingleCommandRead(parsed, root);
++      // CGF-10 (PO tile 2026-11-09): a pipeline of readers that is not an admitted shape is a spelling question, so no signed override is offered.
++      if (!readScope && isReaderOnlyPipeline(parsed, root)) {
++        return withLifts(lifts, blocked(READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejectedGrammarElement("GUARD-OPERATOR-UNAPPROVED", (input.tool_input.command ?? input.tool_input.CommandLine), parsed)));
++      }
+       const code = readScope
+         ? READ_SCOPE_DENIAL_CODE
+         : parsed.redirects.length > 0 ? "GUARD-REDIRECT-UNAPPROVED" : "GUARD-OPERATOR-UNAPPROVED";
+diff --git a/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs b/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
+index c4485df48131693f93a99a162721a9968f5817c3..30efe68fc754bb81b00e9bf826688d37ec182d68 100644
+--- a/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
++++ b/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
+@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+ import { evaluateLifecycleReadyGuard } from "./evaluate.mjs";
++import { isReadOnlyDiagnosticCommand } from "./shell-grammar.mjs";
+ 
+ function seededRequests(toolName, toolInput) {
+   const dir = mkdtempSync(join(tmpdir(), "ac160-seed-"));
+@@ -33,6 +34,8 @@ test("NRS01 refusals with no override route seed no request", () => {
+     ["Bash", { command: "cat /etc/hostname" }, "GUARD-READ-SCOPE-OUTSIDE-ROOT"],
+     ["Bash", { command: "cat .aws/credentials" }, "GUARD-READ-CREDENTIAL-TARGET"],
+     ["Bash", { command: "rg -A3 x a.txt" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
++    ["Bash", { command: "cat a.txt | wc -l" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
++    ["Bash", { command: "nl -ba a.txt | wc -l" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
+     ["Bash", { command: "rm -rf scratch" }, "GUARD-LIFECYCLE-NOT-READY"],
+     ["Bash", { command: "node -e \"process.exit(0)\"" }, "GUARD-LIFECYCLE-NOT-READY"],
+   ]) {
+@@ -43,6 +46,22 @@ test("NRS01 refusals with no override route seed no request", () => {
+   }
+ });
+ 
++test("NRS03 CGF-10: a numbered excerpt of one contained file is an admitted read, anything wider is not", () => {
++  const dir = mkdtempSync(join(tmpdir(), "cgf10-nl-"));
++  try {
++    writeFileSync(join(dir, "a.txt"), "x\n");
++    writeFileSync(join(dir, "b.txt"), "y\n");
++    mkdirSync(join(dir, ".aws"), { recursive: true });
++    writeFileSync(join(dir, ".aws", "credentials"), "synthetic fixture\n");
++    for (const command of ["nl a.txt", "nl -ba a.txt", "nl -b a a.txt", "nl -ba a.txt | tail -n 110", "nl -ba a.txt | head -n 5"]) {
++      assert.equal(isReadOnlyDiagnosticCommand(command, dir), true, command);
++    }
++    for (const command of ["nl -s x a.txt", "nl -ba a.txt b.txt", "nl -ba .aws/credentials", "nl -ba ../outside.txt", "nl -ba missing.txt", "nl -ba a.txt | tail -n 501", "nl -ba a.txt | tee b.txt"]) {
++      assert.equal(isReadOnlyDiagnosticCommand(command, dir), false, command);
++    }
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++});
++
+ test("NRS02 refusals that offer a human override seed exactly one request", () => {
+   for (const [toolName, toolInput, code] of [
+     ["Bash", { command: "echo a; echo b" }, "GUARD-PARSE-UNSUPPORTED"],
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index cf623fc2293e514732df3d8ad34c5867413c1df1..425181e3b7122884b24a71d224531f470e669382 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -321,6 +321,29 @@ function isValidCatPipelineSourceArgs(argv, root, extraRoots = []) {
+  * function and CAT_PIPELINE_DISPLAY_FLAGS for the flag-allowlist and path-restriction
+  * rationale (deliberately narrower than the existing single-command `cat` rule).
+  */
++// CGF-10 (PO tile 2026-11-09): `nl` numbers the lines of one contained file. Only the all-lines body style is admitted, no other option.
++function isNumberedFileReadArgs(args, root, extraRoots) {
++  const flags = args[0] === "-ba" ? 1 : args[0] === "-b" && args[1] === "a" ? 2 : 0;
++  const operands = args.slice(flags);
++  return operands.length === 1 && !operands[0].startsWith("-") && isSafeExactPassiveFile(operands[0], root, extraRoots);
++}
++
++const READER_ONLY_PIPELINE_NAMES = new Set(["cat", "head", "tail", "wc", "stat", "file", "ls", "rg", "grep", "nl"]);
++
++/**
++ * CGF-10 (PO tile 2026-11-09): only plain readers joined by pipes, every operand an admitted passive target. Refused forms of this shape are a
++ * spelling question and offer no signed override. A credential or outside-root operand is not harmless and keeps its existing refusal.
++ */
++export function isReaderOnlyPipeline(parsed, root) {
++  return parsed?.parseStatus === "accepted" && parsed.redirects.length === 0 && parsed.segments.length >= 2
++    && parsed.operators.every((entry) => entry.operator === "|")
++    && parsed.segments.every((segment) => READER_ONLY_PIPELINE_NAMES.has(basename(segment.executable).toLowerCase().replace(/\.exe$/u, ""))
++      && segment.argv.every((arg) => {
++        const candidate = rawReadCandidatePath(arg, root);
++        return (candidate === null || isRealpathedWithinBoundary(candidate, root)) && isApprovedSingleCommandReadArg(arg, root, []);
++      }));
++}
++
+ export function isBoundedCatPipeline(parsed, root, extraRoots = []) {
+   if (!parsed || parsed.parseStatus !== "accepted"
+     || parsed.segments.length !== 2
+@@ -330,14 +353,18 @@ export function isBoundedCatPipeline(parsed, root, extraRoots = []) {
+   const windows = parsed.dialect === "windows-readonly-pipeline";
+   const expectedCat = windows ? "cat.exe" : "cat";
+   const sourceName = basename(parsed.segments[0].executable).toLowerCase();
+-  if (sourceName !== expectedCat) return false;
+-  if (!isValidCatPipelineSourceArgs(parsed.segments[0].argv, root, extraRoots)) return false;
++  const numbered = sourceName === (windows ? "nl.exe" : "nl");
++  if (sourceName !== expectedCat && !numbered) return false;
++  if (!(numbered ? isNumberedFileReadArgs(parsed.segments[0].argv, root, extraRoots)
++    : isValidCatPipelineSourceArgs(parsed.segments[0].argv, root, extraRoots))) return false;
+   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
+   const expectedGrep = windows ? "grep.exe" : "grep";
+   if (sinkName === expectedGrep) {
+     return parsed.redirects.length === 0 && isValidPipelineGrepArgs(parsed.segments[1].argv);
+   }
+-  if (sinkName !== (windows ? "head.exe" : "head")) return false;
++  // CGF-10: a numbered excerpt is usually the end of a file, so `nl` also takes the `tail` sink.
++  const numberedTail = numbered && sinkName === (windows ? "tail.exe" : "tail");
++  if (sinkName !== (windows ? "head.exe" : "head") && !numberedTail) return false;
+   if (parsed.redirects.length === 1) {
+     const redirect = parsed.redirects[0];
+     if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
+@@ -1262,6 +1289,7 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
+     // marker.
+     return args.every((arg) => isApprovedSingleCommandReadArg(arg, root, extraRoots));
+   }
++  if (executable === "nl") return isNumberedFileReadArgs(args, root, extraRoots);
+   if (executable === "sed") {
+     // Only numeric print programs. sed's `e` command executes shell text, and
+     // `w`/`i`/`a` can write or produce effects even without -i.
+@@ -1496,7 +1524,7 @@ export function isRejectedReadFamilyCommand(command, root) {
+     || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+   const { executable, argv } = parsed.segments[0];
+   const name = basename(executable).toLowerCase();
+-  if (["cat", "rg", "grep", "head", "tail", "wc", "stat", "file", "ls"].includes(name)
++  if (["cat", "rg", "grep", "head", "tail", "wc", "stat", "file", "ls", "nl"].includes(name)
+     || isSystemDiagnosticName(name)) return true;
+   if (name === "git" && argv[0] === "diff"
+     && argv.some((arg) => arg === "--output" || arg.startsWith("--output=")

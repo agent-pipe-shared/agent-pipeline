@@ -1,0 +1,86 @@
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+index aab2f4609c3c203f1e3cd4d2a84de4bd321a5488..93f7c4fb3eefed8606e78b2156cbfd4fdf247ced 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+@@ -74,13 +74,16 @@ function regularJsonlFiles(sessionsDirectory, maxCandidates = MAX_CANDIDATES, st
+     const directory = queue.pop();
+     let entries;
+     try { entries = readdirSync(directory, { withFileTypes: true }); } catch { continue; }
++    // readdir order is the filesystem's. Names are dated (year/month/day/rollout-<time>), so newest-first makes the bound drop the oldest sessions, not arbitrary ones.
++    entries.sort((left, right) => (left.name < right.name ? 1 : left.name > right.name ? -1 : 0));
++    const subdirectories = [];
+     for (const entry of entries) {
+       if (files.length >= maxCandidates) { state.boundReached = true; break; }
+       // Never follow a session-storage symlink: it could point at arbitrary host data.
+       if (entry.isSymbolicLink()) continue;
+       const candidate = join(directory, entry.name);
+       if (entry.isDirectory()) {
+-        queue.push(candidate);
++        subdirectories.push(candidate);
+       } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
+         try {
+           const real = realpathSync(candidate);
+@@ -88,6 +91,7 @@ function regularJsonlFiles(sessionsDirectory, maxCandidates = MAX_CANDIDATES, st
+         } catch { /* An unreadable candidate is not evidence. */ }
+       }
+     }
++    queue.push(...subdirectories.reverse());
+   }
+   if (queue.length > 0 && files.length >= maxCandidates) state.boundReached = true;
+   return files;
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+index d2e0e6234fc1759a92d4f86884e920666bd029ae..878ccf28b2076e501d4110eb25f0e2b5dd97d36a 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+@@ -1221,6 +1221,19 @@ test("G20-31 turn markers carry an end time and per-turn counters where the tran
+   });
+ });
+ 
++test("C21F: when the candidate bound cuts a dated Codex store, the newest days and files are the ones kept", () => {
++  withExportFixture(({ project, codexHome }) => {
++    for (const [day, name] of [["2026/10/01", "rollout-a.jsonl"], ["2026/11/08", "rollout-b.jsonl"], ["2026/11/09", "rollout-c.jsonl"], ["2026/11/09", "rollout-d.jsonl"]]) {
++      const directory = join(codexHome, "sessions", ...day.split("/"));
++      mkdirSync(directory, { recursive: true });
++      writeFileSync(join(directory, name), `${JSON.stringify({ timestamp: stamp("05:00:00"), type: "session_meta", payload: { id: name, cwd: project } })}\n`);
++    }
++    const listed = recovery.listRunnerTranscripts({ rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, limits: { maxCandidates: 3 } });
++    assert.equal(listed.page.candidateBoundReached, true);
++    assert.deepEqual(listed.sessions.map((session) => session.sessionId).sort(), ["rollout-b.jsonl", "rollout-c.jsonl", "rollout-d.jsonl"]);
++  });
++});
++
+ test("C21F: a Codex custom_tool_call counts as a tool call beside function_call; its output does not", () => {
+   withExportFixture(({ project, codexHome }) => {
+     codexSegment(codexHome, "custom.jsonl", { cwd: project, sessionId: "custom", metaTimestamp: stamp("05:00:00"), records: [
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md b/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
+index d3dd715491d1fe81ff91e30a78f5331ce1189f8b..f4da9783e44756de2ff2bf464a7b075647b2b276 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
+@@ -32,6 +32,9 @@ from memory is not evidence; a quoted line from the transcript is.
+ 
+ - `exec_command` entries — the equivalent of `tool_use` for Codex: the exact
+   shell invocation, its `cwd`, and its exit status.
++- `response_item` payloads of type `function_call` and `custom_tool_call` — the
++  two call forms. A code-mode `exec` is one `custom_tool_call` that can run
++  several tools; count nested tools separately from top-level calls.
+ - `sandbox_permissions` — the sandbox mode/approval policy in force for a
+   given command; compare across the session to catch an unexplained
+   escalation (e.g. read-only -> workspace-write) that was never surfaced to
+@@ -77,6 +80,17 @@ general impression:
+    routine implementation is itself a finding, independent of whether any
+    single instance was individually correct.
+ 
++## Counting rules
++
++- Count a refusal only from a call paired with its result. An error code in a
++  document the session merely loaded is not a refusal, so plain string
++  matching over the file overcounts.
++- Sum tokens from per-response usage records only, never together with the
++  cumulative turn or thread counters or a second record form of the same
++  response. Cached input is not a price and not a count of words read.
++- A session span is not working time: it contains idle and parallel periods.
++- A missing raw transcript means "not established", never zero.
++
+ ## Report shape — one section per claim, independently traceable
+ 
+ Structure the forensic-analysis report as one section per claim under

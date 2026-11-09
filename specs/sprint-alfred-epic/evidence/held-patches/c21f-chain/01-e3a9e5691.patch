@@ -1,0 +1,31 @@
+diff --git a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+index adc8f9c7b4d023baf535cd8d766035165b2047c1..8901a87bcd0cc40d466f8c4b7fc1849b5fbad7ad 100644
+--- a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
++++ b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+@@ -221,7 +221,7 @@ export function powerShellScopeVerdict(input, root, dependencies) {
+   if (["node", "node.exe"].includes(name) && argv.length > 0) {
+     const script = argv[0];
+     const own = typeof script === "string" && scriptIsSanctioned(script);
+-    return verdict(2, powerShellRefusal("node is admitted for a sanctioned Pipeline script exactly as the bootstrap or `pipeline-state.mjs inspect` prints it, and for the read-only plan, inspect and binding verbs of a sanctioned script in a ready session; this invocation is neither.",
++    return verdict(2, powerShellRefusal("node is admitted for a sanctioned Pipeline script exactly as the bootstrap or `pipeline-state.mjs inspect` prints it, and for the read-only plan, inspect and binding verbs of a sanctioned script in a ready session; this invocation is neither. If this runner also has a Bash tool, submit the same command there: the Bash lane admits the Pipeline's own scripts in a ready session.",
+       "literal", own ? `node "${script}" --help` : "node \"<plugin-root>/scripts/pipeline-state.mjs\" inspect"));
+   }
+   return verdict(2, powerShellGrammarDenial("use a sanctioned Pipeline action or a contained literal read.", "literal"));
+diff --git a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+index c2796886f6dc092fc3f6a1f2686d35a5162c6eaa..9cab314908fbe2618fd4a20065f6399e4a5480aa 100644
+--- a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+@@ -240,9 +240,12 @@ test("AP9b a native Glob may end in any literal extension that is not credential
+     assert.equal(glob(`**/*.${extension}`), 2, `**/ ${extension}`);
+     assert.equal(glob(`*.{md,${extension}}`), 2, `brace ${extension}`);
+   }
+-  for (const pattern of ["*.{pem,md}", "*.{md,pem}", "*.{md}", "{docs,scratch}/*.md", "docs/{a,b}/*.md", "*.{md,mjs}x", "*.{md,mjs}/*", "*.{md,.env}", ".*/*.{md,mjs}", "../*.{md,mjs}", "docs/*.{md,mjs", "*.m*", "*.*", "*.js?", "id_rsa*", "**/*", "*.thirteenchars", "*.{a,b,c,d,e,f,g,h,i}"]) {
++  for (const pattern of ["*.{pem,md}", "*.{md,pem}", "*.{md}", "{docs,scratch}/*.md", "docs/{a,b}/*.md", "*.{md,mjs}x", "*.{md,mjs}/*", "*.{md,.env}", ".*/*.{md,mjs}", "../*.{md,mjs}", "docs/*.{md,mjs", "*.m*", "*.*", "*.js?", "id_rsa*", "*.thirteenchars", "*.{a,b,c,d,e,f,g,h,i}"]) {
+     assert.equal(glob(pattern), 2, pattern);
+   }
++  // QG-04 restated (C21E): candidate 21 (AC-108) deliberately admits `<directory>/**/*` as a names-only listing of one contained directory; the project root stays refused.
++  assert.equal(glob("**/*"), 0, "a names-only listing below a contained directory");
++  assert.equal(glob("**/*", path), 2, "never the project root");
+   assert.equal(glob("*.{md,mjs}", join(path, ".git")), 2);
+   assert.equal(glob("../*.{md,mjs}", join(path, "docs")), 2);
+ }));

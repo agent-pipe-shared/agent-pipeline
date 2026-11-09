@@ -1,0 +1,186 @@
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 8655119032dfca39ba254fcaf4f4322fde5b435d..0e24227348d5b68b71a9a6bd612e766184f3c6d2 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -46,6 +46,9 @@ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ import { NEUTRAL_MANIFEST } from "../lib/project-authority.mjs";
+ import * as po from "../lib/po-gate-authority.mjs";
+ import { nativeContractFixtureParent } from "../lib/test-item-approved-course-fixture.mjs";
++import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
++import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
++import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
+ 
+ const SCRIPTS = fileURLToPath(new URL(".", import.meta.url));
+ const script = (name) => join(SCRIPTS, name);
+@@ -250,10 +253,12 @@ const ANTIGRAVITY_IDENTITY = RUNNER_IDENTITIES.find((entry) => entry.runner ===
+ const WALKS = Object.freeze([
+   ...RUNNER_IDENTITIES.map((identity) => Object.freeze({ identity, criticReturn: identity === ANTIGRAVITY_IDENTITY ? "send-message" : "stop-hook" })),
+   Object.freeze({ identity: ANTIGRAVITY_IDENTITY, criticReturn: "none" }),
++  // The native Goldfish route creates the session-authority catalogue on its first governed item, so a Claude project reaches its close with one.
++  Object.freeze({ identity: RUNNER_IDENTITIES.find((entry) => entry.runner === "claude"), criticReturn: "stop-hook", catalogue: true }),
+ ]);
+ 
+ test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 600_000 }, async () => {
+-  for (const { identity, criticReturn } of WALKS) {
++  for (const { identity, criticReturn, catalogue } of WALKS) {
+     const log = [];
+     const fx = consumerFixture(log, identity);
+     walkEnv = runnerEnv(identity.runner, fx.root);
+@@ -495,6 +500,10 @@ test("G20-35: the close path from implementation to release preflight is walked
+           [script("pipeline-state.mjs"), "approve-critic-acknowledgement", "--by", "Fixture PO", "--critic-packet", packetId], { cwd: fx.root });
+         assert.match(acknowledged.stdout, /acknowledged/u);
+       }
++      if (catalogue) {
++        const repository = inspectSignedDescriptorCustodyRepository(fx.root);
++        assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
++      }
+       const prepared = transition("feature-close-prepared", ["--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]);
+       assert.equal(prepared.phase, "feature-close-prepared");
+       // Without a record the acknowledgement walk ends here: the identical close command above was admitted only after it. The rest of the close
+@@ -566,6 +575,14 @@ test("G20-35: the close path from implementation to release preflight is walked
+       assert.equal(noApproval.status, 2, `${identity.runner}: ${noApproval.stdout}${noApproval.stderr}`);
+       assert.match(noApproval.stderr, /RPC-CONSUMER-PUSH-APPROVAL.*approve-push/u, `${identity.runner}: ${noApproval.stderr}`);
+       assert.equal(existsSync(join(fx.root, "evidence", "release-preflight.json")), false, "a refused preflight leaves no record");
++      if (catalogue) {
++        // The close reached the push boundary. A chat approval stays refused in a catalogue project and names the signature route (K52).
++        const refusedChat = spawnSync(process.execPath, [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"],
++          { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
++        assert.equal(refusedChat.status, 2, refusedChat.stdout);
++        assert.match(refusedChat.stderr, /state-push-source-requester[\s\S]*--proof-request/u);
++        continue;
++      }
+       step(log, `${identity.runner}: approve-push (the line push-prepare printed)`, process.execPath,
+         [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"], { cwd: fx.root });
+       const admitted5 = guardPush(pushCommand);
+diff --git a/plugins/pipeline-core/scripts/continuity-owner-route.mjs b/plugins/pipeline-core/scripts/continuity-owner-route.mjs
+index 51f52bb72fa6fa289f51fc82f4248db777bd4d1b..228bfb5b01079ed9122b62e40332742e535b5a93 100644
+--- a/plugins/pipeline-core/scripts/continuity-owner-route.mjs
++++ b/plugins/pipeline-core/scripts/continuity-owner-route.mjs
+@@ -72,7 +72,7 @@ function courseMessage(refusal, root, entry) {
+ async function run(argv) {
+   const { root, lifecycleId, entry, tail } = parseRun(argv);
+   if (entry === 'close-feature') {
+-    refuse('COR-CLOSE-FEATURE-UNAVAILABLE', 'close-feature cannot run on the owner route yet: its State write runs in the retired-owner terminal, which needs (a) the retirement of the per-invocation owner descriptor before the entry runs and (b) a retired terminal for a physical-readback requester (today only the controlled-unit-method fixture assurance has one). That is a separate slice. The route that works today: the direct route for a project without a catalogue, or the attended close (an operator-held session that owns the lifecycle), see skills/close-feature/SKILL.md.');
++    refuse('COR-CLOSE-FEATURE-UNAVAILABLE', 'close-feature cannot run on the owner route yet: its State write runs in the retired-owner terminal, which needs (a) the retirement of the per-invocation owner descriptor before the entry runs and (b) a retired terminal for a physical-readback requester (today only the controlled-unit-method fixture assurance has one). That is a separate slice. The route that works today: the direct route, that is the close-feature action finish-feature or the close coordinator returns (its coordinator binding admits it in a catalogue project too, unless a State operation is in flight), see skills/close-feature/SKILL.md.');
+   }
+   if (!ALLOWLIST.includes(entry)) refuse('COR-ENTRY-OUTSIDE-ALLOWLIST', `${entry} is not an owner-route entry; the closed list is ${ALLOWLIST.join(', ')}. Everything else keeps its present route.`);
+   let repository;
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index eb082359a9d95d78c3c52e9fc5d4037fa6987e31..a491b4f3697f47d1cba49baa0b77caa4de9d63bb 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -913,6 +913,33 @@ test("D231 owner route: close-feature, entries outside the allowlist, foreign fl
+   assert.deepEqual(readFileSync(early.statePath), earlyBefore); assertReleased(early, "before the Close lifecycle");
+ });
+ 
++test("a catalogue project: close-feature takes the direct route only with a coordinator binding and never while a State operation is in flight", () => {
++  const p = ownerRouteProject("close-direct");
++  const before = readFileSync(p.statePath);
++  const direct = (argv) => {
++    const errors = [], originalError = console.error;
++    console.error = (...parts) => errors.push(parts.join(" "));
++    let status;
++    try { status = run(argv, { dir: p.root }); } finally { console.error = originalError; }
++    assert.equal(status, 2, errors.join("\n"));
++    assert.deepEqual(readFileSync(p.statePath), before, "State bytes unchanged");
++    return errors.join("\n");
++  };
++  const unbound = ["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact"];
++  const bound = [...unbound, "--coordinator-lifecycle", p.lifecycleId, "--coordinator-sha256", h("c")];
++  assert.match(direct(unbound), /companion-owning-lifecycle-context-required/, "no binding: the refusal stays");
++  const passed = direct(bound);
++  assert.doesNotMatch(passed, /State authority route unavailable/, "with a binding the route admits it");
++  assert.match(passed, /close-feature coordinator/, "and the writer still proves the binding");
++  const producerPath = join(p.repository.commonDir, "agent-pipeline/session-authority/producers/onboarding-continuity.json");
++  const producer = JSON.parse(readFileSync(producerPath));
++  const memberLocal = "agent-pipeline/session-authority/members/onboarding-continuity/fixture-in-flight.json";
++  mkdirSync(join(p.repository.commonDir, "agent-pipeline/session-authority/members/onboarding-continuity"), { recursive: true });
++  writeFileSync(join(p.repository.commonDir, memberLocal), JSON.stringify({ association: { state: "bound" }, phase: "armed" }));
++  writeFileSync(producerPath, JSON.stringify({ ...producer, members: [...producer.members, { memberRef: { path: `.git/${memberLocal}` } }] }));
++  assert.match(direct(bound), /SDC-AUTHORITY-HELD: state-operation-in-flight/, "a State operation in flight holds the close");
++});
++
+ test("D231 owner route: a project without a catalogue takes the direct route unchanged and the CLI names that route", () => {
+   const p = ownerRouteProject("cor-nocatalogue", { catalogue: false });
+   const direct = invoke(p.root, ["continuity-result-bootstrap-plan"]);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index cf47c2ee3a83688f0c2919838b65e47d844f1fa2..833580effd5aeb57e43ce8a23764a7d27b4acc77 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -14599,6 +14599,24 @@ function stateAuthorityFailure(code, reason) {
+ function stateRepositoryDigest(repository) {
+   return sha256CanonicalJson({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir});
+ }
++function refuseWhileStateOperationInFlight(repository) {
++  withSessionAuthorityBoundary({repository}, () => {
++    if (!stateCataloguePresent(repository)) return;
++    let inFlight;
++    try {
++      const record = path => JSON.parse(readFileSync(join(repository.commonDir, path), "utf8"));
++      inFlight = ["onboarding-continuity", "state-push-challenge"].some(id => {
++        const path = join("agent-pipeline", "session-authority", "producers", `${id}.json`);
++        if (!existsSync(join(repository.commonDir, path))) throw new Error(`${id} producer record missing`);
++        return record(path).members.some(entry => {
++          const member = record(String(entry.memberRef.path).replace(/^\.git\//u, ""));
++          return member.association?.state === "bound" && ["armed", "running"].includes(member.phase);
++        });
++      });
++    } catch { stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-producer-unreadable"); }
++    if (inFlight) stateAuthorityFailure("SDC-AUTHORITY-HELD", "state-operation-in-flight");
++  });
++}
+ function stateCataloguePresent(repository) {
+   let cursor = repository.commonDir;
+   const parts = ["agent-pipeline", "session-authority", "catalogue.json"];
+@@ -14816,6 +14834,14 @@ All commands: ${PIPELINE_STATE_COMMANDS.join(", ")}.`);
+     if (STATE_COMPANION_ENTRIES.has(sub)) {
+       const cataloguePresent=withSessionAuthorityBoundary({repository},()=>stateCataloguePresent(repository));
+       if(!cataloguePresent) return runStateSource(argv,deps);
++      // No production route supplies an owning context for close-feature (the owner route refuses it, COR-CLOSE-FEATURE-UNAVAILABLE), and the
++      // native Goldfish route creates the catalogue, so without this branch a project that ever used it could never close. A close the
++      // coordinator bound (the writer re-proves phase, digest, audit and Continuity) takes the PF-54 route: refused while a State operation is in flight.
++      if(sub === "close-feature" && argv.includes("--coordinator-lifecycle")
++          && readSourceOwnedOnboardingContinuityCompanionContext({repository,entry:sub}) === null) {
++        refuseWhileStateOperationInFlight(repository);
++        return runStateSource(argv,deps);
++      }
+       if(sub === "approve-plan") {
+         const frame={repository,boundary:null,cataloguePresent,sub,deps,sourceDefaults:Object.keys(deps).every(key=>key === "dir" || key === "now"),deferredCompanion:true,validatingCompanion:false,executingWrite:null,executingCompanion:null};
+         if(!frame.sourceDefaults) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-injected-approval-route");
+@@ -14865,22 +14891,7 @@ All commands: ${PIPELINE_STATE_COMMANDS.join(", ")}.`);
+       // PF-54 (D51 (1)): a route the State companion has not adopted writes the State outside the
+       // registry, as a commit or a checkout of the state file does; the next boundary entry heals
+       // that drift. It is refused only while a bound member of a State producer is armed or running.
+-      withSessionAuthorityBoundary({repository}, () => {
+-        if (!stateCataloguePresent(repository)) return;
+-        let inFlight;
+-        try {
+-          const record = path => JSON.parse(readFileSync(join(repository.commonDir, path), "utf8"));
+-          inFlight = ["onboarding-continuity", "state-push-challenge"].some(id => {
+-            const path = join("agent-pipeline", "session-authority", "producers", `${id}.json`);
+-            if (!existsSync(join(repository.commonDir, path))) throw new Error(`${id} producer record missing`);
+-            return record(path).members.some(entry => {
+-              const member = record(String(entry.memberRef.path).replace(/^\.git\//u, ""));
+-              return member.association?.state === "bound" && ["armed", "running"].includes(member.phase);
+-            });
+-          });
+-        } catch { stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-producer-unreadable"); }
+-        if (inFlight) stateAuthorityFailure("SDC-AUTHORITY-HELD", "state-operation-in-flight");
+-      });
++      refuseWhileStateOperationInFlight(repository);
+       return runStateSource(argv,deps);
+     }
+     return withSessionAuthorityBoundary({repository}, boundary => {
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 0b1499758ed1a2ec6d15f584f686374730a724bb..87517e9f321f841c3558b5b238029f28b41f0014 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -235,7 +235,7 @@ A feature whose State carries `continuity` closes in this order. Every step is f
+ 1. Start the close lifecycle: `close-coordinator.mjs plan-start --root <root> --lifecycle <id> --actor <name> --close-intent durable-stop`, then apply the returned action.
+ 2. Take it to checkpointed: `close-coordinator.mjs plan-transition ... --phase checkpointed`, apply the returned action.
+ 3. Make the Result a Continuity binding: `pipeline-state.mjs continuity-result-bootstrap-plan`, then run the returned `applyAction` (`continuity-result-bootstrap-apply ... --activate`). Its completion prints, while the package is stale, the pending `preview` with its `requiredAuthority` and the `reconcileCommand`, and for a plan that needs the PO also `signatureCommand`.
+-   **Project WITH a session-authority catalogue (D231):** the direct `pipeline-state.mjs` call refuses (`SDC-AUTHORITY-UNAVAILABLE`) because the State write must be owner-bound. For exactly the four entries `continuity-result-bootstrap-plan`, `continuity-result-bootstrap-apply`, `continuity-result-close-plan` and `continuity-result-close-apply`, run `node <plugin-root>/scripts/continuity-owner-route.mjs run --root <root> --lifecycle <id> -- <entry> [<entry flags>]` from the repository root, after the lifecycle reached checkpointed (take the entry and flags from the printed `applyAction.argv` from the entry name onward). One call binds a fresh per-invocation owner (a `controller-<random>` descriptor, not the host session and not the hook-observed owner, which is unauthenticated), runs that one entry through the unchanged gates and releases. A call killed in between leaves a binding: the next call prints `COR-BINDING-HELD` naming `routine-repair.mjs run heal --root <root> --reason "<why>"`, which releases it. A State write moves the image, and the next owner is refused (`companion-historical-owner-witness-missing`) until another route changes it; `close-feature` (step 7) is NOT on this route yet and keeps the direct route or the attended close until the follow-up slice.
++   **Project WITH a session-authority catalogue (D231):** the direct `pipeline-state.mjs` call refuses (`SDC-AUTHORITY-UNAVAILABLE`) because the State write must be owner-bound. For exactly the four entries `continuity-result-bootstrap-plan`, `continuity-result-bootstrap-apply`, `continuity-result-close-plan` and `continuity-result-close-apply`, run `node <plugin-root>/scripts/continuity-owner-route.mjs run --root <root> --lifecycle <id> -- <entry> [<entry flags>]` from the repository root, after the lifecycle reached checkpointed (take the entry and flags from the printed `applyAction.argv` from the entry name onward). One call binds a fresh per-invocation owner (a `controller-<random>` descriptor, not the host session and not the hook-observed owner, which is unauthenticated), runs that one entry through the unchanged gates and releases. A call killed in between leaves a binding: the next call prints `COR-BINDING-HELD` naming `routine-repair.mjs run heal --root <root> --reason "<why>"`, which releases it. A State write moves the image, and the next owner is refused (`companion-historical-owner-witness-missing`) until another route changes it; `close-feature` (step 7) is NOT on this route: run the action `finish-feature` or the coordinator returns. Its coordinator binding admits the direct route in a catalogue project too, unless a State operation is in flight (`SDC-AUTHORITY-HELD`); a call without that binding keeps `SDC-AUTHORITY-UNAVAILABLE`.
+    **Read `preview.requiredAuthority` first.** `"agent"` (the usual case, G20-38): the plan moves only the Result entry, the fence-proven digest and the authority lift of the one Result entry Continuity binds, so every other artifact keeps the digest the approved manifest pins and the approved package is unchanged. There is no `signatureCommand`, no step 4 and no PO signature: run step 5 yourself with `reconcileCommand` exactly as printed (it has no placeholders and no proof inputs) and show the receipt it prints, which carries the before and after digests as the readback. The ledger records it as an agent-run, result-only reconcile labelled `agent-result-only-reconcile-no-po-proof`, never as a PO approval. `"po"`: the plan also changes a non-result entry (or is a legacy Result repair), so steps 4 and 5 below stay the PO-signed route.
+ 4. Sign the reconcile (PO only, in the PO's own terminal, only when `requiredAuthority` is `"po"`): run `signatureCommand` exactly as printed. It is the `po-human-approval.mjs authorize-critical --kind feature-package-reconcile` line, and `signatureCommand.subjectSha256` is the digest it binds (`criticalActionSubjectSha256` over `{ manifest, planSha256, candidate }`). It is never executed by the pipeline. A new commit changes the candidate and with it the digest: take the command again from a fresh `continuity-result-bootstrap-plan`.
+ 5. Reconcile the package: run `reconcileCommand` (`pipeline-state.mjs feature-package-reconcile ...`); on the PO route after replacing its four placeholders. `<po-name>` is the PO's own name, supplied by the PO, never by the agent. `<proof-request>`, `<proof-authority>` and `<proof>` are the `requestPath`, `authorityPath` and `proofPath` the signing terminal printed.

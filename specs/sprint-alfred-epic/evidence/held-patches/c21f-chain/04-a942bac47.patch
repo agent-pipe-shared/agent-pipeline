@@ -1,0 +1,103 @@
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index 0d08881adb97afe0919ff85184280c329b2e6ca6..a62c814c81857662fc8454489eef5fe57c9115d1 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -785,7 +785,7 @@ refusal. The field is additive: every other result field is unchanged.
+ | 4 | `pipeline-state.mjs approve-push` | Agent |
+ | 5a | `git push` (non-main, proof valid) | Agent, subject to the harness classifier |
+ | 5b | `git push` to `main`/protected (GG-03) | Agent — the verified approval *is* the confirmation; no `OVERRIDE GG-03`. Still subject to the harness classifier. |
+-| 5c | `push-prepare.mjs --close` — the last step after a signed push: folds a LEGACY tracked push-approval record into one local commit once the remote is proven to hold the signed commit (D161); a record written by the current `approve-push` is private (D206) and leaves nothing to fold | Agent |
++| 5c | `push-prepare.mjs --close` (alone, no other flag) — the last step after a signed push: folds a LEGACY tracked push-approval record into one local commit once the remote is proven to hold the signed commit (D161); a record written by the current `approve-push` is private (D206) and leaves nothing to fold | Agent |
+ | 6 | GitHub repository ruleset on the target ref | Repo admin (PO); agent can read it, not change it without an explicit decision |
+ | 7 | `gh release create` (tag + release) | Agent |
+ 
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index 0d08881adb97afe0919ff85184280c329b2e6ca6..a62c814c81857662fc8454489eef5fe57c9115d1 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -785,7 +785,7 @@ refusal. The field is additive: every other result field is unchanged.
+ | 4 | `pipeline-state.mjs approve-push` | Agent |
+ | 5a | `git push` (non-main, proof valid) | Agent, subject to the harness classifier |
+ | 5b | `git push` to `main`/protected (GG-03) | Agent — the verified approval *is* the confirmation; no `OVERRIDE GG-03`. Still subject to the harness classifier. |
+-| 5c | `push-prepare.mjs --close` — the last step after a signed push: folds a LEGACY tracked push-approval record into one local commit once the remote is proven to hold the signed commit (D161); a record written by the current `approve-push` is private (D206) and leaves nothing to fold | Agent |
++| 5c | `push-prepare.mjs --close` (alone, no other flag) — the last step after a signed push: folds a LEGACY tracked push-approval record into one local commit once the remote is proven to hold the signed commit (D161); a record written by the current `approve-push` is private (D206) and leaves nothing to fold | Agent |
+ | 6 | GitHub repository ruleset on the target ref | Repo admin (PO); agent can read it, not change it without an explicit decision |
+ | 7 | `gh release create` (tag + release) | Agent |
+ 
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index bb6fe87691060a1496c9fa668c2a67fc8ecf721d..21cbc29ef194a967874d1c5a75236e82834468a0 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -96,6 +96,8 @@ function readCandidateState(dir, commit, readSource) {
+ }
+ 
+ export function parseArgs(argv) {
++  // A Codex run copied `--close` from the flow document, added the push flags, and got only the usage line back.
++  if (argv.includes("--close")) return { error: "push-prepare.mjs --close takes no other flag: run it alone, after the signed push." };
+   const values = {};
+   let checkpoint = false;
+   for (let index = 0; index < argv.length; index += 2) {
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index c65be9121aa20bb5ce2dd888322cda192d0786fd..4e0d399d141208de131438f3a72cc11f8b2884f1 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -93,6 +93,12 @@ test("checkWorkingTreeClean: accepts the WSL EPERM-after-status-zero shape, but
+   }
+ });
+ 
++test("C21F parseArgs: --close beside the push flags says to run it alone, in any position", () => {
++  for (const argv of [["--close", "--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main", "--close"]]) {
++    assert.match(parseArgs(argv).error, /--close takes no other flag/u);
++  }
++});
++
+ test("parseArgs: refuses a missing --by", () => {
+   const parsed = parseArgs(["--remote", "origin", "--destination", "refs/heads/main"]);
+   assert.ok(parsed.error);
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+index e033f828ec89780c2e5f6777be26ef8b8b963157..aab2f4609c3c203f1e3cd4d2a84de4bd321a5488 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+@@ -748,7 +748,8 @@ function describeTurns(runner, records) {
+     const ms = recordTimestampMs(row);
+     if (ms !== null && (counters[turn].endMs === null || ms > counters[turn].endMs)) counters[turn].endMs = ms;
+     const blocks = isObject(row?.message) && Array.isArray(row.message.content) ? row.message.content : [];
+-    if ((row?.type === "response_item" && row.payload?.type === "function_call")
++    // Codex writes its code-mode `exec` calls as custom_tool_call: one record, however many tools the script inside it calls.
++    if ((row?.type === "response_item" && (row.payload?.type === "function_call" || row.payload?.type === "custom_tool_call"))
+       || (runner === CLAUDE_RUNNER && row?.type === "assistant")) {
+       counters[turn].toolCallCount += runner === CLAUDE_RUNNER ? blocks.filter((block) => block?.type === "tool_use").length : 1;
+     }
+@@ -933,7 +934,7 @@ function codexChildSessions({ found, sessionId, records, turnView, projectIdenti
+     let lastRecord = output.index;
+     records.forEach((row, index) => {
+       const payload = row?.type === "response_item" && isObject(row.payload) ? row.payload : null;
+-      if (payload !== null && (payload.type === "function_call" || payload.type === "function_call_output")
++      if (payload !== null && ["function_call", "function_call_output", "custom_tool_call", "custom_tool_call_output"].includes(payload.type)
+         && index > lastRecord && JSON.stringify(payload).includes(childId)) lastRecord = index;
+     });
+     return { start: turnView.turnAt[startRecord], end: turnView.turnAt[lastRecord] };
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+index af85ab6685ac7d99ef39b424e7ba681bdcef8a80..d2e0e6234fc1759a92d4f86884e920666bd029ae 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+@@ -1221,6 +1221,19 @@ test("G20-31 turn markers carry an end time and per-turn counters where the tran
+   });
+ });
+ 
++test("C21F: a Codex custom_tool_call counts as a tool call beside function_call; its output does not", () => {
++  withExportFixture(({ project, codexHome }) => {
++    codexSegment(codexHome, "custom.jsonl", { cwd: project, sessionId: "custom", metaTimestamp: stamp("05:00:00"), records: [
++      { timestamp: stamp("05:00:01"), type: "event_msg", payload: { type: "task_started" } },
++      { timestamp: stamp("05:00:02"), type: "response_item", payload: { type: "custom_tool_call", name: "exec", call_id: "c1", input: "text(1)" } },
++      { timestamp: stamp("05:00:03"), type: "response_item", payload: { type: "custom_tool_call_output", call_id: "c1", output: "1" } },
++      { timestamp: stamp("05:00:04"), type: "response_item", payload: { type: "function_call", name: "shell", call_id: "c2" } },
++    ] });
++    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, sessionId: "custom" });
++    assert.equal(result.turns.markers[0].toolCallCount, 2);
++  });
++});
++
+ test("G20-31 the CLI passes the page and window flags and refuses every other shape", () => {
+   withFiveSessions(({ project, args }) => {
+     const env = { CODEX_HOME: args.env.CODEX_HOME, CODEX_SESSION_ID: "current-session", CODEX_THREAD_ID: "current-session" };

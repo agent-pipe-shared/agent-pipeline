@@ -1,0 +1,131 @@
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.mjs b/plugins/pipeline-core/hooks/guard-devplan.mjs
+index 3a8e9ef45eae0459b6054d2f75784407b9224ec1..1419881f8ae4d620ced64302a50fd9f85493900f 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.mjs
+@@ -148,7 +148,7 @@ import {
+   validatePortablePipelineState,
+ } from "../lib/project-authority.mjs";
+ import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
+-import { designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath, isOnboardingScaffoldPath, unverifiedApprovalAdvisory } from "../lib/guard-devplan-policy.mjs";
++import { completedFeaturePackageEditDenial, designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath, isOnboardingScaffoldPath, unverifiedApprovalAdvisory } from "../lib/guard-devplan-policy.mjs";
+ // NVA-B-REBWIRE-1 (backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-
+ // after-every-conflict.md): the dev-plan gate's ONE relief and its denial disclosure, owned by
+ // the policy module both of this gate's lanes already share, never re-decided here. See that
+@@ -417,6 +417,9 @@ const normalizedPath = normalize(relPath);
+ // still uses).
+ if (normalizedPath.startsWith("scratch/")) process.exit(0);
+ if (isDispatchRecordCoordinationPath(normalizedPath)) process.exit(0);
++// C21F: the shared refusal of a hand edit of a feature package past `implementing` (lib/guard-devplan-policy.mjs).
++const packageEditDenial = completedFeaturePackageEditDenial(relPath, projectDir);
++if (packageEditDenial !== null) { process.stderr.write(`${packageEditDenial}\n`); process.exit(2); }
+ 
+ // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
+ const manifestResult = loadManifest(projectDir);
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.test.mjs b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+index 2ea2a946c22e1b27ade12b1f1ab93eb7279f9a54..1f8589020763468fc6eb4af97528204c761ba0d7 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+@@ -298,6 +298,19 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
+   });
+ }
+ 
++// ---- C21F a feature package past implementing refuses a hand edit, on the real hook -----
++{
++  const dir = freshDir("package-hand-edit");
++  writeManifest(dir, MANIFEST_BLOCKING);
++  writeState(dir, APPROVED_STATE);
++  mkdirSync(join(dir, "specs", "feature-abc"), { recursive: true });
++  writeFileSync(join(dir, "specs", "feature-abc", "lifecycle.json"), JSON.stringify({ state: "completed" }));
++  check("C21F block hand edit of a completed feature package", "Edit", "specs/feature-abc/lifecycle.json", BLOCK, {
++    projectDir: dir,
++    stderrIncludes: ["GUARD-FEATURE-PACKAGE-HAND-EDIT", "--one-shot"],
++  });
++}
++
+ // ---- DP08 default exempt prefixes -> allow ----------------------------------------------
+ {
+   const prefixes = ["docs/", "specs/", ".claude/", "backlog/", "scratch/"];
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+index 0f918fc04e81f70d22dc8bd39e99ed99e282612d..409d97daf30bf75ec2f2c840696a3b1eae597bdf 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+@@ -403,6 +403,24 @@ function normalize(p) {
+   return String(p ?? "").replace(/\\/g, "/").toLowerCase();
+ }
+ 
++/**
++ * C21F (PO decision 2026-11-09): a feature package at `verifying` or `completed` moves only through its writer. A live Antigravity run rewound one by editing
++ * `specs/<feature>/lifecycle.json` and committed that; the one-shot close has its own requalification for exactly that case. Earlier states stay editable, and an
++ * unreadable or absent file is left to the rest of the gate. @returns {string|null} the refusal text, or null.
++ */
++export function completedFeaturePackageEditDenial(relPath, projectDir) {
++  const slashed = String(relPath ?? "").replace(/\\/g, "/");
++  if (!/^specs\/[^/]+\/lifecycle\.json$/iu.test(slashed)) return null;
++  let state = null;
++  try { state = JSON.parse(readFileSync(join(projectDir, slashed), "utf8"))?.state ?? null; } catch { return null; }
++  if (state !== "verifying" && state !== "completed") return null;
++  return [
++    `BLOCKED (guard-devplan, plugin pipeline-core): GUARD-FEATURE-PACKAGE-HAND-EDIT: ${slashed} is at state "${state}" and moves only through its writer.`,
++    "If HEAD moved past the candidate, rerun the one-shot close (finish-feature.mjs --one-shot, with the --resume-lifecycle-id it printed): it qualifies the current HEAD again and rebinds the package.",
++    "Do not rewind this file by hand.",
++  ].join("\n");
++}
++
+ /**
+  * The Dev-Plan-Gate's pure decision function, moved nearly verbatim out of
+  * `guard-devplan.mjs` (see that file's own header for the full rationale behind
+@@ -442,6 +460,8 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate =
+   // ---- scratch/: UNCONDITIONAL allow, before any gate evaluation ---------------------
+   if (!forceLifecycleGate && (normalizedPath.startsWith("scratch/") || isCriticScratchNotesPath(normalizedPath))) return { verdict: "allow" };
+   if (!forceLifecycleGate && isDispatchRecordCoordinationPath(normalizedPath)) return { verdict: "allow" };
++  const packageEditDenial = completedFeaturePackageEditDenial(relPath, projectDir);
++  if (packageEditDenial !== null) return { verdict: "block", reason: packageEditDenial };
+ 
+   // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
+   const manifestResult = loadManifest(projectDir);
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
+index d4f2a733d74f32a8f3490aad7a595ce644c7b52d..3d8bbfa3eb9bcc59588970121ab23d1438884797 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
+@@ -4,7 +4,7 @@ import test from "node:test";
+ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+-import { devPlanGateVerdict, evaluateStagedDevPlanPaths, isCriticScratchNotesPath } from "./guard-devplan-policy.mjs";
++import { completedFeaturePackageEditDenial, devPlanGateVerdict, evaluateStagedDevPlanPaths, isCriticScratchNotesPath } from "./guard-devplan-policy.mjs";
+ 
+ function lifecycleFixture({ phase = "design", planApproved = false } = {}) {
+   const root = mkdtempSync(join(tmpdir(), "staged-devplan-policy-"));
+@@ -19,6 +19,32 @@ function lifecycleFixture({ phase = "design", planApproved = false } = {}) {
+   return root;
+ }
+ 
++test("C21F: a feature package at verifying or completed refuses a hand edit and names the one-shot route; earlier states and other files stay with the gate", () => {
++  const root = mkdtempSync(join(tmpdir(), "package-hand-edit-"));
++  try {
++    mkdirSync(join(root, "specs", "feature-abc"), { recursive: true });
++    const manifest = join(root, "specs", "feature-abc", "lifecycle.json");
++    for (const state of ["verifying", "completed"]) {
++      writeFileSync(manifest, JSON.stringify({ state }));
++      for (const filePath of ["specs/feature-abc/lifecycle.json", manifest, "specs\\feature-abc\\lifecycle.json"]) {
++        const result = devPlanGateVerdict({ filePath, projectDir: root });
++        assert.equal(result.verdict, "block", `${state} ${filePath}`);
++        assert.match(result.reason, /GUARD-FEATURE-PACKAGE-HAND-EDIT/u);
++        assert.match(result.reason, /--one-shot/u);
++      }
++    }
++    for (const state of ["draft", "approved", "implementing"]) {
++      writeFileSync(manifest, JSON.stringify({ state }));
++      assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/lifecycle.json", root), null, state);
++    }
++    writeFileSync(manifest, "not json");
++    assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/lifecycle.json", root), null, "unreadable stays with the gate");
++    writeFileSync(manifest, JSON.stringify({ state: "completed" }));
++    assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/spec.md", root), null);
++    assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/nested/lifecycle.json", root), null);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("isCriticScratchNotesPath identifies critic notes and dispatch scratch paths", () => {
+   assert.equal(isCriticScratchNotesPath("scratch/dispatch/TASK-1/critic-notes.md"), true);
+   assert.equal(isCriticScratchNotesPath("scratch/dispatch/TASK-1/repro.js"), true);

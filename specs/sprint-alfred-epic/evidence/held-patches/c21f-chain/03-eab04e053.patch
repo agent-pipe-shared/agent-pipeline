@@ -1,0 +1,160 @@
+diff --git a/.github/workflows/verify.yml b/.github/workflows/verify.yml
+index 0a55a40c0b27f5823a52a38443c5a250936a1112..50e16471fbfe50e46f963de2716735afa95240a4 100644
+--- a/.github/workflows/verify.yml
++++ b/.github/workflows/verify.yml
+@@ -52,6 +52,8 @@ jobs:
+         run: node --test --test-name-pattern="external reports stay readable|greenfield passive PowerShell" plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+       - name: Existing signing key reuse
+         run: node --test --test-name-pattern="signature anchor reuses a key" plugins/pipeline-core/scripts/onboarding-init.test.mjs
++      - name: Printed signing commands run unchanged
++        run: node --test --test-name-pattern="C21F:" plugins/pipeline-core/scripts/po-human-approval.test.mjs
+       - name: Language transaction and attended anchor recovery
+         run: node --test plugins/pipeline-core/lib/onboarding-initial-answers-transaction.test.mjs plugins/pipeline-core/scripts/bootstrap-trust-recovery.test.mjs
+       - name: Consumer pre-push installation
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 17fb7bdfcb63f6664799d7ffd45750be47af711d..095c2efa95baab7a456b7e0421732a9524c718a5 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -795,7 +795,8 @@ test("G20-76: an older signature's mirror never ends the wait for the expected s
+   assert.match(staleBoth.out.repair, /critical-push-/u, "the repair names the mirror files of the older signature");
+   assert.match(staleBoth.out.repair, /rename|move/iu);
+   assert.doesNotMatch(staleBoth.out.repair, /delete|\brm\b/iu, "set aside, never deleted");
+-  assert.match(staleBoth.out.repair, /sign-intent/u, "then the one signing command again");
++  assert.match(staleBoth.out.repair, /authorize-critical/u, "then the one signing command again");
++  assert.doesNotMatch(staleBoth.out.repair, /sign-intent/u, "sign-intent cannot sign a critical mirror");
+   assert.match(staleBoth.out.repair, /proof-wait\.mjs/u, "then the same wait");
+   assert.ok(staleBoth.out.repair.includes(wanted), "the same wait keeps the expected subject");
+   // (b) a proof file with its sibling request missing: not signed yet.
+diff --git a/plugins/pipeline-core/lib/signed-proof-wait.mjs b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+index ec93f68ba17d1a25f9aea4deb216e4f26f98ded3..d502e1feadf4626320e0c715fa46bda4c7ad981b 100644
+--- a/plugins/pipeline-core/lib/signed-proof-wait.mjs
++++ b/plugins/pipeline-core/lib/signed-proof-wait.mjs
+@@ -95,12 +95,19 @@ export function proofWaitCommand(root, proof, seconds = PROOF_WAIT_DEFAULT_SECON
+   return { executable: process.execPath, argv: [PROOF_WAIT_SCRIPT, "--root", root, "--proof", proof, "--timeout", String(seconds), ...(subjectSha256 === null ? [] : ["--subject", subjectSha256])] };
+ }
+ 
+-/** The PO's one signing command for a proof reference, derived by the naming convention sign-intent itself writes under. */
++/**
++ * authorize-critical owns the `critical-*` mirror: its request appears only after that command ran and carries the digest under
++ * approvalIntent, so sign-intent can never sign it. The wait has no plan, spec or expiry to rebuild that command from.
++ */
++const isCriticalMirrorProof = (proof) => basename(proof).startsWith("critical-");
++const CRITICAL_SIGNING_STEP = "exactly the authorize-critical command the signing step printed (if it is gone, rerun the step that printed it)";
++
++/** The PO's one signing command for a proof reference, derived by the naming convention sign-intent itself writes under; null when sign-intent cannot sign it. */
+ export function signCommandForProof(root, proof) {
+   const kind = proofReferenceKind(proof);
+   if (kind === "scratch") {
+     const name = basename(proof);
+-    if (!name.includes("proof-")) return null;
++    if (!name.includes("proof-") || isCriticalMirrorProof(proof)) return null;
+     return { executable: process.execPath, argv: [PO_HUMAN_APPROVAL_SCRIPT, "sign-intent", "--repo-root", root, "--request", `scratch/${name.replace("proof-", "request-")}`] };
+   }
+   if (kind === "key-directory") {
+@@ -156,13 +163,14 @@ export function waitForSignedProof({ root, proof, timeoutSeconds = PROOF_WAIT_DE
+   }
+   const sign = signCommandForProof(root, proof);
+   const again = text(proofWaitCommand(root, proof, timeoutSeconds, subjectSha256));
++  const critical = isCriticalMirrorProof(proof) ? `ask the PO once to run ${CRITICAL_SIGNING_STEP}` : null;
+   if (last.state === "stale") {
+     return { status: "refused", code: "PROOF-WAIT-STALE", proofPath: proof, reason: `a signed proof sits at ${proof} but it is an older signature's mirror, not one for the expected subject (${last.reason})`,
+-      repair: `rename (do not remove) the older mirror files ${staleMirrorNames(proof).join(", ")}; ${sign === null ? "sign again" : `then ask the PO once to run exactly this signing command: ${text(sign)}`}; then run ${again}` };
++      repair: `rename (do not remove) the older mirror files ${staleMirrorNames(proof).join(", ")}; ${critical ?? (sign === null ? "sign again" : `then ask the PO once to run exactly this signing command: ${text(sign)}`)}; then run ${again}` };
+   }
+   return last.state === "invalid"
+     ? { status: "refused", code: "PROOF-WAIT-INVALID", proofPath: proof, reason: `a file sits at ${proof} but it is not a signed proof (${last.reason})`,
+-      repair: `${sign === null ? "sign again" : `have the PO run the one signing command again: ${text(sign)}`}; then run ${again}` }
++      repair: `${critical ?? (sign === null ? "sign again" : `have the PO run the one signing command again: ${text(sign)}`)}; then run ${again}` }
+     : { status: "refused", code: "PROOF-WAIT-TIMEOUT", proofPath: proof, reason: `no signed proof appeared at ${proof} within ${timeoutSeconds}s`,
+-      repair: `${sign === null ? "the signing step has not been run" : `ask the PO once to run exactly this signing command: ${text(sign)}`}; then run ${again}` };
++      repair: `${critical ?? (sign === null ? "the signing step has not been run" : `ask the PO once to run exactly this signing command: ${text(sign)}`)}; then run ${again}` };
+ }
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index 3a1ac2c0109874b6a1c5cf51e3e8d911bd265265..3433d3ca185b1e3826d87df9c0dfdd9d39ba0253 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -1146,6 +1146,84 @@ test("NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scra
+   }
+ });
+ 
++import { signCommandForProof as c21fSignCommand, waitForSignedProof as c21fWaitForProof } from "../lib/signed-proof-wait.mjs";
++import { PO_APPROVAL_DIRECTORY_ENV as C21F_DIRECTORY_ENV } from "../lib/po-human-approval-read.mjs";
++
++// The printed line carries no --directory: the PO's terminal resolves the key directory itself, so the run does the same.
++function c21fRunPrinted(command, directory, dependencies) {
++  const previous = process.env[C21F_DIRECTORY_ENV];
++  process.env[C21F_DIRECTORY_ENV] = directory;
++  try { return runHumanApproval(command.argv.slice(1), dependencies); } finally {
++    if (previous === undefined) delete process.env[C21F_DIRECTORY_ENV]; else process.env[C21F_DIRECTORY_ENV] = previous;
++  }
++}
++
++test("C21F: the printed signing command runs unchanged and ends the agent's wait, for a scratch request and for a key-directory proof", { skip: REQUIRES_OPENSSL }, () => {
++  const dirs = fixtureDirs();
++  try {
++    keyFixture(dirs.directory);
++    anchorFixtureKey(dirs.repoRoot, dirs.directory);
++    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
++    const scratchIntent = createHash("sha256").update("c21f-printed-scratch").digest("hex");
++    writeFileSync(join(dirs.repoRoot, "scratch", "reconcile-request-42.json"), `${JSON.stringify({ intentSha256: scratchIntent })}\n`);
++    const dependencies = { readConfirmation: () => "approve" };
++
++    const scratchProof = "scratch/reconcile-proof-42.json";
++    const scratchRun = c21fRunPrinted(c21fSignCommand(dirs.repoRoot, scratchProof), dirs.directory, dependencies);
++    assert.equal(scratchRun.code, "PO-HUMAN-SIGN-INTENT-READY");
++    assert.equal(c21fWaitForProof({ root: dirs.repoRoot, proof: scratchProof, timeoutSeconds: 0 }).status, "proof-present");
++
++    const keyIntent = createHash("sha256").update("c21f-printed-key-directory").digest("hex");
++    const keyProof = join(dirs.directory, `proof-${keyIntent}.json`);
++    const keyRun = c21fRunPrinted(c21fSignCommand(dirs.repoRoot, keyProof), dirs.directory, dependencies);
++    assert.equal(keyRun.code, "PO-HUMAN-SIGN-INTENT-READY");
++    assert.equal(c21fWaitForProof({ root: dirs.repoRoot, proof: keyProof, timeoutSeconds: 0 }).status, "proof-present");
++  } finally {
++    cleanup(dirs);
++  }
++});
++
++test("C21F: a critical mirror has no sign-intent line, because sign-intent refuses its request; the wait names authorize-critical instead", { skip: REQUIRES_OPENSSL }, () => {
++  const dirs = fixtureDirs();
++  try {
++    keyFixture(dirs.directory);
++    anchorFixtureKey(dirs.repoRoot, dirs.directory);
++    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
++    const proof = "scratch/critical-push-proof-0123456789ab.json";
++    assert.equal(c21fSignCommand(dirs.repoRoot, proof), null);
++    const waited = c21fWaitForProof({ root: dirs.repoRoot, proof, timeoutSeconds: 0 });
++    assert.equal(waited.code, "PROOF-WAIT-TIMEOUT");
++    assert.match(waited.repair, /authorize-critical/u);
++    assert.doesNotMatch(waited.repair, /po-human-approval\.mjs/u, "the fixture directory's own name also contains sign-intent");
++
++    writeFileSync(join(dirs.repoRoot, "scratch", "critical-push-request-0123456789ab.json"), `${JSON.stringify({ approvalIntent: { sha256: "a".repeat(64) } })}\n`);
++    assert.throws(
++      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/critical-push-request-0123456789ab.json"], { readConfirmation: () => "approve" }),
++      /must carry an intentSha256/u,
++    );
++  } finally {
++    cleanup(dirs);
++  }
++});
++
++test("C21F: the printed authorize-critical line runs unchanged and its mirror ends the wait for exactly that subject", { skip: REQUIRES_OPENSSL }, () => {
++  for (const kind of ["push", "feature-package-reconcile"]) {
++    const dirs = criticalDirs();
++    try {
++      keyFixture(dirs.directory);
++      const subjectSha256 = subjectDigest(`c21f-printed-${kind}`);
++      const printed = authorizeCriticalActionCommand({ kind, repoRoot: dirs.repoRoot, featureId: FEATURE_ID, plan: PLAN, spec: SPEC, subjectSha256, expiresAt: futureExpiry() });
++      const run = c21fRunPrinted(printed, dirs.directory, { observeCandidate: () => ({ ...CANDIDATE }), readConfirmation: () => "approve" });
++      assert.equal(run.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", kind);
++      const proof = `scratch/${basename(run.paths.proof)}`;
++      assert.equal(c21fWaitForProof({ root: dirs.repoRoot, proof, timeoutSeconds: 0, subjectSha256 }).status, "proof-present", kind);
++      assert.equal(c21fWaitForProof({ root: dirs.repoRoot, proof, timeoutSeconds: 0, subjectSha256: subjectDigest("another-subject") }).code, "PROOF-WAIT-STALE", kind);
++    } finally {
++      cleanup(dirs);
++    }
++  }
++});
++
+ function portableAgySigningFixture() {
+   const subject = { schema: PORTABLE_AGY_AUTHORSHIP_SUBJECT_SCHEMA,
+     purpose: "portable-agy-authorship", taskId: "AGY-SIGN-1", runner: "antigravity",
