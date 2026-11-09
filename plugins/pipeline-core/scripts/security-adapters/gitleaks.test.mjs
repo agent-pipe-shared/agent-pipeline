@@ -244,6 +244,28 @@ test("run() resolves the plugin-shipped default config from an installed-plugin 
   }
 });
 
+test("C21B a stray .gitleaks.toml four directories above an installed plugin never replaces the shipped ruleset; only a source checkout with harness/ uses the repo-root file", async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "gitleaks-stray-config-"));
+  try {
+    const adapterDir = join(fixtureRoot, "plugins", "pipeline-core", "scripts", "security-adapters");
+    const configDir = join(fixtureRoot, "plugins", "pipeline-core", "config", "security");
+    mkdirSync(adapterDir, { recursive: true });
+    mkdirSync(configDir, { recursive: true });
+    copyFileSync(fileURLToPath(new URL("./gitleaks.mjs", import.meta.url)), join(adapterDir, "gitleaks.mjs"));
+    copyFileSync(fileURLToPath(new URL("../../config/security/gitleaks-default.toml", import.meta.url)), join(configDir, "gitleaks-default.toml"));
+    writeFileSync(join(fixtureRoot, ".gitleaks.toml"), "[extend]\nuseDefault = true\n");
+    const url = pathToFileURL(join(adapterDir, "gitleaks.mjs")).href;
+    const installed = await import(`${url}?installed`);
+    assert.equal(installed.resolveGitleaksConfigPath(), join(configDir, "gitleaks-default.toml"), "the runner's cache folder must not supply the ruleset");
+    mkdirSync(join(fixtureRoot, "harness", "scripts"), { recursive: true });
+    writeFileSync(join(fixtureRoot, "harness", "scripts", "verify.mjs"), "\n");
+    const checkout = await import(`${url}?checkout`);
+    assert.equal(checkout.resolveGitleaksConfigPath(), join(fixtureRoot, ".gitleaks.toml"), "the source checkout keeps its repo-root file");
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
 test("run() degrades to SKIPPED/success (never ERROR) from an installed-plugin fixture where NEITHER the repo-root NOR the plugin-shipped config exists (fail-safe for a stripped/corrupted install)", async () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), "gitleaks-installed-fixture-noconfig-"));
   const scanRootDir = mkdtempSync(join(tmpdir(), "gitleaks-installed-fixture-noconfig-scanroot-"));
