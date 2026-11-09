@@ -609,7 +609,9 @@ function drivePushInitCore({
     schema: SCHEMA, root, by, remote, destination, base, outcome: "signature-required", steps,
     subjectSha256: prepare.report.subjectSha256,
     // CGF-07/22: a Codex and a Claude run each spent turn after turn re-checking a signature only the human can produce.
-    humanGate: "Hand the signature command to the human once, then end the turn. Nothing changes until the human answers: do not re-run this driver, poll the proof or repeat the request. An automatic continuation gets one line saying the push waits for the signature. Commit nothing meanwhile, a new commit voids the prepared approval.",
+    // Claude greenfield report: the design step sees its own signature arrive, the push made the PO paste the output back. The same bounded wait, when the proof lands where it can be watched.
+    ...(prepare.report.awaitSignature ? { awaitSignature: prepare.report.awaitSignature } : {}),
+    humanGate: `Hand the signature command to the human once.${prepare.report.awaitSignature ? " Then run awaitSignature.waitAction exactly once: it returns by itself when the proof arrives or its window ends, and the human reports nothing back. If it ends without a proof," : " Then"} end the turn. Nothing changes until the human answers: do not re-run this driver, poll the proof by hand or repeat the request. An automatic continuation gets one line saying the push waits for the signature. Commit nothing meanwhile, a new commit voids the prepared approval.`,
     signatureCommand: {
       executedByDriver: false,
       note: "Run this at the PO's own attended terminal. This driver never executes it and cannot -- "

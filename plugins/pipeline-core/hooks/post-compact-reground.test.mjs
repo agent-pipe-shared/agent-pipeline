@@ -385,6 +385,8 @@ for (const [name, value, code] of [
   ["null state", null, "PCR-OUTER-INVALID"],
   ["wrong outer schema", { ...outer(), schema: "pipeline.state.v1" }, "PCR-OUTER-INVALID"],
   ["missing active feature", { ...outer(), activeFeature: undefined }, "PCR-ACTIVE-FEATURE-INVALID"],
+  ["no active feature after a close", { schema: "pipeline.state.v0", activeFeature: null, closedFeatures: [{ id: FEATURE }] }, "PCR-NO-ACTIVE-FEATURE"],
+  ["an empty close history is not a close", { schema: "pipeline.state.v0", activeFeature: null, closedFeatures: [] }, "PCR-ACTIVE-FEATURE-INVALID"],
   ["missing continuity", { schema: "pipeline.state.v0", activeFeature: { id: FEATURE, phase: "implementation" } }, "PCR-CONTINUITY-MISSING"],
   ["mismatched feature", outer({}, { activeFeature: { id: "other", phase: "implementation" } }), "PCR-FEATURE-MISMATCH"],
 ]) {

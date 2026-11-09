@@ -550,6 +550,33 @@ test("drivePushInit: signature preparation keeps the existing signature-required
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("drivePushInit: a proof that can be watched is handed over with its wait action, so the human reports nothing back; without one the turn ends", async () => {
+  const { pushPrepareReport: real } = await import("./push-prepare.mjs");
+  const waitAction = { executable: "node", argv: ["proof-wait.mjs"] };
+  const root = freshFixtureRoot();
+  try {
+    const drive = (awaitSignature) => drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(),
+      pushPrepareReport: (...args) => {
+        const prepared = real(...args);
+        if (awaitSignature) prepared.report.awaitSignature = { waitAction }; else delete prepared.report.awaitSignature;
+        return prepared;
+      },
+    });
+    const watched = drive(true);
+    assert.equal(watched.outcome, "signature-required", JSON.stringify(watched));
+    assert.deepEqual(watched.awaitSignature.waitAction, waitAction);
+    assert.match(watched.humanGate, /run awaitSignature\.waitAction exactly once/u);
+    assert.match(watched.humanGate, /human reports nothing back/u);
+    assert.match(watched.humanGate, /end the turn/u, "a wait that ended without a proof still stops");
+    const unwatched = drive(false);
+    assert.equal(Object.hasOwn(unwatched, "awaitSignature"), false);
+    assert.doesNotMatch(unwatched.humanGate, /waitAction/u);
+    assert.match(unwatched.humanGate, /end the turn/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("drivePushInit: precondition failure remains precondition-unmet and has no chat or signature terminal output", () => {
   const root = freshFixtureRoot();
   try {

@@ -782,6 +782,43 @@ check("R7-6n: an invalid legacy per-repository store is a failure, never absent"
     rmSync(base, { recursive: true, force: true, maxRetries: 3 });
   }
 });
+check("CGR-04: a synchronised folder is named by its provider, an ordinary folder by nobody", async () => {
+  const { cloudSyncProvider } = await import("./toolchain-preflight.mjs");
+  assert.equal(cloudSyncProvider(join("C:", "Users", "someone", "OneDrive - Contoso", "keys")), "OneDrive");
+  assert.equal(cloudSyncProvider("/home/someone/Dropbox/keys"), "Dropbox");
+  assert.equal(cloudSyncProvider("/Users/someone/Library/Mobile Documents/keys"), "iCloud");
+  assert.equal(cloudSyncProvider("/home/someone/Google Drive/keys"), "Google Drive");
+  assert.equal(cloudSyncProvider("/home/someone/.config/po-keys"), null);
+  assert.equal(cloudSyncProvider("/home/someone/my-onedrive-notes/keys"), null, "only a segment that starts with the provider counts");
+});
+check("CGR-04: a key directory in a synchronised folder is reported without its path and without a sign-intent effect; the same directory elsewhere stays as it was", async () => {
+  const base = mkdtempSync(join(tmpdir(), "cgr04-"));
+  const savedEnv = process.env[R76J_ENV];
+  try {
+    const fixture = r76jBuild(join(base, "row"), { plane: "absent", legacy: false });
+    const plain = await (async () => { process.env[R76J_ENV] = fixture.keys.environment; return r76tReport(fixture); })();
+    const plainFinding = plain.findings.find((entry) => entry.findingId === "po-key-directory");
+    assert.doesNotMatch(String(plainFinding.cause), /cloud-synced/u);
+    const synced = join(base, "row", "OneDrive - Contoso", "keys");
+    mkdirSync(synced, { recursive: true });
+    for (const name of ["po-public.pem", "trust-policy.json"]) writeFileSync(join(synced, name), readFileSync(join(fixture.keys.environment, name)));
+    process.env[R76J_ENV] = synced;
+    const report = await r76tReport(fixture);
+    const finding = report.findings.find((entry) => entry.findingId === "po-key-directory");
+    if (plainFinding.status === "ok") {
+      assert.equal(finding.status, "attended", JSON.stringify(finding));
+      assert.match(String(finding.cause), /^key-directory-cloud-synced/u);
+      assert.match(String(finding.cause), /OneDrive/u);
+      assert.doesNotMatch(JSON.stringify(finding), /Contoso/u, "the machine path stays unprinted");
+      assert.equal(finding.repair?.prerequisite, "po-key-directory-local");
+    } else {
+      assert.fail(`the fixture must be ok outside the synchronised folder, got ${plainFinding.status}: ${String(plainFinding.cause).slice(0, 120)}`);
+    }
+  } finally {
+    if (savedEnv === undefined) delete process.env[R76J_ENV]; else process.env[R76J_ENV] = savedEnv;
+    rmSync(base, { recursive: true, force: true, maxRetries: 3 });
+  }
+});
 // W7 preflight slice 1: gitleaks, osv-scanner and semgrep are typed prerequisite findings (AC-264 slice; the environment
 // readiness never reports a missing scanner as ready or clean). Fixtures inject the resolver and probes; nothing is spawned.
 const W7_SCANNER_TOOLS = Object.freeze({ "scanner-gitleaks": "gitleaks", "scanner-osv-scanner": "osv-scanner", "scanner-semgrep": "semgrep" });

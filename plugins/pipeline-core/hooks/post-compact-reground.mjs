@@ -96,6 +96,7 @@ export const REGROUND_CODES = Object.freeze([
   "PCR-DECISION-PENDING",
   "PCR-OUTER-INVALID",
   "PCR-ACTIVE-FEATURE-INVALID",
+  "PCR-NO-ACTIVE-FEATURE",
   "PCR-CONTINUITY-MISSING",
   "PCR-FEATURE-MISMATCH",
   "PCR-CONTINUITY-INVALID",
@@ -219,6 +220,11 @@ function mainSessionRouteProjection(input, phase, rootDir = null) {
 export function resolveRegroundProjection(state, input = null, { rootDir = null } = {}) {
   if (!isObject(state) || state.schema !== OUTER_SCHEMA) {
     return stoppedProjection("PCR-OUTER-INVALID");
+  }
+  // A closed feature clears activeFeature: that is a clean state with nothing to resume, and it must not read like a damaged one (Claude greenfield report).
+  if ((state.activeFeature === null || state.activeFeature === undefined)
+    && Array.isArray(state.closedFeatures) && state.closedFeatures.length > 0) {
+    return stoppedProjection("PCR-NO-ACTIVE-FEATURE");
   }
   const featureId = state.activeFeature?.id;
   const phase = state.activeFeature?.phase;
