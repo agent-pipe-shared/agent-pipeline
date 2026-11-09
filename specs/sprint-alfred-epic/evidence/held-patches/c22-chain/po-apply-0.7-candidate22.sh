@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 22: 39 held patches exported from the build clone chain 91b08e8f3..dd01a4007
+# PO apply script for candidate 22: 40 held patches exported from the build clone chain 91b08e8f3..486f6f67f
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -53,6 +53,7 @@ step 36-cc81e42c6 'chore(verify): register the new suites of candidate 22'
 step 37-85133f151 'chore(inventory): categorize the five verify suites added for candidate 22'
 step 38-a71cd51a1 'test(preflight): pin the plugin list in the trusted Windows custody case'
 step 39-dd01a4007 'test(verify): restate the completion pin for the candidate 22 suites'
+step 40-486f6f67f 'fix(reader): restate the reader-review policy digest after the evidence-only commit rule'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
