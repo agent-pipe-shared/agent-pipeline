@@ -26,6 +26,7 @@ import {
   validateDesignApprovalBinding,
   verifyDesignApprovalRequest,
 } from "./design-approval-binding.mjs";
+import * as bindingModule from "./design-approval-binding.mjs";
 import { reviewChainInconsistencies } from "./design-consistency-check.mjs";
 import { createDesignReviewReceipt, summarizeDesignReviewReceipt } from "./design-review-receipt.mjs";
 import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
@@ -1068,4 +1069,41 @@ test("U3-27: validate accepts pathRebind only with exactly two distinct safe-pat
   refused("toDir not the sources' directory", (b) => { b.pathRebind.toDir = "specs/other"; });
   refused("not an object", (b) => { b.pathRebind = "specs/feat-x"; });
   refused("array", (b) => { b.pathRebind = [DIR, MOVED_DIR]; });
+});
+
+// CGR-03 (candidate 22, AC-108): the design signature text states how many corrections were made after the last readiness review and that they
+// were not re-reviewed, when that number is above zero. The number is what the binding records (unreviewedSourceDelta), so the statement is bound to
+// the signed bytes. No new gate and no new review round: the statement only informs the human who signs.
+test("CGR-03a: a binding with an unreviewedSourceDelta yields one statement naming the count, the paths and that they were not re-reviewed", () => {
+  const made = mustCreate(driftScenario());
+  const lines = bindingModule.describeUnreviewedCorrections(made.binding);
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /^unreviewed corrections: 3 source files were changed after the last readiness review \(round 2\) and were not re-reviewed:/u);
+  for (const path of [DESIGN_PATH, PRD_PATH, SPEC_PATH]) assert.ok(lines[0].includes(path), path);
+});
+
+test("CGR-03b: one changed file is stated in the singular, a removed file is named too, and a long list is cut with the remaining count", () => {
+  const entry = (path, current = digestOf(`now:${path}`)) => ({ path, reviewedSha256: digestOf(`was:${path}`), currentSha256: current });
+  const one = bindingModule.describeUnreviewedCorrections({ reviewReceipts: [{ round: 2 }], unreviewedSourceDelta: [entry(SPEC_PATH)] });
+  assert.match(one[0], /: 1 source file was changed after the last readiness review \(round 2\) and was not re-reviewed: /u);
+  const removed = bindingModule.describeUnreviewedCorrections({ reviewReceipts: [{ round: 2 }], unreviewedSourceDelta: [entry(DESIGN_PATH, null)] });
+  assert.ok(removed[0].includes(`${DESIGN_PATH} (removed)`));
+  const many = bindingModule.describeUnreviewedCorrections({ reviewReceipts: [{ round: 2 }], unreviewedSourceDelta: Array.from({ length: 12 }, (_, index) => entry(`${DIR}/f${String(index).padStart(2, "0")}.md`)) });
+  assert.match(many[0], /: 12 source files were changed /u);
+  assert.match(many[0], /and 4 more\.?$/u);
+  assert.ok(many[0].includes(`${DIR}/f07.md`) && !many[0].includes(`${DIR}/f08.md`));
+});
+
+test("CGR-03c: nothing is stated when the binding records no unreviewed change (a PASS binding, a delta binding without drift)", () => {
+  assert.deepStrictEqual(bindingModule.describeUnreviewedCorrections(mustCreate(passScenario()).binding), []);
+  assert.deepStrictEqual(bindingModule.describeUnreviewedCorrections(mustCreate(deltaScenario()).binding), []);
+  assert.deepStrictEqual(bindingModule.describeUnreviewedCorrections(null), []);
+});
+
+test("CGR-03d: the design signing description puts that statement before the complete binding", () => {
+  const source = readFileSync(new URL("../scripts/po-human-approval.mjs", import.meta.url), "utf8");
+  const statement = source.indexOf("...describeUnreviewedCorrections(");
+  assert.ok(statement > 0, "the signing description spreads describeUnreviewedCorrections of the signed binding");
+  assert.ok(statement < source.indexOf("complete bounded design binding follows"));
+  assert.match(source.slice(statement, statement + 80), /physicalRequest\.binding/u, "it describes the binding the request carries, which the signature covers");
 });

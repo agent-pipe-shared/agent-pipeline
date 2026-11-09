@@ -1875,6 +1875,9 @@ const cases = [
     try{
       const refused=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-2'),candidate:original.candidate,writeScope:['src/change.mjs'],admissionDeadline:{startMs:Date.now()-299500,budgetMs:300000}}));
       assert.equal(refused.status,'refused');assert.equal(refused.code,'SDC-LOCK-HELD',JSON.stringify(refused));
+      // CGR-07 (candidate 22): a start refused at the registry lock says it was not consumed, that the same prompt is sent again once the running start has settled, and that starts go one after another.
+      assert.match(refused.repair??'',/this start was not consumed/u);assert.match(refused.repair,/send the same prompt again after the running start has settled/u);assert.match(refused.repair,/one after another/u);
+      assert.match(refused.repair,/session-authority-repair\.mjs inspect --root /u,'the diagnosis the guard used to print for a lock refusal is kept');
       assert.equal(resolveGovernedItemQueue({root}).queue.slices.some(row=>row.id==='ITEM-AC-2'),false,'a refused preparation writes no row');
     }finally{child.kill();}
   })},

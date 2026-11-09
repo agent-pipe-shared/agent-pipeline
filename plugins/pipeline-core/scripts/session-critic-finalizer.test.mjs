@@ -2960,3 +2960,39 @@ test("G20-72 finalize refuses a split round with a missing child, two records fo
   assert.equal(none.exitCode, 0, "no record at all keeps today's honest label");
   assert.equal(none.output.independence, "caller-authored-fallback");
 });
+
+// CGR-09 (candidate 22): a child that is resumed (the same agent id) and returns again is a resumption, not a second run: its later return stands for its entry. A second
+// DIFFERENT child (or a child whose identity is not recorded) for one entry stays refused: that is verdict shopping, as before.
+test("CGR-09 a resumed child's second return replaces its first for the entry, and a different child for the same entry still refuses", () => {
+  const kids = ["api", "core", "shared"].map((id) => [id, g2072Child(id)]);
+  const resumedCore = g2072Child("core", { deliberately_not_flagged: ["reviewed core again", "resumed: marker corrected"] });
+  const run = (fx, admitted, ...argv) => spawnSync(process.execPath, [MERGE_SCRIPT, "--root", fx.root, "--packet", admitted.packetId, ...argv], { encoding: "utf8" });
+  const fx = g2072Fixture();
+  try {
+    const admitted = g2072Admit(fx);
+    g2072Hook(fx, criticReturn(kids[0][1]), { agent_id: "agent-api" });
+    g2072Hook(fx, criticReturn(kids[1][1]), { agent_id: "agent-core" });
+    const resumed = g2072Hook(fx, criticReturn(resumedCore), { agent_id: "agent-core" });
+    assert.match(resumed.stderr, /Source return issued for packet[\s\S]*split entry core/u);
+    g2072Hook(fx, criticReturn(kids[2][1]), { agent_id: "agent-shared" });
+    assert.equal(g2072Records(admitted).length, 4, "both returns of the resumed child are kept as records");
+    const merged = run(fx, admitted, "--out", "evidence/critic-verdict.json");
+    assert.equal(merged.status, 0, merged.stderr);
+    const verdictOut = JSON.parse(readFileSync(join(fx.root, "evidence", "critic-verdict.json"), "utf8"));
+    assert.ok(verdictOut.deliberately_not_flagged.includes("resumed: marker corrected"), "the later return of the resumed child is the one merged");
+    assert.equal(verdictOut.deliberately_not_flagged.includes("reviewed core"), false, "the earlier return of a resumed child no longer counts");
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
+    assert.equal(result.exitCode, 0, JSON.stringify(result.output));
+    assert.equal(result.output.independence, "source-issued-origin");
+  } finally { cleanup(fx); }
+  const other = g2072Fixture();
+  try {
+    const admitted = g2072Admit(other);
+    g2072Hook(other, criticReturn(kids[0][1]), { agent_id: "agent-api" });
+    g2072Hook(other, criticReturn(kids[1][1]), { agent_id: "agent-core" });
+    g2072Hook(other, criticReturn(resumedCore), { agent_id: "agent-core-second-run" });
+    g2072Hook(other, criticReturn(kids[2][1]), { agent_id: "agent-shared" });
+    const merged = run(other, admitted);
+    assert.equal(JSON.parse(merged.stderr).code, "CSM-CHILD-DUPLICATE", merged.stderr);
+  } finally { cleanup(other); }
+});

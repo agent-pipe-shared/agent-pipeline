@@ -449,6 +449,8 @@ test("K12 a lock that stays held refuses DBG-RULESET-LOCK-HELD naming the holder
     registryLock: () => heldLock(), now: () => clock, pause: (ms) => { clock += ms; } }));
   assert.equal(result.ok, false); assert.equal(result.code, "DBG-RULESET-LOCK-HELD", result.message);
   assert.match(result.message, /pid 4242/u); assert.match(result.message, /retry this command/u); assert.match(result.message, /session-authority-repair\.mjs wait/u);
+  // CGR-07 (candidate 22): the refusal also says that nothing was consumed and that dispatch starts go one after another.
+  assert.match(result.message, /this start was not consumed/u); assert.match(result.message, /one after another/u);
   assert.equal(result.skeleton, undefined);
   // A lock whose owner is provably gone is not waited for and not answered with "wait": the refusal names the heal that retires it (live on
   // Windows: a hook killed at the host limit left a lock "dead for 37230s" and the briefing named wait and release-lock only).

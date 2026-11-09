@@ -37,9 +37,9 @@ const exact = (v, keys) => v !== null && typeof v === "object" && !Array.isArray
   && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k));
 const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 export class GenericCriticBatchError extends Error {
-  constructor(code, detail) { super(detail ?? "Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; this.detail = detail ?? null; }
+  constructor(code, detail, releaseActions = null) { super(detail ?? "Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; this.detail = detail ?? null; this.releaseActions = releaseActions; }
 }
-function fail(code, detail) { throw new GenericCriticBatchError(code, detail); }
+function fail(code, detail, releaseActions = null) { throw new GenericCriticBatchError(code, detail, releaseActions); }
 function shape(v, keys) { if (!exact(v, keys)) fail("CGB-SHAPE"); }
 function ref(v) { shape(v, ["batchId", "registrationSha256"]); if (!ID.test(v.batchId) || !SHA.test(v.registrationSha256)) fail("CGB-SHAPE"); return v; }
 function paths(v, max = 128) {
@@ -753,16 +753,45 @@ const TAKEOVER_REPAIR = {
   "CGB-TAKEOVER-HISTORY": "The feature course already has registered history; continue it in delta mode instead of taking over.",
   "CGB-TAKEOVER-OPEN": "The old batch holds a packet that is not consumed, or no packet at all without a released one. Finish that packet, or release it and inspect again: a batch of an earlier course whose packets were all released can be retired. To release an expired or abandoned packet: node ${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs release --root <root> --request <file> with a request of schema pipeline.session-critic-release-request.v1 carrying packetId and reason.",
 };
+// CGR-02: a stale round must be replaceable without first running it to its end. For every packet the old batch still holds unconsumed (and that release accepts:
+// prepared or claimed) the refusal hands over the release as a ready, exact action: the request file, its body, the command, and what it costs.
+const RELEASE_COST = "Cost: that packet reviewed nothing the course keeps; its reservation is freed and the packet is parked, nothing is deleted.";
+function releaseActionsOf(c, packetIds) {
+  const actions = [];
+  for (const packetId of packetIds) {
+    let phase = null;
+    try { phase = JSON.parse(readFileSync(join(c.controlRoot, packetId, "state.json"), "utf8"))?.phase ?? null; } catch { phase = null; }
+    if (phase !== "prepared" && phase !== "claimed") continue;
+    const requestFile = `scratch/release-${packetId.slice(0, 8)}.json`;
+    actions.push(Object.freeze({ packetId, phase, requestFile,
+      request: Object.freeze({ schema: "pipeline.session-critic-release-request.v1", packetId, reason: "replaced by a newer candidate of the same course" }),
+      command: `node \${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs release --root <root> --request ${requestFile}`, cost: RELEASE_COST }));
+  }
+  return actions;
+}
+function releaseActionsText(actions) {
+  return actions.length === 0 ? "" : ` Open packets of that batch, release each (write the request body to its request file, then run the command): ${actions.map(a => `packet ${a.packetId} (${a.phase}): body ${JSON.stringify(a.request)} in ${a.requestFile}; ${a.command}. ${a.cost}`).join(" ")}`;
+}
+function ownerReleaseActions(c, batchRefs) {
+  try {
+    const ids = [];
+    for (const batchRef of new Map(batchRefs.map(b => [canonicalJson(b), b])).values()) {
+      for (const row of reservations(registration(c, ref(batchRef)).dir)) if (!packetConsumed(c, row.packetId)) ids.push(row.packetId);
+    }
+    return releaseActionsOf(c, [...new Set(ids)]);
+  } catch { return []; }
+}
 function featureOwnership(c, courseKey, work) {
   const hits = work.map(id => indexPath(c, "logical", id)).filter(p => existsSync(p)).map(p => stableJson(p));
   const origin=indexPath(c,"origins",{kind:"feature-course",courseKey});
   if (!hits.length) { if(existsSync(origin))fail("CGB-CONFLICT");return null; }
   const batchRef = ref(hits[0].batchRef);
-  if (hits.length !== work.length || !hits.every(h => eq(h.batchRef, batchRef))) fail("CGB-CONFLICT", TAKEOVER_DETAIL);
+  const conflict = () => { const actions = ownerReleaseActions(c, hits.map(h => h.batchRef)); fail("CGB-CONFLICT", TAKEOVER_DETAIL + releaseActionsText(actions), actions.length > 0 ? actions : null); };
+  if (hits.length !== work.length || !hits.every(h => eq(h.batchRef, batchRef))) conflict();
   const registered = registration(c, batchRef);
   if (registered.value.schema !== GENERIC_CRITIC_BATCH_V2_SCHEMA
     || !eq(registered.value.declaredScope.logicalWorkIds, work)
-    || !eq(registered.value.originTargets, [{kind:"feature-course",courseKey}])) fail("CGB-CONFLICT", TAKEOVER_DETAIL);
+    || !eq(registered.value.originTargets, [{kind:"feature-course",courseKey}])) conflict();
   return { ...registered, batchRef };
 }
 // PF-95: every origins index entry that belongs to a batch (feature-course origin and the delivery target of each member), read-only.
@@ -780,7 +809,7 @@ function packetConsumed(c, packetId) {
 function takeoverState(c, courseKey, work, courseHistoryRegistered, registeredRounds = null) {
   const hits = work.map(id => ({ id, p: indexPath(c, "logical", id) })).filter(h => existsSync(h.p)).map(h => ({ id: h.id, value: stableJson(h.p) }));
   const facts = { courseKey, logicalWorkIds: work, ownedWorkIds: hits.map(h => h.id), batchRef: null, registrationSchema: null, originKind: null,
-    originTargets: null, originEntries: [], packetIds: [], releasedPacketIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true,
+    originTargets: null, originEntries: [], packetIds: [], openPacketIds: [], releasedPacketIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true,
     registeredRounds, scope: "batch", tailOrdinals: [] };
   const done = refusalCode => ({ facts, refusalCode });
   if (!hits.length) return done("CGB-TAKEOVER-NONE");
@@ -794,6 +823,7 @@ function takeoverState(c, courseKey, work, courseHistoryRegistered, registeredRo
   const rows = reservations(r.dir);
   facts.packetIds = rows.map(x => x.packetId);
   facts.allPacketsConsumed = rows.length > 0 && rows.every(x => packetConsumed(c, x.packetId));
+  facts.openPacketIds = rows.filter(x => !packetConsumed(c, x.packetId)).map(x => x.packetId);
   // A packet release renames its reservation to released-<packetId>-<name>; those packets reviewed nothing the course keeps.
   facts.releasedPacketIds = [...new Set(readdirSync(r.dir).map(name => /^released-([a-f0-9]{32})-.+-admission\.json$/u.exec(name)?.[1]).filter(Boolean))].sort();
   if (facts.originKind === "feature-course" && facts.originTargets[0].courseKey === courseKey) {
@@ -830,8 +860,11 @@ export function inspectFeatureCourseTakeover(input) {
     const first = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered, rounds);
     const second = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered, rounds); unlocked(c);
     if (!eq(first, second)) fail("CGB-STALE");
+    // CGR-02: the same ready release for each open packet that the refusal of a newer candidate hands over (read-only: nothing is released here).
+    const releaseActions = releaseActionsOf(c, first.facts.openPacketIds);
     return Object.freeze({ schema: "pipeline.critic-feature-course-takeover-inspection.v1", ...first.facts, refusalCode: first.refusalCode,
-      repair: first.refusalCode === null ? null : TAKEOVER_REPAIR[first.refusalCode], digestSha256: sha256Canonical(first) });
+      repair: first.refusalCode === null ? null : TAKEOVER_REPAIR[first.refusalCode] + (first.refusalCode === "CGB-TAKEOVER-OPEN" ? releaseActionsText(releaseActions) : ""),
+      releaseActions, digestSha256: sha256Canonical(first) });
   });
 }
 /** PF-94: audited, append-only retirement of the old batch's index entries; nothing is deleted. */

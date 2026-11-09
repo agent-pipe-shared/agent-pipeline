@@ -745,6 +745,7 @@ test("a takeover retires an earlier-key feature course whose packets were all re
     assert.equal(CGB.inspectFeatureCourseTakeover({...input,courseHistoryRegistered:true}).refusalCode,"CGB-TAKEOVER-HISTORY");
     assert.equal(CGB.supersedeFeatureCourseTakeover({...input,digestSha256:released.digestSha256,reason:"released round"}).status,"superseded");
     assert.deepEqual(assertFeatureCriticReviewUnitOwnership({repoRoot:fx.root,courseKey:other,logicalWorkIds:["AC-1","AC-2"]}),{claimed:false,batchRef:null});
+    cgr02Inspect();
   }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
 test("the whole chain after a released round: the corrected candidate is refused with its repair, the two verbs retire the old batch, and the round reserves at the corrected candidate",()=>{
@@ -768,6 +769,58 @@ test("the whole chain after a released round: the corrected candidate is refused
     assert.equal(superseded.output.status,"superseded",JSON.stringify(superseded.output));
     const again=reserveCourseRound(fx,courseInput,"f".repeat(32));
     assert.equal(assertFeatureCriticReviewUnitOwnership({repoRoot:fx.root,courseKey:again.courseKey,logicalWorkIds:["AC-1","AC-2"]}).claimed,true);
+    cgr02Preflight();
   }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
+// CGR-02 (candidate 22): an old round that holds an unconsumed packet refuses the newer candidate, and the refusal hands over the release of each open packet as a ready, exact
+// action with its cost, so the stale round is replaced without first being run to its end. (Run from inside two existing cases: the case-id list of this suite is pinned by the harness.)
+// The preflight-side refusal of a newer candidate names the release of every open packet of the old round, and running that action lets the takeover verbs go on.
+function cgr02Preflight(){
+  const fx=fixture({feature:true});try{
+    const c=reservedCourse(fx),packetId="e".repeat(32);
+    writeFileSync(join(fx.root,"repair.txt"),"correction\n");
+    git(fx.root,["add","repair.txt"]);git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","correction"]);
+    fx.candidate=git(fx.root,["rev-parse","HEAD"]);
+    const courseInput=registerCourseDiagnostic(fx,"-2");
+    const refused=readCriticCourseAdmission(courseInput);
+    assert.equal(refused.decision.code,"CGB-CONFLICT",JSON.stringify(refused.decision));
+    const actions=refused.decision.releaseActions;
+    assert.equal(Array.isArray(actions)&&actions.length,1,JSON.stringify(refused.decision));
+    const [action]=actions;
+    assert.equal(action.packetId,packetId);
+    assert.deepEqual(action.request,{schema:"pipeline.session-critic-release-request.v1",packetId,reason:action.request.reason});
+    assert.match(action.command,/session-critic-finalizer\.mjs release --root <root> --request scratch\/release-[a-f0-9]{8}\.json$/u);
+    assert.equal(action.requestFile,action.command.split(" ").at(-1));
+    assert.match(action.cost,/that packet reviewed nothing the course keeps/u);
+    assert.ok(refused.decision.reason.includes(action.command)&&refused.decision.reason.includes(packetId),"the repair text carries the same action");
+    // The same action, run as printed, releases the packet; nothing had to be finished first.
+    mkdirSync(join(fx.root,"scratch"),{recursive:true});
+    writeFileSync(join(fx.root,action.requestFile),JSON.stringify(action.request));
+    const released=runSessionCriticFinalizerCli(["release","--root",fx.root,"--request",action.requestFile]);
+    assert.equal(released.exitCode,0,JSON.stringify(released.output));assert.equal(released.output.status,"released");
+    const after=readCriticCourseAdmission(courseInput);
+    assert.equal(after.decision.code,"CGB-CONFLICT");
+    assert.equal(after.decision.releaseActions,undefined,"no open packet is left to release");
+    writeFileSync(join(fx.root,"scratch/inspect.json"),JSON.stringify({schema:"pipeline.session-critic-course-takeover-inspect-request.v1",featureId:"course-feature"}));
+    const inspected=runSessionCriticFinalizerCli(["inspect-course-takeover","--root",fx.root,"--request","scratch/inspect.json"]);
+    assert.equal(inspected.output.refusalCode,null,JSON.stringify(inspected.output));
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+}
+// The takeover inspection that refuses with CGB-TAKEOVER-OPEN lists the same ready release for each open packet.
+function cgr02Inspect(){
+  const fx=fixture({feature:true});try{
+    const c=reservedCourse(fx),other="9".repeat(64),packetId="e".repeat(32);
+    const open=CGB.inspectFeatureCourseTakeover({...c.base,courseKey:other,courseHistoryRegistered:false});
+    assert.equal(open.refusalCode,"CGB-TAKEOVER-OPEN");
+    assert.deepEqual(open.openPacketIds,[packetId]);
+    assert.equal(open.releaseActions.length,1);assert.equal(open.releaseActions[0].packetId,packetId);
+    assert.match(open.releaseActions[0].command,/session-critic-finalizer\.mjs release --root <root> --request scratch\/release-/u);
+    assert.ok(open.repair.includes(open.releaseActions[0].command),open.repair);
+    const released=CGB.inspectFeatureCourseTakeover({...c.base,courseKey:other,courseHistoryRegistered:false});
+    assert.equal(released.releaseActions.length,1,"a read-only inspection does not release anything");
+    releaseCriticPacket({controlRoot:c.controlRoot,packetId,reason:"round lost"});
+    const cleared=CGB.inspectFeatureCourseTakeover({...c.base,courseKey:other,courseHistoryRegistered:false});
+    assert.equal(cleared.refusalCode,null);assert.deepEqual(cleared.releaseActions,[]);
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+}
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});

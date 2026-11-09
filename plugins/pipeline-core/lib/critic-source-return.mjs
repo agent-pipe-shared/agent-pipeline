@@ -91,8 +91,32 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
       const handback = readHandbackFn(input);
       if (handback?.ok === true) verdict = extractCriticVerdict(handback.message);
     }
-    return issueForVerdict({ commonDir, runner, verdict, nowMs });
+    return issueForVerdict({ commonDir, runner, verdict, nowMs, child: childDigest(input.agent_id) });
   } catch { return { status: "unavailable" }; }
+}
+
+/** CGR-09: the identity of the returning child as a digest (never the raw id), or null when the runner reports none. */
+const childDigest = (id) => (typeof id === "string" && id !== "" && id.length <= 200 ? sha256(id) : null);
+
+/**
+ * CGR-09: the split records that count for the round. A child that was RESUMED (same recorded child identity) and returned again is a resumption, not a second run: its
+ * later return stands for its entry (the later issuedAtMs). Two different children, a child whose identity is not recorded, or equal timestamps stay duplicates, so the
+ * caller still refuses verdict shopping (SCF-SPLIT-DUPLICATE-ENTRY, CSM-CHILD-DUPLICATE). Pure.
+ */
+export function settleSplitReturns(records) {
+  const byEntry = new Map();
+  for (const record of records) {
+    const key = typeof record?.entryId === "string" ? record.entryId : null;
+    byEntry.set(key, [...(byEntry.get(key) ?? []), record]);
+  }
+  const settled = [];
+  for (const [key, list] of byEntry) {
+    const child = list[0]?.childSha256;
+    const resumed = key !== null && list.length > 1 && typeof child === "string" && list.every((record) => record.childSha256 === child)
+      && list.every((record) => Number.isSafeInteger(record.issuedAtMs)) && new Set(list.map((record) => record.issuedAtMs)).size === list.length;
+    settled.push(...(resumed ? [list.reduce((latest, record) => (record.issuedAtMs > latest.issuedAtMs ? record : latest))] : list));
+  }
+  return settled;
 }
 
 /**
@@ -105,7 +129,7 @@ export function issueCriticSourceReturnFromMessage({ commonDir, runner, text, no
     if (!MESSAGE_RUNNERS.has(runner)) return { status: "not-applicable" };
     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
     const verdict = extractCriticVerdict(text);
-    return verdict === null || verdictPassContradiction(verdict) !== null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs });
+    return verdict === null || verdictPassContradiction(verdict) !== null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs, child: childDigest(child) });
   } catch { return { status: "unavailable" }; }
 }
 
@@ -134,7 +158,7 @@ function noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) {
 }
 
 /** The shared half: bind the returned verdict to the one open admitted packet of this runner and write the record exclusively. */
-function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
+function issueForVerdict({ commonDir, runner, verdict, nowMs, child = null }) {
   if (verdict === null) return { status: "no-verdict" };
   // C21B: records are exclusive and a split entry may hold only one, so a return that contradicts itself must leave none or its corrected return could never be recorded.
   const contradiction = verdictPassContradiction(verdict);
@@ -153,7 +177,8 @@ function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
     if (entryId === null) return { status: "unattributed", packetId: target.packetId, entries: target.split.entries.map((entry) => entry.scopeMarker) };
     const verdictSha256 = sha256(canonicalJson(verdict));
     const splitRecord = { schema: CRITIC_SPLIT_SOURCE_RETURN_SCHEMA, issuer: "source", packetId: target.packetId, packetDigest: target.packetDigest, claimant: target.claimant,
-      sessionId: target.sessionId, verdictSha256, issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs, splitSha256: criticSplitDigest(target.split), entryId, verdict };
+      sessionId: target.sessionId, verdictSha256, issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs, splitSha256: criticSplitDigest(target.split), entryId, verdict,
+      ...(child === null ? {} : { childSha256: child }) };
     let splitFd;
     try { splitFd = openSync(join(target.packetDir, `source-return-${verdictSha256}.json`), "wx", 0o600); }
     catch (error) { if (error?.code === "EEXIST") return { status: "already-issued", packetId: target.packetId, entryId }; throw error; }

@@ -294,6 +294,21 @@ export function validateDesignApprovalBinding(binding) {
   return { ok: true, bindingSha256: sha256Of(canonical(binding)) };
 }
 
+/**
+ * CGR-03: what the human sees before signing about changes the last readiness review never saw. The number is the one the binding itself records
+ * (`unreviewedSourceDelta`, inside the signed bytes), so the statement cannot drift from what is signed. Pure; `[]` when nothing is recorded.
+ */
+export function describeUnreviewedCorrections(binding) {
+  const delta = binding?.unreviewedSourceDelta;
+  if (!Array.isArray(delta) || delta.length === 0) return [];
+  const round = binding.reviewReceipts?.[binding.reviewReceipts.length - 1]?.round;
+  const named = delta.map(({ path, currentSha256 }) => (currentSha256 === null ? `${path} (removed)` : path));
+  const shown = named.slice(0, 8).join(", ");
+  const more = named.length > 8 ? `, and ${named.length - 8} more` : "";
+  const many = delta.length !== 1;
+  return [`unreviewed corrections: ${delta.length} source ${many ? "files were" : "file was"} changed after the last readiness review (round ${round}) and ${many ? "were" : "was"} not re-reviewed: ${shown}${more}`];
+}
+
 // ----------------------------------------------------------------------------- request
 
 /** The approval intent over a binding; null when createPoApprovalIntent rejects the candidate or a field. */

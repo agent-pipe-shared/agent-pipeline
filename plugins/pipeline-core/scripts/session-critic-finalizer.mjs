@@ -13,7 +13,7 @@ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { reserveFeatureCriticReviewUnitOwnership, republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore, inspectFeatureCourseTakeover, supersedeFeatureCourseTakeover, readCriticReviewUnit } from "../lib/critic-generic-batch.mjs";
 import { releaseCriticPacket } from "../lib/critic-packet-release.mjs";
-import { CRITIC_SPLIT_SOURCE_RETURN_SCHEMA, readAdmittedSplit, readCriticSourceReturn, readCriticSplitSourceReturns } from "../lib/critic-source-return.mjs";
+import { CRITIC_SPLIT_SOURCE_RETURN_SCHEMA, readAdmittedSplit, readCriticSourceReturn, readCriticSplitSourceReturns, settleSplitReturns } from "../lib/critic-source-return.mjs";
 import { SPLIT_NEXT_ROUND_REPAIR, attributeVerdict, buildCriticSplit, criticSplitDigest, mergeSplitVerdicts } from "../lib/critic-split.mjs";
 import { GOVERNANCE_REVIEW_SOURCE_SCHEMA, buildGovernanceReviewAction, buildGovernanceReviewRetry, preflightGovernanceReviewActionOutput, writeGovernanceReviewAction } from "../lib/governance-review-action.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
@@ -140,11 +140,15 @@ const SPLIT_RECORD_KEYS = Object.freeze([...ORIGINAL_SOURCE_RETURN_KEYS, "splitS
 function splitOriginGate(query, context, deps, controlRoot) {
   let records = [];
   try { records = (deps.readSplitSourceReturnsFn ?? ((q) => readCriticSplitSourceReturns({ controlRoot, packetId: q.packetId })))(query) ?? []; } catch { records = []; }
+  // CGR-09: a resumed child (same recorded child identity) that returned again is a resumption; only its latest return stands. Anything else stays a duplicate below.
+  records = settleSplitReturns(records);
   if (records.length === 0) return Object.freeze({ independence: "caller-authored-fallback", origin: "caller-authored", nativeAttestation: false });
   const now = (deps.originNowMsFn ?? Date.now)();
   const byEntry = new Map();
   for (const record of records) {
-    if (!exact(record, SPLIT_RECORD_KEYS) || typeof record.entryId !== "string") fail("SCF-SPLIT-RECORD-STRAY", `a Source return record names no split entry; repair: ${SPLIT_NEXT_ROUND_REPAIR}`);
+    // childSha256 is optional (records of a runner that reports no child identity, and every earlier record, carry none); when present it is a digest.
+    const closedShape = exact(record, SPLIT_RECORD_KEYS) || (exact(record, [...SPLIT_RECORD_KEYS, "childSha256"]) && /^[a-f0-9]{64}$/u.test(record.childSha256));
+    if (!closedShape || typeof record.entryId !== "string") fail("SCF-SPLIT-RECORD-STRAY", `a Source return record names no split entry; repair: ${SPLIT_NEXT_ROUND_REPAIR}`);
     if (record.schema !== CRITIC_SPLIT_SOURCE_RETURN_SCHEMA || record.issuer !== "source" || record.packetId !== query.packetId || record.packetDigest !== query.packetDigest
       || canonicalJson(record.claimant) !== canonicalJson(query.claimant) || record.sessionId !== query.sessionId || record.splitSha256 !== context.splitSha256
       || sha256(canonicalJson(record.verdict)) !== record.verdictSha256

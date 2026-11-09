@@ -355,7 +355,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
     // The publish is retried while the lock is held and nothing has been written yet, within the admission deadline.
     stored = retryPublishWhileLockHeld(entered => publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline, entered, deliveryQueue.normalized?.slices), admissionDeadline, dependencies.publishRetry);
   }
-  catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
+  catch(error) { const repair=lockHeldStartRepair(error,physicalRoot)??(typeof error.repair==='string'?error.repair:null); return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(repair?{repair}:{})}; }
   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
 }
 
@@ -1051,6 +1051,13 @@ export function createAdmissionCheckpoint(deadline){
  * boundary callback ran is retried, exactly as retryWhileSessionAuthorityLockHeld does.
  * G20-40: the former 60 s cap counted from the FIRST attempt, so one slow lock-free attempt (a 64 s prescan, measured) used it up and a
  * sibling launch's held lock was refused with half the admission budget left; the window is now the whole remaining admission budget. */
+// CGR-07: a start refused at the registry lock (a sibling start still holds it after the bounded wait) consumed nothing. The repair says so, says to send the same
+// prompt again once the running start has settled, and that starts go one after another; no queue, no change to the lock timing. A lock whose owner is gone keeps the guard's own diagnosis (heal).
+function lockHeldStartRepair(error,root){
+  if(error?.code!=='SDC-LOCK-HELD'||error.lock?.owner==='dead')return null;
+  const diagnosis=typeof error.repair==='string'?error.repair:`node ${REPAIR_SCRIPT} inspect --root ${root} names the holder`;
+  return `this start was not consumed: the registry lock is held by a start that is still running. Dispatch starts go one after another, so send the same prompt again after the running start has settled. ${diagnosis}`;
+}
 export function retryPublishWhileLockHeld(attempt,admissionDeadline=null,options={}){
   const now=typeof options.now==='function'?options.now:(typeof admissionDeadline?.now==='function'?admissionDeadline.now:Date.now);
   const remaining=admissionDeadline&&typeof admissionDeadline==='object'&&Number.isFinite(admissionDeadline.budgetMs)&&Number.isFinite(admissionDeadline.startMs)
@@ -1563,7 +1570,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       return {...resolveGovernedItemQueue({root:physical}),written:{root:physical,path,sidecarPath:location.sidecarPath,preimage:workingBefore?preimage.toString('base64'):null,postimageSha256,
         planDir:dirname(state.activeFeature.planPath),rowId:itemDelivery.sliceId,rowSha256:nativeManagedDigest(raw.slices.find(row=>row.id===itemDelivery.sliceId))}};
     }),admissionDeadline,publishRetry);
-  }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message};}
+  }catch(error){const repair=lockHeldStartRepair(error,root);return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message,...(repair?{repair}:{})};}
 }
 
 /** PF-55: a dispatch refused after its queue was prepared leaves the queue as it was. The prepared

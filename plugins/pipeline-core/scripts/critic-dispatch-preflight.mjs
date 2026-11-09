@@ -464,6 +464,8 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
         status: admission?.decision?.status ?? "unavailable", code: admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE",
         ...(parentDetail === null ? {} : { detail: parentDetail }),
         ...(repair === null ? {} : { repair }),
+        // CGR-02: the ready release of each open packet of an old round that holds this review unit (exact request, command and cost).
+        ...(Array.isArray(admission?.decision?.releaseActions) ? { releaseActions: admission.decision.releaseActions } : {}),
         dispatch: { childCreated: false, packetCreated: false, stateMutated: false, spawnAuthorized: false } });
     }
     // Defense at the actual packet preflight: history may remain readable in

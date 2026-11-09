@@ -21,7 +21,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { mergeSplitVerdicts } from "../lib/critic-split.mjs";
-import { readAdmittedSplit, readCriticSplitSourceReturns } from "../lib/critic-source-return.mjs";
+import { readAdmittedSplit, readCriticSplitSourceReturns, settleSplitReturns } from "../lib/critic-source-return.mjs";
 
 export const CRITIC_SPLIT_MERGE_RESULT_SCHEMA = "pipeline.critic-split-merge-result.v1";
 const MAX_BYTES = 1024 * 1024;
@@ -40,7 +40,8 @@ function childrenFromPacket(root, packetId) {
   const digests = new Set(records.map((record) => record?.splitSha256));
   const split = digests.size === 1 ? readAdmittedSplit(join(packetsRoot, packetId), [...digests][0]) : undefined;
   if (split === undefined) throw new MergeUsageError(`the Source returns of packet ${packetId} do not bind one admitted split; repair: pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-SPLIT");
-  return { split, children: records.map((record) => ({ entryId: record.entryId, verdict: record.verdict })) };
+  // CGR-09: a resumed child's later return replaces its earlier one; two different children for one entry still reach the merge as duplicates and are refused there.
+  return { split, children: settleSplitReturns(records).map((record) => ({ entryId: record.entryId, verdict: record.verdict })) };
 }
 
 function repoFile(root, path, label) {
