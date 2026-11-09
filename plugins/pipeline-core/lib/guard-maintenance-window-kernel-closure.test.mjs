@@ -308,6 +308,9 @@ const DYNAMIC_IMPORT_EDGES = {
     // calibration-verify-commit-transition library whether the transition is ready (a second call site of that edge).
     "node:fs",
     "../lib/calibration-verify-commit-transition.mjs",
+    // Candidate 22 (CGR-19): the staged repositoryMode promotion is compared with the writer's own byte rule (one edge) and reads the tree (one builtin load).
+    "./repository-mode-promote.mjs",
+    "node:fs",
   ],
   "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs": [
     "../lib/commit-message-policy.mjs",

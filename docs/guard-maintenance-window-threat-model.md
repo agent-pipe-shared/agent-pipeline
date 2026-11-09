@@ -576,6 +576,15 @@ It is imported by kernel modules and executes in their process, so a corrupted
 copy could report a missing model as usable; it is protected through both anchors
 like the modules above.
 
+The Candidate 22 closure repair additionally protects
+`lib/push-threat-model-materialize.mjs`, `lib/close-acceptance-record.mjs`,
+`scripts/repository-freshness.mjs`, `lib/generated-artefact-schema.mjs`,
+`lib/architecture-verdict-label.mjs`, `lib/critic-route-assurance.mjs`, and
+`scripts/repository-mode-promote.mjs`. Each is imported by a kernel module and
+executes in its process; the last one holds the byte rule by which the generated
+pre-commit hook admits the one `repositoryMode` promotion. They are protected
+through both anchors like the modules above.
+
 The approved design-flow closure additionally protects, in kernel-array order,
 `lib/design-approval-binding.mjs`, `lib/design-consistency-check.mjs`,
 `lib/design-review-receipt.mjs`, `lib/design-review-receipt-write-guard.mjs`

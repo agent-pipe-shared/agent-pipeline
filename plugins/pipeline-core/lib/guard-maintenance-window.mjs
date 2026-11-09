@@ -509,6 +509,14 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/runbook-link.mjs",
   // Candidate 19 (D4a): the push threat model decision is imported by pipeline-state.mjs and push-prepare.mjs (kernel above) and by the close coordinator.
   "plugins/pipeline-core/lib/push-threat-model-gate.mjs",
+  // Candidate 22 closure repair (GMWKC01): modules that kernel files import since the candidate 22 chain and its follow-up build.
+  "plugins/pipeline-core/lib/push-threat-model-materialize.mjs",
+  "plugins/pipeline-core/lib/close-acceptance-record.mjs",
+  "plugins/pipeline-core/scripts/repository-freshness.mjs",
+  "plugins/pipeline-core/lib/generated-artefact-schema.mjs",
+  "plugins/pipeline-core/lib/architecture-verdict-label.mjs",
+  "plugins/pipeline-core/lib/critic-route-assurance.mjs",
+  "plugins/pipeline-core/scripts/repository-mode-promote.mjs",
   // Candidate 19c closure repair (found by the kernel closure suite on the whole chain): the shared seal reader that continuity-state,
   // onboarding-continuity, plan-spec-state-v2, po-gate-authority-read and critical-action-authorization-read import; the carry-forward
   // reader (and the decision and gitleaks adapter it imports) that push-prepare and the pre-push hook load; the EPERM retry that the three
