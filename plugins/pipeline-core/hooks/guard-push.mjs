@@ -1939,6 +1939,9 @@ if (!pushBinding.ok) {
       ? ["Why: a command that names git together with a ( ) { $ backtick or a nested shell -c is refused as a possible hidden push, even when it only reads or commits."]
       : []),
     "Instead: commit with `git commit -F scratch/commit-msg/<slice>.txt -- <paths>` (message in a file, paths after the double dash), and for a search use rg -n <pattern> <file> rather than git grep.",
+    // Critics read a fixed commit, so rg and a plain rev-parse suffix do not help them; these spellings pass this guard.
+    ...(/\^\{(?:tree|commit)\}/u.test(cmd) ? ["For a commit's id and tree use `git log -1 --format=%H%x20%T <commit>`, which needs no braces."] : []),
+    ...(/\sgrep\s/u.test(cmd) ? ["To search inside a commit, where rg cannot look, use `git grep -n -F <literal> <commit> -- <path>`, one literal per call, with no ( ) { $ or backslash."] : []),
   ]);
 }
 

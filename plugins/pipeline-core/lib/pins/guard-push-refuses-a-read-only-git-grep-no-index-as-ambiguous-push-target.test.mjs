@@ -123,6 +123,26 @@ test("AC-194 flag combination: several flags together and the -e/--regexp patter
   assertAllowed("git grep -n needle -- README.md probe.json");
 });
 
+test("a refused commit-tree read names the spelling that passes, and that spelling is admitted", () => {
+  const { code, stderr } = runGuard(`git rev-parse ${head}^{tree}`);
+  assert.equal(code, 2);
+  assert.match(stderr, /git log -1 --format=%H%x20%T <commit>/u);
+  assertAllowed(`git log -1 --format=%H%x20%T ${head}`);
+});
+
+test("a refused search inside a commit names the spelling that passes, and that spelling is admitted", () => {
+  const { code, stderr } = runGuard(`git grep -n -E "alpha\\|beta" ${head} -- README.md`);
+  assert.equal(code, 2);
+  assert.match(stderr, /git grep -n -F <literal> <commit> -- <path>/u);
+  assertAllowed(`git grep -n -F fixture ${head} -- README.md`);
+});
+
+test("a refusal unrelated to reading a commit carries neither spelling", () => {
+  const { code, stderr } = runGuard("git status $( )");
+  assert.equal(code, 2);
+  assert.doesNotMatch(stderr, /--format=%H%x20%T|git grep -n -F/u);
+});
+
 test("AC-194 no regression: the read-only classification does not open a hidden push", () => {
   // A push buried in the pattern's command substitution, a BRE backslash alternation (Ruling 81 option B),
   // a nested shell, and a plain push all stay refused.
