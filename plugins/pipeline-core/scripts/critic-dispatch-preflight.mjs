@@ -39,6 +39,7 @@ import {
 } from "../lib/requirement-traceability.mjs";
 import { criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
 import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
+import { criticRunnerFromEnv, describeCriticRouteAssurance } from "../lib/critic-route-assurance.mjs";
 
 export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
 export const EVIDENCE_SWEEP_SCHEMA = "pipeline.critic-dispatch-preflight-evidence-sweep.v1";
@@ -635,6 +636,13 @@ function reviewAdmissionTaskIds({ root, baseCommit, candidateCommit, given = nul
   return { matching, considered, appliedRows };
 }
 
+/** The feature package's rigor at the candidate (the close rule reads the same field), or null when there is no readable package. Read-only. */
+function featureRigor(root, candidateCommit, specPath) {
+  const match = /^specs\/([^/]+)\//u.exec(specPath ?? "");
+  if (match === null) return null;
+  try { const value = JSON.parse(candidateText(root, candidateCommit, `specs/${match[1]}/lifecycle.json`))?.feature?.rigor; return Number.isInteger(value) && value >= 0 ? value : null; } catch { return null; }
+}
+
 /** MP-07 prompt lines for a Critic route that resolves to an Opus model; null for any other route. T1 and T2 select the high-risk Critic duty (as admit does). */
 function opusCriticPromptLines({ root, result, env, registry, trigger }) {
   const runner = env.CODEX_SESSION_ID !== undefined || env.CODEX_THREAD_ID !== undefined ? "codex" : "claude";
@@ -710,6 +718,8 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
     event: fillPlaceholder("event", "null, or an object with eventOutPath and featureId"),
   };
   const promptLines = opusCriticPromptLines({ root, result, env: deps.env ?? process.env, registry: deps.registry, trigger });
+  // C22 (CGF-03, CGF-20): what the planned route will really deliver and whether the close will need its own acknowledgement, stated now (printed only, like the fields above).
+  const routeAssurance = describeCriticRouteAssurance({ runner: criticRunnerFromEnv(deps.env ?? process.env), trigger, rigor: featureRigor(root, result.candidate.commit, reviewer.specPath), packetId: request.packetId, launchRoute: deps.criticLaunchRoute ?? null });
   // G20-72: a range above the one named bound is split per module; `admit` rebuilds the identical object and binds its digest.
   const split = buildCriticSplit({ root, result });
   if (split !== null && split.entries.length > SPLIT_MAX_ENTRIES) {
@@ -725,7 +735,8 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
     ...(split === null ? [] : [`SPLIT: this range has ${split.changedFileCount} changed files, above the bound of ${split.maxChangedFiles} one Critic can read, so it is split (split.entries, ${split.entries.length} entries, plan ${split.plan.status}; bound exclusions and the delivery records named in the review protocol §2.2 are in no entry). Dispatch one Critic per split entry from the template, each with its entry's reviewerInput, its entry's batchScopeLine as the Batch scope (MP-07) line${promptLines === null ? "" : " (in place of criticDispatchPromptLines[0]; keep the rationale line)"} and the instruction to begin trajectory_evidence with its scopeMarker; run each entry's Critic once (a second run for an entry makes finalize refuse the round). When every child has returned, merge them without copying any verdict: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-split-merge.mjs --root <repo> --packet <packetId> --out <merged verdict file>; only for a child without a Source return, save split as a JSON file under scratch/ and pass --split <split file> and --child <entryId>=<verdict file> (one per entry) instead of --packet; admit binds the split, finalize takes the merged verdict as verdictPath and labels it source-issued only when every child returned through the Critic stop.`]),
   ].join(" ");
   return { ...result, admitRequest: request, admitCommand: ["node", ADMIT_SCRIPT, "admit", "--root", input.root, "--request", ADMIT_REQUEST_FILE], nextStep,
-    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(split === null ? {} : { split }) };
+    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(split === null ? {} : { split }),
+    routeAssurance };
 }
 
 /**

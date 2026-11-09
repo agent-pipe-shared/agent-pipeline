@@ -697,7 +697,8 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
   assert.equal(printedRun.stderr, "");
   // G20-72 (same criterion, same strictness): a range above the split bound also prints the additive `split`; it is stripped like the other additive fields, and this fixture's
   // one-file range is below the bound so the printed line is compared byte for byte without it.
-  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, split: _printedSplit, ...printedRest } = JSON.parse(printedRun.stdout);
+  // C22 (CGF-03, QG-04 restated in place): the printed-only `routeAssurance` is one more additive field next to the admit fields; every other key still equals the library result.
+  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, split: _printedSplit, routeAssurance: _printedAssurance, ...printedRest } = JSON.parse(printedRun.stdout);
   assert.equal(_printedSplit, undefined, "a one-file range carries no split");
   assert.equal(JSON.stringify(printedRest) + "\n", JSON.stringify(expected) + "\n");
   assert.equal(printedAdmitRequest.schema, "pipeline.session-critic-finalization-request.v3");
@@ -2071,7 +2072,8 @@ test("G20-69 the printed packet-ready result carries the complete admit request,
     assert.equal(Object.hasOwn(covered, "admitRequest"), false, "the coverage entry point stays as it was");
     assert.equal(Object.hasOwn(preflightCriticDispatch(input(fx)), "admitRequest"), false, "the library result is digest-bound by the session finalizer");
     const printed = g2069Printed(fx);
-    const { admitRequest, admitCommand, nextStep, criticDispatchPromptLines: _lines, ...rest } = printed;
+    // C22 (CGF-03, QG-04 restated in place): the printed-only `routeAssurance` joins the admit fields; the other keys are still exactly the coverage result.
+    const { admitRequest, admitCommand, nextStep, criticDispatchPromptLines: _lines, routeAssurance: _assurance, ...rest } = printed;
     assert.deepEqual(rest, covered, "the admit fields are the only difference");
     assert.deepEqual(Object.keys(admitRequest), G2069_KEYS);
     assert.equal(admitRequest.schema, "pipeline.session-critic-finalization-request.v3", "a review that is no feature package is a generic batch request");
@@ -2160,6 +2162,28 @@ test("CGR-20 the Opus Critic rationale names the requested effort and says the a
     const prompt = (extra) => ["Model/effort for this run: claude-opus-4-1 / max", `Ruleset SHA: ${fx.candidate}`, ...extra].join("\n");
     const lines = g2069Printed(fx, {}, claude).criticDispatchPromptLines;
     assert.equal(dispatchFindings({ subagentType: "critic", prompt: prompt(lines) }).findings.some(({ code }) => code === "DISPATCH-OPUS-NO-BATCH-RATIONALE"), false);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+// C22 (CGF-03, CGF-20, AC-108): the PRINTED result states the assurance the planned Critic route will really deliver and whether the close will need its own acknowledgement, before
+// the dispatch. Additive and printed-only (the library result the finalizer binds by digest stays byte-identical); criterion-bound cases written before the implementation existed.
+test("C22 CGF-03/CGF-20 the printed result states the route assurance and the close acknowledgement before dispatch; the library entry points carry no such field", () => {
+  const fx = fixture();
+  try {
+    n33bRequiredRecord(fx.root, "C22-RA-ONE", fx.candidate);
+    assert.equal(Object.hasOwn(preflightModule.preflightCriticDispatchWithCoverage(input(fx)), "routeAssurance"), false, "digest-bound results stay as they were");
+    assert.equal(Object.hasOwn(preflightCriticDispatch(input(fx)), "routeAssurance"), false);
+    const defaultRoute = { agentType: "default", sandboxed: false, protection: "instruction-only", reason: "no-receipt" };
+    const codexDefault = g2069Printed(fx, {}, { env: { CODEX_THREAD_ID: "thread-c22" }, criticLaunchRoute: defaultRoute }).routeAssurance;
+    assert.equal(codexDefault.expected.independence, "caller-authored-fallback");
+    assert.equal(codexDefault.expected.freshContext, false);
+    assert.equal(codexDefault.expected.historyInherited, true);
+    assert.equal(codexDefault.profile.status, "below-required", "the matched record carries no Critic row, so the strictest trigger T1 is the critical profile");
+    assert.equal(codexDefault.closeAcknowledgement.required, true);
+    const printed = g2069Printed(fx, {}, { env: { CODEX_THREAD_ID: "thread-c22" }, criticLaunchRoute: defaultRoute });
+    assert.ok(printed.routeAssurance.closeAcknowledgement.command.includes(`--critic-packet ${printed.admitRequest.packetId}`));
+    assert.equal(g2069Printed(fx, {}, { env: { CLAUDE_CODE_SESSION_ID: "session-c22" } }).routeAssurance.expected.independence, "source-issued-origin");
+    assert.equal(g2069Printed(fx, {}, { env: { CODEX_THREAD_ID: "thread-c22" } }).routeAssurance.profile.status, "conditional", "no launch route is known: the floor and both outcomes are stated");
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
@@ -2254,7 +2278,8 @@ test("G20-72 above SPLIT_MAX_CHANGED_FILES the printed result carries one split 
     }
     assert.match(printed.nextStep, /one Critic per split entry/u);
     assert.match(printed.nextStep, /critic-split-merge\.mjs --root <repo> --packet <packetId>/u);
-    const { admitRequest: _a, admitCommand: _c, nextStep: _n, criticDispatchPromptLines: _l, taskIdResolution: _t, split: _s, ...rest } = printed;
+    // C22 (CGF-03, QG-04 restated in place): `routeAssurance` is printed-only like the other admit fields and is set aside before the library comparison.
+    const { admitRequest: _a, admitCommand: _c, nextStep: _n, criticDispatchPromptLines: _l, taskIdResolution: _t, split: _s, routeAssurance: _r, ...rest } = printed;
     assert.deepEqual(rest, preflightModule.preflightCriticDispatchWithCoverage(g2072Input(fx)), "the admit fields and the split are the only additions");
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
