@@ -820,6 +820,35 @@ test("(k0) C21E: critic-addenda writes the addenda before any Verify, moves noth
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
+test("(k1) CFC-3: an addendum that no longer binds (the course moved on) is replaced by the derivation, and its old evidence with it", () => {
+  const fx = w9Course({ label: "cfc3", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE"] });
+  try {
+    const { root } = fx;
+    const first = w9Cli("close-coordinator.mjs", ["critic-addenda", "--root", root]);
+    assert.equal(first.body.status, "written", first.text);
+    const original = Object.fromEntries(first.body.commitPaths.map((path) => [path, readFileSync(join(root, path), "utf8")]));
+    for (const path of first.body.commitPaths) writeFileSync(join(root, path), path.endsWith(".json") ? `${JSON.stringify({ stale: true })}\n` : "evidence of an earlier round\n");
+    w9CommitPaths(root, first.body.commitPaths, first.body.subject);
+    const replaced = w9Cli("close-coordinator.mjs", ["critic-addenda", "--root", root]);
+    assert.equal(replaced.body.status, "written", replaced.text);
+    assert.deepEqual(replaced.body.commitPaths, first.body.commitPaths);
+    assert.deepEqual(Object.fromEntries(replaced.body.commitPaths.map((path) => [path, readFileSync(join(root, path), "utf8")])), original, "the derivation writes the binding files of the last round");
+    w9CommitPaths(root, replaced.body.commitPaths, replaced.body.subject);
+    assert.equal(w9Cli("close-coordinator.mjs", ["critic-addenda", "--root", root]).body.status, "none");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("(k1) CFC-3: an addendum for a record no receipt covers stays as it is", () => {
+  const fx = w9Course({ label: "cfc3neg", rounds: [{ verdict: W9_FAIL_MAJOR }], slices: ["TASK-ONE"] });
+  try {
+    const { root } = fx;
+    const stale = join(root, criticDispositionAddendumPath("TASK-ONE"));
+    writeFileSync(stale, `${JSON.stringify({ stale: true })}\n`);
+    assert.notEqual(w9Cli("close-coordinator.mjs", ["critic-addenda", "--root", root]).body.status, "written");
+    assert.equal(readFileSync(stale, "utf8"), `${JSON.stringify({ stale: true })}\n`);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 test("(k) D223 chain: three slices, a three-round Critic course, plan writes the addenda, the agent commits them, the second plan succeeds and applies", () => {
   const fx = w9Course({ label: "pos", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE", "TASK-TWO", "TASK-THREE"] });
   try {

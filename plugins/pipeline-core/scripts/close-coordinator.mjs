@@ -538,7 +538,10 @@ function deriveCriticAddenda(root, uncoveredIds) {
         const recordPath = `evidence/dispatch-record-${taskId}.json`;
         const entry = entries.find(({ path }) => path === recordPath);
         const addendumPath = criticDispositionAddendumPath(taskId);
-        if (entry === undefined || entry.record?.taskId !== taskId || existsSync(join(root, addendumPath))) continue;
+        if (entry === undefined || entry.record?.taskId !== taskId) continue;
+        // CFC-3: every id here is uncovered, so an addendum that exists no longer binds (a later Critic round moved the course on). It used to end the derivation, and the exclusive writer left a human moving the files by hand.
+        // Replaced only when exactly one receipt covers the record (checked below); the old bytes stay in the repository history.
+        const stale = existsSync(join(root, addendumPath));
         const draft = (receipt, path, digest) => ({ schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath, recordSha256: entry.sha256, taskId,
           candidateCommit: entry.record.candidateCommit, reviewCandidateCommit: receipt.reviewCandidateCommit, criticPacketId: receipt.packetId,
           criticReceiptSha256: receipt.criticReceiptSha256,
@@ -553,17 +556,23 @@ function deriveCriticAddenda(root, uncoveredIds) {
         const evidencePath = criticDispositionEvidencePath(taskId);
         const evidenceBytes = Buffer.from(criticDispositionEvidenceText({ taskId, recordPath, recordSha256: entry.sha256, candidateCommit: entry.record.candidateCommit,
           criticPacketId: cover.packetId, reviewCandidateCommit: cover.reviewCandidateCommit, criticReceiptSha256: cover.criticReceiptSha256 }), "utf8");
-        if (existsSync(join(root, evidencePath)) && !readFileSync(join(root, evidencePath)).equals(evidenceBytes)) continue;
-        plans.push({ taskId, addendumPath, evidencePath, evidenceBytes, cover, addendum: draft(cover, evidencePath, sha256(evidenceBytes)) });
+        if (!stale && existsSync(join(root, evidencePath)) && !readFileSync(join(root, evidencePath)).equals(evidenceBytes)) continue;
+        plans.push({ taskId, addendumPath, evidencePath, evidenceBytes, cover, stale, addendum: draft(cover, evidencePath, sha256(evidenceBytes)) });
       } catch { /* this record is not derivable */ }
     }
   } catch { return { written: [], commitPaths: [] }; }
   const created = [];
   const written = [];
+  const replaced = [];
   let current = null;
   try {
     for (const plan of plans) {
       current = plan.taskId;
+      if (plan.stale) {
+        for (const target of [join(root, plan.addendumPath), join(root, plan.evidencePath)]) {
+          if (existsSync(target)) { replaced.push({ target, bytes: readFileSync(target) }); unlinkSync(target); }
+        }
+      }
       if (!existsSync(join(root, plan.evidencePath))) {
         writeFileSync(join(root, plan.evidencePath), plan.evidenceBytes, { flag: "wx" });
         created.push(join(root, plan.evidencePath));
@@ -575,6 +584,7 @@ function deriveCriticAddenda(root, uncoveredIds) {
     }
   } catch (error) {
     for (const path of created.reverse()) { try { unlinkSync(path); } catch { /* already gone */ } }
+    for (const { target, bytes } of replaced) { try { writeFileSync(target, bytes); } catch { /* the repository history still holds it */ } }
     fail("CLOSE-CRITIC-ADDENDA-WRITE-FAILED", `feature close preparation could not write the Critic addendum for ${current} (${error?.code ?? "write-failed"}); every file this attempt created was removed again and nothing was staged or committed; repair: remove what blocks the path or write the addendum by hand with node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json>, then plan the transition again`);
   }
   return { written, commitPaths: written.flatMap((entry) => [entry.addendumPath, entry.evidencePath]).sort() };
