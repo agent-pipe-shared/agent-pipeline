@@ -23,7 +23,16 @@ function evidenceSection(manifest) {
   const reportText = reports.length === 0 ? "" : `\n## Critic round reports\n\nOne entry per Critic round of the feature. \`REPORT-NOT-EXPORTED\` means the round's report was never exported into the repository's tracked evidence (it lived outside the tracked tree), and \`UNREADABLE\` that the named file was missing or empty at the close: the report is NOT part of this bundle.\n\n${reports.map(line).join("\n")}\n`;
   return `${approvalText}${reportText}`;
 }
-function auditorReadme(manifest) {
+// C22B (CGR-13): printed prose only, from a build input that is NOT a manifest field (the manifest and its keys are hashed by the verifier and the bindings).
+// The README digest is recorded in the manifest at build time, so the extra text is bound like the rest of the README.
+function commitSplitSection(split) {
+  if (split === undefined || split === null || typeof split !== "object") return "";
+  if (split.status === "counted" && Number.isSafeInteger(split.product) && Number.isSafeInteger(split.evidence) && Number.isSafeInteger(split.total)) {
+    return `\n## Commits of the feature range\n\nThe feature range holds ${split.product} product commit(s) and ${split.evidence} evidence commit(s) (${split.total} in total). A commit is an evidence commit when every path it touches is an administration or documentation path, a path under the feature's evidence directory or under audit-bundles, or a root evidence record; any other path (source, tests, configuration, an ADR, the spec text) makes it a product commit. The range starts at the first commit that touched the feature's directory (\`${split.rangeSource}\`). The commits themselves are unchanged; this count is printed here only and is not part of the manifest.\n`;
+  }
+  return "\n## Commits of the feature range\n\nThe commits of the feature range could not be counted at the time this bundle was built; no count is stated.\n";
+}
+function auditorReadme(manifest, commitSplit) {
   const artifactLines = manifest.artifacts.map((artifact) => `- \`${artifact.path}\` (source: \`${artifact.sourcePath}\`, SHA-256: \`${artifact.sha256}\`)`).join("\n");
   return `# Audit bundle: ${manifest.bundleId}
 
@@ -38,7 +47,7 @@ This directory is a candidate-bound audit bundle. It contains the copied artifac
 ## Artifacts
 
 ${artifactLines}
-${evidenceSection(manifest)}${proofsSection(manifest)}${evidenceIndexSection(manifest)}
+${evidenceSection(manifest)}${proofsSection(manifest)}${evidenceIndexSection(manifest)}${commitSplitSection(commitSplit)}
 ## Offline verification
 
 Prerequisites: Node.js and a copy of the repository containing \`plugins/pipeline-core/scripts/audit-bundle.mjs\`; no network, provider, key, or deployment access is required.
@@ -52,6 +61,8 @@ The command exits 0 only for \`verified\` and nonzero for \`invalid\` or a comma
 ## Assurance limits
 
 This bundle is not a claim that requirements are satisfied, that a review or PO approval occurred, that deployment or a push happened, or that the candidate is suitable for release. The unsigned manifest and its hashes are not independently trusted: an actor who can replace both an artifact and the manifest can preserve internal consistency. A separate optional signature, when present and independently verified through its provider, adds cryptographic binding only; signatures are not implied by this bundle. Supporting reports and state files are evidence supplied by the producer, not intrinsically tamper-proof proof.
+
+The bundle states no independence of its own for any Critic round. Whether a round ran in a fresh context, without inherited history, is what the \`receipt.json\` exported beside that round's report records (\`freshContext\`, \`historyInherited\`, \`independence\`): a round recorded as \`caller-authored-fallback\` (freshContext false, historyInherited true) was authored by the calling agent and is not an independent review, and the report next to it must be read that way.
 `;
 }
 function rootPath(root, path, code) { if (typeof path !== "string" || path.length === 0 || isAbsolute(path) || path.includes("\\")) fail(code); const target = resolve(root, path); const check = relative(root, target); if (check === "" || check === ".." || check.startsWith(`..${sep}`) || isAbsolute(check)) fail(code); return target; }
@@ -268,14 +279,15 @@ export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVe
   return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}), ...(carried !== null ? { evidence: carried.evidence } : {}), ...(carriedProofs !== undefined ? { proofs: carriedProofs } : {}), ...(evidenceIndex !== undefined ? { evidenceIndex } : {}) });
 }
 
-export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}) {
+/** `commitSplit` (optional, C22B) is printed in the README only, never in the manifest: see commitSplitSection. */
+export async function buildAuditBundle({ repositoryRoot, outputPath, plan, commitSplit } = {}) {
   const root = resolve(repositoryRoot ?? ""); if (!planShape(plan)) fail("AB-PLAN"); const output = rootPath(root, outputPath, "AB-OUTPUT");
   try { await lstat(output); fail("AB-OUTPUT-EXISTS"); } catch (error) { if (error?.code !== "ENOENT") throw error; }
   await mkdir(output, { recursive: false }); await mkdir(join(output, "artifacts"));
   for (const artifact of plan.artifacts) { const source = rootPath(root, artifact.sourcePath, "AB-SOURCE"); const bytes = await readFile(source); if (digest(bytes) !== artifact.sha256) fail("AB-SOURCE-DIGEST"); await copyFile(source, join(output, artifact.bundlePath)); }
   const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}), ...(Object.hasOwn(plan, "evidence") ? { evidence: plan.evidence } : {}), ...(Object.hasOwn(plan, "proofs") ? { proofs: proofsManifest(plan.proofs) } : {}), ...(Object.hasOwn(plan, "evidenceIndex") ? { evidenceIndex: plan.evidenceIndex } : {}) };
   if (Object.hasOwn(plan, "proofs")) { await mkdir(join(output, "proofs")); for (const entry of plan.proofs) await writeFile(join(output, entry.bundlePath), proofBytes(entry.proof), { flag: "wx", mode: 0o644 }); }
-  const readmeBytes = Buffer.from(auditorReadme(baseManifest), "utf8");
+  const readmeBytes = Buffer.from(auditorReadme(baseManifest, commitSplit), "utf8");
   const manifest = { ...baseManifest, readmeSha256: digest(readmeBytes) };
   const bytes = `${canonicalizeJson(manifest)}\n`; await writeFile(join(output, "manifest.json"), bytes, { encoding: "utf8", flag: "wx", mode: 0o644 }); await writeFile(join(output, "README.md"), readmeBytes, { flag: "wx", mode: 0o644 });
   return Object.freeze({ schema: "pipeline.audit-bundle-build-receipt.v1", status: "built", bundleId: plan.bundleId, outputPath, manifestSha256: digest(bytes), candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256 });

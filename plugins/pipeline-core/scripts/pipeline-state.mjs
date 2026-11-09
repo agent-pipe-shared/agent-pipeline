@@ -11662,7 +11662,7 @@ export function syncPublicCurrentState(dir, state, handoverPath, nowIso) {
   // C22 (CGF-12, CGF-29): with no active feature and a closed one, the section states the closed-local state, the candidate and, as three different facts, the technical close, the product acceptance and the push
   // (generated lines between their own markers, from the feature's package and acceptance record). The stale "is active in <phase>" sentence of that feature goes; a new active feature removes the block.
   const closedId = !active && /^[a-z][a-z0-9-]{2,63}$/u.test(state?.closedFeatures?.at?.(-1)?.id ?? "") ? state.closedFeatures.at(-1).id : null;
-  const closedLines = closedId === null ? null : closedHandoverLines(dir, closedId);
+  const closedLines = closedId === null ? null : closedHandoverLines(dir, closedId, state.closedFeatures.at(-1));
   const cr = markdown.includes("\r\n") ? "\r" : "";
   const sectionLines = lines.slice(start + 1, end); const blockFrom = sectionLines.findIndex(line => line.trim() === CLOSED_BLOCK_BEGIN);
   const blockTo = blockFrom < 0 ? -1 : sectionLines.findIndex((line, index) => index > blockFrom && line.trim() === CLOSED_BLOCK_END);

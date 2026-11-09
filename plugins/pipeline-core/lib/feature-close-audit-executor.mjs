@@ -4,6 +4,7 @@ import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readF
 import { dirname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { buildAuditBundle } from "./audit-bundle.mjs";
+import { featureRangeCommitSplit } from "./close-commit-split.mjs";
 import { canonicalizeJson } from "./governance-event.mjs";
 import { planFeatureCloseAudit } from "./feature-close-audit-preflight.mjs";
 import { publicationClosePaths, syncPublicationCloseDirectory } from "../scripts/publication-close-journal.mjs";
@@ -44,7 +45,10 @@ export async function executeFeatureCloseAudit({ options, lifecycleId, expectedP
         if (!existsSync(cursor)) mkdirSync(cursor, { mode: 0o700 });
         if (!lstatSync(cursor).isDirectory() || lstatSync(cursor).isSymbolicLink()) throw new Error("FCA-UNSAFE-OUTPUT-PARENT");
       }
-      await buildAuditBundle({ repositoryRoot: root, outputPath: plan.outputPath, plan: plan.bundlePlan });
+      // C22B (CGR-13): the README states the product and evidence commits of the feature range apart. It is a read of the history at the candidate, printed in the README only
+      // (never in the plan, the manifest or the receipt), and a range that cannot be read is typed unavailable and never stops the build.
+      let commitSplit; try { commitSplit = featureRangeCommitSplit({ rootDir: root, featureId: options.featureId, head: plan.candidate.commit }); } catch { commitSplit = undefined; }
+      await buildAuditBundle({ repositoryRoot: root, outputPath: plan.outputPath, plan: plan.bundlePlan, ...(commitSplit === undefined ? {} : { commitSplit }) });
     }
     fault("after-build");
     const current = await planFeatureCloseAudit(options);

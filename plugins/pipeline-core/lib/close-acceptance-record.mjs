@@ -98,13 +98,28 @@ export function writeAcceptanceRecord({ root, featureId, record, now = () => new
   return written;
 }
 
-/** The generated closed-state lines of the handover (technical close, product acceptance and push as three different facts), or null when the feature has no readable package. */
-export function closedHandoverLines(root, featureId) {
+/**
+ * The technical-close line, read from the recorded close entry of Pipeline State (C22B, CGF-12) instead of stating "done" from memory. This text is committed in
+ * the close commit, before the freeze, the final Verify and the cleanup, so it names only what the entry records: when, by whom, the close lifecycle and the
+ * phase the State close recorded. An entry that carries none of them is named as such.
+ */
+function technicalCloseLine(entry) {
+  const recorded = typeof entry?.closedAt === "string" && entry.closedAt !== "" ? entry.closedAt : null;
+  const lifecycle = typeof entry?.coordinatorClose?.lifecycleId === "string" ? entry.coordinatorClose.lifecycleId : null;
+  const phase = typeof entry?.coordinatorClose?.phase === "string" ? entry.coordinatorClose.phase : null;
+  const by = typeof entry?.closedBy === "string" && entry.closedBy !== "" ? entry.closedBy : null;
+  const tail = "The freeze, the final Verify and the cleanup follow this text in the close and are not claimed here; it says nothing about product acceptance or push.";
+  if (recorded === null || lifecycle === null) return `**Technical close:** recorded in Pipeline State, but the entry's close time or close lifecycle is not readable here. ${tail}`;
+  return `**Technical close:** recorded in Pipeline State at \`${recorded}\`${by === null ? "" : ` by \`${by}\``}, close lifecycle \`${lifecycle}\`${phase === null ? "" : `, recorded phase \`${phase}\``}. ${tail}`;
+}
+
+/** The generated closed-state lines of the handover (technical close, product acceptance and push as three different facts), or null when the feature has no readable package. `entry` is the feature's closedFeatures entry. */
+export function closedHandoverLines(root, featureId, entry = null) {
   if (!FEATURE.test(featureId ?? "")) return null;
   let candidate = null; try { const value = JSON.parse(readFileSync(resolve(root, `specs/${featureId}/lifecycle.json`), "utf8"))?.candidate?.commit; candidate = typeof value === "string" ? value : null; } catch { candidate = null; }
   const record = readAcceptanceRecord(root, featureId);
   return [`Feature \`${featureId}\` is closed locally; its verified candidate is ${candidate === null ? "not readable from its package" : `\`${candidate}\``}, and the close commit that carries this text is the one the close then freezes as the candidate.`,
-    "**Technical close:** done. The feature close is recorded in Pipeline State; it says nothing about product acceptance or push.",
+    technicalCloseLine(entry),
     record === null ? "**Product acceptance:** not recorded in this feature's acceptance record; the human has not answered the acceptance question through the close."
       : `**Product acceptance:** recorded in \`${record.path}\` for candidate \`${record.candidate}\` (an attribution record of the human's answer, not a signature); open checks: ${record.openChecks.join("; ")}.`,
     "**Push:** not done by the close. Publication and push are separate human-gated steps."];

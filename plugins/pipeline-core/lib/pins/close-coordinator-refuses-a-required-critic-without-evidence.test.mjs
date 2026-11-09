@@ -905,6 +905,8 @@ test("(k) a course closed by a PO residual acceptance of its last round: the add
     assert.match(first.body.message, /TASK-EARLY require a Critic and carry no matching Critic evidence/u);
     assert.doesNotMatch(first.body.message, /TASK-ONE require|TASK-TWO require/u);
     assert.match(first.body.message, /--critic-addendum <request\.json> once for EACH uncovered record/u);
+    // C22B (LOOP-A3, AC-108): the hand route is named as the exception it is, because the close writes every addendum that exactly one consumed receipt covers.
+    assert.match(first.body.message, /the close writes the addendum itself for every record that exactly one consumed Critic receipt covers/u);
     w9CommitPaths(root, first.body.criticAddenda.commitPaths, "chore(evidence): bind the Critic course to the delivery records");
     const before = w9Status(root);
     const second = session.planPrepared();

@@ -18,6 +18,7 @@ import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../li
 import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
 import { acceptanceQuestion, acceptanceTarget, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
 import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
+import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
 import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
 
 const HERE = new URL(".", import.meta.url);
@@ -529,7 +530,15 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     phase = "closed-local";
   }
   if (phase === "closed-local" || phase === "delivered" || phase === "release-eligible" || phase === "promoted") {
-    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, ...pushEvidenceStep(closedFeatureId), message: "The feature is closed locally. Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init." });
+    // C22B (CGR-13, CGF-12): the commits of the feature range counted by kind (the commits themselves stay as they are), and the three statuses read from what exists: the coordinator's phase, the acceptance
+    // record and the fact that this close never pushes. Neither can block the close: a count that cannot be read is typed unavailable.
+    let commits; try { commits = featureRangeCommitSplit({ rootDir: root, featureId: closedFeatureId, runGit: (args) => runner("git", args) }); } catch { commits = { schema: CLOSE_COMMIT_SPLIT_SCHEMA, status: "unavailable", reason: "the range could not be read" }; }
+    let acceptance = null; try { acceptance = readAcceptanceRecord(root, closedFeatureId); } catch { acceptance = null; }
+    const closeStatus = { technicalClose: { status: phase, source: "close coordinator phase" },
+      productAcceptance: acceptance === null ? { status: "not-recorded", source: "the feature's acceptance record" } : { status: "recorded", candidate: acceptance.candidate, openChecks: acceptance.openChecks, source: acceptance.path },
+      push: { status: "not-done-by-the-close", source: "the close never pushes; publication and push are separate human-gated steps" } };
+    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, commits, ...pushEvidenceStep(closedFeatureId),
+      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. ${describeCommitSplit(commits)} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
   }
   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
 }

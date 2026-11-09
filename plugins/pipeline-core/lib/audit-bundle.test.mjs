@@ -187,6 +187,28 @@ test("Q3 a missing item is a typed gap, never silently skipped", () => {
   assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["approval-trace:gap:NOT-REFERENCED", "approval-proofs:gap:NOT-REFERENCED", "verify-record:gap:NOT-REFERENCED", "security-scan:gap:NOT-REFERENCED"]);
   assert.equal(plan.artifacts.length, 5); assert.equal(plan.evidence.traceStatus, null);
 });
+// C22B (CGR-13, CGF-03, AC-108): the README counts the product commits and the evidence commits of the feature range apart, from a build input that is NOT a manifest field
+// (the manifest and its keys are hashed by the verifier and the bindings), and says where the independence of a Critic round is recorded instead of restating it.
+test("C22B CGR-13 the README states product and evidence commits separately without touching the manifest, and the bundle still verifies offline", async () => {
+  const input = fixture(); const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] });
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan, commitSplit: { schema: "pipeline.close-commit-split.v1", status: "counted", base: null, rangeSource: "first-commit-touching-feature-directory", product: 3, evidence: 5, total: 8 } });
+  const readme = readFileSync(join(input.root, "bundle", "README.md"), "utf8");
+  assert.match(readme, /## Commits of the feature range/u); assert.match(readme, /3 product commit\(s\)/u); assert.match(readme, /5 evidence commit\(s\)/u);
+  const manifest = JSON.parse(readFileSync(join(input.root, "bundle", "manifest.json"), "utf8"));
+  assert.deepEqual(Object.keys(manifest).sort(), ["artifacts", "bundleId", "candidate", "effectivePolicySha256", "readmeSha256", "schema"], "no manifest field was added");
+  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle-unavailable", plan, commitSplit: { schema: "pipeline.close-commit-split.v1", status: "unavailable", reason: "git log failed" } });
+  const absent = readFileSync(join(input.root, "bundle-unavailable", "README.md"), "utf8");
+  assert.match(absent, /could not be counted/u); assert.doesNotMatch(absent, /product commit\(s\)/u, "no count is invented");
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle-plain", plan });
+  assert.doesNotMatch(readFileSync(join(input.root, "bundle-plain", "README.md"), "utf8"), /Commits of the feature range/u, "a caller that passes no split gets the README it always got, apart from the assurance sentence");
+});
+test("C22B CGF-03 the README does not restate the assurance of a Critic round: it points at the receipt of each round", async () => {
+  const input = fixture(); const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] });
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  const readme = readFileSync(join(input.root, "bundle", "README.md"), "utf8");
+  assert.match(readme, /freshContext/u); assert.match(readme, /caller-authored-fallback/u); assert.match(readme, /receipt\.json/u); assert.match(readme, /states no independence of its own/u);
+});
 // C22 (CGR-12, AC-108): every Critic round report of the feature travels in the bundle; a round whose report was never exported (it lived only in a scratch directory) is a typed gap the README names.
 test("C22 CGR-12 the bundle carries every Critic round report, names a round without a readable report, and verifies offline", async () => {
   const input = fixture(); const [one, two, three] = ["a", "b", "c"].map((letter) => letter.repeat(32));

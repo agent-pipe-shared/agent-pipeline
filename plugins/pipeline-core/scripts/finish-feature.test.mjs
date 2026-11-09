@@ -842,3 +842,78 @@ test("G20-66: every close stage that writes protected files arms the commit of e
     assert.equal(stale.admitted, false); assert.match(stale.stale.rerun, /finish-feature\.mjs/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// ---- C22B (AC-108): the close reports product and evidence commits of the feature range apart, and its status comes from receipts ----
+// CGR-13 (PO decision: the commits stay as they are): a commit is an evidence commit when every path it touches is an administration/documentation path of the
+// shared path set, a path under specs/<feature>/evidence/ or audit-bundles/, or a root evidence record; any other path (source, an ADR, the spec text) makes it a product commit.
+function commitFile(f, path, text, message) { mkdirSync(dirname(join(f.root, path)), { recursive: true }); writeFileSync(join(f.root, path), text); f.git("add", "-A"); f.git("commit", "-q", "-m", message); }
+function closedLocalFixture() {
+  const f = oneShotFixture({ closed: true, startPhase: "cleanup-complete" });
+  f.resumed = { ...f.input, criticPacketId: null, resumeLifecycleId: "lc-1" };
+  return f;
+}
+test("C22B CGR-13: closed-local counts the product commits and the evidence commits of the feature range separately, by the touched paths", () => {
+  const f = closedLocalFixture();
+  try {
+    // the baseline commit (state file and the feature's result.md) is the first commit that touches specs/feature-abc: an evidence commit
+    commitFile(f, "src/app.mjs", "export const a = 1;\n", "feat: product");
+    commitFile(f, "specs/feature-abc/evidence/run.json", "{}\n", "chore: evidence record");
+    commitFile(f, "docs/guide.md", "# guide\n", "docs: a guide");
+    commitFile(f, "docs/adr/0002-choice.md", "# decision\n", "docs: an ADR is a decision, so content");
+    commitFile(f, `specs/feature-abc/evidence/critic/${"b".repeat(32)}/report.md`, "# report\n", "chore: critic export");
+    commitFile(f, "audit-bundles/feature-abc/x/README.md", "# bundle\n", "chore: bundle");
+    mkdirSync(join(f.root, "specs/feature-abc/evidence"), { recursive: true }); writeFileSync(join(f.root, "specs/feature-abc/evidence/mixed.json"), "{}\n"); commitFile(f, "src/b.mjs", "export const b = 2;\n", "feat: product plus evidence in one commit");
+    const done = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
+    assert.equal(done.commits.schema, "pipeline.close-commit-split.v1");
+    assert.deepEqual([done.commits.product, done.commits.evidence, done.commits.total], [3, 5, 8], JSON.stringify(done.commits));
+    assert.equal(typeof done.commits.rangeSource, "string", "the range names where its base came from");
+    assert.match(done.message, /3 product commit\(s\) and 5 evidence commit\(s\)/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C22B CGR-13: a range that cannot be read is typed unavailable and never blocks the close", () => {
+  const f = closedLocalFixture();
+  try {
+    const runner = (executable, argv) => (executable === "git" && argv[0] === "log" ? { status: 128, stdout: "", stderr: "fatal" } : f.runner(executable, argv));
+    const done = oneShotClose(f.resumed, { runCommand: runner });
+    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
+    assert.equal(done.commits.status, "unavailable"); assert.equal(typeof done.commits.reason, "string");
+    assert.equal(done.commits.product, undefined, "no count is invented");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C22B CGF-12: the closed-local status separates product acceptance, technical close and push and reads the acceptance from its record", () => {
+  const f = closedLocalFixture();
+  try {
+    const none = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(none.status, "closed-local", JSON.stringify(none).slice(0, 400));
+    assert.deepEqual(Object.keys(none.closeStatus).sort(), ["productAcceptance", "push", "technicalClose"]);
+    assert.equal(none.closeStatus.technicalClose.status, "closed-local");
+    assert.equal(none.closeStatus.productAcceptance.status, "not-recorded");
+    assert.equal(none.closeStatus.push.status, "not-done-by-the-close");
+    const head = f.git("rev-parse", "HEAD").trim();
+    writeFileSync(join(f.root, "specs/feature-abc/acceptance.md"), applyAcceptanceSection(null, renderAcceptanceSection({ candidate: head, answer: "accepted", openChecks: ["device check"] })));
+    const recorded = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(recorded.closeStatus.productAcceptance.status, "recorded"); assert.equal(recorded.closeStatus.productAcceptance.candidate, head);
+    assert.deepEqual(recorded.closeStatus.productAcceptance.openChecks, ["device check"]);
+    assert.match(recorded.message, /Technical close: closed-local\. Product acceptance: recorded\. Push: not done by the close\./u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C22B CGF-12: the handover's technical-close line is read from the recorded close entry, never stated as done from memory", () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "closed-handover-receipt-")));
+  try {
+    mkdirSync(join(dir, "docs")); mkdirSync(join(dir, "specs/feature-abc"), { recursive: true });
+    writeFileSync(join(dir, "docs/state.md"), "# State\n\n## Current state\n\nFeature `feature-abc` is active in implementation.\n");
+    writeFileSync(join(dir, "specs/feature-abc/lifecycle.json"), `${JSON.stringify({ candidate: { commit: "c".repeat(40), tree: "d".repeat(40) }, artifacts: [] })}\n`);
+    const entry = { id: "feature-abc", closedBy: "PO", closedAt: "2026-11-09T09:00:00.000Z", coordinatorClose: { lifecycleId: "lc-1", phase: "feature-close-prepared" } };
+    syncPublicCurrentState(dir, { schema: "pipeline.state.v0", closedFeatures: [entry] }, "docs/state.md", "2026-11-09T10:00:00.000Z");
+    const line = readFileSync(join(dir, "docs/state.md"), "utf8").split("\n").find((text) => text.startsWith("**Technical close:**"));
+    assert.ok(line.includes("2026-11-09T09:00:00.000Z") && line.includes("lc-1") && line.includes("feature-close-prepared"), line);
+    assert.doesNotMatch(line, /\bdone\b/u, "the close continues to freeze, final Verify and cleanup after this text is committed, so it is not claimed as done");
+    const bare = { id: "feature-abc", closedBy: "PO" };
+    syncPublicCurrentState(dir, { schema: "pipeline.state.v0", closedFeatures: [bare] }, "docs/state.md", "2026-11-09T10:00:00.000Z");
+    assert.match(readFileSync(join(dir, "docs/state.md"), "utf8"), /^\*\*Technical close:\*\* .*not readable/mu, "an entry without a readable close time is named, not papered over");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
