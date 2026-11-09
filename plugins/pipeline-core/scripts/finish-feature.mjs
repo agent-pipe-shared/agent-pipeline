@@ -294,6 +294,16 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         if (independence?.status === "acknowledgement-required") acknowledgementGap = String(independence.message ?? "");
       } catch { acknowledgementGap = null; /* the close keeps its own check */ }
       if (acknowledgementGap !== null) return stopResult("critic-acknowledgement", "CLOSE-CRITIC-CALLER-AUTHORED", acknowledgementGap, `nothing was written; record the acknowledgement as the reason says, then rerun the identical command: ${rerun(again)}`);
+      // C21E: the close writes the Critic addenda itself, and their commit moves HEAD. Doing that here, before Verify, keeps the candidate of the Verify below current.
+      let addenda = null;
+      try { addenda = command(runner, process.execPath, [COORDINATOR, "critic-addenda", "--root", root], "ONESHOT-CRITIC-ADDENDA"); } catch { addenda = null; /* the close keeps its own check */ }
+      if (addenda?.status === "written") {
+        const steps = writerCommitSteps(addenda.commitPaths, addenda.subject);
+        steps[0] = steps[0].replace("git add --", "git add -f --");
+        return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId, lifecycleId: again, resumeLifecycleId: again, stages: [...stages, "critic-addenda"],
+          commit: { paths: addenda.commitPaths, excluded: [], capability: null, message: addenda.subject, steps }, next: rerun(again),
+          message: "The close derived the Critic addenda from the passed review and wrote them; Verify has not run yet. Run the commit, then the next command. Do not build addenda by hand." });
+      }
       if (requalify) stages.push("requalify-candidate");
       stages.push("verify-candidate");
       const verify = runner(process.execPath, [VERIFY_PRODUCER, "--root", root, "--mode", "candidate", "--critic-packet-id", packet, "--critic-evidence-feature-id", featureId, "--out", verifyPath]);

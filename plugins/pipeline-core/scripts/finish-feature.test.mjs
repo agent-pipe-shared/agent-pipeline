@@ -249,7 +249,7 @@ const sha256Of = (value) => createHash("sha256").update(value).digest("hex");
 const STATE_PATH = ".claude/pipeline-state.json";
 const COORD = new URL("./close-coordinator.mjs", import.meta.url).pathname;
 const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false } = {}) {
+function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false } = {}) {
   const independenceChecks = [];
   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
@@ -264,13 +264,14 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
   git("add", "-A"); git("commit", "-q", "-m", "baseline");
   const packetId = "a".repeat(32); const lifecycleId = "c".repeat(64);
   if (packetOnDisk) mkdirSync(join(root, ".git/agent-pipeline/critic-packets", packetId), { recursive: true });
-  const calls = []; let phase = startPhase ?? "none";
+  const calls = []; let phase = startPhase ?? "none"; let addendaPending = addendaWritten;
   const json = (value) => ({ status: 0, stdout: JSON.stringify(value), stderr: "" });
   const flag = (argv, name) => argv[argv.indexOf(name) + 1];
   const runner = (executable, argv) => {
     if (executable === "git") return spawnSync("git", argv, { cwd: root, encoding: "utf8" });
     const script = argv[0].split("/").at(-1); const sub = argv[1];
     if (script === "close-coordinator.mjs" && sub === "critic-independence") { independenceChecks.push(flag(argv, "--packet")); return json(acknowledgementMissing ? { status: "acknowledgement-required", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "authored by the calling agent; record it with approve-critic-acknowledgement" } : { status: "satisfied" }); }
+    if (script === "close-coordinator.mjs" && sub === "critic-addenda") return json(addendaPending ? { status: "written", commitPaths: ["specs/feature-abc/evidence/critic-addendum-r1.json"], subject: "chore(evidence): bind the Critic course to the delivery records", message: "written" } : { status: "none" });
     calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
     if (script === "verify-evidence-producer.mjs") {
       if (verifyRed) return { status: 2, stdout: "", stderr: "verify-evidence-producer: VEP-FAILED: suite red\n" };
@@ -303,7 +304,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
     }
     throw new Error(`unexpected ${script} ${sub}`);
   };
-  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId } };
+  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId } };
 }
 const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
 
@@ -360,6 +361,23 @@ test("C21C: a missing PO acknowledgement of a caller-authored Critic stops befor
     assert.match(stopped.stop.reason, /approve-critic-acknowledgement/u);
     assert.deepEqual(f.independenceChecks, [f.packetId]); assert.deepEqual(f.calls, [], "Verify, the package and the close must not run");
     for (const name of ["audit-request.json", "verify-candidate.json"]) assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence", name)), false, name);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C21E: the close writes the Critic addenda before Verify, asks for their commit, and the rerun goes on to Verify", () => {
+  const f = oneShotFixture({ addendaWritten: true });
+  try {
+    const first = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(first.status, "commit-required", JSON.stringify(first).slice(0, 400));
+    assert.ok(first.stages.includes("critic-addenda")); assert.deepEqual(first.commit.paths, ["specs/feature-abc/evidence/critic-addendum-r1.json"]);
+    assert.match(first.commit.steps[0], /git add -f --/u, "the addenda live below a possibly ignored evidence directory");
+    assert.match(first.message, /Do not build addenda by hand/u);
+    assert.deepEqual(f.calls, [], "Verify, the package and the close must not run before the addenda are committed");
+    f.addendaCommitted();
+    const second = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(second.status, "commit-required", JSON.stringify(second).slice(0, 400));
+    assert.equal(f.calls[0], "verify-evidence-producer.mjs", "the rerun reaches Verify");
+    assert.ok(!second.stages.includes("critic-addenda"));
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

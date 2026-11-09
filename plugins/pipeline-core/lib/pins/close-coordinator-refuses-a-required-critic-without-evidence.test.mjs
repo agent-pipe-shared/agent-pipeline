@@ -802,6 +802,24 @@ function assertWrittenAndUncommitted(root, outcome, taskIds, head) {
   for (const path of reported.commitPaths) assert.equal(git(root, ["ls-files", "--", path]), "", `${path} is untracked until the agent commits it`);
 }
 
+test("(k0) C21E: critic-addenda writes the addenda before any Verify, moves nothing, and reports none once they are committed", () => {
+  const fx = w9Course({ label: "c21e", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE", "TASK-TWO"] });
+  try {
+    const { root } = fx;
+    const head = git(root, ["rev-parse", "HEAD"]);
+    const first = w9Cli("close-coordinator.mjs", ["critic-addenda", "--root", root]);
+    assert.equal(first.status, 0, first.text);
+    assert.equal(first.body.status, "written", first.text);
+    assert.equal(first.body.subject, "chore(evidence): bind the Critic course to the delivery records");
+    assert.equal(git(root, ["rev-parse", "HEAD"]), head, "the verb commits nothing");
+    assert.deepEqual(w9Derived(root), first.body.commitPaths.map((path) => basename(path)).sort());
+    w9CommitPaths(root, first.body.commitPaths, first.body.subject);
+    const second = w9Cli("close-coordinator.mjs", ["critic-addenda", "--root", root]);
+    assert.equal(second.status, 0, second.text);
+    assert.equal(second.body.status, "none", second.text);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 test("(k) D223 chain: three slices, a three-round Critic course, plan writes the addenda, the agent commits them, the second plan succeeds and applies", () => {
   const fx = w9Course({ label: "pos", rounds: W9_ROUNDS_LAST_PASSED(), slices: ["TASK-ONE", "TASK-TWO", "TASK-THREE"] });
   try {

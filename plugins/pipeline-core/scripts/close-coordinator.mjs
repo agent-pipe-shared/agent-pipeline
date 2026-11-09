@@ -1372,6 +1372,18 @@ try {
       if (error?.code === "CLOSE-CRITIC-CALLER-AUTHORED" && /authored by the calling agent/u.test(error.message)) emit({ schema: "pipeline.close-critic-independence.v1", status: "acknowledgement-required", code: error.code, message: error.message });
       else emit({ schema: "pipeline.close-critic-independence.v1", status: "unknown" });
     }
+  } else if (command === "critic-addenda") {
+    // C21E: the Critic addenda a close derives anyway, written BEFORE the one-shot close spends a Verify: their commit moves HEAD, so writing them inside the close made the candidate stale.
+    const parsed = exactArgs(argv, new Set(["root"]));
+    if (!parsed || !parsed.values.root) fail("CLOSE-ARGS", "critic-addenda arguments invalid");
+    const root = physicalRoot(parsed.values.root);
+    try {
+      assertCourseCriticEvidence(root, activeFeature(stateSnapshot(root).state), { audited: true, deriveAddenda: true });
+      emit({ schema: "pipeline.close-critic-addenda.v1", status: "none" });
+    } catch (error) {
+      if (error?.code === "CLOSE-CRITIC-ADDENDA-WRITTEN" && Array.isArray(error.criticAddenda?.commitPaths)) emit({ schema: "pipeline.close-critic-addenda.v1", status: "written", commitPaths: error.criticAddenda.commitPaths, subject: ADDENDA_COMMIT_SUBJECT, message: error.message });
+      else emit({ schema: "pipeline.close-critic-addenda.v1", status: "unknown" }); // the close keeps its own check and its typed refusal
+    }
   } else if (command === "drive") {
     const parsed = exactArgs(argv, new Set([
       "root", "lifecycle", "actor", "phase", "evidence", "publication",
