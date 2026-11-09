@@ -1,0 +1,46 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 28f07b3bacad1ad99b3d6a97716f816575a40ba3..11675a0a90ed2dbd3728beb7886c6c520e211a93 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -379,8 +379,11 @@ export function evaluateBriefingRoute({ prompt, root } = {}) {
+     }
+     const observed = briefingSha256(prompt);
+     const provenance = admission ? { origin: BRIEFING_ROUTE_ORIGIN_ADMISSION } : {};
+-    return observed === record.briefingSha256
+-      ? { status: "match", sliceId, digest: observed, ...provenance }
++    // C23 (Antigravity greenfield, F15): a native tool call drops the final newline of a long retyped text. Same single tolerance as verifyGeneratedBriefing; an ADDED newline stays a different briefing.
++    const canonical = canonicalBriefing(prompt);
++    const lostFinalNewline = !canonical.endsWith("\n") && briefingSha256(`${canonical}\n`) === record.briefingSha256;
++    return observed === record.briefingSha256 || lostFinalNewline
++      ? { status: "match", sliceId, digest: record.briefingSha256, ...provenance }
+       : { status: "mismatch", sliceId, path: shown, expected: record.briefingSha256, observed, ...provenance };
+   } catch {
+     return { status: "invalid", sliceId: null, path: "evidence/dispatch-route-*.json", reason: "the route check itself faulted" };
+@@ -394,7 +397,7 @@ function briefingRouteRefusal(route) {
+         `  expected: ${route.expected}`,
+         `  observed: ${route.observed}`,
+         `  route record: ${route.path}`,
+-        "The digest binds the text actually sent (CRLF normalised to LF, nothing else). Dispatch the briefing the route names, or issue a new route record for the briefing you intend to send.",
++        "The digest binds the text actually sent (CRLF normalised to LF; only a lost final newline is tolerated). Dispatch the briefing the route names, or issue a new route record for the briefing you intend to send.",
+         "",
+       ].join("\n")
+     : [
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index db57f4941034590fa995e4b2b91dab87df971bef..e112be9fffc6ce65c24e1fc2b8b298a492d12469 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -751,6 +751,14 @@ manualCheck("GD23 allow  a CRLF copy of the routed briefing (the canonical form
+   const trailing = run(routeDispatch("gd23b", `${prompt}\n`)); // a trailing newline IS a different briefing
+   assert.equal(trailing.code, BLOCK, trailing.stderr.slice(0, 300));
+   assert.ok(trailing.stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH"));
++  // C23 F15: a routed briefing that lost only its final newline passes; losing anything more is still refused.
++  const ending = `${routePrompt("GD-ROUTE-NL").replace(/\n+$/u, "")}\nlast line\n`;
++  writeRoute("GD-ROUTE-NL", routeRecord("GD-ROUTE-NL", ending));
++  const lost = run(routeDispatch("gd23c", ending.slice(0, -1)));
++  assert.equal(lost.code, ALLOW, lost.stderr.slice(0, 300));
++  const shortened = run(routeDispatch("gd23d", ending.slice(0, -2)));
++  assert.equal(shortened.code, BLOCK, shortened.stderr.slice(0, 300));
++  assert.ok(shortened.stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH"));
+ });
+ 
+ manualCheck("GD24 allow  no route digest: a slice without a record, or a briefing without a Slice line, is unchanged", () => {

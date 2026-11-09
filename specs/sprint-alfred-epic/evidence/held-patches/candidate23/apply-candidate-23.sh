@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 23: 41 held patches exported from the build clone chain a1376d7cc..27e95aa54
+# PO apply script for candidate 23: 43 held patches exported from the build clone chain a1376d7cc..60f60f667
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -55,6 +55,8 @@ step 38-2167457ab 'fix(antigravity): keep the same model family silent, name the
 step 39-b3aacaa78 'fix(critic): keep why a Critic return left no record and print it in the merge refusal'
 step 40-2fed8ac9c 'fix(dispatch): admit a generated briefing that only lost its final newline'
 step 41-27e95aa54 'chore(inventory): file the read-only search guard suite under its capability'
+step 42-61986e0a8 'fix(dispatch): tolerate a lost final newline on a routed briefing too'
+step 43-60f60f667 'fix(critic): record why an Antigravity Critic message left no return'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
