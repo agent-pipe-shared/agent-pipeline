@@ -36,6 +36,19 @@ test("greenfield scaffold is classified as design-pending without pretending it 
   assert.match(result.guidance, /not an adopted architecture baseline/u);
 });
 
+// CGF-08 / CGF-23 (AC-108): the orientation names what kind of verdict it is. It is report-only (it never decides readiness), carries its
+// observation date and scope, and is not bound to a candidate commit.
+test("CGF-08 the orientation carries a verdict label: report-only, observation date, adoption scope, no candidate", () => {
+  const root = fixtureRoot("label-");
+  const now = new Date("2026-11-09T10:00:00.000Z");
+  const adopted = observeArchitectureAdoptionOrientation({ rootDir: root, now, deps: { resolveAdoptionState: () => ({ state: "approved-scoped", scope: "src/**", decisionRef: "ADR-1", coverageClass: "measured", confidence: "measured" }) } });
+  assert.deepEqual([adopted.verdict.source, adopted.verdict.verdict, adopted.verdict.effect, adopted.verdict.currency, adopted.verdict.candidate, adopted.verdict.observedAt, adopted.verdict.scope],
+    ["architecture-adoption-orientation", "decision-recorded", "report-only", "current", null, "2026-11-09T10:00:00.000Z", "src/**"]);
+  const none = observeArchitectureAdoptionOrientation({ rootDir: root, now });
+  assert.equal(none.verdict.verdict, "adoption-required");
+  assert.match(none.verdict.scope, /no scope recorded/u);
+});
+
 test("brownfield without a physical map has an actionable adoption-required readback", () => {
   const root = fixtureRoot("brownfield-");
   writeFileSync(join(root, "package.json"), "{}\n", "utf8");

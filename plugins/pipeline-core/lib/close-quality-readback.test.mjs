@@ -27,6 +27,20 @@ const rows = (readers) => Object.fromEntries(closeQualityReadback({ root: "<root
 // appended row, "journey-coverage", whose cases live in lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs. `full()`
 // carries no Spec reader, so that row is "unknown" here (never "present" without a signal), and the original "every row is present"
 // assertion now covers the five original rows.
+// CGF-08 / CGF-23 (AC-108): the fitness row stays in its closed shape and its status rules; the evidence text now labels the verdict
+// (candidate, observation date, report-only, source currency not re-checked) and lists the open report-only classes beside "present".
+test("CGF-23 the architecture-fitness evidence labels the observation and lists the open report-only classes beside a present row", () => {
+  const COMMIT = "a".repeat(40), TREE = "b".repeat(40);
+  const history = (outcomes) => () => [{ body: { featureId: FEATURE, observedAt: "2026-11-09T09:00:00.000Z", candidate: { commit: COMMIT, tree: TREE }, fitnessProjection: { outcomes } } }];
+  const open = rows(full({ rigorHistory: history([{ classId: 2, propertyId: "p2", outcome: "pass" }, { classId: 3, propertyId: "p3", outcome: "finding" }]) }))["architecture-fitness"];
+  assert.equal(open.status, "present");
+  for (const part of ["report-only", "a".repeat(12), "2026-11-09T09:00:00.000Z", "open report-only: 3 (1)"]) assert.ok(open.evidence.includes(part), `${part} in ${open.evidence}`);
+  assert.deepEqual(Object.keys(open).sort(), ["evidence", "id", "remedy", "status"]);
+  const clean = rows(full({ rigorHistory: history([{ classId: 2, propertyId: "p2", outcome: "pass" }]) }))["architecture-fitness"];
+  assert.ok(clean.evidence.includes("no open report-only class"), clean.evidence);
+  assert.equal(rows(full())["architecture-fitness"].status, "present", "a bare projection stays present, typed unobserved");
+});
+
 test("AC-239: exactly the five ids, in order, with the closed row shape", () => {
   const list = closeQualityReadback({ root: "<root>", featureId: FEATURE, readers: full() });
   assert.deepEqual(QUALITY_ROW_IDS, ["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);

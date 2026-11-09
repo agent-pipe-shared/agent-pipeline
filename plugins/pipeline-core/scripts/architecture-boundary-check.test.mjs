@@ -198,6 +198,26 @@ test("ABC10 the measurement names the module and file of a forbidden import and 
   assert.equal(measureArchitecture({ rootDir: fixture({ map: false, files: { "src/x.mjs": "export {};\n" } }) }).status, "not-applicable");
 });
 
+// CGF-08 / CGF-23 (AC-108): the blocking verdict names its candidate, observation date, scope and effect, and the open report-only
+// classes (the size budgets) are listed next to a PASS instead of being hidden by it.
+test("ABC12 the verdict carries candidate, date, scope, blocking effect and currency; open size budgets sit beside a PASS", () => {
+  const model = JSON.stringify({ schema: "pipeline.fitness-model.v1", profileId: "p", revision: 1, modules: ["app", "lib"], allowedBoundaryCrossings: [], sizeBudgets: { maxFileLines: 3, maxModuleLines: 4 } });
+  const root = fixture({ files: { "architecture/fitness-model.json": model, "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\n', "src/lib/x.mjs": lines(5) } });
+  const candidate = "a".repeat(40);
+  const seams = { readCandidate: () => candidate, now: () => new Date("2026-11-09T10:00:00.000Z") };
+  const measured = measureArchitecture({ rootDir: root }, seams);
+  assert.equal(measured.status, "pass");
+  assert.equal(measured.verdict.schema, "pipeline.architecture-verdict-label.v1");
+  assert.deepEqual([measured.verdict.source, measured.verdict.verdict, measured.verdict.effect, measured.verdict.currency, measured.verdict.candidate, measured.verdict.observedAt],
+    ["architecture-boundary-check", "pass", "blocking", "current", candidate, "2026-11-09T10:00:00.000Z"]);
+  for (const rule of ["unowned-path", "forbidden-dependency", "over-line-bound"]) assert.ok(measured.verdict.scope.includes(rule), measured.verdict.scope);
+  assert.deepEqual(measured.verdict.reportOnlyOpen, [{ classId: "size-budget", open: 2, detail: "2 over-budget entries, advisory" }]);
+  // The plain check does not measure budgets, so it lists none; a candidate it cannot read leaves the verdict unobserved, never current.
+  const plain = checkArchitectureBoundaries({ rootDir: root }, { readCandidate: () => null, now: seams.now });
+  assert.deepEqual([plain.verdict.reportOnlyOpen, plain.verdict.candidate, plain.verdict.currency], [[], null, "unobserved"]);
+  assert.equal(Object.hasOwn(measured, "_observed"), false, "the public measurement still hides the internal observation");
+});
+
 test("ABC11 budgets carried by the fitness model are reported per module and stay advisory", () => {
   const model = JSON.stringify({ schema: "pipeline.fitness-model.v1", profileId: "p", revision: 1, modules: ["app", "lib"], allowedBoundaryCrossings: [], sizeBudgets: { maxFileLines: 3, maxModuleLines: 4 } });
   const root = fixture({ files: { "architecture/fitness-model.json": model, "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\n', "src/lib/x.mjs": lines(5) } });

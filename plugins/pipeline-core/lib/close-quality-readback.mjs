@@ -19,6 +19,7 @@
 import { createHash } from "node:crypto";
 import { SCANNER_EXCEPTIONS_PATH, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, parseScannerExceptions } from "./security-close-status.mjs";
 import { inspectSpecJourneys, JOURNEY_REPAIR } from "./spec-journey-coverage.mjs";
+import { describeVerdictLabel, fitnessObservationVerdictLabel } from "./architecture-verdict-label.mjs";
 
 export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
 export const QUALITY_ROW_IDS = Object.freeze(["security-scan", "adr-decision", "architecture-fitness", "critic-report-file", "handover-freshness", "journey-coverage"]);
@@ -92,8 +93,11 @@ function fitnessRow(readers, featureId) {
   const remedy = "node <plugin-root>/scripts/architecture-fitness.mjs --root <root> --check";
   const history = call(readers.rigorHistory);
   if (!history.ok || !Array.isArray(history.value)) return unknown(id, remedy);
-  const recorded = history.value.some((entry) => entry?.body?.featureId === featureId && entry.body.fitnessProjection !== null && entry.body.fitnessProjection !== undefined);
-  return recorded ? row(id, "present") : row(id, "missing", null, remedy);
+  const recordedEntries = history.value.filter((entry) => entry?.body?.featureId === featureId && entry.body.fitnessProjection !== null && entry.body.fitnessProjection !== undefined);
+  if (recordedEntries.length === 0) return row(id, "missing", null, remedy);
+  // CGF-08/CGF-23: the row shape is closed, so the label of the latest recorded observation travels in the free evidence text, with
+  // the open report-only classes listed beside "present". A label that cannot be built leaves the bare row (the readback never claims what it cannot read).
+  try { return row(id, "present", describeVerdictLabel(fitnessObservationVerdictLabel(recordedEntries[recordedEntries.length - 1].body))); } catch { return row(id, "present"); }
 }
 
 function criticRow(readers, featureId) {

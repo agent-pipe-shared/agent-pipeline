@@ -13,6 +13,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { resolveAdoptionState } from "../scripts/architecture-adoption.mjs";
+import { architectureVerdictLabel } from "./architecture-verdict-label.mjs";
 
 export const ARCHITECTURE_ADOPTION_ORIENTATION_SCHEMA = "pipeline.architecture-adoption-orientation.v1";
 
@@ -95,5 +96,12 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
       status: physicalMapStatus,
     },
     guidance,
+    // CGF-08/CGF-23: this orientation only reports; it is not bound to a candidate commit and never decides readiness.
+    verdict: architectureVerdictLabel({
+      source: "architecture-adoption-orientation", verdict: status, candidate: null, observedAt: now.toISOString(),
+      scope: (Array.isArray(adoption?.scope) ? adoption.scope.filter((entry) => typeof entry === "string").join(", ")
+        : typeof adoption?.scope === "string" ? adoption.scope : "") || "repository (no scope recorded)",
+      effect: "report-only", currency: "current",
+    }),
   };
 }

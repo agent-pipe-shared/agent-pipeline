@@ -34,6 +34,7 @@ import { fileURLToPath } from "node:url";
 import { loadMapBundle, pathMatchesPattern } from "./module-inventory.mjs";
 import { evaluateSizeBudgets, extractJsImports, loadFitnessModel } from "./architecture-fitness.mjs";
 import { CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/consumer-verify.mjs";
+import { architectureVerdictLabel } from "../lib/architecture-verdict-label.mjs";
 
 export const BOUNDARY_CHECK_SCHEMA = "pipeline.architecture-boundary-check.v1";
 export const BOUNDARY_POLICY_SCHEMA = "pipeline.architecture-boundary-policy.v1";
@@ -170,9 +171,25 @@ function observe(root, modules, policy, listed, readFile, extensions) {
   return { sources, violations: violations.sort(order), usage, edges };
 }
 
+function headCandidate(rootDir) {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: rootDir, encoding: "utf8" });
+  const commit = result.status === 0 ? result.stdout.trim() : "";
+  return /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(commit) ? commit : null;
+}
+
+function boundaryVerdictLabel(rootDir, status, deps, reportOnlyOpen = []) {
+  let candidate = null;
+  try { candidate = (deps.readCandidate ?? headCandidate)(rootDir) ?? null; } catch { candidate = null; }
+  return architectureVerdictLabel({
+    source: "architecture-boundary-check", verdict: status, candidate, observedAt: (deps.now ? deps.now() : new Date()).toISOString(),
+    scope: `boundary rules ${BOUNDARY_RULES.join(", ")}; tracked tree against architecture/map`, effect: "blocking",
+    currency: candidate === null ? "unobserved" : "current", reportOnlyOpen,
+  });
+}
+
 /**
- * Checks the tracked tree against the map. `deps.listFiles(rootDir)` and `deps.readFile(abs)` are
- * injectable for tests.
+ * Checks the tracked tree against the map. `deps.listFiles(rootDir)`, `deps.readFile(abs)`, `deps.readCandidate(rootDir)` and
+ * `deps.now()` are injectable for tests.
  */
 export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExtensions = DEFAULT_SOURCE_EXTENSIONS } = {}, deps = {}) {
   const root = path.resolve(rootDir);
@@ -213,9 +230,13 @@ export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExt
   const staleExceptions = policy.exceptions
     .filter((entry) => !used.has(exceptionKey(entry.rule, entry.path, entry.target ?? null)))
     .map((entry) => ({ rule: entry.rule, path: entry.path, ...(entry.target ? { target: entry.target } : {}) }));
+  const status = violations.length ? "findings" : "pass";
   return {
     ...base,
-    status: violations.length ? "findings" : "pass",
+    status,
+    // CGF-08/CGF-23: this check blocks, over the tracked tree at one candidate. A candidate it cannot read leaves the verdict unobserved,
+    // never "current". measureArchitecture adds the open report-only classes (the size budgets) beside it.
+    verdict: boundaryVerdictLabel(root, status, deps),
     policy: { lineBound: policy.lineBound, excludedPaths: policy.excludedPaths.length, exceptions: policy.exceptions.length, source: policy.source },
     counts: { sourceFiles: sources.length, modules: bundle.modules.length, violations: violations.length, excepted },
     violations,
@@ -248,8 +269,13 @@ export function measureArchitecture({ rootDir = process.cwd(), sourceExtensions 
   const advisory = evaluateSizeBudgets({ rootDir: root, inventory: measured.modules, fitnessModel });
   const bySize = (a, b) => (a.scope === b.scope ? 0 : a.scope === "file" ? -1 : 1) || String(a.path).localeCompare(String(b.path));
   const budget = { maxFileLines: advisory.budgets.maxFileLines, maxModuleLines: advisory.budgets.maxModuleLines };
+  // CGF-23: the over-budget entries are an open report-only class; list them next to the (possibly passing) blocking verdict.
+  const openBudgets = advisory.overBudget.length;
+  const verdict = openBudgets === 0 ? publicOut.verdict
+    : architectureVerdictLabel({ ...publicOut.verdict, reportOnlyOpen: [{ classId: "size-budget", open: openBudgets, detail: `${openBudgets} over-budget entries, advisory` }] });
   return {
     ...publicOut,
+    verdict,
     measurement: {
       schema: ARCHITECTURE_MEASUREMENT_SCHEMA,
       budgets: { ...budget, source: fitnessModel?.sizeBudgets && typeof fitnessModel.sizeBudgets === "object" ? "fitness-model" : "default" },
