@@ -573,6 +573,27 @@ test("P3: after the commit the next call continues to closed-local; an uncommitt
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test("CGF-21: closed-local names the Critic-bound push Verify with the packet of the close, argv as the close chain walk runs it", () => {
+  const f = oneShotFixture({ closed: true, startPhase: "cleanup-complete" });
+  try {
+    const resumed = { ...f.input, criticPacketId: null, resumeLifecycleId: "lc-1" };
+    assert.equal(oneShotClose(resumed, { runCommand: f.runner }).pushEvidence, undefined, "no readable audit request, so the close names no packet it cannot prove");
+    mkdirSync(join(f.root, "specs/feature-abc/evidence"), { recursive: true });
+    writeFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), `${JSON.stringify({ criticVerifyLifecycleId: "d".repeat(64) })}\n`);
+    mkdirSync(join(f.root, ".git/agent-pipeline/critic-verify-lifecycle"), { recursive: true });
+    writeFileSync(join(f.root, `.git/agent-pipeline/critic-verify-lifecycle/${"d".repeat(64)}.json`), JSON.stringify({ critic: { packetId: f.packetId } }));
+    const done = oneShotClose(resumed, { runCommand: f.runner });
+    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
+    assert.deepEqual(done.pushEvidence.argv.slice(1), ["--root", f.root, "--mode", "release", "--critic-packet-id", f.packetId, "--critic-evidence-feature-id", "feature-abc", "--out", "evidence/verify-latest.json"]);
+    assert.match(done.pushEvidence.argv[0], /verify-evidence-producer\.mjs$/u);
+    assert.doesNotMatch(done.pushEvidence.note, /aside/u);
+    mkdirSync(join(f.root, "evidence"), { recursive: true }); writeFileSync(join(f.root, "evidence/verify-latest.json"), "{}\n");
+    const again = oneShotClose(resumed, { runCommand: f.runner });
+    assert.match(again.pushEvidence.note, /move the existing evidence\/verify-latest\.json aside/u);
+    assert.deepEqual(forbidden(f.calls), []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed repair on stderr with exit 2; a bad flag is a usage refusal", () => {
   const f = oneShotFixture({ closed: true });
   try {

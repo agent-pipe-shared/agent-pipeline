@@ -241,6 +241,24 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   }
   const common = () => { const value = rawGit(["rev-parse", "--git-common-dir"]); return value === null ? null : resolve(root, value); };
   const failedText = (out) => String(out?.stderr ?? "").trim() || String(out?.stdout ?? "").trim() || "no output";
+  // The Critic packet this close was bound to, read back from its audit request and the Critic/Verify receipt that request names; null when either is unreadable.
+  const packetOfAuditRequest = (path) => {
+    try {
+      const lifecycle = JSON.parse(readFileSync(resolve(root, path), "utf8")).criticVerifyLifecycleId;
+      const receipt = JSON.parse(readFileSync(join(common(), "agent-pipeline", "critic-verify-lifecycle", `${lifecycle}.json`), "utf8"));
+      const known = receipt?.critic?.packetId ?? receipt?.receipt?.critic?.packetId;
+      return HEX32.test(known ?? "") ? known : null;
+    } catch { return null; }
+  };
+  // CGF-21: the push gate reads evidence/verify-latest.json bound to the Critic, which the close never writes; the run had to search for the flags. Named at closed-local instead. Never run here: push stays separate.
+  const pushEvidenceStep = (closedId) => {
+    const packet = criticPacketId ?? packetOfAuditRequest(`specs/${closedId}/evidence/audit-request.json`);
+    if (packet === null) return {};
+    const out = "evidence/verify-latest.json";
+    const argv = [VERIFY_PRODUCER, "--root", root, "--mode", "release", "--critic-packet-id", packet, "--critic-evidence-feature-id", closedId, "--out", out];
+    const aside = existsSync(resolve(root, out)) ? ` The producer never overwrites, so first move the existing ${out} aside.` : "";
+    return { pushEvidence: { executable: "node", argv, command: `node ${argv.join(" ")}`, note: `Before push-init: this produces the Critic-bound Verify the push gate reads, at the current HEAD.${aside}` } };
+  };
 
   // ---- before the commit: Verify evidence, package, Result block, audit request, then the close itself -------------------------------------------------
   let id = resumeLifecycleId;
@@ -265,14 +283,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     const again = requalify ? resumeLifecycleId : null;
     if (resumeLifecycleId === null || requalify) {
       let packet = criticPacketId;
-      if (packet === null && requalify) {
-        try {
-          const lifecycle = JSON.parse(readFileSync(resolve(root, auditRequestPath), "utf8")).criticVerifyLifecycleId;
-          const receipt = JSON.parse(readFileSync(join(common(), "agent-pipeline", "critic-verify-lifecycle", `${lifecycle}.json`), "utf8"));
-          const known = receipt?.critic?.packetId ?? receipt?.receipt?.critic?.packetId;
-          if (HEX32.test(known ?? "")) packet = known;
-        } catch { packet = null; }
-      }
+      if (packet === null && requalify) packet = packetOfAuditRequest(auditRequestPath);
       if (packet === null) {
         let found = [];
         try { const dir = common(); found = (deps.listCriticPackets ?? ((c) => readdirSync(join(c, "agent-pipeline", "critic-packets"))))(dir).filter((name) => HEX32.test(name)).sort(); } catch { found = []; }
@@ -444,7 +455,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     phase = "closed-local";
   }
   if (phase === "closed-local" || phase === "delivered" || phase === "release-eligible" || phase === "promoted") {
-    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, message: "The feature is closed locally. Publication, push and release are separate human-gated steps and were not touched." });
+    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, ...pushEvidenceStep(closedFeatureId), message: "The feature is closed locally. Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init." });
   }
   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
 }
