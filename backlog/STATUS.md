@@ -174,6 +174,7 @@
 | pipeline.budget-exhaustion-is-a-checkpoint-the-elephant-answers-not-a-failed-stop | open | defect | pipeline | alfred | 2026-10-27 | — | — |
 | pipeline.budget-guard-test-suite-silent-pass | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- guard-dispatch-budget.test.mjs imports its module at the test file's own module scope. If that guard's entrypoint gate ever regresses to an unconditional top-level body, the import calls process.exit at module-evaluation time and node --test reports the whole file as ONE PASSING TEST with no assertion having run. The sibling suite guard-dispatch.test.mjs had the identical shape and it was removed in e4aeb8fe; this one was on that package's no-go list and was carried forward in a commit message body, which is not a tracked mitigation. |
 | pipeline.calibration-twins-should-have-one-canonical-writer-and-a-derived-copy | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — two tracked calibration authorities multiply review/signature work and make a small configuration repair look like two unrelated protected changes. |
+| pipeline.candidate-22-open-follow-ups | open | defect | pipeline | alfred | 2026-11-09 | — | — |
 | pipeline.candidate11-follow-ups | open | workflow-improvement | pipeline | alfred | 2026-10-30 | — | — |
 | pipeline.canonical-verify-evidence-path | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.canonical-worktree-lifecycle | closed | defect | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
@@ -1079,7 +1080,7 @@
 
 ## Counts
 
-- open: 383
+- open: 384
 - in_progress: 0
 - closed: 674
 - rejected: 3

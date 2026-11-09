@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "029729fd8dd0a45fe941ca33acddcd48f859ead3c57cf50d7d811b8594cefed3"
+    "transitionHead": "34bfd30ce6d5874736e662f5c3c903bd440e8d5c99bcffae61aa9f809bc85f1f"
   },
   "counts": {
-    "open": 383,
+    "open": 384,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -2105,6 +2105,16 @@
       "closureRepository": "self",
       "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
       "closureEvidence": "backlog/evidence/2026-09-18-installed-plugin-and-calibration-twins-closure.md"
+    },
+    {
+      "id": "pipeline.candidate-22-open-follow-ups",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-11-09",
+      "source": "Elephant triage of the Claude and Codex greenfield reports and their loop chapters while building candidate 22; the chain is in specs/sprint-alfred-epic/evidence/held-patches/c22-chain/",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.candidate11-follow-ups",
