@@ -1,0 +1,82 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+index 3a3d826ef3a246c77800c27afdecf8a76ab97b9e..6d6d54cdfc8f35ac86704476eb0fe5e26ade0422 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+@@ -701,7 +701,7 @@ export function criticCoverageAdvisory({ records = [], totalCount = records.leng
+       line: `Critic coverage could not be checked early: ${unavailable}; the feature close still refuses a Critic-required record without covering evidence (CLOSE-CRITIC-EVIDENCE-MISSING).` };
+   }
+   if (!Array.isArray(records) || records.length === 0) return null;
+-  const nextStep = `a passed, consumed Critic receipt must cover each record (the receipt of its own task id, or a Critic course whose reviewed range contains its commit, or the last round of a registered Critic course whose rounds together contain its commit; a failed receipt never binds without a PO residual acceptance, which a course closed that way carries; run the Critic dispatch when none does), then write the byte-bound addendum with ${CRITIC_ADDENDUM_COMMAND} (the request file is the pipeline.critic-disposition-addendum.v1 object; see the close-feature skill); the feature close refuses with CLOSE-CRITIC-EVIDENCE-MISSING until then, and this notice itself refuses nothing`;
++  const nextStep = `a passed, consumed Critic receipt must cover each record (the receipt of its own task id, or a Critic course whose reviewed range contains its commit, or the last round of a registered Critic course whose rounds together contain its commit; a failed receipt never binds without a PO residual acceptance, which a course closed that way carries; run the Critic dispatch when none does). Do not build the addenda by hand now: the feature close writes the byte-bound addendum of every record exactly one consumed receipt covers and stops once with CLOSE-CRITIC-ADDENDA-WRITTEN, naming the one evidence-only commit. Only a record it cannot derive stays refused with CLOSE-CRITIC-EVIDENCE-MISSING; for that record write it with ${CRITIC_ADDENDUM_COMMAND} (the request file is the pipeline.critic-disposition-addendum.v1 object; see the close-feature skill). This notice itself refuses nothing`;
+   const named = records.map((entry) => `${entry.recordPath} (${entry.appliedRow ?? "Critic required"}, commit ${String(entry.candidateCommit).slice(0, 12)})`).join(", ");
+   const omitted = totalCount > records.length ? ` and ${totalCount - records.length} more` : "";
+   return { schema: CRITIC_COVERAGE_ADVISORY_SCHEMA, code: "CRITIC-COVERAGE-PENDING", severity: "advisory", totalCount, records, command: CRITIC_ADDENDUM_COMMAND, nextStep,
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+index a72853c72ddf9cdd4d1592541929ec9eb3b4d43c..22dc8db0a98f9f2113df3a6b72932db2fc061e15 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+@@ -821,6 +821,8 @@ check("N33B an attested request writes the record and its result carries a typed
+     assert.ok(advisory.line.includes("NVA-ATT-1") && advisory.line.includes(N33B_COMMAND) && !advisory.line.includes("\n"), advisory.line);
+     assert.match(advisory.nextStep, /passed, consumed Critic receipt/u);
+     assert.match(advisory.nextStep, /CLOSE-CRITIC-EVIDENCE-MISSING/u);
++    assert.match(advisory.nextStep, /Do not build the addenda by hand now/u); // measured: two runs followed this text and scripted the addenda the close writes itself
++    assert.match(advisory.nextStep, /CLOSE-CRITIC-ADDENDA-WRITTEN/u);
+     // The feature close names the same command: one spelling, no second version that could drift.
+     assert.ok(readFileSync(join(import.meta.dirname, "close-coordinator.mjs"), "utf8").includes(N33B_COMMAND), "close-coordinator.mjs must spell the same command");
+   } finally { rmSync(root, { recursive: true, force: true }); }
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 9f387a687f067df32aa2faee54fe158de554e459..2665dea1ec3a522a6d8b06cb6b3eb8677e8e142b 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -447,7 +447,7 @@ function parse(argv) {
+   const value = {};
+   for (let i = 0; i < argv.length; i += 2) {
+     const flag = argv[i]; const next = argv[i + 1];
+-    if (!["--root", "--by", "--architecture-impact", "--audit-request", "--critic-verify-lifecycle", "--continuity-close-request", "--resume-lifecycle-id"].includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --root <repo> --by <name> --architecture-impact <value> --audit-request <repo-relative-json> --critic-verify-lifecycle <receipt-id> [--continuity-close-request <repo-relative-json>] [--resume-lifecycle-id <id>]");
++    if (!["--root", "--by", "--architecture-impact", "--audit-request", "--critic-verify-lifecycle", "--continuity-close-request", "--resume-lifecycle-id"].includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] (the normal close on every runner; it collects the evidence itself). With every input already at hand: finish-feature.mjs --root <repo> --by <name> --architecture-impact <value> --audit-request <repo-relative-json> --critic-verify-lifecycle <receipt-id> [--continuity-close-request <repo-relative-json>] [--resume-lifecycle-id <id>]");
+     value[flag] = next;
+   }
+   return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], auditRequest: value["--audit-request"], criticVerifyLifecycle: value["--critic-verify-lifecycle"], continuityCloseRequest: value["--continuity-close-request"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null };
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 9ba763d9689155e1a8bf8bc4b975f504dde94f5b..93e8f551b48041f9f0ebf74432a9bab470774f47 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -500,6 +500,8 @@ test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed re
+     assert.match(stopped.stderr, /ONESHOT-NO-ACTIVE-FEATURE/u); assert.match(stopped.stderr, /^repair: /mu);
+     const usage = spawnSync(process.execPath, [script, "--one-shot", "--root", f.root, "--bogus", "x"], { encoding: "utf8" });
+     assert.equal(usage.status, 2); assert.match(usage.stderr, /FINISH-USAGE/u);
++    const help = spawnSync(process.execPath, [script, "--help"], { encoding: "utf8" }); // measured: a run asked --help and was never told of the one-shot entry
++    assert.equal(help.status === 0, false); assert.match(help.stderr, /finish-feature\.mjs --one-shot --by/u);
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 7b568bd1cdc9e5f0e477115ffa195b5ab8d728e1..176af4035282a810778827ace5ec68e0ce5e9da9 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -84,7 +84,11 @@ passing evidence for exactly HEAD) and again with `--next-state completed`.
+ The planner also refuses `CLOSE-CRITIC-EVIDENCE-MISSING` for a delivery-course
+ dispatch record that requires a Critic and carries no bound evidence (an
+ orchestrator-attested record included). A record is immutable, so the evidence
+-is a separate addendum. Write one request file under `scratch/`, `evidence/` or
++is a separate addendum. **Do not build these ahead of the close:** the planner
++writes the addendum of every record exactly one consumed receipt covers, stops
++once with `CLOSE-CRITIC-ADDENDA-WRITTEN` and names the one evidence-only commit;
++commit those paths and run the close again. Only for a record that stays refused
++afterwards, write one request file under `scratch/`, `evidence/` or
+ `specs/` holding the `pipeline.critic-disposition-addendum.v1` object
+ (`recordPath`, `recordSha256`, `taskId`, `candidateCommit`,
+ `reviewCandidateCommit`, `criticPacketId`, `criticReceiptSha256`, and a
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index e3448ed27d76cbb2b5313938a3dc24a58a75ff12..51c83d60d3ae19b3f67ec2f57b97a0bb67e92848 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -111,7 +111,7 @@ Owner: `skills/close-feature/SKILL.md`. **The normal entry on every runner is on
+ 
+ `finish-feature.mjs --one-shot --by <name> --architecture-impact <impact> [--root <root>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>]`
+ 
+-It collects the close evidence itself, in this order: candidate Verify bound to the Critic packet, its registration, the package moves to `verifying` and `completed`, the audit request, the Continuity Result bootstrap where the feature needs one, and the coordinator phases. It stops before Verify when the Critic acknowledgement is missing, prints the one commit the close needs, and every stop names its code and the rerun command. A rerun after a commit qualifies the new HEAD again.
++It collects the close evidence itself, in this order: candidate Verify bound to the Critic packet, its registration, the package moves to `verifying` and `completed`, the audit request, the Continuity Result bootstrap where the feature needs one, and the coordinator phases. It stops before Verify when the Critic acknowledgement is missing, prints the one commit the close needs, and every stop names its code and the rerun command. The Critic addenda of the dispatch records are its job as well: do not build them ahead (a `CRITIC-COVERAGE-PENDING` notice asks for nothing yet); the close writes them and stops once with `CLOSE-CRITIC-ADDENDA-WRITTEN` and the commit. A rerun after a commit qualifies the new HEAD again.
+ 
+ The single steps below are what it runs; use them for a recovery or when a stop names one. The coordinator returns the exact argv for each step; run it as returned, do not rebuild it from prose.
+ 
