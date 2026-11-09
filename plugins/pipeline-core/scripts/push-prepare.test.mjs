@@ -21,7 +21,7 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { after, test } from "node:test";
@@ -97,6 +97,25 @@ test("C21F parseArgs: --close beside the push flags says to run it alone, in any
   for (const argv of [["--close", "--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main", "--close"]]) {
     assert.match(parseArgs(argv).error, /--close takes no other flag/u);
   }
+});
+
+test("C21F: every flag the push flow document shows for a Pipeline script is one that script reads", () => {
+  const scripts = new URL("./", import.meta.url);
+  const document = readFileSync(new URL("../docs/push-release-flow.md", import.meta.url), "utf8");
+  const missing = [];
+  let checked = 0;
+  for (const [, script, rest] of document.matchAll(/([a-z][a-z0-9-]*\.mjs)\b([^`\n]*)/gu)) {
+    const target = new URL(script, scripts);
+    if (!existsSync(target)) continue;
+    const source = readFileSync(target, "utf8");
+    for (const flag of rest.split(/[a-z][a-z0-9-]*\.mjs\b/u)[0].match(/--[a-z][a-z0-9-]*/gu) ?? []) {
+      const name = flag.slice(2);
+      checked += 1;
+      if (![flag, `flags.${name}`, `flags["${name}"]`, `"${name}"`, `${name}:`, `values.${name}`, `values["${name}"]`].some((form) => source.includes(form))) missing.push(`${script} ${flag}`);
+    }
+  }
+  assert.ok(checked > 10, `only ${checked} documented flags were found`);
+  assert.deepEqual([...new Set(missing)], []);
 });
 
 test("parseArgs: refuses a missing --by", () => {
