@@ -1296,6 +1296,13 @@ export function completeNativeGoldfishAuthority({repository:given,terminalHandle
   });
 }
 
+/** The re-grounding line for a readback that observed no owners. The first governed dispatch creates the registry (D44), and a plugin update or a repair moves it aside, so its absence blocks nothing. */
+export function itemDeliveryUnobservedLine(code){
+  return code==='SQ-ITEM-REGISTRY-UNAVAILABLE'
+    ?'Item delivery: no session-authority registry exists yet, so no owner is recorded. The next governed dispatch creates it; nothing is blocked.'
+    :`Item delivery: ${code}; ownership readback required before productive admission.`;
+}
+
 /** Bounded readback; producer references come from the actual authority owner. */
 export function inspectNativeGoldfishItemDelivery({root}={}) {
   try {

@@ -401,16 +401,6 @@ async function locateKeyDirectory(rootDir, signingDeps) {
   return { directory: null, legacy: false, invalid: null };
 }
 
-const CLOUD_SYNC_SEGMENTS = Object.freeze([[/^onedrive/iu, "OneDrive"], [/^dropbox/iu, "Dropbox"], [/^icloud ?drive$/iu, "iCloud"], [/^mobile documents$/iu, "iCloud"], [/^google ?drive$/iu, "Google Drive"], [/^cloudstorage$/iu, "a macOS cloud provider"]]);
-
-/** The sync provider whose folder holds `directory`, by path segment, or null. Exported for its test. */
-export function cloudSyncProvider(directory) {
-  for (const segment of String(directory).split(/[\\/]/u)) {
-    for (const [pattern, provider] of CLOUD_SYNC_SEGMENTS) if (pattern.test(segment)) return provider;
-  }
-  return null;
-}
-
 /** One signing-readiness observation per report, shared by the three signing findings. */
 function observeSigning(context) {
   context.signing ??= (async () => {
@@ -427,12 +417,8 @@ function observeSigning(context) {
       byId.set("po-key-directory", located.invalid ?? approval.keyDirectoryUnsetFinding());
       byId.delete("trust-anchor-match");
     }
-    // Claude greenfield report: the private key sat in a cloud-synced folder and nothing said so. This report never gates and never reaches
-    // sign-intent, so a warning here cannot stop a signature. Only the provider is named, the path stays unprinted.
-    const provider = located.directory === null ? null : cloudSyncProvider(located.directory);
-    if (provider !== null && byId.get("po-key-directory")?.status === "ok") {
-      byId.set("po-key-directory", { findingId: "po-key-directory", status: "attended", cause: `key-directory-cloud-synced: the PO key directory lies in a folder synchronised by ${provider}, so the private key leaves this machine`, repair: attendedPrerequisite("po-key-directory-local", "move the key directory to a local folder outside any synchronised location, point the PO key directory at it in your own terminal, then re-run the readiness report.") });
-    }
+    // PO decision 2026-11-09: a key directory in a synchronised folder is fine; the requirement is only that it lies outside the repository
+    // (enforced by po-human-approval.mjs), so this report no longer warns about the folder.
     return byId;
   })();
   return context.signing;

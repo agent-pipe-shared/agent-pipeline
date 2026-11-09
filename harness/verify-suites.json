@@ -1274,7 +1274,8 @@
         "caseIds": [
           "NGHS06",
           "NGHS07",
-          "NGHS08"
+          "NGHS08",
+          "NGHS09"
         ],
         "maxBytes": 65536
       }

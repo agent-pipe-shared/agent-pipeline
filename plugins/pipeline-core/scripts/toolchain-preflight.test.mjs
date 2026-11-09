@@ -782,16 +782,9 @@ check("R7-6n: an invalid legacy per-repository store is a failure, never absent"
     rmSync(base, { recursive: true, force: true, maxRetries: 3 });
   }
 });
-check("CGR-04: a synchronised folder is named by its provider, an ordinary folder by nobody", async () => {
-  const { cloudSyncProvider } = await import("./toolchain-preflight.mjs");
-  assert.equal(cloudSyncProvider(join("C:", "Users", "someone", "OneDrive - Contoso", "keys")), "OneDrive");
-  assert.equal(cloudSyncProvider("/home/someone/Dropbox/keys"), "Dropbox");
-  assert.equal(cloudSyncProvider("/Users/someone/Library/Mobile Documents/keys"), "iCloud");
-  assert.equal(cloudSyncProvider("/home/someone/Google Drive/keys"), "Google Drive");
-  assert.equal(cloudSyncProvider("/home/someone/.config/po-keys"), null);
-  assert.equal(cloudSyncProvider("/home/someone/my-onedrive-notes/keys"), null, "only a segment that starts with the provider counts");
-});
-check("CGR-04: a key directory in a synchronised folder is reported without its path and without a sign-intent effect; the same directory elsewhere stays as it was", async () => {
+// QG-04, restated 2026-11-09 by PO decision: a key directory in a synchronised folder is fine, only "outside the repository" is required. The former
+// provider-name case and the `attended` expectation pinned the withdrawn warning.
+check("CGR-04: a key directory in a synchronised folder reads the same as anywhere else outside the repository", async () => {
   const base = mkdtempSync(join(tmpdir(), "cgr04-"));
   const savedEnv = process.env[R76J_ENV];
   try {
@@ -806,11 +799,9 @@ check("CGR-04: a key directory in a synchronised folder is reported without its 
     const report = await r76tReport(fixture);
     const finding = report.findings.find((entry) => entry.findingId === "po-key-directory");
     if (plainFinding.status === "ok") {
-      assert.equal(finding.status, "attended", JSON.stringify(finding));
-      assert.match(String(finding.cause), /^key-directory-cloud-synced/u);
-      assert.match(String(finding.cause), /OneDrive/u);
+      assert.equal(finding.status, "ok", JSON.stringify(finding));
+      assert.doesNotMatch(JSON.stringify(finding), /cloud-synced/u);
       assert.doesNotMatch(JSON.stringify(finding), /Contoso/u, "the machine path stays unprinted");
-      assert.equal(finding.repair?.prerequisite, "po-key-directory-local");
     } else {
       assert.fail(`the fixture must be ok outside the synchronised folder, got ${plainFinding.status}: ${String(plainFinding.cause).slice(0, 120)}`);
     }

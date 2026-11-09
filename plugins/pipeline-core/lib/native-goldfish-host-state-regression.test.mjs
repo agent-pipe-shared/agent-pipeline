@@ -5,7 +5,7 @@ import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
-import { bindNativeCodexStart, prepareNativeGoldfishHostState,
+import { bindNativeCodexStart, itemDeliveryUnobservedLine, prepareNativeGoldfishHostState,
   readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
 
@@ -111,6 +111,12 @@ const cases = [
     assert.equal(readNativeCodexPending({ commonDir, input: { hook_event_name: "SubagentStop",
       session_id: "session-ambiguous-worker", agent_id: "child-ambiguous" } }).code, "NGHS-CODEX-PENDING-MISSING");
   }) },
+  { id: "NGHS09", name: "an absent registry reads as nothing blocked, every other readback failure keeps asking for the ownership readback", run: () => {
+    const absent = itemDeliveryUnobservedLine("SQ-ITEM-REGISTRY-UNAVAILABLE");
+    assert.match(absent, /next governed dispatch creates it; nothing is blocked/u);
+    assert.doesNotMatch(absent, /readback required|SQ-ITEM-REGISTRY-UNAVAILABLE/u);
+    assert.equal(itemDeliveryUnobservedLine("SDC-AUTHORITY-UNAVAILABLE"), "Item delivery: SDC-AUTHORITY-UNAVAILABLE; ownership readback required before productive admission.");
+  } },
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
