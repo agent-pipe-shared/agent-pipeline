@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -95,6 +95,17 @@ test("D167-PF78 (1) the producer accepts evidence/ and specs/<id>/evidence/ and 
     assert.throws(() => produceCriticDiagnostic({ ...options(f), logPath: "evidence/t2.log", fullVerifyPath: "spec.md" }), /CDI-PATH|CDI-OUTPUT-PATH/u);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
+test("C21B a --full-verify path outside the evidence folders is refused before the capture, names the repair, and leaves no log for the retry to trip over", () => {
+  const f = fixture();
+  try {
+    assert.throws(() => produceCriticDiagnostic({ ...options(f), logPath: "evidence/retry.log", fullVerifyPath: "scratch/verify.json" }), /CDI-PATH: --full-verify scratch\/verify\.json must lie under evidence\/.*--pending full-verify/u);
+    assert.equal(existsSync(join(f.root, "evidence/retry.log")), false, "the failed attempt must leave no log");
+    mkdirSync(join(f.root, "evidence"), { recursive: true });
+    writeFileSync(join(f.root, "evidence/taken.log"), "x");
+    assert.throws(() => produceCriticDiagnostic({ ...options(f), logPath: "evidence/taken.log" }), /CDI-OUTPUT-EXISTS: evidence\/taken\.log already exists.*new --log or --out name/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("D167-PF78 (4) the shared predicate agrees with the producer for a table of paths and the registrar uses it", () => {
   const f = fixture();
   try {

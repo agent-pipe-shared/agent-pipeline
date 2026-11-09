@@ -45,7 +45,7 @@ export function newDiagnosticPath(root, path) {
     at = resolve(at, part);
     if (existsSync(at) && lstatSync(at).isSymbolicLink()) fail("CDI-OUTPUT-PATH");
   }
-  if (existsSync(at)) fail("CDI-OUTPUT-EXISTS");
+  if (existsSync(at)) fail("CDI-OUTPUT-EXISTS", `${path} already exists and evidence is never overwritten; pass a new --log or --out name.`);
   return at;
 }
 function git(root, args) {
