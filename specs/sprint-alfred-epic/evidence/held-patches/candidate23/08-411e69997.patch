@@ -1,0 +1,123 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 0631e6a6463e2db347013a3e9abcdde12dfd1a68..698c71be65f0c7ebacf4761872e79182c983671c 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -362,6 +362,7 @@ test("a not-ready session admits the help flag of a script that answers it and r
+       const refused = evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${rest.join(" ")}`), dependencies);
+       assert.equal(refused.exitCode, 2, tail);
+       assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u, tail);
++      assert.match(refused.stderr, { "project-reset.mjs --help": /project-reset\.mjs has no help: --help would run the script itself/u, "close-coordinator.mjs -h": /close-coordinator\.mjs answers --help, not -h/u }[tail] ?? /^(?![\s\S]*has no help:)/u, tail);
+     }
+   } finally { rmSync(path, { recursive: true, force: true }); }
+ });
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 32dcf59357382faf4498567b32bdb08a18ad244b..9fda77cfc5664c99810f9d1078586c9e5c1392ad 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -668,6 +668,18 @@ function isAnsweredScriptHelp(script, args, options) {
+   return name !== null && SCRIPTS_ANSWERING_HELP.get(name)?.includes(args[0]) === true;
+ }
+ 
++/** PO tile 2026-11-09: what a refusal owes a usage question on a plugin script that cannot answer it, instead of a sentence about the lifecycle; null for every other command. */
++export function scriptHelpRefusalHint(command, root, options = {}) {
++  const resolved = resolveSanctionedScriptInvocation(command, root, options);
++  if (resolved === null || resolved.args.length !== 1 || !["--help", "-h"].includes(resolved.args[0])) return null;
++  const name = relativeUnderRoot(resolved.script, PLUGIN_SCRIPTS_DIR, { platform: options.platform ?? process.platform, lstatFn: options.lstatFn });
++  if (name === null || name === "" || name.includes("/") || !name.endsWith(".mjs")) return null;
++  try { if (!lstatSync(join(PLUGIN_SCRIPTS_DIR, name)).isFile()) return null; } catch { return null; }
++  const flags = SCRIPTS_ANSWERING_HELP.get(name);
++  if (flags !== undefined) return `${name} answers ${flags.join(" and ")}, not ${resolved.args[0]}: ask with that flag. This refusal is about the flag, not about the feature's lifecycle.`;
++  return `${name} has no help: ${resolved.args[0]} would run the script itself, so it is refused here. This refusal is about that, not about the feature's lifecycle. Read the comment at the top of ${resolved.script} for its usage.`;
++}
++
+ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (isAnsweredScriptHelp(script, args, options)) return true;
+   if (script === PROOF_WAIT_SCRIPT) return sanctionedProofWaitArgs(args, root);
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+index d878543d048684d6e7b52a08f2c770edd4645cb0..f82bbd4d0e83982c89fcdb42c9b71f34542a2fc6 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+@@ -12,7 +12,7 @@ import { PIPELINE_STATE_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT } from "./consta
+ import { isReadOnlyDiagnosticCommand, simpleWords } from "./shell-grammar.mjs";
+ import { verdict } from "./verdict.mjs";
+ import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
+-import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand, observedOnboardingCommandMatch, resolveBoundArtifactPublicationInvocation, sameNodeInterpreter } from "./command-catalogue.mjs";
++import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand, observedOnboardingCommandMatch, resolveBoundArtifactPublicationInvocation, sameNodeInterpreter, scriptHelpRefusalHint } from "./command-catalogue.mjs";
+ 
+ /**
+  * GUARD-DEVPLAN-SHELL -- the `Bash|PowerShell` lane of the Dev-Plan-Gate (`guard-devplan.mjs`),
+@@ -182,7 +182,8 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
+         const reason = absoluteNode && typeof named === "string"
+           ? `${named}\nUse the bare \`node\` (not an absolute path to it): \`node scratch/<name>.mjs\` is the admitted draft-phase scratch-script shape.`
+           : named;
+-        return { ...result, ...(reason === undefined ? {} : { reason }), candidate, lane };
++        const helpHint = lane === "opaque-script-execution" && toolName === "Bash" ? scriptHelpRefusalHint(command, root, lifecycleOptions) : null;
++        return { ...result, ...(reason === undefined ? {} : { reason }), candidate, lane, ...(helpHint === null ? {} : { helpHint }) };
+       }
+       // D117 / BI: the first advisory is remembered, a later block still wins, and one command yields ONE advisory.
+       if (advisory === null && typeof result.advisory === "string") {
+@@ -308,6 +309,9 @@ function powerShellDevPlanWriteTargets(command, root, extracted) {
+  * one-owner discipline `lib/guard-devplan-policy.mjs`'s own header describes.
+  */
+ export function devPlanShellBlocked(hit, overrideGuidance) {
++  if (typeof hit.helpHint === "string") {
++    return verdict(2, `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${DEVPLAN_SHELL_DENIAL_CODE}: ${hit.helpHint}\n${overrideGuidance ?? ""}`);
++  }
+   return verdict(
+     2,
+     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+index 8a523d8dec39553f8ee8a7fbc9df3e0a7a1f4e07..6c094167095ba88c5c6b1219f4e1bd8b4fbf540b 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+@@ -4,7 +4,7 @@
+ import assert from 'node:assert/strict';
+ import { join } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+-const { devPlanShellRefusalHit } = await import(new URL('./devplan-shell-lane.mjs', import.meta.url));
++const { devPlanShellBlocked, devPlanShellRefusalHit } = await import(new URL('./devplan-shell-lane.mjs', import.meta.url));
+ const { parseGuardCommand } = await import(new URL('../../hooks/guard-command-grammar.mjs', import.meta.url));
+ const { isExactObservedOnboardingNextAction, isSanctionedLifecycleCommand } = await import(new URL('./command-catalogue.mjs', import.meta.url));
+ import { registerTestCaseCompletion } from '../test-case-completion.mjs';
+@@ -79,6 +79,18 @@ for (const [name, metadata] of [
+   assert.equal(hit?.verdict, 'block', 'the draft recovery corridor is read-only and confirmation-free');
+   assert.equal(hit?.lane, 'opaque-script-execution');
+ });
++// PO 2026-11-09: in draft a usage question passes when the script answers it, and otherwise the refusal says why instead of talking about implementation writes.
++check('draft shell admits a help question the script answers and explains the one it cannot', () => {
++  const reset = fileURLToPath(new URL('../../scripts/project-reset.mjs', import.meta.url));
++  assert.equal(devPlanShellRefusalHit(`node ${script} --help`, root, dependencies()), null);
++  const hit = devPlanShellRefusalHit(`node ${reset} --help`, root, dependencies());
++  assert.equal(hit?.verdict, 'block');
++  assert.match(hit?.helpHint ?? '', /project-reset\.mjs has no help: --help would run the script itself/u);
++  const rendered = devPlanShellBlocked(hit, '').stderr;
++  assert.match(rendered, /GUARD-DEVPLAN-SHELL: project-reset\.mjs has no help/u);
++  assert.doesNotMatch(rendered, /shell write to a dev-plan-gated path/u);
++  assert.equal(devPlanShellRefusalHit(`node ${reset} --root x`, root, dependencies())?.helpHint, undefined);
++});
+ 
+ 
+ const { mkdirSync } = await import('node:fs');
+diff --git a/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs b/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
+index ff1fb999f3baf790faca3aeb666fde1fceea9bce..54793b91f62f6497871045c6651dc2c2d138b769 100644
+--- a/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
++++ b/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
+@@ -13,7 +13,7 @@ import { blocked, externalRestartOnly } from "./denial-route.mjs";
+ import { isBootstrapBindingScratchWrite, isIntakeLifecycleScratchMkdir, isIntakeLifecycleScratchWrite, isPartialLifecycleIncidentReportWrite, isPartialLifecycleScratchDirCreate, isRestartResumeHintCapture, isRestartResumeHintInputWrite, isRestartResumeHintInspect, restartResumeHintNearMissWrite, isHalfMovedRepairCommand, w04IsNonAuthorityRecordWrite } from "./write-scope.mjs";
+ import { architectureAdoptionAuthorityVerdict, architectureFitnessAuthorityVerdict, fitnessModelQualificationObservation, minimumRigorObservation } from "./entry-gates.mjs";
+ import { rootIdentityMismatch } from "./sanctioned-args-onboarding.mjs";
+-import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
++import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand, scriptHelpRefusalHint } from "./command-catalogue.mjs";
+ import { isSanctionedGovernanceScopeDiagnosticInvocation } from "./sanctioned-args-scripts.mjs";
+ import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice } from "./rebase-lane.mjs";
+ 
+@@ -360,7 +360,8 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
+         "",
+         null,
+         null,
+-        restartResumeHintNearMissHint ?? rootIdentityMismatchHint,
++        restartResumeHintNearMissHint ?? rootIdentityMismatchHint
++          ?? (toolName === "Bash" ? scriptHelpRefusalHint((input.tool_input.command ?? input.tool_input.CommandLine), root) : null),
+         invalidObservation,
+         true,
+         sessionCapabilityFailurePhase,

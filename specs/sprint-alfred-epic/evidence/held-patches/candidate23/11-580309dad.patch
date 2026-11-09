@@ -1,0 +1,306 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 368a3d91ad30276ec4c4ff1b0ce9d51616e46c4a..0c6d035dc3e05e1e7a23c7e43d1095639df371b3 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync
+ import { tmpdir, devNull } from "node:os";
+ import { join } from "node:path";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+-import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureLock } from "./native-goldfish-host-finalizer.mjs";
++import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "./native-goldfish-host-finalizer.mjs";
+ import { sessionAuthorityLockFacts } from "./native-goldfish-host-state.mjs";
+ import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
+ import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState, prepareNativeGoldfishAuthorityTerminal } from "./native-goldfish-host-state.mjs";
+@@ -99,6 +99,19 @@ function spawnStopHook({ root, commonDir, binding, writeMeta, stopInput }, { out
+     env: { ...process.env, CLAUDE_PROJECT_DIR: root }, encoding: "utf8" });
+   return { status: run.status, stdout: run.stdout, stderr: run.stderr };
+ }
++// C23 (AC-108): the PreToolUse hook entry for the child's own SubagentHandback call. The input mirrors a subagent PreToolUse payload: the
++// PARENT session id and transcript path, plus the child's agent_id and agent_type (the shape guard-dispatch-budget measured).
++const handbackPre = ({ root, binding, stopInput }, message, over = {}) => ({ hook_event_name: "PreToolUse", session_id: "session-claude",
++  transcript_path: stopInput(binding, "x").transcript_path, cwd: root, agent_id: "agent-bg", agent_type: binding.role,
++  tool_name: "SubagentHandback", tool_use_id: "toolu-handback-1", tool_input: { message }, ...over });
++function spawnHandbackHook(root, input, { raw = null, env = {} } = {}) {
++  const run = spawnSync(process.execPath, [hookScript, "--runner", "claude"], { input: raw ?? JSON.stringify(input),
++    env: { ...process.env, CLAUDE_PROJECT_DIR: root, ...env }, encoding: "utf8" });
++  return { status: run.status, stdout: run.stdout, stderr: run.stderr };
++}
++const cutReturn = (binding, over = {}) => { const full = finalText(binding, over); return full.slice(0, full.indexOf(",\"changedPaths\"")); };
++const handbackWriteMeta = (ctx, agentType = "goldfish-implementor") => ctx.writeMeta("agent-bg", { spawnDepth: 1, agentType, toolUseId: "tool-claude" });
++const refusalFiles = (commonDir) => diagEntries(commonDir).filter((name) => name.startsWith("handback-refusals-"));
+ const diagRecord = (dispatchId, toolUseId) => `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId, toolUseId,
+   status: "not-finalized", code: "NGHR-FINAL-JSON", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`;
+ function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfish-implementor", options = {}) {
+@@ -850,6 +863,122 @@ const cases = [
+       assert.match(text, /process\.once\("exit", \(\) => admissionProgress\("exit"\)\)/u, `${name} marks its exit`);
+     }
+   } },
++  // NGHF43-NGHF49 -- C23 (AC-108): a marked Goldfish's own SubagentHandback is checked while the worker is alive; a broken return is refused with
++  // the cause and a repair sentence, every doubt allows, and the stop-failure record keeps the validator's detail.
++  { id: "NGHF43", name: "C23: a return cut off after the report value is refused at PreToolUse with the code, the position and the repair sentence, and consumes nothing", run: () => fixture((ctx) => {
++    handbackWriteMeta(ctx);
++    const cut = cutReturn(ctx.binding);
++    const before = snapshot(ctx.commonDir);
++    const run = spawnHandbackHook(ctx.root, handbackPre(ctx, cut));
++    assert.equal(run.status, 2, `${run.stderr}${run.stdout}`);
++    assert.equal(run.stdout, "");
++    assert.match(run.stderr, /NGHR-FINAL-JSON/u);
++    assert.match(run.stderr, new RegExp(`position ${cut.length} of ${cut.length} characters`, "u"));
++    assert.match(run.stderr, /json-truncated/u);
++    assert.match(run.stderr, /send the complete JSON object again/iu);
++    assert.match(run.stderr, /shorten report/iu);
++    assert.equal(run.stderr.includes(ctx.root), false, "no host path in the refusal");
++    assert.equal(run.stderr.includes("Implemented and verified"), false, "the return text is not echoed back");
++    assert.equal(snapshot(ctx.commonDir), before, "the host-commit private state is untouched");
++    assert.equal(refusalFiles(ctx.commonDir).length, 1, "the refusal count is kept beside the stop-failure diagnostics");
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF44", name: "C23: a misspelled or missing key is named, and a wrong candidate is refused by the same validator the stop uses", run: () => fixture((ctx) => {
++    handbackWriteMeta(ctx);
++    const { binding } = ctx;
++    const full = JSON.parse(finalText(binding));
++    const { changedPaths, ...rest } = full;
++    const misspelled = spawnHandbackHook(ctx.root, handbackPre(ctx, JSON.stringify({ ...rest, changedPath: changedPaths })));
++    assert.equal(misspelled.status, 2, misspelled.stderr);
++    assert.match(misspelled.stderr, /NGHR-FINAL-SHAPE/u);
++    assert.match(misspelled.stderr, /missing keys changedPaths/u);
++    assert.match(misspelled.stderr, /unexpected keys changedPath\b/u);
++    const foreign = spawnHandbackHook(ctx.root, handbackPre(ctx, finalText(binding, { candidateCommit: "f".repeat(40) })));
++    assert.equal(foreign.status, 2, foreign.stderr);
++    assert.match(foreign.stderr, /condition candidate-commit/u);
++    // A checkpoint outcome is a valid handback here, exactly as at the stop.
++    const checkpoint = spawnHandbackHook(ctx.root, handbackPre(ctx, finalText(binding, { outcome: "checkpoint", report: "Budget stop; continuation card follows." })));
++    assert.equal(checkpoint.status, 0, checkpoint.stderr);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF45", name: "C23: a well-formed return passes PreToolUse silently and the later SubagentStop still commits it once", run: () => fixture((ctx) => {
++    handbackWriteMeta(ctx);
++    const { root, commonDir, binding, dependencies, facts, stopInput } = ctx;
++    const message = finalText(binding);
++    const run = spawnHandbackHook(root, handbackPre(ctx, message));
++    assert.equal(run.status, 0, run.stderr);
++    assert.equal(run.stdout, ""); assert.equal(run.stderr, "");
++    assert.deepEqual(refusalFiles(commonDir), []);
++    const transcript = stopInput(binding, "x").transcript_path;
++    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
++      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message } }] } })}\n`);
++    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, dependencies);
++    assert.equal(result.status, "authored-commit-recorded", result.code);
++    assert.equal(facts.commits, 1);
++    assert.equal(readReceipt(commonDir).assurance, STOP_ASSURANCE);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF46", name: "C23: every doubt allows the call (unmarked child, Critic, other tool, no meta, no or unreadable pending state, foreground state, bad input, unusable root)", run: () => fixture((ctx) => {
++    handbackWriteMeta(ctx);
++    const { root, commonDir, binding } = ctx;
++    const cut = cutReturn(binding);
++    const allowed = (label, input, options) => { const run = spawnHandbackHook(root, input, options); assert.equal(run.status, 0, `${label}: ${run.stderr}`); assert.equal(run.stdout, "", label); assert.equal(run.stderr, "", label); };
++    // The control: the same broken return of a marked child is refused.
++    assert.equal(spawnHandbackHook(root, handbackPre(ctx, cut, { tool_use_id: "toolu-control" })).status, 2);
++    for (const file of refusalFiles(commonDir)) rmSync(join(diagDir(commonDir), file));
++    allowed("unmarked child", handbackPre(ctx, cut, { agent_type: "general-purpose" }));
++    allowed("critic", handbackPre(ctx, cut, { agent_type: "pipeline-core:critic" }));
++    allowed("another tool", handbackPre(ctx, cut, { tool_name: "Read" }));
++    allowed("no message string", handbackPre(ctx, cut, { tool_input: {} }));
++    allowed("message not a string", handbackPre(ctx, cut, { tool_input: { message: 7 } }));
++    allowed("no meta file", handbackPre(ctx, cut, { agent_id: "agent-nometa" }));
++    allowed("foreign session", handbackPre(ctx, cut, { session_id: "session-other" }));
++    allowed("no transcript path", handbackPre(ctx, cut, { transcript_path: undefined }));
++    allowed("orchestrator payload", handbackPre(ctx, cut, { agent_id: undefined, agent_type: undefined }));
++    allowed("stdin is not JSON", null, { raw: "{not json" });
++    allowed("project root does not exist", handbackPre(ctx, cut), { env: { CLAUDE_PROJECT_DIR: join(root, "does-not-exist") } });
++    ctx.writeMeta("agent-orphan", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-never-prepared" });
++    allowed("no pending state", handbackPre(ctx, cut, { agent_id: "agent-orphan" }));
++    const [pendingName] = privateEntries(commonDir, "pending-claude-");
++    writeFileSync(join(privateDir(commonDir), pendingName), "{unreadable");
++    allowed("unreadable pending state", handbackPre(ctx, cut));
++    assert.deepEqual(refusalFiles(commonDir), [], "an allowed call counts nothing");
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF47", name: "C23: a foreground pending state is never touched by the handback check", run: () => fixture((ctx) => {
++    handbackWriteMeta(ctx);
++    const run = spawnHandbackHook(ctx.root, handbackPre(ctx, cutReturn(ctx.binding)));
++    assert.equal(run.status, 0, run.stderr); assert.equal(run.stderr, "");
++    assert.deepEqual(refusalFiles(ctx.commonDir), []);
++  }, "claude", 1, "goldfish-implementor", { background: false }) },
++  { id: "NGHF48", name: "C23: after three refusals the fourth attempt is allowed, and the failure stays visible through the stop path with the validator's detail", run: () => fixture((ctx) => {
++    handbackWriteMeta(ctx);
++    const { root, commonDir, binding, dependencies, facts, stopInput } = ctx;
++    const cut = cutReturn(binding);
++    const statuses = [1, 2, 3, 4, 5].map(() => spawnHandbackHook(root, handbackPre(ctx, cut)).status);
++    assert.deepEqual(statuses, [2, 2, 2, 0, 0]);
++    assert.equal(refusalFiles(commonDir).length, 1);
++    assert.equal(JSON.parse(readFileSync(join(diagDir(commonDir), refusalFiles(commonDir)[0]), "utf8")).refusals, 3);
++    // The allowed fourth message is what the stop reads: today's stop path fails with NGHR-FINAL-JSON, and the record keeps WHY.
++    const transcript = stopInput(binding, "x").transcript_path;
++    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
++      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: cut } }] } })}\n`);
++    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, dependencies);
++    assert.equal(failed.code, "NGHR-FINAL-JSON", JSON.stringify(failed));
++    assert.equal(facts.commits, 0);
++    assert.equal(failed.detail.condition, "json-truncated");
++    const recordName = diagEntries(commonDir).find((name) => name.startsWith("stop-failure-"));
++    const recorded = JSON.parse(readFileSync(join(diagDir(commonDir), recordName), "utf8"));
++    assert.equal(recorded.code, "NGHR-FINAL-JSON");
++    assert.deepEqual(recorded.detail, { condition: "json-truncated", errorMessage: `parse failed at position ${cut.length} of ${cut.length} characters` });
++    assert.equal(JSON.stringify(recorded).includes(root), false);
++    const shown = nativeGoldfishHookMessage(failed, { stopFailure: readNativeGoldfishStopFailure({ commonDir }) });
++    assert.match(shown, new RegExp(`position ${cut.length} of ${cut.length} characters`, "u"));
++    assert.match(shown, /condition json-truncated/u);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF49", name: "C23: the stop-failure detail admits the key lists as bounded slugs and drops everything else", run: () => {
++    assert.deepEqual(sanitizeStopFailureDetail({ condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "has space", "a/b", "k3", "k4", "k5", "k6"] }),
++      { condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "k3", "k4", "k5"] });
++    assert.deepEqual(sanitizeStopFailureDetail({ condition: "json-truncated", errorMessage: "parse failed at position 5 of 5 characters" }), { condition: "json-truncated", errorMessage: "parse failed at position 5 of 5 characters" });
++    assert.deepEqual(sanitizeStopFailureDetail({ errorMessage: "at /home/x/y" }), null, "a message holding a path separator never travels");
++    assert.deepEqual(sanitizeStopFailureDetail({ missingKeys: "changedPaths" }), null);
++  } },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+index 93be1a013233ab711be46019b6232b00b2dfd646..926792d4968165f4dac1bd618e8843993a42b5a1 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+@@ -101,6 +101,16 @@ export function parseNativeGoldfishBriefing(prompt, { runners = ["claude", "code
+     allowedPaths: [...binding.allowedPaths] } };
+ }
+ 
++/** C23 (AC-108): the wrong-field-set condition names the keys that are missing and the keys that are not part of the contract (a misspelling
++ * shows as one of each), at most 5 each. Only keys of a JSON object can be named; any other JSON value says just `fields`. */
++function fieldsCondition(value) {
++  if (value === null || typeof value !== "object" || Array.isArray(value)) return { condition: "fields" };
++  const keys = Object.keys(value);
++  const missingKeys = FINAL_FIELDS.filter((key) => !keys.includes(key)).slice(0, 5);
++  const unexpectedKeys = keys.filter((key) => !FINAL_FIELDS.includes(key) && key !== "testFirst").slice(0, 5);
++  return { condition: "fields", ...(missingKeys.length > 0 ? { missingKeys } : {}), ...(unexpectedKeys.length > 0 ? { unexpectedKeys } : {}) };
++}
++
+ /** AC-164: the first sub-condition of NGHR-FINAL-SHAPE that fires, as a bounded detail, or null when the shape is valid.
+  * The slugs are closed; a path is echoed only after it passed `normalizedPath` (repository-relative), at most 5, so a
+  * host path or arbitrary text from the contract never travels. The checks and their order are those of the former
+@@ -108,7 +118,7 @@ export function parseNativeGoldfishBriefing(prompt, { runners = ["claude", "code
+ function finalShapeCondition(value, binding, allowCheckpoint) {
+   const named = (condition, paths) => (paths === undefined ? { condition } : { condition, paths: paths.slice(0, 5) });
+   const hasTestFirst = value !== null && typeof value === "object" && !Array.isArray(value) && Object.hasOwn(value, "testFirst");
+-  if (!exact(hasTestFirst ? (({ testFirst: _t, ...rest }) => rest)(value) : value, FINAL_FIELDS)) return named("fields");
++  if (!exact(hasTestFirst ? (({ testFirst: _t, ...rest }) => rest)(value) : value, FINAL_FIELDS)) return fieldsCondition(value);
+   if (value.schema !== NATIVE_GOLDFISH_RETURN_SCHEMA) return named("schema");
+   if (value.dispatchId !== binding.dispatchId) return named("dispatch-id");
+   if (value.candidateCommit !== binding.candidateCommit) return named("candidate-commit");
+@@ -156,6 +166,22 @@ function withoutWholeMessageFence(text) {
+   return match === null ? text : match[1];
+ }
+ 
++/** C23 (AC-108): where the text of a refused return stopped being JSON, as a closed, bounded detail that never echoes the text. The strict
++ * parser reports no offset, so the position is read from the engine's own message by a second, diagnostic-only parse: nothing it accepts is
++ * ever admitted. `json-truncated` = the text ends inside the value (a cut-off return); `json-syntax` = it breaks earlier; `json-duplicate-key`;
++ * `json-not-strict` = the engine accepts what the strict parser refuses (for example a lone surrogate escape). */
++function jsonFailureDetail(text, error) {
++  if (/GE-JSON-DUPLICATE-KEY/u.test(String(error?.message))) return { condition: "json-duplicate-key" };
++  let engine = null;
++  try { JSON.parse(text); } catch (caught) { engine = caught; }
++  if (engine === null) return { condition: "json-not-strict" };
++  const message = String(engine?.message);
++  const found = /\bposition (\d+)/u.exec(message);
++  const position = found ? Number(found[1]) : /end of JSON input/u.test(message) ? text.length : null;
++  if (!Number.isSafeInteger(position) || position > text.length) return { condition: "json-syntax" };
++  return { condition: position >= text.length ? "json-truncated" : "json-syntax", errorMessage: `parse failed at position ${position} of ${text.length} characters` };
++}
++
+ /** Validate one JSON final result (plain, or in one fence around the whole message); prose, any other fencing and duplicate keys fail closed. */
+ // D31: `allowCheckpoint` is opt-in. Only the SubagentStop route passes it, because a budget stop settles there without
+ // a commit; every other route (foreground PostToolUse, Codex) keeps admitting a success only.
+@@ -163,7 +189,8 @@ export function validateNativeGoldfishFinal(text, { binding, allowCheckpoint = f
+   if (typeof text !== "string" || text.length === 0 || Buffer.byteLength(text, "utf8") > 2 * 1024 * 1024
+     || !binding || !ID.test(binding.dispatchId ?? "") || !OID.test(binding.candidateCommit ?? "")) return fail("NGHR-FINAL-INPUT");
+   let value;
+-  try { value = parseStrictJson(withoutWholeMessageFence(text)); } catch { return fail("NGHR-FINAL-JSON"); }
++  const inner = withoutWholeMessageFence(text);
++  try { value = parseStrictJson(inner); } catch (error) { return { ...fail("NGHR-FINAL-JSON"), detail: jsonFailureDetail(inner, error) }; }
+   const shapeCondition = finalShapeCondition(value, binding, allowCheckpoint);
+   if (shapeCondition !== null) return { ...fail("NGHR-FINAL-SHAPE"), detail: shapeCondition };
+   try { validateDurableDispatchReportText(value.report); } catch { return fail("NGHR-FINAL-REPORT-UNSAFE"); }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
+index 7582209257fc4d78806b7f37545cbb50d242852c..98b12f77dd1840b45cfc8c4b7f457ce2e5b2ddf6 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
+@@ -205,6 +205,51 @@ const cases = [
+       assert.equal(result.detail?.condition, condition, JSON.stringify(result));
+     }
+   }],
++  ["NGHR12 C23 (AC-108): a return that is not JSON keeps NGHR-FINAL-JSON and names where the text stopped being JSON, never echoing the text", () => {
++    // A valid return cut directly after the report value: no changedPaths, no closing brace (the live failure shape).
++    const cut = finalText.slice(0, finalText.indexOf(",\"changedPaths\""));
++    const truncated = validateNativeGoldfishFinal(cut, { binding, allowCheckpoint: true });
++    assert.equal(truncated.ok, false);
++    assert.equal(truncated.code, "NGHR-FINAL-JSON");
++    assert.equal(truncated.detail?.condition, "json-truncated", JSON.stringify(truncated));
++    assert.equal(truncated.detail.errorMessage, `parse failed at position ${cut.length} of ${cut.length} characters`);
++    assert.equal(JSON.stringify(truncated).includes(final.report), false, "the message text never travels in the detail");
++    // The same cut inside one whole-message fence: the position is that of the unwrapped text, which is what was parsed.
++    const fenced = validateNativeGoldfishFinal(`\`\`\`json\n${cut}\n\`\`\``, { binding });
++    assert.equal(fenced.detail?.condition, "json-truncated");
++    assert.equal(fenced.detail.errorMessage, `parse failed at position ${cut.length} of ${cut.length} characters`);
++    // A syntax error before the end is a syntax error, with its own position; prose has no usable position and says only that.
++    const broken = finalText.replace("\"outcome\":", "\"outcome\" ");
++    const syntax = validateNativeGoldfishFinal(broken, { binding });
++    assert.equal(syntax.code, "NGHR-FINAL-JSON");
++    assert.equal(syntax.detail?.condition, "json-syntax", JSON.stringify(syntax));
++    assert.match(syntax.detail.errorMessage, new RegExp(`^parse failed at position \\d+ of ${broken.length} characters$`, "u"));
++    const prose = validateNativeGoldfishFinal("All done, no JSON here.", { binding });
++    assert.equal(prose.code, "NGHR-FINAL-JSON");
++    assert.equal(prose.detail?.condition, "json-syntax");
++    assert.equal(JSON.stringify(prose).includes("All done"), false);
++    // A duplicate key and a text the strict parser refuses although native JSON accepts it are told apart.
++    assert.equal(validateNativeGoldfishFinal(`{"schema":"${final.schema}","schema":"forged"}`, { binding }).detail?.condition, "json-duplicate-key");
++    assert.equal(validateNativeGoldfishFinal(finalText.replace("Implemented and verified.", "lone\\ud800surrogate"), { binding }).detail?.condition, "json-not-strict");
++    // A return that parses never carries a JSON detail, and an empty text is still the input refusal.
++    assert.equal(validateNativeGoldfishFinal(finalText, { binding }).ok, true);
++    assert.equal(validateNativeGoldfishFinal("", { binding }).code, "NGHR-FINAL-INPUT");
++  }],
++  ["NGHR13 C23 (AC-108): a wrong field set names the missing and the unexpected keys, bounded; every other shape condition is unchanged", () => {
++    const { changedPaths, ...withoutPaths } = final;
++    const misspelled = validateNativeGoldfishFinal(JSON.stringify({ ...withoutPaths, changedPath: changedPaths }), { binding });
++    assert.equal(misspelled.code, "NGHR-FINAL-SHAPE");
++    assert.equal(misspelled.detail.condition, "fields");
++    assert.deepEqual(misspelled.detail.missingKeys, ["changedPaths"]);
++    assert.deepEqual(misspelled.detail.unexpectedKeys, ["changedPath"]);
++    const cutKeys = validateNativeGoldfishFinal(JSON.stringify(withoutPaths), { binding });
++    assert.deepEqual(cutKeys.detail, { condition: "fields", missingKeys: ["changedPaths"] });
++    const many = validateNativeGoldfishFinal(JSON.stringify({ ...final, k1: 1, k2: 2, k3: 3, k4: 4, k5: 5, k6: 6, k7: 7 }), { binding });
++    assert.equal(many.detail.unexpectedKeys.length, 5, "at most 5 keys are named");
++    // A JSON value that is no object has no keys to name.
++    assert.deepEqual(validateNativeGoldfishFinal("[1]", { binding }).detail, { condition: "fields" });
++    assert.deepEqual(validateNativeGoldfishFinal(JSON.stringify({ ...final, dispatchId: "OTHER" }), { binding }).detail, { condition: "dispatch-id" });
++  }],
+ ];
+ 
+ const temp = mkdtempSync(join(tmpdir(), "native-goldfish-host-return-"));
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index b1fb2ec4311dabba39bf1e69a680e4003ccf2075..71b87c452f29dd49afe1a70d1450406a5f933c75 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1612,6 +1612,26 @@ test("PF-61 reader the warning names the recorded stage and reason, the detail's
+   assert.ok(hostile.length < 700, `the cause text is bounded (${hostile.length})`);
+ });
+ 
++test("C23 reader the warning names the validator detail of a refused return, so a broken handback no longer reads as no reason recorded", async () => {
++  const { runDispatchBriefing } = await lib();
++  const messageOf = async (over) => {
++    const fx = makeFixture();
++    const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { stopFailures: () => [stopFailure({ code: "NGHR-FINAL-JSON", ...over })] }));
++    assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++    return stopWarnings(result)[0].message;
++  };
++  const truncated = await messageOf({ detail: { condition: "json-truncated", errorMessage: "parse failed at position 312 of 312 characters" } });
++  assert.match(truncated, /condition json-truncated, message "parse failed at position 312 of 312 characters"\); verify/u);
++  assert.doesNotMatch(truncated, /no reason recorded/u);
++  const fields = await messageOf({ detail: { condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath"] } });
++  assert.match(fields, /condition fields, missing keys changedPaths, unexpected keys changedPath\); verify/u);
++  // The stage and reason still come first, and a hostile detail stays one bounded line.
++  assert.match(await messageOf({ stage: "pending-read", detail: { condition: "json-syntax" } }), /stage pending-read, condition json-syntax\); verify/u);
++  const hostile = await messageOf({ detail: { condition: `line one\nline two ${"x".repeat(400)}`, errorMessage: "y".repeat(400), missingKeys: Array.from({ length: 40 }, (_, i) => `key${i}`) } });
++  assert.equal(hostile.includes("\n"), false, "one warning stays one line");
++  assert.ok(hostile.length < 900, `the cause text is bounded (${hostile.length})`);
++});
++
+ test("PF-61 reader no diagnostic yields no stop-failure warning", async () => {
+   const { runDispatchBriefing } = await lib();
+   const fx = makeFixture();

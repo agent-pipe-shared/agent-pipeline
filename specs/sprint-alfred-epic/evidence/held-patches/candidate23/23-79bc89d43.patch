@@ -1,0 +1,135 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+index 47bacf301325144ee75ba446760189d4ea422cb3..540e43487026060080739e438ea6f6da75c2ad5d 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+@@ -170,15 +170,16 @@ manualCheck("GD15n prepare a native pending binding for a complete dispatched Co
+   assert.equal(pending.binding.nativeAgentType, "worker");
+   assert.equal(pending.binding.candidateCommit, candidateCommit);
+ 
+-  // The candidate moves after the briefing is generated: the binding no longer matches the fixture HEAD.
++  // The candidate moves after the briefing is generated, on the briefing's own path. QG-04, candidate 23 (PO tile 2026-11-09): a move outside
++  // the briefing's paths now admits, so the refusal this case pins comes from the queue admission; failure still blocks launch and publishes nothing.
+   const stale = generatedCodexFixture("negative");
+-  writeFileSync(join(stale.root, "src", "moved.txt"), "head moved after the briefing was generated\n");
+-  execFileSync("git", ["add", "--", "src/moved.txt"], { cwd: stale.root });
++  writeFileSync(join(stale.root, "src", "change.mjs"), "export const moved = 'head moved after the briefing was generated';\n");
++  execFileSync("git", ["add", "--", "src/change.mjs"], { cwd: stale.root });
+   execFileSync("git", ["-c", "user.name=Pipeline Fixture", "-c", "user.email=pipeline-fixture@example.invalid", "commit", "-q", "-m", "move the candidate"], { cwd: stale.root });
+   const failed = run({ tool_name: "spawn_agent", tool_use_id: "gd15n-negative", session_id: sessionId, cwd: stale.root,
+     tool_input: { agent_type: "worker", message: stale.text } }, stale.root);
+   assert.equal(failed.code, BLOCK, `failed native preparation must block launch: ${failed.stderr}`);
+-  assert.ok(failed.stderr.includes("NGHS-CANDIDATE-MISMATCH"), `typed preparation failure missing: ${failed.stderr}`);
++  assert.ok(failed.stderr.includes("SQ-ITEM-CANDIDATE-DRIFT"), `typed preparation failure missing: ${failed.stderr}`);
+   assert.equal(pendingCodexFiles(stale.root).length, 0, "failed preparation must not publish a pending state");
+ });
+ check("GD15k block a marked Codex worker when its native type differs from the binding", {
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-admission.mjs b/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
+index 72c3671b706819c9a9a71b51517328f8aa859816..2b1a71536c8dd8996276b915c04cd238211f5828 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
+@@ -100,8 +100,9 @@ function captureHostCommitBaseline({ root, candidateCommit, resultPath } = {}, c
+ export function captureAgyHostCommitBaseline(input={}){return captureHostCommitBaseline(input);}
+ export function captureSourceOwnedNativeHostCommitBaseline(input={}){
+   const concurrent=inspectSourceOwnedNativeConcurrentAuthority(input.authority,{root:input.root});
+-  if(concurrent.baseCommit!==input.candidateCommit||concurrent.parentCommit!==input.candidateCommit)return fail('NATIVE-HOST-BASELINE-HEAD');
+-  const captured=captureHostCommitBaseline(input,concurrent);return captured.ok?{...captured,baseline:{...captured.baseline,schema:NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA,nativeRef:concurrent.reference}}:captured;
++  // Candidate 23 (PO tile 2026-11-09): the authority's plan already proved that base..HEAD is a disjoint advance, so the dirty check runs against HEAD and the baseline keeps the briefing's base.
++  if(concurrent.baseCommit!==input.candidateCommit)return fail('NATIVE-HOST-BASELINE-HEAD');
++  const captured=captureHostCommitBaseline({...input,candidateCommit:concurrent.parentCommit},concurrent);return captured.ok?{...captured,baseline:{...captured.baseline,candidateCommit:input.candidateCommit,schema:NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA,nativeRef:concurrent.reference}}:captured;
+ }
+ const nativeConcurrentAdmissions=new WeakMap();
+ export function inspectSourceOwnedNativeConcurrentAdmission(admission){
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 7b6252d6fb4e235bc9767d95c0ee3ee2b2a07d0a..da637dc9bad75d9eb6f9f54f87cb2aaf3fca8691 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -321,7 +321,14 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+   const readGit = dependencies.git ?? git;
+   const head = readGit(physicalRoot, ["rev-parse", "--verify", "HEAD^{commit}"]);
+   const tree = readGit(physicalRoot, ["rev-parse", "--verify", "HEAD^{tree}"]);
+-  if (head !== binding.candidateCommit || tree !== binding.candidateTree) return fail("NGHS-CANDIDATE-MISMATCH");
++  if (head !== binding.candidateCommit || tree !== binding.candidateTree) {
++    // Candidate 23 (PO tile 2026-11-09): the same rule the queue admission applies above. An item briefing stays valid while the checkout only
++    // advanced through commits outside its paths; the host commit already lands on such an advance. Any other drift, and a briefing without an item, stays refused.
++    const advancedDisjointly = head !== binding.candidateCommit && Boolean(binding.itemDelivery)
++      && candidateAdvancedDisjointly(physicalRoot, { commit: binding.candidateCommit }, { candidate: { commit: head } },
++        [...binding.allowedPaths, ...binding.itemDelivery.checks.flatMap(check => [check.path, ...check.dependencies])]);
++    if (!advancedDisjointly) return fail("NGHS-CANDIDATE-MISMATCH");
++  }
+   const resultPath = `scratch/.native-host-return-${binding.dispatchId}.json`;
+   checkpoint("agy-baseline");
+   const captured =(dependencies.captureBaseline ?? captureAgyHostCommitBaseline)({ root: physicalRoot,
+@@ -1161,7 +1168,7 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
+     // refused dispatch leaves no orphaned reserved member behind.
+     if(state.binding.itemDelivery){
+       checkpoint('mint');
+-      const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:state.binding.allowedPaths,baseCommit:state.binding.candidateCommit,ownPendingSha256:null});
++      const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:state.binding.allowedPaths,scopePaths:[...state.binding.allowedPaths,...(state.binding.itemDelivery?.checks??[]).flatMap(check=>[check.path,...check.dependencies])],baseCommit:state.binding.candidateCommit,ownPendingSha256:null});
+       try {checkpoint('baseline-capture');const captured=captureSourceOwnedNativeHostCommitBaseline({root:state.root,candidateCommit:state.binding.candidateCommit,resultPath:state.resultPath,authority});if(!captured.ok)throw baselineFault(captured);state.baseline=captured.baseline;}
+       finally{nativeConcurrentAuthorities.delete(authority);}
+     }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
+index 9e5bd250264743a3b36d94128db135891ea18841..f6ecea6b1b157972828ff91696e3c8b7dcca8b48 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs
+@@ -86,6 +86,8 @@ function siblingRow(root, id, scope) {
+   writeWorkingQueue(location(root), Buffer.from(JSON.stringify(queue)), source);
+ }
+ const realGit = (root, args) => { const run = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" }); return run.error || run.status !== 0 ? null : run.stdout.trim(); };
++/** A HEAD that is no descendant of any briefing candidate, so the candidate-git check refuses. */
++const foreignHead = (root, args) => args.join(" ") === "rev-parse --verify HEAD^{commit}" ? "f".repeat(40) : realGit(root, args);
+ 
+ // C19K-W245: the registry as a LATER, separate process reads it (the inspect and heal commands each start with no in-memory operations).
+ const SAR = new URL("../scripts/session-authority-repair.mjs", import.meta.url).pathname, ROUTINE = new URL("../scripts/routine-repair.mjs", import.meta.url).pathname;
+@@ -191,9 +193,10 @@ const cases = [
+   { id: "NGSP3", name: "C19J-W242 (B): an admission refused at candidate-git after its queue row was written leaves the queue bytes unchanged, and a successor with an overlapping scope is admitted", run: () => fixture(({ root }) => {
+     const { runtime, launch, original } = setup(root);
+     const before = queueState(root);
+-    // HEAD advances through a commit that touches none of the slice's paths: the queue accepts the old briefing, the candidate-git check refuses it.
++    // QG-04, candidate 23 (PO tile 2026-11-09): a commit outside the slice's paths now admits (NGSP3A), so the candidate-git check is reached
++    // with a HEAD the briefing cannot descend to. The intent of this case, the rollback of the row after that refusal, is unchanged.
+     writeFileSync(join(root, "unrelated.txt"), "unrelated\n"); git(root, "add", "--", "unrelated.txt"); git(root, "commit", "-q", "-m", "unrelated");
+-    const refused = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: launch(0).input }));
++    const refused = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: launch(0).input }, { git: foreignHead }));
+     assert.equal(refused.ok, false, JSON.stringify(refused)); assert.equal(refused.code, "NGHS-CANDIDATE-MISMATCH", JSON.stringify(refused));
+     assert.deepEqual(queueState(root), before, "the refused admission left the queue exactly as it was");
+     const candidate = { commit: git(root, "rev-parse", "HEAD"), tree: git(root, "rev-parse", "HEAD^{tree}") };
+@@ -202,6 +205,28 @@ const cases = [
+     void original;
+   }) },
+ 
++  { id: "NGSP3A", name: "candidate 23 (PO tile 2026-11-09): a briefing behind a checkout that advanced only outside its paths is admitted, and its host commit lands on that advance", run: () => fixture(({ root }) => {
++    const { runtime, launch } = setup(root);
++    const one = launch(0);
++    writeFileSync(join(root, "unrelated.txt"), "unrelated\n"); git(root, "add", "--", "unrelated.txt"); git(root, "commit", "-q", "-m", "unrelated");
++    const advanced = git(root, "rev-parse", "HEAD");
++    const admitted = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input }));
++    assert.equal(admitted.ok, true, JSON.stringify(admitted));
++    writeFileSync(join(root, one.file), one.content);
++    const result = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: one.returned }));
++    assert.equal(result.status, "authored-commit-recorded", JSON.stringify(result));
++    assert.equal(git(root, "rev-parse", `${result.commit}^`), advanced, "the host commit sits on the advanced checkout");
++  }) },
++
++  { id: "NGSP3A2", name: "candidate 23: an advance that touches the briefing's own path stays refused before anything is admitted", run: () => fixture(({ root }) => {
++    const { runtime, launch } = setup(root);
++    const one = launch(0);
++    writeFileSync(join(root, one.file), "export const value='foreign';\n"); git(root, "add", "--", one.file); git(root, "commit", "-q", "-m", "foreign change on the slice scope");
++    const refused = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input }));
++    assert.equal(refused.ok, false, JSON.stringify(refused));
++    assert.equal(refused.code, "SQ-ITEM-CANDIDATE-DRIFT", JSON.stringify(refused));
++  }) },
++
+   { id: "NGSP3B", name: "C19J-W242 (B): an admission refused at the role check after its queue row was written leaves the queue bytes unchanged, and the same slice is admitted again", run: () => fixture(({ root }) => {
+     const { runtime, launch } = setup(root);
+     const before = queueState(root);
+@@ -216,7 +241,8 @@ const cases = [
+     writeFileSync(join(root, "unrelated.txt"), "unrelated\n"); git(root, "add", "--", "unrelated.txt"); git(root, "commit", "-q", "-m", "unrelated");
+     let wrote = false;
+     const refused = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: launch(0).input }, {
+-      git: (rootArg, args) => { if (!wrote) { wrote = true; siblingRow(root, "SIBLING-ROW", "src/second.mjs"); } return realGit(rootArg, args); } }));
++      // QG-04, candidate 23: the refusal is reached through a foreign HEAD, see NGSP3.
++      git: (rootArg, args) => { if (!wrote) { wrote = true; siblingRow(root, "SIBLING-ROW", "src/second.mjs"); } return foreignHead(rootArg, args); } }));
+     assert.equal(refused.code, "NGHS-CANDIDATE-MISMATCH", JSON.stringify(refused));
+     assert.equal(wrote, true, "the sibling wrote its row after the admission's row");
+     const ids = rowIds(root);

@@ -1,0 +1,151 @@
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 0243957fd25a634aaf0194d5c650a2160f4dfa69..b1e9c85aa7481ae6bed20b02512ac85e5fc7f30c 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -26,7 +26,7 @@ import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation
+ import { isClaudeSessionMemoryWritePath, isIntakeLifecycleScratchWrite, isMachinePlaneWritePath } from "./write-scope.mjs";
+ import { DISPATCH_RECORD_COLLISION_DENIAL_CODE, EVIDENCE_HOST_PATH_DENIAL_CODE, blockedDispatchRecordCollision, blockedEvidenceHostPath, checkDispatchRecordCollision, claimDispatchRecordOwnership, extractWritePayload, isEvidenceArtifactPath } from "./dispatch-record-lane.mjs";
+ import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestPathShellFaultBlocked, protectedTestPathShellRefusalHit } from "./gate-strength-lane.mjs";
+-import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, missingProjectTargetDenialText, missingReadOperandIsOnlyFault, missingSingleReadTargetOperand, pluginCopyOfMissingProjectPath, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
++import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, missingPluginFileShellDenialText, missingProjectTargetDenialText, missingReadOperandIsOnlyFault, missingSingleReadTargetOperand, pluginCopyOfMissingProjectPath, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
+ import { externalPoSigningOnly, isForbiddenCrossRepositoryMutation, isHostOnlyClaudeCaptureInvocation, isHumanPoProfileChangeCommand, isHumanPoSigningCommand } from "./po-commands.mjs";
+ import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice, rebaseAuthorityShapeBlocked, rebaseAuthorityShapeRefusal } from "./rebase-lane.mjs";
+ import { isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
+@@ -515,6 +515,10 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+         { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM },
+       );
+       outsideRoot = isOutsideRootSingleCommandRead(rejected, root) || qp4OperandResolvesOutsideRoot(rejected, root);
++      if (outsideRoot) {
++        const missingPluginFile = missingPluginFileShellDenialText(rejected, root);
++        if (missingPluginFile !== null) return withLifts(lifts, verdict(2, missingPluginFile));
++      }
+       // K96 (PO decision 2026-10-23, rows 6/16, M7): an in-root read whose target is a credential location is refused for the PATH, so it
+       // gets its own typed code (checked only when the target is inside the root: an outside-root credential read keeps the scope code, QP4-1).
+       credentialTarget = !outsideRoot && qp4OperandIsCredentialTarget(rejected, root);
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index 4dedb1f2c9c176432264a8075fe9644e849460fa..2f551be349d8fdb68b2e4462b2cbe4f403164869 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -9,7 +9,7 @@ import { readClaudeTaskOutputReadScope } from "../claude-task-output-read-scope.
+ import { isBoundedReadOnlyPipeline, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM, MAX_CLAUDE_TASK_OUTPUT_READ_BYTES } from "./constants.mjs";
+ import { commandPath, isPathWithinRoot, pathInside, rawReadCandidatePath } from "./path-containment.mjs";
+-import { isBoundedCatPipeline, isBoundedGitPipeline, isBoundedGrepPipeline, isBoundedReadOnlyAndChain, isChainSegmentAdmitted, isReadOnlyDiagnosticCommand, isReadOnlySimpleWords, isSafeExactPassiveFile, passiveCandidate, splitTopLevelAndChain } from "./shell-grammar.mjs";
++import { isBoundedCatPipeline, isBoundedGitPipeline, isBoundedGrepPipeline, isBoundedReadOnlyAndChain, isChainSegmentAdmitted, isReadOnlyDiagnosticCommand, isReadOnlySimpleWords, isSafeExactPassiveFile, passiveCandidate, qp4ReadTargetOperands, splitTopLevelAndChain } from "./shell-grammar.mjs";
+ import { verdict } from "./verdict.mjs";
+ import { claudeSessionMemoryDirectory } from "./write-scope.mjs";
+ 
+@@ -685,6 +685,36 @@ export function pluginCopyOfMissingProjectPath(raw, root, pluginRoots = BOUNDED_
+   return null;
+ }
+ 
++function missingPluginFileDenialText(target, listing) {
++  return "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the file does not exist in the Pipeline plugin "
++    + `(${target.relative}); nothing to read at that path. List the nearest existing plugin directory ${listing} `
++    + "and read an exact file it shows; a skill names the references it uses in its own skill file.\n";
++}
++
++/**
++ * C23 (PO word 2026-11-09, Codex greenfield F17): a shell read of a guessed plugin path was refused GUARD-READ-SCOPE-OUTSIDE-ROOT, which
++ * reads as a permission problem although the file simply does not exist. The refusal text for a rejected single read whose every target
++ * outside the project is such a missing plugin file; null otherwise (a target that exists, or lies elsewhere, keeps the scope code).
++ * Label selection only: the command stays refused.
++ */
++export function missingPluginFileShellDenialText(parsed, root, pluginRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
++  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1) return null;
++  const { executable, argv } = parsed.segments[0];
++  const name = basename(String(executable ?? "")).toLowerCase();
++  const operands = name === "rg" || name === "grep" ? qp4ReadTargetOperands(name, argv) : argv;
++  const rootResolved = resolve(root);
++  let first = null;
++  for (const token of operands) {
++    if (typeof token !== "string" || token.includes("\0")) continue;
++    const candidate = rawReadCandidatePath(token, root);
++    if (candidate === null || pathInside(rootResolved, resolve(candidate))) continue;
++    const missing = missingRegisteredPluginTarget(token, root, pluginRoots);
++    if (missing === null) return null;
++    first ??= missing;
++  }
++  return first === null ? null : missingPluginFileDenialText(first, `with \`ls ${first.listDirectory}\``);
++}
++
+ /** The missing-project-target refusal, naming the plugin copy when there is one. */
+ export function missingProjectTargetDenialText(raw, root, pluginRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
+   const copy = pluginCopyOfMissingProjectPath(raw, root, pluginRoots);
+@@ -839,9 +869,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
+   // guessed a plugin path (seven times in one run). Name the real cause and the nearest existing plugin directory to list instead.
+   const pluginMissing = toolName === "Read" ? missingRegisteredPluginTarget(path, root, pluginRoots) : null;
+   if (pluginMissing !== null) {
+-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the file does not exist in the Pipeline plugin "
+-      + `(${pluginMissing.relative}); nothing to read at that path. List the nearest existing plugin directory with Glob (path ${pluginMissing.listDirectory}, pattern *) `
+-      + "and read an exact file it shows; a skill names the references it uses in its own skill file.\n");
++    return verdict(2, missingPluginFileDenialText(pluginMissing, `with Glob (path ${pluginMissing.listDirectory}, pattern *)`));
+   }
+   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
+     + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index b71054379f36dd0838919aea7ec6a333366844c9..d350d7ddcd2c5d5b7a790683b53a9c4eb89bd0aa 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -1120,7 +1120,7 @@ const QP4_RG_LONG_VALUE = new Set(["regexp", "file", "glob", "iglob", "max-count
+ const QP4_GREP_LONG_VALUE = new Set(["regexp", "file", "max-count", "after-context", "before-context", "context", "directories", "devices", "include",
+   "exclude", "exclude-from", "exclude-dir", "label", "binary-files", "group-separator"]);
+ 
+-function qp4ReadTargetOperands(name, argv) {
++export function qp4ReadTargetOperands(name, argv) {
+   const rg = name === "rg";
+   const shortValue = rg ? QP4_RG_SHORT_VALUE : QP4_GREP_SHORT_VALUE;
+   const longValue = rg ? QP4_RG_LONG_VALUE : QP4_GREP_LONG_VALUE;
+diff --git a/plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs b/plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs
+index 37d56de2a8b94d03e71c0d8457f22ee7b8634b69..31fa4e843192ac144c80aee558646f898a3be4d1 100644
+--- a/plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs
++++ b/plugins/pipeline-core/lib/pins/missing-canon-pointer-names-the-plugin-copy.test.mjs
+@@ -4,7 +4,7 @@
+ // create it first") and then went looking for the plugin copy. Canon pointers mean the repository file when it exists, else the plugin's
+ // own copy. The refusal now names that copy. The read itself stays refused; only the text changes.
+ import assert from "node:assert/strict";
+-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
+ 
+ import { missingProjectTargetDenialText, pluginCopyOfMissingProjectPath } from "../guard/read-scope.mjs";
+ import { readToolScopeVerdict } from "../guard/read-scope.mjs";
++import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
+ 
+ function fixture(fn) {
+   const base = mkdtempSync(join(tmpdir(), "c20-w252-g20-9-"));
+@@ -75,3 +76,31 @@ test("the native Read refusal of a missing canon pointer names the running plugi
+   assert.match(verdict.stderr, /GUARD-READ-TARGET-MISSING/u);
+   assert.ok(verdict.stderr.includes(join(pluginRoot, "templates", "prompts", "goldfish-task.md")), verdict.stderr);
+ }));
++
++// C23 (PO word 2026-11-09, Codex greenfield F17): a shell read of a guessed plugin path read as a scope problem. Run through the real guard.
++test("C23 a shell read of a file the plugin does not have says it does not exist and names a listing that works", () => fixture(({ project, plugin: outside }) => {
++  mkdirSync(join(project, ".claude"), { recursive: true });
++  mkdirSync(join(project, ".agent-pipeline"), { recursive: true });
++  writeFileSync(join(project, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
++    schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-09-29T00:00:00.000Z",
++  }));
++  const pluginRoot = realpathSync(fileURLToPath(new URL("../..", import.meta.url)));
++  const hooks = join(pluginRoot, "hooks");
++  const guessed = join(hooks, "absent", "guessed.mjs");
++  const run = (command) => evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, { projectDir: project });
++  for (const command of [`cat ${guessed}`, `rg -n needle ${guessed}`, `head -n 5 ${guessed}`]) {
++    const refused = run(command);
++    assert.equal(refused.exitCode, 2, command);
++    assert.match(refused.stderr, /GUARD-READ-TARGET-MISSING: the file does not exist in the Pipeline plugin \(hooks\/absent\/guessed\.mjs\)/u, command);
++    assert.doesNotMatch(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
++    assert.ok(refused.stderr.includes(`\`ls ${hooks}\``), refused.stderr);
++  }
++  assert.equal(run(`ls ${hooks}`).exitCode, 0, "the listing the refusal names is admitted");
++  const existingOutside = join(outside, "templates", "prompts", "agent-obligations.md");
++  for (const command of [`cat ${join(outside, "absent.md")}`, `cat ${guessed} ${existingOutside}`]) {
++    const refused = run(command);
++    assert.equal(refused.exitCode, 2, command);
++    assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
++    assert.doesNotMatch(refused.stderr, /does not exist in the Pipeline plugin/u, command);
++  }
++}));

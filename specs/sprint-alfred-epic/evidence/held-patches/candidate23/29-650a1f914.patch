@@ -1,0 +1,381 @@
+diff --git a/plugins/pipeline-core/lib/agent-model-registry.mjs b/plugins/pipeline-core/lib/agent-model-registry.mjs
+index 9f7e70b574f070b6d4ebcb94fe45767eea286337..78b2152d8aceae0e6f0661782b779e8b229078fd 100644
+--- a/plugins/pipeline-core/lib/agent-model-registry.mjs
++++ b/plugins/pipeline-core/lib/agent-model-registry.mjs
+@@ -117,6 +117,10 @@ export function modelBelongsToFamily(concreteModel, tierAlias) {
+  *
+  *   "model-matches"           family + effort both agree with the agent definition.
+  *   "model-mismatch"          family or effort disagrees, and no override was declared.
++ *   "model-route-configured"  C23: each half agrees with the agent definition or with a route the project's
++ *                              own configuration names (the injected `configuredRoute` reader, see
++ *                              `configuredRecordRoute`); reported as such so it stays distinct from a
++ *                              frontmatter match. Without a reader this classification does not occur.
+  *   "model-override-declared" the record carries a well-formed `modelOverride` (see below);
+  *                              honoured rather than flagged, and reported AS an override so it
+  *                              stays visibly distinct from an accidental mismatch.
+@@ -137,7 +141,7 @@ export function modelBelongsToFamily(concreteModel, tierAlias) {
+  * precedent `declaredCommits()`/`declaredPaths()` already set in `dispatch-authorship-verify.mjs`
+  * ("most existing records predate the convention").
+  */
+-export function compareRecordedModel(record, { agentsDir = DEFAULT_AGENTS_DIR } = {}) {
++export function compareRecordedModel(record, { agentsDir = DEFAULT_AGENTS_DIR, configuredRoute = null } = {}) {
+   // Claude agent frontmatter is not an authority for a different runtime.
+   // Until the v4 record carries a verifier-readable host observation and
+   // consent binding, a non-Claude authored return must remain unverified.
+@@ -196,6 +200,15 @@ export function compareRecordedModel(record, { agentsDir = DEFAULT_AGENTS_DIR }
+       reason: `recorded \`${recordedModel}\`/\`${recordedEffort}\` agrees with \`${agentType}\` definition (\`${resolved.model}\`/\`${resolved.effort}\`)`,
+     };
+   }
++  // C23: the project's configuration owns its routing, and the briefing and the guard admit what it names. The reader is injected so
++  // this module stays free of the routing sources, and is asked only when the agent definition does not already bind the record.
++  const configured = typeof configuredRoute === "function" ? configuredRoute(record) : null;
++  if (configured && (familyMatches || configured.model === true) && (effortMatches || configured.effort === true)) {
++    return {
++      classification: "model-route-configured",
++      reason: `recorded \`${recordedModel}\`/\`${recordedEffort}\` differs from \`${agentType}\` definition (\`${resolved.model}\`/\`${resolved.effort}\`) and is named by the project's routing configuration`,
++    };
++  }
+   return {
+     classification: "model-mismatch",
+     reason: `recorded \`${recordedModel}\`/\`${recordedEffort}\` disagrees with \`${agentType}\` definition (\`${resolved.model}\`/\`${resolved.effort}\`) and no override was declared`,
+diff --git a/plugins/pipeline-core/lib/agent-model-registry.test.mjs b/plugins/pipeline-core/lib/agent-model-registry.test.mjs
+index 2b4280722a153831b7f3acbf82fc752fe92c3b1d..a0cf8efa501250e7b8481ca240dea221c3bd0c6a 100644
+--- a/plugins/pipeline-core/lib/agent-model-registry.test.mjs
++++ b/plugins/pipeline-core/lib/agent-model-registry.test.mjs
+@@ -87,6 +87,22 @@ test("compareRecordedModel: recorded model reproduces the exact 2026-08-08 incid
+   assert.match(outcome.reason, /goldfish-deep/u);
+ });
+ 
++test("compareRecordedModel C23: a route the project's configuration names is bound, and stays visibly distinct from a frontmatter match", () => {
++  const deviating = { agentType: "goldfish-deep", model: "claude-opus-5", effort: "medium" };
++  const named = compareRecordedModel(deviating, { configuredRoute: () => ({ model: true, effort: true }) });
++  assert.equal(named.classification, "model-route-configured");
++  assert.match(named.reason, /configuration/u);
++  // Each half has to be covered: by the agent definition or by the configuration.
++  assert.equal(compareRecordedModel(deviating, { configuredRoute: () => ({ model: true, effort: false }) }).classification, "model-mismatch");
++  assert.equal(compareRecordedModel(deviating, { configuredRoute: () => ({ model: false, effort: true }) }).classification, "model-mismatch");
++  assert.equal(compareRecordedModel({ ...deviating, model: "claude-sonnet-5" }, { configuredRoute: () => ({ model: false, effort: true }) }).classification, "model-route-configured");
++  assert.equal(compareRecordedModel(deviating, { configuredRoute: () => null }).classification, "model-mismatch", "an unreadable configuration binds nothing");
++  assert.equal(compareRecordedModel(deviating).classification, "model-mismatch", "no reader, no configured route");
++  let asked = 0;
++  compareRecordedModel({ agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium" }, { configuredRoute: () => { asked += 1; return null; } });
++  assert.equal(asked, 0, "the configuration is read only when the agent definition does not already bind the record");
++});
++
+ test("compareRecordedModel: v4 Antigravity model cannot be judged by Claude agent frontmatter", () => {
+   const record = { schema: "pipeline.dispatch-record.v4", runner: "antigravity", agentType: "goldfish-implementor", model: "gemini-3.8-flash-high", effort: "high" };
+   const outcome = compareRecordedModel(record);
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+index 5060e429171cb37b84450426bc6535b136e33bc6..938a020e96403f7a50db3d0af8ef9ff7f4e26486 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.mjs
+@@ -72,6 +72,24 @@ export function observeEffectiveEffort({ configuredEffort, stopInput } = {}) {
+   return { status: "observed", observed, configured, warning: null };
+ }
+ 
++/**
++ * C23: the reader `compareRecordedModel` is given, so a record on a route the project's configuration names is bound at the host commit
++ * too; refusing it there would throw away finished work the briefing and the guard admitted. Same breadth as the guard: any available
++ * Claude duty route counts, not only the agent type's own (a differing one is the warned escalation shape). Null when nothing is readable,
++ * and for anything but a v4 Claude record: a v3 record is hand-typed, and the comparison with the agent definition is what catches a mistyped one.
++ */
++export function configuredRecordRoute(root, { routeSource } = {}) {
++  return (record) => {
++    if (record?.schema !== "pipeline.dispatch-record.v4" || record.runner !== "claude") return null;
++    if (routeSource === undefined && (typeof root !== "string" || root === "")) return null;
++    const source = routeSource ?? projectFunctionalTaskRoutes(root, { warn: () => {} });
++    if (!source?.ok || !Array.isArray(source.taskRoutes)) return null;
++    const routes = source.taskRoutes.filter((route) => route.runner === "claude" && route.state !== "unavailable" && route.taskRoute.startsWith("duty."));
++    return { model: typeof record?.model === "string" && record.model.trim() !== "" && routes.some((route) => selectorMatches(route.selector, record.model)),
++      effort: routes.some((route) => route.effort === record?.effort) };
++  };
++}
++
+ /**
+  * The route source is the project's own routing for `root` unless a caller injects one (draft ADR "a project's pipeline.user.yaml
+  * owns its routing"). A fallback to the registry is reported through `warn`, else as a warning on the returned evaluation.
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+index 776fcb9e714b042aec95ff1d75681c20c2be7c19..7ad40ef14ba77024457cded3cef203d6b2b0a341 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+@@ -2,7 +2,7 @@
+ // D84: a dispatch takes its model from the configured routing, never from inheritance or the Elephant's choice.
+ import test from "node:test";
+ import assert from "node:assert/strict";
+-import { evaluateDispatchModel, dispatchModelRefusalText, dispatchModelWarningText } from "./dispatch-model-enforcement.mjs";
++import { configuredRecordRoute, evaluateDispatchModel, dispatchModelRefusalText, dispatchModelWarningText } from "./dispatch-model-enforcement.mjs";
+ import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
+ 
+ const claudeSelectors = {
+@@ -236,6 +236,23 @@ test("DME-C23c a call that carries the configured effort is admitted, a differen
+   assert.equal(noModel.findings[0].code, "DISPATCH-MODEL-MISSING", "naming an effort never replaces naming a model");
+ });
+ 
++test("DME-C23f the record reader answers per half whether the project's Claude duty routes name a recorded model and effort", () => {
++  const route = (taskRoute, runner, value, effort, state = "default") => ({ taskRoute, runner, role: "worker", effort, state, selector: { kind: value.startsWith("claude-") ? "model-id" : "alias", value } });
++  const routeSource = { ok: true, taskRoutes: [route("duty.deep", "claude", "sonnet", "high"), route("duty.implement", "claude", "claude-haiku-5-5", "medium"),
++    route("duty.read", "claude", "fable", "max", "unavailable"), route("duty.deep", "codex", "gpt-6-luna", "low"), route("profile.epic.design_phase", "claude", "opus", "xhigh")] };
++  const read = configuredRecordRoute("/fixture-root", { routeSource });
++  const v4 = (model, effort) => ({ schema: "pipeline.dispatch-record.v4", runner: "claude", model, effort });
++  assert.deepEqual(read(v4("claude-sonnet-5-5", "medium")), { model: true, effort: true }, "an alias selector admits its family's ids; any duty route counts, as at the guard");
++  assert.deepEqual(read(v4("haiku", "high")), { model: true, effort: true }, "a model-id selector is reached as its family alias");
++  assert.deepEqual(read(v4("fable", "max")), { model: false, effort: false }, "an unavailable route names nothing");
++  assert.deepEqual(read(v4("gpt-6-luna", "low")), { model: false, effort: false }, "another runner's route names nothing on Claude");
++  assert.deepEqual(read(v4("opus", "xhigh")), { model: false, effort: false }, "a main-session profile route is not a dispatch route");
++  assert.equal(read({ ...v4("sonnet", "high"), schema: "pipeline.dispatch-record.v3" }), null, "a hand-typed v3 record stays on the agent definition");
++  assert.equal(read({ ...v4("sonnet", "high"), runner: "codex" }), null);
++  assert.equal(configuredRecordRoute("/fixture-root", { routeSource: { ok: false } })(v4("sonnet", "high")), null);
++  assert.equal(configuredRecordRoute(undefined)(v4("sonnet", "high")), null, "no root, no project to read");
++});
++
+ test("DME-C23e the Claude SubagentStop hook names the effort that really ran, or says it is unobserved, beside a recorded Goldfish commit", async () => {
+   const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import("node:fs");
+   const { tmpdir } = await import("node:os");
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 821e9f41b69093500e4043c49110460e77de5d75..3dbe8c085eba41a694191500bfc8e4362bcfdefb 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -399,7 +399,7 @@ function draftRecord({ state, observation, commitReadback, testFirstEvidence = "
+     dispatcher: "Elephant", candidateCommit: commitReadback.commit,
+     resultSha256: observation.final.reportSha256, outcome: "completed", commits: [commitReadback.commit],
+     log: observedNativeHostProgress({ state, observation }).map((entry) => entry.phase === "host-return-observed"
+-      ? { ...entry, note: `${entry.note} ${testFirstNote(testFirstEvidence)}` } : entry), report,
++      ? { ...entry, note: `${entry.note} ${testFirstNote(testFirstEvidence)}${observation.resolvedModelDiffers ? ` resolvedModel: ${observation.resolvedModelDiffers} (the record names the configured ${binding.model}; the tool layer carries only the family alias).` : ""}` } : entry), report,
+     outcomeClassification: { schema: OUTCOME_CLASSIFICATION_SCHEMA, kind: "authored-commit" },
+     ...(decision.schema === CRITIC_REQUIRED_SCHEMA ? { criticRequired: decision } : { criticSkip: decision }),
+   };
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 24ad465a43919e941df2dfd9ee732a6a5379dbde..6bec7176421da67ab7e1d0ad6dc936b9f7eae858 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -132,7 +132,7 @@ function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfi
+     return runtime.run(()=> {
+       const binding={schema:adapterVersion===2?"pipeline.native-goldfish-host-briefing.v2":"pipeline.native-goldfish-host-briefing.v1",dispatchId:`NGHF-${runner.toUpperCase()}-1`,
+         candidateCommit:git("rev-parse","HEAD"),candidateTree:git("rev-parse","HEAD^{tree}"),runner,role:`pipeline-core:${agentName}`,
+-        ...(adapterVersion===2?{nativeAgentType:"worker"}:{agentType:agentName}),model:runner==="claude"?"sonnet":"gpt-6-luna",effort:runner==="claude"?(agentName==="goldfish-deep"?"high":"medium"):"high",rulesetSha,allowedPaths:["src/change.mjs"],criticDecision};
++        ...(adapterVersion===2?{nativeAgentType:"worker"}:{agentType:agentName}),model:options.model??(runner==="claude"?"sonnet":"gpt-6-luna"),effort:options.effort??(runner==="claude"?(agentName==="goldfish-deep"?"high":"medium"):"high"),rulesetSha,allowedPaths:["src/change.mjs"],criticDecision};
+       const prompt=`Goldfish task\n<!-- pipeline-native-goldfish-host-commit:v${adapterVersion}\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}`;
+       const input=runner==="claude"?{cwd:root,session_id:"session-claude",hook_event_name:"PreToolUse",tool_name:"Agent",tool_use_id:"tool-claude",tool_input:{subagent_type:binding.role,prompt,run_in_background:background}}
+         :{cwd:root,session_id:"session-codex",hook_event_name:"PreToolUse",tool_name:"spawn_agent",tool_use_id:"tool-codex",tool_input:{agent_type:binding.nativeAgentType??binding.agentType,message:prompt}};
+@@ -229,6 +229,27 @@ const cases = [
+     assert.equal(facts.publishedRecord.agentType, "goldfish-deep");
+     assert.equal(facts.commits, 1);
+   }, "claude", 1, "goldfish-deep") },
++  // C23: a route the project's configuration names is admitted at the briefing and the guard, so the host commit at the END of the work may not refuse it either.
++  ...[
++    { id: "NGHF01-DEEP-C23A", name: "a configured Claude effort differing from the agent definition reaches the host commit", options: { effort: "medium" }, resolved: "sonnet" },
++    { id: "NGHF01-DEEP-C23B", name: "a configured Claude model of another family than the agent definition reaches the host commit, and the record names what really ran", options: { model: "opus" }, resolved: "claude-opus-5-5", note: /claude-opus-5-5/u },
++  ].map(({ id, name, options, resolved, note }) => ({ id, name, run: () => fixture(({ root, binding, dependencies, facts }) => {
++    const input = { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude", tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
++      tool_response: { status: "completed", resolvedModel: resolved, modelsUsed: [resolved], content: [{ type: "text", text: finalText(binding) }] } };
++    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
++    assert.equal(result.status, "authored-commit-recorded", `${result.code} ${JSON.stringify(result).slice(0, 300)}`);
++    assert.equal(facts.commits, 1);
++    assert.equal(facts.publishedRecord.model, binding.model);
++    assert.equal(facts.publishedRecord.effort, binding.effort);
++    if (note) assert.match(facts.publishedRecord.log.find((entry) => entry.phase === "host-return-observed").note, note);
++  }, "claude", 1, "goldfish-deep", options) })),
++  { id: "NGHF01-DEEP-C23C", name: "a model that neither the agent definition nor any configured route names still gets no host commit", run: () => fixture(({ root, binding, dependencies, facts }) => {
++    const input = { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude", tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
++      tool_response: { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model], content: [{ type: "text", text: finalText(binding) }] } };
++    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
++    assert.notEqual(result.status, "authored-commit-recorded");
++    assert.equal(facts.commits, 0);
++  }, "claude", 1, "goldfish-deep", { model: "no-route-names-this" }) },
+   { id: "NGHF01-P3", name: "Claude PostToolUse without pending state names the exact reason and the orchestrator route, not the bare code", run: () => fixture(({ root, binding, dependencies, facts }) => {
+     const marked = `x\n<!-- pipeline-native-goldfish-host-commit:v1\n${JSON.stringify(binding)}\n-->`;
+     const launch = (tool_response, run_in_background) => ({ hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+index 926792d4968165f4dac1bd618e8843993a42b5a1..be2da8fb9c2b7abe01b87d7e91bc430571ad9fd5 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+@@ -215,6 +215,12 @@ function oneTextBlock(value) {
+   return content[0].text;
+ }
+ 
++// C23: the Agent tool's `model` parameter carries only a family alias, so the host may resolve a configured alias or id to another
++// model of that family. Another family, or a configured value with no recognisable family, keeps the exact comparison.
++const claudeFamily = (model) => /^(?:claude-)?(opus|sonnet|haiku|fable)(?=$|[-_.:[])/u.exec(String(model).trim().toLowerCase())?.[1] ?? null;
++const satisfiesClaudeBinding = (model, configured) => model === configured
++  || (claudeFamily(configured) !== null && claudeFamily(model) === claudeFamily(configured));
++
+ /** Bind Claude's foreground Task/Agent PostToolUse result to its exact call and resolved model. */
+ export function observeClaudeGoldfishReturn(input, pending) {
+   if (!input || input.hook_event_name !== "PostToolUse" || !["Agent", "Task"].includes(input.tool_name)
+@@ -223,15 +229,16 @@ export function observeClaudeGoldfishReturn(input, pending) {
+     || pending?.runner !== "claude" || pending.binding?.runner !== "claude") return fail("NGHR-CLAUDE-CORRELATION");
+   const response = input.tool_response;
+   if (!response || response.status !== "completed" || typeof response.resolvedModel !== "string"
+-    || response.resolvedModel !== pending.binding.model) return fail("NGHR-CLAUDE-RETURN-MODEL");
++    || !satisfiesClaudeBinding(response.resolvedModel, pending.binding.model)) return fail("NGHR-CLAUDE-RETURN-MODEL");
+   if (Array.isArray(response.modelsUsed)
+-    && (response.modelsUsed.length === 0 || response.modelsUsed.some((model) => model !== pending.binding.model))) {
++    && (response.modelsUsed.length === 0 || response.modelsUsed.some((model) => !satisfiesClaudeBinding(model, pending.binding.model)))) {
+     return fail("NGHR-CLAUDE-MODEL-SWITCH");
+   }
+   const text = oneTextBlock(response);
+   if (text === null) return fail("NGHR-CLAUDE-RETURN-SHAPE");
+   const final = validateNativeGoldfishFinal(text, { binding: pending.binding });
+-  return final.ok ? { ...final, runner: "claude", assurance: "host-observed-tool-use-and-resolved-model" } : final;
++  return final.ok ? { ...final, runner: "claude", assurance: "host-observed-tool-use-and-resolved-model",
++    ...(response.resolvedModel === pending.binding.model ? {} : { resolvedModelDiffers: response.resolvedModel }) } : final;
+ }
+ 
+ /**
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
+index 98b12f77dd1840b45cfc8c4b7f457ce2e5b2ddf6..ee68ab1662af8b9ba641427921c9d79f69a94844 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
+@@ -250,6 +250,20 @@ const cases = [
+     assert.deepEqual(validateNativeGoldfishFinal("[1]", { binding }).detail, { condition: "fields" });
+     assert.deepEqual(validateNativeGoldfishFinal(JSON.stringify({ ...final, dispatchId: "OTHER" }), { binding }).detail, { condition: "dispatch-id" });
+   }],
++  ["NGHR14 C23: the Agent tool carries only a family alias, so a model of the configured family satisfies the binding and another family does not", () => {
++    const familyBinding = (model) => ({ ...claudePending, binding: { ...claudePending.binding, model } });
++    const input = (resolvedModel, modelsUsed = [resolvedModel]) => ({ hook_event_name: "PostToolUse", tool_name: "Agent", tool_use_id: "tool-use-1",
++      session_id: "session-1", tool_response: { status: "completed", resolvedModel, modelsUsed, content: [{ type: "text", text: finalText }] } });
++    const aliasBound = observeClaudeGoldfishReturn(input("claude-sonnet-5-5"), familyBinding("sonnet"));
++    assert.equal(aliasBound.ok, true, aliasBound.code);
++    assert.equal(aliasBound.resolvedModelDiffers, "claude-sonnet-5-5", "what really ran is reported, never overwritten by the configured value");
++    const idBound = observeClaudeGoldfishReturn(input("claude-sonnet-5-5"), familyBinding("claude-sonnet-5-0"));
++    assert.equal(idBound.ok, true, idBound.code);
++    assert.equal(Object.hasOwn(observeClaudeGoldfishReturn(input("claude-sonnet-5-5"), familyBinding("claude-sonnet-5-5")), "resolvedModelDiffers"), false);
++    assert.equal(observeClaudeGoldfishReturn(input("claude-opus-5-5"), familyBinding("sonnet")).code, "NGHR-CLAUDE-RETURN-MODEL");
++    assert.equal(observeClaudeGoldfishReturn(input("claude-sonnet-5-5", ["claude-sonnet-5-5", "claude-opus-5-5"]), familyBinding("sonnet")).code, "NGHR-CLAUDE-MODEL-SWITCH");
++    assert.equal(observeClaudeGoldfishReturn(input("claude-sonnet-5-5"), familyBinding("no-family-model")).code, "NGHR-CLAUDE-RETURN-MODEL", "a value with no family has only the exact comparison");
++  }],
+ ];
+ 
+ const temp = mkdtempSync(join(tmpdir(), "native-goldfish-host-return-"));
+diff --git a/plugins/pipeline-core/lib/workflow-runner-boundary.mjs b/plugins/pipeline-core/lib/workflow-runner-boundary.mjs
+index 548f35e0d65424c05b6fb6c5a700616af567b09e..adba0fa138cba8445767988ea3ce0ad08e6bc427 100644
+--- a/plugins/pipeline-core/lib/workflow-runner-boundary.mjs
++++ b/plugins/pipeline-core/lib/workflow-runner-boundary.mjs
+@@ -83,7 +83,7 @@ function validReturnAuthorship(value) {
+     || typeof value.reason !== "string" || value.reason.length === 0
+     || typeof value.taskId !== "string" || !SAFE_ID.test(value.taskId)
+     || !exactKeyCount(value.modelCheck, new Set(["classification", "reason"]))
+-    || value.modelCheck.classification !== "model-matches"
++    || !["model-matches", "model-route-configured"].includes(value.modelCheck.classification)
+     || typeof value.modelCheck.reason !== "string" || value.modelCheck.reason.length === 0) return false;
+   if (!Object.hasOwn(value, "orchestratorAddedFiles")) return true;
+   const paths = value.orchestratorAddedFiles;
+diff --git a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+index c8dd44604ac0e4299e59f03791c04d490982176f..1c38f9da860490a341f58a2ffdd415c8f2b907a7 100644
+--- a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+@@ -114,6 +114,7 @@ import { fileURLToPath } from "node:url";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
++import { configuredRecordRoute } from "../lib/dispatch-model-enforcement.mjs";
+ import { AGY_HOST_OBSERVED_TRAILER } from "../lib/agy-host-observed-receipt.mjs";
+ import { inspectAgyHostObservedLocalReadback } from "../lib/agy-host-observed-local-readback.mjs";
+ import { nativeAuthoredRecordBytes, inspectNativeGoldfishHostObservation } from "../lib/native-goldfish-host-observation.mjs";
+@@ -755,7 +756,8 @@ export function verifyCommit(sha, deps) {
+ 
+   // Dimension 4: the recorded model, checked against the dispatched agent's own definition
+   // (NVA-BL-78). Silent (no effect on verdict) when the record predates `agentType`.
+-  const modelCheck = compareRecordedModel(record);
++  // C23: a route the project's configuration names is bound here as at the writer; a double without a repository root keeps the definition-only comparison.
++  const modelCheck = compareRecordedModel(record, { configuredRoute: configuredRecordRoute(deps.repoRoot) });
+   let acceptedModelCheck = modelCheck;
+   const nativeHostMarkers = parseTrailerBlock(message).filter((entry) => entry.key.toLowerCase() === "native-host-observed");
+   if (isV4 && record.outcomeClassification?.kind === "authored-commit"
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+index 6d6d54cdfc8f35ac86704476eb0fe5e26ade0422..e25d97599bfdadd0567281ed4a221230ffb82875 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+@@ -13,6 +13,7 @@ import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { criticAddendumBindingFinding, evaluateRepositoryCriticSkipCoverage, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
+ import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
++import { configuredRecordRoute } from "../lib/dispatch-model-enforcement.mjs";
+ import { agyAuthoredRecordBytes } from "../lib/agy-host-observed-receipt.mjs";
+ import { agyAgentTypeForRole } from "../lib/agy-final-return.mjs";
+ import { inspectAgyHostObservedLocalReadback } from "../lib/agy-host-observed-local-readback.mjs";
+@@ -214,6 +215,10 @@ function verifyOrchestratorAttestedDelivery(root, record, dependencies) {
+   if (JSON.stringify([...changed].sort()) !== JSON.stringify(reported)) fail("record-attestation-scope", "the files the attested commits touch differ from the files the record reports");
+ }
+ 
++// C23: the two classifications that bind a record's model and effort: the agent definition, or a route the project's configuration names.
++const MODEL_BOUND = new Set(["model-matches", "model-route-configured"]);
++const compareForProject = (root, record) => compareRecordedModel(record, { configuredRoute: configuredRecordRoute(root) });
++
+ function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
+   { hostObservedAgy = false, hostObservedNativeGoldfish = false, orchestratorAttestedRoute = false } = {}) {
+   const record = validateDispatchRecord(inputRecord);
+@@ -222,7 +227,7 @@ function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
+   const orchestratorAttested = record.schema === "pipeline.dispatch-record.v4" && record.outcomeClassification.kind === "orchestrator-attested";
+   if (orchestratorAttested !== orchestratorAttestedRoute) fail("record-attestation-route", "the orchestrator-attested kind is written only by the attested writer, and that writer accepts nothing else");
+   if (orchestratorAttested) verifyOrchestratorAttestedDelivery(root, record, dependencies);
+-  const modelCheck = compareRecordedModel(record);
++  const modelCheck = compareForProject(root, record);
+   if (record.schema === DISPATCH_RECORD_SCHEMA && !isTerminalOutcome(record.outcome)) {
+     if (hostObservedAgy || hostObservedNativeGoldfish) fail("attempt-host-route", "terminal host route cannot publish an opening");
+     return publishOpening(root, targetPath, record, modelCheck, dependencies);
+@@ -264,7 +269,7 @@ function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
+   } else if (!hostObservedNativeGoldfish && !agyUndelivered && !agyInterrupted
+     && !(orchestratorAttested && record.attestation.modelAssurance === MODEL_ASSURANCE_DECLARED_UNOBSERVED
+       && modelCheck.classification === "runner-model-authority-required")
+-    && modelCheck.classification !== "model-matches"
++    && !MODEL_BOUND.has(modelCheck.classification)
+     && !(record.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA
+       && modelCheck.classification === "model-override-declared")) {
+     // v3 already admits a closed, rationale-bearing declared override. It is
+@@ -337,7 +342,7 @@ export function writeDispatchAttemptCheckpoint({ repoRoot, taskId, openingSha256
+ }
+ function publishOpening(root, targetPath, record, modelCheck, dependencies) {
+   openingRecord(record);
+-  if (modelCheck.classification !== "model-matches") fail("record-model", "opening requires configured model/effort binding; it does not observe a host model");
++  if (!MODEL_BOUND.has(modelCheck.classification)) fail("record-model", "opening requires configured model/effort binding; it does not observe a host model");
+   const normalized = normalizeDispatchRecordPath(targetPath, "opening target");
+   if (![attemptPath(record.taskId), `evidence/dispatch-record-${record.taskId}.json`].includes(normalized)) fail("target-path", "opening target does not match task");
+   const target = attemptPath(record.taskId);
+@@ -374,9 +379,9 @@ function nativeDispatchAttempt({ repoRoot, runner, input, expectedPendingSha256
+   if(configured&&(configured.model!==expected.model||configured.effort!==expected.effort||configured.role!==state.binding.role||configured.candidateCommit!==expected.candidateCommit))fail("record-model","native configured route differs from original opening");
+   if (!present && publish) {
+     if(configured){const envelope={schema:"pipeline.dispatch-attempt.v1",opening:expected};publishExclusiveBytes(root,target,binding.dispatchId,jsonBytes(envelope),{},"dispatch-attempt");}
+-    else publishOpening(root,target,expected,compareRecordedModel(expected),{});
++    else publishOpening(root,target,expected,compareForProject(root,expected),{});
+   }
+-  if (!configured&&compareRecordedModel(expected).classification !== "model-matches") fail("record-model", "native opening model configuration mismatch");
++  if (!configured&&!MODEL_BOUND.has(compareForProject(root,expected).classification)) fail("record-model", "native opening model configuration mismatch");
+   const bytes = !present && !publish ? jsonBytes({ schema: "pipeline.dispatch-attempt.v1", opening: expected }) : readPhysicalRequest(root,target,{});
+   const envelope = decodeJson(bytes);
+   exactKeys(envelope,["schema","opening"],"attempt");
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+index 22dc8db0a98f9f2113df3a6b72932db2fc061e15..a7cff2bc2f5a7e02278d73e9214b793325a00513 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+@@ -63,6 +63,20 @@ check("writer persists no-delivery without manufacturing a commit or delivery pa
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++check("C23: a Claude record on a route the configuration names is written, also when the Goldfish stopped without a commit; one nothing names is not", () => {
++  const report = { text: "Read-only inspection completed.", changedFiles: [] };
++  const value = (taskId, overrides) => record({ schema: "pipeline.dispatch-record.v4", runner: "claude", taskId, agentType: "goldfish-deep", resultSha256: reportSha256(report.text),
++    outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" }, commits: [], report, ...overrides });
++  const named = value("NVA-C23-NAMED", { model: "opus", effort: "medium" });
++  const namedRoot = fixture(named);
++  try { assert.equal(writeDispatchRecordObject({ repoRoot: namedRoot, target: `evidence/dispatch-record-${named.taskId}.json`, record: named }).taskId, named.taskId); }
++  finally { rmSync(namedRoot, { recursive: true, force: true }); }
++  const unnamed = value("NVA-C23-UNNAMED", { model: "no-route-names-this", effort: "medium" });
++  const unnamedRoot = fixture(unnamed);
++  try { assert.throws(() => writeDispatchRecordObject({ repoRoot: unnamedRoot, target: `evidence/dispatch-record-${unnamed.taskId}.json`, record: unnamed }), (error) => error.code === "record-model"); }
++  finally { rmSync(unnamedRoot, { recursive: true, force: true }); }
++});
++
+ check("writer publishes a closed v4 read-only receipt without commit authorship", () => {
+   const report = { text: "Read-only inspection completed.", changedFiles: [] };
+   const value = record({ schema: "pipeline.dispatch-record.v4", taskId: "NVA-V4-READONLY", resultSha256: reportSha256(report.text), outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" }, commits: [], report });
+@@ -916,7 +930,8 @@ check("the attempt-terminal parent binding accepts the original parent and a typ
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
+-assert.equal(cases.length, 46, "the complete dispatch-record writer corpus must be registered before execution begins");
++// QG-04: 46 -> 47, one new C23 case (a Claude record on a configured route); the corpus is otherwise unchanged.
++assert.equal(cases.length, 47, "the complete dispatch-record writer corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

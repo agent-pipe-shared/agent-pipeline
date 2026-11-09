@@ -1,0 +1,164 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index c9cd88ecb8be76bca5192aa328b0fe144d8f7ff5..62edf2346f563aee809e92f8c400cff8eed95280 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -10339,6 +10339,32 @@ export function readOnboardingContinuityMemberBoundStateSha256({repository, bind
+   return null;
+ }
+ 
++/**
++ * The State image a released onboarding-continuity member left settled, or null when it cannot be shown. Pure; the registry and the owner side
++ * decide through this one function. D231 option (a) admitted only a member that never wrote. C23 (Codex greenfield F25, PO decision 2026-11-09)
++ * admits a writer too, because the Close's own route writes twice in a row (bind the Result, then the close block) and the second step was refused for good:
++ * a normally released member whose own selected-state facts and release evidence all name ONE image has its writes witnessed, since its facts
++ * move only through the owned refresh of its write. An image changed behind it leaves its facts and its release evidence apart. A recovered
++ * binding proves nothing about a write that was cut short, so lost-binding-recovered stays limited to a member that never wrote.
++ */
++export function onboardingContinuityReleasedSettledImage({terminal, boundStateSha256, memberFacts, releaseFacts} = {}) {
++  if (!['continuity-released','lost-binding-recovered'].includes(terminal) || typeof boundStateSha256 !== 'string') return null;
++  const own = (Array.isArray(memberFacts) ? memberFacts : []).filter(fact=>fact?.namespaceId==='selected-state');
++  const released = (Array.isArray(releaseFacts) ? releaseFacts : []).filter(fact=>fact?.namespaceId==='selected-state');
++  if (!own.length || !released.length) return null;
++  const image = released[0].sha256;
++  if (typeof image !== 'string' || !released.every(fact=>fact.sha256===image) || !own.every(fact=>fact.sha256===image)) return null;
++  return terminal === 'lost-binding-recovered' && image !== boundStateSha256 ? null : image;
++}
++/** The settled image of one released member record, read against its immutable execution journal; null on anything unreadable. */
++export function readOnboardingContinuityReleasedSettledImage({repository, record, releaseRecord} = {}) {
++  try {
++    return onboardingContinuityReleasedSettledImage({terminal:releaseRecord?.terminal,
++      boundStateSha256:readOnboardingContinuityMemberBoundStateSha256({repository,bindingSha256:record?.bindingSha256}),
++      memberFacts:record?.sourceFacts, releaseFacts:releaseRecord?.sourceFacts});
++  } catch { return null; }
++}
++
+ // D231 (PO decision 2026-11-01, option A): the one closed list of State entries a plain-terminal OWNER ROUTE process may run for
+ // the process's own direct binding. close-feature is NOT on it (it needs the owner-descriptor retirement and the retired terminal
+ // for physical-readback, a separate slice): it keeps its present refusal here as well as in scripts/continuity-owner-route.mjs.
+@@ -11252,18 +11278,9 @@ function continuityRefreshCompanionKnownOwnerAlias(data,snapshot) {
+     fail('SDC-AUTHORITY-UNAVAILABLE','continuity companion lifetime bound');
+   data.legacy.set(key,value.operation.operationHandle);
+ }
+-// D231 option (a): the owner-side twin of the registry's exemption. A released member is no historical writer only when its terminal is
+-// continuity-released or lost-binding-recovered AND the State sha it was bound at (its immutable execution journal) equals every
+-// selected-state fact of the member and of its release evidence. A member that wrote moved its facts to the postimage and never matches.
+-function continuityReleasedMemberNeverChangedState(data,item) {
+-  try {
+-    if (!['continuity-released','lost-binding-recovered'].includes(item.releaseRecord?.terminal)) return false;
+-    const bound=readOnboardingContinuityMemberBoundStateSha256({repository:data.repository,bindingSha256:item.record.bindingSha256});
+-    if (typeof bound!=='string') return false;
+-    const released=item.releaseRecord.sourceFacts.filter(fact=>fact.namespaceId==='selected-state');
+-    return released.length>0 && released.every(fact=>fact.sha256===bound)
+-      && item.record.sourceFacts.filter(fact=>fact.namespaceId==='selected-state').every(fact=>fact.sha256===bound);
+-  } catch { return false; }
++// The owner-side twin of the registry's check: the same predicate, onboardingContinuityReleasedSettledImage.
++function continuityReleasedMemberLeftStateSettled(data,item) {
++  return typeof readOnboardingContinuityReleasedSettledImage({repository:data.repository,record:item.record,releaseRecord:item.releaseRecord})==='string';
+ }
+ function continuityObserveCompanionStateWrite(data,port,methods,handle,context) {
+   if (!exactKeys(context,new Set(['boundary','producerRecord','memberRecords','releaseRecords']))
+@@ -11292,7 +11309,7 @@ function continuityObserveCompanionStateWrite(data,port,methods,handle,context)
+       || !continuityAuthorityEqual(members.filter(item=>item.releaseRecord!==null).map(item=>item.releaseRecord),context.releaseRecords)
+       || members.some(item=>item.record.phase==='terminal-observed'
+         || (item.record.phase==='released'&&item.record.sourceFacts.some(fact=>continuityCompanionFactMatched(fact,plan.effects,'preimage'))
+-          &&!continuityReleasedMemberNeverChangedState(data,item))))
++          &&!continuityReleasedMemberLeftStateSettled(data,item))))
+     fail('SDC-AUTHORITY-CAS','continuity companion record authentication failed');
+   const snapshot=continuityAuthoritySnapshot(data.repository);
+   if (!continuityAuthorityEqual(snapshot.memberships,producer.record.baseline))
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index e45500131b8a8b889d28383f301aaa4c1f60d049..69ac1bdcda62e59a7950a6405ec573c70e6668b9 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -1333,19 +1333,13 @@ function companionInventory(row,images){
+   return {memberships:baseline.memberships,legacyOperationsSha256:digest(legacy)};
+ }
+ function companionConserveFacts(before,after,preimages,postimages){if(!equal(before.filter(f=>!companionFactMatches(f,preimages)),after.filter(f=>!companionFactMatches(f,postimages))))fail('SDC-AUTHORITY-CAS','companion-unscoped-source-effects');}
+-// D231 (PO decision 2026-11-01, option a): a RELEASED onboarding-continuity member is no historical writer when (1) its release terminal is
+-// continuity-released or lost-binding-recovered AND (2) the State image it was BOUND at equals the State image in its release evidence (and the
+-// image the next write starts from). The bound image is the sha256 the owner recorded in its immutable execution journal at the bind (found by the
+-// member's bindingSha256); the release evidence is the selected-state fact of the release record. A member that wrote moved its own facts to the
+-// postimage, so its journal sha differs from a later image or from its release evidence: it stays blocking, as does every other terminal.
+-function releasedMemberNeverChangedState(repo,row,member,preimages){
++// A RELEASED onboarding-continuity member does not block the next State write when the image it left settled is the image that write starts from
++// (D231 option a, widened to a witnessed writer by C23; the rule and its limits: onboardingContinuityReleasedSettledImage). Every other terminal stays blocking.
++function releasedMemberLeftStateSettled(repo,row,member,preimages){
+   try{
+-    if(row.participant.producerId!=='onboarding-continuity'||!member.release||!['continuity-released','lost-binding-recovered'].includes(member.release.value.terminal))return false;
+-    const bound=onboarding.readOnboardingContinuityMemberBoundStateSha256({repository:repo,bindingSha256:member.value.bindingSha256});
+-    if(typeof bound!=='string')return false;
+-    const released=member.release.value.sourceFacts.filter(f=>f.namespaceId==='selected-state');
+-    if(!released.length||released.some(f=>f.sha256!==bound))return false;
+-    return member.value.sourceFacts.filter(f=>companionFactMatches(f,preimages)).every(f=>f.sha256===bound);
++    if(row.participant.producerId!=='onboarding-continuity'||!member.release)return false;
++    const image=onboarding.readOnboardingContinuityReleasedSettledImage({repository:repo,record:member.value,releaseRecord:member.release.value});
++    return typeof image==='string'&&member.value.sourceFacts.filter(f=>companionFactMatches(f,preimages)).every(f=>f.sha256===image);
+   }catch{return false;}
+ }
+ export function inspectSourceOwnedSessionAuthorityCompanionRefresh(input){
+@@ -1380,7 +1374,7 @@ export function executeSourceOwnedSessionAuthorityCompanionWrite(input){
+   const pairs=boundaryPorts(token),before=stateRead(repo,pairs),preimages=plan.effects.map(e=>e.preimage),pre=before.rows.map(r=>companionInventory(r,preimages));
+   const affected=[];for(let i=0;i<before.rows.length;i++){
+     const row=before.rows[i];if(!equal(pre[i].memberships,row.record.value.baseline))fail('SDC-AUTHORITY-CAS','companion-preexisting-drift');
+-    if(row.members.some(m=>m.value.phase==='released'&&m.value.sourceFacts.some(f=>companionFactMatches(f,preimages))&&!releasedMemberNeverChangedState(repo,row,m,preimages)))fail('SDC-AUTHORITY-UNAVAILABLE','companion-historical-owner-witness-missing');
++    if(row.members.some(m=>m.value.phase==='released'&&m.value.sourceFacts.some(f=>companionFactMatches(f,preimages))&&!releasedMemberLeftStateSettled(repo,row,m,preimages)))fail('SDC-AUTHORITY-UNAVAILABLE','companion-historical-owner-witness-missing');
+     const overlap=[...pre[i].memberships.flatMap(m=>m.sourceFacts),...row.members.filter(m=>m.value.phase!=='released').flatMap(m=>m.value.sourceFacts)].some(f=>companionFactMatches(f,preimages));
+     const declared=plan.affectedProducerIds.includes(row.participant.producerId);
+     if(overlap&&!declared)fail('SDC-AUTHORITY-UNAVAILABLE','companion-unknown-overlapping-owner');
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index a491b4f3697f47d1cba49baa0b77caa4de9d63bb..0d2d97655b97d880d08d44f6327a8fa4bae47c5e 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -858,15 +858,18 @@ test("D231 owner route: the four Close-route entries run through the spawned CLI
+   assertReleased(p, "bootstrap-apply");
+   const bound = JSON.parse(readFileSync(p.statePath));
+   assert.notEqual(bound.continuity.authority.result, null, "the Result is bound exactly as on the direct route");
+-  // Registry side "not exempt" (PO decision option a): the member of bootstrap-apply WROTE the State, so its released record is a
+-  // historical writer for the image it left. The next owner is refused with the registry's code, writes nothing and still releases.
+-  const stateAfterWrite = readFileSync(p.statePath);
+-  const blockedAfterWriter = ownerRun(p, ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", String(bound.continuity.revision),
++  // C23 (Codex greenfield F25, PO decision 2026-11-09): the Close's own route is this chain. The member of bootstrap-apply wrote the State and
++  // left it settled, so the close block runs next in the same project, plan and apply, each under its own member.
++  const chainPlanned = ownerRun(p, ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", String(bound.continuity.revision),
+     "--result-path", bound.continuity.authority.result.path, "--result-sha256", bound.continuity.authority.result.sha256]);
+-  assert.notEqual(blockedAfterWriter.status, 0);
+-  assert.match(blockedAfterWriter.stderr, /companion-historical-owner-witness-missing/, "a released member that wrote is never exempt");
+-  assert.deepEqual(readFileSync(p.statePath), stateAfterWrite);
+-  assertReleased(p, "refused after a writer");
++  assert.equal(chainPlanned.status, 0, chainPlanned.stderr);
++  assertReleased(p, "close-plan after the writer");
++  const chainApplied = ownerRun(p, JSON.parse(chainPlanned.stdout).applyAction.argv.slice(1));
++  assert.equal(chainApplied.status, 0, chainApplied.stderr);
++  assertReleased(p, "close-apply after the writer");
++  const chainEnd = JSON.parse(readFileSync(p.statePath));
++  assert.equal(chainEnd.continuity.queueHead.nextAction, "close", "the chain ends where the close continues");
++  assert.equal(chainEnd.continuity.revision, bound.continuity.revision + 1);
+   // The close entries on a project whose Result is still unbound (the direct-route close fixture): plan, then apply under a second member.
+   const c = ownerRouteProject("cor-close");
+   const closePlanned = ownerRun(c, ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", "7",
+@@ -884,6 +887,25 @@ test("D231 owner route: the four Close-route entries run through the spawned CLI
+   assertReleased(c, "close-apply");
+ });
+ 
++test("C23 F25: a released member counts as settled only when its facts and its release evidence name one image, and a recovered binding only when it never wrote", () => {
++  const { onboardingContinuityReleasedSettledImage: settled } = continuityApi;
++  const facts = (...shas) => shas.map((sha256) => ({ namespaceId: "selected-state", sha256 }));
++  const [S0, S1, S2] = ["a", "b", "c"].map((c) => c.repeat(64));
++  const released = { terminal: "continuity-released", boundStateSha256: S0, memberFacts: facts(S1), releaseFacts: facts(S1) };
++  assert.equal(settled(released), S1, "a writer that released at the image it left");
++  assert.equal(settled({ ...released, boundStateSha256: S1 }), S1, "a member that never wrote");
++  assert.equal(settled({ ...released, memberFacts: facts(S0) }), null, "the image moved behind the member: its facts stayed at the old image");
++  assert.equal(settled({ ...released, releaseFacts: facts(S2) }), null, "the release evidence names another image");
++  assert.equal(settled({ ...released, memberFacts: facts(S1, S2) }), null, "the member's facts disagree");
++  assert.equal(settled({ ...released, releaseFacts: facts(S1, S2) }), null, "the release evidence disagrees");
++  assert.equal(settled({ ...released, boundStateSha256: null }), null, "no journal, no proof");
++  assert.equal(settled({ ...released, memberFacts: [] }), null, "no facts, no proof");
++  assert.equal(settled({ ...released, releaseFacts: [{ namespaceId: "other", sha256: S1 }] }), null, "only the selected-state evidence counts");
++  for (const terminal of ["completed", "cancelled", "revoked", undefined]) assert.equal(settled({ ...released, terminal }), null, String(terminal));
++  assert.equal(settled({ ...released, terminal: "lost-binding-recovered" }), null, "a recovered binding proves nothing about a write cut short");
++  assert.equal(settled({ ...released, terminal: "lost-binding-recovered", boundStateSha256: S1 }), S1, "a recovered binding that never wrote");
++});
++
+ test("D231 owner route: close-feature, entries outside the allowlist, foreign flags and a State before the Close lifecycle are refused with a typed code and write nothing", () => {
+   const p = ownerRouteProject("cor-negatives");
+   const before = readFileSync(p.statePath), resultBefore = readFileSync(p.resultPath);

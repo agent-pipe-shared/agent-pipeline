@@ -1,0 +1,191 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 698c71be65f0c7ebacf4761872e79182c983671c..91853a512bd3ee695e86565137b8d0b95afe7601 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -353,16 +353,16 @@ test("a not-ready session admits the help flag of a script that answers it and r
+     markGovernedFixture(path);
+     const dependencies = { projectDir: path, requireProjectOnboardingReadyFn() { deny(NON_PARTIAL_DENIAL_STATUS); } };
+     const scriptPath = (name) => fileURLToPath(new URL(`../scripts/${name}`, import.meta.url));
+-    for (const tail of ["onboarding-init.mjs --help", "onboarding-init.mjs -h", "design-review-receipt.mjs --help", "dispatch-briefing.mjs --help"]) {
++    for (const tail of ["onboarding-init.mjs --help", "onboarding-init.mjs -h", "design-review-receipt.mjs --help", "dispatch-briefing.mjs --help", "project-reset.mjs --help"]) {
+       const [name, flag] = tail.split(" ");
+       assert.deepEqual(evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${flag}`), dependencies), { exitCode: 0, stderr: "" }, tail);
+     }
+-    for (const tail of ["project-reset.mjs --help", "close-coordinator.mjs -h", "dispatch-briefing.mjs --help --root x"]) {
++    for (const tail of ["rotate-handover-sections.mjs --help", "close-coordinator.mjs -h", "dispatch-briefing.mjs --help --root x"]) {
+       const [name, ...rest] = tail.split(" ");
+       const refused = evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${rest.join(" ")}`), dependencies);
+       assert.equal(refused.exitCode, 2, tail);
+       assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u, tail);
+-      assert.match(refused.stderr, { "project-reset.mjs --help": /project-reset\.mjs has no help: --help would run the script itself/u, "close-coordinator.mjs -h": /close-coordinator\.mjs answers --help, not -h/u }[tail] ?? /^(?![\s\S]*has no help:)/u, tail);
++      assert.match(refused.stderr, { "rotate-handover-sections.mjs --help": /rotate-handover-sections\.mjs has no usable help: --help would start the script/u, "close-coordinator.mjs -h": /close-coordinator\.mjs answers --help, not -h/u }[tail] ?? /^(?![\s\S]*has no usable help:)/u, tail);
+     }
+   } finally { rmSync(path, { recursive: true, force: true }); }
+ });
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 9fda77cfc5664c99810f9d1078586c9e5c1392ad..41d9a068dbe20ccb45309859cbe19da06a72ea7a 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -660,12 +660,34 @@ export const SCRIPTS_ANSWERING_HELP = new Map([
+     "publish-evidence-run", "reconcile-backlog-delivery", "register-feature-package", "run-codex-critic-isolation", "session-critic-finalizer",
+     "verify-evidence-producer"].map((name) => [`${name}.mjs`, LONG_HELP_FLAG]),
+ ]);
++// PO tile 2026-11-09: these have no help branch but refuse `--help` as an unknown argument and print their usage, with a non-zero exit and no write
++// (measured for each, and re-run by the same test). Only `--help`: `-h` was not measured for them.
++export const SCRIPTS_PRINTING_USAGE_ON_HELP = new Set(["advisor-capability-preflight", "advisory-host-bridge", "agy-native-integrate", "agy-session-consent",
++  "architecture-boundary-check", "audit-bundle", "audit-pack", "authority-restore", "bootstrap-trust-recovery", "capture-evidence", "change-control",
++  "check-backlog-state", "check-completeness-vocabulary-doclint", "check-critic-bound-verify", "check-critic-skip-coverage", "check-po-gate-authority",
++  "check-private-identifiers", "check-protected-path-integrity", "check-resume-consumption", "clean-candidate-run", "clone-hook-readiness",
++  "codex-advisory-bootstrap", "codex-app-server-health", "codex-private-overlay-activation", "commit-msg-hook-install", "commit-pipeline-owned",
++  "critic-correction-input-bindings", "critic-notes-write", "critic-t1-po-override", "dispatch-authorship-verify", "dispatch-record-liveness",
++  "dispatch-record-write", "document-adapter", "document-binding", "durable-evidence", "evidence-viewer", "external-reference", "finish-feature",
++  "generate-architecture-overview", "generate-runbook", "github-issue-operations", "gitlab-forge-adapter", "goldfish-antigravity-host",
++  "goldfish-host-commit-recover", "governance-authority", "governance-event", "governance-export", "governance-replay", "governance-replay-viewer",
++  "guard-human-override", "guard-maintenance-window", "human-approval-trace", "human-authority-grant", "human-terminal-action",
++  "model-family-approval-request", "model-role-bootstrap", "model-role-dispatch-select", "module-slice-proposal", "observation-governance-bootstrap",
++  "onboarding-consent", "onboarding-consent-mark", "organization-policy", "phoenix-authority-approval", "po-approval-gate", "po-approval-request",
++  "po-gate-profile-repair", "pre-commit-hook-install", "pre-push-hook-install", "private-overlay-activation", "project-reset", "public-baseline-diagnose",
++  "publication-gate-evidence", "push-batch-executor", "push-gate-satisfiability", "push-prepare", "reconcile-backlog-ledger", "recover-sentinel-backlog",
++  "refresh-mandatory-hooks", "release-preflight-cli", "remote-provisional-approval", "repository-freshness", "repository-mode-promote", "resume-hint",
++  "routine-repair", "ruleset-freshness", "ruleset-freshness-host", "runner-capabilities", "sbom-discovery", "scratch-custody-check",
++  "security-gate-configure", "session-authority-repair", "session-capability-diagnose", "session-cleanup", "session-power", "session-power-address-repair",
++  "signing-ceremony", "toolchain-preflight", "worktree-create"].map((name) => `${name}.mjs`));
+ const PLUGIN_SCRIPTS_DIR = fileURLToPath(new URL("../../scripts", import.meta.url));
+ 
++const flagsAnsweredBy = (name) => SCRIPTS_ANSWERING_HELP.get(name) ?? (SCRIPTS_PRINTING_USAGE_ON_HELP.has(name) ? LONG_HELP_FLAG : undefined);
++
+ function isAnsweredScriptHelp(script, args, options) {
+   if (args.length !== 1 || typeof script !== "string") return false;
+   const name = relativeUnderRoot(script, PLUGIN_SCRIPTS_DIR, { platform: options.platform ?? process.platform, lstatFn: options.lstatFn });
+-  return name !== null && SCRIPTS_ANSWERING_HELP.get(name)?.includes(args[0]) === true;
++  return name !== null && flagsAnsweredBy(name)?.includes(args[0]) === true;
+ }
+ 
+ /** PO tile 2026-11-09: what a refusal owes a usage question on a plugin script that cannot answer it, instead of a sentence about the lifecycle; null for every other command. */
+@@ -675,9 +697,9 @@ export function scriptHelpRefusalHint(command, root, options = {}) {
+   const name = relativeUnderRoot(resolved.script, PLUGIN_SCRIPTS_DIR, { platform: options.platform ?? process.platform, lstatFn: options.lstatFn });
+   if (name === null || name === "" || name.includes("/") || !name.endsWith(".mjs")) return null;
+   try { if (!lstatSync(join(PLUGIN_SCRIPTS_DIR, name)).isFile()) return null; } catch { return null; }
+-  const flags = SCRIPTS_ANSWERING_HELP.get(name);
++  const flags = flagsAnsweredBy(name);
+   if (flags !== undefined) return `${name} answers ${flags.join(" and ")}, not ${resolved.args[0]}: ask with that flag. This refusal is about the flag, not about the feature's lifecycle.`;
+-  return `${name} has no help: ${resolved.args[0]} would run the script itself, so it is refused here. This refusal is about that, not about the feature's lifecycle. Read the comment at the top of ${resolved.script} for its usage.`;
++  return `${name} has no usable help: ${resolved.args[0]} would start the script or be refused by it without a usage text, so it is refused here. This refusal is about that, not about the feature's lifecycle. Read the comment at the top of ${resolved.script} for its usage.`;
+ }
+ 
+ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+@@ -753,7 +775,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+     if (args[0] === "inspect") return exactRoot(args, root, 1) && args.length === 3;
+     // 17: the bootstrap skill (pipeline-start step 7) tells an agent to capture the material input BEFORE a restart, in a session that is
+     // not ready, and names exactly one argv shape for it: the card at the fixed path, consumed, no other flag. That shape is admitted in
+-    // every lifecycle state, nothing wider (no other card path, no `--help`, no other flag).
++    // every lifecycle state, nothing wider (no other card path, no other flag). `--help` is decided above, at the head of this function.
+     return args[0] === "capture" && exactRoot(args, root, 1) && args.length === 6
+       && args[3] === "--card-file" && args[4] === join(root, "project", ".resume-hint-input.json") && args[5] === "--consume-card";
+   }
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+index 6c094167095ba88c5c6b1219f4e1bd8b4fbf540b..8cc46ebdb668d8f7433b2096e4dfef6c541fcd52 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+@@ -81,15 +81,15 @@ for (const [name, metadata] of [
+ });
+ // PO 2026-11-09: in draft a usage question passes when the script answers it, and otherwise the refusal says why instead of talking about implementation writes.
+ check('draft shell admits a help question the script answers and explains the one it cannot', () => {
+-  const reset = fileURLToPath(new URL('../../scripts/project-reset.mjs', import.meta.url));
++  const running = fileURLToPath(new URL('../../scripts/rotate-handover-sections.mjs', import.meta.url));
+   assert.equal(devPlanShellRefusalHit(`node ${script} --help`, root, dependencies()), null);
+-  const hit = devPlanShellRefusalHit(`node ${reset} --help`, root, dependencies());
++  const hit = devPlanShellRefusalHit(`node ${running} --help`, root, dependencies());
+   assert.equal(hit?.verdict, 'block');
+-  assert.match(hit?.helpHint ?? '', /project-reset\.mjs has no help: --help would run the script itself/u);
++  assert.match(hit?.helpHint ?? '', /rotate-handover-sections\.mjs has no usable help: --help would start the script/u);
+   const rendered = devPlanShellBlocked(hit, '').stderr;
+-  assert.match(rendered, /GUARD-DEVPLAN-SHELL: project-reset\.mjs has no help/u);
++  assert.match(rendered, /GUARD-DEVPLAN-SHELL: rotate-handover-sections\.mjs has no usable help/u);
+   assert.doesNotMatch(rendered, /shell write to a dev-plan-gated path/u);
+-  assert.equal(devPlanShellRefusalHit(`node ${reset} --root x`, root, dependencies())?.helpHint, undefined);
++  assert.equal(devPlanShellRefusalHit(`node ${running} --root x`, root, dependencies())?.helpHint, undefined);
+ });
+ 
+ 
+diff --git a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+index 0b51227850029a6473672ffc4e9f8191c75215f8..6759fddfd5c7d3e3cdbf36f5dedd349285f86837 100644
+--- a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+@@ -2,11 +2,11 @@
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+-import { join, resolve } from "node:path";
++import { dirname, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { registerTestCaseCompletion } from "../test-case-completion.mjs";
+ import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+-import { isSanctionedLifecycleCommand, SCRIPTS_ANSWERING_HELP } from "./command-catalogue.mjs";
++import { isSanctionedLifecycleCommand, SCRIPTS_ANSWERING_HELP, SCRIPTS_PRINTING_USAGE_ON_HELP } from "./command-catalogue.mjs";
+ import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
+ import { isReadOnlyDiagnosticCommand } from "./shell-grammar.mjs";
+ import * as denials from "./grammar-denials.mjs";
+@@ -78,6 +78,14 @@ test("G23 exact source-owned PO help is a pure CLI route", () => {
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// One help question in its own empty directory, with a private home and only Node's own directory on PATH.
++function askHelp(path, flag, root) {
++  const dir = mkdtempSync(join(root, "run-"));
++  const child = spawnSync(process.execPath, [path, flag], { cwd: dir, encoding: "utf8", timeout: 60000,
++    env: { PATH: dirname(process.execPath), HOME: dir, USERPROFILE: dir, TMPDIR: dir, TEMP: dir, TMP: dir, ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}) } });
++  return { status: child.status, stdout: child.stdout ?? "", stderr: child.stderr ?? "", left: readdirSync(dir) };
++}
++
+ // PO 2026-11-09: `--help` on a plugin script is admitted in every lifecycle state, but only for a script that really answers it.
+ test("every plugin script with a help branch is admitted for its own flags and only prints its usage", () => {
+   mkdirSync(fixtureBase, { recursive: true });
+@@ -96,16 +104,26 @@ test("every plugin script with a help branch is admitted for its own flags and o
+       assert.equal(isSanctionedLifecycleCommand(`node ${path} -h`, root), flags.includes("-h"), `${name} short flag`);
+       for (const flag of flags) {
+         assert.equal(isSanctionedLifecycleCommand(`node ${path} ${flag}`, root), true, `${name} ${flag}`);
+-        const dir = mkdtempSync(join(root, "run-"));
+-        const child = spawnSync(process.execPath, [path, flag], { cwd: dir, encoding: "utf8", timeout: 60000,
+-          env: { ...process.env, HOME: dir, USERPROFILE: dir, TMPDIR: dir, TEMP: dir, TMP: dir } });
++        const child = askHelp(path, flag, root);
+         assert.equal(child.status, 0, `${name} ${flag}: ${child.stderr}`);
+         assert.ok(child.stdout.trim().length > 0, `${name} ${flag} prints its usage`);
+-        assert.deepEqual(readdirSync(dir), [], `${name} ${flag} writes nothing`);
++        assert.deepEqual(child.left, [], `${name} ${flag} writes nothing`);
+       }
+     }
+-    for (const refused of [`node ${join(scriptsDir, "project-reset.mjs")} --help`, `node ${join(scriptsDir, "resume-hint.mjs")} --help`,
+-      `node ${join(root, "pipeline-state.mjs")} --help`, `node ${join(scriptsDir, "..", "scripts", "project-reset.mjs")} --help`]) {
++    // No help branch, but `--help` is refused as an unknown argument and the refusal carries the usage: admitted for exactly that flag, proven here.
++    for (const name of SCRIPTS_PRINTING_USAGE_ON_HELP) {
++      assert.equal(SCRIPTS_ANSWERING_HELP.has(name), false, `${name} is on one list only`);
++      const path = join(scriptsDir, name);
++      assert.equal(isSanctionedLifecycleCommand(`node ${path} --help`, root), true, name);
++      assert.equal(isSanctionedLifecycleCommand(`node ${path} -h`, root), false, `${name} short flag`);
++      const child = askHelp(path, "--help", root);
++      assert.ok(child.status !== 0 && child.status !== null, `${name}: exit ${child.status}`);
++      assert.match(`${child.stdout}${child.stderr}`, /usage/iu, `${name} prints its usage`);
++      assert.deepEqual(child.left, [], `${name} writes nothing`);
++    }
++    const running = "rotate-handover-sections.mjs"; // really starts its normal run when asked `--help`
++    for (const refused of [`node ${join(scriptsDir, running)} --help`, `node ${join(root, "pipeline-state.mjs")} --help`,
++      `node ${join(scriptsDir, "..", "scripts", running)} --help`]) {
+       assert.equal(isSanctionedLifecycleCommand(refused, root), false, refused);
+     }
+   } finally { rmSync(root, { recursive: true, force: true }); }
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index a2ced5a9161ebc7f1686db8c45b5ec56b1341e11..3024d7ebabb5fccdbf65546570fc672687b663dd 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -201,8 +201,8 @@ recommendation.
+    distil that input into a bounded, closed context card and capture it; do not
+    reduce it to a new short kickoff goal or merely promise to remember it.
+    **Before a restart the session is not ready, and then exactly one argv shape
+-   is admitted** — card at the fixed path, no other flags, `--help` included in
+-   what is refused:
++   is admitted** — card at the fixed path, no other flags (its `--help` only
++   prints the usage):
+    `node <plugin-root>/scripts/resume-hint.mjs capture --root <root> --card-file <root>/project/.resume-hint-input.json --consume-card`.
+    Write the card to that exact path first. Elsewhere (a ready session) any
+    `--card-file <json>` works. Read back `resume-hint.mjs inspect` after a

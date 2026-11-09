@@ -1,0 +1,164 @@
+diff --git a/plugins/pipeline-core/lib/critic-source-return.mjs b/plugins/pipeline-core/lib/critic-source-return.mjs
+index f840266b76d3b9b0f0578a3711b6dc83e706024f..dd2626110712cbd0cdde283292aa19a65c51c146 100644
+--- a/plugins/pipeline-core/lib/critic-source-return.mjs
++++ b/plugins/pipeline-core/lib/critic-source-return.mjs
+@@ -15,7 +15,7 @@
+  * `send_message` to its parent (hooks/antigravity-pretool-guard.mjs recognises the child; whether a stop event fires for an Antigravity child is not
+  * measured and nothing is built on it). Imports only the packet read half and the schema checker.
+  */
+-import { closeSync, existsSync, openSync, readFileSync, readdirSync, writeSync } from "node:fs";
++import { closeSync, existsSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, writeSync } from "node:fs";
+ import { join } from "node:path";
+ import { PACKET_ID, SESSION_REVIEW_TTL_SECONDS, SPLIT_FILE, canonicalJson, currentState, packetContext, readJson, sha256 } from "./critic-packet-preflight-read.mjs";
+ import { attributeVerdict, criticSplitDigest, criticSplitProblem, verdictPassContradiction } from "./critic-split.mjs";
+@@ -35,11 +35,12 @@ const CRITIC_AGENT_TYPES = new Set(["critic", "critic-high-risk"]);
+ 
+ const normalizedAgentType = (value) => typeof value !== "string" ? null : value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
+ 
++const VERDICT_FENCE = /```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```/gu;
+ /** The verdict a Critic returned: its whole message, else the content of the LAST fenced block, as a schema-shaped object; otherwise null. */
+ export function extractCriticVerdict(text) {
+   if (typeof text !== "string" || text.length === 0 || text.length > 4 * 1024 * 1024) return null;
+   const candidates = [text.trim()];
+-  const blocks = [...text.matchAll(/```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```/gu)];
++  const blocks = [...text.matchAll(VERDICT_FENCE)];
+   if (blocks.length > 0) candidates.push(blocks.at(-1)[1]);
+   for (const candidate of candidates) {
+     let value;
+@@ -91,10 +92,58 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
+       const handback = readHandbackFn(input);
+       if (handback?.ok === true) verdict = extractCriticVerdict(handback.message);
+     }
+-    return issueForVerdict({ commonDir, runner, verdict, nowMs, child: childDigest(input.agent_id) });
++    const child = childDigest(input.agent_id);
++    const result = issueForVerdict({ commonDir, runner, verdict, nowMs, child });
++    noteReturnProblem({ commonDir, runner, nowMs, child, result, text: input.last_assistant_message });
++    return result;
+   } catch { return { status: "unavailable" }; }
+ }
+ 
++/** In words, why a Critic's final message holds no verdict that can be recorded. */
++function verdictProblemText(text) {
++  if (typeof text !== "string" || text.trim() === "") return "its final message was empty";
++  const blocks = [...text.matchAll(VERDICT_FENCE)];
++  let value;
++  try { value = JSON.parse(blocks.length > 0 ? blocks.at(-1)[1] : text.trim()); }
++  catch { return blocks.length > 0 ? "the last fenced block of its final message is not valid JSON" : "its final message does not end in a fenced JSON verdict"; }
++  const { errors } = validateAgainstSchema(value, VERDICT_SCHEMA);
++  return errors.length > 0 ? `its verdict does not match the verdict schema (${errors.slice(0, 3).join("; ")})` : "its final message holds no verdict";
++}
++
++const returnProblemFile = (child) => `return-problem-${child ?? "unknown"}.json`;
++/**
++ * C23 (Claude greenfield 2026-11-09: a split entry stayed without a record, the merge could only say it was missing and the agent resumed that Critic twice in the dark). The reason a return
++ * left no record goes to the private packet directory, because a stop hook's own output never reaches the calling agent; the merge prints it. A later good return of that child clears it.
++ * Best effort: it never changes what the stop did.
++ */
++function noteReturnProblem({ commonDir, runner, nowMs, child, result, text }) {
++  try {
++    const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
++    if (result.status === "issued") {
++      if (child !== null && typeof result.packetId === "string") rmSync(join(controlRoot, result.packetId, returnProblemFile(child)), { force: true });
++      return;
++    }
++    const reason = result.status === "no-verdict" ? verdictProblemText(text)
++      : result.status === "contradictory-verdict" ? `its verdict contradicts its own pass: true (${result.reason})`
++        : result.status === "unattributed" ? `its verdict names no split entry: trajectory_evidence must begin with one of ${result.entries.join(", ")}`
++          : null;
++    if (reason === null || !existsSync(controlRoot)) return;
++    const open = openAdmittedPackets(controlRoot, runner, nowMs);
++    if (open === null || open.length !== 1 || !open[0].split) return;
++    writeFileSync(join(open[0].packetDir, returnProblemFile(child)), canonicalJson({ reason: reason.slice(0, 800), atMs: nowMs }), { mode: 0o600 });
++  } catch { /* a diagnostic never fails the stop */ }
++}
++
++/** C23: why Critics of this split packet returned without a record, newest first; [] when none did. */
++export function readCriticReturnProblems({ controlRoot, packetId } = {}) {
++  try {
++    if (typeof controlRoot !== "string" || !PACKET_ID.test(packetId ?? "")) return [];
++    const dir = join(controlRoot, packetId);
++    return readdirSync(dir).filter((name) => /^return-problem-(?:[a-f0-9]{64}|unknown)\.json$/u.test(name))
++      .map((name) => JSON.parse(readFileSync(join(dir, name), "utf8"))).sort((left, right) => right.atMs - left.atMs).map((problem) => String(problem.reason));
++  } catch { return []; }
++}
++
+ /** CGR-09: the identity of the returning child as a digest (never the raw id), or null when the runner reports none. */
+ const childDigest = (id) => (typeof id === "string" && id !== "" && id.length <= 200 ? sha256(id) : null);
+ 
+diff --git a/plugins/pipeline-core/scripts/critic-split-merge.mjs b/plugins/pipeline-core/scripts/critic-split-merge.mjs
+index 2aa7140ddc4ce7768c549ff3476e7daf8f0275dd..d0c49bfbc7adfd72e82dd92da805f42f90f64ced 100644
+--- a/plugins/pipeline-core/scripts/critic-split-merge.mjs
++++ b/plugins/pipeline-core/scripts/critic-split-merge.mjs
+@@ -21,7 +21,7 @@ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { mergeSplitVerdicts } from "../lib/critic-split.mjs";
+-import { readAdmittedSplit, readCriticSplitSourceReturns, settleSplitReturns } from "../lib/critic-source-return.mjs";
++import { readAdmittedSplit, readCriticReturnProblems, readCriticSplitSourceReturns, settleSplitReturns } from "../lib/critic-source-return.mjs";
+ 
+ export const CRITIC_SPLIT_MERGE_RESULT_SCHEMA = "pipeline.critic-split-merge-result.v1";
+ const MAX_BYTES = 1024 * 1024;
+@@ -36,12 +36,18 @@ function childrenFromPacket(root, packetId) {
+   const packetsRoot = join(resolve(root, common.stdout.trim()), "agent-pipeline", "critic-packets");
+   let records = [];
+   try { records = readCriticSplitSourceReturns({ controlRoot: packetsRoot, packetId }); } catch { records = []; }
+-  if (records.length === 0) throw new MergeUsageError(`packet ${JSON.stringify(String(packetId).slice(0, 40))} holds no Critic Source return; repair: let the module Critics return through their stop, or pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-NO-RECORDS");
++  const problems = problemText(readCriticReturnProblems({ controlRoot: packetsRoot, packetId }));
++  if (records.length === 0) throw new MergeUsageError(`packet ${JSON.stringify(String(packetId).slice(0, 40))} holds no Critic Source return${problems}; repair: let the module Critics return through their stop, or pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-NO-RECORDS");
+   const digests = new Set(records.map((record) => record?.splitSha256));
+   const split = digests.size === 1 ? readAdmittedSplit(join(packetsRoot, packetId), [...digests][0]) : undefined;
+   if (split === undefined) throw new MergeUsageError(`the Source returns of packet ${packetId} do not bind one admitted split; repair: pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-SPLIT");
+   // CGR-09: a resumed child's later return replaces its earlier one; two different children for one entry still reach the merge as duplicates and are refused there.
+-  return { split, children: settleSplitReturns(records).map((record) => ({ entryId: record.entryId, verdict: record.verdict })) };
++  return { split, problems, children: settleSplitReturns(records).map((record) => ({ entryId: record.entryId, verdict: record.verdict })) };
++}
++
++/** C23: the recorded reasons as one clause of a refusal, with the step they call for; empty when no Critic left one. */
++function problemText(problems) {
++  return problems.length === 0 ? "" : `. A Critic of this round returned without a record because ${problems.slice(0, 3).join("; and ")}. Send that Critic this reason so its corrected final message counts for its entry, or dispatch a fresh Critic for the missing entry`;
+ }
+ 
+ function repoFile(root, path, label) {
+@@ -84,7 +90,7 @@ export function runCriticSplitMergeCli(argv) {
+       return { split, children };
+     })();
+     const merged = mergeSplitVerdicts(input.split, input.children);
+-    if (!merged.ok) return { exitCode: 1, stdout: "", stderr: `${JSON.stringify({ schema: CRITIC_SPLIT_MERGE_RESULT_SCHEMA, status: "rejected", code: merged.code, message: merged.message })}\n` };
++    if (!merged.ok) return { exitCode: 1, stdout: "", stderr: `${JSON.stringify({ schema: CRITIC_SPLIT_MERGE_RESULT_SCHEMA, status: "rejected", code: merged.code, message: `${merged.message}${merged.code === "CSM-CHILD-MISSING" ? input.problems ?? "" : ""}` })}\n` };
+     if (flags.out !== undefined) {
+       const out = repoFile(root, flags.out, "--out");
+       let fd;
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 279a4688f74af79f5de48407827d766105a7e6ea..546554c92c6907342b2c3f48267970ea6f0f517a 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -2828,6 +2828,29 @@ test("C21B a child verdict that passes against its own fields issues no Source r
+   } finally { cleanup(fx); }
+ });
+ 
++test("C23: a Critic return that leaves no record states why in the merge refusal, and a corrected return of the same child clears the reason", async () => {
++  const { runCriticSplitMergeCli } = await import("./critic-split-merge.mjs");
++  const fx = g2072Fixture();
++  try {
++    const admitted = g2072Admit(fx);
++    const merge = () => JSON.parse(runCriticSplitMergeCli(["--root", fx.root, "--packet", admitted.packetId]).stderr);
++    const problems = () => readdirSync(admitted.packetDir).filter((name) => name.startsWith("return-problem-"));
++    for (const id of ["api", "shared"]) assert.match(g2072Hook(fx, criticReturn(g2072Child(id))).stderr, /Source return issued/u);
++    const child = { agent_id: "agent-core" };
++    g2072Hook(fx, criticReturn({ ...g2072Child("core"), severity: "extra" }), child);
++    assert.equal(problems().length, 1);
++    const schema = merge();
++    assert.equal(schema.code, "CSM-CHILD-MISSING");
++    assert.match(schema.message, /no child verdict for entry core[\s\S]*does not match the verdict schema \(.*severity[\s\S]*Send that Critic this reason/u, schema.message);
++    g2072Hook(fx, "The review is finished, no block here.", child);
++    assert.match(merge().message, /does not end in a fenced JSON verdict/u);
++    g2072Hook(fx, criticReturn(verdict()), child);
++    assert.match(merge().message, /names no split entry: trajectory_evidence must begin with one of scope:/u);
++    assert.match(g2072Hook(fx, criticReturn(g2072Child("core")), child).stderr, /Source return issued/u);
++    assert.deepEqual(problems(), [], "the corrected return clears the reason");
++  } finally { cleanup(fx); }
++});
++
+ test("G20-72 admit binds the split; the Critic stop hook issues one Source return per returning child; the whole chain ends in one source-issued verdict whose receipt carries the split digest", async () => {
+   const { criticSplitDigest } = await import("../lib/critic-split.mjs");
+   const fx = g2072Fixture();

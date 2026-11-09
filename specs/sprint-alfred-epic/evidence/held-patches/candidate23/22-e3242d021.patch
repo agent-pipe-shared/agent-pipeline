@@ -1,0 +1,104 @@
+diff --git a/plugins/pipeline-core/hooks/guard-git.mjs b/plugins/pipeline-core/hooks/guard-git.mjs
+index 1e59136785ca6cd844ee76e161b8da5f937d437c..6438e42698d56f01def236ab76f9aac5345522d2 100644
+--- a/plugins/pipeline-core/hooks/guard-git.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.mjs
+@@ -268,7 +268,7 @@
+ import { existsSync, readFileSync, appendFileSync, realpathSync } from "node:fs";
+ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+-import { dirname, join, resolve, sep } from "node:path";
++import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { commitMessageFindings, commitTypeFindings, markerPolicyMode, parseIntegrationTrailerBlock, finishedCommitMessageFindings } from "../lib/commit-message-policy.mjs";
+@@ -317,9 +317,13 @@ const PHOENIX_OVERRIDE_REFERENCE_SCHEMA = "pipeline.git-override-authority-refer
+ 
+ // ---- read tool input (fail-open) --------------------------------------------------
+ let cmd = "";
++// C23 (Antigravity greenfield F24): the Antigravity adapter starts this hook in the project root and carries the directory the command
++// really runs in as tool_input.cwd, so a child in its own worktree had `-F scratch/msg.txt` looked up in the parent repository.
++let toolCwd = null;
+ try {
+   const input = JSON.parse(readFileSync(0, "utf8"));
+   cmd = String(input?.tool_input?.command ?? input?.tool_input?.CommandLine ?? "");
++  if (typeof input?.tool_input?.cwd === "string" && isAbsolute(input.tool_input.cwd)) toolCwd = input.tool_input.cwd;
+ } catch {
+   process.exit(0); // fail-open: guard is a safety net, not a prison
+ }
+@@ -1009,7 +1013,7 @@ function gitInvocationCwd(command) {
+   }
+   if (!/^(?:.*[/\\])?git(?:\.exe)?$/i.test(tokens[index] ?? "")) return null;
+   index += 1;
+-  let cwd = process.cwd();
++  let cwd = toolCwd ?? process.cwd();
+   while (index < tokens.length) {
+     const token = tokens[index];
+     if (token === "-C") {
+diff --git a/plugins/pipeline-core/hooks/guard-git.test.mjs b/plugins/pipeline-core/hooks/guard-git.test.mjs
+index 6c91f029e2a7e1e949c17c81846dbed20567f664..abb02d019317a65506228e5790f9ab02ca26efe4 100644
+--- a/plugins/pipeline-core/hooks/guard-git.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.test.mjs
+@@ -35,7 +35,7 @@ import { spawnSync } from "node:child_process";
+ import { appendFileSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
+ import { createHash, generateKeyPairSync, sign } from "node:crypto";
+ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { basename, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+@@ -70,11 +70,11 @@ const GUARD = fileURLToPath(new URL("./guard-git.mjs", import.meta.url));
+  * didn't ask for it. `envOverride` lets an override-mechanism case opt back into a
+  * session-level arming deliberately (AC-1 env-fallback path).
+  */
+-function runGuard(command, projectDir, envOverride = {}) {
++function runGuard(command, projectDir, envOverride = {}, toolCwd = undefined) {
+   enrollFixtureGovernance(projectDir);
+   const { PIPELINE_GUARD_OVERRIDE: _dropInherited, ...baseEnv } = process.env;
+   const res = spawnSync(process.execPath, [GUARD], {
+-    input: JSON.stringify({ tool_input: { command } }),
++    input: JSON.stringify({ tool_input: toolCwd === undefined ? { command } : { command, cwd: toolCwd } }),
+     encoding: "utf8",
+     cwd: projectDir,
+     env: { ...baseEnv, CLAUDE_PROJECT_DIR: projectDir, ...envOverride },
+@@ -92,8 +92,8 @@ const NO_CONFIG_DIR = mkdtempSync(join(tmpdir(), "guard-test-no-config-"));
+ 
+ let pass = 0;
+ const failures = [];
+-function check(id, command, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrEmpty, env = {} } = {}) {
+-  const { code, stderr } = runGuard(command, projectDir, env);
++function check(id, command, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrEmpty, env = {}, toolCwd = undefined } = {}) {
++  const { code, stderr } = runGuard(command, projectDir, env, toolCwd);
+   const problems = [];
+   if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit})`);
+   for (const needle of [].concat(stderrIncludes ?? [])) {
+@@ -858,6 +858,29 @@ check("GIT03-10 block  body lines cannot pose as the final provenance block",
+     projectDir: GIT03_BLOCKING_DIR,
+     stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING"],
+   });
++// C23 (Antigravity greenfield F24): the hook process runs in the project root; the command runs in the child's own worktree, named by tool_input.cwd.
++const GIT03_CHILD_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-child-"));
++writeFileSync(join(GIT03_CHILD_DIR, "child-only.txt"),
++  "feat(x): a thing\n\nWhy it matters.\n\nAI-Assisted: true\nDispatch: NVA-GIT03 (goldfish)\n");
++check("GIT03-11 allow  a relative -F is read from the directory the command runs in",
++  "git commit -F child-only.txt", ALLOW, { projectDir: GIT03_BLOCKING_DIR, toolCwd: GIT03_CHILD_DIR });
++check("GIT03-12 block  without that directory the same file is not found in the project root",
++  "git commit -F child-only.txt", BLOCK, {
++    projectDir: GIT03_BLOCKING_DIR,
++    stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE"],
++  });
++check("GIT03-13 block  a relative tool directory is ignored rather than resolved against the hook",
++  "git commit -F child-only.txt", BLOCK, {
++    projectDir: GIT03_BLOCKING_DIR,
++    toolCwd: "guard-test-relative",
++    stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE"],
++  });
++check("GIT03-14 block  a -F escaping the directory the command runs in stays refused",
++  `git commit -F ${join("..", basename(GIT03_OUTSIDE_DIR), "clean.txt")}`, BLOCK, {
++    projectDir: GIT03_BLOCKING_DIR,
++    toolCwd: GIT03_CHILD_DIR,
++    stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE"],
++  });
+ 
+ const GIT03_WARN_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-warn-"));
+ mkdirSync(join(GIT03_WARN_DIR, ".claude"), { recursive: true });

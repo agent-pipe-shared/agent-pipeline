@@ -1,0 +1,58 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 9dd72d806be5c849864379f455d2db1da68f9c30..49c0401c6708f47ea545cfa12550c0b684e6556c 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -358,6 +358,7 @@ ${verify}
+   3. Run exactly those cases GREEN, correct the implementation until they pass, then run the targeted checks below.
+   A case written in step 1 is changed after step 2 only with a written justification in the report that ties it to the criterion; never weaken it to make the implementation pass. Update only the cases the owned outcome needs.
+ - Journey coverage: for a user-facing criterion, examine whole user journeys and state transitions, not only the unit - every entry path, a reload in the middle of a transition, a second action after an error, a concurrent import, every dynamic text context the Spec names - and assert the actual effect (stored state or produced output), not only that text changed. Report journey coverage per criterion as covered / not covered.
++- Failure classes: when this assignment repairs a review finding or a reported defect, treat each one as an example of its failure class, not as a single case. Find the other inputs and state transitions of that class in the code you touch, repair and test them in this dispatch, and name in the report which cases each class covered. A case outside the write scope is reported, not repaired.
+ - Test fixtures mirror the real input, absolute paths included where a hook receives them.
+ - A new test FILE is not run by Verify until it is registered in the project's Verify suite list; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.${visualCheckBlock(pkg)}
+ 
+diff --git a/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+index 8b4340d4e4412d69e2af92fb2c4844be8375b37d..0234466042e7409114060ee88fb55edb023bc7fc 100644
+--- a/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
++++ b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+@@ -125,7 +125,9 @@ test("J4 the Spec template, the Critic template and the Goldfish test-authorship
+     has(text, /Journey coverage/u, `${rel} names journey coverage`);
+     has(text, /actual effect/u, `${rel} demands an assertion on the actual effect`);
+     has(text, /not only "text changed"/u, `${rel} rules out "text changed" alone`);
++    has(text, /Each finding is an example of its failure class/u, `${rel} makes a correction repair the failure class (PO tile 2026-11-09)`);
+   }
++  has(flat(read("plugins/pipeline-core/lib/dispatch-briefing-build.mjs")), /Failure classes: when this assignment repairs a review finding or a reported defect/u, "the generated briefing carries the failure-class duty on every runner");
+   for (const name of ["critic-review", "goldfish-task"]) {
+     assert.equal(read(`templates/prompts/${name}.md`), read(`plugins/pipeline-core/templates/prompts/${name}.md`), `${name}: root and vendored copy are byte-identical`);
+   }
+diff --git a/plugins/pipeline-core/templates/prompts/goldfish-task.md b/plugins/pipeline-core/templates/prompts/goldfish-task.md
+index dec15a8db11b576aba8d1b070e696fdf25e7daf1..0ddb003c3b40ff5b64b83fc234e134af7ed0bdb4 100644
+--- a/plugins/pipeline-core/templates/prompts/goldfish-task.md
++++ b/plugins/pipeline-core/templates/prompts/goldfish-task.md
+@@ -545,7 +545,10 @@ not the intended RED. Do not split test authoring from the fix by default. Do
+ not bundle incidental cleanup or unrelated refactors. If the batch Critic later
+ requires changes, the Elephant assigns one fresh Correction Goldfish to the
+ whole coherent frozen batch; that owner carries findings through tests, fixes
+-and targeted GREEN in one context. Preserve the batch's original review budget
++and targeted GREEN in one context. Each finding is an example of its failure
++class, not a single case: the owner repairs and tests the other inputs and state
++transitions of that class in the code it touches, and reports which cases each
++class covered. Preserve the batch's original review budget
+ and exact candidate lineage. Existing acceptance examiner changes remain
+ bounded and independently scrutinized under QG-04.
+ 
+diff --git a/templates/prompts/goldfish-task.md b/templates/prompts/goldfish-task.md
+index dec15a8db11b576aba8d1b070e696fdf25e7daf1..0ddb003c3b40ff5b64b83fc234e134af7ed0bdb4 100644
+--- a/templates/prompts/goldfish-task.md
++++ b/templates/prompts/goldfish-task.md
+@@ -545,7 +545,10 @@ not the intended RED. Do not split test authoring from the fix by default. Do
+ not bundle incidental cleanup or unrelated refactors. If the batch Critic later
+ requires changes, the Elephant assigns one fresh Correction Goldfish to the
+ whole coherent frozen batch; that owner carries findings through tests, fixes
+-and targeted GREEN in one context. Preserve the batch's original review budget
++and targeted GREEN in one context. Each finding is an example of its failure
++class, not a single case: the owner repairs and tests the other inputs and state
++transitions of that class in the code it touches, and reports which cases each
++class covered. Preserve the batch's original review budget
+ and exact candidate lineage. Existing acceptance examiner changes remain
+ bounded and independently scrutinized under QG-04.
+ 

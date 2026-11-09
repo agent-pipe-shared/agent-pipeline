@@ -1,0 +1,30 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 5c8cbce8496daabb115630765fd034ce3a5e626a..821e9f41b69093500e4043c49110460e77de5d75 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -236,7 +236,7 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
+       let entries = [];
+       try { entries = stopReaddir(directory); } catch { /* none to remove */ }
+       for (const entry of entries) {
+-        if (!/^stop-failure-.+\.json$/u.test(entry)) continue;
++        if (!/^(?:stop-failure|handback-refusals)-.+\.json$/u.test(entry)) continue;
+         try {
+           const recorded = JSON.parse(stopRead(join(directory, entry), "utf8"));
+           if (typeof recorded?.dispatchId === "string" && recorded.dispatchId === dispatchId) stopUnlink(join(directory, entry));
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 19619daadb386fedcdc78eb1bc574e0e1afb33b5..24ad465a43919e941df2dfd9ee732a6a5379dbde 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -971,6 +971,12 @@ const cases = [
+     const shown = nativeGoldfishHookMessage(failed, { stopFailure: readNativeGoldfishStopFailure({ commonDir }) });
+     assert.match(shown, new RegExp(`position ${cut.length} of ${cut.length} characters`, "u"));
+     assert.match(shown, /condition json-truncated/u);
++    // The repaired return completes the dispatch; the success removes the stop-failure record and the refusal count of that dispatch.
++    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
++      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding) } }] } })}\n`);
++    const done = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, dependencies);
++    assert.equal(done.status, "authored-commit-recorded", done.code);
++    assert.deepEqual(diagEntries(commonDir), [], "no diagnostic of the completed dispatch is left");
+   }, "claude", 1, "goldfish-implementor", { background: true }) },
+   { id: "NGHF49", name: "C23: the stop-failure detail admits the key lists as bounded slugs and drops everything else", run: () => {
+     assert.deepEqual(sanitizeStopFailureDetail({ condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "has space", "a/b", "k3", "k4", "k5", "k6", "k7"] }),

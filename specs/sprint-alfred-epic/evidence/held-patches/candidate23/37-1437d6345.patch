@@ -1,0 +1,124 @@
+diff --git a/plugins/pipeline-core/lib/critic-split.mjs b/plugins/pipeline-core/lib/critic-split.mjs
+index 7e37bc8e40bd65d76e12ef7303085e583a745173..de2a3c8dcbde6135971f3f8d74642fa6e7c98cd7 100644
+--- a/plugins/pipeline-core/lib/critic-split.mjs
++++ b/plugins/pipeline-core/lib/critic-split.mjs
+@@ -132,6 +132,27 @@ function cutByDirectory(paths, max) {
+   return parts;
+ }
+ 
++/**
++ * PO decision 2026-11-09 (greenfield runs: one small module per Critic meant many Critics that each read a handful of files): groups are packed together up to the bound, largest
++ * first and into the first one with room, so the round needs as few Critics as the bound allows. A group that stays alone keeps its id and module; a packed one becomes `group-<n>`,
++ * names its members in its scope line and has no single module. A leftover smaller than the bound stays alone: nothing is left to pack it with. Deterministic.
++ */
++function packSmallGroups(parts, max, taken) {
++  const bins = [];
++  const position = new Map(parts.map((part, index) => [part.id, index]));
++  for (const part of [...parts].sort((left, right) => right.paths.length - left.paths.length || position.get(left.id) - position.get(right.id))) {
++    const bin = bins.find((candidate) => candidate.size + part.paths.length <= max);
++    if (bin === undefined) bins.push({ size: part.paths.length, first: position.get(part.id), members: [part] });
++    else { bin.size += part.paths.length; bin.first = Math.min(bin.first, position.get(part.id)); bin.members.push(part); }
++  }
++  let suffix = 0;
++  return bins.sort((left, right) => left.first - right.first).map(({ members }) => {
++    if (members.length === 1) return members[0];
++    do suffix += 1; while (taken.has(`group-${suffix}`));
++    return { id: `group-${suffix}`, moduleId: null, paths: members.flatMap((member) => member.paths).sort(), label: `path group group-${suffix} (${members.map((member) => member.label).join(", ")})` };
++  });
++}
++
+ /**
+  * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES changed files after the bound exclusions) or holds nothing but
+  * delivery records. Delivery records count towards that bound, because an unsplit Critic would have them in its range, and are then left out of the parts.
+@@ -166,7 +187,7 @@ export function buildCriticSplit({ root, result }) {
+   const groups = [...plan.modules.map((module) => module.id).sort().map((id) => ({ id, moduleId: id, paths: owned.get(id), label: `module ${id}` })),
+     { id: SPLIT_SHARED_ENTRY_ID, moduleId: null, paths: shared, label: "the shared entry (every changed path no module owns)" }].filter((group) => group.paths.length > 0);
+   const moduleIds = new Set(plan.modules.map((module) => module.id));
+-  const parts = groups.flatMap((group) => {
++  const cut = groups.flatMap((group) => {
+     if (group.paths.length <= SPLIT_MAX_CHANGED_FILES) return [group];
+     let suffix = 0;
+     return cutByDirectory(group.paths, SPLIT_MAX_CHANGED_FILES).map((paths) => {
+@@ -175,6 +196,7 @@ export function buildCriticSplit({ root, result }) {
+       return { id, moduleId: null, paths, label: `path group ${id} of ${group.label}` };
+     });
+   });
++  const parts = packSmallGroups(cut, SPLIT_MAX_CHANGED_FILES, moduleIds);
+   const range = `${base.slice(0, 12)}..${candidate.slice(0, 12)}`;
+   return {
+     schema: CRITIC_SPLIT_SCHEMA, base, candidate, maxChangedFiles: SPLIT_MAX_CHANGED_FILES, changedFileCount: changed.length,
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index b40bbc6eee1f9b3b90d09276a78c753d95385891..bc39c9ceb33aba9b0b3e5828d3b76dc5afbaaf96 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -2251,7 +2251,7 @@ const g2072Input = (fx) => ({ root: fx.root, base: fx.base, candidate: fx.candid
+ const g2072Changed = (fx) => git(fx.root, ["diff", "--name-only", fx.base, fx.candidate]).split("\n").filter((line) => line !== "");
+ test("G20-72 above SPLIT_MAX_CHANGED_FILES the printed result carries one split entry per module plus a shared entry, disjoint and covering every changed path; the library result is unchanged", async () => {
+   const { CRITIC_SPLIT_SCHEMA, SPLIT_MAX_CHANGED_FILES, SPLIT_SHARED_ENTRY_ID } = await import("../lib/critic-split.mjs");
+-  const fx = g2072Fixture();
++  const fx = g2072Fixture({ core: 13, api: 13, loose: 13 }); // QG-04 (PO decision 2026-11-09, small groups are packed): no two of these fit one Critic
+   try {
+     const changed = g2072Changed(fx);
+     assert.ok(changed.length > SPLIT_MAX_CHANGED_FILES, `${changed.length} changed files`);
+@@ -2324,7 +2324,8 @@ test("G20-72 without an approved architecture plan the shared paths are cut alon
+ 
+ test("G20-72 a module above the bound is cut into parts, one flat directory included, while a module that fits keeps its entry", async () => {
+   const { SPLIT_MAX_CHANGED_FILES, criticSplitProblem } = await import("../lib/critic-split.mjs");
+-  const fx = g2072Fixture({ core: 40, api: 3, loose: 1 });
++  // QG-04 (PO decision 2026-11-09, small groups are packed): api and the shared group are too large to fit with each other or with core-part-2, so every entry stays.
++  const fx = g2072Fixture({ core: 40, api: 13, loose: 13 });
+   try {
+     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
+     assert.deepEqual(split.entries.map((entry) => entry.id), ["api", "core-part-1", "core-part-2", "shared"]);
+@@ -2336,6 +2337,28 @@ test("G20-72 a module above the bound is cut into parts, one flat directory incl
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++test("C23 PO decision 2026-11-09: small groups share one Critic up to the bound, the packed entry names its members and covers every path, and a group that stays alone keeps its module", async () => {
++  const { SPLIT_MAX_CHANGED_FILES, attributeVerdict, criticSplitProblem } = await import("../lib/critic-split.mjs");
++  const fx = g2072Fixture({ core: 40, api: 3, loose: 1 });
++  try {
++    const first = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} }).split;
++    assert.deepEqual(first.entries.map((entry) => entry.id), ["group-1", "core-part-1"], "the small module, the rest of core and the shared group take one Critic");
++    assert.equal(criticSplitProblem(first), null);
++    const packed = first.entries.find((entry) => entry.id === "group-1");
++    assert.equal(packed.moduleId, null);
++    assert.ok(packed.paths.length <= SPLIT_MAX_CHANGED_FILES);
++    for (const member of ["module api", "core-part-2", "the shared entry"]) assert.ok(packed.batchScopeLine.includes(member), `${member}: ${packed.batchScopeLine}`);
++    assert.deepEqual(first.entries.flatMap((entry) => entry.paths).sort(), g2072Changed(fx).sort());
++    assert.equal(attributeVerdict(first, { trajectory_evidence: `${packed.scopeMarker} reviewed` }), "group-1");
++    assert.deepEqual(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} }).split, first, "admit rebuilds the identical object");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++  const alone = g2072Fixture({ core: 14, api: 14, loose: 14 });
++  try {
++    const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(alone), { env: {} });
++    assert.equal(split.entries.find((entry) => entry.id === "api").moduleId, "api", "a group nothing fits with stays alone and keeps its module");
++  } finally { rmSync(alone.root, { recursive: true, force: true }); }
++});
++
+ test("G20-72 outside the delivery-record folders a split leaves out exactly the bound exclusions: another evidence file stays review source", async () => {
+   const fx = g2072Fixture({ records: true });
+   try {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index f5ddfea48550addd68e9aa3995f92cab597bd504..279a4688f74af79f5de48407827d766105a7e6ea 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -2705,7 +2705,8 @@ const MERGE_SCRIPT = fileURLToPath(new URL("./critic-split-merge.mjs", import.me
+ const NATIVE_HOOK = fileURLToPath(new URL("../hooks/native-goldfish-host.mjs", import.meta.url));
+ function g2072Fixture() {
+   const fx = fixture();
+-  // The fixture leaves its diagnostic untracked; the split candidate carries 28 module files, a PRD with the approved architecture design and its own diagnostic.
++  // The fixture leaves its diagnostic untracked; the split candidate carries 48 module files, a PRD with the approved architecture design and its own diagnostic.
++  // QG-04 (PO decision 2026-11-09, small groups are packed): 24 files per module keep api, core and shared three entries, so this walk stays one Critic per entry.
+   rmSync(join(fx.root, "evidence", "verify.json"), { force: true });
+   rmSync(join(fx.root, "evidence", "targeted.log"), { force: true });
+   const design = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield", disposition: { decision: "approved-scoped", scope: ["specs/", "src/"], rationale: "fixture" },
+@@ -2716,7 +2717,7 @@ function g2072Fixture() {
+   writeFileSync(join(fx.root, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
+   for (const dir of ["core", "api"]) {
+     mkdirSync(join(fx.root, "src", dir), { recursive: true });
+-    for (let index = 0; index < 14; index += 1) writeFileSync(join(fx.root, "src", dir, `m${index}.mjs`), `export const m${index} = ${index};\n`);
++    for (let index = 0; index < 24; index += 1) writeFileSync(join(fx.root, "src", dir, `m${index}.mjs`), `export const m${index} = ${index};\n`);
+   }
+   fx.candidate = commit(fx.root, "split candidate");
+   fx.tree = git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`]);

@@ -1,0 +1,26 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 288687e406d4849ec8c68bcc24de1bddd1bc130e..7b6252d6fb4e235bc9767d95c0ee3ee2b2a07d0a 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -69,7 +69,7 @@ function fail(code) { return { ok: false, code }; }
+ // Names each held dependency with the cause that actually holds it (Critic F1): only a deliverable,
+ // non-cancelled slice can be released by a "Dispatch: <slice> (goldfish)" commit.
+ export function heldDependencyRepair() {
+-  return `a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit`;
++  return `a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit; when its Goldfish no longer runs and the work landed another way, add --started and use --class integrated-elsewhere`;
+ }
+ // PO 2026-10-30 (D203): when the registry cannot be read (a producer refuses its reconcile), the refusal names the whole
+ // repair route itself: inspect, then the routine heal, and when heal did not clear it and no Goldfish runs, move-aside.
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 67584c97857f88e5c02f3ff1e559776df6c9b451..b97806980e63e40bbca91f6edf8171731d329081 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1490,6 +1490,8 @@ const cases = [
+     // The reservation-publish refusal is only reachable on an admission race, so it is pinned at its source and through the one shared text.
+     assert.equal(typeof mod.heldDependencyRepair,"function","heldDependencyRepair is exported");
+     namesRepair(mod.heldDependencyRepair(),'heldDependencyRepair');
++    // Live (candidate 23): a started slice whose host commit was lost and whose work was committed by hand has no goldfish commit to wait for.
++    assert.match(mod.heldDependencyRepair(),/add --started and use --class integrated-elsewhere/u,"the repair names the route for a started slice");
+     const source=readFileSync(new URL("./native-goldfish-host-state.mjs",import.meta.url),"utf8");
+     assert.match(source,/item-delivery-integration-dependency-held:[^\n]*\n?[^\n]*heldDependencyRepair\(\)|heldDependencyRepair\(\)[^\n]*item-delivery-integration-dependency-held/u,"the reservation-publish throw attaches the repair");
+     // PO 2026-10-30: an unreadable registry (a producer refuses its reconcile) names inspect, the routine heal and the human move-aside.

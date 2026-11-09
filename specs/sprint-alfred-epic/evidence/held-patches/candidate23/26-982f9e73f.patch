@@ -1,0 +1,26 @@
+diff --git a/.claude/pipeline.yaml b/.claude/pipeline.yaml
+index c98f0b158fe9cfbd9eb30bfaa3efcdabb80dfef2..b770dd358cc1f0b0df22de1807f262fd43e7e38e 100644
+--- a/.claude/pipeline.yaml
++++ b/.claude/pipeline.yaml
+@@ -92,7 +92,7 @@ modelRouting:
+     effort: high
+   goldfish_deep:
+     model: sonnet-5
+-    effort: medium
++    effort: high
+   critic:
+     model: opus
+     effort: medium
+diff --git a/project/pipeline.yaml b/project/pipeline.yaml
+index c98f0b158fe9cfbd9eb30bfaa3efcdabb80dfef2..b770dd358cc1f0b0df22de1807f262fd43e7e38e 100644
+--- a/project/pipeline.yaml
++++ b/project/pipeline.yaml
+@@ -92,7 +92,7 @@ modelRouting:
+     effort: high
+   goldfish_deep:
+     model: sonnet-5
+-    effort: medium
++    effort: high
+   critic:
+     model: opus
+     effort: medium

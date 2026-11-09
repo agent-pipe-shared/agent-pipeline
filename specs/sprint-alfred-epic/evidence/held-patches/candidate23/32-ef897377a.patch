@@ -1,0 +1,54 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index eac95ce7dce5656df69382c611bf90d1ee4b5e46..1b06c694e3552003271e791e3053fc17278d75b3 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -358,12 +358,12 @@ test("a not-ready session admits the help flag of a script that answers it and r
+       const [name, flag] = tail.split(" ");
+       assert.deepEqual(evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${flag}`), dependencies), { exitCode: 0, stderr: "" }, tail);
+     }
+-    for (const tail of ["rotate-handover-sections.mjs --help", "close-coordinator.mjs -h", "dispatch-briefing.mjs --help --root x"]) {
++    for (const tail of ["critic-split-merge.mjs --help", "close-coordinator.mjs -h", "dispatch-briefing.mjs --help --root x"]) {
+       const [name, ...rest] = tail.split(" ");
+       const refused = evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${rest.join(" ")}`), dependencies);
+       assert.equal(refused.exitCode, 2, tail);
+       assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u, tail);
+-      assert.match(refused.stderr, { "rotate-handover-sections.mjs --help": /rotate-handover-sections\.mjs has no usable help: --help would start the script/u, "close-coordinator.mjs -h": /close-coordinator\.mjs answers --help, not -h/u }[tail] ?? /^(?![\s\S]*has no usable help:)/u, tail);
++      assert.match(refused.stderr, { "critic-split-merge.mjs --help": /critic-split-merge\.mjs has no usable help: --help would start the script/u, "close-coordinator.mjs -h": /close-coordinator\.mjs answers --help, not -h/u }[tail] ?? /^(?![\s\S]*has no usable help:)/u, tail);
+     }
+   } finally { rmSync(path, { recursive: true, force: true }); }
+ });
+@@ -4977,8 +4977,15 @@ test("restart-required admits bounded resume-hint capture and required readback"
+         projectDir: path,
+         requireProjectOnboardingReadyFn() { deny("restart-required"); },
+       }).exitCode, 0, input.tool_name);
++      // C23: the first restart of a new project happens at this status, and the same fixed card route is open there.
++      assert.equal(evaluateLifecycleReadyGuard(input, {
++        projectDir: path,
++        requireProjectOnboardingReadyFn() { deny("runtime-initialization-required"); },
++      }).exitCode, 0, `runtime-initialization-required/${input.tool_name}`);
+     }
+     for (const [input, status] of [
++      [bash(`${capture} --bypass`), "runtime-initialization-required"],
++      [edit("project/resume-hint.json"), "runtime-initialization-required"],
+       [bash(`${capture} --bypass`), "restart-required"],
+       [bash(`node '${RESUME_HINT_SCRIPT}' capture --root '${path}' --card-file '${inputPath}'`), "restart-required"],
+       [bash(`node '${RESUME_HINT_SCRIPT}' capture --root '${path}' --card-file '${join(path, "resume-card.json")}' --consume-card`), "restart-required"],
+diff --git a/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs b/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
+index 77bc61e148187a2e3aca021d2893d4d30ab07379..c9f45730bc89dff3495fa4ec3603b9dc0081b9a7 100644
+--- a/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
++++ b/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
+@@ -176,7 +176,13 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
+       && error.code === "PORG-NOT-READY"
+       && error.intent === "session"
+       && error.lifecycleStatus === "restart-required";
+-    if (restartRequired && (isRestartResumeHintInputWrite(input, root)
++    // C23 (Antigravity greenfield D): the skill demands the card before ANY restart, and the first restart of a new project happens while the
++    // lifecycle still reads runtime-initialization-required; material input was refused its one durable route there.
++    const resumeCardStatus = restartRequired || (error instanceof ProjectOnboardingReadyError
++      && error.code === "PORG-NOT-READY"
++      && error.intent === "session"
++      && error.lifecycleStatus === "runtime-initialization-required");
++    if (resumeCardStatus && (isRestartResumeHintInputWrite(input, root)
+       || (toolName === "Bash" && (isRestartResumeHintCapture((input.tool_input.command ?? input.tool_input.CommandLine), root)
+         || isRestartResumeHintInspect((input.tool_input.command ?? input.tool_input.CommandLine), root))))) {
+       return verdict(0);

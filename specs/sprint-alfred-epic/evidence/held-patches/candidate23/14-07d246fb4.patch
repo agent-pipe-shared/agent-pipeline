@@ -1,0 +1,54 @@
+diff --git a/docs/enforcement.md b/docs/enforcement.md
+index c14d89157e4d99f7cea57d43a126c7162a2688ea..3b322a8762ad30ae60424ae419962eaf3e1e1527 100644
+--- a/docs/enforcement.md
++++ b/docs/enforcement.md
+@@ -46,6 +46,7 @@ no hand-maintained guard count or command list.
+ | Claude Code | PreToolUse | Edit&#124;Write&#124;NotebookEdit | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs" --runner claude |
+ | Claude Code | PreToolUse | Edit&#124;Write&#124;NotebookEdit | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-onboarding-consent-lock.mjs" |
+ | Claude Code | PreToolUse | Edit&#124;Write&#124;NotebookEdit | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs" |
++| Claude Code | PreToolUse | SubagentHandback | node "${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner claude |
+ | Claude Code | PreToolUse | Task&#124;Agent&#124;Workflow | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs" |
+ | Claude Code | PreToolUse | Task&#124;Agent&#124;Workflow&#124;TodoWrite | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-slicing.mjs" |
+ | Claude Code | PreToolUse | advisor | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-advisor-prohibition.mjs" |
+@@ -83,6 +84,6 @@ The hashes bind this generated page to the exact manifest bytes it read.
+ 
+ | Runner | Manifest | SHA-256 |
+ | --- | --- | --- |
+-| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `b50798c8f187d483f23a537e425606d3ea90883ecf9e986a1652a289780d586c` |
++| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `02450dcd399b16f1a9d23f988ef024cb9ac48fed7c669d9206fde79da1f2bc98` |
+ | Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `6ea0eba1803ea886a6da30328d1618873d39e03759822acd479b066fa56d1e34` |
+ | Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `356c5819743976907a35322902f6a48083cda1aec3e25ea5ffb7cf35e77ab900` |
+diff --git a/plugins/pipeline-core/hooks/hooks.json b/plugins/pipeline-core/hooks/hooks.json
+index c162afcf5eded1da07aa67f145965eb2a948e207..746b6f0937e3141e304153d075c4f23805e81bab 100644
+--- a/plugins/pipeline-core/hooks/hooks.json
++++ b/plugins/pipeline-core/hooks/hooks.json
+@@ -24,6 +24,17 @@
+           }
+         ]
+       },
++      {
++        "$comment": "Goldfish return check while the worker still exists (candidate 23). A marked Goldfish's own SubagentHandback is validated against its binding before the child is gone, because SubagentStop has no channel back to the worker or the Coordinator; live, a return cut off after its report lost the host commit silently. Allows every unmarked child and every fault, and stops refusing after three attempts. Whether Claude fires PreToolUse for this host tool is proven only by a live run.",
++        "matcher": "SubagentHandback",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
++            "timeout": 120
++          }
++        ]
++      },
+       {
+         "$comment": "Dispatch budget (NVA-BUDGETGUARD-1, 2026-08-27). Counts a dispatched subagent's tool calls externally instead of trusting its self-report, and once the working cap is reached permits only closing acts -- so the dispatch stops BEFORE the harness cliff, at the one point where a handover is still possible. Measured motivation: three dispatches ran 62, 53 and 50 tool calls against a stated ~40-45 allowance, and one reported \"34 logged\" while the runtime recorded 62. The matcher is MATCH-ALL ON PURPOSE -- the budget is a count of ALL tool calls, so a matcher naming individual tools would undercount silently, the same failure class this file already paid for with NotebookEdit; the installed runtime treats an absent matcher, \"*\" and \".*\" as match-all, and that was verified against the running binary rather than assumed, because a matcher the runtime does not recognise is a SILENT no-op that looks exactly like success. The orchestrating session is identified and exempted INSIDE the guard (subagent detection on transcript_path), never by the matcher, so this hook never limits the Elephant. CORRECTION (2026-08-27, same day): this registration first carried a match-all matcher, and it matched NOTHING -- a live dispatch made 34 tool calls without moving the counter once. The runtime binary does contain a match-all predicate accepting an absent matcher and the two wildcard literals, which is why the choice was believed proven; that predicate simply does not govern plugin PreToolUse matchers. Hooks DO reach subagents -- the same dispatch was refused mid-run by guard-lifecycle-ready on its Bash|PowerShell matcher, which is the control separating \"hooks do not fire in subagents\" from \"this matcher is not honoured\". The matcher now enumerates, using the identical alternation construction every other working matcher here already uses, deliberately wider than any single agent's toolset because undercounting is the failure this guard exists to prevent. Wired by harness/scripts/wire-dispatch-budget-hook.mjs; see hooks/guard-dispatch-budget.mjs.",
+         "matcher": "Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write",
+diff --git a/policies/control-placement.v1.json b/policies/control-placement.v1.json
+index 62654b153d791950dd59d365c3b36e89719d4b80..2d27522e56e0c06fd79bbebb758f5708703aa335 100644
+--- a/policies/control-placement.v1.json
++++ b/policies/control-placement.v1.json
+@@ -3,6 +3,7 @@
+   "revision": 1,
+   "controls": [
+     {"controlId":"hook:posttooluse:native-goldfish-host","protects":["native Goldfish host-commit dispatch and return correlation"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["Source hooks and host transaction are fixture-tested; installed runner observation and exact candidate A1 evidence remain unavailable."]},
++    {"controlId":"hook:pretooluse:native-goldfish-host","protects":["a marked Goldfish's own return is validated while the worker can still repair it"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["Whether Claude fires PreToolUse for SubagentHandback is unproven until a live run. Codex and Antigravity have no early channel and rely on the shared stop diagnostic."]},
+     {"controlId":"hook:subagentstop:native-goldfish-host","protects":["native Goldfish host-commit of a marked background dispatch at its stop"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["SubagentStop carries no resolved model; the receipt records that weaker assurance. Installed runner observation and exact candidate A1 evidence remain unavailable."]},
+     {"controlId":"hook:pretooluse:guard-dispatch","protects":["dispatch briefing admission"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["A1 native enforcement evidence has not been recorded; this row is unqualified."]},
+     {"controlId":"hook:pretooluse:guard-advisor-prohibition","protects":["dispatch-bound advisor prohibition"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["A1 native enforcement evidence has not been recorded; this row is unqualified."]},

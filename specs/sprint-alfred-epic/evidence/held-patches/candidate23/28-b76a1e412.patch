@@ -1,0 +1,74 @@
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index 13a89fbd376a668fc049bba45bf86749796c05a5..b346180afd144d7c4b412eb59bc808035f8b05a7 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -13,6 +13,24 @@ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ import { admissionProgress } from "../lib/admission-progress.mjs";
++import { observeEffectiveEffort } from "../lib/dispatch-model-enforcement.mjs";
++
++/**
++ * C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 6): beside a recorded Claude Goldfish commit the stop names the
++ * effort that really ran (the `effort.level` the host reports) or says it is unobserved; the configured effort is read from the written
++ * dispatch record. A line for stderr, or null for any other event, runner or outcome. Never a refusal; the closed record gains no field.
++ */
++export function effortObservationNotice({ root, runner, input, result } = {}) {
++  if (runner !== "claude" || input?.hook_event_name !== "SubagentStop" || result?.status !== "authored-commit-recorded") return null;
++  let configuredEffort = null;
++  try {
++    const target = result.record?.target;
++    if (typeof target === "string") configuredEffort = JSON.parse(readFileSync(join(root, target), "utf8"))?.effort ?? null;
++  } catch { configuredEffort = null; }
++  const observation = observeEffectiveEffort({ configuredEffort, stopInput: input });
++  if (observation.warning) return `WARNING (native-goldfish-host): ${observation.warning.code}: ${observation.warning.message}`;
++  return `Effective effort observed: ${observation.observed} (configured ${observation.configured ?? "unrecorded"}).`;
++}
+ // Repository admission precedes hook input hardening and all governed effects.
+ if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+ // E5: the same opt-in authority trace the guard hooks write (progress marks while running, the tally line at exit); a no-op unless PIPELINE_AUTHORITY_TRACE is "1".
+@@ -306,6 +324,11 @@ if (isDirectInvocation(import.meta.url)) {
+     process.exit(0);
+   }
+   const message = nativeGoldfishHookMessage(result, { stopFailure });
++  // C23: the effective effort of the stopped Claude Goldfish, observed or unobserved; stderr only, never a decision.
++  try {
++    const effortNote = effortObservationNotice({ root: process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd(), runner, input, result });
++    if (effortNote) process.stderr.write(`${effortNote}\n`);
++  } catch { /* an unreadable observation never changes the stop */ }
+   if (!message) process.exit(0);
+   if (runner === "claude" && input.hook_event_name === "PostToolUse") {
+     process.stdout.write(`${JSON.stringify({ hookSpecificOutput: {
+diff --git a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+index 772df1460299a8f0b675dce5223a3d281e804f23..776fcb9e714b042aec95ff1d75681c20c2be7c19 100644
+--- a/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs
+@@ -236,6 +236,28 @@ test("DME-C23c a call that carries the configured effort is admitted, a differen
+   assert.equal(noModel.findings[0].code, "DISPATCH-MODEL-MISSING", "naming an effort never replaces naming a model");
+ });
+ 
++test("DME-C23e the Claude SubagentStop hook names the effort that really ran, or says it is unobserved, beside a recorded Goldfish commit", async () => {
++  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import("node:fs");
++  const { tmpdir } = await import("node:os");
++  const { join } = await import("node:path");
++  const { effortObservationNotice } = await import("../hooks/native-goldfish-host.mjs");
++  assert.equal(typeof effortObservationNotice, "function");
++  const root = mkdtempSync(join(tmpdir(), "c23-effort-"));
++  try {
++    mkdirSync(join(root, "evidence"), { recursive: true });
++    writeFileSync(join(root, "evidence", "dispatch-record-X1.json"), JSON.stringify({ taskId: "X1", effort: "high" }));
++    const recorded = { status: "authored-commit-recorded", record: { target: "evidence/dispatch-record-X1.json" } };
++    const stop = (extra = {}) => ({ hook_event_name: "SubagentStop", ...extra });
++    assert.match(effortObservationNotice({ root, runner: "claude", input: stop({ effort: { level: "high" } }), result: recorded }), /observed.*high/iu);
++    assert.match(effortObservationNotice({ root, runner: "claude", input: stop({ effort: { level: "xhigh" } }), result: recorded }), /DISPATCH-EFFORT-NOT-EFFECTIVE.*xhigh/u);
++    assert.match(effortObservationNotice({ root, runner: "claude", input: stop(), result: recorded }), /DISPATCH-EFFORT-UNOBSERVED/u);
++    // Nothing is claimed for another event, another runner, or a stop that recorded no commit.
++    assert.equal(effortObservationNotice({ root, runner: "claude", input: { hook_event_name: "PostToolUse" }, result: recorded }), null);
++    assert.equal(effortObservationNotice({ root, runner: "codex", input: stop(), result: recorded }), null);
++    assert.equal(effortObservationNotice({ root, runner: "claude", input: stop(), result: { status: "recovery-required" } }), null);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("DME-C23d the effort that really ran is the one the stop reports; absent, it is recorded as unobserved and never claimed", async () => {
+   const { observeEffectiveEffort } = await import("./dispatch-model-enforcement.mjs");
+   assert.equal(typeof observeEffectiveEffort, "function");

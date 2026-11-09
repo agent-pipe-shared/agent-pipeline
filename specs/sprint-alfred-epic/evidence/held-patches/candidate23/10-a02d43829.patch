@@ -1,0 +1,137 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 41d9a068dbe20ccb45309859cbe19da06a72ea7a..7c770dc5c6960c7257a414763ec65a4740cdc505 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -656,9 +656,9 @@ export const SCRIPTS_ANSWERING_HELP = new Map([
+     "pipeline-state", "plan-runtime-projection-v2", "plan-runtime-projection-v3", "po-human-approval", "project-authority-migration", "project-onboarding-v3",
+     "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
+     "validate-runner-profiles-v2"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
+-  ...["check-protected-delta", "close-coordinator", "codex-host-advisor-route", "critic-diagnostic-evidence", "critic-export-consent", "handover-rotate",
+-    "publish-evidence-run", "reconcile-backlog-delivery", "register-feature-package", "run-codex-critic-isolation", "session-critic-finalizer",
+-    "verify-evidence-producer"].map((name) => [`${name}.mjs`, LONG_HELP_FLAG]),
++  ...["check-backlog-done-predicate", "check-protected-delta", "close-coordinator", "codex-host-advisor-route", "critic-diagnostic-evidence", "critic-export-consent", "handover-rotate",
++    "publish-evidence-run", "reconcile-backlog-delivery", "register-feature-package", "repair-map", "rotate-handover-sections", "run-codex-critic-isolation",
++    "session-critic-finalizer", "verify-evidence-producer"].map((name) => [`${name}.mjs`, LONG_HELP_FLAG]),
+ ]);
+ // PO tile 2026-11-09: these have no help branch but refuse `--help` as an unknown argument and print their usage, with a non-zero exit and no write
+ // (measured for each, and re-run by the same test). Only `--help`: `-h` was not measured for them.
+diff --git a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+index 6759fddfd5c7d3e3cdbf36f5dedd349285f86837..89d6c836de27be2a172e4b3f594ce9a7a309c4e8 100644
+--- a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+@@ -121,7 +121,7 @@ test("every plugin script with a help branch is admitted for its own flags and o
+       assert.match(`${child.stdout}${child.stderr}`, /usage/iu, `${name} prints its usage`);
+       assert.deepEqual(child.left, [], `${name} writes nothing`);
+     }
+-    const running = "rotate-handover-sections.mjs"; // really starts its normal run when asked `--help`
++    const running = "pipeline-start-preflight.mjs"; // on no list: no help branch of its own, so a help request is not admitted
+     for (const refused of [`node ${join(scriptsDir, running)} --help`, `node ${join(root, "pipeline-state.mjs")} --help`,
+       `node ${join(scriptsDir, "..", "scripts", running)} --help`]) {
+       assert.equal(isSanctionedLifecycleCommand(refused, root), false, refused);
+diff --git a/plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs b/plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs
+index e5e79d04f6ea3097426fc4dd79efadf7a8393e96..2c12c9bc70934ec146ea9073f46a048c263a3714 100644
+--- a/plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs
++++ b/plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs
+@@ -297,6 +297,10 @@ export function exitCodeFor(result) {
+ }
+ 
+ function main(argv) {
++  if (argv.includes("--help")) {
++    process.stdout.write("Usage: check-backlog-done-predicate.mjs [--json]\nEvaluates each backlog item's done_when predicate against the tree; exit 0 = no fatal finding, 1 = a fatal finding, 3 = usage/environment error.\n");
++    return 0;
++  }
+   const json = argv.includes("--json");
+   const result = checkBacklogDonePredicate();
+   if (json) {
+diff --git a/plugins/pipeline-core/scripts/repair-map.mjs b/plugins/pipeline-core/scripts/repair-map.mjs
+index 995772fd2c7a2f502e619c30530ec9d185965ece..7260f6efa2b363147a4d2b685fb3183ead7e166c 100644
+--- a/plugins/pipeline-core/scripts/repair-map.mjs
++++ b/plugins/pipeline-core/scripts/repair-map.mjs
+@@ -324,6 +324,10 @@ function render(map) {
+ }
+ 
+ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
++  if (process.argv.slice(2).includes("--help")) {
++    process.stdout.write("Usage: repair-map.mjs\nRead-only: prints which refusal classes are liftable, by whom, and the exact command. Takes no arguments.\n");
++    process.exit(0);
++  }
+   const rootDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+   const map = buildRepairMap({ rootDir, pluginRoot: PLUGIN_ROOT });
+   process.stdout.write(`${render(map)}\n`);
+diff --git a/plugins/pipeline-core/scripts/rotate-handover-sections.mjs b/plugins/pipeline-core/scripts/rotate-handover-sections.mjs
+index 4fab33cc8cb7b9a538d903d132d48a36e0b3c03e..a53bc801f2a48f4643ea039df22ac47b362c7a10 100644
+--- a/plugins/pipeline-core/scripts/rotate-handover-sections.mjs
++++ b/plugins/pipeline-core/scripts/rotate-handover-sections.mjs
+@@ -228,6 +228,10 @@ function parseArgs(argv) {
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) {
++  if (process.argv.slice(2).includes("--help")) {
++    console.log("Usage: rotate-handover-sections.mjs [--file <handover file>] [--retain-count <n>] [--archive-dir <dir>] [--apply]\nDry-run by default; --apply writes the rotation.");
++    process.exit(0);
++  }
+   const root = DEFAULT_ROOT;
+   const args = parseArgs(process.argv.slice(2));
+   const fullPath = join(root, args.file);
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+index 3bfa98c24c1a9262235381263658fa580906b84c..0cb109dfcb47358d929ded5df3bf26eaaff58470 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+@@ -71,6 +71,10 @@ transport only. Do not `define_subagent` a Pipeline role yourself; `dispatch-bri
+   uncommitted and unstaged; it refuses a path outside the briefed scope, a path with local changes and a change that no longer applies. The
+   commit is then the existing recovery route (`scripts/goldfish-host-commit-recover.mjs plan|apply`). The host owns the worktree and the
+   branch; do not remove them.
++- **Briefing text, not a file pointer.** The generated `promptPointer` (`pipeline-briefing-file:` line) is admitted only in a direct
++  Claude Agent call; an Antigravity call carrying it is refused `DBG-REF-CARRIER`. Pass the full generated briefing as `Prompt`,
++  copied verbatim from the `--out` file including its final newline: the marker digest covers every byte, and a retyped or
++  newline-trimmed text fails `DBG-GENERATED-DIGEST-MISMATCH`.
+ - **Delivery.** The child runs in the background and its completion message arrives in the SAME parent turn, at the next model
+   invocation, as a `<SYSTEM_MESSAGE>`; the parent does not need to end its turn.
+ - **Hand-back and commit.** Hooks govern the child (see above): its writes, shell and commits pass the same PreToolUse guard and a denial
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+index 9a26750f2a57fac4a6dab8d13f821459e59b0ef3..241c0114ef5a7c838944c2e59e4c618f29e3af0f 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/design-course.md
+@@ -30,6 +30,16 @@ was needed; capability evidence is not an Advisor answer.
+    verification. Check explicit machine-checkable rules; do not invent
+    arithmetic from prose. Preserve the separately adopted Reader-review course
+    and evidence; it is not the independent technical design review.
++   Spec acceptance criteria (shape of `templates/spec.md` §5; `submit-plan`
++   refuses otherwise with `PLR-HANDOFF-NO-CRITERION` / `PLR-HANDOFF-NO-JOURNEY`):
++   a normative table with a header row and rows like
++   `| AC-1 | WHEN <trigger>, THE system <behaviour> | <test file> |` (or numbered
++   `1` / `R-2` rows under an acceptance-criteria heading). Each user-facing
++   criterion carries `Journeys:` and `Asserts:` in its own text (a table cell or
++   an indented continuation line), e.g. `... Journeys: entry by link and by
++   form; reload mid-save; second submit after an error. Asserts: the stored
++   record holds the new title.` A criterion no user sees is tagged
++   `[not user-facing: <reason>]`; `[user-facing]` forces the duty.
+ 2. Obtain one independent review of the final design sources. Resolve its
+    findings; if sources change, use at most one delta follow-up and bind the
+    final receipt to the current sources. Do not add a separate readiness child
+@@ -43,7 +53,11 @@ was needed; capability evidence is not an Advisor answer.
+    as `DRR-FINDING-IDS` and the refusal names the id). It reads the
+    sources and the report from disk and stamps the review time, runner and
+    reviewer model itself. Never write or edit a receipt by hand: a hand-written
+-   receipt is not admissible evidence.
++   receipt is not admissible evidence. Omit `--requested-route` and
++   `--observed-identity` unless a source-owned dispatch observation exists: a
++   self-asserted value is refused with `DRC-OBSERVATION-UNATTESTED` and the
++   identity is then recorded as `unknown` (only the typed fallback record,
++   `--fallback-reason-code`, may carry a route).
+    Dispatching the design review: the `critic-review` skill is for implementation
+    batches (diff range, batch preflight) and does not fit uncommitted design
+    sources. Dispatch the agent type `pipeline-core:readiness-reviewer` instead.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+index ff5024d378f9bc242058b93ab253708ef66becd7..c0ad42227d72b2be8c36c24dde73eb730e712ebf 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+@@ -186,6 +186,8 @@ state this priority explicitly in the briefing, not just the number.
+ 
+ A returned `outcome: checkpoint` keeps the reservation live and the agent resumable. The cheap move is always the same: read the report and the actual diff, run `dispatch-budget-grant.mjs --agent-id <id> --extra 30 --reason "<why>"`, then `SendMessage` to the SAME agent id with a procedural continuation (make one read-only call first; continue only after the `DISPATCH-BUDGET-GRANT` notice names the digest). Grants are repeatable and each is a recorded decision. A fresh dispatch for the same outcome is the exception, named by a typed reason (`elephant-restart`, `owner-lost`, `context-poisoned`, `new-vertical-outcome`) and by the checkpointed outcome it does not continue. When the estimate already exceeds the base cap, plan the grant in the package (`budgetRationale`) instead of discovering it at the checkpoint. The rule text is `roles/elephant.md` EL-25a and EL-13b.
+ 
++`dispatch-budget-grant.mjs` is for Claude agents only; do not read it for another runner. On Codex the route is the checkpoint plus a narrow continuation: the agent returns `outcome: checkpoint` with its continuation card (done, remaining, next step), and the Coordinator dispatches one narrow continuation limited to the remaining step, instead of a grant.
++
+ The generator reminds the dispatcher at build time and never refuses (D196): `DBG-CHECKPOINTED-OWNER` names another started, unfinished slice of the same item with the grant-and-resume commands and the release route (`slice-queue.mjs cancel <id> --started --reason "<why>" --class budget`) and is not raised for a slice whose recorded write scope is disjoint from this one (D205: a parallel slice); `DBG-ESTIMATE-ABOVE-BASE` fires when `estimatedToolCalls` exceeds the base cap and `budgetRationale` does not say a grant is planned; `DBG-ESTIMATE-NEEDS-SPLIT` asks for a split along independent criteria when the estimate exceeds twice the base cap plus one grant step of 30.
+ 
+ ## The dispatch-record artifact is not automatic — verify the prompt actually carries it

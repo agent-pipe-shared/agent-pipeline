@@ -1,0 +1,170 @@
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index 7e9472cd624031703d78e1761ee1348a19ed9af4..13a89fbd376a668fc049bba45bf86749796c05a5 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -7,7 +7,7 @@ import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { integrateNativeGoldfishItemDelivery, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+-import { finalizeNativeGoldfishHostReturn, readSubagentHandbackMessage, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
++import { checkSubagentHandbackBeforeStop, finalizeNativeGoldfishHostReturn, readSubagentHandbackMessage, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
+ import { issueCriticSourceReturn } from "../lib/critic-source-return.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+@@ -104,11 +104,19 @@ export function readNativeGoldfishStopFailure({ commonDir, dispatchId = null } =
+ 
+ /** AC-164: one short human sentence derived from a bounded failure detail, or "" when there is none. */
+ function describeFailureDetail(detail) {
++  const parts = failureDetailParts(detail);
++  return parts.length > 0 ? ` Cause: ${parts.join("; ")}. Do not edit the tree during a Goldfish run.` : "";
++}
++
++/** The bounded parts of a failure detail, in reading order (empty when there is none); shared by the stop notice and the handback refusal. */
++function failureDetailParts(detail) {
+   const clean = sanitizeStopFailureDetail(detail);
+-  if (!clean) return "";
++  if (!clean) return [];
+   const parts = [];
+   if (clean.condition) parts.push(`condition ${clean.condition}`);
+   if (clean.conditions) parts.push(`conditions ${clean.conditions.join(", ")}`);
++  if (clean.missingKeys) parts.push(`missing keys ${clean.missingKeys.join(", ")}`);
++  if (clean.unexpectedKeys) parts.push(`unexpected keys ${clean.unexpectedKeys.join(", ")}`);
+   if (clean.stagedPaths) parts.push(`staged ${clean.stagedPaths.join(", ")}`);
+   if (clean.paths) parts.push(`paths ${clean.paths.join(", ")}`);
+   if (clean.outsideAllowed) parts.push(`outside the allowed paths ${clean.outsideAllowed.join(", ")}`);
+@@ -117,7 +125,15 @@ function describeFailureDetail(detail) {
+   if (clean.errorName) parts.push(`error ${clean.errorName}${clean.errorCode ? ` ${clean.errorCode}` : ""}`);
+   if (clean.errorMessage) parts.push(`message "${clean.errorMessage}"`);
+   if (clean.reason) parts.push(`reason ${clean.reason}`);
+-  return parts.length > 0 ? ` Cause: ${parts.join("; ")}. Do not edit the tree during a Goldfish run.` : "";
++  return parts;
++}
++
++/** C23 (AC-108): the model-visible refusal of a broken SubagentHandback: the exact code, what is wrong, and the one repair. Never echoes the message. */
++export function handbackRefusalMessage({ code, detail, refusal, limit }) {
++  const parts = failureDetailParts(detail);
++  return `Your SubagentHandback was refused before it was delivered (${code}${parts.length > 0 ? `: ${parts.join("; ")}` : ""}). The host cannot repair a return it cannot read, and the host commit would be lost at your stop. `
++    + "Repair: send the complete JSON object again as the whole message (schema, dispatchId, candidateCommit, outcome, report, changedPaths, then the closing brace), and shorten report if it was long. "
++    + `This is refusal ${refusal} of ${limit}; the attempt after the last one is allowed and the failure is then recorded at your stop.`;
+ }
+ 
+ /** E5: one short sentence naming the registry lock holder a failed stop met, or "" when the failure was not a lock. */
+@@ -231,6 +247,17 @@ if (isDirectInvocation(import.meta.url)) {
+   // G20-63: the Codex SubagentStart/SubagentStop hooks bind the same hook-observed owner (the prepare command's admission bound it for the
+   // pending state); without it the stop's authority boundary refused SDC-AUTHORITY-UNAVAILABLE and nothing was host-committed.
+   else enterCodexHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
++  // C23 (AC-108): the PreToolUse of a marked Goldfish's own SubagentHandback. A return the stop cannot read is refused here, while the worker
++  // can still repair it (exit 2, the reason on stderr is the model-visible refusal). Every other PreToolUse, every doubt and every fault is exit 0.
++  if (runner === "claude" && input.hook_event_name === "PreToolUse") {
++    let refusal = null;
++    try {
++      const checked = checkSubagentHandbackBeforeStop({ root: process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd(), input });
++      if (checked.action === "refuse") refusal = handbackRefusalMessage(checked);
++    } catch { refusal = null; }
++    if (refusal) { process.stderr.write(`${refusal}\n`); process.exit(2); }
++    process.exit(0);
++  }
+   // G20-39: the Critic subagent's stop issues the Critic Source return record (this hook, never the calling agent). Any other stop, and
+   // any fault here, continues below exactly as before; this branch never blocks the stop and prints nothing on stdout.
+   if (input.hook_event_name === "SubagentStop") {
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index cdb1826115a0756b274e03f7dda596fcdc55f2e6..5c8cbce8496daabb115630765fd034ce3a5e626a 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -172,6 +172,44 @@ function observeClaudeSubagentStop(input, pending, mark) {
+   return final.ok ? { ...final, runner: "claude", assurance: SUBAGENT_STOP_ASSURANCE } : final;
+ }
+ 
++const stopDiagnosticsDirectory = (commonDir) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++
++/**
++ * C23 (AC-108): the early check of a marked Goldfish's OWN SubagentHandback call, made at PreToolUse while the worker can still repair it.
++ * At SubagentStop the Goldfish is gone and nothing reaches the Coordinator, so a return cut off or mis-keyed there is lost silently. The call
++ * is correlated exactly as the stop is (the child's meta file and its pending state, `readSubagentStopPending`), the message is validated by the
++ * SAME validator against the SAME binding (`allowCheckpoint: true`, as at the stop), and an invalid one is refused with the code and its bounded
++ * detail. It never traps a worker: anything unmarked, unresolvable or faulty allows; after HANDBACK_REFUSAL_LIMIT refusals of one dispatch
++ * (counted in a small file beside the stop-failure diagnostics, never in the host-commit private state) the next attempt is allowed and the
++ * stop path records the failure as before.
++ * @returns {{action:"allow"}|{action:"refuse",code:string,detail:object|null,refusal:number,limit:number}}
++ */
++export const HANDBACK_REFUSAL_LIMIT = 3;
++export function checkSubagentHandbackBeforeStop({ root, input } = {}) {
++  const allow = { action: "allow" };
++  try {
++    if (input?.hook_event_name !== "PreToolUse" || input.tool_name !== SUBAGENT_HANDBACK_TOOL || typeof input.tool_input?.message !== "string") return allow;
++    const physical = physicalRoot(root ?? input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
++    if (!physical) return allow;
++    const commonDir = resolveGitCommonDir(physical);
++    if (typeof commonDir !== "string") return allow;
++    const stop = readSubagentStopPending({ commonDir, input });
++    if (!stop.ok) return allow;
++    const state = stop.pending.state;
++    if (state.root !== physical || state.commonDir !== commonDir || state.runner !== "claude" || state.binding?.runner !== "claude") return allow;
++    const final = validateNativeGoldfishFinal(input.tool_input.message, { binding: state.binding, allowCheckpoint: true });
++    if (final.ok) return allow;
++    const directory = stopDiagnosticsDirectory(commonDir);
++    const file = join(directory, `handback-refusals-${stopHash("sha256").update(`${state.sessionId}\0${state.toolUseId}`).digest("hex").slice(0, 32)}.json`);
++    let refusals = 0;
++    try { refusals = JSON.parse(stopRead(file, "utf8")).refusals; } catch (error) { if (error?.code !== "ENOENT") return allow; }
++    if (!Number.isSafeInteger(refusals) || refusals < 0 || refusals >= HANDBACK_REFUSAL_LIMIT) return allow;
++    stopMkdir(directory, { recursive: true, mode: 0o700 });
++    stopWrite(file, `${JSON.stringify({ schema: "pipeline.native-goldfish-handback-refusals.v1", dispatchId: state.binding.dispatchId, refusals: refusals + 1, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
++    return { action: "refuse", code: final.code, detail: sanitizeStopFailureDetail(final.detail), refusal: refusals + 1, limit: HANDBACK_REFUSAL_LIMIT };
++  } catch { return allow; }
++}
++
+ // PF-61 visibility: SubagentStop has no channel the Coordinator reads, so a failed completion of a marked Goldfish also
+ // leaves a small diagnostic next to its pending state, naming the exact code. A later success removes every diagnostic
+ // recorded for that dispatch (whatever tool use id or route wrote it). Diagnostic only:
+@@ -182,7 +220,7 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
+   try {
+     // D180b: a sibling no authority scan inventories; inside native-goldfish-host-commit the file drifts the registry namespace.
+     const commonDir = stop ? stop.commonDir : dispatch ? dispatch.commonDir : unresolved.commonDir;
+-    const directory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++    const directory = stopDiagnosticsDirectory(commonDir);
+     if (!stop && !dispatch) {
+       // AC-164: a marked Goldfish stop whose pending state could not be resolved still leaves its code, keyed by session and agent.
+       const key = stopHash("sha256").update(`${unresolved.sessionId}\0${unresolved.agentId}`).digest("hex").slice(0, 32);
+@@ -228,7 +266,8 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
+ // most 5 repository-relative paths, counts are small integers; anything else is dropped, so no host path and no raw exception
+ // text can travel. Exported for the hook reader, which sanitizes again on read.
+ const DETAIL_SLUG_KEYS = ["condition", "errorName", "errorCode", "reason"];
+-const DETAIL_LIST_KEYS = ["conditions"];
++// C23: `missingKeys` / `unexpectedKeys` name the keys of a wrong-field-set return; a key that is no slug is dropped like any other entry.
++const DETAIL_LIST_KEYS = ["conditions", "missingKeys", "unexpectedKeys"];
+ // C18-1C: the error message of a commit exception travels bounded (<= 160 chars, printable) and without any token that holds a path separator.
+ const detailMessage = (value) => typeof value === "string" && value.length > 0 && value.length <= 160 && !/[\\/\u0000-\u001f]/u.test(value);
+ export function boundedErrorMessage(error) {
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 0c6d035dc3e05e1e7a23c7e43d1095639df371b3..19619daadb386fedcdc78eb1bc574e0e1afb33b5 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -973,8 +973,8 @@ const cases = [
+     assert.match(shown, /condition json-truncated/u);
+   }, "claude", 1, "goldfish-implementor", { background: true }) },
+   { id: "NGHF49", name: "C23: the stop-failure detail admits the key lists as bounded slugs and drops everything else", run: () => {
+-    assert.deepEqual(sanitizeStopFailureDetail({ condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "has space", "a/b", "k3", "k4", "k5", "k6"] }),
+-      { condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "k3", "k4", "k5"] });
++    assert.deepEqual(sanitizeStopFailureDetail({ condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "has space", "a/b", "k3", "k4", "k5", "k6", "k7"] }),
++      { condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "k3", "k4", "k5", "k6"] });
+     assert.deepEqual(sanitizeStopFailureDetail({ condition: "json-truncated", errorMessage: "parse failed at position 5 of 5 characters" }), { condition: "json-truncated", errorMessage: "parse failed at position 5 of 5 characters" });
+     assert.deepEqual(sanitizeStopFailureDetail({ errorMessage: "at /home/x/y" }), null, "a message holding a path separator never travels");
+     assert.deepEqual(sanitizeStopFailureDetail({ missingKeys: "changedPaths" }), null);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 3adeef56c30352e06664442f2322914668141757..77b4b7d05beb41fee5b9d4594f16ca8d716b0f75 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -346,7 +346,12 @@ function stopFailureCauseText(entry) {
+   const clean = (value) => (typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]/gu, " ").trim().slice(0, 160) : "");
+   const reason = clean(entry?.reason) || clean(entry?.detail?.reason);
+   const stage = clean(entry?.stage);
+-  const parts = [stage ? `stage ${stage}` : null, reason ? `reason ${reason}` : null].filter(Boolean);
++  // C23 (AC-108): the validator's bounded detail (a cut-off return names the position, a wrong field set names the keys), so a refused return no longer reads "no reason recorded".
++  const detail = entry?.detail !== null && typeof entry?.detail === "object" ? entry.detail : {};
++  const keys = (value) => (Array.isArray(value) ? value.filter((key) => typeof key === "string").slice(0, 5).map(clean).filter(Boolean).join(", ") : "");
++  const condition = clean(detail.condition), message = clean(detail.errorMessage), missing = keys(detail.missingKeys), unexpected = keys(detail.unexpectedKeys);
++  const parts = [stage ? `stage ${stage}` : null, reason ? `reason ${reason}` : null, condition ? `condition ${condition}` : null,
++    missing ? `missing keys ${missing}` : null, unexpected ? `unexpected keys ${unexpected}` : null, message ? `message "${message}"` : null].filter(Boolean);
+   return parts.length > 0 ? parts.join(", ") : "no reason recorded";
+ }
+ 

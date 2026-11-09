@@ -1,0 +1,107 @@
+diff --git a/plugins/pipeline-core/lib/node-sandbox-probe.mjs b/plugins/pipeline-core/lib/node-sandbox-probe.mjs
+index 2f13bf7b7908d7974c773d8ce4f3a68f994a77f1..6b6010b3e382775955030b6df05a317b5e29f8f2 100644
+--- a/plugins/pipeline-core/lib/node-sandbox-probe.mjs
++++ b/plugins/pipeline-core/lib/node-sandbox-probe.mjs
+@@ -37,6 +37,18 @@ export function observeNodeSandboxProbe({
+     const normalized = execPath.replaceAll("\\", "/").toLowerCase();
+     if (NODE_VERSION_MANAGER_PATTERN.test(normalized)) {
+       const stableNode = findStableNode({ platform, env, exists, spawn, stableCandidates });
++      const resolvedVersion = versionOf(probe);
++      const resolvedMajor = majorOf(resolvedVersion);
++      const stableMajor = stableNode.found ? majorOf(stableNode.version) : null;
++      if (resolvedMajor !== null && stableMajor !== null) {
++        // A stable node of the same major is what a daemon falls back to, so a version-manager path alone is no warning.
++        if (resolvedMajor === stableMajor) return { ...base, status: "version-manager-path", ready: true, stableNode };
++        return {
++          ...base, status: "version-manager-path", ready: false, code: "NODE-SANDBOX-STABLE-VERSION-DIFFERS", stableNode,
++          versions: { resolved: resolvedVersion, stable: stableNode.version },
++          remedy: `The resolved node (${resolvedVersion}) lives under a version-manager path and the stable node at ${stableNode.path} has another major version (${stableNode.version}). A hook started by a background daemon may run the stable one. Align the two versions, then restart the runner.`,
++        };
++      }
+       return {
+         ...base, status: "version-manager-path", ready: false, code: "NODE-SANDBOX-UNREACHABLE", stableNode,
+         remedy: stableNode.found ? NODE_SANDBOX_REMEDY : NODE_NO_STABLE_REMEDY,
+@@ -48,7 +60,10 @@ export function observeNodeSandboxProbe({
+   }
+ }
+ 
+-/** Wanted 3: first existing stable-path node that answers a bounded `--version`; never throws, never reports ready. */
++const versionOf = (run) => (typeof run?.stdout === "string" ? run.stdout.trim() : "");
++const majorOf = (version) => /^v?(\d+)\./u.exec(version ?? "")?.[1] ?? null;
++
++/** Wanted 3: first existing stable-path node that answers a bounded `--version`, with that version; never throws. */
+ function findStableNode({ platform, env, exists, spawn, stableCandidates }) {
+   try {
+     const candidates = Array.isArray(stableCandidates) ? stableCandidates
+@@ -58,7 +73,7 @@ function findStableNode({ platform, env, exists, spawn, stableCandidates }) {
+       try {
+         if (!exists(path)) continue;
+         const run = spawn(path, ["--version"], { encoding: "utf8", shell: false, timeout: 3_000, windowsHide: true });
+-        if (!run?.error && run?.status === 0) return { found: true, path };
++        if (!run?.error && run?.status === 0) return { found: true, path, version: versionOf(run) };
+       } catch { /* an unreadable candidate is simply not found */ }
+     }
+   } catch { /* fall through */ }
+diff --git a/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs b/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
+index 27471be252a9cb3120fb32d375a7ebb9b920afbc..b4a82765d1cc8b081e83b789568b41154b9e1f84 100644
+--- a/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
++++ b/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
+@@ -222,7 +222,7 @@ test("AC-108: the start preflight reports a sandbox-unreachable node with a type
+   const { observeNodeSandboxProbe } = await import(
+     pathToFileURL(join(REPO, "plugins/pipeline-core/lib/node-sandbox-probe.mjs")).href);
+   const ok = { status: 0, stdout: "v22.0.0\n" };
+-  const manager = observeNodeSandboxProbe({ execPath: "/home/u/.local/share/fnm/node-versions/v22/installation/bin/node", spawn: () => ok });
++  const manager = observeNodeSandboxProbe({ execPath: "/home/u/.local/share/fnm/node-versions/v22/installation/bin/node", spawn: () => ok, exists: () => false });
+   assert.equal(manager.status, "version-manager-path");
+   assert.equal(manager.code, "NODE-SANDBOX-UNREACHABLE");
+   assert.equal(typeof manager.remedy, "string");
+@@ -245,7 +245,27 @@ async function nodeProbe() {
+   return (await import(pathToFileURL(join(REPO, "plugins/pipeline-core/lib/node-sandbox-probe.mjs")).href)).observeNodeSandboxProbe;
+ }
+ 
+-test("Wanted 3 (a): under a version manager, an existing runnable stable candidate is reported as stableNode.found while status stays version-manager-path", async () => {
++test("Wanted 3 (g): a stable node of another major version is a typed warning naming both versions", async () => {
++  const probe = await nodeProbe();
++  const result = probe({
++    execPath: FNM_NODE, platform: "linux", exists: (p) => p === "/usr/bin/node",
++    spawn: (cmd) => ({ status: 0, stdout: cmd === FNM_NODE ? "v22.0.0\n" : "v18.19.1\n" }),
++  });
++  assert.equal(result.ready, false);
++  assert.equal(result.code, "NODE-SANDBOX-STABLE-VERSION-DIFFERS");
++  assert.deepEqual(result.versions, { resolved: "v22.0.0", stable: "v18.19.1" });
++  assert.match(result.remedy, /v22\.0\.0/u);
++  assert.match(result.remedy, /v18\.19\.1/u);
++});
++
++test("Wanted 3 (h): an unreadable version keeps the existing warning instead of claiming ready", async () => {
++  const probe = await nodeProbe();
++  const result = probe({ execPath: FNM_NODE, platform: "linux", exists: (p) => p === "/usr/bin/node", spawn: () => ({ status: 0, stdout: "" }) });
++  assert.equal(result.ready, false);
++  assert.equal(result.code, "NODE-SANDBOX-UNREACHABLE");
++});
++
++test("Wanted 3 (a): under a version manager, a runnable stable candidate of the same major is ready while status stays version-manager-path", async () => {
+   const probe = await nodeProbe();
+   const calls = [];
+   const result = probe({
+@@ -254,8 +274,9 @@ test("Wanted 3 (a): under a version manager, an existing runnable stable candida
+     spawn: (cmd, args, opts) => { calls.push({ cmd, args, opts }); return { status: 0, stdout: "v22.0.0\n" }; },
+   });
+   assert.equal(result.status, "version-manager-path");
+-  assert.equal(result.ready, false);
+-  assert.deepEqual(result.stableNode, { found: true, path: "/usr/bin/node" });
++  assert.equal(result.ready, true);
++  assert.equal(Object.hasOwn(result, "code"), false);
++  assert.deepEqual(result.stableNode, { found: true, path: "/usr/bin/node", version: "v22.0.0" });
+   const candidate = calls.find((c) => c.cmd === "/usr/bin/node");
+   assert.ok(candidate, "the stable candidate is run with --version");
+   assert.deepEqual(candidate.args, ["--version"]);
+@@ -285,7 +306,7 @@ test("Wanted 3 (c): on win32 the stable candidate is the injected ProgramFiles n
+     spawn: () => ({ status: 0, stdout: "v22.0.0\n" }),
+   });
+   assert.equal(result.status, "version-manager-path");
+-  assert.deepEqual(result.stableNode, { found: true, path: wanted });
++  assert.deepEqual(result.stableNode, { found: true, path: wanted, version: "v22.0.0" });
+ });
+ 
+ test("Wanted 3 (d): a candidate that exists but fails or times out --version is not found and the probe is never ready", async () => {

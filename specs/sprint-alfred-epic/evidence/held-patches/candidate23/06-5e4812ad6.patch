@@ -1,0 +1,125 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index ea6327cfb6d4cde8e0c7d2becfb53778e56fef85..32dcf59357382faf4498567b32bdb08a18ad244b 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -14,7 +14,7 @@ import { readState as readDesignCourseState } from "../../scripts/pipeline-state
+ import { RUNNER_CAPABILITIES_SCRIPT, CHECK_PRIVATE_IDENTIFIERS_SCRIPT, CHECK_PO_GATE_AUTHORITY_SCRIPT, ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, BIND_ADR_PROPOSALS_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { MODULE_SLICE_PROPOSAL_SCRIPT } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+-import { isNodeInterpreterWord, samePathSpelling } from "../path-spelling.mjs";
++import { isNodeInterpreterWord, relativeUnderRoot, samePathSpelling } from "../path-spelling.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+ import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
+ 
+@@ -647,7 +647,29 @@ function sanctionedProofWaitArgs(args, root) {
+   return args.length === at;
+ }
+ 
++// PO 2026-11-09: asking a plugin script for its usage is admitted in every lifecycle state, before onboarding too. Only a script that really answers
++// the flag is listed: one without a help branch would simply run its main, so a wildcard over scripts/ would execute mutating code. The list holds each
++// script's own flags, and g23-read-help.test.mjs runs every entry in an empty directory and fails when a script with a help branch is missing here.
++const BOTH_HELP_FLAGS = ["--help", "-h"], LONG_HELP_FLAG = ["--help"];
++export const SCRIPTS_ANSWERING_HELP = new Map([
++  ...["architecture-baseline", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "onboarding-init",
++    "pipeline-state", "plan-runtime-projection-v2", "plan-runtime-projection-v3", "po-human-approval", "project-authority-migration", "project-onboarding-v3",
++    "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
++    "validate-runner-profiles-v2"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
++  ...["check-protected-delta", "close-coordinator", "codex-host-advisor-route", "critic-diagnostic-evidence", "critic-export-consent", "handover-rotate",
++    "publish-evidence-run", "reconcile-backlog-delivery", "register-feature-package", "run-codex-critic-isolation", "session-critic-finalizer",
++    "verify-evidence-producer"].map((name) => [`${name}.mjs`, LONG_HELP_FLAG]),
++]);
++const PLUGIN_SCRIPTS_DIR = fileURLToPath(new URL("../../scripts", import.meta.url));
++
++function isAnsweredScriptHelp(script, args, options) {
++  if (args.length !== 1 || typeof script !== "string") return false;
++  const name = relativeUnderRoot(script, PLUGIN_SCRIPTS_DIR, { platform: options.platform ?? process.platform, lstatFn: options.lstatFn });
++  return name !== null && SCRIPTS_ANSWERING_HELP.get(name)?.includes(args[0]) === true;
++}
++
+ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
++  if (isAnsweredScriptHelp(script, args, options)) return true;
+   if (script === PROOF_WAIT_SCRIPT) return sanctionedProofWaitArgs(args, root);
+   if (script === SESSION_AUTHORITY_REPAIR_SCRIPT) return sanctionedSessionAuthorityRepairReadArgs(args, root);
+   if (script === HOST_COMMIT_RECOVER_SCRIPT) return sanctionedHostCommitRecoverArgs(args, root);
+diff --git a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+index edaa7a5a1ed416d91ae859ef6c5945d4c5d5b193..0b51227850029a6473672ffc4e9f8191c75215f8 100644
+--- a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+@@ -1,12 +1,12 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+-import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { registerTestCaseCompletion } from "../test-case-completion.mjs";
+ import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+-import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
++import { isSanctionedLifecycleCommand, SCRIPTS_ANSWERING_HELP } from "./command-catalogue.mjs";
+ import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
+ import { isReadOnlyDiagnosticCommand } from "./shell-grammar.mjs";
+ import * as denials from "./grammar-denials.mjs";
+@@ -78,6 +78,39 @@ test("G23 exact source-owned PO help is a pure CLI route", () => {
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// PO 2026-11-09: `--help` on a plugin script is admitted in every lifecycle state, but only for a script that really answers it.
++test("every plugin script with a help branch is admitted for its own flags and only prints its usage", () => {
++  mkdirSync(fixtureBase, { recursive: true });
++  const scriptsDir = fileURLToPath(new URL("../../scripts/", import.meta.url));
++  // These two hand the flag to the Codex binary; they have no help branch of their own.
++  const passesFlagOn = new Set(["codex-critic-isolation.mjs", "codex-isolation-control-decomposition.mjs"]);
++  const withHelpBranch = readdirSync(scriptsDir).filter((name) => name.endsWith(".mjs") && !name.endsWith(".test.mjs") && !passesFlagOn.has(name)
++    && /["']--help["']/u.test(readFileSync(join(scriptsDir, name), "utf8")));
++  assert.deepEqual(withHelpBranch.filter((name) => !SCRIPTS_ANSWERING_HELP.has(name)), [], "a script with a help branch belongs on the admitted list");
++  assert.deepEqual([...SCRIPTS_ANSWERING_HELP.keys()].filter((name) => !withHelpBranch.includes(name)), [], "the admitted list names only scripts with a help branch");
++  const root = mkdtempSync(join(fixtureBase, "g23-help-all-"));
++  try {
++    for (const [name, flags] of SCRIPTS_ANSWERING_HELP) {
++      const path = join(scriptsDir, name);
++      assert.equal(isSanctionedLifecycleCommand(`node ${path} --help --root x`, root), false, `${name} extra argument`);
++      assert.equal(isSanctionedLifecycleCommand(`node ${path} -h`, root), flags.includes("-h"), `${name} short flag`);
++      for (const flag of flags) {
++        assert.equal(isSanctionedLifecycleCommand(`node ${path} ${flag}`, root), true, `${name} ${flag}`);
++        const dir = mkdtempSync(join(root, "run-"));
++        const child = spawnSync(process.execPath, [path, flag], { cwd: dir, encoding: "utf8", timeout: 60000,
++          env: { ...process.env, HOME: dir, USERPROFILE: dir, TMPDIR: dir, TEMP: dir, TMP: dir } });
++        assert.equal(child.status, 0, `${name} ${flag}: ${child.stderr}`);
++        assert.ok(child.stdout.trim().length > 0, `${name} ${flag} prints its usage`);
++        assert.deepEqual(readdirSync(dir), [], `${name} ${flag} writes nothing`);
++      }
++    }
++    for (const refused of [`node ${join(scriptsDir, "project-reset.mjs")} --help`, `node ${join(scriptsDir, "resume-hint.mjs")} --help`,
++      `node ${join(root, "pipeline-state.mjs")} --help`, `node ${join(scriptsDir, "..", "scripts", "project-reset.mjs")} --help`]) {
++      assert.equal(isSanctionedLifecycleCommand(refused, root), false, refused);
++    }
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("G23 missing local targets are distinct from unknown grammar and protected paths", () => {
+   mkdirSync(fixtureBase, { recursive: true });
+   const root = mkdtempSync(join(fixtureBase, "g23-missing-"));
+@@ -149,5 +182,5 @@ test("C18-8 refusal texts carry one working example per refused shape, each admi
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
+-if (cases.length !== 4) throw new Error("G23 read/help case count drift");
++if (cases.length !== 5) throw new Error("G23 read/help case count drift");
+ registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index 4cb333345251ffc31999e7d44777d7733f6e1bc8..bb81d670735a058b43565b49c4a460219e77e14b 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -332,6 +332,11 @@ export function main(argv = process.argv.slice(2), env = process.env, deps = {})
+     writeError(`${result.code}: ${result.message}\n`);
+     return 2;
+   };
++  // Asking for the usage is a question, never a refusal; the first argument is the only place the flag means that.
++  if (argv.length === 1 && ["--help", "-h"].includes(argv[0])) {
++    write(`${USAGE}\n`);
++    return 0;
++  }
+   try {
+     const parsed = parseArgv(argv);
+     if (!parsed.ok) return refused(parsed);

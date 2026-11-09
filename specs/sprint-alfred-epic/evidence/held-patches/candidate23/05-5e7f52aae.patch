@@ -1,0 +1,186 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+index 26a7d0d1c2f4bab981f3596a97e9a33477890698..f4decb2fddcc63cf20ea0306aef8884a7e96b7a6 100644
+--- a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
++++ b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+@@ -36,8 +36,8 @@ const STATE = "pipeline-state.mjs";
+ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
+   Object.freeze({
+     id: "install",
+-    en: "install the Pipeline into this project (portable authority seed, runtime initialization and readbacks)",
+-    de: "die Pipeline in dieses Projekt installieren (portable Authority-Seed, Runtime-Initialisierung und Readbacks)",
++    en: "install the Pipeline into this project (portable authority seed, runtime initialization and readbacks; on Windows the new project folder gets rights for you alone)",
++    de: "die Pipeline in dieses Projekt installieren (portable Authority-Seed, Runtime-Initialisierung und Readbacks; unter Windows bekommt der neue Projektordner nur für Sie Rechte)",
+     routes: Object.freeze([
+       { script: ONBOARDING, verbs: ["plan", "apply-portable-seed", "initialize-runtime", "apply-readback"] },
+       { script: "onboarding-init.mjs", verbs: null },
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+index b5e9ba4eae4863bb9e1d514c2a1879d9edd14b57..5f0bd23043f602410880025a3156555efd501d87 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+@@ -2,7 +2,9 @@
+ // Read-only Windows custody diagnosis. The native authority backend remains the sole policy oracle.
+ import { win32 } from 'node:path';
+ import { createHash } from 'node:crypto';
++import { spawnSync } from 'node:child_process';
+ import { existsSync } from 'node:fs';
++import { resolveTrustedSystemExecutable } from './trusted-tool-resolution.mjs';
+ import { inspectWindowsOwnedAuthorityPath, observeWindowsAuthorityAncestor } from './windows-owned-authority-backend.mjs';
+ import { assessWindowsPrivateRoot } from './windows-private-state.mjs';
+ 
+@@ -166,6 +168,29 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
+   return { schema: WINDOWS_AUTHORITY_READINESS_SCHEMA, status: causes.length ? 'unavailable' : 'ready', causes };
+ }
+ 
++/**
++ * PO decision 2026-11-09, the narrow exception to "the agent never changes folder rights": the onboarding driver narrows the `project` folder it has
++ * just created itself, and no other folder. The grant runs first, so a failure can never leave the owner without access; the readiness check reads the
++ * result back and a folder that is still not secure falls back to the human step. Never throws.
++ */
++export function narrowOwnNewPrivateState({ projectRoot, spawn = spawnSync, resolveExecutable = resolveTrustedSystemExecutable } = {}) {
++  try {
++    const stateRoot = win32.join(projectRoot, 'project');
++    const whoami = resolveExecutable('whoami.exe');
++    const icacls = resolveExecutable('icacls.exe');
++    if (!whoami?.ok || !icacls?.ok) return { status: 'unavailable' };
++    const run = (path, args) => spawn(path, args, { encoding: 'utf8', shell: false, windowsHide: true, timeout: 15_000 });
++    const identity = run(whoami.path, ['/user', '/fo', 'csv', '/nh']);
++    const sid = identity?.status === 0 ? /"(S-1-5-[0-9-]+)"/u.exec(identity.stdout ?? '')?.[1] : null;
++    if (!sid) return { status: 'unavailable' };
++    if (run(icacls.path, [stateRoot, '/grant:r', `*${sid}:(OI)(CI)F`])?.status !== 0) return { status: 'failed', step: 'grant' };
++    if (run(icacls.path, [stateRoot, '/inheritance:r'])?.status !== 0) return { status: 'failed', step: 'inheritance' };
++    return { status: 'narrowed' };
++  } catch {
++    return { status: 'failed', step: 'internal' };
++  }
++}
++
+ /**
+  * The private state folder check alone (one native call, the full assessment is one per path). The onboarding driver runs it in the first question round,
+  * so the one manual step stands next to the other questions instead of stopping the run later. Null when the folder is absent or secure.
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+index 2698a97dc283aad64a363cec7cfe2efef6c58fe1..774b501eb169c0857bee56698bfc693ede17ce38 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+@@ -158,6 +158,35 @@ test('D168-S7b an insecure private-state root yields one WIN-AUTH-PRIVATE-ROOT c
+   assert.match(preview.afterwards, /next preflight reads the folder back/u);
+ });
+ 
++test('PO 2026-11-09: the driver narrows its own new folder by SID, grant first, without a shell', () => {
++  const calls = [];
++  const spawn = (path, args, options) => {
++    calls.push({ path, args, shell: options.shell });
++    return path === 'whoami' ? { status: 0, stdout: '"host\\owner","S-1-5-21-1-2-3-1001"\r\n' } : { status: 0, stdout: '' };
++  };
++  const resolveExecutable = (name) => ({ ok: true, path: name.replace('.exe', '') });
++  const result = readiness.narrowOwnNewPrivateState({ projectRoot: 'D:\\work\\repo', spawn, resolveExecutable });
++  assert.deepEqual(result, { status: 'narrowed' });
++  assert.deepEqual(calls.slice(1).map((call) => call.args), [
++    ['D:\\work\\repo\\project', '/grant:r', '*S-1-5-21-1-2-3-1001:(OI)(CI)F'],
++    ['D:\\work\\repo\\project', '/inheritance:r'],
++  ]);
++  assert.ok(calls.every((call) => call.shell === false));
++});
++
++test('PO 2026-11-09: a failed grant never removes the inherited rights, and a missing tool reports unavailable', () => {
++  const calls = [];
++  const spawn = (path, args) => {
++    calls.push(args);
++    return path === 'whoami' ? { status: 0, stdout: '"host\\owner","S-1-5-21-1-2-3-1001"' } : { status: 5, stdout: '' };
++  };
++  const resolveExecutable = (name) => ({ ok: true, path: name.replace('.exe', '') });
++  assert.deepEqual(readiness.narrowOwnNewPrivateState({ projectRoot: 'D:\\work\\repo', spawn, resolveExecutable }), { status: 'failed', step: 'grant' });
++  assert.equal(calls.some((args) => args.includes('/inheritance:r')), false);
++  assert.deepEqual(readiness.narrowOwnNewPrivateState({ projectRoot: 'D:\\work\\repo', spawn, resolveExecutable: () => ({ ok: false }) }), { status: 'unavailable' });
++  assert.deepEqual(readiness.narrowOwnNewPrivateState({ projectRoot: 'D:\\work\\repo', spawn: () => { throw new Error('boom'); }, resolveExecutable }), { status: 'failed', step: 'internal' });
++});
++
+ test('D168-S7b an unobservable private-state root fails closed without offering an icacls command', () => {
+   const { result } = withVerdict({ status: 'unavailable', reason: 'no observation' });
+   assert.equal(result.status, 'unavailable');
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.mjs b/plugins/pipeline-core/scripts/onboarding-init.mjs
+index 3211aa086d37ecd808996ed7e74e78ea6d073922..c36675502c93180c144975169754672bd1db417a 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.mjs
+@@ -116,7 +116,7 @@ import { printOnboardingInitResult } from "../lib/onboarding-driver-output.mjs";
+ import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
+ import { existsSync as actorExistsSync } from "node:fs";
+ import { heldIdentityChoice, normalizePipelineActorAssignment, writePipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
+-import { windowsPrivateStateCause } from "../lib/windows-authority-readiness.mjs";
++import { narrowOwnNewPrivateState, windowsPrivateStateCause } from "../lib/windows-authority-readiness.mjs";
+ import { beginInitialAnswersJournal, completeInitialAnswersJournal } from "../lib/onboarding-initial-answers-transaction.mjs";
+ import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
+ import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+@@ -1463,11 +1463,16 @@ function withWindowsRightsAsk(result, root, platform, privateStateCause) {
+ }
+ 
+ export function driveOnboardingInit(options = {}) {
+-  const { exists = actorExistsSync, platform = process.platform, privateStateCause = windowsPrivateStateCause } = options;
++  const { exists = actorExistsSync, platform = process.platform, privateStateCause = windowsPrivateStateCause, narrowNewPrivateState = narrowOwnNewPrivateState } = options;
+   const hadRepository = options?.rootDir ? exists(join(resolve(options.rootDir), ".git")) : true;
++  const hadStateFolder = options?.rootDir ? exists(join(resolve(options.rootDir), "project")) : true;
+   const core = driveOnboardingInitCore(options);
+   if (!core || typeof core !== "object" || !options?.rootDir) return core;
+   const root = resolve(options.rootDir);
++  // PO decision 2026-11-09: only a folder this very run created; an existing one stays the human's. The check below reads the result back.
++  if (platform === "win32" && !hadStateFolder && exists(join(root, "project"))) {
++    try { narrowNewPrivateState({ projectRoot: root }); } catch { /* the readback below still names the human step */ }
++  }
+   const restart = antigravityRestartStop(core, root, hadRepository, exists);
+   if (restart !== null) return restart;
+   const result = withWindowsRightsAsk(core, root, platform, privateStateCause);
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.test.mjs b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+index 2b560703c3c9b0604838bd6ca0dea28e11287723..06f4b90e58ff8d8c01b8bad1b8da6ee51f598aba 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.test.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+@@ -381,6 +381,30 @@ test("Antigravity: the driver call that creates the repository names the restart
+   }
+ });
+ 
++test("Windows rights: the driver narrows only a project folder this run created, and an existing one or another platform stays untouched", () => {
++  const root = freshRoot();
++  const home = freshHome();
++  try {
++    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "claude");
++    const state = join(root, "project");
++    const calls = [];
++    const narrow = (input) => { calls.push(input.projectRoot); return { status: "narrowed" }; };
++    let created = false;
++    const exists = (path) => (path === state ? created : existsSync(path));
++    const appearsDuringRun = (path) => { const seen = exists(path); if (path === state) created = true; return seen; };
++    driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "win32", privateStateCause: () => null, exists: appearsDuringRun, narrowNewPrivateState: narrow });
++    assert.deepEqual(calls, [root], "the folder was absent before the run and present after it");
++    calls.length = 0;
++    driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "win32", privateStateCause: () => null, exists: () => true, narrowNewPrivateState: narrow });
++    assert.deepEqual(calls, [], "a folder that existed before the run is the human's");
++    created = false;
++    driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "linux", privateStateCause: () => null, exists: appearsDuringRun, narrowNewPrivateState: narrow });
++    assert.deepEqual(calls, [], "other platforms never narrow");
++  } finally {
++    for (const dir of [root, home]) rmSync(dir, { recursive: true, force: true });
++  }
++});
++
+ test("Windows rights step: an insecure state folder stands beside the first-round questions, a secure one and other platforms add nothing", () => {
+   const root = freshRoot();
+   const home = freshHome();
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+index 292464c1878e35c6a48a4a3f50d23beeab4461c9..51f581bf8fda6383d6ea99bbccc7f71b7b73d2d3 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+@@ -87,10 +87,12 @@ operator may instead relocate the project into a private user profile path.
+ No action in this diagnostic writes an ACL. Rerun preflight after a reviewed
+ repair; a WSL fixture cannot certify native Windows custody.
+ 
+-The onboarding driver checks the `project/` folder already in the first question
+-round. When its rights are inherited from above the repository, `pendingAsks`
+-carries a `windowsPrivateStateRights` step with the commands. Show it with the
+-other questions. The human runs it, the agent never does.
++The onboarding driver narrows the rights of a `project/` folder it has just
++created itself. A folder that existed before it stays untouched. The driver
++then checks the folder in the first question round. When its rights are still
++inherited from above the repository, `pendingAsks` carries a
++`windowsPrivateStateRights` step with the commands. Show it with the other
++questions. The human runs it, the agent never does.
+ 
+ ## Antigravity restart after the repository was created
+ 

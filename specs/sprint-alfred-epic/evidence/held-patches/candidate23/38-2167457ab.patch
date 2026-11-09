@@ -1,0 +1,118 @@
+diff --git a/plugins/pipeline-core/lib/agy-native-goldfish.mjs b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+index 13b5f6e6bbf2cb5fbd12056f48ab752c076e4c01..e96169825857f82cb2678b6cdeb8d165bd94b446 100644
+--- a/plugins/pipeline-core/lib/agy-native-goldfish.mjs
++++ b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+@@ -128,8 +128,12 @@ export function evaluateNativeChildCall(input, { routeSource } = {}) {
+   // G20-43: the resolved model is RECORDED next to the expected registry cell and never refused. The host's Model alias does not select a
+   // model (measured), so a refusal here only blocked every happy-path child with a repair nobody could run.
+   const resolved = input?.modelName ?? null;
+-  const modelCheck = { status: normalizeModel(resolved) === normalizeModel(expected.value) ? "match" : "mismatch", resolved, expected };
+-  if (modelCheck.status === "match") return { ok: true, attributed, modelCheck };
++  // C23 (Antigravity greenfield report): the host names the configured model family with its own alias (gemini-3-flash-agent for gemini-3.8-flash-medium), so a notice on every child call
++  // said nothing the reader could act on. The same family is recorded as tier-match, and only another family earns the notice.
++  const tierOf = (value) => { const name = normalizeModel(value); return /flash.?lite/u.test(name) ? "flash-lite" : /flash/u.test(name) ? "flash" : /(?:^|-)pro(?:-|$)/u.test(name) ? "pro" : null; };
++  const status = normalizeModel(resolved) === normalizeModel(expected.value) ? "match" : tierOf(resolved) !== null && tierOf(resolved) === tierOf(expected.value) ? "tier-match" : "mismatch";
++  const modelCheck = { status, resolved, expected };
++  if (status !== "mismatch") return { ok: true, attributed, modelCheck };
+   return {
+     ok: true, attributed, modelCheck,
+     notice: `AGY-NATIVE-CHILD-MODEL-NOTICE: child ${bound.typeName} (parent ${bound.parentConversationId}) resolved to model ${JSON.stringify(resolved)}, the expected cell for duty.${expected.duty} is ${JSON.stringify(expected.value)}; admitted and recorded (the host's Model alias does not select a model).`,
+diff --git a/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.mjs b/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.mjs
+index 9cc04f349f7bc42c645b369ee2aa4bdac0d2a9eb..fefc0f5eb42d8178540b7bf7322d0029d821e093 100644
+--- a/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.mjs
++++ b/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.mjs
+@@ -213,7 +213,7 @@ export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagent
+   });
+   if (batch.status !== "prepared") return { ...rejected(batch.code, "packets"), preparation: batch };
+   if (packets.some((packet) => packet.transport !== "antigravity" || packet.resultDestination?.kind !== "return")) {
+-    return rejected("AGY-NATIVE-PACKET-BOUNDARY", "packets");
++    return { ...rejected("AGY-NATIVE-PACKET-BOUNDARY", "packets"), repair: "every packet needs \"transport\": \"antigravity\" and \"resultDestination\": { \"kind\": \"return\" }, because a native child hands its result back in its return; a result file path is not a field of this packet" };
+   }
+   if (packets.some((packet) => packet.candidate.commit !== state.head || packet.candidate.tree !== state.tree)) {
+     return rejected("AGY-NATIVE-CANDIDATE", "packets.candidate");
+diff --git a/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs b/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs
+index 357e736d7c6015c455b986791cf7a70f03675894..b8085f653911317d792c403bc88f0e3ef21f4560 100644
+--- a/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs
++++ b/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs
+@@ -318,7 +318,9 @@ test("preparation rejects partial packet arrays", () => withFixture((value) => {
+ 
+ test("preparation rejects non-return native results", () => withFixture((value) => {
+   value.packets[0].resultDestination = { kind: "stream" };
+-  assert.equal(prepareAntigravityNativeDispatch(value).code, "AGY-NATIVE-PACKET-BOUNDARY");
++  const refused = prepareAntigravityNativeDispatch(value);
++  assert.equal(refused.code, "AGY-NATIVE-PACKET-BOUNDARY");
++  assert.match(refused.repair, /"resultDestination": \{ "kind": "return" \}/u, "C23: the refusal names the field and value the packet needs");
+ }));
+ 
+ test("preparation rejects a recursive/non-native transport", () => withFixture((value) => {
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 49c0401c6708f47ea545cfa12550c0b684e6556c..0377ec45b65b6b8dcc3b4d95abf3dd366ede58d2 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -35,6 +35,13 @@ export const RECON_NOTE_PREFIXES = Object.freeze(["scratch/", "specs/"]);
+ const REQUIRED_LISTS = Object.freeze(["paths", "context", "targeted"]);
+ const OPTIONAL_LISTS = Object.freeze(["newFiles", "forbidden", "stops", "facts"]);
+ const KNOWN_KEYS = new Set([...REQUIRED_STRINGS, ...OPTIONAL_STRINGS, ...REQUIRED_LISTS, ...OPTIONAL_LISTS, "estimatedToolCalls", "visualCheck"]);
++// C23 (Antigravity greenfield report: five attempts at the package fields): the help text is built from the lists the validator uses, so it cannot drift from them.
++export const BRIEFING_PACKAGE_FIELDS_HELP = `Package fields (JSON object, ${BRIEFING_PACKAGE_SCHEMA}):
++  required strings: ${REQUIRED_STRINGS.join(", ")}
++  required lists of strings: ${REQUIRED_LISTS.join(", ")}
++  optional strings: ${OPTIONAL_STRINGS.join(", ")}
++  optional lists of strings: ${OPTIONAL_LISTS.join(", ")}
++  optional: estimatedToolCalls (positive integer), visualCheck ({ question, evidencePath })`;
+ // C18-15 (AC-239): an optional visual check; a closed { question, evidencePath } object, rendered as a fixed block in field 3.
+ const VISUAL_CHECK_KEYS = Object.freeze(["evidencePath", "question"]);
+ const VISUAL_QUESTION_MAX = 300;
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+index 8a81744978327738bb24085cbfd90cb1a6b14055..490ea983ac94781b69dc172431d5ff61ef4fb239 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+@@ -200,6 +200,14 @@ test("G20-43: a child whose resolved modelName differs from the selected model i
+     assert.equal(matched.modelCheck.status, "match");
+     assert.equal(matched.notice, undefined);
+     assert.doesNotMatch(runAdapter(fx, right).stderr, /agy-native-child-model-mismatch/u);
++    // C23: the host's alias of the configured family is recorded as a tier match, without a notice on every child call; another family still gets it.
++    const family = (expected, resolved) => expected.replace(/flash.*|pro.*/u, "") + resolved;
++    const tierName = selectedModel("implement").includes("pro") ? "pro" : "flash";
++    const sameFamily = payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: family(selectedModel("implement"), `${tierName}-agent`), toolCall: childCall });
++    const tiered = evaluateNativeChildCall(sameFamily);
++    assert.equal(tiered.modelCheck.status, "tier-match", JSON.stringify(tiered.modelCheck));
++    assert.equal(tiered.notice, undefined);
++    assert.doesNotMatch(runAdapter(fx, sameFamily).stderr, /agy-native-child-model-mismatch/u);
+     // Every other check still governs: an ambiguous binding is still refused whatever the model.
+     mkdirSync(join(fx.brain, "44444444-dddd-4ddd-8ddd-000000000004"), { recursive: true });
+     descriptor(fx, CHILD, "goldfish-implementor", "SUBAGENT_STATE_ALIVE", "44444444-dddd-4ddd-8ddd-000000000004");
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index da106ced8e4b780448da27d1c055012c8986fd4d..c2c33e1840d8fb8bf98a4b544b38b85ceabe8547 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -58,6 +58,13 @@ const USAGE = `Usage:
+   node <plugin-root>/scripts/dispatch-briefing.mjs build --package <package.json> [--out scratch/<briefing>.md] [--root <directory>]
+   node <plugin-root>/scripts/dispatch-briefing.mjs probe --package <package.json> [--root <directory>]
+ 
++Package fields (JSON object, pipeline.dispatch-briefing-package.v1):
++  required strings: id, item, agentType, modelId, check, title, ac, goal
++  required lists of strings: paths, context, targeted
++  optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner, effortEscalation, module, modulePlan
++  optional lists of strings: newFiles, forbidden, stops, facts
++  optional: estimatedToolCalls (positive integer), visualCheck ({ question, evidencePath })
++
+ probe runs every dispatch-time check of that package in dry-run (package fields, binding refusals, plan approval, registry lock),
+   writes no file, takes no lock, reserves no slice, and prints ALL failures at once as JSON, each with its repair; exit 0 when ready, 2 otherwise.
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 5a9439cb8e7984c741739eac6a53ea8be181a1db..33e9b5e33e56ad7f2dbf7ff5923f95d4e3c0c82a 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -127,6 +127,11 @@ for (const flag of ["--help", "-h"]) test(`public ${flag} prints actionable usag
+   assert.match(result.stdout, /Usage:[\s\S]*binding[\s\S]*build/u);
+ });
+ 
++test("C23: the help lists exactly the package fields the validator knows", async () => {
++  const { BRIEFING_PACKAGE_FIELDS_HELP } = await import("../lib/dispatch-briefing-build.mjs");
++  assert.ok(spawnSync(process.execPath, [SCRIPT, "--help"], { encoding: "utf8" }).stdout.includes(BRIEFING_PACKAGE_FIELDS_HELP));
++});
++
+ test("public --help and -h work before setup without private reads, processes or filesystem effects", () => {
+   const root = mkdtempSync(join(tmpdir(), "dispatch-help-"));
+   const held = lstatSync(root);

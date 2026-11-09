@@ -1,0 +1,40 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 0377ec45b65b6b8dcc3b4d95abf3dd366ede58d2..d8f4c29f758b88fb0d1f935cb2d5c902c6423098 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -254,7 +254,8 @@ function splitMarker(text) {
+ export function verifyGeneratedBriefing(text) {
+   const split = splitMarker(text);
+   if (split === null) return { ok: false, code: "DBG-GENERATED-MARKER-MISSING" };
+-  if (sha256(split.body) !== split.digest) return { ok: false, code: "DBG-GENERATED-DIGEST-MISMATCH" };
++  // C23 (Antigravity greenfield, F15, four occurrences): a native tool call drops the final newline of a long retyped text. Nothing else may differ: the digest still covers every other byte.
++  if (sha256(split.body) !== split.digest && (split.body.endsWith("\n") || sha256(`${split.body}\n`) !== split.digest)) return { ok: false, code: "DBG-GENERATED-DIGEST-MISMATCH" };
+   return { ok: true, code: "DBG-GENERATED-VERIFIED" };
+ }
+ 
+@@ -268,8 +269,7 @@ export function generatedBriefingAdmission(prompt, generatorCommand = "node <plu
+   const repair = `repair: write the package (${BRIEFING_PACKAGE_SCHEMA}), run \`${generatorCommand} build --package <package.json> --out scratch/briefing-<dispatch-id>.md\`, and dispatch that file's text unchanged`;
+   if (prompt.includes("<!-- pipeline-briefing-generator:")) {
+     const verified = verifyGeneratedBriefing(prompt);
+-    // Antigravity greenfield 2026-11-08: a missing final newline cost a 13 KB retype; the digest covers it.
+-    if (!verified.ok) return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it (a dropped final newline counts: the text must end with the file's own newline); ${repair}` };
++    if (!verified.ok) return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; ${repair}` };
+     // G20-48: the D78 rule is runner-neutral, so an Antigravity binding is parsed too.
+     const parsed = parseNativeGoldfishBriefing(prompt, { runners: DISPATCH_ADMISSION_BRIEFING_RUNNERS });
+     if (requireGenerated && (!parsed.ok || parsed.binding.itemDelivery === undefined)) {
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 33e9b5e33e56ad7f2dbf7ff5923f95d4e3c0c82a..efa35e227fc91a6b6ea33f91a684400900b308fe 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -657,6 +657,11 @@ test("a one-byte edit or a removed marker fails the generated-briefing verificat
+   const unmarked = text.split("\n").filter((line) => !line.startsWith("<!-- pipeline-briefing-generator:")).join("\n");
+   assert.equal(verifyGeneratedBriefing(unmarked).code, "DBG-GENERATED-MARKER-MISSING");
+   assert.equal(verifyGeneratedBriefing(`${text}${text}`).code, "DBG-GENERATED-MARKER-MISSING");
++  // C23 (F15): only the final newline may be missing; anything else still fails, a second newline and an edit without the newline included.
++  assert.equal(text.endsWith("\n"), true);
++  assert.deepEqual(verifyGeneratedBriefing(text.slice(0, -1)), { ok: true, code: "DBG-GENERATED-VERIFIED" });
++  assert.equal(verifyGeneratedBriefing(`${text}\n`).code, "DBG-GENERATED-DIGEST-MISMATCH");
++  assert.equal(verifyGeneratedBriefing(edited.slice(0, -1)).code, "DBG-GENERATED-DIGEST-MISMATCH");
+ });
+ 
+ test("build refuses a named path that does not exist unless the package declares it new", async () => {

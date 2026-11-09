@@ -1,0 +1,31 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 29a143ded55e40b9c9f06909b1e9e0705fee4147..0631e6a6463e2db347013a3e9abcdde12dfd1a68 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -346,6 +346,26 @@ test("inactive repositories remain silent for session writes and Bash; valid con
+   }
+ });
+ 
++// PO 2026-11-09: a usage question on a script that answers it passes a session that is not ready; a script without a help branch would run, so it stays refused.
++test("a not-ready session admits the help flag of a script that answers it and refuses every other script", () => {
++  const path = root();
++  try {
++    markGovernedFixture(path);
++    const dependencies = { projectDir: path, requireProjectOnboardingReadyFn() { deny(NON_PARTIAL_DENIAL_STATUS); } };
++    const scriptPath = (name) => fileURLToPath(new URL(`../scripts/${name}`, import.meta.url));
++    for (const tail of ["onboarding-init.mjs --help", "onboarding-init.mjs -h", "design-review-receipt.mjs --help", "dispatch-briefing.mjs --help"]) {
++      const [name, flag] = tail.split(" ");
++      assert.deepEqual(evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${flag}`), dependencies), { exitCode: 0, stderr: "" }, tail);
++    }
++    for (const tail of ["project-reset.mjs --help", "close-coordinator.mjs -h", "dispatch-briefing.mjs --help --root x"]) {
++      const [name, ...rest] = tail.split(" ");
++      const refused = evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${rest.join(" ")}`), dependencies);
++      assert.equal(refused.exitCode, 2, tail);
++      assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u, tail);
++    }
++  } finally { rmSync(path, { recursive: true, force: true }); }
++});
++
+ test("bare invalid source, calibration, lock, runtime and consent markers stay inactive; valid consent enforces", () => {
+   const markers = [
+     ".agent-pipeline/core.lock.json", "pipeline.user.yaml", ".claude/pipeline.json",

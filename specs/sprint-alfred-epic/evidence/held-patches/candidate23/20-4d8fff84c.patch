@@ -1,0 +1,54 @@
+diff --git a/plugins/pipeline-core/roles/elephant.md b/plugins/pipeline-core/roles/elephant.md
+index 928a55d9a7ae75b0ee7d01bb47eee6b58920090f..51138695d041852e466e1a15f6368c533a8ee70f 100644
+--- a/plugins/pipeline-core/roles/elephant.md
++++ b/plugins/pipeline-core/roles/elephant.md
+@@ -34,6 +34,7 @@ You are the **Elephant** — the orchestrator of the Agent-Pipeline.
+ - **Check:** Production diffs originate from Goldfish sessions; commit/session trailers prove authorship — verified at close by the mandatory authorship check.
+ - **Exception (rigor-0 fast-path only):** for a task that fully meets the stage-0 fast-path definition — ALL criteria: ≤ 2 files, ≤ ~25 diff lines, no architecture/schema/public-API/test/guardrail-hook-CI/dependency/security-surface change, trivially `git revert`-able, and no risk flag set — the interactive Elephant session MAY execute the fix itself. `verify` + the evidence artifact remain mandatory; a Critic run is required only if the risk flag is set. This exception is scoped EXCLUSIVELY to this definition — do not extend it by local judgment; anything outside those criteria still requires a Goldfish dispatch.
+ - **Clarification (extracted from `docs/state.md` checkpoint 45/46, dispatch `PHX-WP-STATE-ROTATION-EXTRACT-AND-BUILD`):** a GMW-signed guard-maintenance-window lift authorizes crossing the ONE specific technical guard it names (e.g. test-path protection) for the window's duration — it does NOT independently satisfy, extend, or substitute for this rule's own stage-0 fast-path criteria. "The guard is lifted so I can touch this myself" is not a valid EL-01 exception in its own right; the file-count/line-count/surface-touch conjunction above still governs, and it is stricter than "small, mechanical, no design latitude" (that looser phrasing is the `goldfish-mechanic` DISPATCH-TIER selection criterion, a different question — which model/effort tier a dispatch gets — not an EL-01 authorship exception). A guardrail-hook-CI file, a schema file, or a multi-file/large diff touched under a GMW lift still routes to a `goldfish-mechanic` dispatch, never Elephant self-execution.
++- **Clarification (landing a delivered result, PO decision 2026-11-09):** when a Goldfish delivered its result and only the host commit did not land, committing exactly the delivered paths is a commit act, not production authorship, at any size. The route is `scripts/goldfish-host-commit-recover.mjs plan|apply`, which writes `Dispatch: <TASK_ID> (goldfish)` and `Commit-Act: orchestrator`. For the authorship check such a commit, or a hand commit whose body names the failed host commit and whose paths are exactly the delivered ones, is a warning: severity minor, never a lifecycle violation, and no dispatch record is invented for it. Code the orchestrator wrote or changed itself stays under this rule.
+ 
+ **Administrative work is role work, not a production exception.** Backlog item
+ registration, spec/planning Markdown and official ledger projections use
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 77b4b7d05beb41fee5b9d4594f16ca8d716b0f75..a4c00648b56119d5f5c5c868bde01f205c3022f2 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -931,7 +931,7 @@ export function generateDispatchBinding(options, deps = {}) {
+   }
+   for (const entry of stopEntries.filter((row) => !leavingIds.has(row.dispatchId) || preDispatch === null)) {
+     const name = typeof entry.file === "string" && entry.file !== "" ? entry.file : `stop-failure-${entry.dispatchId}.json`;
+-    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${[STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR].map((parts) => parts.join("/")).find((rel) => rel === entry.directory) ?? STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}, ${stopFailureCauseText(entry)}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
++    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${[STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR].map((parts) => parts.join("/")).find((rel) => rel === entry.directory) ?? STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}, ${stopFailureCauseText(entry)}); verify its diff, run the recovery plan command, apply with --expect-sha256, then rebuild (a hand commit draws a Critic warning); the diagnostic is removed by the next successful completion`, recovery: ["node", fileURLToPath(new URL("./goldfish-host-commit-recover.mjs", import.meta.url)), "plan", "--root", root, "--dispatch-id", entry.dispatchId] });
+   }
+ 
+   // Agent definition: effort, model alias and the maxTurns cliff.
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 71b87c452f29dd49afe1a70d1450406a5f933c75..091b1a14b6846e8ef2e471b78ceafb568f1a331c 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1593,7 +1593,11 @@ test("PF-61 reader one persisted diagnostic yields exactly one warning naming di
+   assert.ok(found[0].message.includes("ALF-BG"));
+   assert.ok(found[0].message.includes("NGHF-HANDBACK-INVALID"));
+   assert.ok(found[0].message.includes(COMMIT));
+-  assert.match(found[0].message, /commit it yourself with the Dispatch trailer, then rebuild/u);
++  assert.match(found[0].message, /run the recovery plan command, apply with --expect-sha256, then rebuild/u);
++  assert.doesNotMatch(found[0].message, /commit it yourself/u);
++  assert.match(found[0].recovery[1], /goldfish-host-commit-recover\.mjs$/u);
++  assert.deepEqual(found[0].recovery.slice(2, 3), ["plan"]);
++  assert.deepEqual(found[0].recovery.slice(-2), ["--dispatch-id", "ALF-BG"]);
+ });
+ 
+ test("PF-61 reader the warning names the recorded stage and reason, the detail's reason when the record has none, and says so when there is none", async () => {
+diff --git a/roles/elephant.md b/roles/elephant.md
+index 928a55d9a7ae75b0ee7d01bb47eee6b58920090f..51138695d041852e466e1a15f6368c533a8ee70f 100644
+--- a/roles/elephant.md
++++ b/roles/elephant.md
+@@ -34,6 +34,7 @@ You are the **Elephant** — the orchestrator of the Agent-Pipeline.
+ - **Check:** Production diffs originate from Goldfish sessions; commit/session trailers prove authorship — verified at close by the mandatory authorship check.
+ - **Exception (rigor-0 fast-path only):** for a task that fully meets the stage-0 fast-path definition — ALL criteria: ≤ 2 files, ≤ ~25 diff lines, no architecture/schema/public-API/test/guardrail-hook-CI/dependency/security-surface change, trivially `git revert`-able, and no risk flag set — the interactive Elephant session MAY execute the fix itself. `verify` + the evidence artifact remain mandatory; a Critic run is required only if the risk flag is set. This exception is scoped EXCLUSIVELY to this definition — do not extend it by local judgment; anything outside those criteria still requires a Goldfish dispatch.
+ - **Clarification (extracted from `docs/state.md` checkpoint 45/46, dispatch `PHX-WP-STATE-ROTATION-EXTRACT-AND-BUILD`):** a GMW-signed guard-maintenance-window lift authorizes crossing the ONE specific technical guard it names (e.g. test-path protection) for the window's duration — it does NOT independently satisfy, extend, or substitute for this rule's own stage-0 fast-path criteria. "The guard is lifted so I can touch this myself" is not a valid EL-01 exception in its own right; the file-count/line-count/surface-touch conjunction above still governs, and it is stricter than "small, mechanical, no design latitude" (that looser phrasing is the `goldfish-mechanic` DISPATCH-TIER selection criterion, a different question — which model/effort tier a dispatch gets — not an EL-01 authorship exception). A guardrail-hook-CI file, a schema file, or a multi-file/large diff touched under a GMW lift still routes to a `goldfish-mechanic` dispatch, never Elephant self-execution.
++- **Clarification (landing a delivered result, PO decision 2026-11-09):** when a Goldfish delivered its result and only the host commit did not land, committing exactly the delivered paths is a commit act, not production authorship, at any size. The route is `scripts/goldfish-host-commit-recover.mjs plan|apply`, which writes `Dispatch: <TASK_ID> (goldfish)` and `Commit-Act: orchestrator`. For the authorship check such a commit, or a hand commit whose body names the failed host commit and whose paths are exactly the delivered ones, is a warning: severity minor, never a lifecycle violation, and no dispatch record is invented for it. Code the orchestrator wrote or changed itself stays under this rule.
+ 
+ **Administrative work is role work, not a production exception.** Backlog item
+ registration, spec/planning Markdown and official ledger projections use

@@ -1,0 +1,17 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 5f8b74131d733e4665774daf0ebedec7c0c1b77f..1d04a1bb08f9e89977ed2429ddcc47ca4796c4b8 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -109,6 +109,12 @@
+       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/guard-push-promotion.test.mjs",
+       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/guard-push-promotion.test.mjs"
+     },
++    {
++      "name": "guard-push-read-search-tests",
++      "file": "plugins/pipeline-core/hooks/guard-push-read-search.test.mjs",
++      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/guard-push-read-search.test.mjs",
++      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/guard-push-read-search.test.mjs"
++    },
+     {
+       "name": "agy-session-authority-tests",
+       "file": "plugins/pipeline-core/lib/agy-session-authority.test.mjs",

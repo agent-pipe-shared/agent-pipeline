@@ -1,0 +1,88 @@
+diff --git a/plugins/pipeline-core/hooks/codex-session-start-hint.mjs b/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
+index fb14196f62ce4bcf29e9ed0e74733408e892127d..ab107ee40b672883d8a4576781eadebb8785a985 100644
+--- a/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
++++ b/plugins/pipeline-core/hooks/codex-session-start-hint.mjs
+@@ -173,16 +173,16 @@ export function sessionStartDecision(projectDir = process.cwd(), exists = exists
+     };
+   }
+   const message =
+-    "Agent Pipeline is available as an optional project workflow, but it is not active in this folder. Run the pipeline-start skill before any project work: its preflight carries the exact question to relay, so the user is asked once and not first in your own words.";
++    "Agent Pipeline is available as an optional project workflow, but it is not active in this folder. Run the pipeline-start skill before any project work: its preflight is read-only in this folder and carries the exact question to relay, so the user is asked once and not first in your own words.";
+   return {
+     governed,
+     message,
+     context: [
+       message,
+-      "On the user's first request, briefly explain that Agent Pipeline adds a structured, verifiable delivery workflow, then ask whether it should be installed for this repository.",
+-      "End that turn and wait.",
+-      "Before an explicit affirmative answer, do not invoke pipeline-core:pipeline-start, inspect or plan onboarding, initialize Git, or change project files.",
+-      "After consent, invoke pipeline-core:pipeline-start; every returned mutating lifecycle action still keeps its own digest-bound confirmation.",
++      "Ask no consent question of your own, neither before that preflight result nor beside it: its consentQuestion is the only one, and it already says what Agent Pipeline is.",
++      "Relay its textByLanguage entry for the user's language (consentQuestion.text when that language has no entry) verbatim in one message, then end that turn and wait.",
++      "Before an explicit affirmative answer, run only that preflight: do not execute its nextAction, inspect or plan onboarding, initialize Git, or change project files.",
++      "After consent, execute the returned nextAction; the one yes covers the steps the question names, and the remaining onboarding questions arrive together as one batch.",
+       "Reply in the user's language.",
+     ].join(" "),
+   };
+diff --git a/plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs b/plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs
+index 1cbf982ef650b8351487a78009d6aa76a7078631..f309e7d5d4d1e16e4ba9cba73b67ea19a3a70a2e 100644
+--- a/plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs
++++ b/plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs
+@@ -49,9 +49,13 @@ cases.push({ id: "SSH001", name: "optional workflow remains inert and explains i
+   assert.match(optional.message, /optional project workflow/u);
+   assert.match(optional.message, /before any project work/u);
+   assert.doesNotMatch(optional.message, /before running any Pipeline command/u);
+-  assert.match(optional.context, /ask whether it should be installed/u);
+-  assert.match(optional.context, /End that turn and wait/u);
+-  assert.match(optional.context, /do not invoke pipeline-core:pipeline-start/u);
++  // One consent question: the hint routes to the preflight's question and never asks a first one in the agent's own words.
++  assert.match(optional.context, /Ask no consent question of your own/u);
++  assert.match(optional.context, /consentQuestion is the only one/u);
++  assert.match(optional.context, /verbatim in one message, then end that turn and wait/u);
++  assert.match(optional.context, /do not execute its nextAction/u);
++  assert.doesNotMatch(optional.context, /ask whether it should be installed/u);
++  assert.doesNotMatch(optional.context, /do not invoke pipeline-core:pipeline-start/u);
+   assert.doesNotMatch(optional.message, /run pipeline-core:pipeline-start/u);
+   assert.equal(sessionStartMessage(root), optional.message);
+ 
+diff --git a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+index 07c1f1ef4552dd51bd8c2ef11da9bab1d5156d9d..26a7d0d1c2f4bab981f3596a97e9a33477890698 100644
+--- a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
++++ b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+@@ -117,8 +117,8 @@ export const ONBOARDING_CONSENT_NOT_COVERED = Object.freeze([
+ ]);
+ 
+ const QUESTION_FRAME = Object.freeze({
+-  en: (covered, excluded) => `Should this project use Agent Pipeline? If you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval: ${covered}. Your yes does not cover ${excluded}; those stay your own decisions.`,
+-  de: (covered, excluded) => `Soll dieses Projekt Agent Pipeline nutzen? Wenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird: ${covered}. Ihr Ja deckt nicht ab: ${excluded}; das bleiben Ihre eigenen Entscheidungen.`,
++  en: (covered, excluded) => `Agent Pipeline adds a structured, verifiable delivery workflow to a project. Should this project use it? If you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval: ${covered}. Your yes does not cover ${excluded}; those stay your own decisions.`,
++  de: (covered, excluded) => `Agent Pipeline ergänzt ein Projekt um einen strukturierten, nachprüfbaren Lieferablauf. Soll dieses Projekt es nutzen? Wenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird: ${covered}. Ihr Ja deckt nicht ab: ${excluded}; das bleiben Ihre eigenen Entscheidungen.`,
+ });
+ 
+ /**
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index d36414342494cdc81d1e737c784b10265ae52e01..7385dfef507eada742036eadc40890b96d861342 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -1134,7 +1134,7 @@ function onboardingConsentFields({ rootDir, scriptUrl }) {
+       requiresConfirmation: false,
+       executionBoundary: "host",
+       expected: { schema: "pipeline.onboarding-consent-mark.v2", answer: "yes" },
+-      guidance: "Relay consentQuestion.text to the user verbatim, never paraphrased. After an affirmative answer, run this record command once the first onboarding apply (the portable seed) has completed, replacing <the-user-answer-verbatim> with the user's answer word for word; a file written into .claude/ earlier makes a fresh root read as partial. The record is what lets later actions print coveredBy instead of asking again. A decline is recorded with --answer no and leaves the project inactive.",
++      guidance: "Relay consentQuestion.textByLanguage for the user's language (consentQuestion.text when it has no entry) verbatim, never paraphrased, as the only consent question: no question of your own before it or beside it. After an affirmative answer, run this record command once the first onboarding apply (the portable seed) has completed, replacing <the-user-answer-verbatim> with the user's answer word for word; a file written into .claude/ earlier makes a fresh root read as partial. The record is what lets later actions print coveredBy instead of asking again. A decline is recorded with --answer no and leaves the project inactive.",
+     },
+   };
+ }
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 1bbaddc75c31efa002248fb8e1df75023b40a215..27c14ace8810971fd7007d382a97bb6aca3785ef 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -28,7 +28,7 @@ conflicting or unknown carriers stop — Critic is closed, never Elephant.
+ 
+ For `pipeline-governance-inactive`, ask the human once whether this project
+ should use the Pipeline. That question lists in short what agreeing
+-installs and activates, git hooks included, by relaying `consentQuestion.text` verbatim, never paraphrased. Only after an affirmative answer, execute the exact
++installs and activates, git hooks included, by relaying `consentQuestion.text` verbatim (or its `textByLanguage` entry for the user's language), never paraphrased, with no question of your own before it. Only after an affirmative answer, execute the exact
+ read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
+ mutations; then run `consentRecordAction`. When an escalation review asks why a
+ covered action runs, give its `escalationJustification` line verbatim; the

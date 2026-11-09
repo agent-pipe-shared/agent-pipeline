@@ -1,0 +1,36 @@
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 40f04ab5e66e1d875abe7e39a6a98bd992173b1f..1157e2baae6fd01ea73b59ff7c4d6852fe0e0353 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -87,7 +87,7 @@ function applyBound(runner, plan, values, code, subcommand) {
+ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact, auditRequest, criticVerifyLifecycle, continuityCloseRequest = null, lifecycleId = null, resumeLifecycleId = null } = {}, deps = {}) {
+   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
+   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
+-  if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", "Feature close requires a known architecture impact.");
++  if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", `Feature close requires a known architecture impact; allowed --architecture-impact values: ${[...IMPACT].join(", ")}.`);
+   if (typeof auditRequest !== "string" || auditRequest.length === 0 || auditRequest.startsWith("/") || auditRequest.includes("\\") || auditRequest.split("/").some(part => part === "" || part === "." || part === "..")) fail("FINISH-AUDIT-REQUEST", "Feature close requires one safe repository-relative audit request.");
+   if (!/^[a-f0-9]{64}$/u.test(criticVerifyLifecycle ?? "")) fail("FINISH-CRITIC-VERIFY", "Feature close requires the exact private Critic/Verify lifecycle receipt ID.");
+   if (continuityCloseRequest !== null && (typeof continuityCloseRequest !== "string" || continuityCloseRequest.length === 0 || continuityCloseRequest.startsWith("/") || continuityCloseRequest.includes("\\") || continuityCloseRequest.split("/").some(part => part === "" || part === "." || part === ".."))) fail("FINISH-CONTINUITY", "Continuity close request must be safe and repository-relative.");
+@@ -224,7 +224,7 @@ function writeRepoJson(root, path, value) { const target = resolve(root, path);
+ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, openChecks = null } = {}, deps = {}) {
+   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
+   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
+-  if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", "Feature close requires a known architecture impact.");
++  if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", `Feature close requires a known architecture impact; allowed --architecture-impact values: ${[...IMPACT].join(", ")}.`);
+   if (criticPacketId !== null && !HEX32.test(criticPacketId)) fail("FINISH-CRITIC-PACKET", "The Critic packet id must be 32 lowercase hex characters.");
+   if (resumeLifecycleId !== null && !/^[A-Za-z0-9._-]{1,100}$/u.test(resumeLifecycleId)) fail("FINISH-LIFECYCLE", "Lifecycle ID is invalid.");
+   // C22 (CGR-06): the human's literal answer to the acceptance question is recorded as given, so only its presence and size are checked.
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index bdbbca011f9311a87596537eb6d3ad2978605c1b..e7a415af2cdeb48fd3c443e7819315f3978ab18f 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -106,6 +106,9 @@ test("resume rejects a different feature or changed close binding before mutatio
+     readFileSyncFn: () => JSON.stringify({ activeFeature: { id: "feature-abc" } }),
+     runCommand: runner,
+   }), error => error.code === "FINISH-RESUME-STATE");
++  // C23 (Antigravity greenfield C): the refusal names what it would accept.
++  assert.throws(() => finishFeature({ rootDir: "/repo", by: "PO", architectureImpact: "none", auditRequest: "specs/feature/audit-request.json", criticVerifyLifecycle: f.criticVerifyLifecycle }, { realpathSyncFn: value => value, runCommand: runner }),
++    error => error.code === "FINISH-IMPACT" && /no-architecture-impact/u.test(error.message) && /architecture-conforms/u.test(error.message));
+   assert.deepEqual(calls.map(argv => argv[1]), ["inspect"]);
+ });
+ 

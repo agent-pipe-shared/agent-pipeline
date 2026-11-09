@@ -1,0 +1,63 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index b3ea695c1bc437416e44e580244676679e6db920..19b2ff7567b5219da61d15834b2867340a797acc 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -653,7 +653,7 @@ function sanctionedProofWaitArgs(args, root) {
+ // script's own flags, and g23-read-help.test.mjs runs every entry in an empty directory and fails when a script with a help branch is missing here.
+ const BOTH_HELP_FLAGS = ["--help", "-h"], LONG_HELP_FLAG = ["--help"];
+ export const SCRIPTS_ANSWERING_HELP = new Map([
+-  ...["architecture-baseline", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "onboarding-init",
++  ...["antigravity-native-dispatch-prepare", "architecture-baseline", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "onboarding-init",
+     "pipeline-state", "plan-runtime-projection-v2", "plan-runtime-projection-v3", "po-human-approval", "project-authority-migration", "project-onboarding-v3",
+     "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
+     "validate-runner-profiles-v2"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
+diff --git a/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs b/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs
+index c8718110b9aedc2f4b5e241a55d38247ab52abd7..25969fa8643795fd646cd37707d87b0ee8a93749 100644
+--- a/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs
++++ b/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs
+@@ -77,7 +77,23 @@ function requestFromArgv(argv) {
+   catch { return null; }
+ }
+ 
++const USAGE = `Usage: antigravity-native-dispatch-prepare.mjs prepare --root <repository root> --request <scratch/ or evidence/ relative .json file>
++
++Checks one native Antigravity dispatch and records its single-use preparation before invoke_subagent is called. Starts no child.
++
++The request file holds one JSON object: "packets" (one per child), optional "root", and either "Subagents" (a batch of children)
++or the flat fields "TypeName", "Role", "Prompt" and optional "Model" and "Workspace". The two shapes cannot be mixed.
++Each packet: "schema" (pipeline.role-dispatch-request.v1), "dispatchId", "transport" ("antigravity"), "role", "prompt",
++"candidate" {"commit","tree"}, "requiredPaths", "requiredPathSha256", "resultDestination" ({"kind":"return"}).
++
++The whole route, with an example packet: skills/pipeline-start/references/antigravity-native-dispatch.md
++`;
++
+ if (isDirectInvocation(import.meta.url)) {
++  if (process.argv.length === 3 && ["--help", "-h"].includes(process.argv[2])) {
++    process.stdout.write(USAGE);
++    process.exit(0);
++  }
+   const selected = requestFromArgv(process.argv.slice(2));
+   if (selected === null) {
+     process.stdout.write(`${JSON.stringify({ status: "rejected", code: "AGY-NATIVE-REQUEST-JSON", modelCalls: 0, launcherCalls: 0 })}\n`);
+diff --git a/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.test.mjs b/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.test.mjs
+index c9a95b819dfeffc6956da93d284667af09dda0a9..3784d1f9bef5c001a98b2c48380a56dd836b6c66 100644
+--- a/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.test.mjs
+@@ -53,6 +53,17 @@ function flatRequest(root, extra = {}) {
+   return { packets: [packet], ...native };
+ }
+ 
++test("C23: --help and -h print the usage with the request shape and exit 0", () => {
++  for (const flag of ["--help", "-h"]) {
++    const res = spawnSync(process.execPath, [prepareScript, flag], { encoding: "utf8" });
++    assert.equal(res.status, 0, res.stderr);
++    for (const needle of ["prepare --root", "--request", "packets", "Subagents", "resultDestination", "antigravity-native-dispatch.md"]) assert.ok(res.stdout.includes(needle), needle);
++  }
++  const combined = spawnSync(process.execPath, [prepareScript, "--help", "extra"], { encoding: "utf8" });
++  assert.equal(combined.status, 2, "help combines with nothing");
++  assert.match(combined.stdout, /AGY-NATIVE-REQUEST-JSON/u);
++});
++
+ test("A4: a branch workspace with untracked files is prepared, names the files and the step, and does not refuse", () => withRepository((root) => {
+   mkdirSync(join(root, "scratch"));
+   writeFileSync(join(root, "scratch", "notes.txt"), "n\n");
