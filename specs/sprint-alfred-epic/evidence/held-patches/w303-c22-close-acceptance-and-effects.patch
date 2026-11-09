@@ -1,0 +1,668 @@
+diff --git a/plugins/pipeline-core/lib/audit-bundle.mjs b/plugins/pipeline-core/lib/audit-bundle.mjs
+index fab2f8036..f0d49a675 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.mjs
+@@ -16,8 +16,12 @@ function exact(value, keys) { return value !== null && typeof value === "object"
+ function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+ function evidenceSection(manifest) {
+   if (!Object.hasOwn(manifest, "evidence")) return "";
+-  const lines = manifest.evidence.items.map((entry) => `- ${entry.item}: ${entry.status}${entry.code ? ` (${entry.code})` : ""}${entry.bundlePath ? ` at \`${entry.bundlePath}\`` : ""}`).join("\n");
+-  return `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${lines}\n`;
++  const line = (entry) => `- ${entry.item}: ${entry.status}${entry.code ? ` (${entry.code})` : ""}${entry.bundlePath ? ` at \`${entry.bundlePath}\`` : ""}`;
++  // C22 (CGR-12): the Critic round reports are their own section; a round without a report names what is missing instead of being left out.
++  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:")); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
++  const approvalText = approval.length === 0 ? "" : `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${approval.map(line).join("\n")}\n`;
++  const reportText = reports.length === 0 ? "" : `\n## Critic round reports\n\nOne entry per Critic round of the feature. \`REPORT-NOT-EXPORTED\` means the round's report was never exported into the repository's tracked evidence (it lived outside the tracked tree), and \`UNREADABLE\` that the named file was missing or empty at the close: the report is NOT part of this bundle.\n\n${reports.map(line).join("\n")}\n`;
++  return `${approvalText}${reportText}`;
+ }
+ function auditorReadme(manifest) {
+   const artifactLines = manifest.artifacts.map((artifact) => `- \`${artifact.path}\` (source: \`${artifact.sourcePath}\`, SHA-256: \`${artifact.sha256}\`)`).join("\n");
+@@ -158,14 +162,14 @@ function followUpFindings(root, manifest) {
+   return proofFindings(root, list.proofs);
+ }
+ function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
+-const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan"]);
+-const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan" });
++const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report"]);
++const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report" });
+ const TRACE_SCHEMA = "pipeline.human-approval-trace.v1"; const TRACE_STATUSES = new Set(["traced", "attribution-only", "untraceable"]);
+ const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
+ function evidenceShape(value) {
+   return exact(value, ["schema", "candidateBound", "traceStatus", "items"]) && value.schema === "pipeline.audit-bundle-evidence.v1" && value.candidateBound === true
+     && (value.traceStatus === null || TRACE_STATUSES.has(value.traceStatus)) && Array.isArray(value.items) && value.items.length <= 64
+-    && value.items.every((entry) => exact(entry, ["item", "status", "code", "bundlePath"]) && /^[a-z-]+(?::[a-z-]{1,40})?$/u.test(entry.item) && EVIDENCE_ITEMS.has(entry.item.split(":")[0])
++    && value.items.every((entry) => exact(entry, ["item", "status", "code", "bundlePath"]) && /^[a-z-]+(?::[a-z0-9-]{1,40})?$/u.test(entry.item) && EVIDENCE_ITEMS.has(entry.item.split(":")[0])
+       && (entry.status === "carried" || entry.status === "gap") && (entry.code === null || /^[A-Z0-9-]{3,48}$/u.test(entry.code))
+       && (entry.bundlePath === null || /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath)) && (entry.status === "gap" ? entry.code !== null && entry.bundlePath === null : entry.bundlePath !== null));
+ }
+@@ -186,12 +190,18 @@ const sameCandidate = (value, candidate) => value !== null && typeof value === "
+  */
+ function collectEvidence(root, candidate, evidence, firstIndex) {
+   if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) fail("AB-EVIDENCE-INPUT");
+-  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath"]);
++  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports"]);
+   if (Object.keys(evidence).some((key) => !known.has(key)) || (evidence.proofPaths !== undefined && (!Array.isArray(evidence.proofPaths) || evidence.proofPaths.length > 16))) fail("AB-EVIDENCE-INPUT");
++  // C22 (CGR-12): one entry per Critic round of the feature; a null path is a round whose report was never exported.
++  const reports = evidence.criticReports;
++  if (reports !== undefined && (!Array.isArray(reports) || reports.length > 40 || !reports.every((entry) => exact(entry, ["packetId", "path"]) && /^[a-f0-9]{32}$/u.test(entry.packetId) && (entry.path === null || typeof entry.path === "string")) || new Set(reports.map((entry) => entry.packetId)).size !== reports.length)) fail("AB-EVIDENCE-INPUT");
++  const approvalNamed = ["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath"].some((key) => evidence[key] !== undefined);
+   const artifacts = []; const items = []; let traceStatus = null; let traceHasProof = false;
+   const carry = (cls, sourcePath, sha256) => { const bundlePath = `artifacts/${String(firstIndex + artifacts.length + 1).padStart(3, "0")}-${cls}`; artifacts.push({ sourcePath, bundlePath, sha256 }); return bundlePath; };
+   const gap = (item, code) => items.push({ item, status: "gap", code, bundlePath: null });
+   let traceBundlePath = null;
++  // Only reports named (the close's own request): no approval item is invented, so a gap there is not a claim this request made.
++  if (approvalNamed || reports === undefined) {
+   if (evidence.traceReportPath === undefined) gap("approval-trace", "NOT-REFERENCED");
+   else {
+     const file = readEvidenceFile(root, evidence.traceReportPath); const report = file && jsonOrNull(file.bytes);
+@@ -227,6 +237,14 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
+     else if (record.exitCode !== 0 || record.findings.length > 0) gap("security-scan", "NOT-PASSING");
+     else items.push({ item: "security-scan", status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.security, evidence.securityScanPath, file.sha256) });
+   }
++  }
++  for (const entry of reports ?? []) {
++    const item = `critic-report:${entry.packetId}`;
++    if (entry.path === null) { gap(item, "REPORT-NOT-EXPORTED"); continue; }
++    const file = readEvidenceFile(root, entry.path);
++    if (file === null || file.bytes.length === 0) gap(item, "UNREADABLE");
++    else items.push({ item, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.critic, entry.path, file.sha256) });
++  }
+   return { artifacts, evidence: Object.freeze({ schema: "pipeline.audit-bundle-evidence.v1", candidateBound: true, traceStatus, items: Object.freeze(items.map((entry) => Object.freeze(entry))) }) };
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/audit-bundle.test.mjs b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+index df5f5b505..c18152bed 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.test.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+@@ -187,6 +187,21 @@ test("Q3 a missing item is a typed gap, never silently skipped", () => {
+   assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["approval-trace:gap:NOT-REFERENCED", "approval-proofs:gap:NOT-REFERENCED", "verify-record:gap:NOT-REFERENCED", "security-scan:gap:NOT-REFERENCED"]);
+   assert.equal(plan.artifacts.length, 5); assert.equal(plan.evidence.traceStatus, null);
+ });
++// C22 (CGR-12, AC-108): every Critic round report of the feature travels in the bundle; a round whose report was never exported (it lived only in a scratch directory) is a typed gap the README names.
++test("C22 CGR-12 the bundle carries every Critic round report, names a round without a readable report, and verifies offline", async () => {
++  const input = fixture(); const [one, two, three] = ["a", "b", "c"].map((letter) => letter.repeat(32));
++  mkdirSync(join(input.root, "evidence"), { recursive: true }); writeFileSync(join(input.root, "evidence/round-one.md"), "# round one\n");
++  const plan = planWith(input, { candidate: CANDIDATE, evidence: { criticReports: [{ packetId: one, path: "evidence/round-one.md" }, { packetId: two, path: null }, { packetId: three, path: "evidence/missing.md" }] } });
++  assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), [`critic-report:${one}:carried:null`, `critic-report:${two}:gap:REPORT-NOT-EXPORTED`, `critic-report:${three}:gap:UNREADABLE`], "no approval item is invented when only reports are named");
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
++  const readme = readFileSync(join(input.root, "bundle", "README.md"), "utf8");
++  assert.match(readme, /Critic round reports/u); assert.ok(readme.includes(two) && readme.includes("REPORT-NOT-EXPORTED") && readme.includes(three) && readme.includes("UNREADABLE"), "the README names what is missing");
++  const manifest = JSON.parse(readFileSync(join(input.root, "bundle", "manifest.json"), "utf8"));
++  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
++  writeFileSync(join(input.root, "bundle", manifest.artifacts.at(-1).path), "tampered");
++  assert.ok((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).findings.some((finding) => finding.startsWith("AB-DIGEST")));
++  assert.throws(() => planWith(fixture(), { evidence: { criticReports: [{ packetId: "../x", path: null }] } }), (error) => error.code === "AB-EVIDENCE-INPUT");
++});
+ test("Q3 evidence bound to another candidate or not passing is a typed gap and is not carried", () => {
+   const other = { commit: "e".repeat(40), tree: "f".repeat(40) }; const input = fixture();
+   const plan = planWith(input, { evidence: { ...evidenceFiles(input.root, { traceCandidate: other, verifyCandidate: other, securityCandidate: other }) } });
+diff --git a/plugins/pipeline-core/lib/close-acceptance-record.mjs b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+new file mode 100644
+index 000000000..e1e252abe
+--- /dev/null
++++ b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+@@ -0,0 +1,111 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C22 (AC-108; CGR-06, CGF-12, CGF-29): the human acceptance of a feature package as one recorded answer, and the closed-state block of the handover.
++ *
++ * The one-shot close asks the human once, in one generated sentence, before its irreversible part. The answer is stored as a managed section of the
++ * feature's tracked acceptance.md (the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature.
++ * A registered acceptance.md that the approval binds (authority) is never edited: its record goes to evidence/human-acceptance.md. A non-authority
++ * entry (the Pipeline-generated pointer) keeps its registered digest honest through the package's own amendment record, so no signature is needed.
++ * Every read splits on /\r?\n/ and every write keeps the line ending of the file it changes (Windows).
++ */
++import { createHash } from "node:crypto";
++import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
++import { dirname, resolve } from "node:path";
++
++export const ACCEPTANCE_BEGIN = "<!-- close-acceptance:begin -->";
++export const ACCEPTANCE_END = "<!-- close-acceptance:end -->";
++export const CLOSED_BLOCK_BEGIN = "<!-- pipeline:closed-state:begin -->";
++export const CLOSED_BLOCK_END = "<!-- pipeline:closed-state:end -->";
++/** The standing open check: what a close can never observe about the product. Always part of the list the human is asked about. */
++export const STANDING_OPEN_CHECK = "any manual or real-device check of the product, which this close does not run";
++const FEATURE = /^[a-z][a-z0-9-]{2,63}$/u;
++const sha256Hex = (bytes) => createHash("sha256").update(bytes).digest("hex");
++const fallbackPath = (featureId) => `specs/${featureId}/evidence/human-acceptance.md`;
++const lines = (text) => String(text).split(/\r?\n/u);
++
++/** The checks the human is told are still open: the ones the caller named, then the standing one. */
++export function openChecksOf(named) {
++  const own = (Array.isArray(named) ? named : []).map((value) => String(value).replace(/\s+/gu, " ").trim().slice(0, 200)).filter((value) => value !== "").slice(0, 8);
++  return [...own, STANDING_OPEN_CHECK];
++}
++
++/** The one sentence the agent asks the human in the chat. */
++export function acceptanceQuestion({ featureId, candidate, openChecks }) {
++  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}.`;
++}
++
++export function renderAcceptanceSection({ candidate, answer, openChecks }) {
++  return [ACCEPTANCE_BEGIN, "## Human acceptance of this feature package", "",
++    `- Candidate: \`${candidate}\``, `- Answer (literal): ${JSON.stringify(answer)}`, "- Open checks:", ...openChecks.map((check) => `  - ${check}`),
++    "- Record type: an attribution record of the human's answer in the chat, not a signature and not proof; the performed close counts as the human acceptance of this feature package.",
++    ACCEPTANCE_END].join("\n");
++}
++
++/** The record a text carries, or null. */
++export function parseAcceptanceRecord(text) {
++  const all = lines(text); const from = all.findIndex((line) => line.trim() === ACCEPTANCE_BEGIN); const to = all.findIndex((line, index) => index > from && line.trim() === ACCEPTANCE_END);
++  if (from < 0 || to < 0) return null;
++  const block = all.slice(from, to); const candidate = /^- Candidate: `([0-9a-f]{40}|[0-9a-f]{64})`\s*$/u; const answer = /^- Answer \(literal\): (".*")\s*$/u;
++  const found = block.map((line) => candidate.exec(line)).find((match) => match !== null); let literal = null;
++  for (const line of block) { const match = answer.exec(line); if (match !== null) { try { literal = JSON.parse(match[1]); } catch { literal = null; } } }
++  if (!found || typeof literal !== "string" || literal.trim() === "") return null;
++  const checksAt = block.findIndex((line) => line.trim() === "- Open checks:");
++  const openChecks = checksAt < 0 ? [] : block.slice(checksAt + 1).filter((line) => /^ {2}- /u.test(line)).map((line) => line.slice(4).trim());
++  return { candidate: found[1], answer: literal, openChecks };
++}
++
++/** The text with the managed section replaced (or appended), in the line ending the text already uses; a missing text becomes a small document. */
++export function applyAcceptanceSection(existing, section) {
++  const eol = typeof existing === "string" && existing.includes("\r\n") ? "\r\n" : "\n"; const block = section.split("\n").join(eol);
++  if (typeof existing !== "string") return `# Human acceptance${eol}${eol}${block}${eol}`;
++  const all = existing.split(eol); const from = all.findIndex((line) => line.trim() === ACCEPTANCE_BEGIN); const to = all.findIndex((line, index) => index > from && line.trim() === ACCEPTANCE_END);
++  if (from >= 0 && to >= 0) return [...all.slice(0, from), ...block.split(eol), ...all.slice(to + 1)].join(eol);
++  return `${existing.replace(/\s+$/u, "")}${eol}${eol}${block}${eol}`;
++}
++
++/** Where the record belongs: the registered acceptance.md, unless the approval binds it (authority), then the evidence file. `entry` is the package entry to keep honest, else null. */
++export function acceptanceTarget(root, featureId) {
++  const manifestPath = `specs/${featureId}/lifecycle.json`; let entry = null;
++  try { entry = JSON.parse(readFileSync(resolve(root, manifestPath), "utf8")).artifacts.find((item) => item?.class === "acceptance") ?? null; } catch { entry = null; }
++  const safe = typeof entry?.path === "string" && entry.path.startsWith(`specs/${featureId}/`) && !entry.path.split("/").includes("..") && !entry.path.includes("\\");
++  if (entry !== null && entry.authority === true) return { path: fallbackPath(featureId), manifestPath, entry: null };
++  return { path: safe ? entry.path : `specs/${featureId}/acceptance.md`, manifestPath, entry: safe ? entry : null };
++}
++
++/** The recorded acceptance of the feature (either place), or null. */
++export function readAcceptanceRecord(root, featureId) {
++  for (const path of [acceptanceTarget(root, featureId).path, `specs/${featureId}/acceptance.md`, fallbackPath(featureId)]) {
++    try { const record = parseAcceptanceRecord(readFileSync(resolve(root, path), "utf8")); if (record !== null) return { ...record, path }; } catch { /* next place */ }
++  }
++  return null;
++}
++
++/** Writes (idempotently) the record and, for a registered non-authority entry, rebinds its digest with the package's amendment record. Returns the paths written. */
++export function writeAcceptanceRecord({ root, featureId, record, now = () => new Date().toISOString() }) {
++  const target = acceptanceTarget(root, featureId); const file = resolve(root, target.path); const written = [];
++  let before = null; try { before = readFileSync(file, "utf8"); } catch { before = null; }
++  const text = applyAcceptanceSection(before, renderAcceptanceSection(record));
++  if (text !== before) { mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, text); written.push(target.path); }
++  if (target.entry !== null) {
++    const manifestFile = resolve(root, target.manifestPath); const manifest = JSON.parse(readFileSync(manifestFile, "utf8")); const index = manifest.artifacts.findIndex((item) => item?.class === "acceptance");
++    const digest = sha256Hex(readFileSync(file));
++    if (index >= 0 && manifest.artifacts[index].sha256 !== digest) {
++      const previous = manifest.artifacts[index].sha256;
++      manifest.artifacts[index] = { ...manifest.artifacts[index], sha256: digest, amendment: { at: now(), reason: "close acceptance record: the human's answer was recorded in this acceptance file (attribution record, no signature)", previousSha256: previous } };
++      writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`); written.push(target.manifestPath);
++    }
++  }
++  return written;
++}
++
++/** The generated closed-state lines of the handover (technical close, product acceptance and push as three different facts), or null when the feature has no readable package. */
++export function closedHandoverLines(root, featureId) {
++  if (!FEATURE.test(featureId ?? "")) return null;
++  let candidate = null; try { const value = JSON.parse(readFileSync(resolve(root, `specs/${featureId}/lifecycle.json`), "utf8"))?.candidate?.commit; candidate = typeof value === "string" ? value : null; } catch { candidate = null; }
++  const record = readAcceptanceRecord(root, featureId);
++  return [`Feature \`${featureId}\` is closed locally; its verified candidate is ${candidate === null ? "not readable from its package" : `\`${candidate}\``}, and the close commit that carries this text is the one the close then freezes as the candidate.`,
++    "**Technical close:** done. The feature close is recorded in Pipeline State; it says nothing about product acceptance or push.",
++    record === null ? "**Product acceptance:** not recorded in this feature's acceptance record; the human has not answered the acceptance question through the close."
++      : `**Product acceptance:** recorded in \`${record.path}\` for candidate \`${record.candidate}\` (an attribution record of the human's answer, not a signature); open checks: ${record.openChecks.join("; ")}.`,
++    "**Push:** not done by the close. Publication and push are separate human-gated steps."];
++}
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.mjs b/plugins/pipeline-core/lib/close-chain-guide.mjs
+index be18399f3..6dac1b21b 100644
+--- a/plugins/pipeline-core/lib/close-chain-guide.mjs
++++ b/plugins/pipeline-core/lib/close-chain-guide.mjs
+@@ -24,12 +24,12 @@ export const CLOSE_STEP_REQUIREMENTS = Object.freeze({
+     requires: ["architectureImpact"], needsAuthorized: false,
+     flags: ["--architecture-impact <typed impact>", "--continuity-close-request <path> (when the feature has one)", "--audit-request <path> --critic-verify-lifecycle <id> (required at rigor >= 1)"],
+     evidenceSchema: "pipeline.feature-close-audit-request.v1", humanGate: false,
+-    producer: "the Critic/Verify lifecycle records and the audit request file; the plan prints the next action",
++    producer: "the Critic/Verify lifecycle records and the audit request file (its evidence.criticReports names every Critic round, so the audit bundle carries each exported report and names a missing one); the one-shot close first asks the human once whether the feature package is accepted and records the answer in the feature's acceptance record (an attribution record, not a signature); the plan prints the next action",
+   },
+   "tracked-close-finalized": {
+     requires: ["evidence"], needsAuthorized: false, flags: ["--evidence <path>"],
+     evidenceSchema: "pipeline.close-tracked-effects.v1", humanGate: false,
+-    producer: "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close",
++    producer: "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close; the one-shot close hashes the calibrated handover (first brought to the closed state by update-public-handover) and telemetry/costs.md when they exist, and keeps the marked empty digest for what has no defined file",
+   },
+   "candidate-frozen": {
+     requires: [], needsAuthorized: false, flags: [], evidenceSchema: null, humanGate: false,
+diff --git a/plugins/pipeline-core/runbooks/close-path.v1.json b/plugins/pipeline-core/runbooks/close-path.v1.json
+index adac02d0f..d07ea6add 100644
+--- a/plugins/pipeline-core/runbooks/close-path.v1.json
++++ b/plugins/pipeline-core/runbooks/close-path.v1.json
+@@ -95,7 +95,7 @@
+         "--audit-request <path> --critic-verify-lifecycle <id> (required at rigor >= 1)"
+       ],
+       "evidenceSchema": "pipeline.feature-close-audit-request.v1",
+-      "producer": "the Critic/Verify lifecycle records and the audit request file; the plan prints the next action",
++      "producer": "the Critic/Verify lifecycle records and the audit request file (its evidence.criticReports names every Critic round, so the audit bundle carries each exported report and names a missing one); the one-shot close first asks the human once whether the feature package is accepted and records the answer in the feature's acceptance record (an attribution record, not a signature); the plan prints the next action",
+       "humanGate": false,
+       "next": [
+         "tracked-close-finalized"
+@@ -109,7 +109,7 @@
+         "--evidence <path>"
+       ],
+       "evidenceSchema": "pipeline.close-tracked-effects.v1",
+-      "producer": "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close",
++      "producer": "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close; the one-shot close hashes the calibrated handover (first brought to the closed state by update-public-handover) and telemetry/costs.md when they exist, and keeps the marked empty digest for what has no defined file",
+       "humanGate": false,
+       "next": [
+         "candidate-frozen"
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+index 652c916da..eee39ffc6 100644
+--- a/plugins/pipeline-core/runbooks/index.v1.json
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -5,7 +5,7 @@
+       "pathId": "close",
+       "path": "plugins/pipeline-core/runbooks/close-path.v1.json",
+       "schema": "pipeline.runbook.v1",
+-      "sha256": "32b7800bdfe0144ad62e0a1b92202da137778b1cd606a8519ea64c850461f407"
++      "sha256": "3041e407946880a6f639d7bf5e18c90829c9bdfba923df643418c96fbc98c51e"
+     },
+     {
+       "pathId": "start",
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 44c03c9c4..95619d948 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
+ import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
+ import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
++import { acceptanceQuestion, acceptanceTarget, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
+ 
+ const HERE = new URL(".", import.meta.url);
+ const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
+@@ -217,12 +218,15 @@ const HEX32 = /^[a-f0-9]{32}$/u;
+ function stopResult(stage, code, reason, repair, extra = {}) { return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "stopped", stage, stop: Object.freeze({ code, reason: String(reason).slice(0, 1200), repair }), ...extra }); }
+ function writeRepoJson(root, path, value) { const target = resolve(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`); return path; }
+ 
+-export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null } = {}, deps = {}) {
++export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, openChecks = null } = {}, deps = {}) {
+   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
+   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
+   if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", "Feature close requires a known architecture impact.");
+   if (criticPacketId !== null && !HEX32.test(criticPacketId)) fail("FINISH-CRITIC-PACKET", "The Critic packet id must be 32 lowercase hex characters.");
+   if (resumeLifecycleId !== null && !/^[A-Za-z0-9._-]{1,100}$/u.test(resumeLifecycleId)) fail("FINISH-LIFECYCLE", "Lifecycle ID is invalid.");
++  // C22 (CGR-06): the human's literal answer to the acceptance question is recorded as given, so only its presence and size are checked.
++  if (humanAcceptance !== null && (typeof humanAcceptance !== "string" || humanAcceptance.trim() === "" || humanAcceptance.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(humanAcceptance))) fail("FINISH-ACCEPTANCE", "The human acceptance must be the human's literal answer: non-empty, at most 500 characters, no control characters.");
++  if (openChecks !== null && (!Array.isArray(openChecks) || openChecks.some((value) => typeof value !== "string"))) fail("FINISH-ACCEPTANCE", "The open checks must be a list of texts.");
+   const runner = deps.runCommand ?? ((executable, argv) => spawnSync(executable, argv, { cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root } }));
+   const actor = by.trim();
+   const rawGit = (args) => { const out = runner("git", args); return out?.status === 0 ? String(out.stdout ?? "").trim() : null; };
+@@ -235,6 +239,10 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+   const rerun = (id) => `${rerunBase}${id || packetForRerun === null ? "" : ` --critic-packet-id ${packetForRerun}`}${id ? ` --resume-lifecycle-id ${id}` : ""}`;
+   const repairFor = (error, id) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command: ${rerun(id)}`;
+   const stages = [];
++  // The calibrated handover file (project/pipeline.json `handover`), the same resolution the coordinator's quality readback uses.
++  const handoverPath = (() => {
++    try { const configured = JSON.parse(readFileSync(resolve(root, "project/pipeline.json"), "utf8")).handover; return typeof configured === "string" && /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/u.test(configured) && !configured.split("/").includes("..") ? configured : "docs/state.md"; } catch { return "docs/state.md"; }
++  })();
+   if (featureId !== undefined && !FEATURE.test(featureId)) fail("FINISH-FEATURE", "A valid active feature is required.");
+   if (featureId === undefined && resumeLifecycleId === null) {
+     return stopResult("preflight", "ONESHOT-NO-ACTIVE-FEATURE", "Pipeline State has no active feature, so there is nothing to close.", `if a close was started, rerun with the lifecycle id it printed: ${rerunBase} --resume-lifecycle-id <id>`);
+@@ -282,6 +290,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     const requalify = resumeLifecycleId !== null && packageAt().moved && coordinatorStillBeforePrepared();
+     const again = requalify ? resumeLifecycleId : null;
+     if (resumeLifecycleId === null || requalify) {
++      let accepted = null;
+       let packet = criticPacketId;
+       if (packet === null && requalify) packet = packetOfAuditRequest(auditRequestPath);
+       if (packet === null) {
+@@ -321,9 +330,23 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+           commit: { paths: addenda.commitPaths, excluded: [], capability: null, message: addenda.subject, steps }, next: rerun(again),
+           message: "The close derived the Critic addenda from the passed review and wrote them; Verify has not run yet. Run the commit, then the next command. Do not build addenda by hand." });
+       }
++      // C22 (CGR-06): the human acceptance. The stop belongs here because nothing has been written yet (a stop costs no Verify and no cleanup), HEAD is final (the addenda commit above moved it) and the
++      // irreversible State close is still ahead. A resumed close (past the prepared stages) never enters this branch, so it never asks twice and a close already running is not broken. An acceptance recorded for
++      // this very candidate (committed or still uncommitted) is kept; a changed candidate asks again. Nothing is signed: the answer is an attribution record in the feature's acceptance.md.
++      const candidateHead = rawGit(["rev-parse", "HEAD"]);
++      if (candidateHead === null) return stopResult("acceptance", "ONESHOT-HEAD-UNREADABLE", "The candidate commit (HEAD) could not be read, so the acceptance cannot be bound to it.", `repair the repository, then rerun the identical command: ${rerun(again)}`);
++      const recorded = readAcceptanceRecord(root, featureId);
++      if (recorded !== null && recorded.candidate === candidateHead) accepted = { candidate: candidateHead, answer: recorded.answer, openChecks: recorded.openChecks };
++      else if (humanAcceptance !== null) accepted = { candidate: candidateHead, answer: humanAcceptance, openChecks: openChecksOf(openChecks) };
++      else {
++        const named = openChecks === null ? "" : ` --open-checks ${JSON.stringify(openChecks.join("; "))}`;
++        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-REQUIRED", acceptanceQuestion({ featureId, candidate: candidateHead, openChecks: openChecksOf(openChecks) }),
++          `nothing was written. Ask the human exactly this one sentence in the chat (reason above), then rerun the identical command with the answer exactly as given: ${rerun(again)}${named} --human-acceptance "<the human's literal answer>". If a check you know about is missing from the sentence (for example a real device check), first rerun with --open-checks "<check; check>" so the sentence names it, then ask. The answer is recorded in the feature's acceptance record as an attribution record; nothing is signed.`);
++      }
+       // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward
+       // (VEP-CVL-CARRY-RANGE; a human had to reset). Only a tree whose every dirty path is such an output, with an evidence file proving an earlier attempt, is rolled back; the stages write the same again.
+-      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath]);
++      // C22: the acceptance record is such an output too (the answer is already held in `accepted`, and written again after the package moves below).
++      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath, acceptanceTarget(root, featureId).path, `specs/${featureId}/acceptance.md`, `${evidenceDir}/human-acceptance.md`]);
+       const leftovers = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
+       const dirtyOutputs = leftovers?.status === 0 ? String(leftovers.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => ({ tracked: !line.startsWith("??"), path: line.slice(3) })) : [];
+       if (dirtyOutputs.some(({ tracked, path }) => !tracked && (path === auditRequestPath || path === verifyPath)) && dirtyOutputs.every(({ path }) => ownOutputs.has(path))) {
+@@ -362,8 +385,22 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+       criticVerifyLifecycle = lifecycleFile.slice(0, -5);
+       let coreVersion = "0.0.0";
+       try { coreVersion = String(JSON.parse(readFileSync(PLUGIN_MANIFEST, "utf8")).version).split(/[+-]/u)[0]; } catch { /* the request is refused by the coordinator with its typed code */ }
++      // C22 (CGR-06): after the Verify and the package moves, so the Verify ran on the tree the candidate names; the record then travels in the one close commit (specs/<feature>).
++      stages.push("acceptance-record");
++      writeAcceptanceRecord({ root, featureId, record: accepted, ...(deps.nowFn === undefined ? {} : { now: deps.nowFn }) });
++      // C22 (CGR-12): every Critic round of the feature: the tracked exports (specs/<feature>/evidence/critic/<packet>/report.md), the rounds of the registered lineage files and the packet this close is bound to.
++      // A round whose report was never exported (it lived only in a scratch directory) is named with a null path, so the bundle README states what is missing instead of omitting it.
++      const rounds = new Map();
++      const listed = (relative) => { try { return readdirSync(resolve(root, relative)); } catch { return []; } };
++      for (const name of listed(`${evidenceDir}/critic`).filter((entry) => HEX32.test(entry))) rounds.set(name, existsSync(resolve(root, `${evidenceDir}/critic/${name}/report.md`)) ? `${evidenceDir}/critic/${name}/report.md` : null);
++      for (const name of listed(evidenceDir).filter((entry) => /^critic-lineage-[a-f0-9]{64}\.json$/u.test(entry))) {
++        let text = ""; try { text = readFileSync(resolve(root, `${evidenceDir}/${name}`), "utf8"); } catch { text = ""; }
++        for (const match of text.matchAll(/"packetId"\s*:\s*"([a-f0-9]{32})"/gu)) if (!rounds.has(match[1])) rounds.set(match[1], null);
++      }
++      if (!rounds.has(packet)) rounds.set(packet, null);
++      const criticReports = [...rounds].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([packetId, path]) => ({ packetId, path }));
+       stages.push("audit-request");
+-      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle });
++      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports } });
+       if (state.continuity !== null && typeof state.continuity === "object") {
+         let current = state;
+         if (state.continuity.queueHead?.nextAction !== "close") {
+@@ -406,7 +443,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+   const closedFeatureId = featureId ?? observed.value.identity?.featureId;
+   const commitFacts = () => {
+     // not rawGit: its trim() would eat the leading space of the first " M" status entry
+-    const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`]);
++    // C22: the calibrated handover is part of the one close commit when the close rewrote it (CGF-12).
++    const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`, ...(existsSync(resolve(root, handoverPath)) ? [handoverPath] : [])]);
+     const tokens = (status?.status === 0 ? String(status.stdout ?? "") : "").split("\0").filter((token) => token !== "");
+     const paths = []; for (let index = 0; index < tokens.length; index += 1) { const code = tokens[index].slice(0, 2); paths.push(tokens[index].slice(3)); if (/[RC]/u.test(code)) index += 1; }
+     paths.sort();
+@@ -423,11 +461,21 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     let resultBytes = null; try { resultBytes = readFileSync(resolve(root, resultPath)); } catch { resultBytes = null; }
+     if (resultBytes === null) return stopResult("tracked-close-finalized", "ONESHOT-RESULT-MISSING", `The Result ${resultPath} is missing.`, `restore it, then rerun the identical command: ${rerun(id)}`, { resumeLifecycleId: id, next: rerun(id) });
+     const trackedPath = `specs/${closedFeatureId}/evidence/tracked-close.json`;
+-    // Only resultSha256 and pipelineStateSha256 are compared by the coordinator; a project without the other artefacts uses the empty-input digest (PO rule).
+-    writeRepoJson(root, trackedPath, { schema: "pipeline.close-tracked-effects.v1", resultSha256: sha256Hex(resultBytes), backlogSha256: EMPTY_SHA256, handoverSha256: EMPTY_SHA256, historySha256: EMPTY_SHA256, telemetrySha256: EMPTY_SHA256, retrospectiveSha256: EMPTY_SHA256, pipelineStateSha256: sha256Hex(readFileSync(resolve(root, statePath))) });
++    // C22 (CGF-12, CGF-29): the calibrated handover is brought to the closed state by its existing writer (pipeline-state.mjs update-public-handover) BEFORE its bytes are digested, so the handover that is
++    // committed no longer reads as active in design or implementation. A project whose handover does not exist, or whose layout the writer cannot update, is never blocked: the result names it.
++    let handover = null;
++    if (existsSync(resolve(root, handoverPath))) {
++      stages.push("update-public-handover");
++      const updated = runner(process.execPath, [STATE_WRITER, "update-public-handover"]);
++      handover = { path: handoverPath, status: updated?.status === 0 ? "current" : "not-updated", ...(updated?.status === 0 ? {} : { reason: failedText(updated).slice(0, 300) }) };
++    }
++    // C22 (CGR-05): hash what exists. Measured, the project-defined files are the calibrated handover and the telemetry ledger the close-feature skill names (telemetry/costs.md); a project has no defined
++    // file for backlog, history or retrospective (the backlog is a directory), so those keep the marked empty digest (PO rule 2026-11-01). Only resultSha256 and pipelineStateSha256 are compared by the coordinator.
++    const digestOf = (relative) => { try { return sha256Hex(readFileSync(resolve(root, relative))); } catch { return EMPTY_SHA256; } };
++    writeRepoJson(root, trackedPath, { schema: "pipeline.close-tracked-effects.v1", resultSha256: sha256Hex(resultBytes), backlogSha256: EMPTY_SHA256, handoverSha256: digestOf(handoverPath), historySha256: EMPTY_SHA256, telemetrySha256: digestOf("telemetry/costs.md"), retrospectiveSha256: EMPTY_SHA256, pipelineStateSha256: sha256Hex(readFileSync(resolve(root, statePath))) });
+     const tracked = step("tracked-close-finalized", () => transition("tracked-close-finalized", { evidence: trackedPath })); if (tracked.stop) return tracked.stop;
+     const commit = commitFacts();
+-    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId: closedFeatureId, lifecycleId: id, resumeLifecycleId: id, stages, commit,
++    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId: closedFeatureId, lifecycleId: id, resumeLifecycleId: id, stages, commit, ...(handover === null ? {} : { handover }),
+       next: rerun(id), message: "Run the commit (the pre-commit hook admits exactly these bytes), then run the next command: it continues to closed-local. Nothing here signs or pushes." });
+   }
+   if (phase === "tracked-close-finalized") {
+@@ -472,13 +520,13 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+ }
+ 
+ function parseOneShot(argv) {
+-  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id"]; const value = {};
++  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--open-checks"]; const value = {};
+   for (let i = 0; i < argv.length; i += 2) {
+     const flag = argv[i]; const next = argv[i + 1];
+-    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>]");
++    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<the human's literal answer>\"] (the first call stops once with the acceptance question for the human)");
+     value[flag] = next;
+   }
+-  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null };
++  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";") };
+ }
+ 
+ function parse(argv) {
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 2bdc15630..1be3b8c07 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -9,6 +9,9 @@ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import { finishFeature, oneShotClose } from "./finish-feature.mjs";
+ import { canonical } from "../lib/po-approval-proof.mjs";
++import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
++import { applyAcceptanceSection, renderAcceptanceSection } from "../lib/close-acceptance-record.mjs";
++import { syncPublicCurrentState } from "./pipeline-state.mjs";
+ 
+ function response(value) { return { status: 0, stdout: JSON.stringify(value), stderr: "" }; }
+ function closeAction(criticVerifyLifecycle) {
+@@ -249,7 +252,10 @@ const sha256Of = (value) => createHash("sha256").update(value).digest("hex");
+ const STATE_PATH = ".claude/pipeline-state.json";
+ const COORD = new URL("./close-coordinator.mjs", import.meta.url).pathname;
+ const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
+-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false } = {}) {
++// C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
++// human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
++// tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
++function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false } = {}) {
+   const independenceChecks = [];
+   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
+   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+@@ -261,6 +267,8 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+     ...(continuity ? { continuity: { revision: 3, queueHead: { nextAction }, authority: { result: resultBound ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
+   const writeState = (value) => writeFileSync(join(root, STATE_PATH), `${JSON.stringify(value)}\n`);
+   writeState(closed ? { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] } : stateValue("review"));
++  if (handover) { mkdirSync(join(root, "project")); mkdirSync(join(root, "docs")); writeFileSync(join(root, "project/pipeline.json"), `${JSON.stringify({ handover: "docs/state.md" })}\n`); writeFileSync(join(root, "docs/state.md"), "# State\n\n## Current state\n\nFeature `feature-abc` is active in implementation.\n"); }
++  if (telemetry) { mkdirSync(join(root, "telemetry")); writeFileSync(join(root, "telemetry/costs.md"), "| session | cost |\n"); }
+   git("add", "-A"); git("commit", "-q", "-m", "baseline");
+   const packetId = "a".repeat(32); const lifecycleId = "c".repeat(64);
+   if (packetOnDisk) mkdirSync(join(root, ".git/agent-pipeline/critic-packets", packetId), { recursive: true });
+@@ -286,6 +294,8 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+     if (script === "pipeline-state.mjs") {
+       if (sub === "feature-package-plan") return json({ planSha256: "9".repeat(64) });
+       if (sub === "feature-package-apply") return json({ status: "applied" });
++      // C22 (CGF-12): the existing handover writer; this stand-in rewrites the generated Current state sentence the way the writer does for a closed feature.
++      if (sub === "update-public-handover") { writeFileSync(join(root, "docs/state.md"), "# State\n\n## Current state\n\n**Lifecycle phase:** no active feature\nFeature `feature-abc` is closed locally.\n"); return json({ status: "current", path: "docs/state.md", currentState: "updated" }); }
+       if (sub === "continuity-result-close-plan") return json({ applyAction: { executable: process.execPath, argv: [STATE_WRITER, "continuity-result-close-apply", "--feature-id", "feature-abc"] } });
+       if (sub === "continuity-result-close-apply") { writeState(stateValue("close")); return json({ status: "applied" }); }
+       if (sub === "close-feature") { writeState({ schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] }); return { status: 0, stdout: "Feature \"feature-abc\" closed", stderr: "" }; }
+@@ -304,7 +314,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+     }
+     throw new Error(`unexpected ${script} ${sub}`);
+   };
+-  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId } };
++  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept this feature package" } : {}) } };
+ }
+ const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
+ 
+@@ -622,6 +632,142 @@ test("CGF-21: closed-local names the Critic-bound push Verify with the packet of
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++// ---- C22 (AC-108, PO decisions 2026-11-09): the human acceptance question, the effects the close really touched, the closed handover, the Critic reports ----
++const ACCEPTANCE_FILE = "specs/feature-abc/acceptance.md"; const SPEC_POINTER = "# Acceptance pointer: feature-abc\n\nThe criteria are the approved Spec's (specs/feature-abc/spec.md).\n";
++const EMPTY_DIGEST = sha256Of("");
++const headOf = (f) => f.git("rev-parse", "HEAD").trim();
++function packageFixture(f, { acceptanceAuthority = false } = {}) {
++  const base = join(f.root, "specs/feature-abc"); const bytes = { "prd.md": "prd\n", "spec.md": "spec\n", "acceptance.md": SPEC_POINTER, "result.md": "# Result\n", "evidence/candidate.json": "{}\n" };
++  for (const [name, text] of Object.entries(bytes)) writeFileSync(join(base, name), text);
++  const entry = (cls, name, authority, mutability) => ({ class: cls, path: `specs/feature-abc/${name}`, sha256: sha256Of(bytes[name]), authority, mutability, retention: "active" });
++  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: "feature-abc", rigor: 1 }, state: "completed", artifacts: [entry("prd", "prd.md", true, "mutable"), entry("spec", "spec.md", true, "mutable"), entry("acceptance", "acceptance.md", acceptanceAuthority, "immutable"), entry("result", "result.md", false, "immutable"), entry("candidate-evidence", "evidence/candidate.json", false, "immutable")], candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, supersedes: null };
++  writeFileSync(join(base, "lifecycle.json"), `${JSON.stringify(manifest, null, 2)}\n`); f.git("add", "-A"); f.git("commit", "-q", "-m", "package");
++  return { manifestPath: "specs/feature-abc/lifecycle.json", pointerSha: sha256Of(SPEC_POINTER) };
++}
++
++test("C22 CGR-06: the one-shot stops once, before anything is written, with the one sentence to ask the human; the sentence says the close counts as the acceptance and names the open checks", () => {
++  const f = oneShotFixture({ acceptance: false });
++  try {
++    const stopped = oneShotClose({ ...f.input, openChecks: ["real device check"] }, { runCommand: f.runner });
++    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
++    assert.equal(stopped.stage, "acceptance"); assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
++    assert.match(stopped.stop.reason, /counts as the human acceptance of this feature package/u); assert.match(stopped.stop.reason, /real device check/u); assert.ok(stopped.stop.reason.includes("feature-abc"));
++    assert.match(stopped.stop.repair, /--human-acceptance/u); assert.match(stopped.stop.repair, /--open-checks/u);
++    assert.deepEqual(f.calls, [], "no Verify, package or close stage ran"); assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false); assert.equal(f.git("status", "--porcelain").trim(), "");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C22 CGR-06: the answer is recorded in the feature's acceptance.md with the literal answer, the candidate commit and the open checks, labelled as an attribution record and not a signature", () => {
++  const f = oneShotFixture({ acceptance: false });
++  try {
++    const head = headOf(f); const answer = "Yes, I accept \"this\" package";
++    const result = oneShotClose({ ...f.input, humanAcceptance: answer, openChecks: ["real device check"] }, { runCommand: f.runner });
++    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 400));
++    const text = readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8");
++    assert.ok(text.includes(JSON.stringify(answer)), "the literal answer"); assert.ok(text.includes(head), "the candidate commit"); assert.match(text, /real device check/u);
++    assert.match(text, /attribution record/u); assert.match(text, /not a signature/u);
++    assert.ok(result.commit.paths.includes(ACCEPTANCE_FILE), "the record travels in the one close commit"); assert.deepEqual(forbidden(f.calls), []);
++    assert.throws(() => oneShotClose({ ...f.input, humanAcceptance: "  " }, { runCommand: f.runner }), (error) => error.code === "FINISH-ACCEPTANCE");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C22 CGR-06: a rerun with an acceptance recorded for the same candidate does not ask again, and a changed candidate asks again", () => {
++  const f = oneShotFixture({ acceptance: false });
++  try {
++    const answer = "accepted, as asked";
++    assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required");
++    f.git("checkout", "--", STATE_PATH);
++    const again = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(again.status, "commit-required", JSON.stringify(again).slice(0, 400)); assert.ok(readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8").includes(JSON.stringify(answer)), "the recorded answer is kept");
++    f.git("add", "-A"); f.git("commit", "-q", "-m", "close outputs"); f.git("checkout", "HEAD~1", "--", STATE_PATH);
++    const changed = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(changed.stage, "acceptance"); assert.equal(changed.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C22 CGR-06: a resumed close never asks (the question belongs to the evidence stages before the irreversible part)", () => {
++  const f = oneShotFixture({ acceptance: false, startPhase: "checkpointed" });
++  try {
++    const resumed = oneShotClose({ ...f.input, criticPacketId: null, resumeLifecycleId: "lc-1" }, { runCommand: f.runner });
++    assert.notEqual(resumed.stop?.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(resumed).slice(0, 300));
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C22 CGR-06: the generated immutable pointer is replaced by the record WITHOUT a signature: the package entry is rebound with an amendment and the package still validates; an authority entry is never edited", () => {
++  const f = oneShotFixture({ acceptance: false });
++  try {
++    const { manifestPath, pointerSha } = packageFixture(f);
++    assert.equal(oneShotClose({ ...f.input, humanAcceptance: "yes" }, { runCommand: f.runner }).status, "commit-required");
++    const text = readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8"); assert.ok(text.includes("# Acceptance pointer: feature-abc") && text.includes("\"yes\""));
++    const entry = JSON.parse(readFileSync(join(f.root, manifestPath), "utf8")).artifacts.find((item) => item.class === "acceptance");
++    assert.equal(entry.sha256, sha256Of(text)); assert.equal(entry.amendment.previousSha256, pointerSha); assert.equal(entry.mutability, "immutable"); assert.equal(entry.authority, false);
++    assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true, JSON.stringify(validateFeaturePackage(f.root, manifestPath).findings));
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++  const g = oneShotFixture({ acceptance: false });
++  try {
++    const { manifestPath } = packageFixture(g, { acceptanceAuthority: true }); const before = readFileSync(join(g.root, manifestPath), "utf8");
++    assert.equal(oneShotClose({ ...g.input, humanAcceptance: "yes" }, { runCommand: g.runner }).status, "commit-required");
++    assert.equal(readFileSync(join(g.root, ACCEPTANCE_FILE), "utf8"), SPEC_POINTER, "a bound authority acceptance stays byte for byte"); assert.equal(readFileSync(join(g.root, manifestPath), "utf8"), before);
++    assert.match(readFileSync(join(g.root, "specs/feature-abc/evidence/human-acceptance.md"), "utf8"), /"yes"/u);
++  } finally { rmSync(g.root, { recursive: true, force: true }); }
++});
++
++test("C22 CGR-05: the tracked effects hash what exists (the calibrated handover, written by its own writer first, and the telemetry file) and keep the marked empty digest only for the rest", () => {
++  const f = oneShotFixture({ handover: true, telemetry: true });
++  try {
++    const result = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 400));
++    const tracked = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/tracked-close.json"), "utf8"));
++    assert.equal(tracked.handoverSha256, sha256Of(readFileSync(join(f.root, "docs/state.md"))), "the bytes after the writer ran"); assert.match(readFileSync(join(f.root, "docs/state.md"), "utf8"), /closed locally/u);
++    assert.equal(tracked.telemetrySha256, sha256Of(readFileSync(join(f.root, "telemetry/costs.md"))));
++    for (const key of ["backlogSha256", "historySha256", "retrospectiveSha256"]) assert.equal(tracked[key], EMPTY_DIGEST, key);
++    assert.deepEqual(Object.keys(tracked).sort(), ["backlogSha256", "handoverSha256", "historySha256", "pipelineStateSha256", "resultSha256", "retrospectiveSha256", "schema", "telemetrySha256"]);
++    assert.ok(f.calls.indexOf("pipeline-state update-public-handover") > f.calls.indexOf("pipeline-state close-feature"), f.calls.join());
++    assert.ok(result.commit.paths.includes("docs/state.md"), result.commit.paths.join());
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++  const g = oneShotFixture();
++  try {
++    oneShotClose(g.input, { runCommand: g.runner });
++    const tracked = JSON.parse(readFileSync(join(g.root, "specs/feature-abc/evidence/tracked-close.json"), "utf8"));
++    for (const key of ["backlogSha256", "handoverSha256", "historySha256", "telemetrySha256", "retrospectiveSha256"]) assert.equal(tracked[key], EMPTY_DIGEST, `a project without the artefact keeps the marked empty digest (${key})`);
++    assert.equal(g.calls.includes("pipeline-state update-public-handover"), false);
++  } finally { rmSync(g.root, { recursive: true, force: true }); }
++});
++
++test("C22 CGF-12/CGF-29: after the close the calibrated handover is no longer active in design or implementation and states technical close, product acceptance and push as three facts, through the existing public-handover writer", () => {
++  const dir = realpathSync(mkdtempSync(join(tmpdir(), "closed-handover-")));
++  try {
++    mkdirSync(join(dir, "docs")); mkdirSync(join(dir, "specs/feature-abc"), { recursive: true });
++    writeFileSync(join(dir, "docs/state.md"), "# State\n\n## Current state\n\nFeature `feature-abc` is active in implementation (PO profile: `light`).\nProject prose stays.\n\n## Decisions\n\nKeep this.\n");
++    writeFileSync(join(dir, "specs/feature-abc/lifecycle.json"), `${JSON.stringify({ candidate: { commit: "c".repeat(40), tree: "d".repeat(40) }, artifacts: [] })}\n`);
++    const closedState = { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc", closedBy: "PO" }] };
++    assert.equal(syncPublicCurrentState(dir, closedState, "docs/state.md", "2026-11-09T10:00:00.000Z"), "updated");
++    const text = readFileSync(join(dir, "docs/state.md"), "utf8");
++    assert.doesNotMatch(text, /is active in/u); assert.match(text, /closed locally/u); assert.ok(text.includes("c".repeat(40)), "the candidate");
++    for (const label of ["Technical close", "Product acceptance", "Push"]) assert.match(text, new RegExp(`^\\*\\*${label}:\\*\\*`, "mu"), label);
++    assert.match(text, /^\*\*Product acceptance:\*\* not recorded/mu); assert.ok(text.includes("Project prose stays.") && text.includes("## Decisions\n\nKeep this.\n"));
++    assert.equal(syncPublicCurrentState(dir, closedState, "docs/state.md", "2026-11-09T10:00:00.000Z"), "current", "idempotent");
++    writeFileSync(join(dir, "specs/feature-abc/acceptance.md"), applyAcceptanceSection(null, renderAcceptanceSection({ candidate: "c".repeat(40), answer: "accepted", openChecks: ["device check"] })));
++    assert.equal(syncPublicCurrentState(dir, closedState, "docs/state.md", "2026-11-09T10:00:00.000Z"), "updated");
++    assert.match(readFileSync(join(dir, "docs/state.md"), "utf8"), /^\*\*Product acceptance:\*\* recorded/mu);
++    const next = { schema: "pipeline.state.v0", activeFeature: { id: "feature-two", phase: "design" }, closedFeatures: closedState.closedFeatures };
++    syncPublicCurrentState(dir, next, "docs/state.md", "2026-11-10T10:00:00.000Z");
++    assert.doesNotMatch(readFileSync(join(dir, "docs/state.md"), "utf8"), /closed locally|Technical close/u, "a new active feature leaves no stale closed projection");
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++});
++
++test("C22 CGR-12: the audit request carries every Critic round report of the feature, and a round without an exported report is named, not omitted", () => {
++  const f = oneShotFixture();
++  try {
++    const evidence = join(f.root, "specs/feature-abc/evidence"); const exported = "b".repeat(32); const lineageOnly = "c".repeat(32);
++    mkdirSync(join(evidence, "critic", exported), { recursive: true }); writeFileSync(join(evidence, "critic", exported, "report.md"), "# report\n");
++    writeFileSync(join(evidence, `critic-lineage-${"1".repeat(64)}.json`), `${JSON.stringify({ rounds: [{ packetId: lineageOnly }] })}\n`);
++    assert.equal(oneShotClose(f.input, { runCommand: f.runner }).status, "commit-required");
++    const request = JSON.parse(readFileSync(join(evidence, "audit-request.json"), "utf8"));
++    assert.deepEqual(request.evidence.criticReports, [{ packetId: f.packetId, path: null }, { packetId: exported, path: `specs/feature-abc/evidence/critic/${exported}/report.md` }, { packetId: lineageOnly, path: null }]);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed repair on stderr with exit 2; a bad flag is a usage refusal", () => {
+   const f = oneShotFixture({ closed: true });
+   try {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 4ca46bc2a..8be88613a 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -532,6 +532,7 @@ import {
+ import { observeGitSource } from "../lib/source-observation.mjs";
+ import { collectRigorJournalEntry, rigorVerifyRows, closeArchitectureFitnessDisposition, readCurrentArchitectureFitnessBindings } from "../lib/rigor-lifecycle.mjs";
+ import { inspectPublicHandoverDuty, updatePublicHandoverDuty } from "../lib/onboarding-continuity.mjs";
++import { CLOSED_BLOCK_BEGIN, CLOSED_BLOCK_END, closedHandoverLines } from "../lib/close-acceptance-record.mjs";
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
+ import { custodyInspectionStats, discoverRepository, inspectSessionClosure, inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+@@ -11657,14 +11658,24 @@ export function syncPublicCurrentState(dir, state, handoverPath, nowIso) {
+   const marker = active ? `**Lifecycle phase:** feature \`${feature.id}\` · phase \`${feature.phase}\`` : "**Lifecycle phase:** no active feature";
+   const date = String(nowIso ?? "").slice(0, 10);
+   if (!/^\d{4}-\d{2}-\d{2}$/u.test(date)) return "absent";
+-  const body = lines.slice(start + 1, end)
++  // C22 (CGF-12, CGF-29): with no active feature and a closed one, the section states the closed-local state, the candidate and, as three different facts, the technical close, the product acceptance and the push
++  // (generated lines between their own markers, from the feature's package and acceptance record). The stale "is active in <phase>" sentence of that feature goes; a new active feature removes the block.
++  const closedId = !active && /^[a-z][a-z0-9-]{2,63}$/u.test(state?.closedFeatures?.at?.(-1)?.id ?? "") ? state.closedFeatures.at(-1).id : null;
++  const closedLines = closedId === null ? null : closedHandoverLines(dir, closedId);
++  const cr = markdown.includes("\r\n") ? "\r" : "";
++  const sectionLines = lines.slice(start + 1, end); const blockFrom = sectionLines.findIndex(line => line.trim() === CLOSED_BLOCK_BEGIN);
++  const blockTo = blockFrom < 0 ? -1 : sectionLines.findIndex((line, index) => index > blockFrom && line.trim() === CLOSED_BLOCK_END);
++  const withoutBlock = blockFrom >= 0 && blockTo >= 0 ? [...sectionLines.slice(0, blockFrom), ...sectionLines.slice(blockTo + 1)] : sectionLines;
++  const body = withoutBlock
+     .filter(line => !line.startsWith("**Lifecycle phase:**") && !line.startsWith("**Last updated:**"))
++    .filter(line => closedId === null || new RegExp(`^Feature \`${closedId}\` is active in [a-z-]+( \\(PO profile: \`[^\`]+\`\\))?\\.\\r?$`, "u").exec(line) === null)
+     .map(line => {
+       const match = active ? /^Feature `([^`]+)` is active in [a-z-]+( \(PO profile: `[^`]+`\))?\.$/u.exec(line) : null;
+       return match !== null && match[1] === feature.id ? `Feature \`${feature.id}\` is active in ${feature.phase}${match[2] ?? ""}.` : line;
+     });
+   while (body.length > 0 && body[0] === "") body.shift();
+-  const rebuilt = [...lines.slice(0, start + 1), "", `**Last updated:** ${date}`, marker, "", ...body, ...(body.length === 0 ? [""] : []), ...lines.slice(end)].join("\n");
++  const closedBlock = closedLines === null ? [] : [CLOSED_BLOCK_BEGIN + cr, ...closedLines.map(line => line + cr), CLOSED_BLOCK_END + cr, ""];
++  const rebuilt = [...lines.slice(0, start + 1), "", `**Last updated:** ${date}`, marker, "", ...closedBlock, ...body, ...(body.length === 0 ? [""] : []), ...lines.slice(end)].join("\n");
+   if (rebuilt === markdown) return "current";
+   try { writeFileSync(path, rebuilt, "utf8"); } catch { return "absent"; }
+   return "updated";
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 2912904bb..0db6a9c95 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -25,6 +25,10 @@ It produces the Verify evidence in candidate mode bound to the Critic packet (fo
+ 
+ The command stops at `commit-required` and prints the paths and the commit message (`git add -- <paths>`, then `git commit`; the pre-commit hook admits exactly the bytes the stages wrote, G20-66). Run that commit, then run the printed `next` command (the same command with `--resume-lifecycle-id <id>`): it freezes the candidate, runs the final Verify and the Security scan, writes the final-verification and cleanup evidence and ends at `closed-local`. Exit code 2 and `status: "stopped"` mean one typed stop with its exact repair on stderr: `ONESHOT-CRITIC-PACKET-MISSING` (finish the Critic review; pass `--critic-packet-id`), `ONESHOT-VERIFY-RED` (fix what the Verify prints, rerun), `ONESHOT-COMMIT-PENDING` (the close outputs are not committed yet), `ONESHOT-SECURITY-BLOCKING`, `ONESHOT-OWNER-ROUTE-REQUIRED` (a project with a session-authority catalogue runs the Result close through `continuity-owner-route.mjs`), or the coordinator's own typed refusal (for example `CLOSE-CRITIC-CALLER-AUTHORED`). Rerunning the identical command is always safe. Publication, push and release stay separate human-gated steps. At `closed-local` the result's `pushEvidence.command` is the Critic-bound Verify the push gate reads (`evidence/verify-latest.json`): run it, then `push-init.mjs`.
+ 
++**The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. Rerun the identical command with `--human-acceptance "<the human's literal answer>"` (pass it only when the human accepted; a decline means the close does not run). The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
++
++**What the close touches.** The tracked-effects digests hash what exists: the calibrated handover (`project/pipeline.json` `handover`, first brought to the closed state by `pipeline-state.mjs update-public-handover`, the existing writer: closed-local, the verified candidate, and technical close, product acceptance and push as three separate facts) and `telemetry/costs.md`; backlog, history and retrospective have no defined project file and keep the marked empty digest. The audit request names every Critic round of the feature (`evidence.criticReports`); the bundle under `audit-bundles/<feature>/<commit>/` carries each exported round report (`specs/<feature>/evidence/critic/<packet>/report.md`) and its README section "Critic round reports" names a round whose report was never exported instead of omitting it: export it with `session-critic-finalizer.mjs export` before the close.
++
+ Everything below is the per-stage recovery reference: use it when the one command stops and the repair needs a single stage by hand.
+ 
+ Closes the feature currently tracked in `.claude/pipeline-state.json` (`activeFeature`). This is a
