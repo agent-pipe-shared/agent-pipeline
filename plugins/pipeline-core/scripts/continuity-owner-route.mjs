@@ -38,6 +38,12 @@ class OwnerRouteRefusal extends Error {
 }
 const refuse = (code, message, options) => { throw new OwnerRouteRefusal(code, message, options); };
 
+/** C21C (native Windows greenfield): the runtime's typed reason (`error.reason`) was dropped here, so a platform fault read like a wrong command line. */
+export function ownerRouteRequesterRefusal(error, root) {
+  const reason = typeof error?.reason === 'string' && error.reason !== '' ? `: ${error.reason.slice(0, 200)}` : '';
+  return `the owner-route requester was refused (${error?.code ?? 'unavailable'}${reason}). Inspect the cause with: node ${SESSION_AUTHORITY_REPAIR} inspect --root ${root}. If the reason names the command line instead: this script is admitted only when started exactly as ${USAGE}, from the repository root, once per process`;
+}
+
 function parseRun(argv) {
   const dash = argv.indexOf('--');
   if (dash < 0) refuse('COR-USAGE', `the entry follows a literal "--": ${USAGE}`);
@@ -80,7 +86,7 @@ async function run(argv) {
   let runtime;
   try { runtime = createSourceOwnedContinuityOwnerRouteRequesterRuntime({ rootDir: root }); }
   catch (error) {
-    refuse('COR-REQUESTER-UNAVAILABLE', `the owner-route requester was refused (${error?.code ?? 'unavailable'}); this script is admitted only when started exactly as ${USAGE}, from the repository root, once per process`);
+    refuse('COR-REQUESTER-UNAVAILABLE', ownerRouteRequesterRefusal(error, root));
   }
   try {
     return await runtime.run(async () => {
