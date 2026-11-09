@@ -3494,6 +3494,16 @@ c11Case("C21B the acknowledgement signing command names the packet and a proof f
   } finally { console.log = originalLog; fx.cleanup(); }
 });
 
+c11Case("C21B approve-residual-acceptance names the cause of a proof path inside the repository", () => {
+  const fx = c11Fixture({ findings: c11Minor });
+  try {
+    const inside = join(fx.root, "scratch", "copy.json");
+    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, "--proof-request", inside, "--proof-authority", inside, "--proof", inside], fx.deps));
+    assert.equal(outcome.result, 2, outcome.lines.join(" "));
+    assert.match(outcome.lines.join(" "), /CRITICAL-PROOF-EXTERNAL-PATH\)\. The three proof paths must be absolute/u);
+  } finally { fx.cleanup(); }
+});
+
 c11Case("C11-a chat mode records an attended residual acceptance and the lifecycle then qualifies the failed all-minor receipt", () => {
   const fx = c11Fixture({ chat: true, findings: c11Minor });
   try {

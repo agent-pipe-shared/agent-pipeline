@@ -9832,7 +9832,7 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
     flags, now: approvedAt, required: true,
   });
   if (!verified.ok) {
-    console.error(`Error: approve-residual-acceptance refused (${verified.code}).`);
+    console.error(`Error: approve-residual-acceptance refused (${verified.code}).${criticalProofRefusalHint(verified.code)}`);
     return 2;
   }
   const priorConsumption = base.criticalProofConsumption;
@@ -9889,15 +9889,15 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
 // bridge for a runner that issues no Source return record; the close gate names this command as its one runnable repair. Recorded through the same
 // human-approval route as `feature-package-reconcile` (signature or chat per `gates.human_approval`), into the private approval store, never inferred.
 /** C21B: the cause and the next step behind the two proof refusals that otherwise leave an agent reading plugin source. Empty for every other code. */
-function criticalProofRefusalHint(code) {
+function criticalProofRefusalHint(code, renewal = "") {
   if (code === "CRITICAL-PROOF-EXTERNAL-PATH") return " The three proof paths must be absolute, must exist and must lie outside this repository: pass the requestPath, authorityPath and proofPath the signing step printed, never a copy under scratch/ or anywhere else in the project.";
-  if (code === "CRITICAL-ACTION-REQUEST-MISMATCH") return " The signed request is not the one this action expects: sign the printed signatureCommand unchanged, because any edited value, --expires-at included, makes a different request. When its window has passed, run this command again without the proof flags to get a fresh one.";
+  if (code === "CRITICAL-ACTION-REQUEST-MISMATCH") return ` The signed request is not the one this action expects: sign the printed signatureCommand unchanged, because any edited value, --expires-at included, makes a different request.${renewal}`;
   return "";
 }
 
 function runApproveCriticAcknowledgement({ dir, rest, base, now, deps }) {
   const kind = CRITIC_ACKNOWLEDGEMENT_KIND;
-  const refuse = (code) => { console.error(`Error: approve-critic-acknowledgement refused (${code}).${criticalProofRefusalHint(code)}`); return 2; };
+  const refuse = (code) => { console.error(`Error: approve-critic-acknowledgement refused (${code}).${criticalProofRefusalHint(code, " When its window has passed, run this command again without the proof flags to get a fresh one.")}`); return 2; };
   const configured = criticalProofWaiverFor(dir, kind);
   if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
   const waived = configured.waived === true;
@@ -13426,7 +13426,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         dir, state: base, kind: "push", candidate: observed,
         subject: { sourceCommit: observed.commit, remote, destination, threatModel: threatModelBinding }, flags: parsed.value, now: approvedAt, required: true,
       });
-      if (!verified.ok) { console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.`); return 2; }
+      if (!verified.ok) { console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.${criticalProofRefusalHint(verified.code)}`); return 2; }
       const priorConsumption = base.criticalProofConsumption;
       if (priorConsumption !== undefined && (!Array.isArray(priorConsumption)
         || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) {
