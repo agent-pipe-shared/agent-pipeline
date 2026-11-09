@@ -1,0 +1,16 @@
+diff --git a/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs b/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
+index e6b4db9f9647280fe7ef20efcd1465b68a50cd6b..8b477e9bab9a5bd1c7081e14bc7ff95b7e43da5b 100644
+--- a/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
++++ b/plugins/pipeline-core/lib/pins/critic-course-consumer-chain-walk.test.mjs
+@@ -1017,8 +1017,9 @@ test("W9 SLICE 3 NEGATIVE (2): a range the derivation refuses stays CDP-CORRECTI
+   const fx = walkCourse({ label: "w9s3-refused", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], derived: true });
+   try {
+     const [round] = fx.observed.rounds;
+-    git(fx.root, ["mv", "src/TASK-ONE.mjs", "docs/HISTORY.md"]);
+-    const crossing = commitPaths(fx.root, ["src", "docs/HISTORY.md"], "move a source file onto the block history file");
++    // A move from a source file into the project-state record is split and admitted (critic-correction-input-bindings.mjs); this reverse direction stays refused.
++    git(fx.root, ["mv", "docs/state.md", "src/moved-state.mjs"]);
++    const crossing = commitPaths(fx.root, ["src"], "move the handover file onto a source path");
+     const refused = cli("critic-dispatch-preflight.mjs", ["--root", fx.root, "--base", round.candidate, "--candidate", crossing, "--spec", SPEC_PATH, "--evidence", `specs/${FEATURE}/evidence/diagnostic-r1.json`]);
+     assert.equal(refused.status, 1);
+     assert.equal(refused.body.code, "CDP-CORRECTION-INPUT-REFUSED", refused.text);

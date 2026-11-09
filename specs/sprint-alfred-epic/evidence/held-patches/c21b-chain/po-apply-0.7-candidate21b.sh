@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 21b: 12 held patches exported from the build clone chain cf73ce22d..fccd736d2
+# PO apply script for candidate 21b: 13 held patches exported from the build clone chain cf73ce22d..740753e7e
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -26,6 +26,7 @@ step 09-77d3ca163 'fix(dispatch-budget): keep the copied grant line within the p
 step 10-e736962ae 'fix(dispatch-budget): restate the native return contract when a child resumes on a grant'
 step 11-6801a5ebc 'fix(critic): a released first round no longer blocks the corrected candidate, and a batch refusal prints its repair'
 step 12-fccd736d2 'test(critic): register the released-round takeover case'
+step 13-740753e7e 'test(critic): pin the rename direction the correction derivation still refuses'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
