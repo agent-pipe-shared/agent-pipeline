@@ -16,9 +16,14 @@ done_when: manual
 
 Candidate 22 (40 patches, stamp `ef16e1b86`) carries the P0 to P2 findings of the Claude report (CGR-01 to CGR-22) and the cheap loop topics of both reports. This item keeps what stayed open so none of it lives only in chat. Status: implementation complete, PO acceptance pending. No Full Verify and no Critic ran on this state, and none of the close changes has run in a live close.
 
-## Open choice for the PO
+## PO decisions of 2026-11-09 for the follow-up build (22b)
 
-- **CGF-06:** the classifier for generated artefacts (`lib/generated-artefact-schema.mjs`) was not shipped. It is wired to nothing, and wiring it would relax the secret scanner and needs `.gitleaks.toml` and its plugin mirror. The earlier narrow ignore and the per-finding reasoned ignore stay. The classifier is kept in the w308 patch evidence.
+- **CGF-06:** wire the classifier narrowly. A scanner finding is discounted only when the file carries a known Pipeline schema and the finding lies in a digest field. Everything else keeps blocking.
+- **CGF-08:** when the two disagree, the blocking check alone decides the gate. The stored view stays beside it as report-only and open, with its date.
+- **CGR-13:** commits stay as they are. The close result and the audit bundle count product and evidence commits separately.
+- **CGR-19:** one narrow command moves `repositoryMode` from `local-only` to `remote-tracked`, only with a configured remote. Every other direction stays on the guard-override route.
+- **Read grammar:** combined short flags are admitted by checking each flag against the existing list.
+- **Stay in 0.7.1:** CGF-16, CGF-24, CGF-25 with CGF-01, CGF-26, CGF-36, the CGR-07 queue, straight-run tests 1, 2, 3 and 5.
 
 ## Built only partly
 
