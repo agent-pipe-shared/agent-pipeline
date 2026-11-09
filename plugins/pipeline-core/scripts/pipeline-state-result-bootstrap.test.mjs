@@ -913,6 +913,33 @@ test("D231 owner route: close-feature, entries outside the allowlist, foreign fl
   assert.deepEqual(readFileSync(early.statePath), earlyBefore); assertReleased(early, "before the Close lifecycle");
 });
 
+test("a catalogue project: close-feature takes the direct route only with a coordinator binding and never while a State operation is in flight", () => {
+  const p = ownerRouteProject("close-direct");
+  const before = readFileSync(p.statePath);
+  const direct = (argv) => {
+    const errors = [], originalError = console.error;
+    console.error = (...parts) => errors.push(parts.join(" "));
+    let status;
+    try { status = run(argv, { dir: p.root }); } finally { console.error = originalError; }
+    assert.equal(status, 2, errors.join("\n"));
+    assert.deepEqual(readFileSync(p.statePath), before, "State bytes unchanged");
+    return errors.join("\n");
+  };
+  const unbound = ["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact"];
+  const bound = [...unbound, "--coordinator-lifecycle", p.lifecycleId, "--coordinator-sha256", h("c")];
+  assert.match(direct(unbound), /companion-owning-lifecycle-context-required/, "no binding: the refusal stays");
+  const passed = direct(bound);
+  assert.doesNotMatch(passed, /State authority route unavailable/, "with a binding the route admits it");
+  assert.match(passed, /close-feature coordinator/, "and the writer still proves the binding");
+  const producerPath = join(p.repository.commonDir, "agent-pipeline/session-authority/producers/onboarding-continuity.json");
+  const producer = JSON.parse(readFileSync(producerPath));
+  const memberLocal = "agent-pipeline/session-authority/members/onboarding-continuity/fixture-in-flight.json";
+  mkdirSync(join(p.repository.commonDir, "agent-pipeline/session-authority/members/onboarding-continuity"), { recursive: true });
+  writeFileSync(join(p.repository.commonDir, memberLocal), JSON.stringify({ association: { state: "bound" }, phase: "armed" }));
+  writeFileSync(producerPath, JSON.stringify({ ...producer, members: [...producer.members, { memberRef: { path: `.git/${memberLocal}` } }] }));
+  assert.match(direct(bound), /SDC-AUTHORITY-HELD: state-operation-in-flight/, "a State operation in flight holds the close");
+});
+
 test("D231 owner route: a project without a catalogue takes the direct route unchanged and the CLI names that route", () => {
   const p = ownerRouteProject("cor-nocatalogue", { catalogue: false });
   const direct = invoke(p.root, ["continuity-result-bootstrap-plan"]);

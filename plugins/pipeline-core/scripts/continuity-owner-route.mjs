@@ -72,7 +72,7 @@ function courseMessage(refusal, root, entry) {
 async function run(argv) {
   const { root, lifecycleId, entry, tail } = parseRun(argv);
   if (entry === 'close-feature') {
-    refuse('COR-CLOSE-FEATURE-UNAVAILABLE', 'close-feature cannot run on the owner route yet: its State write runs in the retired-owner terminal, which needs (a) the retirement of the per-invocation owner descriptor before the entry runs and (b) a retired terminal for a physical-readback requester (today only the controlled-unit-method fixture assurance has one). That is a separate slice. The route that works today: the direct route for a project without a catalogue, or the attended close (an operator-held session that owns the lifecycle), see skills/close-feature/SKILL.md.');
+    refuse('COR-CLOSE-FEATURE-UNAVAILABLE', 'close-feature cannot run on the owner route yet: its State write runs in the retired-owner terminal, which needs (a) the retirement of the per-invocation owner descriptor before the entry runs and (b) a retired terminal for a physical-readback requester (today only the controlled-unit-method fixture assurance has one). That is a separate slice. The route that works today: the direct route, that is the close-feature action finish-feature or the close coordinator returns (its coordinator binding admits it in a catalogue project too, unless a State operation is in flight), see skills/close-feature/SKILL.md.');
   }
   if (!ALLOWLIST.includes(entry)) refuse('COR-ENTRY-OUTSIDE-ALLOWLIST', `${entry} is not an owner-route entry; the closed list is ${ALLOWLIST.join(', ')}. Everything else keeps its present route.`);
   let repository;

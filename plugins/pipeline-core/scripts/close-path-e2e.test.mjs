@@ -46,6 +46,9 @@ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { NEUTRAL_MANIFEST } from "../lib/project-authority.mjs";
 import * as po from "../lib/po-gate-authority.mjs";
 import { nativeContractFixtureParent } from "../lib/test-item-approved-course-fixture.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
+import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
 
 const SCRIPTS = fileURLToPath(new URL(".", import.meta.url));
 const script = (name) => join(SCRIPTS, name);
@@ -250,10 +253,12 @@ const ANTIGRAVITY_IDENTITY = RUNNER_IDENTITIES.find((entry) => entry.runner === 
 const WALKS = Object.freeze([
   ...RUNNER_IDENTITIES.map((identity) => Object.freeze({ identity, criticReturn: identity === ANTIGRAVITY_IDENTITY ? "send-message" : "stop-hook" })),
   Object.freeze({ identity: ANTIGRAVITY_IDENTITY, criticReturn: "none" }),
+  // The native Goldfish route creates the session-authority catalogue on its first governed item, so a Claude project reaches its close with one.
+  Object.freeze({ identity: RUNNER_IDENTITIES.find((entry) => entry.runner === "claude"), criticReturn: "stop-hook", catalogue: true }),
 ]);
 
 test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 600_000 }, async () => {
-  for (const { identity, criticReturn } of WALKS) {
+  for (const { identity, criticReturn, catalogue } of WALKS) {
     const log = [];
     const fx = consumerFixture(log, identity);
     walkEnv = runnerEnv(identity.runner, fx.root);
@@ -495,6 +500,10 @@ test("G20-35: the close path from implementation to release preflight is walked 
           [script("pipeline-state.mjs"), "approve-critic-acknowledgement", "--by", "Fixture PO", "--critic-packet", packetId], { cwd: fx.root });
         assert.match(acknowledged.stdout, /acknowledged/u);
       }
+      if (catalogue) {
+        const repository = inspectSignedDescriptorCustodyRepository(fx.root);
+        assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
+      }
       const prepared = transition("feature-close-prepared", ["--audit-request", "evidence/audit-request.json", "--critic-verify-lifecycle", lifecycleIds[0], "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"]);
       assert.equal(prepared.phase, "feature-close-prepared");
       // Without a record the acknowledgement walk ends here: the identical close command above was admitted only after it. The rest of the close
@@ -566,6 +575,14 @@ test("G20-35: the close path from implementation to release preflight is walked 
       assert.equal(noApproval.status, 2, `${identity.runner}: ${noApproval.stdout}${noApproval.stderr}`);
       assert.match(noApproval.stderr, /RPC-CONSUMER-PUSH-APPROVAL.*approve-push/u, `${identity.runner}: ${noApproval.stderr}`);
       assert.equal(existsSync(join(fx.root, "evidence", "release-preflight.json")), false, "a refused preflight leaves no record");
+      if (catalogue) {
+        // The close reached the push boundary. A chat approval stays refused in a catalogue project and names the signature route (K52).
+        const refusedChat = spawnSync(process.execPath, [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"],
+          { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
+        assert.equal(refusedChat.status, 2, refusedChat.stdout);
+        assert.match(refusedChat.stderr, /state-push-source-requester[\s\S]*--proof-request/u);
+        continue;
+      }
       step(log, `${identity.runner}: approve-push (the line push-prepare printed)`, process.execPath,
         [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"], { cwd: fx.root });
       const admitted5 = guardPush(pushCommand);

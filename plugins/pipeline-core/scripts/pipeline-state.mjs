@@ -14599,6 +14599,24 @@ function stateAuthorityFailure(code, reason) {
 function stateRepositoryDigest(repository) {
   return sha256CanonicalJson({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir});
 }
+function refuseWhileStateOperationInFlight(repository) {
+  withSessionAuthorityBoundary({repository}, () => {
+    if (!stateCataloguePresent(repository)) return;
+    let inFlight;
+    try {
+      const record = path => JSON.parse(readFileSync(join(repository.commonDir, path), "utf8"));
+      inFlight = ["onboarding-continuity", "state-push-challenge"].some(id => {
+        const path = join("agent-pipeline", "session-authority", "producers", `${id}.json`);
+        if (!existsSync(join(repository.commonDir, path))) throw new Error(`${id} producer record missing`);
+        return record(path).members.some(entry => {
+          const member = record(String(entry.memberRef.path).replace(/^\.git\//u, ""));
+          return member.association?.state === "bound" && ["armed", "running"].includes(member.phase);
+        });
+      });
+    } catch { stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-producer-unreadable"); }
+    if (inFlight) stateAuthorityFailure("SDC-AUTHORITY-HELD", "state-operation-in-flight");
+  });
+}
 function stateCataloguePresent(repository) {
   let cursor = repository.commonDir;
   const parts = ["agent-pipeline", "session-authority", "catalogue.json"];
@@ -14816,6 +14834,14 @@ All commands: ${PIPELINE_STATE_COMMANDS.join(", ")}.`);
     if (STATE_COMPANION_ENTRIES.has(sub)) {
       const cataloguePresent=withSessionAuthorityBoundary({repository},()=>stateCataloguePresent(repository));
       if(!cataloguePresent) return runStateSource(argv,deps);
+      // No production route supplies an owning context for close-feature (the owner route refuses it, COR-CLOSE-FEATURE-UNAVAILABLE), and the
+      // native Goldfish route creates the catalogue, so without this branch a project that ever used it could never close. A close the
+      // coordinator bound (the writer re-proves phase, digest, audit and Continuity) takes the PF-54 route: refused while a State operation is in flight.
+      if(sub === "close-feature" && argv.includes("--coordinator-lifecycle")
+          && readSourceOwnedOnboardingContinuityCompanionContext({repository,entry:sub}) === null) {
+        refuseWhileStateOperationInFlight(repository);
+        return runStateSource(argv,deps);
+      }
       if(sub === "approve-plan") {
         const frame={repository,boundary:null,cataloguePresent,sub,deps,sourceDefaults:Object.keys(deps).every(key=>key === "dir" || key === "now"),deferredCompanion:true,validatingCompanion:false,executingWrite:null,executingCompanion:null};
         if(!frame.sourceDefaults) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-injected-approval-route");
@@ -14865,22 +14891,7 @@ All commands: ${PIPELINE_STATE_COMMANDS.join(", ")}.`);
       // PF-54 (D51 (1)): a route the State companion has not adopted writes the State outside the
       // registry, as a commit or a checkout of the state file does; the next boundary entry heals
       // that drift. It is refused only while a bound member of a State producer is armed or running.
-      withSessionAuthorityBoundary({repository}, () => {
-        if (!stateCataloguePresent(repository)) return;
-        let inFlight;
-        try {
-          const record = path => JSON.parse(readFileSync(join(repository.commonDir, path), "utf8"));
-          inFlight = ["onboarding-continuity", "state-push-challenge"].some(id => {
-            const path = join("agent-pipeline", "session-authority", "producers", `${id}.json`);
-            if (!existsSync(join(repository.commonDir, path))) throw new Error(`${id} producer record missing`);
-            return record(path).members.some(entry => {
-              const member = record(String(entry.memberRef.path).replace(/^\.git\//u, ""));
-              return member.association?.state === "bound" && ["armed", "running"].includes(member.phase);
-            });
-          });
-        } catch { stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-producer-unreadable"); }
-        if (inFlight) stateAuthorityFailure("SDC-AUTHORITY-HELD", "state-operation-in-flight");
-      });
+      refuseWhileStateOperationInFlight(repository);
       return runStateSource(argv,deps);
     }
     return withSessionAuthorityBoundary({repository}, boundary => {
