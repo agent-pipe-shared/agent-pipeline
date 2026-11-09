@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 21b: 18 held patches exported from the build clone chain cf73ce22d..78287f85e
+# PO apply script for candidate 21b: 19 held patches exported from the build clone chain cf73ce22d..61df3692b
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -32,6 +32,7 @@ step 15-6441c3dfd 'fix(pipeline): name the cause of a refused proof on approve-p
 step 16-9c94fa928 'test(pipeline): pin the proof refusal cause on approve-push'
 step 17-b4cb894a8 'fix(guard-push): name the spellings that read a commit when a marker refuses one'
 step 18-78287f85e 'feat(critic-split): merge the children from their Source returns instead of copied verdicts'
+step 19-61df3692b 'fix(guard-dispatch): stop claiming admission in the template shape warning'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

@@ -1,0 +1,25 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 4df87c6d3ecca2375d7db64bc78c341b1447fead..fdbf4ff45f33c6dea529aadd23b7210b46dd3a73 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -121,7 +121,7 @@ export function promptTemplateShapeWarning({ subagentType, prompt } = {}) {
+   const missing = (goldfish ? GOLDFISH_SHAPE_MARKERS : CRITIC_SHAPE_MARKERS).filter((marker) => !prompt.includes(marker));
+   if (missing.length === 0) return "";
+   const template = goldfish ? "templates/prompts/goldfish-task.md" : "templates/prompts/critic-review.md";
+-  return `WARNING (guard-dispatch): GUARD-DISPATCH-PROMPT-NOT-TEMPLATE-SHAPED: the ${subagentType} prompt lacks ${missing.length} template marker(s) (${missing.join("; ")}); build it by filling ${template}, not freehand. Admitted anyway.\n`;
++  return `WARNING (guard-dispatch): GUARD-DISPATCH-PROMPT-NOT-TEMPLATE-SHAPED: the ${subagentType} prompt lacks ${missing.length} template marker(s) (${missing.join("; ")}); build it by filling ${template}, not freehand. This warning does not stop this dispatch by itself; later checks still can.\n`;
+ }
+ 
+ // W7 B: per-session memory of refused dispatches, under <git common dir>/agent-pipeline/refused-dispatch-retry/<sha(session)>/<sha(type NUL prompt)>.json.
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index 80b09c29498680a061af3b114f5c22f174d873d4..a1fe85181895b82ace05c1f5710a3d8fb98f718c 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -1164,6 +1164,7 @@ manualCheck("GD69 a pipeline-core critic dispatch without the review-template he
+   const line = shapeWarningLine(stderr);
+   assert.equal(code, ALLOW, `the shape warning must never refuse -- ${stderr.trim().slice(0, 300)}`);
+   assert.ok(line.startsWith("WARNING (guard-dispatch):") && line.includes("templates/prompts/critic-review.md"), `got ${JSON.stringify(stderr.slice(0, 300))}`);
++  assert.ok(line.includes("does not stop this dispatch by itself; later checks still can") && !line.includes("Admitted anyway"), line);
+ });
+ manualCheck("GD70 a non-pipeline agent type with a free prompt emits no shape warning (W7 A-iv)", () => {
+   for (const builtIn of ["Explore", "general-purpose"]) {
