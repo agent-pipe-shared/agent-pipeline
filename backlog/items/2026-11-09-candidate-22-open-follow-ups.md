@@ -34,7 +34,8 @@ The chain is in `specs/sprint-alfred-epic/evidence/held-patches/c22b-chain/`. On
 - **CGF-08:** the blocking check decides. The stored view is shown beside it as report-only with its date, in the orientation and in Verify.
 - **CGR-13:** the close result and the audit bundle count product and evidence commits separately.
 - **CGR-19:** `repository-mode-promote.mjs` plus a stateless commit-hook admission for exactly that one token in both calibration twins. Installed hooks need a refresh after the install. The command is not reachable in lifecycle draft because it has no catalogue row. An unrecorded architecture adoption request created before a promotion goes stale (`ADOPTION-AUTHORITY-INPUT-CHANGED`).
-- **Read grammar:** a short-flag cluster of `rg` and `grep` is admitted when every letter is admitted on its own and takes no value. `grep -rn` stays refused because `-r` is not admitted alone. Admitting recursive `grep` is a separate grammar decision.
+- **Read grammar:** a short-flag cluster of `rg` and `grep` is admitted when every letter is admitted on its own and takes no value.
+- **Recursive grep:** `grep -r` with `-l`, `-w`, `-s`, `--include`, `--exclude` and `--exclude-dir` is admitted behind its own screen, which visits every entry and refuses a secret name, a `.git` that is not excluded and more than 10000 entries. A refusal by the screen names one admitted spelling. The screen took about 170 ms on 10000 entries (WSL2, warm cache). Not run: Windows-native and BSD `grep`.
 - **LOOP-A1:** a round-trip test exists and found no defect. It runs on Linux. Execution of the printed command under cmd.exe and PowerShell is not proven, and some kinds are covered only through the library leg.
 - **Preflight and compact wording:** the cloud-folder key warning is gone and the false registry alarm after a compact is fixed.
 

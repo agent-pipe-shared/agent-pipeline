@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 22b: 9 held patches exported from the build clone chain 8627df377..133352788
+# PO apply script for candidate 22b: 10 held patches exported from the build clone chain 8627df377..e81014f9a
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -23,6 +23,7 @@ step 06-1d2f362cd 'fix(close): report product and evidence commits separately in
 step 07-e99be7c27 'fix(guard): close the protected kernel list over the candidate 22 imports'
 step 08-814aa4c62 'chore(verify): register the candidate 22b test suites'
 step 09-133352788 'feat(guard): admit a short-flag cluster of rg and grep when every flag in it is admitted on its own'
+step 10-e81014f9a 'feat(guard): admit recursive grep behind its own all-files tree screen'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
