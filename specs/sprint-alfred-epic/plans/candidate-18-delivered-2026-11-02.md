@@ -48,3 +48,11 @@ Exit 1 after 3596 s, 1152 steps, 4 red: `codex-isolated-critic-protected-preimag
 ## Open
 
 The Critic preimage re-pin by the PO; the batch Critic (paused by the PO); native Windows runs; real Codex and Antigravity runs; the security scan (`--remote upstream`); the end-to-end hook activation on a real promotion; parallel host commits in a real parallel run; PO acceptance.
+
+## Moved verbatim from `docs/state.md` on 2026-11-09 (size cap)
+
+**Candidate 17 (runner neutrality Claude/Codex/Antigravity, first consumer-run findings) delivered 2026-11-02** as held patches w48-w73 and one apply script
+(`specs/sprint-alfred-epic/evidence/held-patches/po-apply-0.7-candidate17.sh`), applied by the PO the same day (`130ebba59` to `235014116`) and stamped `5337c081b`
+(`0.7.0+claude.20261102073855.fba0507`); not installed or read back on this machine yet. Rehearsal and whole-chain checks green; implementation complete, PO acceptance pending. Open: Full Verify on the final tree, the batch Critic (paused by the PO), native Windows runs, real Codex and Antigravity runs, the security scan
+(`--remote upstream`). Not built, planned for candidate 18 with the draft native Antigravity admission: [candidate 18 plan](candidate-18-plan-2026-11-02.md).
+**Candidate 18 (parallel Goldfish host commits, signing parity on every runner, the Antigravity runner, first greenfield findings) applied, stamped and installed 2026-11-02**: w74-w109 via `po-apply-0.7-candidate18.sh` (`1fb3e5197`), stamp `3cdc6e7a8`, then the fixes w110-w114 via `po-apply-0.7-candidate18-fixes.sh` (`0caf799`) and the second stamp `63d505ca3` (`0.7.0+claude.20261102210630.0caf799`), installed by the PO and read back; implementation complete, PO acceptance pending.
