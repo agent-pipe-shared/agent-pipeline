@@ -9,7 +9,7 @@ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
 // Expose the policy-owned binding; shell decisions continue through the same policy function.
 export { PASSIVE_READ_CREDENTIAL_ROOTS };
-import { gitShowObjectOperand, isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+import { expandBooleanShortClusters, gitShowObjectOperand, isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM } from "./constants.mjs";
 import { MAX_AND_CHAIN_SEGMENTS } from "./grammar-denials.mjs";
 import { commandPath, isProjectWritePath, isRealpathedWithinBoundary, pathInside, rawReadCandidatePath } from "./path-containment.mjs";
@@ -146,8 +146,10 @@ export function matchFlagSpec(argsTail, spec) {
 // applies outside a pipeline (isReadOnlySimpleWords below). Factored out once so a second
 // pipeline SOURCE never means a second, parallel copy of this rule -- NVA-CATPIPE-1 briefing
 // field 3, "reuse the SAME argv predicates the existing grep/head sinks already use".
-function isValidPipelineGrepArgs(argv) {
+function isValidPipelineGrepArgs(sinkArgv) {
   const safeFlags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count"]);
+  // C22B: a cluster of flags this sink admits on their own (`-ic`) is read as those flags; the sink keeps its own, narrower set (no -o, -H, -h).
+  const argv = expandBooleanShortClusters(sinkArgv, safeFlags);
   let index = 0;
   while (safeFlags.has(argv[index])) index += 1;
   const endedOptions = argv[index] === "--";
@@ -920,15 +922,17 @@ export function isSafeExactPassiveFile(raw, root, extraRoots = []) {
 
 const GREP_CONTEXT_FLAG = /^-([ABC])([0-9]{1,3})?$/u;
 
-function isSafeExactGrepArgs(args, root, extraRoots = []) {
+function isSafeExactGrepArgs(grepArgs, root, extraRoots = []) {
   const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename", "-o", "--only-matching"]); // TR-B-F (T74): match-output spellings; the operand loop below is unchanged.
+  // C22B: a cluster of boolean flags admitted above on their own (`-in`) is read as those flags; a cluster holding -A/-B/-C/-m or any other letter stays refused.
+  const args = expandBooleanShortClusters(grepArgs, flags);
   let index = 0;
   let maxCountSeen = false;
   const contextSeen = new Set();
   while (flags.has(args[index]) || args[index] === "-m" || args[index] === "--max-count" || GREP_CONTEXT_FLAG.test(args[index] ?? "")) {
     if (flags.has(args[index])) { index += 1; continue; }
     // C21 (AC-108): -A, -B and -C only print neighbouring lines of an operand the checks below already admit. One bounded value (1..3 digits) each, in the
-    // separate (`-C 5`) or the attached (`-C5`) spelling; a repeated letter, a clustered flag (`-nC5`) and the long spellings stay refused.
+    // separate (`-C 5`) or the attached (`-C5`) spelling; a repeated letter, a cluster holding a context flag (`-nC5`) and the long spellings stay refused. A cluster of plain boolean flags (`-in`) is admitted (C22B).
     const context = GREP_CONTEXT_FLAG.exec(args[index] ?? "");
     if (context !== null) {
       const value = context[2] ?? args[index + 1];

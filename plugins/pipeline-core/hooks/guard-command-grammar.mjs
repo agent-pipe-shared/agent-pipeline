@@ -41,6 +41,32 @@ const NUMERIC_VALUE = new Set([
 // names, recurse through a path pattern, or change rg's default ignore policy.
 const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not", "-g", "--glob"]);
 
+/**
+ * C22B (AC-108, PO decision 2026-11-09): a combined short-flag cluster (`-ln`, `-in`) is read as its single flags, and only when EVERY letter is a boolean
+ * flag the caller's own set admits on its own. A cluster holding a value-taking letter (`-nA`, `-ne`), a letter the command does not admit (`-r`, `-z`) or
+ * a letter that is not a letter stays untouched, so the caller's one-token rules refuse it exactly as before. The members then go through the caller's
+ * per-flag rules one by one, so a repeated flag is judged as if it were spelled out twice. Tokens after `--` are operands and never expanded. Pure; it
+ * admits nothing by itself and widens no flag, path or command beyond what the spelled-out form already reaches.
+ * @param {string[]} args
+ * @param {Set<string>} booleans the single-flag spellings (`-n`) the caller admits as boolean flags
+ * @returns {string[]}
+ */
+export function expandBooleanShortClusters(args, booleans) {
+  const expanded = [];
+  let afterDashDash = false;
+  for (const arg of args) {
+    if (afterDashDash || arg === "--") {
+      afterDashDash = true;
+      expanded.push(arg);
+      continue;
+    }
+    const members = /^-[A-Za-z]{2,}$/u.test(arg) ? [...arg.slice(1)].map((letter) => `-${letter}`) : null;
+    if (members !== null && !booleans.has(arg) && members.every((member) => booleans.has(member))) expanded.push(...members);
+    else expanded.push(arg);
+  }
+  return expanded;
+}
+
 function isBoundedFilenameFilter(value) {
   // Test-module suffixes are filename data too: the observed `*.test.mjs`
   // read has the same traversal boundary as `*.mjs`. Keep the extension
@@ -355,10 +381,12 @@ function validateRg(argv, root, windows, additionalRoots = []) {
   // --pre, so no rg read lane is valid while the host setting is active.
   if (typeof process.env.RIPGREP_CONFIG_PATH === "string"
     && process.env.RIPGREP_CONFIG_PATH !== "") return false;
-  const args = [...argv];
+  let args = [...argv];
   const filesMode = args[0] === "--files";
   if (filesMode) args.shift();
   const booleans = filesMode ? FILE_BOOLEAN : SEARCH_BOOLEAN;
+  // C22B: a cluster of flags this command admits on their own is judged flag by flag below (a repeated member is refused like a repeated flag).
+  args = expandBooleanShortClusters(args, booleans);
   const values = filesMode ? FILE_VALUE : SEARCH_VALUE;
   const seen = new Set();
   const paths = [];

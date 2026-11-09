@@ -64,8 +64,9 @@ export function flagSpellingHint(flag) {
 }
 
 /**
- * F9 (candidate 19): a short-flag cluster such as `rg -ln` is refused where the same flags given one by one (`rg -l -n`) are admitted. The hint is
- * printed only when the grammar itself admits the split spelling, so it is never a guess; it grants nothing.
+ * F9 (candidate 19): a short-flag cluster is refused where the same flags given one by one are admitted. C22B (2026-11-09): a cluster of boolean flags
+ * (`rg -ln`) is now admitted by the grammar itself, so this hint fires only for a cluster that holds a flag taking a value (`rg -nA 5`, split `-n -A 5`).
+ * The hint is printed only when the grammar itself admits the split spelling, so it is never a guess; it grants nothing.
  * @returns {string|null}
  */
 export function clusterSpellingHint(command, flag, root) {
@@ -74,6 +75,7 @@ export function clusterSpellingHint(command, flag, root) {
   try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
   if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
     || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
+  if (isReadOnlyDiagnosticCommand(command, root)) return null; // C22B: an admitted cluster is no refusal, so it gets no hint
   const { executable, argv } = parsed.segments[0];
   const split = [...flag.slice(1)].map((letter) => `-${letter}`);
   const expanded = argv.flatMap((token) => (token === flag ? split : [token]));
@@ -118,6 +120,12 @@ export function firstUnadmittedFlag(command, root) {
     // pattern itself vanish and be mistaken for a flag fault, so a bad value flag is simply not diagnosed (null).
     const rest = argv.filter((_, position) => position !== index);
     if (isReadOnlyDiagnosticCommand([executable, ...rest.map(quote)].join(" "), root)) return token;
+    // C22B: a short-flag cluster that holds a value-taking flag (`-nA 5`) is refused although its flags spelled out are admitted. Removing the token cannot
+    // show that (the value would be left behind), so replacing it by its single flags is the one extra probe; clusterSpellingHint then prints the spelling.
+    if (/^-[A-Za-z]{2,}$/u.test(token)) {
+      const split = argv.flatMap((word, position) => (position === index ? [...token.slice(1)].map((letter) => `-${letter}`) : [word]));
+      if (isReadOnlyDiagnosticCommand([executable, ...split.map(quote)].join(" "), root)) return token;
+    }
   }
   return null;
 }
