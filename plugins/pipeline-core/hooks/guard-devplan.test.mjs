@@ -311,6 +311,20 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   });
 }
 
+// ---- CGF-09 an edit of an approved architecture file is admitted and says what it costs ----
+{
+  const dir = freshDir("architecture-edit-notice");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, APPROVED_STATE);
+  mkdirSync(join(dir, "architecture", "map"), { recursive: true });
+  writeFileSync(join(dir, "architecture", "design-materialization.json"), JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", designSha256: "e".repeat(64), targets: [{ path: "architecture/map/index.md", sha256: "f".repeat(64) }] }));
+  check("CGF-09 notice on an edit of an approved architecture file", "Edit", "architecture/map/index.md", ALLOW, {
+    projectDir: dir,
+    stderrIncludes: ["ARCHITECTURE-DESIGN-ARTIFACT-DRIFT", "reopen-design", "e".repeat(64)],
+  });
+  check("CGF-09 a file the design did not materialize stays silent", "Edit", "architecture/map/other.md", ALLOW, { projectDir: dir, stderrEmpty: true });
+}
+
 // ---- DP08 default exempt prefixes -> allow ----------------------------------------------
 {
   const prefixes = ["docs/", "specs/", ".claude/", "backlog/", "scratch/"];

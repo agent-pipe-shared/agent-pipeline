@@ -155,6 +155,7 @@ import { completedFeaturePackageEditDenial, designAdvisoryAdmission, designAdvis
 // module's "rebase authority" section for why it lives there and what it deliberately does not
 // widen.
 import {
+  approvedArchitectureEditNotice,
   rebaseAuthorityAdmissionNotice,
   rebaseAuthorityDisclosure,
   resolveActiveRebaseAuthority,
@@ -420,6 +421,13 @@ if (isDispatchRecordCoordinationPath(normalizedPath)) process.exit(0);
 // C21F: the shared refusal of a hand edit of a feature package past `implementing` (lib/guard-devplan-policy.mjs).
 const packageEditDenial = completedFeaturePackageEditDenial(relPath, projectDir);
 if (packageEditDenial !== null) { process.stderr.write(`${packageEditDenial}\n`); process.exit(2); }
+// CGF-09: said whatever the lifecycle, the drift check applies during and after a feature. Never a verdict: the gate below decides as before.
+// stdout carries it to the model and takes no permission decision; stderr is the channel of the other admission notices.
+const architectureNotice = approvedArchitectureEditNotice(normalizedPath, projectDir);
+if (architectureNotice !== null) {
+  process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: architectureNotice } })}\n`);
+  process.stderr.write(`${architectureNotice}\n`);
+}
 
 // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
 const manifestResult = loadManifest(projectDir);

@@ -45,6 +45,11 @@ from memory is not evidence; a quoted line from the transcript is.
   the pre-restart and post-restart files back into one timeline before
   drawing any conclusion about what happened "across the restart" — reading
   only the final file silently drops everything before it.
+- A dispatched child has its own thread id. Naming the parent as the current
+  session in a prior-session selection is refused with
+  `MODEL-ROLE-SESSION-IDENTITY-CONFLICT`, by design: the host's identity wins
+  over a claim. Let the coordinator capture the source and hand the child the
+  captured file.
 
 ## Standard categories to check every time
 

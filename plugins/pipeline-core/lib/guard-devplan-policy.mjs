@@ -404,6 +404,22 @@ function normalize(p) {
 }
 
 /**
+ * CGF-09 (PO decision 2026-11-09): an edit of a file the approved architecture design materialized is admitted, and the next architecture inspection still refuses
+ * the drift (ARCHITECTURE-DESIGN-ARTIFACT-DRIFT). The notice names that at the edit, not one inspection later. Never a refusal, and silent on anything unreadable.
+ * @returns {string|null} the notice, or null when the path is no materialized target.
+ */
+export function approvedArchitectureEditNotice(relPath, projectDir) {
+  const slashed = String(relPath ?? "").replace(/\\/g, "/").toLowerCase();
+  if (!slashed.startsWith("architecture/")) return null;
+  let receipt;
+  try { receipt = JSON.parse(readFileSync(join(projectDir, "architecture", "design-materialization.json"), "utf8")); } catch { return null; }
+  if (receipt?.schema !== "pipeline.architecture-design-materialization.v1" || !Array.isArray(receipt.targets)) return null;
+  if (!receipt.targets.some((target) => String(target?.path ?? "").toLowerCase() === slashed)) return null;
+  return `Notice: ${slashed} is a file of the approved architecture design (design digest ${receipt.designSha256}). This edit is admitted, but the next architecture inspection refuses it as ARCHITECTURE-DESIGN-ARTIFACT-DRIFT. `
+    + "To change the architecture, change the approved design through reopen-design and a new approval, which writes this file again; otherwise restore its bytes before the next inspection.";
+}
+
+/**
  * C21F (PO decision 2026-11-09): a feature package at `verifying` or `completed` moves only through its writer. A live Antigravity run rewound one by editing
  * `specs/<feature>/lifecycle.json` and committed that; the one-shot close has its own requalification for exactly that case. Earlier states stay editable, and an
  * unreadable or absent file is left to the rest of the gate. @returns {string|null} the refusal text, or null.

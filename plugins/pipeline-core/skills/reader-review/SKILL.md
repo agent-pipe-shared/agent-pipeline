@@ -35,7 +35,9 @@ course, including by silently starting another course for the same findings.
 Count a batch once even if it spans several commits. Preserve the same course
 ID, round counts, batches, reviewed snapshots, report pairs and remaining
 findings across edits, commits, restarts and evidence renaming. Deleting a
-report or making an evidence-only commit does not reset the count. Distinct new
+report or making an evidence-only commit does not reset the count, and an
+evidence-only commit (reports, receipts, no reviewed document changed) needs no
+review round of its own. Distinct new
 documentation scope may require a new course, but must retain outstanding
 findings from the previous one. A clean round needing no further document edits
 can close through the ordinary v1 binding, including a single clean round.
