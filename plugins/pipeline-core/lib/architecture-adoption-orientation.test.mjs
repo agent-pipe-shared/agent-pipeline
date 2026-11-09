@@ -45,6 +45,9 @@ test("CGF-08 the orientation carries a verdict label: report-only, observation d
   assert.deepEqual([adopted.verdict.source, adopted.verdict.verdict, adopted.verdict.effect, adopted.verdict.currency, adopted.verdict.candidate, adopted.verdict.observedAt, adopted.verdict.scope],
     ["architecture-adoption-orientation", "decision-recorded", "report-only", "current", null, "2026-11-09T10:00:00.000Z", "src/**"]);
   const none = observeArchitectureAdoptionOrientation({ rootDir: root, now });
+  // No wall clock enters the byte-compared bootstrap envelope (AC-245): without a supplied clock the date is typed null.
+  assert.equal(observeArchitectureAdoptionOrientation({ rootDir: root }).verdict.observedAt, null);
+  assert.deepEqual(observeArchitectureAdoptionOrientation({ rootDir: root }), observeArchitectureAdoptionOrientation({ rootDir: root }));
   assert.equal(none.verdict.verdict, "adoption-required");
   assert.match(none.verdict.scope, /no scope recorded/u);
 });

@@ -54,9 +54,9 @@ export function hasExactGreenfieldDesignPendingScaffold({ rootDir = process.cwd(
  * Produces one compact readback that every runner's normal bootstrap can
  * surface.  It contains no mutation and does not make an adoption decision.
  */
-export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd(), now = new Date(), deps = {} } = {}) {
+export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd(), now, deps = {} } = {}) {
   const root = resolve(rootDir);
-  const adoption = (deps.resolveAdoptionState ?? resolveAdoptionState)(root, now);
+  const adoption = (deps.resolveAdoptionState ?? resolveAdoptionState)(root, now ?? new Date());
   const greenfieldScaffold = (deps.hasExactGreenfieldDesignPendingScaffold ?? hasExactGreenfieldDesignPendingScaffold)({
     rootDir: root,
     read: deps.read ?? readFileSync,
@@ -98,7 +98,9 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
     guidance,
     // CGF-08/CGF-23: this orientation only reports; it is not bound to a candidate commit and never decides readiness.
     verdict: architectureVerdictLabel({
-      source: "architecture-adoption-orientation", verdict: status, candidate: null, observedAt: now.toISOString(),
+      source: "architecture-adoption-orientation", verdict: status, candidate: null,
+      // The bootstrap envelope is byte-compared (AC-245), so no wall clock enters it: the date is named only when the caller supplies the clock.
+      observedAt: now instanceof Date && Number.isFinite(now.getTime()) ? now.toISOString() : null,
       scope: (Array.isArray(adoption?.scope) ? adoption.scope.filter((entry) => typeof entry === "string").join(", ")
         : typeof adoption?.scope === "string" ? adoption.scope : "") || "repository (no scope recorded)",
       effect: "report-only", currency: "current",
