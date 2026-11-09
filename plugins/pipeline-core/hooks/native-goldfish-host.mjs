@@ -208,6 +208,7 @@ export function criticSourceReturnMessage(outcome) {
       return `Critic Source return issued for packet ${outcome.packetId}: finalize reads it from the private control area and labels the verdict source-issued-origin when the verdict file is the returned JSON verbatim.`;
     case "already-issued": return `Critic Source return not issued: packet ${outcome.packetId} already holds ${outcome.entryId === undefined ? "one" : `this verdict for split entry ${outcome.entryId}`}; it is never overwritten.`;
     case "no-verdict": return `Critic Source return not issued: the Critic's final message carries no schema-shaped verdict JSON (return it as the whole message or as the last fenced json block); ${finalizeAs}.`;
+    case "contradictory-verdict": return `Critic Source return not issued: the verdict says pass true against its own ${outcome.reason}; resume this Critic and have it return the verdict again with pass false or without that entry, which issues the record; ${finalizeAs}.`;
     case "no-open-packet": return `Critic Source return not issued: no claimed, admitted, unresulted session packet of this runner is open; ${finalizeAs}.`;
     case "ambiguous": return `Critic Source return not issued: ${outcome.count} session packets of this runner are open and the stop names none of them; release the stale ones (session-critic-finalizer.mjs release) and finalize; ${finalizeAs}.`;
     default: return `Critic Source return not issued (the private control area could not be read); ${finalizeAs}.`;

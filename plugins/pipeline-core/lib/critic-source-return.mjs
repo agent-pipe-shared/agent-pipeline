@@ -18,7 +18,7 @@
 import { closeSync, existsSync, openSync, readFileSync, readdirSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import { PACKET_ID, SESSION_REVIEW_TTL_SECONDS, SPLIT_FILE, canonicalJson, currentState, packetContext, readJson, sha256 } from "./critic-packet-preflight-read.mjs";
-import { attributeVerdict, criticSplitDigest, criticSplitProblem } from "./critic-split.mjs";
+import { attributeVerdict, criticSplitDigest, criticSplitProblem, verdictPassContradiction } from "./critic-split.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 
 export const CRITIC_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return.v1";
@@ -102,7 +102,7 @@ export function issueCriticSourceReturnFromMessage({ commonDir, runner, text, no
     if (!MESSAGE_RUNNERS.has(runner)) return { status: "not-applicable" };
     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
     const verdict = extractCriticVerdict(text);
-    return verdict === null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs });
+    return verdict === null || verdictPassContradiction(verdict) !== null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs });
   } catch { return { status: "unavailable" }; }
 }
 
@@ -133,6 +133,9 @@ function noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) {
 /** The shared half: bind the returned verdict to the one open admitted packet of this runner and write the record exclusively. */
 function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
   if (verdict === null) return { status: "no-verdict" };
+  // C21B: records are exclusive and a split entry may hold only one, so a return that contradicts itself must leave none or its corrected return could never be recorded.
+  const contradiction = verdictPassContradiction(verdict);
+  if (contradiction !== null) return { status: "contradictory-verdict", reason: contradiction };
   const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
   if (!existsSync(controlRoot)) return { status: "no-open-packet" };
   const open = openAdmittedPackets(controlRoot, runner, nowMs);

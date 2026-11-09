@@ -212,6 +212,16 @@ export function attributeVerdict(split, verdict) {
   return id !== undefined && split.entries.some((entry) => entry.id === id) ? id : null;
 }
 
+/** C21B: what in a schema-valid verdict contradicts its `pass: true`, in words, or null when nothing does. */
+export function verdictPassContradiction(verdict) {
+  if (verdict?.pass !== true) return null;
+  const reasons = [];
+  if (verdict.findings.some(({ severity }) => severity === "blocker" || severity === "major")) reasons.push("blocker or major finding");
+  if (verdict.briefing_violations.length > 0) reasons.push("briefing violation");
+  if (verdict.trajectory_verdict !== "consistent") reasons.push(`trajectory_verdict ${JSON.stringify(verdict.trajectory_verdict)}`);
+  return reasons.length === 0 ? null : reasons.join(" and ");
+}
+
 const SEVERITY_RANK = { blocker: 0, major: 1, minor: 2 };
 const TRAJECTORY_RANK = { consistent: 0, "not verifiable": 1, inconsistent: 2 };
 const NEXT_ROUND = "release this packet (session-critic-finalizer.mjs release) and open the next round of the batch with a new packet id";
@@ -249,8 +259,9 @@ export function mergeSplitVerdicts(split, children) {
     for (const entry of split.entries) {
       const verdict = byEntry.get(entry.id);
       if (!validateAgainstSchema(verdict, VERDICT_SCHEMA).valid) return fail("CSM-CHILD-INVALID", `the child verdict of entry ${entry.id} is not a Critic verdict`, "pass the Critic's returned JSON verbatim");
-      if (verdict.pass && (verdict.findings.some(({ severity }) => severity === "blocker" || severity === "major") || verdict.briefing_violations.length > 0 || verdict.trajectory_verdict !== "consistent")) {
-        return fail("CSM-CHILD-INVALID", `the child verdict of entry ${entry.id} passes although it has a blocker or major finding, a briefing violation or an unconsistent trajectory`, "pass the Critic's returned JSON verbatim");
+      const contradiction = verdictPassContradiction(verdict);
+      if (contradiction !== null) {
+        return fail("CSM-CHILD-INVALID", `the child verdict of entry ${entry.id} says pass true against its own ${contradiction}`, "resume that Critic and have it return its verdict again with pass false or without that entry, then pass the new return verbatim; a hand-edited file matches no Source return");
       }
       if (attributeVerdict(split, verdict) !== entry.id) return fail("CSM-CHILD-UNATTRIBUTED", `the child verdict given for entry ${entry.id} does not start its trajectory_evidence with ${entry.scopeMarker}`, `dispatch the entry's Critic with the instruction to begin trajectory_evidence with "${entry.scopeMarker} " and run that entry again`);
       const others = split.entries.filter((other) => other.id !== entry.id);

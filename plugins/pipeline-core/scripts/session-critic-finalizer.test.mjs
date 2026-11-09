@@ -2059,6 +2059,19 @@ test("C21B a Critic child's message without a verdict is sent back once while it
   } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
 });
 
+test("C21B an Antigravity Critic message whose verdict contradicts itself is sent back once and issues no record", async () => {
+  const fx = fixture();
+  const brain = agyBrain();
+  try {
+    const admitted = admitAntigravity(fx);
+    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
+    const send = (stepIdx, value) => ({ ...agySendMessage(fx, brain, { message: criticReturn(value) }), stepIdx });
+    const first = await agyIssue(send(9, verdict({ trajectory_verdict: "not verifiable", pass: true })));
+    assert.equal(first.refuse, true, JSON.stringify(first)); assert.equal(existsSync(target), false);
+    assert.equal((await agyIssue(send(11, verdict({ trajectory_verdict: "not verifiable", pass: false })))).status, "issued");
+  } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
+});
+
 test("C21B a message without a verdict is not refused when no packet waits for one, and a stepless payload is refused at most once", async () => {
   const fx = fixture();
   const brain = agyBrain();
@@ -2747,6 +2760,24 @@ test("G20-72 the merge script refuses a missing child, an unknown or duplicated 
     refused([all[0], ["core", g2072Child("core", { pass: false, findings: [g2072Finding({ evidence: "src/api/m3.mjs:9" })] })], all[2]], "CSM-CHILD-OUT-OF-SCOPE");
     const same = g2072Finding({ evidence: "the quoted line", spec_ref: "AC-1" });
     refused([["api", g2072Child("api", { pass: false, findings: [same] })], ["core", g2072Child("core", { pass: false, findings: [same] })], all[2]], "CSM-FINDING-DUPLICATE");
+  } finally { cleanup(fx); }
+});
+
+test("C21B a child verdict that passes against its own fields issues no Source return, so the corrected return is the only record and the merge says what to do", () => {
+  const fx = g2072Fixture();
+  try {
+    const admitted = g2072Admit(fx);
+    const contradictory = g2072Child("core", { trajectory_verdict: "not verifiable", pass: true });
+    const first = g2072Hook(fx, criticReturn(contradictory));
+    assert.match(first.stderr, /Source return not issued.*pass true.*trajectory_verdict/u, first.stderr);
+    const children = ["api", "core", "shared"].map((id) => [id, id === "core" ? contradictory : g2072Child(id)]);
+    const refused = g2072MergeCli(fx, admitted, children, null);
+    assert.equal(refused.json.code, "CSM-CHILD-INVALID", JSON.stringify(refused.json));
+    assert.match(refused.json.message, /entry core.*trajectory_verdict.*repair: resume that Critic/u);
+    assert.match(g2072Hook(fx, criticReturn(g2072Child("core", { trajectory_verdict: "not verifiable", pass: false }))).stderr, /Source return issued/u);
+    for (const id of ["api", "shared"]) assert.match(g2072Hook(fx, criticReturn(g2072Child(id))).stderr, /Source return issued/u);
+    const records = readdirSync(admitted.packetDir).filter((name) => /^source-return-[a-f0-9]{64}\.json$/u.test(name));
+    assert.equal(records.length, 3, "one record per entry; the contradictory return left none");
   } finally { cleanup(fx); }
 });
 
