@@ -1,0 +1,38 @@
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index 4454f3f5efa1246ddd8cda196b1d07c32a32a603..4dedb1f2c9c176432264a8075fe9644e849460fa 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -751,7 +751,9 @@ function missingOperandIsTheOnlyFault(name, executable, argv, root) {
+   });
+   // An option's value (head -n 5) is no path: also try with every word that directly follows an option left as written.
+   const afterOption = missing.filter((index) => !(index > 0 && /^-[^-]/u.test(argv[index - 1]) && (endOfOptions === -1 || index - 1 < endOfOptions)));
+-  for (const set of [missing, afterOption]) {
++  // C21E: the value of a long option (rg ... --max-columns 300) is no path either; it was replaced by the stand-in, the grammar refused that, and a missing path kept the flag-or-spelling text.
++  const afterAnyOption = missing.filter((index) => !(index > 0 && /^--?[^-]/u.test(argv[index - 1]) && (endOfOptions === -1 || index - 1 < endOfOptions)));
++  for (const set of [missing, afterOption, afterAnyOption]) {
+     if (set.length === 0) continue;
+     const choices = set.map((index) => existingInRootStandIns(argv[index], root));
+     for (let pick = 0; pick < 2; pick += 1) {
+diff --git a/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs b/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+index 18870deafcb07a399c1072490e2671989ce27da5..6525ed97e24ef866e7adba41aa79113236ea23e2 100644
+--- a/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
++++ b/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+@@ -149,6 +149,9 @@ test("P5b a missing in-root path in any admitted read shape is GUARD-READ-TARGET
+     "grep -n -i apply docs/missing.md",
+     "head -n 5 docs/missing.md",
+     "tail -n 5 docs/missing.md",
++    // C21E: the value of a long option is no path, so a missing file next to it stays the only fault.
++    "rg -n apply docs/missing.md --max-columns 300 --max-count 8",
++    "rg -n apply docs/2026-09-21-a.md docs/missing.md --max-columns 300",
+   ]) {
+     // QG-04 restated (G20-67, 2026-11-08): when the missing in-root path is the command's ONLY fault the read is an existence probe and
+     // is admitted (the shell reports the missing file); before, it was refused with GUARD-READ-TARGET-MISSING. The second loop keeps
+@@ -156,7 +159,7 @@ test("P5b a missing in-root path in any admitted read shape is GUARD-READ-TARGET
+     const r = run(bash(command), path);
+     assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
+   }
+-  for (const command of ["rg --pre=sh apply docs/missing.md", "rg --pre=sh apply docs/2026-09-21-a.md", "cat vault/id_rsa docs/missing.md"]) {
++  for (const command of ["rg --pre=sh apply docs/missing.md", "rg --pre=sh apply docs/2026-09-21-a.md", "cat vault/id_rsa docs/missing.md", "rg --pre sh apply docs/missing.md", "rg -n apply docs/missing.md --max-columns 99999"]) {
+     const r = run(bash(command), path);
+     assert.equal(r.exitCode, 2, command);
+     assert.doesNotMatch(r.text, /GUARD-READ-TARGET-MISSING/u, `${command}: the missing path is not the only fault\n${r.text}`);
