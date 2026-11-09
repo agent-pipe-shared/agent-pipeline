@@ -1788,7 +1788,8 @@ export function ownerRouteProcessStatus(recorded,{platform=process.platform,obse
   }catch{return 'unknown';}
 }
 /** Read-only: the owner-route invocation record of one cleanup session, with the proven liveness of its process (dead only on proof). */
-export function inspectSourceOwnedContinuityOwnerRouteInvocation(input){
+// C21D: a POSIX owner and mode check here threw on Windows (no process.getuid), so a killed owner-route call read as "no owner-route binding" and heal could never release it.
+export function inspectSourceOwnedContinuityOwnerRouteInvocation(input,{platform=process.platform,readWindows=(path,r)=>osvWindowsRead(path,MAX,true,osvWindowsBoundary(path,r.primaryRoot)).bytes,processStatus=ownerRouteProcessStatus}={}){
   osvExact(input,['rootDir','sessionId']);ownerRouteValidRoot(input.rootDir);
   if(typeof input.sessionId!=='string'||!ID.test(input.sessionId))return Object.freeze({status:'absent'});
   const repository=retiredDescriptorOwner.inspectSignedDescriptorCustodyRepository(input.rootDir);
@@ -1799,13 +1800,16 @@ export function inspectSourceOwnedContinuityOwnerRouteInvocation(input){
     const path=join(directory,name);
     let value;
     try{
-      const before=lstatSync(path);
-      if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.uid!==process.getuid()||(before.mode&0o077)!==0||before.size>MAX)continue;
-      value=parseStrictJson(readFileSync(path));
+      if(platform==='win32')value=parseStrictJson(readWindows(path,repository));
+      else{
+        const before=lstatSync(path);
+        if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.uid!==process.getuid()||(before.mode&0o077)!==0||before.size>MAX)continue;
+        value=parseStrictJson(readFileSync(path));
+      }
     }catch{continue;}
     if(value?.schema!==OWNER_ROUTE_SCHEMA||value.sessionId!==input.sessionId||value.repositorySha256!==repositoryHash(repository)
       ||!Number.isSafeInteger(value.process?.pid))continue;
-    return Object.freeze({status:'found',sessionId:value.sessionId,lifecycleId:value.lifecycleId,entry:value.entry,ownerStatus:ownerRouteProcessStatus(value.process)});
+    return Object.freeze({status:'found',sessionId:value.sessionId,lifecycleId:value.lifecycleId,entry:value.entry,ownerStatus:processStatus(value.process)});
   }
   return Object.freeze({status:'absent'});
 }

@@ -8,6 +8,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { finishFeature, oneShotClose } from "./finish-feature.mjs";
+import { canonical } from "../lib/po-approval-proof.mjs";
 
 function response(value) { return { status: 0, stdout: JSON.stringify(value), stderr: "" }; }
 function closeAction(criticVerifyLifecycle) {
@@ -423,6 +424,55 @@ test("C21C: the owner route names the typed reason of a refused requester instea
   assert.match(platform, /\(SDC-AUTHORITY-UNAVAILABLE: WINDOWS-REQUESTER-STORAGE\)/u);
   assert.match(platform, /session-authority-repair\.mjs inspect --root \/repo/u);
   assert.match(ownerRouteRequesterRefusal(Object.assign(new Error("x"), { code: "OSV-REPLAY" }), "/repo"), /\(OSV-REPLAY\)/u, "no reason, no empty colon");
+});
+
+test("C21D: every private record name the requester bridge publishes passes the Windows path check", async () => {
+  const { WINDOWS_REQUESTER_PRIVATE_REF: check } = await import("../lib/windows-requester-runtime.mjs");
+  const source = readFileSync(new URL("../lib/session-requester-bridge.mjs", import.meta.url), "utf8");
+  const published = [...source.matchAll(/ensureNamespace\(r\),'(invocations|transports)','([a-z-]+-)'\+randomBytes\(12\)/gu)].map(([, directory, prefix]) => `${directory}/${prefix}`);
+  assert.ok(published.length >= 5, `found only: ${published.join(", ")}`);
+  for (const name of published) assert.match(`.git/agent-pipeline/run/session-requesters/${name}${"a".repeat(24)}.json`, check, name);
+  assert.match(`.git/agent-pipeline/run/session-requesters/controller-${"a".repeat(24)}.1.json`, check, "the binding of a controller session");
+  for (const refused of ["invocations/other-", "invocations/../child-", "transports/owner-route-"]) assert.doesNotMatch(`.git/agent-pipeline/run/session-requesters/${refused}${"a".repeat(24)}.json`, check, refused);
+  assert.doesNotMatch(`.git/agent-pipeline/run/session-requesters/invocations/owner-route-${"A".repeat(24)}.json`, check, "the hex part stays lower case");
+});
+
+function ownerRouteInvocationFixture() {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "c21d-owner-route-")));
+  execFileSync("git", ["init", "-q", root]);
+  const commonDir = join(root, ".git");
+  const directory = join(commonDir, "agent-pipeline", "run", "session-requesters", "invocations");
+  mkdirSync(directory, { recursive: true });
+  const repositorySha256 = createHash("sha256").update(canonical({ primaryRoot: root, commonDir })).digest("hex");
+  const record = { schema: "pipeline.continuity-owner-route-invocation.v1", repositorySha256, sessionId: "controller-abc", lifecycleId: "close-1", entry: "continuity-result-close-plan", process: { platform: "win32", pid: 4242 } };
+  const path = join(directory, `owner-route-${"a".repeat(24)}.json`);
+  writeFileSync(path, `${canonical(record)}\n`);
+  chmodSync(path, 0o644);
+  return { root, path, record };
+}
+
+test("C21D: on Windows a killed owner-route call is found through the native reader, without POSIX owner checks", async () => {
+  const { inspectSourceOwnedContinuityOwnerRouteInvocation: inspect } = await import("../lib/session-requester-bridge.mjs");
+  const f = ownerRouteInvocationFixture();
+  try {
+    const input = { rootDir: f.root, sessionId: "controller-abc" };
+    const reads = [];
+    const found = inspect(input, { platform: "win32", readWindows: (path) => { reads.push(path); return readFileSync(path); }, processStatus: (p) => (p.pid === 4242 ? "dead" : "unknown") });
+    assert.deepEqual({ ...found }, { status: "found", sessionId: "controller-abc", lifecycleId: "close-1", entry: "continuity-result-close-plan", ownerStatus: "dead" });
+    assert.deepEqual(reads, [f.path]);
+    const unreadable = inspect(input, { platform: "win32", readWindows: () => { throw new Error("WIN-AUTH"); }, processStatus: () => "dead" });
+    assert.equal(unreadable.status, "absent", "a record the native reader refuses proves nothing");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C21D: on POSIX an owner-route record with open permissions stays refused", { skip: process.platform === "win32" }, async () => {
+  const { inspectSourceOwnedContinuityOwnerRouteInvocation: inspect } = await import("../lib/session-requester-bridge.mjs");
+  const f = ownerRouteInvocationFixture();
+  try {
+    assert.equal(inspect({ rootDir: f.root, sessionId: "controller-abc" }, { processStatus: () => "dead" }).status, "absent");
+    chmodSync(f.path, 0o600);
+    assert.equal(inspect({ rootDir: f.root, sessionId: "controller-abc" }, { processStatus: () => "dead" }).status, "found");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
 test("C21C: a resumed close past the prepared phase is not requalified", () => {
