@@ -1,0 +1,533 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 3e233f48f..5dedc3646 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -915,7 +915,7 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
+  const delta=history.length&&!preparing?(typeof input.deltaRequestPath==='string'?requestRead(input,resolved,history,source,evidence):fail('CCA-DELTA-REQUIRED')):null;
+  return {resolved,history,source,evidence,criterion,delta,budgets};
+ }
+-function emptyProjection(input,error){return {schema:'pipeline.critic-course-admission.v2',courseIdentity:null,source:null,parent:null,acceptance:null,deltaRequestSha256:null,deterministicEvidenceSha256:null,budgets:null,decision:{status:error?.status??'refused',mode:null,code:error?.code??'CCA-RUNTIME-READBACK',...(error instanceof GenericCriticBatchError&&error.detail?{reason:error.detail}:{}),affectedInvariantIds:[]}};}
++function emptyProjection(input,error){return {schema:'pipeline.critic-course-admission.v2',courseIdentity:null,source:null,parent:null,acceptance:null,deltaRequestSha256:null,deterministicEvidenceSha256:null,budgets:null,decision:{status:error?.status??'refused',mode:null,code:error?.code??'CCA-RUNTIME-READBACK',...(error instanceof GenericCriticBatchError&&error.detail?{reason:error.detail}:{}),...(error instanceof GenericCriticBatchError&&Array.isArray(error.releaseActions)&&error.releaseActions.length>0?{releaseActions:error.releaseActions}:{}),affectedInvariantIds:[]}};}
+ export function readCriticCourseAdmission(input){try{const c=runtimeCompose(input);return deriveCriticCourseAdmissionV2({source:{courseIdentity:c.resolved.courseIdentity,source:c.source},acceptedCriterion:c.criterion,consumedHistory:c.history,deltaRequest:c.delta,deterministicEvidence:c.evidence,budgets:c.budgets});}catch(error){return emptyProjection(input,error);}}
+ // D223 slice 3: the registration commit of a round, derived (read-only) by the rule the admission itself applies. A candidate commit is
+ // registered by evidence-only commits that follow it (transport() requires exactly that), so the commits after the candidate on the way to
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index 32608a507..cc88d0880 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -37,9 +37,9 @@ const exact = (v, keys) => v !== null && typeof v === "object" && !Array.isArray
+   && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k));
+ const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+ export class GenericCriticBatchError extends Error {
+-  constructor(code, detail) { super(detail ?? "Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; this.detail = detail ?? null; }
++  constructor(code, detail, releaseActions = null) { super(detail ?? "Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; this.detail = detail ?? null; this.releaseActions = releaseActions; }
+ }
+-function fail(code, detail) { throw new GenericCriticBatchError(code, detail); }
++function fail(code, detail, releaseActions = null) { throw new GenericCriticBatchError(code, detail, releaseActions); }
+ function shape(v, keys) { if (!exact(v, keys)) fail("CGB-SHAPE"); }
+ function ref(v) { shape(v, ["batchId", "registrationSha256"]); if (!ID.test(v.batchId) || !SHA.test(v.registrationSha256)) fail("CGB-SHAPE"); return v; }
+ function paths(v, max = 128) {
+@@ -753,16 +753,45 @@ const TAKEOVER_REPAIR = {
+   "CGB-TAKEOVER-HISTORY": "The feature course already has registered history; continue it in delta mode instead of taking over.",
+   "CGB-TAKEOVER-OPEN": "The old batch holds a packet that is not consumed, or no packet at all without a released one. Finish that packet, or release it and inspect again: a batch of an earlier course whose packets were all released can be retired. To release an expired or abandoned packet: node ${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs release --root <root> --request <file> with a request of schema pipeline.session-critic-release-request.v1 carrying packetId and reason.",
+ };
++// CGR-02: a stale round must be replaceable without first running it to its end. For every packet the old batch still holds unconsumed (and that release accepts:
++// prepared or claimed) the refusal hands over the release as a ready, exact action: the request file, its body, the command, and what it costs.
++const RELEASE_COST = "Cost: that packet reviewed nothing the course keeps; its reservation is freed and the packet is parked, nothing is deleted.";
++function releaseActionsOf(c, packetIds) {
++  const actions = [];
++  for (const packetId of packetIds) {
++    let phase = null;
++    try { phase = JSON.parse(readFileSync(join(c.controlRoot, packetId, "state.json"), "utf8"))?.phase ?? null; } catch { phase = null; }
++    if (phase !== "prepared" && phase !== "claimed") continue;
++    const requestFile = `scratch/release-${packetId.slice(0, 8)}.json`;
++    actions.push(Object.freeze({ packetId, phase, requestFile,
++      request: Object.freeze({ schema: "pipeline.session-critic-release-request.v1", packetId, reason: "replaced by a newer candidate of the same course" }),
++      command: `node \${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs release --root <root> --request ${requestFile}`, cost: RELEASE_COST }));
++  }
++  return actions;
++}
++function releaseActionsText(actions) {
++  return actions.length === 0 ? "" : ` Open packets of that batch, release each (write the request body to its request file, then run the command): ${actions.map(a => `packet ${a.packetId} (${a.phase}): body ${JSON.stringify(a.request)} in ${a.requestFile}; ${a.command}. ${a.cost}`).join(" ")}`;
++}
++function ownerReleaseActions(c, batchRefs) {
++  try {
++    const ids = [];
++    for (const batchRef of new Map(batchRefs.map(b => [canonicalJson(b), b])).values()) {
++      for (const row of reservations(registration(c, ref(batchRef)).dir)) if (!packetConsumed(c, row.packetId)) ids.push(row.packetId);
++    }
++    return releaseActionsOf(c, [...new Set(ids)]);
++  } catch { return []; }
++}
+ function featureOwnership(c, courseKey, work) {
+   const hits = work.map(id => indexPath(c, "logical", id)).filter(p => existsSync(p)).map(p => stableJson(p));
+   const origin=indexPath(c,"origins",{kind:"feature-course",courseKey});
+   if (!hits.length) { if(existsSync(origin))fail("CGB-CONFLICT");return null; }
+   const batchRef = ref(hits[0].batchRef);
+-  if (hits.length !== work.length || !hits.every(h => eq(h.batchRef, batchRef))) fail("CGB-CONFLICT", TAKEOVER_DETAIL);
++  const conflict = () => { const actions = ownerReleaseActions(c, hits.map(h => h.batchRef)); fail("CGB-CONFLICT", TAKEOVER_DETAIL + releaseActionsText(actions), actions.length > 0 ? actions : null); };
++  if (hits.length !== work.length || !hits.every(h => eq(h.batchRef, batchRef))) conflict();
+   const registered = registration(c, batchRef);
+   if (registered.value.schema !== GENERIC_CRITIC_BATCH_V2_SCHEMA
+     || !eq(registered.value.declaredScope.logicalWorkIds, work)
+-    || !eq(registered.value.originTargets, [{kind:"feature-course",courseKey}])) fail("CGB-CONFLICT", TAKEOVER_DETAIL);
++    || !eq(registered.value.originTargets, [{kind:"feature-course",courseKey}])) conflict();
+   return { ...registered, batchRef };
+ }
+ // PF-95: every origins index entry that belongs to a batch (feature-course origin and the delivery target of each member), read-only.
+@@ -780,7 +809,7 @@ function packetConsumed(c, packetId) {
+ function takeoverState(c, courseKey, work, courseHistoryRegistered, registeredRounds = null) {
+   const hits = work.map(id => ({ id, p: indexPath(c, "logical", id) })).filter(h => existsSync(h.p)).map(h => ({ id: h.id, value: stableJson(h.p) }));
+   const facts = { courseKey, logicalWorkIds: work, ownedWorkIds: hits.map(h => h.id), batchRef: null, registrationSchema: null, originKind: null,
+-    originTargets: null, originEntries: [], packetIds: [], releasedPacketIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true,
++    originTargets: null, originEntries: [], packetIds: [], openPacketIds: [], releasedPacketIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true,
+     registeredRounds, scope: "batch", tailOrdinals: [] };
+   const done = refusalCode => ({ facts, refusalCode });
+   if (!hits.length) return done("CGB-TAKEOVER-NONE");
+@@ -794,6 +823,7 @@ function takeoverState(c, courseKey, work, courseHistoryRegistered, registeredRo
+   const rows = reservations(r.dir);
+   facts.packetIds = rows.map(x => x.packetId);
+   facts.allPacketsConsumed = rows.length > 0 && rows.every(x => packetConsumed(c, x.packetId));
++  facts.openPacketIds = rows.filter(x => !packetConsumed(c, x.packetId)).map(x => x.packetId);
+   // A packet release renames its reservation to released-<packetId>-<name>; those packets reviewed nothing the course keeps.
+   facts.releasedPacketIds = [...new Set(readdirSync(r.dir).map(name => /^released-([a-f0-9]{32})-.+-admission\.json$/u.exec(name)?.[1]).filter(Boolean))].sort();
+   if (facts.originKind === "feature-course" && facts.originTargets[0].courseKey === courseKey) {
+@@ -830,8 +860,11 @@ export function inspectFeatureCourseTakeover(input) {
+     const first = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered, rounds);
+     const second = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered, rounds); unlocked(c);
+     if (!eq(first, second)) fail("CGB-STALE");
++    // CGR-02: the same ready release for each open packet that the refusal of a newer candidate hands over (read-only: nothing is released here).
++    const releaseActions = releaseActionsOf(c, first.facts.openPacketIds);
+     return Object.freeze({ schema: "pipeline.critic-feature-course-takeover-inspection.v1", ...first.facts, refusalCode: first.refusalCode,
+-      repair: first.refusalCode === null ? null : TAKEOVER_REPAIR[first.refusalCode], digestSha256: sha256Canonical(first) });
++      repair: first.refusalCode === null ? null : TAKEOVER_REPAIR[first.refusalCode] + (first.refusalCode === "CGB-TAKEOVER-OPEN" ? releaseActionsText(releaseActions) : ""),
++      releaseActions, digestSha256: sha256Canonical(first) });
+   });
+ }
+ /** PF-94: audited, append-only retirement of the old batch's index entries; nothing is deleted. */
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index 6153f9090..a28decacc 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -745,6 +745,7 @@ test("a takeover retires an earlier-key feature course whose packets were all re
+     assert.equal(CGB.inspectFeatureCourseTakeover({...input,courseHistoryRegistered:true}).refusalCode,"CGB-TAKEOVER-HISTORY");
+     assert.equal(CGB.supersedeFeatureCourseTakeover({...input,digestSha256:released.digestSha256,reason:"released round"}).status,"superseded");
+     assert.deepEqual(assertFeatureCriticReviewUnitOwnership({repoRoot:fx.root,courseKey:other,logicalWorkIds:["AC-1","AC-2"]}),{claimed:false,batchRef:null});
++    cgr02Inspect();
+   }finally{rmSync(fx.root,{recursive:true,force:true});}
+ });
+ test("the whole chain after a released round: the corrected candidate is refused with its repair, the two verbs retire the old batch, and the round reserves at the corrected candidate",()=>{
+@@ -768,6 +769,58 @@ test("the whole chain after a released round: the corrected candidate is refused
+     assert.equal(superseded.output.status,"superseded",JSON.stringify(superseded.output));
+     const again=reserveCourseRound(fx,courseInput,"f".repeat(32));
+     assert.equal(assertFeatureCriticReviewUnitOwnership({repoRoot:fx.root,courseKey:again.courseKey,logicalWorkIds:["AC-1","AC-2"]}).claimed,true);
++    cgr02Preflight();
+   }finally{rmSync(fx.root,{recursive:true,force:true});}
+ });
++// CGR-02 (candidate 22): an old round that holds an unconsumed packet refuses the newer candidate, and the refusal hands over the release of each open packet as a ready, exact
++// action with its cost, so the stale round is replaced without first being run to its end. (Run from inside two existing cases: the case-id list of this suite is pinned by the harness.)
++// The preflight-side refusal of a newer candidate names the release of every open packet of the old round, and running that action lets the takeover verbs go on.
++function cgr02Preflight(){
++  const fx=fixture({feature:true});try{
++    const c=reservedCourse(fx),packetId="e".repeat(32);
++    writeFileSync(join(fx.root,"repair.txt"),"correction\n");
++    git(fx.root,["add","repair.txt"]);git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","correction"]);
++    fx.candidate=git(fx.root,["rev-parse","HEAD"]);
++    const courseInput=registerCourseDiagnostic(fx,"-2");
++    const refused=readCriticCourseAdmission(courseInput);
++    assert.equal(refused.decision.code,"CGB-CONFLICT",JSON.stringify(refused.decision));
++    const actions=refused.decision.releaseActions;
++    assert.equal(Array.isArray(actions)&&actions.length,1,JSON.stringify(refused.decision));
++    const [action]=actions;
++    assert.equal(action.packetId,packetId);
++    assert.deepEqual(action.request,{schema:"pipeline.session-critic-release-request.v1",packetId,reason:action.request.reason});
++    assert.match(action.command,/session-critic-finalizer\.mjs release --root <root> --request scratch\/release-[a-f0-9]{8}\.json$/u);
++    assert.equal(action.requestFile,action.command.split(" ").at(-1));
++    assert.match(action.cost,/that packet reviewed nothing the course keeps/u);
++    assert.ok(refused.decision.reason.includes(action.command)&&refused.decision.reason.includes(packetId),"the repair text carries the same action");
++    // The same action, run as printed, releases the packet; nothing had to be finished first.
++    mkdirSync(join(fx.root,"scratch"),{recursive:true});
++    writeFileSync(join(fx.root,action.requestFile),JSON.stringify(action.request));
++    const released=runSessionCriticFinalizerCli(["release","--root",fx.root,"--request",action.requestFile]);
++    assert.equal(released.exitCode,0,JSON.stringify(released.output));assert.equal(released.output.status,"released");
++    const after=readCriticCourseAdmission(courseInput);
++    assert.equal(after.decision.code,"CGB-CONFLICT");
++    assert.equal(after.decision.releaseActions,undefined,"no open packet is left to release");
++    writeFileSync(join(fx.root,"scratch/inspect.json"),JSON.stringify({schema:"pipeline.session-critic-course-takeover-inspect-request.v1",featureId:"course-feature"}));
++    const inspected=runSessionCriticFinalizerCli(["inspect-course-takeover","--root",fx.root,"--request","scratch/inspect.json"]);
++    assert.equal(inspected.output.refusalCode,null,JSON.stringify(inspected.output));
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++}
++// The takeover inspection that refuses with CGB-TAKEOVER-OPEN lists the same ready release for each open packet.
++function cgr02Inspect(){
++  const fx=fixture({feature:true});try{
++    const c=reservedCourse(fx),other="9".repeat(64),packetId="e".repeat(32);
++    const open=CGB.inspectFeatureCourseTakeover({...c.base,courseKey:other,courseHistoryRegistered:false});
++    assert.equal(open.refusalCode,"CGB-TAKEOVER-OPEN");
++    assert.deepEqual(open.openPacketIds,[packetId]);
++    assert.equal(open.releaseActions.length,1);assert.equal(open.releaseActions[0].packetId,packetId);
++    assert.match(open.releaseActions[0].command,/session-critic-finalizer\.mjs release --root <root> --request scratch\/release-/u);
++    assert.ok(open.repair.includes(open.releaseActions[0].command),open.repair);
++    const released=CGB.inspectFeatureCourseTakeover({...c.base,courseKey:other,courseHistoryRegistered:false});
++    assert.equal(released.releaseActions.length,1,"a read-only inspection does not release anything");
++    releaseCriticPacket({controlRoot:c.controlRoot,packetId,reason:"round lost"});
++    const cleared=CGB.inspectFeatureCourseTakeover({...c.base,courseKey:other,courseHistoryRegistered:false});
++    assert.equal(cleared.refusalCode,null);assert.deepEqual(cleared.releaseActions,[]);
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++}
+ registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});
+diff --git a/plugins/pipeline-core/lib/critic-source-return.mjs b/plugins/pipeline-core/lib/critic-source-return.mjs
+index b182e639a..f840266b7 100644
+--- a/plugins/pipeline-core/lib/critic-source-return.mjs
++++ b/plugins/pipeline-core/lib/critic-source-return.mjs
+@@ -91,10 +91,34 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
+       const handback = readHandbackFn(input);
+       if (handback?.ok === true) verdict = extractCriticVerdict(handback.message);
+     }
+-    return issueForVerdict({ commonDir, runner, verdict, nowMs });
++    return issueForVerdict({ commonDir, runner, verdict, nowMs, child: childDigest(input.agent_id) });
+   } catch { return { status: "unavailable" }; }
+ }
+ 
++/** CGR-09: the identity of the returning child as a digest (never the raw id), or null when the runner reports none. */
++const childDigest = (id) => (typeof id === "string" && id !== "" && id.length <= 200 ? sha256(id) : null);
++
++/**
++ * CGR-09: the split records that count for the round. A child that was RESUMED (same recorded child identity) and returned again is a resumption, not a second run: its
++ * later return stands for its entry (the later issuedAtMs). Two different children, a child whose identity is not recorded, or equal timestamps stay duplicates, so the
++ * caller still refuses verdict shopping (SCF-SPLIT-DUPLICATE-ENTRY, CSM-CHILD-DUPLICATE). Pure.
++ */
++export function settleSplitReturns(records) {
++  const byEntry = new Map();
++  for (const record of records) {
++    const key = typeof record?.entryId === "string" ? record.entryId : null;
++    byEntry.set(key, [...(byEntry.get(key) ?? []), record]);
++  }
++  const settled = [];
++  for (const [key, list] of byEntry) {
++    const child = list[0]?.childSha256;
++    const resumed = key !== null && list.length > 1 && typeof child === "string" && list.every((record) => record.childSha256 === child)
++      && list.every((record) => Number.isSafeInteger(record.issuedAtMs)) && new Set(list.map((record) => record.issuedAtMs)).size === list.length;
++    settled.push(...(resumed ? [list.reduce((latest, record) => (record.issuedAtMs > latest.issuedAtMs ? record : latest))] : list));
++  }
++  return settled;
++}
++
+ /**
+  * G20-41: the Antigravity producer. The caller (hooks/antigravity-pretool-guard.mjs) has already recognised the Critic child's final `send_message`
+  * to its parent from runner-written facts; this takes only the message text and issues the record exactly like the stop path. Never throws.
+@@ -105,7 +129,7 @@ export function issueCriticSourceReturnFromMessage({ commonDir, runner, text, no
+     if (!MESSAGE_RUNNERS.has(runner)) return { status: "not-applicable" };
+     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
+     const verdict = extractCriticVerdict(text);
+-    return verdict === null || verdictPassContradiction(verdict) !== null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs });
++    return verdict === null || verdictPassContradiction(verdict) !== null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs, child: childDigest(child) });
+   } catch { return { status: "unavailable" }; }
+ }
+ 
+@@ -134,7 +158,7 @@ function noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) {
+ }
+ 
+ /** The shared half: bind the returned verdict to the one open admitted packet of this runner and write the record exclusively. */
+-function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
++function issueForVerdict({ commonDir, runner, verdict, nowMs, child = null }) {
+   if (verdict === null) return { status: "no-verdict" };
+   // C21B: records are exclusive and a split entry may hold only one, so a return that contradicts itself must leave none or its corrected return could never be recorded.
+   const contradiction = verdictPassContradiction(verdict);
+@@ -153,7 +177,8 @@ function issueForVerdict({ commonDir, runner, verdict, nowMs }) {
+     if (entryId === null) return { status: "unattributed", packetId: target.packetId, entries: target.split.entries.map((entry) => entry.scopeMarker) };
+     const verdictSha256 = sha256(canonicalJson(verdict));
+     const splitRecord = { schema: CRITIC_SPLIT_SOURCE_RETURN_SCHEMA, issuer: "source", packetId: target.packetId, packetDigest: target.packetDigest, claimant: target.claimant,
+-      sessionId: target.sessionId, verdictSha256, issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs, splitSha256: criticSplitDigest(target.split), entryId, verdict };
++      sessionId: target.sessionId, verdictSha256, issuedAtMs: target.issuedAtMs, expiresAtMs: target.expiresAtMs, splitSha256: criticSplitDigest(target.split), entryId, verdict,
++      ...(child === null ? {} : { childSha256: child }) };
+     let splitFd;
+     try { splitFd = openSync(join(target.packetDir, `source-return-${verdictSha256}.json`), "wx", 0o600); }
+     catch (error) { if (error?.code === "EEXIST") return { status: "already-issued", packetId: target.packetId, entryId }; throw error; }
+diff --git a/plugins/pipeline-core/lib/design-approval-binding.mjs b/plugins/pipeline-core/lib/design-approval-binding.mjs
+index e0bdc06df..de3dfe23b 100644
+--- a/plugins/pipeline-core/lib/design-approval-binding.mjs
++++ b/plugins/pipeline-core/lib/design-approval-binding.mjs
+@@ -294,6 +294,21 @@ export function validateDesignApprovalBinding(binding) {
+   return { ok: true, bindingSha256: sha256Of(canonical(binding)) };
+ }
+ 
++/**
++ * CGR-03: what the human sees before signing about changes the last readiness review never saw. The number is the one the binding itself records
++ * (`unreviewedSourceDelta`, inside the signed bytes), so the statement cannot drift from what is signed. Pure; `[]` when nothing is recorded.
++ */
++export function describeUnreviewedCorrections(binding) {
++  const delta = binding?.unreviewedSourceDelta;
++  if (!Array.isArray(delta) || delta.length === 0) return [];
++  const round = binding.reviewReceipts?.[binding.reviewReceipts.length - 1]?.round;
++  const named = delta.map(({ path, currentSha256 }) => (currentSha256 === null ? `${path} (removed)` : path));
++  const shown = named.slice(0, 8).join(", ");
++  const more = named.length > 8 ? `, and ${named.length - 8} more` : "";
++  const many = delta.length !== 1;
++  return [`unreviewed corrections: ${delta.length} source ${many ? "files were" : "file was"} changed after the last readiness review (round ${round}) and ${many ? "were" : "was"} not re-reviewed: ${shown}${more}`];
++}
++
+ // ----------------------------------------------------------------------------- request
+ 
+ /** The approval intent over a binding; null when createPoApprovalIntent rejects the candidate or a field. */
+diff --git a/plugins/pipeline-core/lib/design-approval-binding.test.mjs b/plugins/pipeline-core/lib/design-approval-binding.test.mjs
+index b769fbbf3..4b29c0a49 100644
+--- a/plugins/pipeline-core/lib/design-approval-binding.test.mjs
++++ b/plugins/pipeline-core/lib/design-approval-binding.test.mjs
+@@ -26,6 +26,7 @@ import {
+   validateDesignApprovalBinding,
+   verifyDesignApprovalRequest,
+ } from "./design-approval-binding.mjs";
++import * as bindingModule from "./design-approval-binding.mjs";
+ import { reviewChainInconsistencies } from "./design-consistency-check.mjs";
+ import { createDesignReviewReceipt, summarizeDesignReviewReceipt } from "./design-review-receipt.mjs";
+ import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
+@@ -1069,3 +1070,40 @@ test("U3-27: validate accepts pathRebind only with exactly two distinct safe-pat
+   refused("not an object", (b) => { b.pathRebind = "specs/feat-x"; });
+   refused("array", (b) => { b.pathRebind = [DIR, MOVED_DIR]; });
+ });
++
++// CGR-03 (candidate 22, AC-108): the design signature text states how many corrections were made after the last readiness review and that they
++// were not re-reviewed, when that number is above zero. The number is what the binding records (unreviewedSourceDelta), so the statement is bound to
++// the signed bytes. No new gate and no new review round: the statement only informs the human who signs.
++test("CGR-03a: a binding with an unreviewedSourceDelta yields one statement naming the count, the paths and that they were not re-reviewed", () => {
++  const made = mustCreate(driftScenario());
++  const lines = bindingModule.describeUnreviewedCorrections(made.binding);
++  assert.equal(lines.length, 1);
++  assert.match(lines[0], /^unreviewed corrections: 3 source files were changed after the last readiness review \(round 2\) and were not re-reviewed:/u);
++  for (const path of [DESIGN_PATH, PRD_PATH, SPEC_PATH]) assert.ok(lines[0].includes(path), path);
++});
++
++test("CGR-03b: one changed file is stated in the singular, a removed file is named too, and a long list is cut with the remaining count", () => {
++  const entry = (path, current = digestOf(`now:${path}`)) => ({ path, reviewedSha256: digestOf(`was:${path}`), currentSha256: current });
++  const one = bindingModule.describeUnreviewedCorrections({ reviewReceipts: [{ round: 2 }], unreviewedSourceDelta: [entry(SPEC_PATH)] });
++  assert.match(one[0], /: 1 source file was changed after the last readiness review \(round 2\) and was not re-reviewed: /u);
++  const removed = bindingModule.describeUnreviewedCorrections({ reviewReceipts: [{ round: 2 }], unreviewedSourceDelta: [entry(DESIGN_PATH, null)] });
++  assert.ok(removed[0].includes(`${DESIGN_PATH} (removed)`));
++  const many = bindingModule.describeUnreviewedCorrections({ reviewReceipts: [{ round: 2 }], unreviewedSourceDelta: Array.from({ length: 12 }, (_, index) => entry(`${DIR}/f${String(index).padStart(2, "0")}.md`)) });
++  assert.match(many[0], /: 12 source files were changed /u);
++  assert.match(many[0], /and 4 more\.?$/u);
++  assert.ok(many[0].includes(`${DIR}/f07.md`) && !many[0].includes(`${DIR}/f08.md`));
++});
++
++test("CGR-03c: nothing is stated when the binding records no unreviewed change (a PASS binding, a delta binding without drift)", () => {
++  assert.deepStrictEqual(bindingModule.describeUnreviewedCorrections(mustCreate(passScenario()).binding), []);
++  assert.deepStrictEqual(bindingModule.describeUnreviewedCorrections(mustCreate(deltaScenario()).binding), []);
++  assert.deepStrictEqual(bindingModule.describeUnreviewedCorrections(null), []);
++});
++
++test("CGR-03d: the design signing description puts that statement before the complete binding", () => {
++  const source = readFileSync(new URL("../scripts/po-human-approval.mjs", import.meta.url), "utf8");
++  const statement = source.indexOf("...describeUnreviewedCorrections(");
++  assert.ok(statement > 0, "the signing description spreads describeUnreviewedCorrections of the signed binding");
++  assert.ok(statement < source.indexOf("complete bounded design binding follows"));
++  assert.match(source.slice(statement, statement + 80), /physicalRequest\.binding/u, "it describes the binding the request carries, which the signature covers");
++});
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index db8ad416f..1ca73d5f2 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -355,7 +355,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+     // The publish is retried while the lock is held and nothing has been written yet, within the admission deadline.
+     stored = retryPublishWhileLockHeld(entered => publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline, entered, deliveryQueue.normalized?.slices), admissionDeadline, dependencies.publishRetry);
+   }
+-  catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
++  catch(error) { const repair=lockHeldStartRepair(error,physicalRoot)??(typeof error.repair==='string'?error.repair:null); return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(repair?{repair}:{})}; }
+   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
+ }
+ 
+@@ -1051,6 +1051,13 @@ export function createAdmissionCheckpoint(deadline){
+  * boundary callback ran is retried, exactly as retryWhileSessionAuthorityLockHeld does.
+  * G20-40: the former 60 s cap counted from the FIRST attempt, so one slow lock-free attempt (a 64 s prescan, measured) used it up and a
+  * sibling launch's held lock was refused with half the admission budget left; the window is now the whole remaining admission budget. */
++// CGR-07: a start refused at the registry lock (a sibling start still holds it after the bounded wait) consumed nothing. The repair says so, says to send the same
++// prompt again once the running start has settled, and that starts go one after another; no queue, no change to the lock timing. A lock whose owner is gone keeps the guard's own diagnosis (heal).
++function lockHeldStartRepair(error,root){
++  if(error?.code!=='SDC-LOCK-HELD'||error.lock?.owner==='dead')return null;
++  const diagnosis=typeof error.repair==='string'?error.repair:`node ${REPAIR_SCRIPT} inspect --root ${root} names the holder`;
++  return `this start was not consumed: the registry lock is held by a start that is still running. Dispatch starts go one after another, so send the same prompt again after the running start has settled. ${diagnosis}`;
++}
+ export function retryPublishWhileLockHeld(attempt,admissionDeadline=null,options={}){
+   const now=typeof options.now==='function'?options.now:(typeof admissionDeadline?.now==='function'?admissionDeadline.now:Date.now);
+   const remaining=admissionDeadline&&typeof admissionDeadline==='object'&&Number.isFinite(admissionDeadline.budgetMs)&&Number.isFinite(admissionDeadline.startMs)
+@@ -1563,7 +1570,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+       return {...resolveGovernedItemQueue({root:physical}),written:{root:physical,path,sidecarPath:location.sidecarPath,preimage:workingBefore?preimage.toString('base64'):null,postimageSha256,
+         planDir:dirname(state.activeFeature.planPath),rowId:itemDelivery.sliceId,rowSha256:nativeManagedDigest(raw.slices.find(row=>row.id===itemDelivery.sliceId))}};
+     }),admissionDeadline,publishRetry);
+-  }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message};}
++  }catch(error){const repair=lockHeldStartRepair(error,root);return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message,...(repair?{repair}:{})};}
+ }
+ 
+ /** PF-55: a dispatch refused after its queue was prepared leaves the queue as it was. The prepared
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 633926046..67584c978 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1875,6 +1875,9 @@ const cases = [
+     try{
+       const refused=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-2'),candidate:original.candidate,writeScope:['src/change.mjs'],admissionDeadline:{startMs:Date.now()-299500,budgetMs:300000}}));
+       assert.equal(refused.status,'refused');assert.equal(refused.code,'SDC-LOCK-HELD',JSON.stringify(refused));
++      // CGR-07 (candidate 22): a start refused at the registry lock says it was not consumed, that the same prompt is sent again once the running start has settled, and that starts go one after another.
++      assert.match(refused.repair??'',/this start was not consumed/u);assert.match(refused.repair,/send the same prompt again after the running start has settled/u);assert.match(refused.repair,/one after another/u);
++      assert.match(refused.repair,/session-authority-repair\.mjs inspect --root /u,'the diagnosis the guard used to print for a lock refusal is kept');
+       assert.equal(resolveGovernedItemQueue({root}).queue.slices.some(row=>row.id==='ITEM-AC-2'),false,'a refused preparation writes no row');
+     }finally{child.kill();}
+   })},
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 29f97f9fd..2451b3cd1 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -464,6 +464,8 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+         status: admission?.decision?.status ?? "unavailable", code: admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE",
+         ...(parentDetail === null ? {} : { detail: parentDetail }),
+         ...(repair === null ? {} : { repair }),
++        // CGR-02: the ready release of each open packet of an old round that holds this review unit (exact request, command and cost).
++        ...(Array.isArray(admission?.decision?.releaseActions) ? { releaseActions: admission.decision.releaseActions } : {}),
+         dispatch: { childCreated: false, packetCreated: false, stateMutated: false, spawnAuthorized: false } });
+     }
+     // Defense at the actual packet preflight: history may remain readable in
+diff --git a/plugins/pipeline-core/scripts/critic-split-merge.mjs b/plugins/pipeline-core/scripts/critic-split-merge.mjs
+index afa17c212..2aa7140dd 100644
+--- a/plugins/pipeline-core/scripts/critic-split-merge.mjs
++++ b/plugins/pipeline-core/scripts/critic-split-merge.mjs
+@@ -21,7 +21,7 @@ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { mergeSplitVerdicts } from "../lib/critic-split.mjs";
+-import { readAdmittedSplit, readCriticSplitSourceReturns } from "../lib/critic-source-return.mjs";
++import { readAdmittedSplit, readCriticSplitSourceReturns, settleSplitReturns } from "../lib/critic-source-return.mjs";
+ 
+ export const CRITIC_SPLIT_MERGE_RESULT_SCHEMA = "pipeline.critic-split-merge-result.v1";
+ const MAX_BYTES = 1024 * 1024;
+@@ -40,7 +40,8 @@ function childrenFromPacket(root, packetId) {
+   const digests = new Set(records.map((record) => record?.splitSha256));
+   const split = digests.size === 1 ? readAdmittedSplit(join(packetsRoot, packetId), [...digests][0]) : undefined;
+   if (split === undefined) throw new MergeUsageError(`the Source returns of packet ${packetId} do not bind one admitted split; repair: pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-SPLIT");
+-  return { split, children: records.map((record) => ({ entryId: record.entryId, verdict: record.verdict })) };
++  // CGR-09: a resumed child's later return replaces its earlier one; two different children for one entry still reach the merge as duplicates and are refused there.
++  return { split, children: settleSplitReturns(records).map((record) => ({ entryId: record.entryId, verdict: record.verdict })) };
+ }
+ 
+ function repoFile(root, path, label) {
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index e977ea311..3adeef56c 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -1028,7 +1028,7 @@ export function generateDispatchBinding(options, deps = {}) {
+       const holder = lock.pid === null || lock.pid === undefined ? "an owner it does not record" : `pid ${lock.pid}`;
+       refuse("DBG-RULESET-LOCK-HELD", `the session-authority registry lock is held by ${holder} (${lock.owner}, for ${lock.ageSeconds}s) and no fallback ruleset identity is taken while it is (preflight status: ${identityStatus}); repair: ${lock.owner === "dead"
+         ? "the owner is gone, so no wait will clear this: run `node <plugin-root>/scripts/session-authority-repair.mjs heal --root <repo>` (it retires a lock whose owner is provably gone), then retry this command"
+-        : "retry this command; to wait longer run `node <plugin-root>/scripts/session-authority-repair.mjs wait --root <repo> --timeout 120`; if the owner cannot be judged run `... release-lock --root <repo> --no-pipeline-running --reason \"<why>\"`"}`);
++        : "this start was not consumed: dispatch starts go one after another, so retry this command (send the same prompt again) after the running start has settled; to wait longer run `node <plugin-root>/scripts/session-authority-repair.mjs wait --root <repo> --timeout 120`; if the owner cannot be judged run `... release-lock --root <repo> --no-pipeline-running --reason \"<why>\"`"}`);
+     }
+     if (waited || observationFault === "SDC-LOCK-HELD") {
+       observeOnce();
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index a3e45a66f..2bdfb06b3 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -449,6 +449,8 @@ test("K12 a lock that stays held refuses DBG-RULESET-LOCK-HELD naming the holder
+     registryLock: () => heldLock(), now: () => clock, pause: (ms) => { clock += ms; } }));
+   assert.equal(result.ok, false); assert.equal(result.code, "DBG-RULESET-LOCK-HELD", result.message);
+   assert.match(result.message, /pid 4242/u); assert.match(result.message, /retry this command/u); assert.match(result.message, /session-authority-repair\.mjs wait/u);
++  // CGR-07 (candidate 22): the refusal also says that nothing was consumed and that dispatch starts go one after another.
++  assert.match(result.message, /this start was not consumed/u); assert.match(result.message, /one after another/u);
+   assert.equal(result.skeleton, undefined);
+   // A lock whose owner is provably gone is not waited for and not answered with "wait": the refusal names the heal that retires it (live on
+   // Windows: a hook killed at the host limit left a lock "dead for 37230s" and the briefing named wait and release-lock only).
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index c336ce9b8..ffdc06d24 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -40,7 +40,7 @@ import { describeHumanGuardOverrideSelection, describeHumanGuardOverrideSignatur
+ import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApprovalSubject, inspectForkedGovernanceStream } from "../lib/governance-event-store.mjs";
+ import { PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA, validatePortableAgyAuthorshipRequest } from "../lib/portable-agy-authorship-export.mjs";
+ import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+-import { DESIGN_APPROVAL_REQUEST_SCHEMA, validateDesignApprovalBinding, verifyDesignApprovalRequest } from "../lib/design-approval-binding.mjs";
++import { DESIGN_APPROVAL_REQUEST_SCHEMA, describeUnreviewedCorrections, validateDesignApprovalBinding, verifyDesignApprovalRequest } from "../lib/design-approval-binding.mjs";
+ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+@@ -439,6 +439,8 @@ function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
+       ...receipts.map(({ summary }) => `review report: ${summary.report.path} (sha256: ${summary.report.sha256})`),
+       `selected approval mode: ${mode.mode} (${mode.source})`,
+       `public trust posture: ${policy.trustAnchors === null ? "legacy singular anchor" : "v3 anchor set"}`,
++      // CGR-03: stated before the binding, from the signed binding itself; informs the signer, adds no gate and no review round.
++      ...describeUnreviewedCorrections(physicalRequest.binding),
+       "complete bounded design binding follows (current sources and actual receipt/report bytes validated):",
+       JSON.stringify(physicalRequest.binding, null, 2),
+       "this signs only the exact design decision digest; approve-plan must independently consume it. It is not push, release, publication or a guard override.",
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index 193a444f3..f1258909d 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -13,7 +13,7 @@ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { reserveFeatureCriticReviewUnitOwnership, republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore, inspectFeatureCourseTakeover, supersedeFeatureCourseTakeover, readCriticReviewUnit } from "../lib/critic-generic-batch.mjs";
+ import { releaseCriticPacket } from "../lib/critic-packet-release.mjs";
+-import { CRITIC_SPLIT_SOURCE_RETURN_SCHEMA, readAdmittedSplit, readCriticSourceReturn, readCriticSplitSourceReturns } from "../lib/critic-source-return.mjs";
++import { CRITIC_SPLIT_SOURCE_RETURN_SCHEMA, readAdmittedSplit, readCriticSourceReturn, readCriticSplitSourceReturns, settleSplitReturns } from "../lib/critic-source-return.mjs";
+ import { SPLIT_NEXT_ROUND_REPAIR, attributeVerdict, buildCriticSplit, criticSplitDigest, mergeSplitVerdicts } from "../lib/critic-split.mjs";
+ import { GOVERNANCE_REVIEW_SOURCE_SCHEMA, buildGovernanceReviewAction, buildGovernanceReviewRetry, preflightGovernanceReviewActionOutput, writeGovernanceReviewAction } from "../lib/governance-review-action.mjs";
+ import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+@@ -140,11 +140,15 @@ const SPLIT_RECORD_KEYS = Object.freeze([...ORIGINAL_SOURCE_RETURN_KEYS, "splitS
+ function splitOriginGate(query, context, deps, controlRoot) {
+   let records = [];
+   try { records = (deps.readSplitSourceReturnsFn ?? ((q) => readCriticSplitSourceReturns({ controlRoot, packetId: q.packetId })))(query) ?? []; } catch { records = []; }
++  // CGR-09: a resumed child (same recorded child identity) that returned again is a resumption; only its latest return stands. Anything else stays a duplicate below.
++  records = settleSplitReturns(records);
+   if (records.length === 0) return Object.freeze({ independence: "caller-authored-fallback", origin: "caller-authored", nativeAttestation: false });
+   const now = (deps.originNowMsFn ?? Date.now)();
+   const byEntry = new Map();
+   for (const record of records) {
+-    if (!exact(record, SPLIT_RECORD_KEYS) || typeof record.entryId !== "string") fail("SCF-SPLIT-RECORD-STRAY", `a Source return record names no split entry; repair: ${SPLIT_NEXT_ROUND_REPAIR}`);
++    // childSha256 is optional (records of a runner that reports no child identity, and every earlier record, carry none); when present it is a digest.
++    const closedShape = exact(record, SPLIT_RECORD_KEYS) || (exact(record, [...SPLIT_RECORD_KEYS, "childSha256"]) && /^[a-f0-9]{64}$/u.test(record.childSha256));
++    if (!closedShape || typeof record.entryId !== "string") fail("SCF-SPLIT-RECORD-STRAY", `a Source return record names no split entry; repair: ${SPLIT_NEXT_ROUND_REPAIR}`);
+     if (record.schema !== CRITIC_SPLIT_SOURCE_RETURN_SCHEMA || record.issuer !== "source" || record.packetId !== query.packetId || record.packetDigest !== query.packetDigest
+       || canonicalJson(record.claimant) !== canonicalJson(query.claimant) || record.sessionId !== query.sessionId || record.splitSha256 !== context.splitSha256
+       || sha256(canonicalJson(record.verdict)) !== record.verdictSha256
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 01d46fba1..f5ddfea48 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -2960,3 +2960,39 @@ test("G20-72 finalize refuses a split round with a missing child, two records fo
+   assert.equal(none.exitCode, 0, "no record at all keeps today's honest label");
+   assert.equal(none.output.independence, "caller-authored-fallback");
+ });
++
++// CGR-09 (candidate 22): a child that is resumed (the same agent id) and returns again is a resumption, not a second run: its later return stands for its entry. A second
++// DIFFERENT child (or a child whose identity is not recorded) for one entry stays refused: that is verdict shopping, as before.
++test("CGR-09 a resumed child's second return replaces its first for the entry, and a different child for the same entry still refuses", () => {
++  const kids = ["api", "core", "shared"].map((id) => [id, g2072Child(id)]);
++  const resumedCore = g2072Child("core", { deliberately_not_flagged: ["reviewed core again", "resumed: marker corrected"] });
++  const run = (fx, admitted, ...argv) => spawnSync(process.execPath, [MERGE_SCRIPT, "--root", fx.root, "--packet", admitted.packetId, ...argv], { encoding: "utf8" });
++  const fx = g2072Fixture();
++  try {
++    const admitted = g2072Admit(fx);
++    g2072Hook(fx, criticReturn(kids[0][1]), { agent_id: "agent-api" });
++    g2072Hook(fx, criticReturn(kids[1][1]), { agent_id: "agent-core" });
++    const resumed = g2072Hook(fx, criticReturn(resumedCore), { agent_id: "agent-core" });
++    assert.match(resumed.stderr, /Source return issued for packet[\s\S]*split entry core/u);
++    g2072Hook(fx, criticReturn(kids[2][1]), { agent_id: "agent-shared" });
++    assert.equal(g2072Records(admitted).length, 4, "both returns of the resumed child are kept as records");
++    const merged = run(fx, admitted, "--out", "evidence/critic-verdict.json");
++    assert.equal(merged.status, 0, merged.stderr);
++    const verdictOut = JSON.parse(readFileSync(join(fx.root, "evidence", "critic-verdict.json"), "utf8"));
++    assert.ok(verdictOut.deliberately_not_flagged.includes("resumed: marker corrected"), "the later return of the resumed child is the one merged");
++    assert.equal(verdictOut.deliberately_not_flagged.includes("reviewed core"), false, "the earlier return of a resumed child no longer counts");
++    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
++    assert.equal(result.exitCode, 0, JSON.stringify(result.output));
++    assert.equal(result.output.independence, "source-issued-origin");
++  } finally { cleanup(fx); }
++  const other = g2072Fixture();
++  try {
++    const admitted = g2072Admit(other);
++    g2072Hook(other, criticReturn(kids[0][1]), { agent_id: "agent-api" });
++    g2072Hook(other, criticReturn(kids[1][1]), { agent_id: "agent-core" });
++    g2072Hook(other, criticReturn(resumedCore), { agent_id: "agent-core-second-run" });
++    g2072Hook(other, criticReturn(kids[2][1]), { agent_id: "agent-shared" });
++    const merged = run(other, admitted);
++    assert.equal(JSON.parse(merged.stderr).code, "CSM-CHILD-DUPLICATE", merged.stderr);
++  } finally { cleanup(other); }
++});
