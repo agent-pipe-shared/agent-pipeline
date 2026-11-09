@@ -1,0 +1,183 @@
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 441cfcb10afc72808df9a897db2991df3c86c935..9303f4158e2a038588c326e301c0f3feb5487464 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -351,7 +351,7 @@ function assertCriticIndependenceForClose({ root, common, lifecycle }) {
+   // route) admits the identical close; the label stays caller-authored-fallback and travels with the acknowledgement reference.
+   const acknowledgement = findCriticAcknowledgement({ gitCommonDir: common, packetId, receipt });
+   if (acknowledgement !== null) return Object.freeze({ independence, acknowledgement });
+-  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk; repair: record the PO acknowledgement of this caller-authored Critic for exactly this packet and its candidate with node ${STATE_WRITER} approve-critic-acknowledgement --by <name> --critic-packet ${packetId}, where <name> is the name the PO gives for this command (in signature mode that exact command prints the signing command for this packet; after the PO signed, repeat it with --proof-request/--proof-authority/--proof set to the paths the signing step printed), then run the identical close command again; a runner whose Critic subagent stop issues the Source return record needs no acknowledgement`);
++  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk; repair: record the PO acknowledgement of this caller-authored Critic for exactly this packet and its candidate with node ${STATE_WRITER} approve-critic-acknowledgement --by <name> --critic-packet ${packetId}, where <name> is the name the PO gives for this command (in signature mode that exact command prints the signing command for this packet, the wait for its proof and the follow-up command: hand the PO only the signing command, the PO reports nothing back, then run the wait and the follow-up yourself), then run the identical close command again; a runner whose Critic subagent stop issues the Source return record needs no acknowledgement`);
+ }
+ function startPlan(values) {
+   const root = physicalRoot(values.root);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index e6b8d180aefff46ceae202160d6cbac86a89c1f4..82f720ee02fb37966366f629de754b6f616691f1 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -566,7 +566,7 @@ import {
+   readHumanApprovalMode,
+ } from "../lib/critical-human-proof-policy.mjs";
+ import { chatAttributionRecord, isAttendedTerminal, requireAttendedChatGateConfirmation, runRegisteredAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
+-import { authorizeCriticalActionCommand, criticalPushScratchArtifactPaths, prepareAuthorizeCriticalLine, resolvePoKeyDirectory } from "./po-human-approval.mjs";
++import { authorizeCriticalActionCommand, criticalScratchArtifactPaths, prepareAuthorizeCriticalLine, resolvePoKeyDirectory } from "./po-human-approval.mjs";
+ import {
+   lifecycleDigest as closeCoordinatorDigest,
+   readCloseCoordinator,
+@@ -4824,14 +4824,15 @@ function externalPublicJson(dir, value) {
+   } catch { return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-FILE" }; }
+ }
+ 
+-// A signed push is the one critical-proof route whose human command deliberately
+-// mirrors its *public* request/proof/authority into this repository's scratch/
+-// directory.  The agent must not need the PO's private external key directory
+-// merely to consume that proof.  This reader admits only that exact four-name
+-// mirror, rejects symlinks and hard links, and pins its authority to this
+-// repository's private key-directory pointer before cryptographic verification.
+-// It is therefore not a general
+-// in-repository-proof escape hatch, and non-push kinds remain external-only.
++// A signed push, and since C21C the acknowledgement of a caller-authored Critic, are the
++// critical-proof routes whose consumption reads the *public* request/proof/authority the
++// human command mirrored into this repository's scratch/ directory.  The agent must not
++// need the PO's private external key directory merely to consume that proof, and the PO
++// reports nothing back.  This reader admits only that exact four-name mirror of the one
++// kind, rejects symlinks and hard links, and pins its authority to this repository's
++// private key-directory pointer before cryptographic verification.  It is therefore not
++// a general in-repository-proof escape hatch, and every other kind remains external-only.
++const LOCAL_MIRROR_PROOF_KINDS = new Set(["push", CRITIC_ACKNOWLEDGEMENT_KIND]);
+ function localPushScratchJson(dir, value, expectedPath) {
+   if (typeof value !== "string" || !isAbsolute(value) || resolve(value) !== resolve(expectedPath)) {
+     return { ok: false, code: "CRITICAL-PROOF-SCRATCH-PATH" };
+@@ -4859,10 +4860,10 @@ function repoScopedPushKeyAnchor(dir, gitCommonDir) {
+   } catch { return null; }
+ }
+ 
+-function localPushScratchArtifacts(dir, flags) {
++function localMirrorScratchArtifacts(dir, flags, kind) {
+   const common = defaultGitCommonDir(dir);
+   if (!common.ok) return null;
+-  const expected = criticalPushScratchArtifactPaths(dir, common.path);
++  const expected = criticalScratchArtifactPaths(dir, common.path, kind);
+   if (flags["proof-request"] !== expected.request
+     || flags["proof-authority"] !== expected.authority
+     || flags.proof !== expected.proof) return null;
+@@ -4924,7 +4925,7 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
+   if (!policy.requiredKinds.has(kind) && !ALWAYS_REQUIRED_KINDS.has(kind)) {
+     return required ? { ok: false, code: "CRITICAL-PROOF-POLICY-KIND-REQUIRED" } : { ok: true, proof: null };
+   }
+-  const local = kind === "push" ? localPushScratchArtifacts(dir, flags) : null;
++  const local = LOCAL_MIRROR_PROOF_KINDS.has(kind) ? localMirrorScratchArtifacts(dir, flags, kind) : null;
+   if (local !== null && !local.ok) return local;
+   const request = local?.request ?? externalPublicJson(dir, flags["proof-request"]);
+   const authority = local?.authority ?? externalPublicJson(dir, flags["proof-authority"]);
+@@ -9932,10 +9933,15 @@ function runApproveCriticAcknowledgement({ dir, rest, base, now, deps }) {
+       const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
+       const expiresAt = new Date((Date.parse(approvedAt) || Date.now()) + 3_600_000).toISOString();
+       const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId: base.activeFeature?.id, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt, criticPacket: packetId });
++      // C21C: the signing step mirrors its public artifacts to these exact scratch names, so the agent waits for the proof itself and the PO reports nothing back.
++      const mirrorCommon = defaultGitCommonDir(dir);
++      const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, kind) : null;
++      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256 });
+       console.log(JSON.stringify({ schema: "pipeline.critic-acknowledgement-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
+         signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
+-        acknowledgeCommand: { executable: process.execPath, argv: [fileURLToPath(import.meta.url), "approve-critic-acknowledgement", "--by", "<po-name>", "--critic-packet", packetId, "--proof-request", "<proof-request>", "--proof-authority", "<proof-authority>", "--proof", "<proof>"],
+-          note: "run after the PO signed: --by is the PO's own name; the three proof paths are printed by the signing step" } }));
++        ...(waiting === null ? {} : { ...waiting, afterSigning: `${waiting.afterSigning.replace("then read the next step from the same inspect readback", "then run acknowledgeCommand unchanged and the identical close command again")}` }),
++        acknowledgeCommand: { executable: process.execPath, argv: [fileURLToPath(import.meta.url), "approve-critic-acknowledgement", "--by", flags.by, "--critic-packet", packetId, "--proof-request", mirror?.request ?? "<proof-request>", "--proof-authority", mirror?.authority ?? "<proof-authority>", "--proof", mirror?.proof ?? "<proof>"],
++          note: mirror === null ? "run after the PO signed; the three proof paths are printed by the signing step" : "run unchanged once the proof is there; the three paths are the repository mirror the signing step writes" } }));
+     } catch { /* the refusal below still names the missing flags */ }
+     return refuse("CRITICAL-PROOF-FLAGS-PROOF-REQUIRED");
+   }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 6052dae684adcb606004fef119f8477dfac46f3a..d2a46736bd0c45e97d744af68bcc66ed7f9def11 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -3411,6 +3411,7 @@ function c11Findings(list) {
+ // N22: the acceptance lives in a private record under the git common directory (never in the tracked state
+ // file); the shared loader turns it into the lifecycle deps.
+ import * as c11Readiness from "../lib/critic-verify-readiness.mjs";
++import { criticalScratchArtifactPaths } from "./po-human-approval.mjs";
+ function c11PrivatePath(fx) {
+   return join(fx.common, "agent-pipeline", "critic-residual-acceptance", `${fx.made.receiptSha256}.json`);
+ }
+@@ -3468,6 +3469,64 @@ c11Case("C21B approve-critic-acknowledgement without proof flags prints the sign
+   } finally { console.log = originalLog; fx.cleanup(); }
+ });
+ 
++c11Case("C21C the acknowledgement signing output carries the agent's own wait and exact follow-up, and the mirrored proof is consumed with no path reported by the PO", () => {
++  const fx = c11Fixture({ findings: c11Minor });
++  const keyDir = mktempProjectDir();
++  const printed = []; const originalLog = console.log; console.log = (line) => { printed.push(String(line)); };
++  const envName = "PIPELINE_PO_APPROVAL_DIRECTORY";
++  const priorEnv = process.env[envName]; process.env[envName] = keyDir;
++  try {
++    const receipt = { ...fx.made.receipt, independence: "caller-authored-fallback" };
++    const deps = { ...fx.deps, readConsumedCandidateReceiptFn: () => ({ packet: fx.made.packet, receipt }) };
++    const verb = ["approve-critic-acknowledgement", "--by", "PO", "--critic-packet", receipt.packetId];
++    const bound = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
++    bound.continuity = { authority: { spec: { path: "specs/sprint-nova-epic/spec.md" } } };
++    writeFileSync(fx.statePathFile, JSON.stringify(bound, null, 2));
++    assert.equal(capturedStderr(() => run(verb, deps)).result, 2);
++    const out = JSON.parse(printed.at(-1));
++    assert.equal(out.reportBackRequired, false, "the PO reports nothing back on this route either");
++    assert.match(out.proofPath, /^scratch\/critical-acknowledge-caller-authored-critic-proof-[a-f0-9]+\.json$/u);
++    assert.deepEqual(out.waitAction.argv.slice(-2), ["--subject", out.signatureCommand.subjectSha256], "an older signature's mirror must not end the wait");
++    assert.match(out.afterSigning, /acknowledgeCommand/u);
++    const follow = out.acknowledgeCommand.argv;
++    assert.ok(follow.every((part) => !part.includes("<")), "the follow-up holds no placeholder");
++    assert.equal(follow[follow.indexOf("--by") + 1], "PO");
++    const signing = out.signatureCommand;
++    const request = createCriticalActionApprovalRequest({ candidate: signing.candidate, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action: { kind: "acknowledge-caller-authored-critic", subjectSha256: signing.subjectSha256, expiresAt: signing.expiresAt } });
++    const keys = generateKeyPairSync("ed25519");
++    const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
++    const authority = { keyReference: "test-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
++    writeFileSync(join(keyDir, "trust-policy.json"), JSON.stringify(authority));
++    mkdirSync(join(fx.root, "scratch"), { recursive: true });
++    const at = (flag) => follow[follow.indexOf(flag) + 1];
++    writeFileSync(at("--proof-request"), JSON.stringify(request));
++    writeFileSync(at("--proof"), JSON.stringify({ schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "test-key", publicKey, signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64") }));
++    writeFileSync(at("--proof-authority"), JSON.stringify({ keyReference: "other-key", publicKeySha256: "a".repeat(64) }));
++    const foreign = capturedStderr(() => run(follow.slice(1), deps));
++    assert.equal(foreign.result, 2, foreign.lines.join(" "));
++    assert.match(foreign.lines.join(" "), /CRITICAL-PROOF-LOCAL-ANCHOR-MISMATCH/u, "a mirrored authority is pinned to the key directory before the signature is checked");
++    writeFileSync(at("--proof-authority"), JSON.stringify(authority));
++    const acknowledged = capturedStderr(() => run(follow.slice(1), deps));
++    assert.equal(acknowledged.result, 0, acknowledged.lines.join(" "));
++    assert.match(printed.at(-1), /Caller-authored Critic acknowledged by "PO"/u);
++  } finally {
++    console.log = originalLog;
++    if (priorEnv === undefined) delete process.env[envName]; else process.env[envName] = priorEnv;
++    rmSync(keyDir, { recursive: true, force: true }); fx.cleanup();
++  }
++});
++
++c11Case("C21C the repository mirror stays closed for the residual acceptance", () => {
++  const fx = c11Fixture({ findings: c11Minor });
++  try {
++    const common = spawnSync("git", ["-C", fx.root, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8" }).stdout.trim();
++    const mirror = criticalScratchArtifactPaths(fx.root, common, C11_KIND);
++    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, "--proof-request", mirror.request, "--proof-authority", mirror.authority, "--proof", mirror.proof], fx.deps));
++    assert.equal(outcome.result, 2, outcome.lines.join(" "));
++    assert.match(outcome.lines.join(" "), /CRITICAL-PROOF-EXTERNAL-PATH/u);
++  } finally { fx.cleanup(); }
++});
++
+ c11Case("C21B the acknowledgement signing command names the packet and a proof for the REVIEWED candidate is accepted although HEAD has moved on", () => {
+   const fx = c11Fixture({ findings: c11Minor });
+   const printed = []; const originalLog = console.log; console.log = (line) => { printed.push(String(line)); };
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index 763ea5e0d6aba686c1b0b4e5c269c818abfd9b6f..3a1ac2c0109874b6a1c5cf51e3e8d911bd265265 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -6333,6 +6333,11 @@ test("C21B authorize-critical --kind acknowledge-caller-authored-critic --critic
+     assert.deepEqual(result.candidate, CANDIDATE, "the reviewed candidate, not HEAD");
+     assert.equal(result.action.subjectSha256, expected);
+     assert.ok(prompts[0].includes(RESIDUAL_ROUTE_PACKET), "must show the packet");
++    // C21C: the agent consumes exactly these mirrored files, so the PO reports no path back.
++    for (const role of ["request", "proof", "authority"]) {
++      assert.match(result.paths[role], new RegExp(`scratch[\\\\/]critical-${kind}-${role}-[a-f0-9]+\\.json$`, "u"));
++      assert.ok(existsSync(result.paths[role]), `the signing step must write the ${role} mirror`);
++    }
+     assert.throws(() => runHumanApproval(argv("prepare-critical", ["--subject-sha256", "e".repeat(64)]), deps()), /--subject-sha256 does not match the digest computed from the consumed Critic packet/u);
+     assert.throws(() => runHumanApproval(argv("prepare-critical"), deps({ readConsumedCandidateReceiptFn: () => ({ packet: {}, receipt: { ...receipt, independence: "source-issued-origin" } }) })), /CRITIC-ACK-NOT-CALLER-AUTHORED/u);
+   } finally {
