@@ -701,6 +701,8 @@ const MAX_CHILD_SESSIONS = 256;
 const MAX_TURN_MARKERS = 500;
 const MAX_CHILD_META_BYTES = 64 * 1024;
 const TURN_MODELS = { claude: "claude-assistant-message-id", codex: "codex-task-started", antigravity: "antigravity-turn-started" };
+// CGF-02: the event a Codex rollout writes when a turn ends, as measured in real rollouts of the 2026-11-08 greenfield runs.
+const CODEX_TURN_END_MARKERS = new Set(["task_complete"]);
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -744,13 +746,21 @@ function describeTurns(runner, records) {
   }
   // Per-turn counters from the records the transcript carries: the turn's end time is its last timestamped record, its
   // tool calls are the call records of the runner's own spelling. Absent timestamps stay null, never a guess.
-  const counters = markers.map(() => ({ recordCount: 0, toolCallCount: 0, endMs: null }));
+  const counters = markers.map(() => ({ recordCount: 0, toolCallCount: 0, nestedToolCallCount: 0, endMs: null, taskEndMs: null, endMarker: null }));
   records.forEach((row, index) => {
     const turn = turnAt[index];
     if (turn === null || counters[turn] === undefined) return;
     counters[turn].recordCount += 1;
     const ms = recordTimestampMs(row);
     if (ms !== null && (counters[turn].endMs === null || ms > counters[turn].endMs)) counters[turn].endMs = ms;
+    // CGF-02: the runner's own end marker wins over "the last record seen"; a later record of the turn (a late usage row) is not work.
+    if (runner === CODEX_RUNNER && row?.type === "event_msg" && CODEX_TURN_END_MARKERS.has(row.payload?.type) && ms !== null) {
+      counters[turn].taskEndMs = ms; counters[turn].endMarker = row.payload.type;
+    }
+    // CGF-02: the tools a code-mode script calls, reported beside the call records, because one `exec` can run many of them. Read from the script text, so it is a count of call sites.
+    if (row?.type === "response_item" && row.payload?.type === "custom_tool_call" && typeof row.payload.input === "string") {
+      counters[turn].nestedToolCallCount += (row.payload.input.match(/\btools\.[A-Za-z_][A-Za-z0-9_]*\s*\(/gu) ?? []).length;
+    }
     const blocks = isObject(row?.message) && Array.isArray(row.message.content) ? row.message.content : [];
     // Codex writes its code-mode `exec` calls as custom_tool_call: one record, however many tools the script inside it calls.
     if ((row?.type === "response_item" && (row.payload?.type === "function_call" || row.payload?.type === "custom_tool_call"))
@@ -759,9 +769,13 @@ function describeTurns(runner, records) {
     }
   });
   markers.forEach((marker, ordinal) => {
-    marker.endTimestamp = isoOrNull(counters[ordinal].endMs);
+    marker.endTimestamp = isoOrNull(counters[ordinal].taskEndMs ?? counters[ordinal].endMs);
     marker.recordCount = counters[ordinal].recordCount;
     marker.toolCallCount = counters[ordinal].toolCallCount;
+    if (runner === CODEX_RUNNER) {
+      marker.nestedToolCallCount = counters[ordinal].nestedToolCallCount;
+      marker.endMarker = counters[ordinal].endMarker;
+    }
   });
   return {
     turns: { model: TURN_MODELS[runner] ?? "unknown", count: markers.length, markersTruncated: markers.length > MAX_TURN_MARKERS, markers: markers.slice(0, MAX_TURN_MARKERS) },

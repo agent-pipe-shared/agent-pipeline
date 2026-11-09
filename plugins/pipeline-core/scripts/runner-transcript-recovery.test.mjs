@@ -1247,6 +1247,30 @@ test("C21F: a Codex custom_tool_call counts as a tool call beside function_call;
   });
 });
 
+test("CGF-02: a Codex turn ends at its own task_complete, and the tools a code-mode script calls are reported beside the call records", () => {
+  withExportFixture(({ project, codexHome }) => {
+    codexSegment(codexHome, "nested.jsonl", { cwd: project, sessionId: "nested", metaTimestamp: stamp("06:00:00"), records: [
+      { timestamp: stamp("06:00:01"), type: "event_msg", payload: { type: "task_started" } },
+      { timestamp: stamp("06:00:02"), type: "response_item", payload: { type: "custom_tool_call", name: "exec", call_id: "c1", input: "const a = await tools.shell({}); await tools.read_file ({}); text(a); tools;" } },
+      { timestamp: stamp("06:00:03"), type: "response_item", payload: { type: "custom_tool_call_output", call_id: "c1", output: "tools.shell(1)" } },
+      { timestamp: stamp("06:00:04"), type: "response_item", payload: { type: "function_call", name: "shell", call_id: "c2", arguments: "tools.shell(1)" } },
+      { timestamp: stamp("06:00:05"), type: "event_msg", payload: { type: "task_complete" } },
+      { timestamp: stamp("06:00:09"), type: "event_msg", payload: { type: "token_count" } },
+      { timestamp: stamp("06:00:10"), type: "event_msg", payload: { type: "task_started" } },
+      { timestamp: stamp("06:00:11"), type: "response_item", payload: { type: "custom_tool_call", name: "exec", call_id: "c3", input: "text(1)" } },
+    ] });
+    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, sessionId: "nested" });
+    const [first, unfinished] = result.turns.markers;
+    assert.equal(first.toolCallCount, 2);
+    assert.equal(first.nestedToolCallCount, 2, "two call sites in the script, none in an output or a function_call argument");
+    assert.equal(first.endMarker, "task_complete");
+    assert.equal(first.endTimestamp, new Date(stamp("06:00:05")).toISOString(), "a later usage record is not work of the turn");
+    assert.equal(unfinished.nestedToolCallCount, 0);
+    assert.equal(unfinished.endMarker, null, "a turn without its end marker says so, and keeps the last record as its end");
+    assert.equal(unfinished.endTimestamp, new Date(stamp("06:00:11")).toISOString());
+  });
+});
+
 test("G20-31 the CLI passes the page and window flags and refuses every other shape", () => {
   withFiveSessions(({ project, args }) => {
     const env = { CODEX_HOME: args.env.CODEX_HOME, CODEX_SESSION_ID: "current-session", CODEX_THREAD_ID: "current-session" };
