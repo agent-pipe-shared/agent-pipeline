@@ -1,0 +1,14 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index a3e45a66fe07bec47f7b71ee5791ad3a50258b9a..ec723f6efb090ec636e0c873523a3f2538a7cc79 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1802,7 +1802,8 @@ test("D196 R1: a started, unfinished slice of the same item warns DBG-CHECKPOINT
+   const warning = result.warnings.find((entry) => entry.code === "DBG-CHECKPOINTED-OWNER");
+   assert.ok(warning, JSON.stringify(result.warnings));
+   assert.match(warning.message, /ALF-T0/u);
+-  assert.match(warning.message, /dispatch-budget-grant\.mjs --agent-id <the agent id of that run> --extra <1\.\.30> --reason/u);
++  // QG-04: restated in place. The per-grant limit is 40 since c34f9a2ef; this pin had kept the old 30.
++  assert.match(warning.message, /dispatch-budget-grant\.mjs --agent-id <the agent id of that run> --extra <1\.\.40> --reason/u);
+   assert.match(warning.message, /SendMessage/u);
+   assert.match(warning.message, /elephant-restart, owner-lost, context-poisoned or new-vertical-outcome/u);
+   assert.match(warning.message, /slice-queue\.mjs cancel ALF-T0 --started --reason "<why>" --class budget/u);

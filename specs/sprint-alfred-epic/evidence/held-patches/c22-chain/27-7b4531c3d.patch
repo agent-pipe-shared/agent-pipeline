@@ -1,0 +1,16 @@
+diff --git a/plugins/pipeline-core/scripts/rigor-floor.test.mjs b/plugins/pipeline-core/scripts/rigor-floor.test.mjs
+index 317c5f9cdaa1110f9403737c8d28c2367d818eff..76ab8fbf3ea4fc4e43b7547f339ed50f7b74a48e 100644
+--- a/plugins/pipeline-core/scripts/rigor-floor.test.mjs
++++ b/plugins/pipeline-core/scripts/rigor-floor.test.mjs
+@@ -65,7 +65,10 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
+     assert.equal(observed.actualPaths.status, "available");
+     assert.equal(observed.plannedPaths.status, "unknown", "actual files are not a PO-approved plan");
+     assert.equal(observed.selectedProfile.status, "unknown", "the CLI cannot invent a PO selection");
+-    assert.equal(observed.diffStats.status, "unknown", "untracked file lines were not counted");
++    // Restated in place (QG-04, CGR-16 / w306), assertion unchanged: since w306 an untracked file that exists IS counted. This stub names
++    // "src/new file.mjs", which is not on disk under REPO_ROOT, so its lines cannot be counted and the count must stay unknown. The
++    // counted case is pinned in the CGR-16 block below.
++    assert.equal(observed.diffStats.status, "unknown", "untracked file lines could not be counted (the file is not on disk)");
+ 
+     const deletionOnly = inferInputsFromRepo(REPO_ROOT, { execFileSyncFn(_command, argv) {
+       if (argv[3] === "diff" && argv[4] === "--name-only") return Buffer.from("src/deleted.mjs\0");

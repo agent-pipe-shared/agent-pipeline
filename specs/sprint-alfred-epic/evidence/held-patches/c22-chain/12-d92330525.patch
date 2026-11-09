@@ -1,0 +1,518 @@
+diff --git a/plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json b/plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json
+index 049c83bce40f191b237fd2111c5b937af9513eaf..aeb817a1bc2e294bb26bbadbe0f072e311d15372 100644
+--- a/plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json
++++ b/plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json
+@@ -60,6 +60,13 @@
+       "cell": { "kind": "duty", "dutyId": "critic_normal" },
+       "decision": 3
+     },
++    {
++      "path": ".codex/agents/critic-high-risk.toml",
++      "format": "toml",
++      "projection": "codex-custom-agent-v3",
++      "ownedKeys": ["model", "model_reasoning_effort"],
++      "cell": { "kind": "duty", "dutyId": "critic_high_risk" }
++    },
+     {
+       "path": ".codex/agents/consult-advisor.toml",
+       "format": "toml",
+diff --git a/plugins/pipeline-core/lib/codex-host-layout.mjs b/plugins/pipeline-core/lib/codex-host-layout.mjs
+index 9ebe78b90a8ab08a47d340cf68366a442e9862bf..ecf474b009a23718f30ce02973cc46405cda937b 100644
+--- a/plugins/pipeline-core/lib/codex-host-layout.mjs
++++ b/plugins/pipeline-core/lib/codex-host-layout.mjs
+@@ -34,6 +34,7 @@ export const CODEX_HOST_REPOSITORY_INIT_MARKER = `${CODEX_HOST_REPOSITORY_INIT_D
+ const REQUIRED_CODEX_HOST_CONTROL_PATHS = Object.freeze([".codex", ".git"]);
+ const CODEX_PROJECT_AGENT_PROFILES = Object.freeze([
+   "consult-advisor.toml",
++  "critic-high-risk.toml",
+   "critic.toml",
+   "implementor.toml",
+ ]);
+diff --git a/plugins/pipeline-core/lib/critic-source-return.mjs b/plugins/pipeline-core/lib/critic-source-return.mjs
+index 601681f4de93e25b09ab5415f976a139f0b2982b..b182e639ad7cab6b00134d6b4264d5de7bcc6ab1 100644
+--- a/plugins/pipeline-core/lib/critic-source-return.mjs
++++ b/plugins/pipeline-core/lib/critic-source-return.mjs
+@@ -30,6 +30,9 @@ const MAX_PACKETS = 4096;
+ const RUNNERS = new Set(["claude", "codex"]); // the runners whose subagent STOP event issues the record
+ const MESSAGE_RUNNERS = new Set(["antigravity"]); // the runners whose Critic child's final message to its parent issues it (G20-41)
+ 
++// C21H (CGF-03): the projected Codex roles `critic` and `critic-high-risk` are both the Critic; `default` with effort overrides is not.
++const CRITIC_AGENT_TYPES = new Set(["critic", "critic-high-risk"]);
++
+ const normalizedAgentType = (value) => typeof value !== "string" ? null : value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
+ 
+ /** The verdict a Critic returned: its whole message, else the content of the LAST fenced block, as a schema-shaped object; otherwise null. */
+@@ -81,7 +84,7 @@ function openAdmittedPackets(controlRoot, runner, nowMs) {
+  */
+ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date.now(), readHandbackFn = null } = {}) {
+   try {
+-    if (!RUNNERS.has(runner) || input?.hook_event_name !== "SubagentStop" || normalizedAgentType(input.agent_type) !== "critic") return { status: "not-applicable" };
++    if (!RUNNERS.has(runner) || input?.hook_event_name !== "SubagentStop" || !CRITIC_AGENT_TYPES.has(normalizedAgentType(input.agent_type))) return { status: "not-applicable" };
+     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
+     let verdict = extractCriticVerdict(input.last_assistant_message);
+     if (verdict === null && typeof readHandbackFn === "function") {
+diff --git a/plugins/pipeline-core/lib/governance-scope.mjs b/plugins/pipeline-core/lib/governance-scope.mjs
+index 86bf9be94e6de529c30b6861977fb3813bbb2a2c..6aacf65107346b3837140c83603248bd12fc27e2 100644
+--- a/plugins/pipeline-core/lib/governance-scope.mjs
++++ b/plugins/pipeline-core/lib/governance-scope.mjs
+@@ -170,7 +170,7 @@ function legacyObservation(ctx,budget){
+   refs.push({path:manifestPath,sha256:manifest.sha256});
+   // Only the manifest's owned projection is being observed. Other renderer
+   // inputs are inert canonical seeds, not observed agent/runtime assertions.
+-  const baselines={'.claude/pipeline.yaml':{status:'present',bytes:manifest.text},'.claude/settings.json':{status:'present',bytes:'{}\n'},'.claude/pipeline.json':{status:'present',bytes:'{}\n'},'.codex/config.toml':{status:'present',bytes:''},'.codex/agents/implementor.toml':{status:'present',bytes:codexCustomAgentSeed('implementor')},'.codex/agents/critic.toml':{status:'present',bytes:codexCustomAgentSeed('critic')},'.codex/agents/consult-advisor.toml':{status:'present',bytes:''}};
++  const baselines={'.claude/pipeline.yaml':{status:'present',bytes:manifest.text},'.claude/settings.json':{status:'present',bytes:'{}\n'},'.claude/pipeline.json':{status:'present',bytes:'{}\n'},'.codex/config.toml':{status:'present',bytes:''},'.codex/agents/implementor.toml':{status:'present',bytes:codexCustomAgentSeed('implementor')},'.codex/agents/critic.toml':{status:'present',bytes:codexCustomAgentSeed('critic')},'.codex/agents/critic-high-risk.toml':{status:'present',bytes:codexCustomAgentSeed('critic-high-risk')},'.codex/agents/consult-advisor.toml':{status:'present',bytes:''}};
+   const plan=planRuntimeProjectionV3(intent,{source:'pipeline.user.yaml',baselines});
+   const expected=plan.status==='ready'?plan.targets.find(t=>t.path==='.claude/pipeline.yaml')?.after?.bytes:null;
+   return {state:typeof expected==='string'&&expected===manifest.text?'active':'unverifiable-active',kind:'legacy-v3-owned-projection',refs};
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+index 3165b9971254e7862e8d90bf74a727a420a6ab55..6a021e5c1ecee4b036d192cddc9d48b385923db8 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+@@ -638,6 +638,7 @@ const GENERATED_CODEX_PROJECTION_PATHS = new Set([
+   ".codex/config.toml",
+   ".codex/agents/implementor.toml",
+   ".codex/agents/critic.toml",
++  ".codex/agents/critic-high-risk.toml",
+   ".codex/agents/consult-advisor.toml",
+ ]);
+ 
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 3e0e17d85b3ce1b12179804d4063ed28c2d4001e..5ef303144fd164e5d5ecbe8865e885c8d21f425b 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -1822,6 +1822,7 @@ function freshBaselines(intent, { rootDir, hostManaged = false, profile = null,
+     ".codex/config.toml": { status: "present", bytes: "" },
+     ".codex/agents/implementor.toml": { status: "present", bytes: codexCustomAgentSeed("implementor") },
+     ".codex/agents/critic.toml": { status: "present", bytes: codexCustomAgentSeed("critic") },
++    ".codex/agents/critic-high-risk.toml": { status: "present", bytes: codexCustomAgentSeed("critic-high-risk") },
+     ".codex/agents/consult-advisor.toml": { status: "present", bytes: "" },
+   };
+   const projection = planRuntimeProjectionV3(intent, { baselines });
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index dd319ff5a90e8c447fe5782f06de60c7dc5cf26d..b23a1b299c8b610369d8e17338a19b7be7713302 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -54,7 +54,7 @@ import {
+ import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
+ import { evaluateLifecycleReadyGuard, isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
+ import { confirmTrustAnchorKey, readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+-import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
++import { applyRunnerProfileMigrationV3, planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
+ import { main as runnerProfileMigrationCli } from "../scripts/runner-profile-migration-v3.mjs";
+ import { planInstall as planPrePushHookInstall } from "../scripts/pre-push-hook-install.mjs";
+ import { applyInstall as applyPreCommitHookInstall, planInstall as planPreCommitHookInstall } from "../scripts/pre-commit-hook-install.mjs";
+@@ -62,7 +62,7 @@ import { planInstall as planCommitMsgHookInstall } from "../scripts/commit-msg-h
+ import { applySettingsAllowlistMerge, planSettingsAllowlistMerge } from "../scripts/settings-allowlist-merge.mjs";
+ import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
+ import { parseYaml } from "./yaml-lite.mjs";
+-import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
++import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
+ import { validCurrentPlanApproval, validPreviousCurrentPlanApproval, validPlanSubmission } from "./plan-spec-state-v2.mjs";
+ import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
+ import { applyInitialOnboardingAnswers, driveOnboardingInit } from "../scripts/onboarding-init.mjs";
+@@ -7848,6 +7848,23 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
+     assert.equal(existsSync(join(path, ".codex/agents/consult-advisor.toml")), true);
+     assert.match(readFileSync(join(path, ".codex/agents/implementor.toml"), "utf8"), /developer_instructions\s*=/u);
+     assert.match(readFileSync(join(path, ".codex/agents/critic.toml"), "utf8"), /developer_instructions\s*=/u);
++    // C21H (AC-108, CGF-03): the second Codex Critic role is materialized with the others, with its own effort from the critic_high_risk duty.
++    assert.equal(existsSync(join(path, ".codex/agents/critic-high-risk.toml")), true);
++    const highRisk = readFileSync(join(path, ".codex/agents/critic-high-risk.toml"), "utf8");
++    assert.match(highRisk, /^name = "critic-high-risk"$/mu);
++    assert.match(highRisk, /developer_instructions\s*=/u);
++    assert.match(highRisk, new RegExp(`^model_reasoning_effort = "${loadRunnerProfilesV3Registry().duties.critic_high_risk.codex.effort}"$`, "mu"));
++    assert.equal(readFileSync(join(path, ".codex/agents/critic.toml"), "utf8").includes('model_reasoning_effort = "medium"'), true, "the first role keeps its own effort");
++    // An existing project that lacks the new file (it was onboarded before the role existed) is not broken: the plain plan names the absent owned
++    // file as a baseline fault exactly like any other missing owned file, the initialization plan adds it as a first-time target, and the
++    // existing activation writes it. No new manual step.
++    unlinkSync(join(path, ".codex/agents/critic-high-risk.toml"));
++    const lacking = planRunnerProfileMigrationV3({ rootDir: path, initializeMissingRuntimeForSlimV3: true });
++    assert.equal(lacking.status, "ready", JSON.stringify(lacking.diagnostics));
++    assert.deepEqual(lacking.changes.map((change) => change.path), [".codex/agents/critic-high-risk.toml"]);
++    assert.deepEqual(lacking.targets.find((target) => target.path === ".codex/agents/critic-high-risk.toml").before, { status: "absent", sha256: null, byteLength: 0 });
++    assert.equal(applyRunnerProfileMigrationV3(lacking, { rootDir: path, activate: true }).status, "applied");
++    assert.equal(readFileSync(join(path, ".codex/agents/critic-high-risk.toml"), "utf8"), highRisk, "the repaired file is byte-identical to the original projection");
+     assert.equal(existsSync(join(path, "setup.mjs")), false);
+     assert.equal(existsSync(join(path, ".agent-pipeline/core.lock.json")), false);
+     assert.equal(validatePipelineUserV3(parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"))).ok, true);
+diff --git a/plugins/pipeline-core/lib/project-pipeline-footprint.mjs b/plugins/pipeline-core/lib/project-pipeline-footprint.mjs
+index 2eab363baa2073879aef8e33acd3c35e92a6bf52..a95ade723e254ad8480d5d50c1cfec41fa57c5b7 100644
+--- a/plugins/pipeline-core/lib/project-pipeline-footprint.mjs
++++ b/plugins/pipeline-core/lib/project-pipeline-footprint.mjs
+@@ -11,7 +11,7 @@ const strictUtf8=row=>new TextDecoder('utf-8',{fatal:true}).decode(row.bytes);
+ export function deriveContentPreservingPipelineFootprint({rootDir}){
+  const budget={used:0,max:33554432},source=readPhysicalFootprint(join(rootDir,'pipeline.user.yaml'),{budget}),owned=loadRuntimeProjectionV3OwnedKeys(),observations=[],actions=[],conflicts=[],preserve=['AGENTS.md','CLAUDE.md','architecture/','docs/','specs/','backlog/','Git history','user-scope stores'];let intent=null;
+  if(source)try{const v=parseYaml(strictUtf8(source));if(validatePipelineUserV3(v).ok)intent=v;}catch{}
+- const defaultBytes={'.claude/settings.json':'{}\n','.claude/pipeline.json':'{}\n','.codex/config.toml':'','.codex/agents/implementor.toml':codexCustomAgentSeed('implementor'),'.codex/agents/critic.toml':codexCustomAgentSeed('critic'),'.codex/agents/consult-advisor.toml':''};
++ const defaultBytes={'.claude/settings.json':'{}\n','.claude/pipeline.json':'{}\n','.codex/config.toml':'','.codex/agents/implementor.toml':codexCustomAgentSeed('implementor'),'.codex/agents/critic.toml':codexCustomAgentSeed('critic'),'.codex/agents/critic-high-risk.toml':codexCustomAgentSeed('critic-high-risk'),'.codex/agents/consult-advisor.toml':''};
+  const baselines={},rows=new Map();for(const target of owned.targets){const row=readPhysicalFootprint(join(rootDir,target.path),{budget});rows.set(target.path,row);baselines[target.path]={status:'present',bytes:row?strictUtf8(row):defaultBytes[target.path]??'schema: pipeline.manifest.v0\n'};}
+  const neutralManifest=readPhysicalFootprint(join(rootDir,'project','pipeline.yaml'),{budget});if(!rows.get('.claude/pipeline.yaml')&&neutralManifest)baselines['.claude/pipeline.yaml']={status:'present',bytes:strictUtf8(neutralManifest)};
+  const projected=intent?planRuntimeProjectionV3(intent,{source:'pipeline.user.yaml',baselines}):null;
+diff --git a/plugins/pipeline-core/lib/project-uninstall.fixture.mjs b/plugins/pipeline-core/lib/project-uninstall.fixture.mjs
+index 8ba280c737523f3f41f9d5c3ceaad24744f2d1a4..1f450d926cc179011a1f63d4dcbbcf52910a488c 100644
+--- a/plugins/pipeline-core/lib/project-uninstall.fixture.mjs
++++ b/plugins/pipeline-core/lib/project-uninstall.fixture.mjs
+@@ -22,7 +22,7 @@ export function fixture(t,{hooks=true,keys=true,runners=['claude','codex']}={}){
+  const put=(path,bytes)=>{const out=join(root,path);mkdirSync(dirname(out),{recursive:true});writeFileSync(out,bytes);};
+  const content={'AGENTS.md':'User instructions unchanged\n','CLAUDE.md':'User instructions too\n','README':'Product readme\n','docs/guide.md':'User guide\n','specs/promoted/spec.md':'Product design\n','backlog/notes.md':'Product history\n','architecture/map/index.md':'Product map\n'};for(const [path,bytes] of Object.entries(content))put(path,bytes);
+  if(keys){const registry=loadRunnerProfilesV3Registry(),intent={schema:'pipeline.user.v3',language:{human_facing:'en',agent_facing:'en'},agent_runtime:'other',runners:{enabled:runners,default:runners.includes('codex')?'codex':runners[0]},routing:{profiles:registry.profiles,duties:registry.duties},usage:{common_projection:'pipeline.runner-usage.v1',raw_persistence:'none'},autonomy:{push_policy:'gated',branch_model:'feature-branch',wip_limit:1},gates:{dev_plan:'blocking',push:'blocking',security:'warn',claude_md_max_lines:300},critic_export:registry.criticExportPolicy,roles:{po:{display_label:'Fixture Owner'}},session:{keep_awake:true}};
+-  put('pipeline.user.yaml',yaml(intent));put('.claude/pipeline.json','{ "foreign" : { "escaped" : "\\u00df", "n" : 1e+2 }, "humanRoles" : { "po" : { "custom" : true } } }\n');put('.claude/settings.json','{ \"unowned\" : true }\n');put('.codex/config.toml','profile = \"keep\"\n');put('.codex/agents/consult-advisor.toml','name = \"stale\"\n');put('.claude/pipeline.yaml','# unowned-prefix\nlanguage:\n  human_facing: en\n  unowned_language_sentinel: exact\nmodelRouting:\n  stale: true\nrunnerRoutes:\n  worktype_feature_advisor:\n    runner: claude\n  worktype_mini_advisor:\n    runner: claude\nforeign: keep-exact\n');put('.codex/agents/implementor.toml',codexCustomAgentSeed('implementor')+'# foreign comment\n[foreign]\nmodel = "mine"\n');put('.codex/agents/critic.toml',codexCustomAgentSeed('critic'));
++  put('pipeline.user.yaml',yaml(intent));put('.claude/pipeline.json','{ "foreign" : { "escaped" : "\\u00df", "n" : 1e+2 }, "humanRoles" : { "po" : { "custom" : true } } }\n');put('.claude/settings.json','{ \"unowned\" : true }\n');put('.codex/config.toml','profile = \"keep\"\n');put('.codex/agents/consult-advisor.toml','name = \"stale\"\n');put('.claude/pipeline.yaml','# unowned-prefix\nlanguage:\n  human_facing: en\n  unowned_language_sentinel: exact\nmodelRouting:\n  stale: true\nrunnerRoutes:\n  worktype_feature_advisor:\n    runner: claude\n  worktype_mini_advisor:\n    runner: claude\nforeign: keep-exact\n');put('.codex/agents/implementor.toml',codexCustomAgentSeed('implementor')+'# foreign comment\n[foreign]\nmodel = "mine"\n');put('.codex/agents/critic.toml',codexCustomAgentSeed('critic'));put('.codex/agents/critic-high-risk.toml',codexCustomAgentSeed('critic-high-risk'));
+   const projected=planRuntimeProjectionV3(intent,{baselines:readRuntimeProjectionV3Baselines(root)});assert.equal(projected.status,'ready',JSON.stringify(projected));for(const row of projected.targets)if(row.after?.bytes!==undefined)put(row.path,row.after.bytes);
+   // Insert physically distinct foreign bytes after projection without changing owned values.
+   const json=join(root,'.claude/pipeline.json');const value=JSON.parse(readFileSync(json));value.foreign={escaped:'ß',n:100};writeFileSync(json,JSON.stringify(value).replace('"foreign":{"escaped":"ß","n":100}','"foreign" : { "escaped" : "\\u00df", "n" : 1e+2 }')+'\n');
+diff --git a/plugins/pipeline-core/lib/runbook-paths.mjs b/plugins/pipeline-core/lib/runbook-paths.mjs
+index dc76ed2d9f9deefd174018ac1bc4770e15b3b656..249b5a654fbca4ba84b5ec4b4d4c6f9fa05ffd9d 100644
+--- a/plugins/pipeline-core/lib/runbook-paths.mjs
++++ b/plugins/pipeline-core/lib/runbook-paths.mjs
+@@ -208,7 +208,7 @@ function criticSteps() {
+     }),
+     finalizerStep("admit", "admit", finalization, { needs: ["a packet-ready preflight"], producer: "the admission record for this packet", next: ["dispatch-critic"] }),
+     otherStep({
+-      id: "dispatch-critic", command: "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template",
++      id: "dispatch-critic", command: "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template (Codex: agent_type critic, or critic-high-risk for a higher effort, never default, which loses the Source return)",
+       needs: ["the admission record"], producer: "the Critic's return; a split review returns one per child", next: ["finalize", "split-merge"],
+     }),
+     scriptStep({
+diff --git a/plugins/pipeline-core/lib/runner-profile-migration-v3.mjs b/plugins/pipeline-core/lib/runner-profile-migration-v3.mjs
+index 52cd635380c0127901ad998955cbe363af15c958..9ffa7373ef181199fc7173d14e3012c269b19260 100644
+--- a/plugins/pipeline-core/lib/runner-profile-migration-v3.mjs
++++ b/plugins/pipeline-core/lib/runner-profile-migration-v3.mjs
+@@ -94,6 +94,7 @@ const LEGACY_CLASSIFIER_BASELINES = Object.freeze({
+   ".codex/config.toml": "# classifier baseline\n",
+   ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
+   ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
++  ".codex/agents/critic-high-risk.toml": codexCustomAgentSeed("critic-high-risk"),
+   ".codex/agents/consult-advisor.toml": "",
+ });
+ // These seeds exist only in authenticated legacy -> V3 planning memory. They
+@@ -127,6 +128,7 @@ const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
+   ".codex/config.toml": "",
+   ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
+   ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
++  ".codex/agents/critic-high-risk.toml": codexCustomAgentSeed("critic-high-risk"),
+   ".codex/agents/consult-advisor.toml": "",
+ });
+ // Single owner for `.claude/pipeline.yaml` across every branch of
+@@ -179,6 +181,7 @@ const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
+   ".codex/config.toml": "",
+   ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
+   ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
++  ".codex/agents/critic-high-risk.toml": codexCustomAgentSeed("critic-high-risk"),
+   ".codex/agents/consult-advisor.toml": "",
+ });
+ // Resolved per use, never at module evaluation: project-onboarding-v3.mjs
+diff --git a/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs b/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
+index 70ffdcf3b6afc40e84313afa75b3fc8b58220073..550bf3f5c5ff78e363d4d66518c0cf0a914e7eee 100644
+--- a/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
++++ b/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
+@@ -95,6 +95,8 @@ function fixture(source, { omitCodex = false, omitRuntime = [] } = {}) {
+     ".codex/config.toml": '# config-unowned-sentinel\nprofile = "keep"\n',
+     ".codex/agents/implementor.toml": '# implementor-prefix-sentinel\nmodel = "old-implementor"\nmodel_reasoning_effort = "low"\nname = "keep-implementor"\n[metadata]\nmodel = "nested-must-stay"\n',
+     ".codex/agents/critic.toml": '# critic-prefix-sentinel\nmodel = "old-critic"\nmodel_reasoning_effort = "medium"\nname = "keep-critic"\n[metadata]\nmodel_reasoning_effort = "nested-must-stay"\n',
++    // C21H (AC-108, CGF-03): the second Codex Critic role is an owned runtime target too, restated in place with its own sentinel.
++    ".codex/agents/critic-high-risk.toml": '# critic-high-risk-prefix-sentinel\nmodel = "old-critic-high-risk"\nmodel_reasoning_effort = "medium"\nname = "keep-critic-high-risk"\n[metadata]\nmodel_reasoning_effort = "nested-must-stay"\n',
+     ".codex/agents/consult-advisor.toml": '# advisor-prefix-sentinel\nname = "old-advisor"\nmodel = "old-advisor"\n',
+   };
+   for (const path of runtimePaths) {
+diff --git a/plugins/pipeline-core/lib/runtime-projection-v3.mjs b/plugins/pipeline-core/lib/runtime-projection-v3.mjs
+index 22fafc0a66bc26f4f1bff87a4c6627d36285bff8..a0fcfc3e60f0806eee398908007323c6363f32b6 100644
+--- a/plugins/pipeline-core/lib/runtime-projection-v3.mjs
++++ b/plugins/pipeline-core/lib/runtime-projection-v3.mjs
+@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
+ import {
+   closeSync, existsSync, fsyncSync, lstatSync, openSync, readFileSync, writeFileSync,
+ } from "node:fs";
+-import { dirname, join, resolve } from "node:path";
++import { basename, dirname, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { loadRunnerProfilesV2Registry } from "./runner-profiles-v2.mjs";
+@@ -33,6 +33,9 @@ const OWNED_KEYS_PATH = join(HERE, "..", "config", "runtime-projection-v3-owned-
+ const PLAN_SCHEMA = "pipeline.runtime-projection-plan.v3";
+ const EFFECTIVE_MODEL_UNKNOWN = "effective-model-not-observed";
+ 
++// C21H (AC-108, CGF-03): `critic` and `critic-high-risk` are the same closed read-only Critic; only the effort of their duty cell differs.
++const CRITIC_DEVELOPER_INSTRUCTIONS = "Act as an independent, read-only Critic. Your bootstrap role is closed as critic: when pipeline-start is required, use its compact critic path and never Elephant onboarding, State, handover, or history. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity.";
++
+ export const CODEX_CUSTOM_AGENT_METADATA = Object.freeze({
+   implementor: Object.freeze({
+     name: "implementor",
+@@ -42,7 +45,12 @@ export const CODEX_CUSTOM_AGENT_METADATA = Object.freeze({
+   critic: Object.freeze({
+     name: "critic",
+     description: "Independent read-only critic",
+-    developerInstructions: "Act as an independent, read-only Critic. Your bootstrap role is closed as critic: when pipeline-start is required, use its compact critic path and never Elephant onboarding, State, handover, or history. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity.",
++    developerInstructions: CRITIC_DEVELOPER_INSTRUCTIONS,
++  }),
++  "critic-high-risk": Object.freeze({
++    name: "critic-high-risk",
++    description: "Independent read-only critic for high-risk reviews",
++    developerInstructions: CRITIC_DEVELOPER_INSTRUCTIONS,
+   }),
+ });
+ 
+@@ -508,7 +516,22 @@ function replaceCodexAgentTarget(v2Target, target, intent) {
+   };
+ }
+ 
+-const ADVISOR_DESCRIPTION = "Fresh independent read-only advisor; answer one supplied question with repository evidence only.";
++/**
++ * A Codex custom agent the frozen V2 kernel does not enumerate (C21H: `critic-high-risk`). Projected like the advisor: from the baseline when
++ * the file exists, from the role seed when it does not, so a project onboarded before the role existed plans it as a first-time addition.
++ */
++function replaceAddedCodexAgentTarget(target, intent, baseline) {
++  const beforeBytes = baselineBytes(baseline);
++  const seeded = beforeBytes ?? codexCustomAgentSeed(basename(target.path, ".toml"));
++  return replaceCodexAgentTarget({
++    path: target.path,
++    format: target.format,
++    before: describeBytes(beforeBytes),
++    after: { bytes: seeded },
++  }, target, intent);
++}
++
++const ADVISOR_DESCRIPTION ="Fresh independent read-only advisor; answer one supplied question with repository evidence only.";
+ const ADVISOR_INSTRUCTIONS = "Use fresh context and answer exactly one supplied question. Read-only sandbox only: no chat, handover, memory, mutation, persistence, auto-apply, or gate decisions; no separate network tool or third-party export. Report evidence and insufficiency without claiming unobserved model identity or OS isolation.";
+ 
+ function renderCodexAdvisorAgent(intent) {
+@@ -740,6 +763,10 @@ function projectValidatedIntent(intent, { source, baselines }) {
+       intent,
+       baselines?.[".codex/agents/consult-advisor.toml"],
+     ));
++    for (const manifestTarget of committedOwnedKeys.manifest.targets) {
++      if (manifestTarget.projection !== "codex-custom-agent-v3" || targets.some((entry) => entry.path === manifestTarget.path)) continue;
++      targets.push(replaceAddedCodexAgentTarget(manifestTarget, intent, baselines?.[manifestTarget.path]));
++    }
+     targets.push(replaceHumanRoleCalibrationTarget(
+       manifestTargets[".claude/pipeline.json"],
+       intent,
+@@ -860,9 +887,10 @@ export function readRuntimeProjectionV3Baselines(rootDir) {
+   const ownedTargets = frozenOwnedKeys().manifest.targets;
+   const target = ownedTargets.find((entry) => entry.path === ".claude/pipeline.json");
+   const advisor = ownedTargets.find((entry) => entry.path === ".codex/agents/consult-advisor.toml");
+-  if (!target || !advisor) throw new Error("V3 owned target is missing");
++  const criticHighRisk = ownedTargets.find((entry) => entry.path === ".codex/agents/critic-high-risk.toml");
++  if (!target || !advisor || !criticHighRisk) throw new Error("V3 owned target is missing");
+   const root = resolve(rootDir);
+-  for (const entry of [target, advisor]) {
++  for (const entry of [target, advisor, criticHighRisk]) {
+     const path = resolve(root, entry.path);
+     if (!isPhysicalPathContained(root, path)) throw new Error(`Unsafe owned target path: ${entry.path}`);
+     baselines[entry.path] = existsSync(path)
+diff --git a/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs b/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs
+index 7c3d5c70c133654fca196991928bdce816b558cf..8f4c506c94a51580ef199c82323b93d89d9eacbf 100644
+--- a/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs
++++ b/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs
+@@ -27,6 +27,7 @@ const targetPaths = [
+   ".codex/config.toml",
+   ".codex/agents/implementor.toml",
+   ".codex/agents/critic.toml",
++  ".codex/agents/critic-high-risk.toml",
+   ".codex/agents/consult-advisor.toml",
+ ];
+ 
+@@ -74,6 +75,7 @@ function writeFixture(root, { pipelineYaml = `${PREFIX}${OWNED}${LEGACY_RUNNER_R
+     ".codex/config.toml": "profile = \"keep\"\n",
+     ".codex/agents/implementor.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\nname = \"keep\"\n[metadata]\nmodel = \"nested\"\n",
+     ".codex/agents/critic.toml": "model = \"old\"\nmodel_reasoning_effort = \"medium\"\nname = \"keep\"\n[metadata]\nmodel_reasoning_effort = \"nested\"\n",
++    ".codex/agents/critic-high-risk.toml": "model = \"old\"\nmodel_reasoning_effort = \"medium\"\nname = \"keep-high-risk\"\n[metadata]\nmodel_reasoning_effort = \"nested\"\n",
+     ".codex/agents/consult-advisor.toml": "name = \"stale\"\n",
+   };
+   for (const [path, bytes] of Object.entries(files)) {
+@@ -182,6 +184,74 @@ test("V3 owns the Codex advisor custom-agent target", () => {
+   assert.ok(claude.ownedKeys.includes("session.keep_awake"), "session power is an explicit owned V3 projection");
+ });
+ 
++// C21H (AC-108, CGF-03): the second projected Codex Critic role. Same closed read-only developer instructions as `critic`, its own effort from the
++// registered `critic_high_risk` duty cell (no new configuration key), and a project that lacks the file gets it through the existing plan.
++const HIGH_RISK_PATH = ".codex/agents/critic-high-risk.toml";
++
++test("C21H V3 owns the critic-high-risk Codex custom agent with the critic_high_risk duty and the critic developer instructions", () => {
++  const manifest = loadRuntimeProjectionV3OwnedKeys();
++  const entry = manifest.targets.find((item) => item.path === HIGH_RISK_PATH);
++  assert.ok(entry, "the owned-key manifest names the second Critic role");
++  assert.equal(entry.projection, "codex-custom-agent-v3");
++  assert.deepEqual(entry.ownedKeys, ["model", "model_reasoning_effort"]);
++  assert.deepEqual(entry.cell, { kind: "duty", dutyId: "critic_high_risk" });
++  const role = CODEX_CUSTOM_AGENT_METADATA["critic-high-risk"];
++  assert.equal(role.name, "critic-high-risk");
++  assert.equal(role.developerInstructions, CODEX_CUSTOM_AGENT_METADATA.critic.developerInstructions);
++  assert.match(codexCustomAgentSeed("critic-high-risk"), /^name = "critic-high-risk"\n/u);
++  const instructionLine = (seed) => seed.match(/^developer_instructions = (.+)$/mu)?.[1];
++  assert.ok(instructionLine(codexCustomAgentSeed("critic-high-risk")), "the seed carries developer instructions");
++  assert.equal(instructionLine(codexCustomAgentSeed("critic-high-risk")), instructionLine(codexCustomAgentSeed("critic")), "same closed read-only Critic instructions");
++  assert.throws(() => codexCustomAgentSeed("not-a-role"), /unknown Codex custom-agent role/u);
++});
++
++test("C21H V3 projects the critic-high-risk model and effort from the critic_high_risk duty, apart from critic", () => {
++  const root = fixtureRoot();
++  try {
++    const baselines = readRuntimeProjectionV3Baselines(root);
++    assert.equal(baselines[HIGH_RISK_PATH].status, "present", "the baseline reader reads the second Critic role like the advisor");
++    const plan = planRuntimeProjectionV3(completeIntent(), { baselines });
++    assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
++    const highRisk = target(plan, HIGH_RISK_PATH);
++    const duty = registry.duties.critic_high_risk.codex;
++    assert.match(highRisk.after.bytes, new RegExp(`^model = "${duty.selector.value}"$`, "mu"));
++    assert.match(highRisk.after.bytes, new RegExp(`^model_reasoning_effort = "${duty.effort}"$`, "mu"));
++    assert.deepEqual(highRisk.route.cell, { kind: "duty", dutyId: "critic_high_risk" });
++    assert.equal(highRisk.route.requested.effort, duty.effort);
++    assert.notEqual(highRisk.route.requested.effort, target(plan, ".codex/agents/critic.toml").route.requested.effort, "the second role exists to carry a different effort");
++    assert.match(highRisk.after.bytes, /name = "keep-high-risk"/u, "unowned top-level keys stay byte-for-byte");
++    assert.match(highRisk.after.bytes, /\[metadata\]\nmodel_reasoning_effort = "nested"\n/u, "a nested key of the same name is not an owned key");
++    assert.deepEqual(plan.ownedKeyManifest.targets.find((item) => item.path === HIGH_RISK_PATH).ownedKeys, ["model", "model_reasoning_effort"]);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("C21H a project without the critic-high-risk file plans it as a first-time addition from the seed instead of failing", () => {
++  const root = fixtureRoot();
++  try {
++    unlinkSync(join(root, HIGH_RISK_PATH));
++    const baselines = readRuntimeProjectionV3Baselines(root);
++    assert.equal(baselines[HIGH_RISK_PATH].status, "absent");
++    const plan = planRuntimeProjectionV3(completeIntent(), { baselines });
++    assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
++    const highRisk = target(plan, HIGH_RISK_PATH);
++    assert.equal(highRisk.before.status, "absent");
++    assert.equal(highRisk.changed, true);
++    assert.equal(highRisk.after.status, "present");
++    const duty = registry.duties.critic_high_risk.codex;
++    assert.equal(highRisk.after.bytes, codexCustomAgentSeed("critic-high-risk").replace('model = ""', `model = "${duty.selector.value}"`).replace('model_reasoning_effort = ""', `model_reasoning_effort = "${duty.effort}"`));
++    assert.equal(plan.decisionConflicts.some((conflict) => conflict.target === HIGH_RISK_PATH), false, "an absent file owes no model decision");
++    for (const path of targetPaths.filter((item) => item !== HIGH_RISK_PATH)) assert.ok(target(plan, path), `${path} is still planned`);
++    // The same plan from baselines that never heard of the new file (a caller that predates it) still plans, never throws.
++    const withoutKey = { ...baselines };
++    delete withoutKey[HIGH_RISK_PATH];
++    assert.equal(planRuntimeProjectionV3(completeIntent(), { baselines: withoutKey }).status, "ready");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
+ test("V3 planning is deterministic, read-only, and byte-preserving", () => {
+   const root = fixtureRoot();
+   try {
+diff --git a/plugins/pipeline-core/runbooks/critic-path.v1.json b/plugins/pipeline-core/runbooks/critic-path.v1.json
+index bab6dc31e480c24fb6c2d42f85928db4d9265a55..f0634dc0f9269d8dd2f063cecccb223f61659f12 100644
+--- a/plugins/pipeline-core/runbooks/critic-path.v1.json
++++ b/plugins/pipeline-core/runbooks/critic-path.v1.json
+@@ -137,7 +137,7 @@
+     {
+       "id": "dispatch-critic",
+       "who": "agent",
+-      "command": "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template",
++      "command": "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template (Codex: agent_type critic, or critic-high-risk for a higher effort, never default, which loses the Source return)",
+       "needs": [
+         "the admission record"
+       ],
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+index 22fb588fc238e93a6087baae8458f7fcd78c37a7..2c0831423aad1c0aa1b31e99dac09ea1dd420f24 100644
+--- a/plugins/pipeline-core/runbooks/index.v1.json
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -29,7 +29,7 @@
+       "pathId": "critic",
+       "path": "plugins/pipeline-core/runbooks/critic-path.v1.json",
+       "schema": "pipeline.runbook.v1",
+-      "sha256": "8c0a5b92f0cba9ee593def124e40bfbbe41ffd8aa772a4656b7a6c1a01c30bb9"
++      "sha256": "a2e8f7064166ebbbda70ec31093b68c02f777d45dc5806953f6b9349cb5e49e4"
+     },
+     {
+       "pathId": "push",
+diff --git a/plugins/pipeline-core/scripts/generate-runbook.test.mjs b/plugins/pipeline-core/scripts/generate-runbook.test.mjs
+index 0fba201def263fc24ec462150114f80a97d257bc..c454e1fdcc886afd93794c0576e84fc0a1fee3d2 100644
+--- a/plugins/pipeline-core/scripts/generate-runbook.test.mjs
++++ b/plugins/pipeline-core/scripts/generate-runbook.test.mjs
+@@ -138,6 +138,18 @@ test("C21C: the happy-path guide names the evidence commands and one close entry
+   assert.equal(guide.includes("--audit-request <json>"), false, "the old Antigravity-only close line is gone");
+ });
+ 
++test("C21H: the Codex Critic launch names critic-high-risk for a higher effort and never default, in the guide and in the critic runbook step", () => {
++  const guide = readFileSync(join(PLUGIN_ROOT, "skills/pipeline-start/references/happy-path.md"), "utf8");
++  const criticSection = guide.slice(guide.indexOf("## 3. Critic"), guide.indexOf("## 4."));
++  assert.match(criticSection, /agent_type: "critic-high-risk"/u);
++  assert.match(criticSection, /never `default`/u);
++  assert.ok(criticSection.indexOf("session-critic-finalizer.mjs admit") < criticSection.indexOf("critic-high-risk"), "the role is named in the step after admit");
++  const step = docOf("critic").steps.find((s) => s.id === "dispatch-critic");
++  assert.match(step.command, /critic-high-risk/u);
++  assert.match(step.command, /never default/u);
++  assert.deepEqual(step.next, ["finalize", "split-merge"], "the step keeps its place in the path");
++});
++
+ test("the index lists the lifecycle paths, each file with its own sha256", () => {
+   const files = buildRunbookFiles();
+   const idx = JSON.parse(files["plugins/pipeline-core/runbooks/index.v1.json"]);
+diff --git a/plugins/pipeline-core/scripts/project-reset.mjs b/plugins/pipeline-core/scripts/project-reset.mjs
+index 82c04b8bca5d718a29d2e67f4147d73e2f7148a3..4465fbd5d55f351217601d30a35298a4811bc638 100644
+--- a/plugins/pipeline-core/scripts/project-reset.mjs
++++ b/plugins/pipeline-core/scripts/project-reset.mjs
+@@ -50,7 +50,7 @@
+  * `.codex/config.toml`) is `keep`, never `remove`. A whole-file-seed
+  * projection (`codex-custom-agent-v3`, `codex-advisor-agent-v3`) whose
+  * renderer emits the COMPLETE file body from static role metadata / intent
+- * alone -- the three `.codex/agents/*.toml` files -- is a whole-file
++ * alone -- the `.codex/agents/*.toml` files -- is a whole-file
+  * `remove`, exactly like the authority artifacts above, because the whole
+  * file is Pipeline prose. A keys-patch projection (`human-role-display-v3`,
+  * `claude-model-routing-v3`) whose renderer instead patches specific keys
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 2e38052b53af1507748062d014f4a2bf2a7ee73b..01d46fba12fc60bfa50c92f9d8355c8a0e1679be 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -1949,6 +1949,43 @@ test("G20-39 (e) an unmarked or non-Critic stop, a stop without a schema-shaped
+   } finally { cleanup(fx); }
+ });
+ 
++// C21H (AC-108, CGF-03): the second projected Codex Critic role `critic-high-risk` is the Critic for the Source return exactly like `critic`;
++// `default` with a model and effort set on the spawn call (what every Codex round used before) and every other agent type stay not-applicable.
++test("C21H (a) a Codex Critic stop under the agent type critic-high-risk issues the Source return like critic; default and every other type stay a silent no-op", async () => {
++  const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
++  const fx = fixture();
++  try {
++    const admitted = admitViaCli(fx);
++    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
++    for (const agentType of ["default", "worker", "critic-high-risk-extra", "high-risk", "critic-high", "pipeline-core:goldfish-deep"]) {
++      const outcome = issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(), { agent_type: agentType }) });
++      assert.equal(outcome.status, "not-applicable", agentType);
++      assert.equal(existsSync(target), false, agentType);
++    }
++    const issued = issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(), { agent_type: "critic-high-risk" }) });
++    assert.equal(issued.status, "issued", JSON.stringify(issued));
++    assert.equal(issued.packetId, admitted.packetId);
++    const record = JSON.parse(readFileSync(target, "utf8"));
++    assert.equal(record.packetDigest, admitted.admission.packetDigest);
++    assert.deepEqual(record.claimant, { runner: "codex", adapter: "session-functional-equivalent" });
++    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
++    assert.equal(runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]).output.independence, "source-issued-origin");
++  } finally { cleanup(fx); }
++});
++
++test("C21H (b) the namespaced critic-high-risk type is the Critic as well, and only the codex and claude stop events issue it", async () => {
++  const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
++  const fx = fixture();
++  try {
++    const admitted = admitViaCli(fx);
++    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
++    assert.notEqual(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "antigravity", input: stopInput(criticReturn(), { agent_type: "critic-high-risk" }) }).status, "issued");
++    assert.notEqual(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(), { agent_type: "critic-high-risk", hook_event_name: "PostToolUse" }) }).status, "issued");
++    assert.equal(existsSync(target), false);
++    assert.equal(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(), { agent_type: "pipeline-core:critic-high-risk" }) }).status, "issued");
++  } finally { cleanup(fx); }
++});
++
+ // G20-41 (candidate 20, AC-108): on Antigravity the Critic CHILD's final `send_message` to its parent conversation issues the same record.
+ // Criterion-bound cases, written before the producer existed. The child is recognised only through runner-written facts: its own conversationId,
+ // the descriptor the host wrote under the PARENT's brain directory, and the Recipient; payloads are shaped like the M4c measurement.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index d067f429db9aea719fb636d614420a90c88ca798..53dd55aafea0ce04b903ab7a57515a46eaa8ba27 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -99,6 +99,7 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
+    `--candidate`, `--spec`, `--guardrail` and `--evidence` (repository-relative paths for the last three); the refusal chain names the next missing input.
+ 2. `session-critic-finalizer.mjs admit --root "$PWD" --request scratch/session-critic-finalization-request.json`, then dispatch one fresh read-only Critic
+    (Antigravity: no external process; refs-only packets per `references/antigravity-native-dispatch.md`).
++   Codex: the Critic is the projected role `critic`; a Critic that needs a higher effort than `critic` carries uses `spawn_agent` with `agent_type: "critic-high-risk"` (same read-only instructions, effort from the `critic_high_risk` duty), never `default` with model or effort set on the call, because `default` loses the Source return and the round is recorded as caller-authored.
+ 3. `session-critic-finalizer.mjs finalize --root "$PWD" --request scratch/session-critic-finalization-request.json`, then `... export --root "$PWD" --request scratch/session-critic-export-request.json`.
+    `finalize --help` prints the closed request keys. A split review: `critic-split-merge.mjs --root <root> --packet <packetId>` once every child returned, before `finalize`.
+ 4. Findings: `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` or `--add-delta-request <input.json>`; every later round reuses the first `taskId`.

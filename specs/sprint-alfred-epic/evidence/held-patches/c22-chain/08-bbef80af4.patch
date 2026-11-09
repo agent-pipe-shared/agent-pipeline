@@ -1,0 +1,21 @@
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index d8a79d019644ce0055c4b2c5f61623632ab06d55..2912904bb4d454be2a6db5b6849dbfb533535733 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -182,6 +182,16 @@ and `reason`). The shipped gitleaks configuration already exempts the bare hex d
+ writes into `audit-bundles/<feature>/<commit>/` and the State file (bare hex values of 32 to 64 characters);
+ a real key in those files is still found.
+ 
++A scanner that did NOT RUN is a different case from a finding. In a project calibrated critical it blocks the close
++(`SEC-CLOSE-SCANNER-NOT-EXECUTED`; a skipped `license-check` counts, `osv-scanner` with no package sources stays
++`not applicable`). Install or configure the scanner, or record a named exception BEFORE the freeze in the tracked file
++`project/security-scanner-exceptions.json` (`{"schema":"pipeline.security-scanner-exceptions.v1","exceptions":[{"scanner":
++"license-check","reason":"<non-blank, at most 500 characters>","expires":"<ISO-8601 date in the future>","confirmedBy":
++"<the label the human gave for this exception in chat>"}]}`); quote the human's confirmation in the chat and the close
++report. An applied exception is printed on the scanner's `Security close status` line and the close ends
++`ADMITTED BY NAMED EXCEPTION`, never `GREEN`; an expired, malformed or unknown entry is ignored and named in the refusal,
++and an exception never covers a scanner that reported findings.
++
+ The record for an auditor is that bundle: its README lists the signed proofs and the feature's tracked evidence
+ with Git blobs, and it is pushed with the close. Never hand-write an index or evidence summary under `scratch/`.
+ 

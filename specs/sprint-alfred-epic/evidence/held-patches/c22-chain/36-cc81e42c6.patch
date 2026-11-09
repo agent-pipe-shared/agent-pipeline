@@ -1,0 +1,23 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index e359c60f61f64b8766c7d8f1a2730df9139df396..a43c21f7d85848101802ce1547920479c827940f 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -1760,6 +1760,18 @@
+       "invariantPinned": "Open minor Critic findings are kept in one managed handover block, an accepted entry is never reopened, and the close line counts only what the block lists",
+       "nonOverlapNote": "Text and file functions of the handover block; the one-shot close wiring is covered in the finish-feature suite"
+     },
++    {
++      "name": "critic-route-assurance-tests",
++      "file": "plugins/pipeline-core/lib/critic-route-assurance.test.mjs",
++      "invariantPinned": "Before dispatch a planned Critic route states exactly the assurance it delivers and whether the close needs an acknowledgement, never a stronger word",
++      "nonOverlapNote": "Pure assurance projection; the printed preflight field is covered in the Critic dispatch preflight suite"
++    },
++    {
++      "name": "architecture-verdict-label-tests",
++      "file": "plugins/pipeline-core/lib/architecture-verdict-label.test.mjs",
++      "invariantPinned": "Every architecture verdict label carries candidate, observation date, scope, whether it blocks and whether it is current",
++      "nonOverlapNote": "Pure label builder; its use is covered in the boundary check, orientation and readback suites"
++    },
+     {
+       "name": "codex-critic-selected-host-fallback-tests",
+       "file": "plugins/pipeline-core/scripts/codex-critic-selected-host-fallback.test.mjs",

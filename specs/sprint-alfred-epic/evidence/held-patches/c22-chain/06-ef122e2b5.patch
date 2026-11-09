@@ -1,0 +1,86 @@
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+index 93f7c4fb3eefed8606e78b2156cbfd4fdf247ced..27e43cd814d8d73a9486c45ae09f69949cf0bb78 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs
+@@ -701,6 +701,8 @@ const MAX_CHILD_SESSIONS = 256;
+ const MAX_TURN_MARKERS = 500;
+ const MAX_CHILD_META_BYTES = 64 * 1024;
+ const TURN_MODELS = { claude: "claude-assistant-message-id", codex: "codex-task-started", antigravity: "antigravity-turn-started" };
++// CGF-02: the event a Codex rollout writes when a turn ends, as measured in real rollouts of the 2026-11-08 greenfield runs.
++const CODEX_TURN_END_MARKERS = new Set(["task_complete"]);
+ 
+ const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+ 
+@@ -744,13 +746,21 @@ function describeTurns(runner, records) {
+   }
+   // Per-turn counters from the records the transcript carries: the turn's end time is its last timestamped record, its
+   // tool calls are the call records of the runner's own spelling. Absent timestamps stay null, never a guess.
+-  const counters = markers.map(() => ({ recordCount: 0, toolCallCount: 0, endMs: null }));
++  const counters = markers.map(() => ({ recordCount: 0, toolCallCount: 0, nestedToolCallCount: 0, endMs: null, taskEndMs: null, endMarker: null }));
+   records.forEach((row, index) => {
+     const turn = turnAt[index];
+     if (turn === null || counters[turn] === undefined) return;
+     counters[turn].recordCount += 1;
+     const ms = recordTimestampMs(row);
+     if (ms !== null && (counters[turn].endMs === null || ms > counters[turn].endMs)) counters[turn].endMs = ms;
++    // CGF-02: the runner's own end marker wins over "the last record seen"; a later record of the turn (a late usage row) is not work.
++    if (runner === CODEX_RUNNER && row?.type === "event_msg" && CODEX_TURN_END_MARKERS.has(row.payload?.type) && ms !== null) {
++      counters[turn].taskEndMs = ms; counters[turn].endMarker = row.payload.type;
++    }
++    // CGF-02: the tools a code-mode script calls, reported beside the call records, because one `exec` can run many of them. Read from the script text, so it is a count of call sites.
++    if (row?.type === "response_item" && row.payload?.type === "custom_tool_call" && typeof row.payload.input === "string") {
++      counters[turn].nestedToolCallCount += (row.payload.input.match(/\btools\.[A-Za-z_][A-Za-z0-9_]*\s*\(/gu) ?? []).length;
++    }
+     const blocks = isObject(row?.message) && Array.isArray(row.message.content) ? row.message.content : [];
+     // Codex writes its code-mode `exec` calls as custom_tool_call: one record, however many tools the script inside it calls.
+     if ((row?.type === "response_item" && (row.payload?.type === "function_call" || row.payload?.type === "custom_tool_call"))
+@@ -759,9 +769,13 @@ function describeTurns(runner, records) {
+     }
+   });
+   markers.forEach((marker, ordinal) => {
+-    marker.endTimestamp = isoOrNull(counters[ordinal].endMs);
++    marker.endTimestamp = isoOrNull(counters[ordinal].taskEndMs ?? counters[ordinal].endMs);
+     marker.recordCount = counters[ordinal].recordCount;
+     marker.toolCallCount = counters[ordinal].toolCallCount;
++    if (runner === CODEX_RUNNER) {
++      marker.nestedToolCallCount = counters[ordinal].nestedToolCallCount;
++      marker.endMarker = counters[ordinal].endMarker;
++    }
+   });
+   return {
+     turns: { model: TURN_MODELS[runner] ?? "unknown", count: markers.length, markersTruncated: markers.length > MAX_TURN_MARKERS, markers: markers.slice(0, MAX_TURN_MARKERS) },
+diff --git a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+index 878ccf28b2076e501d4110eb25f0e2b5dd97d36a..ef00ac0e67cabdfca3d87f9207697dd2e4c6282e 100644
+--- a/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
++++ b/plugins/pipeline-core/scripts/runner-transcript-recovery.test.mjs
+@@ -1247,6 +1247,30 @@ test("C21F: a Codex custom_tool_call counts as a tool call beside function_call;
+   });
+ });
+ 
++test("CGF-02: a Codex turn ends at its own task_complete, and the tools a code-mode script calls are reported beside the call records", () => {
++  withExportFixture(({ project, codexHome }) => {
++    codexSegment(codexHome, "nested.jsonl", { cwd: project, sessionId: "nested", metaTimestamp: stamp("06:00:00"), records: [
++      { timestamp: stamp("06:00:01"), type: "event_msg", payload: { type: "task_started" } },
++      { timestamp: stamp("06:00:02"), type: "response_item", payload: { type: "custom_tool_call", name: "exec", call_id: "c1", input: "const a = await tools.shell({}); await tools.read_file ({}); text(a); tools;" } },
++      { timestamp: stamp("06:00:03"), type: "response_item", payload: { type: "custom_tool_call_output", call_id: "c1", output: "tools.shell(1)" } },
++      { timestamp: stamp("06:00:04"), type: "response_item", payload: { type: "function_call", name: "shell", call_id: "c2", arguments: "tools.shell(1)" } },
++      { timestamp: stamp("06:00:05"), type: "event_msg", payload: { type: "task_complete" } },
++      { timestamp: stamp("06:00:09"), type: "event_msg", payload: { type: "token_count" } },
++      { timestamp: stamp("06:00:10"), type: "event_msg", payload: { type: "task_started" } },
++      { timestamp: stamp("06:00:11"), type: "response_item", payload: { type: "custom_tool_call", name: "exec", call_id: "c3", input: "text(1)" } },
++    ] });
++    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, sessionId: "nested" });
++    const [first, unfinished] = result.turns.markers;
++    assert.equal(first.toolCallCount, 2);
++    assert.equal(first.nestedToolCallCount, 2, "two call sites in the script, none in an output or a function_call argument");
++    assert.equal(first.endMarker, "task_complete");
++    assert.equal(first.endTimestamp, new Date(stamp("06:00:05")).toISOString(), "a later usage record is not work of the turn");
++    assert.equal(unfinished.nestedToolCallCount, 0);
++    assert.equal(unfinished.endMarker, null, "a turn without its end marker says so, and keeps the last record as its end");
++    assert.equal(unfinished.endTimestamp, new Date(stamp("06:00:11")).toISOString());
++  });
++});
++
+ test("G20-31 the CLI passes the page and window flags and refuses every other shape", () => {
+   withFiveSessions(({ project, args }) => {
+     const env = { CODEX_HOME: args.env.CODEX_HOME, CODEX_SESSION_ID: "current-session", CODEX_THREAD_ID: "current-session" };

@@ -1,0 +1,109 @@
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.mjs b/plugins/pipeline-core/hooks/guard-devplan.mjs
+index 1419881f8ae4d620ced64302a50fd9f85493900f..c2870e32bcb2d7e7a853372849eaac2b9a98d6b4 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.mjs
+@@ -155,6 +155,7 @@ import { completedFeaturePackageEditDenial, designAdvisoryAdmission, designAdvis
+ // module's "rebase authority" section for why it lives there and what it deliberately does not
+ // widen.
+ import {
++  approvedArchitectureEditNotice,
+   rebaseAuthorityAdmissionNotice,
+   rebaseAuthorityDisclosure,
+   resolveActiveRebaseAuthority,
+@@ -420,6 +421,13 @@ if (isDispatchRecordCoordinationPath(normalizedPath)) process.exit(0);
+ // C21F: the shared refusal of a hand edit of a feature package past `implementing` (lib/guard-devplan-policy.mjs).
+ const packageEditDenial = completedFeaturePackageEditDenial(relPath, projectDir);
+ if (packageEditDenial !== null) { process.stderr.write(`${packageEditDenial}\n`); process.exit(2); }
++// CGF-09: said whatever the lifecycle, the drift check applies during and after a feature. Never a verdict: the gate below decides as before.
++// stdout carries it to the model and takes no permission decision; stderr is the channel of the other admission notices.
++const architectureNotice = approvedArchitectureEditNotice(normalizedPath, projectDir);
++if (architectureNotice !== null) {
++  process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: architectureNotice } })}\n`);
++  process.stderr.write(`${architectureNotice}\n`);
++}
+ 
+ // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
+ const manifestResult = loadManifest(projectDir);
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.test.mjs b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+index 1f8589020763468fc6eb4af97528204c761ba0d7..77090fab41efd3fa9743417c5b2ad6f08f26c726 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+@@ -311,6 +311,20 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
+   });
+ }
+ 
++// ---- CGF-09 an edit of an approved architecture file is admitted and says what it costs ----
++{
++  const dir = freshDir("architecture-edit-notice");
++  writeManifest(dir, MANIFEST_BLOCKING);
++  writeState(dir, APPROVED_STATE);
++  mkdirSync(join(dir, "architecture", "map"), { recursive: true });
++  writeFileSync(join(dir, "architecture", "design-materialization.json"), JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", designSha256: "e".repeat(64), targets: [{ path: "architecture/map/index.md", sha256: "f".repeat(64) }] }));
++  check("CGF-09 notice on an edit of an approved architecture file", "Edit", "architecture/map/index.md", ALLOW, {
++    projectDir: dir,
++    stderrIncludes: ["ARCHITECTURE-DESIGN-ARTIFACT-DRIFT", "reopen-design", "e".repeat(64)],
++  });
++  check("CGF-09 a file the design did not materialize stays silent", "Edit", "architecture/map/other.md", ALLOW, { projectDir: dir, stderrEmpty: true });
++}
++
+ // ---- DP08 default exempt prefixes -> allow ----------------------------------------------
+ {
+   const prefixes = ["docs/", "specs/", ".claude/", "backlog/", "scratch/"];
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+index 1df1c4717d7db8352d31c9a53d035e57ef1a8693..3165b9971254e7862e8d90bf74a727a420a6ab55 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+@@ -403,6 +403,22 @@ function normalize(p) {
+   return String(p ?? "").replace(/\\/g, "/").toLowerCase();
+ }
+ 
++/**
++ * CGF-09 (PO decision 2026-11-09): an edit of a file the approved architecture design materialized is admitted, and the next architecture inspection still refuses
++ * the drift (ARCHITECTURE-DESIGN-ARTIFACT-DRIFT). The notice names that at the edit, not one inspection later. Never a refusal, and silent on anything unreadable.
++ * @returns {string|null} the notice, or null when the path is no materialized target.
++ */
++export function approvedArchitectureEditNotice(relPath, projectDir) {
++  const slashed = String(relPath ?? "").replace(/\\/g, "/").toLowerCase();
++  if (!slashed.startsWith("architecture/")) return null;
++  let receipt;
++  try { receipt = JSON.parse(readFileSync(join(projectDir, "architecture", "design-materialization.json"), "utf8")); } catch { return null; }
++  if (receipt?.schema !== "pipeline.architecture-design-materialization.v1" || !Array.isArray(receipt.targets)) return null;
++  if (!receipt.targets.some((target) => String(target?.path ?? "").toLowerCase() === slashed)) return null;
++  return `Notice: ${slashed} is a file of the approved architecture design (design digest ${receipt.designSha256}). This edit is admitted, but the next architecture inspection refuses it as ARCHITECTURE-DESIGN-ARTIFACT-DRIFT. `
++    + "To change the architecture, change the approved design through reopen-design and a new approval, which writes this file again; otherwise restore its bytes before the next inspection.";
++}
++
+ /**
+  * C21F (PO decision 2026-11-09): a feature package at `verifying` or `completed` moves only through its writer. A live Antigravity run rewound one by editing
+  * `specs/<feature>/lifecycle.json` and committed that; the one-shot close has its own requalification for exactly that case. Earlier states stay editable, and an
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md b/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
+index b21b5fcc7effc9ca860e1e5299f6110eaaaed540..3edec644344a42d2aaf4f4bf036b5a2ee4d93d7f 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
+@@ -45,6 +45,11 @@ from memory is not evidence; a quoted line from the transcript is.
+   the pre-restart and post-restart files back into one timeline before
+   drawing any conclusion about what happened "across the restart" — reading
+   only the final file silently drops everything before it.
++- A dispatched child has its own thread id. Naming the parent as the current
++  session in a prior-session selection is refused with
++  `MODEL-ROLE-SESSION-IDENTITY-CONFLICT`, by design: the host's identity wins
++  over a claim. Let the coordinator capture the source and hand the child the
++  captured file.
+ 
+ ## Standard categories to check every time
+ 
+diff --git a/plugins/pipeline-core/skills/reader-review/SKILL.md b/plugins/pipeline-core/skills/reader-review/SKILL.md
+index f07d2c77a92c8265fe79565534c891d506c78cf2..4ae631c43be1c25843363e6c33f8790214dd2597 100644
+--- a/plugins/pipeline-core/skills/reader-review/SKILL.md
++++ b/plugins/pipeline-core/skills/reader-review/SKILL.md
+@@ -35,7 +35,9 @@ course, including by silently starting another course for the same findings.
+ Count a batch once even if it spans several commits. Preserve the same course
+ ID, round counts, batches, reviewed snapshots, report pairs and remaining
+ findings across edits, commits, restarts and evidence renaming. Deleting a
+-report or making an evidence-only commit does not reset the count. Distinct new
++report or making an evidence-only commit does not reset the count, and an
++evidence-only commit (reports, receipts, no reviewed document changed) needs no
++review round of its own. Distinct new
+ documentation scope may require a new course, but must retain outstanding
+ findings from the previous one. A clean round needing no further document edits
+ can close through the ordinary v1 binding, including a single clean round.

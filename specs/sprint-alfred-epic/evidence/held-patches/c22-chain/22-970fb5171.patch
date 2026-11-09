@@ -1,0 +1,215 @@
+diff --git a/plugins/pipeline-core/lib/security-close-status.mjs b/plugins/pipeline-core/lib/security-close-status.mjs
+index 2d2edf0c5cb97336af354b57e852314aa2bca70a..40abb986d61daa7b342f4e0a9389ed1c1601b2c3 100644
+--- a/plugins/pipeline-core/lib/security-close-status.mjs
++++ b/plugins/pipeline-core/lib/security-close-status.mjs
+@@ -142,6 +142,28 @@ export function readScannerExceptions(projectDir, now = new Date()) {
+   return parseScannerExceptions(text, now);
+ }
+ 
++/**
++ * Candidate 22 (CGR-10): what a scanner entry's `ruleSet` (written by security-scan.mjs for a scanner that was invoked) says really ran, on one line:
++ * the config or rule file with where it came from, a digest prefix, the rule ids when they are known, and a short description. Null without a rule set.
++ * Never contains " -- " (the separator of the status lines).
++ */
++export function ruleSetSummary(ruleSet) {
++  if (ruleSet === null || typeof ruleSet !== "object") return null;
++  const ids = Array.isArray(ruleSet.ruleIds) && ruleSet.ruleIds.length > 0
++    ? `: ${ruleSet.ruleIds.join(", ")}${Number.isInteger(ruleSet.ruleCount) && ruleSet.ruleCount > ruleSet.ruleIds.length ? ` (+${ruleSet.ruleCount - ruleSet.ruleIds.length} more)` : ""}`
++    : "";
++  const digest = typeof ruleSet.sha256 === "string" && ruleSet.sha256 !== "" ? `, sha256 ${ruleSet.sha256.slice(0, 12)}` : "";
++  const note = typeof ruleSet.description === "string" && ruleSet.description !== "" ? ` - ${ruleSet.description}` : "";
++  return `${ruleSet.ref ?? "no config resolved"} (${ruleSet.source ?? "unknown"}${digest})${ids}${note}`.replace(/ -- /gu, " - ");
++}
++
++/** One line per scanner entry for the scan output: the rule set of a scanner that ran, else the plain statement that no rules ran. */
++export function formatRuleSetLine(entry) {
++  const ran = entry?.status === "PASS" || entry?.status === "FINDINGS";
++  const summary = ran ? ruleSetSummary(entry.ruleSet) : null;
++  return `${entry?.tool ?? "unknown"}: ${ran ? (summary ?? "ran, rule set not recorded") : "no rules ran (scanner did not execute)"}`;
++}
++
+ /**
+  * One {element, state, reason} per security element. `scanners` is the scan evidence's scanner list (or null when there is none);
+  * `enabled` maps an element to false when the calibration does not configure it. An element without an entry is "not applicable"
+@@ -158,7 +180,11 @@ export function securityCloseElements({ scanners = null, enabled = {}, critical
+   };
+   return SECURITY_ELEMENTS.map((element) => {
+     const entry = list.find((s) => s?.tool === element);
+-    if (entry) return excepted({ element, state: securityScannerState(entry, { critical }), reason: entry.reason ?? null });
++    if (entry) {
++      const state = securityScannerState(entry, { critical });
++      const rules = state === "passed" || state === "failed" ? ruleSetSummary(entry.ruleSet) : null;
++      return excepted({ element, state, reason: entry.reason ?? null, ...(rules === null ? {} : { rules }) });
++    }
+     if (enabled?.[element] === false) return { element, state: "not applicable", reason: "not configured for this project" };
+     return excepted({ element, state: "not executed", reason: "no scan evidence for this scanner" });
+   });
+@@ -177,9 +203,11 @@ export const unexcusedNotExecuted = (elements) => elements.filter((e) => e.state
+ // One line per exception: never contains a newline, and the " -- " that separates the reason from the label stays unique.
+ const oneLine = (value) => String(value).replace(/\s+/gu, " ").replace(/ -- /gu, " - ").trim();
+ export function formatSecurityCloseStatus(elements) {
+-  return elements.map(({ element, state, reason, exception }) => {
++  return elements.map(({ element, state, reason, exception, rules }) => {
+     const applied = exception ? ` [named exception: ${oneLine(exception.reason)}; expires ${exception.expires}; confirmed by ${oneLine(exception.confirmedBy)}]` : "";
+-    return `${element}: ${state}${applied}${reason ? ` -- ${reason}` : ""}`;
++    // Candidate 22 (CGR-10): a scanner that ran shows which rules or rule set really ran.
++    const ran = rules ? ` [rules: ${oneLine(rules)}]` : "";
++    return `${element}: ${state}${applied}${ran}${reason ? ` -- ${reason}` : ""}`;
+   });
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/security-scan.mjs b/plugins/pipeline-core/scripts/security-scan.mjs
+index f26c932ae4751867e1e8afbdcfe158153042810e..450ee181dc47ee20f4243d26c1eb9c07b970b80b 100644
+--- a/plugins/pipeline-core/scripts/security-scan.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.mjs
+@@ -96,10 +96,10 @@
+  *
+  * CLI: `node plugins/pipeline-core/scripts/security-scan.mjs [--root <dir>] [--timeout-ms N]`.
+  */
+-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmdirSync, statSync, writeFileSync } from "node:fs";
+ import { createHash } from "node:crypto";
+ import { tmpdir } from "node:os";
+-import { basename, dirname, join, resolve, sep } from "node:path";
++import { basename, dirname, join, relative, resolve, sep } from "node:path";
+ import { spawnSync } from "node:child_process";
+ import { fileURLToPath } from "node:url";
+ 
+@@ -112,7 +112,7 @@ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ // why "blocking" was chosen and why it moved rather than staying duplicated here.
+ import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
+ import {
+-  deriveReportStatus, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions,
++  deriveReportStatus, elementsOfCompletedScan, formatRuleSetLine, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions,
+ } from "../lib/security-close-status.mjs";
+ import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
+ import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
+@@ -270,6 +270,93 @@ function buildAdapterConfig(key, { rootDir, manifest, policiesPathAbs }) {
+   return {};
+ }
+ 
++// ---------------------------------------------------------------------------------------------
++// Candidate 22 (CGR-10): which rules or rule set each scanner REALLY ran. Written onto the scanner entry (`ruleSet`) for a scanner that was invoked,
++// from the very config the adapter was handed (never re-derived): where it came from, a digest of the bytes, the rule ids when a rule file lists them.
++// Plugin-shipped files are named `plugin:<path inside the plugin>` so no machine-specific path is recorded.
++// ---------------------------------------------------------------------------------------------
++const RULE_ID_LINE = /^\s*-\s+id:\s*["']?([^\s"']+)/gmu;
++const RULE_FILE = /\.ya?ml$/iu;
++const MAX_RULE_FILES = 200;
++const MAX_RULE_IDS = 50;
++
++function pluginRef(absPath) {
++  return `plugin:${relative(PLUGIN_ROOT, absPath).split(sep).join("/")}`;
++}
++
++function listRuleFiles(path) {
++  const files = [];
++  const visit = (current, depth) => {
++    if (files.length >= MAX_RULE_FILES) return;
++    let info;
++    try { info = statSync(current); } catch { return; }
++    if (info.isFile()) { if (RULE_FILE.test(current)) files.push(current); return; }
++    if (!info.isDirectory() || depth > 5) return;
++    let names;
++    try { names = readdirSync(current).sort(); } catch { return; }
++    for (const name of names) visit(join(current, name), depth + 1);
++  };
++  visit(path, 0);
++  return files;
++}
++
++function describeRuleSet(key, builtConfig, scanRoot) {
++  if (key === "gitleaks") {
++    const path = gitleaksAdapter.resolveGitleaksConfigPath();
++    const description = "extends the gitleaks built-in default ruleset (rule ids are the tool's own and are not listed here)";
++    if (path === null) return { source: "none", ref: null, sha256: null, description: "no gitleaks config could be resolved" };
++    const shipped = path.startsWith(PLUGIN_ROOT);
++    return { source: shipped ? "plugin-default" : "pipeline-repo", ref: shipped ? pluginRef(path) : ".gitleaks.toml", sha256: fileSha256(path), description };
++  }
++  if (key === "semgrep") {
++    const rulesDir = builtConfig.rulesDir;
++    if (typeof rulesDir !== "string") return { source: "registry-auto", ref: "auto", sha256: null, description: "semgrep registry mode; no local rule file was passed" };
++    const files = listRuleFiles(rulesDir);
++    const ids = [];
++    for (const file of files) {
++      let text = "";
++      try { text = readFileSync(file, "utf8"); } catch { /* an unreadable rule file lists no ids */ }
++      for (const match of text.matchAll(RULE_ID_LINE)) ids.push(match[1]);
++    }
++    const unique = [...new Set(ids)];
++    const shipped = builtConfig.rulesDirSource === "plugin-default";
++    const digests = files.map((file) => `${relative(rulesDir, file).split(sep).join("/")}\0${fileSha256(file)}`);
++    return {
++      source: builtConfig.rulesDirSource ?? "project",
++      ref: shipped ? pluginRef(rulesDir) : relative(scanRoot, rulesDir).split(sep).join("/") || ".",
++      sha256: files.length === 0 ? null : (files.length === 1 ? fileSha256(files[0]) : sha256(digests.join("\n"))),
++      ruleIds: unique.slice(0, MAX_RULE_IDS),
++      ruleCount: unique.length,
++      description: files.length === 0 ? "the configured rules path holds no rule file" : `${files.length} rule file${files.length === 1 ? "" : "s"}`,
++    };
++  }
++  if (key === "osv-scanner") {
++    return { source: "builtin", ref: "osv-scanner:auto-detect", sha256: null, description: "the osv.dev advisory database matched against the lockfiles and manifests found in the candidate tree; there is no rule file" };
++  }
++  const shipped = builtConfig.allowlistPathSource === "plugin-default";
++  return {
++    source: builtConfig.allowlistPathSource ?? "project",
++    ref: shipped ? pluginRef(builtConfig.allowlistPath) : relative(scanRoot, builtConfig.allowlistPath).split(sep).join("/"),
++    sha256: fileSha256(builtConfig.allowlistPath),
++    description: "the licence allowlist the declared licences are checked against",
++  };
++}
++
++/** One printed line per scanner: the rules or rule set that really ran, or that none did. */
++export function formatRuleSetLines(scanners) {
++  return (Array.isArray(scanners) ? scanners : []).map((entry) => formatRuleSetLine(entry));
++}
++
++/** What the v2 plan source means, in one sentence (candidate 22, CGR-10): `catalog-unavailable` is the normal state of a project that is not the Pipeline's own repository. */
++export function describePlanSource(source) {
++  const reporting = "this verdict is reporting only and does not affect the exit code";
++  if (source === "catalog-unavailable") {
++    return `by design for a project without the Pipeline's own control catalog (governance/security-controls/catalog.json is read from the scanned project and exists only in the Pipeline repository): the required-capability plan is empty, so the v2 verdict names no required capability; ${reporting}`;
++  }
++  if (source === "repo-catalog") return `the plan was sourced from this project's control catalog; ${reporting}`;
++  return `the control catalog could not be used (${source}); the required-capability plan is empty; ${reporting}`;
++}
++
+ /** Best-effort `project` name from the coherent authority layer, else dir basename. */
+ function resolveProjectName(rootDir, authority) {
+   try {
+@@ -827,7 +914,7 @@ function buildSecurityEvidenceV2({ rootDir, evidence, exitCode, scanners, findin
+     exitAuthority: "v1-blocking-logic",
+     note: "CYB-2E Option B (D9): this policy-complete v2 verdict is evidence/reporting only and does NOT govern the process exit code this wave; the exit-authority switch to the v2 verdict is CYB-2F.",
+     v1ExitCode: exitCode,
+-    plan: { required: plan.required, optional: plan.optional, planDigest: plan.planDigest, source: planSource, resolvedPolicyDigest },
++    plan: { required: plan.required, optional: plan.optional, planDigest: plan.planDigest, source: planSource, sourceNote: describePlanSource(planSource), resolvedPolicyDigest },
+     capabilityOutcomes,
+     verdict,
+     controls,
+@@ -970,6 +1057,7 @@ export async function runSecurityScan({
+           const result = await adapter.run(runArgs);
+           rawByTool[adapter.name] = result.raw ?? null; // CYB-2E: additive capture (see decl above)
+           entry = scannerEntry(adapter, result, fileSha256(inst.path));
++          entry.ruleSet = describeRuleSet(key, builtConfig, scanRoot); // CGR-10: what really ran, from the config the adapter was handed
+           if (key === "semgrep") {
+             // SEM-F: a degraded-coverage result (warn-level PartialParsing only) is merged onto the
+             // entry's existing {subject, exclusions} coverage object, never replacing those keys.
+@@ -1153,6 +1241,9 @@ function printSummary(evidence, critical = false, exceptions = null) {
+   for (const s of evidence.scanners) {
+     console.log(formatScannerLine(s));
+   }
++  // Candidate 22 (CGR-10): which rules or rule sets really ran, for each scanner.
++  console.log("Rules that ran:");
++  for (const line of formatRuleSetLines(evidence.scanners)) console.log(`  ${line}`);
+   // G20-25: the four-state close status (passed / failed / not executed / not applicable), so a scanner that did not run never
+   // reads like a passed scan next to a "policy exit 0". Candidate 21h: a critical calibration reads a skipped license-check as not
+   // executed and shows every applied named exception on its line.
+@@ -1244,6 +1335,7 @@ export async function main(argv = process.argv.slice(2)) {
+   if (evidenceV2) {
+     console.log(`v2 evidence written: ${join(evidenceBase, "evidence", "security-latest.v2.json")}`);
+     const b = verdictV2?.verdict;
++    console.log(`v2 plan source: ${verdictV2?.plan?.source} -- ${verdictV2?.plan?.sourceNote}`);
+     console.log(
+       `v2 policy-complete verdict (reporting-only, does NOT affect exit ${exitCode}): ` +
+         `${b?.blocking ? "BLOCKING" : "clean"} (${b?.offendingCapabilities?.length ?? 0} offending required capabilities)`,

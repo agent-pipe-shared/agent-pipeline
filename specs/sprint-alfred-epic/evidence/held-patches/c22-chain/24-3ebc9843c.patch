@@ -1,0 +1,149 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index bdb189c5f5c834ca7cdc8f58d8b52fee8bbd7a4e..9860dd2ee0976911be7e5e4a703d1ecb29242c79 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -1748,6 +1748,12 @@
+       "invariantPinned": "A Codex Critic launch always ends in a running Critic: only a passing sandbox preflight receipt selects the sandboxed role, every other case selects the labelled fallback with exit 0",
+       "nonOverlapNote": "Pure launch-route decision for the projected Critic role, distinct from the selected-host sandbox lane covered by critic-lane-fallback-tests"
+     },
++    {
++      "name": "antigravity-native-dispatch-prepare-tests",
++      "file": "plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.test.mjs",
++      "invariantPinned": "A branch workspace prepare names the untracked files before the host can refuse, without counting its own request file and without refusing",
++      "nonOverlapNote": "Prepare-script notice only, distinct from the coordinator and pretool suites of the Antigravity native dispatch"
++    },
+     {
+       "name": "codex-critic-selected-host-fallback-tests",
+       "file": "plugins/pipeline-core/scripts/codex-critic-selected-host-fallback.test.mjs",
+diff --git a/plugins/pipeline-core/lib/close-cleanup-receipt.mjs b/plugins/pipeline-core/lib/close-cleanup-receipt.mjs
+index 3455cb9069970294f2b7b52d5b4112ed262f950b..da095ac9b147571b89fb2f0752a41dc5f3fd67cb 100644
+--- a/plugins/pipeline-core/lib/close-cleanup-receipt.mjs
++++ b/plugins/pipeline-core/lib/close-cleanup-receipt.mjs
+@@ -49,6 +49,16 @@ export function buildCleanupReceipt({ descriptors, ownSessionId, candidateOid, c
+       || seen.has(descriptor.sessionId)) refuse("descriptor entry is invalid");
+     seen.add(descriptor.sessionId);
+   }
++  // LOOP-A2. An Antigravity close whose hook record is missing cannot name its own conversation, but the close was admitted by that
++  // runner's hook, so the one Antigravity descriptor of the listing that answers `unavailable` (all a still-running session can say of
++  // itself) is its own. The inference is labelled in what the digest binds. Several are never guessed between: they are named instead.
++  const antigravity = ownSessionId === null && ownSession?.runner === "antigravity"
++    ? descriptors.filter((descriptor) => descriptor.sessionId.startsWith("antigravity-")).map((descriptor) => descriptor.sessionId).sort()
++    : [];
++  if (antigravity.length === 1 && descriptors.find((descriptor) => descriptor.sessionId === antigravity[0]).status === "unavailable") {
++    ownSessionId = antigravity[0];
++    ownSession = { ...ownSession, derivation: "inferred-single-antigravity-descriptor", reason: "no hook record for this close; the only antigravity session descriptor, answering unavailable as a running session does for itself, is taken as the closing conversation (inferred, not observed)" };
++  }
+   const own = ownSessionId === null ? null : descriptors.find((descriptor) => descriptor.sessionId === ownSessionId) ?? null;
+   const others = descriptors
+     .filter((descriptor) => descriptor.sessionId !== ownSessionId)
+@@ -70,10 +80,17 @@ export function buildCleanupReceipt({ descriptors, ownSessionId, candidateOid, c
+   // A typed result for the case the old text got wrong: the own session could not be derived, so the closing session's own
+   // descriptor (if it has one) is among the "others". That is not "other sessions remain"; the person has to know which it is.
+   const ownSessionCode = ownSessionId === null && others.length > 0 && ownSession !== null ? "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED" : null;
++  const named = ownSessionCode !== null && antigravity.length > 0;
+   return {
+     observation,
+     observationSha256,
+     ownSessionCode,
++    // The own-session record that was really used, so a caller prints the inferred derivation and not the one it passed in.
++    ownSession,
++    ...(!named ? {} : {
++      ownSessionCandidates: antigravity,
++      ownSessionHint: `${antigravity.length} active antigravity session descriptor(s) exist (${antigravity.join(", ")}) and the closing conversation could not be told among them, so none is excluded. Run write-cleanup-receipt directly as a shell command (not inside another script): the Antigravity hook records the conversation of a command that names close-coordinator.mjs or finish-feature.mjs, and the receipt then excludes exactly that one. Otherwise check them with session-cleanup.mjs status, end or clear every one that is not this conversation, and write the receipt again.`,
++    }),
+     receipt: {
+       schema: CLEANUP_RECEIPT_SCHEMA,
+       status: others.length === 0 ? "complete" : "uncertain",
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 249de011deb8c9ff06a107c9e109995070e45750..6d1e58a6e6a740d05e172c1b7eacfe9f6e836a59 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -1030,14 +1030,17 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
+     excludedOwnSession: built.observation.excludedOwnSession,
+     ownSessionDerived: built.observation.ownSessionDerived,
+     otherActiveDescriptors: built.observation.otherActiveDescriptors,
+-    runner: ownSession.runner,
+-    ownSessionDerivation: ownSession.derivation,
+-    ownSessionReason: ownSession.reason,
++    runner: built.ownSession.runner,
++    ownSessionDerivation: built.ownSession.derivation,
++    ownSessionReason: built.ownSession.reason,
++    ...(built.ownSessionCandidates === undefined ? {} : { ownSessionCandidates: built.ownSessionCandidates }),
+     ...(built.ownSessionCode === null ? {} : { code: built.ownSessionCode }),
+     next: built.receipt.status === "complete"
+       ? `close-coordinator.mjs plan-transition --root ${root} --lifecycle ${values.lifecycle} --actor <name> --phase cleanup-complete --evidence ${receiptPath}`
++      : built.ownSessionHint !== undefined
++        ? `${built.ownSessionCode}: ${built.ownSessionHint} An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).`
+       : built.ownSessionCode !== null
+-        ? `${built.ownSessionCode}: this ${ownSession.runner} process could not tell which active session descriptor is its own (${ownSession.reason}), so it cannot exclude it and the receipt stays uncertain. Look at the listed descriptors (session-cleanup.mjs status): if the only remaining one is this closing session's own, the close needs the PO-accepted empty-input receipt convention (skills/close-feature, labelled operator-asserted); if another session is listed, end or clear it and write the receipt again. An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).`
++        ? `${built.ownSessionCode}: this ${built.ownSession.runner} process could not tell which active session descriptor is its own (${built.ownSession.reason}), so it cannot exclude it and the receipt stays uncertain. Look at the listed descriptors (session-cleanup.mjs status): if the only remaining one is this closing session's own, the close needs the PO-accepted empty-input receipt convention (skills/close-feature, labelled operator-asserted); if another session is listed, end or clear it and write the receipt again. An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).`
+         : "other active session descriptors remain; end or clear those sessions (session-cleanup.mjs status lists them), then write the receipt again. An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).",
+   };
+ }
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 7044476b0d42757b91b3fe3a61b00740b7ce8d2a..3104d8997ce8f602a983b5e753f31743299a7dce 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -855,6 +855,47 @@ test("17 cleanup receipt: an own session that could not be derived is a typed re
+   assert.equal(legacy.ownSessionCode, null);
+ });
+ 
++// LOOP-A2 (Antigravity greenfield 2026-11-09): a close stopped at CLOSE-CLEANUP-OWN-SESSION-UNDERIVED although the only descriptor was its own.
++// The hook record is the observation; when it is missing, exactly ONE antigravity descriptor in the listing of a close that the Antigravity
++// hook admitted can only be the closing conversation's own. It is labelled inferred in what the digest binds. Several are never guessed between.
++test("C22 A2 cleanup receipt: one Antigravity descriptor is the closing session, several are named and never guessed", () => {
++  const oid = h("c", 40); const tree = h("d", 40);
++  const agy = { runner: "antigravity", derivation: "unavailable", reason: "the antigravity hook recorded no current conversation for this close" };
++  const own = { sessionId: "antigravity-1a41c1ed-bb39-40db-b45a-866595bab590", descriptorSha256: h("1"), status: "unavailable" };
++  const other = { sessionId: "antigravity-99999999-aaaa-bbbb-cccc-dddddddddddd", descriptorSha256: h("2"), status: "unavailable" };
++  const build = (descriptors, ownSession = agy, ownSessionId = null) => buildCleanupReceipt({ descriptors, ownSessionId, candidateOid: oid, candidateTree: tree, ownSession });
++
++  const inferred = build([own]);
++  assert.equal(inferred.receipt.status, "complete");
++  assert.equal(inferred.ownSessionCode, null);
++  assert.equal(inferred.observation.ownSessionDerived, true);
++  assert.equal(inferred.observation.ownSessionDerivation, "inferred-single-antigravity-descriptor");
++  assert.equal(inferred.observation.excludedOwnSession.sessionId, own.sessionId, "the exclusion is named, never silent");
++  assert.deepEqual(inferred.observation.otherActiveDescriptors, []);
++  assert.equal(inferred.ownSession.derivation, "inferred-single-antigravity-descriptor", "the caller prints the derivation that was really used");
++  const observed = build([own], { runner: "antigravity", derivation: "observed", reason: "x" }, own.sessionId);
++  assert.notEqual(inferred.observationSha256, observed.observationSha256, "an inferred own session is not digest-equal to an observed one");
++
++  const several = build([own, other]);
++  assert.equal(several.receipt.status, "uncertain");
++  assert.equal(several.ownSessionCode, "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED");
++  assert.equal(several.observation.ownSessionDerived, false);
++  assert.deepEqual(several.ownSessionCandidates, [own.sessionId, other.sessionId].sort());
++  for (const id of several.ownSessionCandidates) assert.ok(several.ownSessionHint.includes(id), several.ownSessionHint);
++  assert.match(several.ownSessionHint, /session-cleanup\.mjs status/u);
++  assert.match(several.ownSessionHint, /directly as a shell command/u, "the hint names the exact way the hook records the closing conversation");
++
++  const foreignRunner = build([own, { sessionId: "codex-33333333", descriptorSha256: h("3"), status: "unavailable" }]);
++  assert.equal(foreignRunner.receipt.status, "uncertain", "a non-Antigravity descriptor still counts as another session");
++  assert.equal(foreignRunner.observation.excludedOwnSession.sessionId, own.sessionId);
++  assert.equal(foreignRunner.ownSessionCode, null, "the own session is inferred, so what remains is the ordinary 'others remain' result");
++
++  assert.equal(build([own], { ...agy, runner: "codex" }).ownSessionCode, "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED", "only an Antigravity close infers");
++  assert.equal(build([{ ...own, status: "live" }]).ownSessionCode, "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED", "a descriptor that answers as live is not the still-running closing session");
++  assert.equal(build([{ ...own, status: "not-live" }]).receipt.status, "uncertain");
++  assert.equal(build([own], agy, own.sessionId).observation.ownSessionDerivation, "unavailable", "a derived own session leaves the observation as the caller reported it");
++});
++
+ test("process: drive names the missing input, plans without writing, applies one step, writes the cleanup receipt itself and stops at a human gate", () => {
+   const f = processFixture("drive", { stopAfterFreeze: true });
+   const drive = (extra, status = 0) => f.invoke(["drive", "--root", f.root, "--lifecycle", f.lifecycle, "--actor", "PO", ...extra], status);
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 0db6a9c95832913bea67407ecb5012886b1ab459..a610175543b5299063e61a048ecd922d1ae786ba 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -220,7 +220,9 @@ named in the stored observation (`cleanup-observation.json`, beside the receipt)
+ the SHA-256 of that observation. Every OTHER active descriptor counts: `complete` only when none remains, otherwise
+ `uncertain`, and the output lists them. When the own session cannot be derived (the runner exposed no usable session
+ id), nothing is excluded, the receipt cannot be `complete` while any descriptor exists, and the output carries the
+-typed code `CLOSE-CLEANUP-OWN-SESSION-UNDERIVED` instead of claiming that other sessions remain. A project with no descriptor at all
++typed code `CLOSE-CLEANUP-OWN-SESSION-UNDERIVED` instead of claiming that other sessions remain. On Antigravity, exactly one
++`antigravity-` descriptor answering `unavailable` is taken as the closing conversation and labelled
++`inferred-single-antigravity-descriptor`; with several, none is excluded and the output names them and the way out. A project with no descriptor at all
+ gets `complete` with an observation that says so (no hand-chosen digest is needed any more). `uncertain` is accepted
+ by `cleanup-complete`, but `closed-local` is then refused with `CLOSE-CLEANUP`; end or clear the other sessions,
+ write the receipt again, and run `cleanup-complete` again with the new file (a later `cleanup-complete` with

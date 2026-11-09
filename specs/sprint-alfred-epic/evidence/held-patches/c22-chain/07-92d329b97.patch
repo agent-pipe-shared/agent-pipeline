@@ -1,0 +1,599 @@
+diff --git a/plugins/pipeline-core/lib/close-quality-readback.mjs b/plugins/pipeline-core/lib/close-quality-readback.mjs
+index 3fa731e1a3ada24f7256cb4438f86a51c1dba5f7..4d2ad8433ea88088e83c072a9ebcea7d56147810 100644
+--- a/plugins/pipeline-core/lib/close-quality-readback.mjs
++++ b/plugins/pipeline-core/lib/close-quality-readback.mjs
+@@ -17,7 +17,7 @@
+ // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
+ 
+ import { createHash } from "node:crypto";
+-import { elementsOfCompletedScan, formatSecurityCloseStatus } from "./security-close-status.mjs";
++import { SCANNER_EXCEPTIONS_PATH, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, parseScannerExceptions } from "./security-close-status.mjs";
+ import { inspectSpecJourneys, JOURNEY_REPAIR } from "./spec-journey-coverage.mjs";
+ 
+ export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
+@@ -52,7 +52,13 @@ function securityRow(readers) {
+   const scan = call(readers.readBytes, SECURITY_SCAN_PATH);
+   if (scan.ok) {
+     try {
+-      const states = formatSecurityCloseStatus(elementsOfCompletedScan(JSON.parse(Buffer.from(scan.value).toString("utf8")).scanners)).map((line) => line.split(" -- ")[0]);
++      // Candidate 21h: the same critical reading and named exceptions as the close gate, read through the injected reader (a reader that
++      // cannot supply the calibration or the exception file leaves the non-critical reading, which the readback never claims beyond).
++      const text = (rel) => { const read = call(readers.readBytes, rel); return read.ok ? Buffer.from(read.value).toString("utf8") : null; };
++      const stakesOf = (rel) => { try { const stakes = JSON.parse(text(rel))?.stakes; return typeof stakes === "string" ? stakes : null; } catch { return null; } };
++      const critical = isCriticalStakes(stakesOf("project/pipeline.json") ?? stakesOf(".claude/pipeline.json"));
++      const exceptions = critical ? parseScannerExceptions(text(SCANNER_EXCEPTIONS_PATH)) : null;
++      const states = formatSecurityCloseStatus(elementsOfCompletedScan(JSON.parse(Buffer.from(scan.value).toString("utf8")).scanners, { critical, exceptions })).map((line) => line.split(" -- ")[0]);
+       return row(id, "present", `${SECURITY_ENVELOPE_PATH} (${states.join("; ")})`);
+     } catch { /* unreadable scan result: fall through to the bare path */ }
+   }
+diff --git a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+index b1ff0bea96e6827efed19c089de1808dc1351407..57afe76797b23de1c437b8d10450814814d9546e 100644
+--- a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
++++ b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+@@ -340,3 +340,222 @@ test("C12 a refused repair leaves every byte and the directory unchanged; twin m
+   const { SECURITY_GATE_BLOCK } = await import("../../scripts/security-gate-configure.mjs");
+   assert.equal(SECURITY_GATE_BLOCK, BLOCK());
+ });
++
++// ---- C13-C19 (Candidate 21h, CGF-05, AC-108; PO decision 2026-11-09): in a critical calibration a SKIPPED scanner blocks the close unless a
++// named, expiring exception was recorded beforehand. Written from the decision text, not from the code: `not applicable` keeps its reason,
++// every other calibration reads exactly as before, the exception only answers "did not run" (never findings), every applied exception is
++// shown and reads differently from `passed`, and the refusal names both ways out (install/configure, or the exact exception file and shape).
++const EXCEPTIONS_PATH = "project/security-scanner-exceptions.json";
++const EXCEPTIONS_SCHEMA = "pipeline.security-scanner-exceptions.v1";
++const FUTURE = "2999-01-01T00:00:00Z";
++const PAST = "2000-01-01T00:00:00Z";
++const exception = (over = {}) => ({ scanner: "license-check", reason: "no licence policy is declared for this internal tool", expires: FUTURE, confirmedBy: "chat-2026-11-09", ...over });
++const writeExceptions = (dir, entries, schema = EXCEPTIONS_SCHEMA) => writeJson(dir, EXCEPTIONS_PATH, { schema, exceptions: entries });
++// A clean capability scan (gitleaks passed) whose license-check control was skipped: license-check is a control, so the real scan records it
++// in the verdict document's `controls`, never in the envelope's `capabilities`.
++function licenseSkipped(dir) {
++  evidence(dir, { status: "PASS", classification: "success", outcome: "pass" });
++  const verdictPath = join(dir, "evidence/security-latest.v2.verdict.json");
++  const doc = JSON.parse(readFileSync(verdictPath, "utf8"));
++  doc.controls = [{ control: "license-check", tool: "license-check", capabilityId: null, controlRef: null, required: false, status: "SKIPPED", classification: "success", runOutcome: "not-applicable", controlResult: "not-applicable", reason: "no license policy configured" }];
++  writeFileSync(verdictPath, JSON.stringify(doc));
++}
++const gateFailures = (dir) => checkSecurityCompleteness({ projectDir: dir, commit: HEAD, tree: TREE });
++
++test("C13 critical + a skipped license-check is a typed block that names both ways out; standard stays admitted", () => {
++  const dir = project("critical");
++  licenseSkipped(dir);
++  const failures = gateFailures(dir);
++  assert.equal(failures.length, 1, failures.join("\n"));
++  assert.match(failures[0], /SEC-CLOSE-SCANNER-NOT-EXECUTED/u);
++  assert.match(failures[0], /license-check/u);
++  assert.match(failures[0], /Install license-check|configure license-check/u, "way 1: install or configure the scanner");
++  assert.match(failures[0], /node <plugin-root>\/scripts\/security-scan\.mjs/u);
++  assert.match(failures[0], /project\/security-scanner-exceptions\.json/u, "way 2: the exact exception file");
++  for (const word of ["pipeline.security-scanner-exceptions.v1", "scanner", "reason", "expires", "confirmedBy", "before the candidate"]) assert.ok(failures[0].includes(word), word);
++  const standard = project("standard");
++  licenseSkipped(standard);
++  assert.deepEqual(gateFailures(standard), []);
++});
++
++test("C13b the state reading: critical turns a skipped license-check into not executed; no package sources stays not applicable with its reason", () => {
++  const list = scanners(["license-check", "SKIPPED", "success"], ["osv-scanner", "SKIPPED", "success"]).map((s) => ({ ...s, reason: `${s.tool} reason` }));
++  const critical = Object.fromEntries(securityCloseElements({ scanners: list, critical: true }).map((e) => [e.element, e]));
++  assert.equal(critical["license-check"].state, "not executed");
++  assert.equal(critical["osv-scanner"].state, "not applicable");
++  assert.equal(critical["osv-scanner"].reason, "osv-scanner reason");
++  const standard = Object.fromEntries(securityCloseElements({ scanners: list }).map((e) => [e.element, e.state]));
++  assert.equal(standard["license-check"], "not applicable", "non-critical reads exactly as before");
++});
++
++test("C14 a valid named exception lets that one scanner pass the critical gate and is shown, never as passed", async () => {
++  const { readScannerExceptions } = await import("../security-close-status.mjs");
++  const dir = project("critical");
++  licenseSkipped(dir);
++  writeExceptions(dir, [exception()]);
++  assert.deepEqual(gateFailures(dir), []);
++  const read = readScannerExceptions(dir);
++  assert.equal(read.valid.length, 1);
++  const lines = formatSecurityCloseStatus(securityCloseElements({ scanners: scanners(["license-check", "SKIPPED", "success"]), critical: true, exceptions: read })).filter((l) => l.startsWith("license-check"));
++  assert.equal(lines.length, 1);
++  assert.match(lines[0], /license-check: not executed/u);
++  for (const text of ["named exception", "no licence policy is declared for this internal tool", FUTURE, "chat-2026-11-09"]) assert.ok(lines[0].includes(text), text);
++  assert.doesNotMatch(lines[0], /: (passed|ok)\b/iu);
++  // The exception covers only the scanner it names: a second skipped scanner is still refused.
++  const second = project("critical");
++  evidence(second, { status: "SKIPPED", classification: "binary_missing", outcome: "not-applicable" });
++  writeExceptions(second, [exception()]);
++  const refused = gateFailures(second);
++  assert.equal(refused.length, 1, refused.join("\n"));
++  assert.match(refused[0], /gitleaks/u);
++  writeExceptions(second, [exception({ scanner: "gitleaks" })]);
++  assert.deepEqual(gateFailures(second), [], "a capability scanner is covered by its own entry");
++});
++
++test("C14b a scanner the capability plan marks required is covered by its own exception too, and still blocks without one", () => {
++  const dir = project("critical");
++  evidence(dir, { status: "SKIPPED", classification: "binary_missing", outcome: "required-capability-missing", blocking: true, optional: false });
++  const blocked = gateFailures(dir);
++  assert.ok(blocked.some((f) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(f)), blocked.join("\n"));
++  writeExceptions(dir, [exception({ scanner: "gitleaks" })]);
++  assert.deepEqual(gateFailures(dir), []);
++  const standard = project("standard");
++  evidence(standard, { status: "SKIPPED", classification: "binary_missing", outcome: "required-capability-missing", blocking: true, optional: false });
++  writeExceptions(standard, [exception({ scanner: "gitleaks" })]);
++  assert.equal(gateFailures(standard).length, 1, "outside the critical profile the exception file changes nothing");
++});
++
++test("C15 an expired, malformed or unknown entry is ignored for admission and named in the refusal", () => {
++  const cases = [
++    ["expired", exception({ expires: PAST }), /expired/u],
++    ["unknown scanner", exception({ scanner: "trivy" }), /unknown scanner/u],
++    ["reason too long", exception({ reason: "x".repeat(501) }), /500/u],
++    ["blank reason", exception({ reason: "   " }), /reason/u],
++    ["missing confirmedBy", exception({ confirmedBy: undefined }), /confirmedBy/u],
++    ["bad expires", exception({ expires: "tomorrow" }), /expires/u],
++  ];
++  for (const [label, entry, word] of cases) {
++    const dir = project("critical");
++    licenseSkipped(dir);
++    writeExceptions(dir, [entry]);
++    const failures = gateFailures(dir);
++    assert.equal(failures.length, 1, `${label}: ${failures.join("\n")}`);
++    assert.match(failures[0], /SEC-CLOSE-SCANNER-NOT-EXECUTED/u, label);
++    assert.match(failures[0], word, `${label}: the refusal names why the entry was ignored`);
++  }
++  const wrongSchema = project("critical");
++  licenseSkipped(wrongSchema);
++  writeExceptions(wrongSchema, [exception()], "pipeline.security-scanner-exceptions.v0");
++  assert.match(gateFailures(wrongSchema)[0], /schema/u);
++  const notJson = project("critical");
++  licenseSkipped(notJson);
++  put(notJson, EXCEPTIONS_PATH, "{ not json");
++  assert.match(gateFailures(notJson)[0], /JSON/u);
++  // One bad entry does not poison a good one.
++  const mixed = project("critical");
++  licenseSkipped(mixed);
++  writeExceptions(mixed, [exception({ expires: PAST }), exception()]);
++  assert.deepEqual(gateFailures(mixed), []);
++});
++
++test("C16 a scanner that ran and reported findings is never covered by an exception", () => {
++  const dir = project("critical");
++  evidence(dir, { status: "FINDINGS", classification: "findings", outcome: "findings", blocking: true, optional: false });
++  const without = gateFailures(dir);
++  assert.equal(without.length, 1, without.join("\n"));
++  writeExceptions(dir, [exception({ scanner: "gitleaks" })]);
++  assert.deepEqual(gateFailures(dir), without, "the exception changes nothing for a scanner that ran");
++  const elements = securityCloseElements({ scanners: scanners(["gitleaks", "FINDINGS", "findings"]), critical: true, exceptions: { valid: [exception({ scanner: "gitleaks" })], rejected: [] } });
++  const gitleaks = elements.find((e) => e.element === "gitleaks");
++  assert.equal(gitleaks.state, "failed");
++  assert.ok(!formatSecurityCloseStatus([gitleaks]).join("").includes("named exception"));
++});
++
++test("C17 the close.pre entry point: critical + skipped license-check exits 2; with a valid exception it exits 0, prints the exception and never GREEN", () => {
++  const closeLicense = (stakes, exceptionEntries) => {
++    const fixture = closeFixture({ gate: "blocking", stakes });
++    licenseSkipped(fixture.dir);
++    const envelopePath = join(fixture.dir, "evidence/security-latest.v2.json");
++    const envelope = JSON.parse(readFileSync(envelopePath, "utf8"));
++    envelope.input.commit = fixture.commit;
++    envelope.input.tree = fixture.tree;
++    writeFileSync(envelopePath, JSON.stringify(envelope));
++    // The scan lists every scanner the project enables; only license-check was skipped (osv-scanner found no package sources).
++    writeJson(fixture.dir, "evidence/security-latest.json", { scanners: [
++      { tool: "gitleaks", status: "PASS", classification: "success" }, { tool: "osv-scanner", status: "SKIPPED", classification: "success", reason: "no package sources in project" },
++      { tool: "semgrep", status: "PASS", classification: "success" }, { tool: "license-check", status: "SKIPPED", classification: "success", reason: "no license policy configured" },
++    ] });
++    if (exceptionEntries) writeExceptions(fixture.dir, exceptionEntries);
++    return runClose(fixture.dir);
++  };
++  const refused = closeLicense("critical", null);
++  assert.equal(refused.status, 2, refused.stdout + refused.stderr);
++  assert.match(refused.stderr, /SEC-CLOSE-SCANNER-NOT-EXECUTED/u);
++  assert.match(refused.stderr, /license-check/u);
++  const admitted = closeLicense("critical", [exception()]);
++  assert.equal(admitted.status, 0, admitted.stdout + admitted.stderr);
++  assert.match(admitted.stdout, /license-check: not executed/u);
++  for (const text of ["named exception", "no licence policy is declared for this internal tool", FUTURE, "chat-2026-11-09"]) assert.ok(admitted.stdout.includes(text), text);
++  assert.match(admitted.stdout, /NAMED EXCEPTION/u);
++  assert.doesNotMatch(admitted.stdout, /GREEN/u);
++  assert.doesNotMatch(admitted.stdout, /license-check: (passed|ok)\b/iu);
++  const standard = closeLicense("standard", null);
++  assert.equal(standard.status, 0, standard.stdout + standard.stderr);
++  assert.match(standard.stdout, /license-check: not applicable/u);
++});
++
++test("C18 the Verify security check and the scan summary apply the same reading and show each applied exception", async () => {
++  const { runSecurityCloseCheck } = await import("../../scripts/security-close-check.mjs");
++  const { deriveSummaryVerdict } = await import("../../scripts/security-scan.mjs");
++  const gateFile = "schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: blocking\n    type: automated\n";
++  const make = (stakes) => { const root = project(stakes); put(root, ".claude/pipeline.yaml", gateFile); return root; };
++  const run = (root) => {
++    const lines = [];
++    const log = console.log; const error = console.error;
++    console.log = (...a) => lines.push(a.join(" ")); console.error = (...a) => lines.push(a.join(" "));
++    try { return { code: runSecurityCloseCheck(root, { PATH: "", Path: "", HOME: root }), text: lines.join("\n") }; } finally { console.log = log; console.error = error; }
++  };
++  // No scanner binary on this PATH: gitleaks, osv-scanner and semgrep did not execute, and license-check has no policy (skipped).
++  const bare = run(make("critical"));
++  assert.equal(bare.code, 1);
++  assert.match(bare.text, /license-check/u, "the skipped license-check is refused in the Verify path too");
++  assert.match(bare.text, /project\/security-scanner-exceptions\.json/u);
++  const all = make("critical");
++  writeExceptions(all, ["gitleaks", "osv-scanner", "semgrep", "license-check"].map((scanner) => exception({ scanner })));
++  const admitted = run(all);
++  assert.equal(admitted.code, 0, admitted.text);
++  const partial = make("critical");
++  writeExceptions(partial, ["gitleaks", "osv-scanner", "semgrep"].map((scanner) => exception({ scanner })));
++  const stillRefused = run(partial);
++  assert.equal(stillRefused.code, 1);
++  assert.match(stillRefused.text, /license-check/u);
++  // The scan's own summary reads a skipped license-check as an incomplete scan in a critical project only.
++  const skippedEvidence = { exitCode: 0, scanners: [{ tool: "license-check", status: "SKIPPED", classification: "success", reportStatus: "not-configured" }] };
++  assert.equal(deriveSummaryVerdict(skippedEvidence), "NOT CONFIGURED");
++  assert.equal(deriveSummaryVerdict(skippedEvidence, { critical: true }), "INCOMPLETE");
++  // The real CLI prints the status lines with the exception applied.
++  const cli = make("critical");
++  writeExceptions(cli, [exception()]);
++  const res = spawnSync(process.execPath, [scanScript, "--root", cli, "--timeout-ms", "5000"], { encoding: "utf8", shell: false, env: { HOME: cli, USERPROFILE: cli, SystemRoot: process.env.SystemRoot ?? "", PATH: "", Path: "" } });
++  assert.match(res.stdout, /^ {2}license-check: not executed.*named exception.*chat-2026-11-09/mu, res.stdout + res.stderr);
++  const plain = make("standard");
++  const plainRes = spawnSync(process.execPath, [scanScript, "--root", plain, "--timeout-ms", "5000"], { encoding: "utf8", shell: false, env: { HOME: plain, USERPROFILE: plain, SystemRoot: process.env.SystemRoot ?? "", PATH: "", Path: "" } });
++  assert.match(plainRes.stdout, /^ {2}license-check: not applicable/mu, plainRes.stdout + plainRes.stderr);
++});
++
++test("C19 the close quality readback names an applied exception in its security evidence", async () => {
++  const { closeQualityReadback } = await import("../close-quality-readback.mjs");
++  const files = {
++    "evidence/security-latest.json": JSON.stringify({ scanners: [{ tool: "gitleaks", status: "PASS", classification: "success" }, { tool: "license-check", status: "SKIPPED", classification: "success" }] }),
++    "project/pipeline.json": JSON.stringify({ stakes: "critical" }),
++    [EXCEPTIONS_PATH]: JSON.stringify({ schema: EXCEPTIONS_SCHEMA, exceptions: [exception()] }),
++  };
++  const readers = { exists: (p) => p.startsWith("evidence/security-latest.v2"), readBytes: (p) => { if (!(p in files)) throw new Error("absent"); return Buffer.from(files[p]); }, listDir: () => [] };
++  const row = closeQualityReadback({ root: "<root>", featureId: "feature", readers }).find((r) => r.id === "security-scan");
++  assert.equal(row.status, "present");
++  assert.match(row.evidence, /license-check: not executed/u);
++  assert.ok(row.evidence.includes("named exception") && row.evidence.includes("chat-2026-11-09"), row.evidence);
++  const noException = closeQualityReadback({ root: "<root>", featureId: "feature", readers: { ...readers, readBytes: (p) => { if (p === EXCEPTIONS_PATH || !(p in files)) throw new Error("absent"); return Buffer.from(files[p]); } } }).find((r) => r.id === "security-scan");
++  assert.match(noException.evidence, /license-check: not executed/u);
++  assert.ok(!noException.evidence.includes("named exception"));
++});
+diff --git a/plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs b/plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs
+index 87eaa6b7a65e8f590823a9236039f115d9385dda..e91905caf14bfe2ff1c110c54d3f32ab6bb11451 100644
+--- a/plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs
++++ b/plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs
+@@ -137,7 +137,9 @@ test("P4: formatter contract on literal entries (suffix only for degraded + file
+ 
+ test("P4: the CLI summary printer routes every scanner line through formatScannerLine", () => {
+   const src = readFileSync(SCRIPT, "utf8");
+-  const m = src.match(/function printSummary\(evidence\) \{[\s\S]*?\n\}/);
++  // QG-04 restatement (Candidate 21h, CGF-05): printSummary gained two optional parameters (the calibration's critical reading and the named
++  // scanner exceptions) so the close status lines honour them; the assertion on the scanner-line loop below is unchanged.
++  const m = src.match(/function printSummary\(evidence(?:, [^)]*)?\) \{[\s\S]*?\n\}/);
+   assert.ok(m, "printSummary found");
+   assert.match(m[0], /for \(const s of evidence\.scanners\) \{\s*console\.log\(formatScannerLine\(s\)\);\s*\}/);
+ });
+diff --git a/plugins/pipeline-core/lib/security-close-status.mjs b/plugins/pipeline-core/lib/security-close-status.mjs
+index abc94b10380ebcc4d219ad734930ca152bd07d9e..b0dd0d51872426b0c234c6668dd16dd08f990981 100644
+--- a/plugins/pipeline-core/lib/security-close-status.mjs
++++ b/plugins/pipeline-core/lib/security-close-status.mjs
+@@ -44,12 +44,17 @@ export function deriveReportStatus({ tool, status, classification }) {
+   return "tool-unavailable";
+ }
+ 
+-/** The four-state reading of one scanner entry {tool, status, classification, reason?}. */
+-export function securityScannerState(entry) {
++/**
++ * The four-state reading of one scanner entry {tool, status, classification, reason?}. `critical` (Candidate 21h, CGF-05): in a critical
++ * calibration a skipped license-check ("not-configured") did not run, so it reads "not executed" like every other scanner that did not run;
++ * every other calibration keeps "not applicable". osv-scanner's "no package sources" result stays "not applicable" in both.
++ */
++export function securityScannerState(entry, { critical = false } = {}) {
+   const label = entry?.reportStatus ?? deriveReportStatus(entry ?? {});
+   if (label === "passed") return "passed";
+   if (label === "findings") return "failed";
+-  if (label === "not-configured" || label === "not-applicable") return "not applicable";
++  if (label === "not-configured") return critical ? "not executed" : "not applicable";
++  if (label === "not-applicable") return "not applicable";
+   return "not executed"; // tool-unavailable, error, or an unrecognised status: the scanner did not complete a scan
+ }
+ 
+@@ -75,30 +80,94 @@ export function readCalibrationStakes(projectDir) {
+   return null;
+ }
+ 
++// The named exception for a scanner that did not run (Candidate 21h, CGF-05; PO decision 2026-11-09): one committed file, entries with the
++// scanner, a reason, an expiry and the label the human gave in chat. Same strength as the per-finding ignore (reason + expiry, listed in the
++// close evidence, confirmed in chat, no signature). It only ever answers "did not run": a scanner that reported findings reads "failed".
++export const SCANNER_EXCEPTIONS_PATH = "project/security-scanner-exceptions.json";
++export const SCANNER_EXCEPTIONS_SCHEMA = "pipeline.security-scanner-exceptions.v1";
++export const SCANNER_EXCEPTION_REASON_MAX = 500;
++const ISO_8601 = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/u;
++const nonBlank = (value) => typeof value === "string" && value.trim() !== "";
++
++/**
++ * Parses the exception file text (null = no file). Returns {valid, rejected}: `valid` are the entries that may admit a scanner,
++ * `rejected` are {ref, why} for every file-level or entry-level problem (expired, malformed, unknown scanner), which the refusal names.
++ */
++export function parseScannerExceptions(text, now = new Date()) {
++  if (text === null) return { valid: [], rejected: [] };
++  const rejectFile = (why) => ({ valid: [], rejected: [{ ref: SCANNER_EXCEPTIONS_PATH, why }] });
++  let doc;
++  try { doc = JSON.parse(text); } catch { return rejectFile("not valid JSON"); }
++  if (doc?.schema !== SCANNER_EXCEPTIONS_SCHEMA) return rejectFile(`schema must be ${SCANNER_EXCEPTIONS_SCHEMA}`);
++  if (!Array.isArray(doc.exceptions)) return rejectFile("exceptions must be an array");
++  const valid = [];
++  const rejected = [];
++  doc.exceptions.forEach((entry, index) => {
++    const ref = `entry ${index}${typeof entry?.scanner === "string" ? ` (${entry.scanner})` : ""}`;
++    const problem = (() => {
++      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return "not an object";
++      if (!SECURITY_ELEMENTS.includes(entry.scanner)) return `unknown scanner (one of ${SECURITY_ELEMENTS.join(", ")})`;
++      if (!nonBlank(entry.reason)) return "reason is missing or blank";
++      if (entry.reason.length > SCANNER_EXCEPTION_REASON_MAX) return `reason is longer than ${SCANNER_EXCEPTION_REASON_MAX} characters`;
++      if (!nonBlank(entry.confirmedBy)) return "confirmedBy is missing or blank";
++      if (typeof entry.expires !== "string" || !ISO_8601.test(entry.expires) || Number.isNaN(Date.parse(entry.expires))) return "expires is not an ISO-8601 date";
++      if (Date.parse(entry.expires) <= now.getTime()) return `expired (${entry.expires})`;
++      return null;
++    })();
++    if (problem) rejected.push({ ref, why: problem });
++    else valid.push({ scanner: entry.scanner, reason: entry.reason, expires: entry.expires, confirmedBy: entry.confirmedBy });
++  });
++  return { valid, rejected };
++}
++
++/** The exceptions of the project under `projectDir` (committed file; absent = none). Pure and offline. */
++export function readScannerExceptions(projectDir, now = new Date()) {
++  const path = join(projectDir, SCANNER_EXCEPTIONS_PATH);
++  if (!existsSync(path)) return { valid: [], rejected: [] };
++  let text;
++  try { text = readFileSync(path, "utf8"); } catch { return { valid: [], rejected: [{ ref: SCANNER_EXCEPTIONS_PATH, why: "could not be read" }] }; }
++  return parseScannerExceptions(text, now);
++}
++
+ /**
+  * One {element, state, reason} per security element. `scanners` is the scan evidence's scanner list (or null when there is none);
+  * `enabled` maps an element to false when the calibration does not configure it. An element without an entry is "not applicable"
+  * when not configured and "not executed" when configured -- no evidence never reads like a passed scan.
++ * `critical` applies the critical reading (securityScannerState); `exceptions` ({valid, rejected} of readScannerExceptions) is honoured only
++ * then: an element that did not execute and has a valid exception keeps the state "not executed" and carries the entry as `exception`, so it
++ * is printed with its reason, expiry and confirmer and can never read like "passed".
+  */
+-export function securityCloseElements({ scanners = null, enabled = {} } = {}) {
++export function securityCloseElements({ scanners = null, enabled = {}, critical = false, exceptions = null } = {}) {
+   const list = Array.isArray(scanners) ? scanners : [];
++  const excepted = (base) => {
++    const entry = critical && base.state === "not executed" ? exceptions?.valid?.find((e) => e.scanner === base.element) : null;
++    return entry ? { ...base, exception: entry } : base;
++  };
+   return SECURITY_ELEMENTS.map((element) => {
+     const entry = list.find((s) => s?.tool === element);
+-    if (entry) return { element, state: securityScannerState(entry), reason: entry.reason ?? null };
++    if (entry) return excepted({ element, state: securityScannerState(entry, { critical }), reason: entry.reason ?? null });
+     if (enabled?.[element] === false) return { element, state: "not applicable", reason: "not configured for this project" };
+-    return { element, state: "not executed", reason: "no scan evidence for this scanner" };
++    return excepted({ element, state: "not executed", reason: "no scan evidence for this scanner" });
+   });
+ }
+ 
+ /** The elements of a scan that completed: it lists every scanner the project enables, so an element missing from it is not configured. */
+-export function elementsOfCompletedScan(scanners) {
++export function elementsOfCompletedScan(scanners, options = {}) {
+   const list = Array.isArray(scanners) ? scanners : [];
+   const enabled = Object.fromEntries(SECURITY_ELEMENTS.filter((e) => !list.some((s) => s?.tool === e)).map((e) => [e, false]));
+-  return securityCloseElements({ scanners: list, enabled });
++  return securityCloseElements({ ...options, scanners: list, enabled });
+ }
+ 
++/** The elements that did not execute and no named exception covers: these are what a critical calibration refuses. */
++export const unexcusedNotExecuted = (elements) => elements.filter((e) => e.state === "not executed" && !e.exception);
++
++// One line per exception: never contains a newline, and the " -- " that separates the reason from the label stays unique.
++const oneLine = (value) => String(value).replace(/\s+/gu, " ").replace(/ -- /gu, " - ").trim();
+ export function formatSecurityCloseStatus(elements) {
+-  return elements.map(({ element, state, reason }) => `${element}: ${state}${reason ? ` -- ${reason}` : ""}`);
++  return elements.map(({ element, state, reason, exception }) => {
++    const applied = exception ? ` [named exception: ${oneLine(exception.reason)}; expires ${exception.expires}; confirmed by ${oneLine(exception.confirmedBy)}]` : "";
++    return `${element}: ${state}${applied}${reason ? ` -- ${reason}` : ""}`;
++  });
+ }
+ 
+ /**
+@@ -116,7 +185,12 @@ export function securityGateNotConfiguredRefusal(root, where = "this check") {
+ }
+ 
+ /** The typed refusal of a critical calibration for a scanner that did not execute: names the scanner and the commands that repair it. */
+-export function scannerNotExecutedRefusal(element, where = "the security evidence") {
++export function scannerNotExecutedRefusal(element, where = "the security evidence", { rejected = [] } = {}) {
++  const ignored = rejected.length > 0 ? ` Exception entries ignored: ${rejected.map((r) => `${r.ref}: ${r.why}`).join("; ")}.` : "";
+   return `${SCANNER_NOT_EXECUTED_CODE}: ${element} did not execute (${where}) and this project is calibrated critical (stakes in the project calibration). `
+-    + `Install ${element} (platform guidance: ${SECURITY_PREFLIGHT_COMMAND}), then run: ${SECURITY_RUN_COMMAND}`;
++    + `Install or configure ${element} (platform guidance: ${SECURITY_PREFLIGHT_COMMAND}), then run: ${SECURITY_RUN_COMMAND}. `
++    + `Or record a named exception for ${element} in ${SCANNER_EXCEPTIONS_PATH} (schema ${SCANNER_EXCEPTIONS_SCHEMA}): `
++    + `{"schema":"${SCANNER_EXCEPTIONS_SCHEMA}","exceptions":[{"scanner":"${element}","reason":"<non-blank, at most ${SCANNER_EXCEPTION_REASON_MAX} characters>",`
++    + `"expires":"<ISO-8601 date in the future>","confirmedBy":"<the label the human gave for this exception in chat>"}]} `
++    + `and commit it before the candidate is frozen; an exception never covers a scanner that reported findings.${ignored}`;
+ }
+diff --git a/plugins/pipeline-core/lib/security-completeness-gate.mjs b/plugins/pipeline-core/lib/security-completeness-gate.mjs
+index e1466db73108fe8f6e4a963c0d514de9dd810528..b8b78a358b45b87ca3e63ddef31ca06437d7a1d3 100644
+--- a/plugins/pipeline-core/lib/security-completeness-gate.mjs
++++ b/plugins/pipeline-core/lib/security-completeness-gate.mjs
+@@ -82,7 +82,7 @@ import { join } from "node:path";
+ 
+ import { evaluateAllCapabilities, aggregateVerdict, validateSecurityEvidenceV2 } from "./security-evidence-evaluator.mjs";
+ import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes, freshnessCodeSuffix } from "./evidence-freshness-codes.mjs";
+-import { isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal, securityScannerState } from "./security-close-status.mjs";
++import { isCriticalStakes, readCalibrationStakes, readScannerExceptions, scannerNotExecutedRefusal, securityScannerState } from "./security-close-status.mjs";
+ 
+ const DEFAULT_ENVELOPE_PATH = "evidence/security-latest.v2.json";
+ const DEFAULT_VERDICT_PATH = "evidence/security-latest.v2.verdict.json";
+@@ -301,8 +301,18 @@ export function checkSecurityCompleteness({
+     return [`${verdictPath}: verdict is not consistent with ${envelopePath}'s capability records (stale or mismatched pair)`];
+   }
+ 
++  // Candidate 21h (CGF-05): in a critical calibration a named, unexpired exception (project/security-scanner-exceptions.json) answers a
++  // scanner that did NOT RUN -- here and in the plan-required verdict line above it, which is the same refusal for the same scanner. It never
++  // covers a scanner that ran (state "failed"), and every other calibration ignores the file.
++  const critical = isCriticalStakes(readCalibrationStakes(projectDir));
++  const exceptions = critical ? readScannerExceptions(projectDir) : null;
++  const didNotRunAndExcepted = (record) =>
++    critical && securityScannerState(record, { critical }) === "not executed" && exceptions.valid.some((e) => e.scanner === record.tool);
++  const capabilityRecords = envelope.capabilities.map((c) => ({ id: c?.capabilityId, tool: c?.tool?.name, status: c?.status, classification: c?.classification }));
+   if (verdictBlock.blocking === true) {
+     for (const offender of verdictBlock.offendingCapabilities) {
++      const record = capabilityRecords.find((c) => c.id === offender?.capabilityId);
++      if (record && didNotRunAndExcepted(record)) continue;
+       failures.push(
+         `${verdictPath}: required capability ${offender?.capabilityId} did not reach an accepted state (outcome=${offender?.outcome})`,
+       );
+@@ -310,11 +320,13 @@ export function checkSecurityCompleteness({
+   }
+   // G20-25: a critical calibration is hard -- a scanner that did not execute blocks even where the plan marks it optional. Any other
+   // calibration keeps the verdict above as the whole decision (its status line still reads "not executed", see security-close-status.mjs).
+-  if (isCriticalStakes(readCalibrationStakes(projectDir))) {
+-    for (const c of envelope.capabilities) {
+-      const element = c?.tool?.name;
+-      if (securityScannerState({ tool: element, status: c?.status, classification: c?.classification }) === "not executed") {
+-        failures.push(scannerNotExecutedRefusal(element, envelopePath));
++  // license-check is a control, not a capability: the scan records it in the verdict document's `controls`, never in the envelope.
++  if (critical) {
++    const controlRecords = (Array.isArray(verdictDoc.controls) ? verdictDoc.controls : [])
++      .map((c) => ({ tool: c?.tool ?? c?.control, status: c?.status, classification: c?.classification }));
++    for (const record of [...capabilityRecords, ...controlRecords]) {
++      if (securityScannerState(record, { critical }) === "not executed" && !didNotRunAndExcepted(record)) {
++        failures.push(scannerNotExecutedRefusal(record.tool, envelopePath, { rejected: exceptions.rejected }));
+       }
+     }
+   }
+diff --git a/plugins/pipeline-core/scripts/check-close-security-completeness.mjs b/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
+index 8e05358ec6f965868ea1b7e616c458be8412895d..7e8b332f9ae95c247523bd75be48f46a6fcb3494 100644
+--- a/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
++++ b/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
+@@ -39,7 +39,8 @@ import { readFileSync } from "node:fs";
+ import { join } from "node:path";
+ 
+ import {
+-  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, securityCloseElements, securityGateNotConfiguredRefusal,
++  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions, securityCloseElements,
++  securityGateNotConfiguredRefusal, unexcusedNotExecuted,
+ } from "../lib/security-close-status.mjs";
+ 
+ import { loadManifest, gateConfig } from "../lib/manifest.mjs";
+@@ -75,7 +76,9 @@ export function checkCloseSecurityCompleteness(root) {
+   let scanners = null;
+   try { scanners = JSON.parse(readFileSync(join(root, "evidence", "security-latest.json"), "utf8")).scanners; } catch { /* no readable scan evidence: every configured element reads "not executed" */ }
+   const enabled = Object.fromEntries(SECURITY_ELEMENTS.map((key) => [key, manifestResult.manifest?.security?.scanners?.[key]?.enabled ?? true]));
+-  return { skipped: false, commit, failures, elements: securityCloseElements({ scanners, enabled }) };
++  // Candidate 21h: the critical reading and the named exceptions, so the printed lines match what the completeness check above decided.
++  const critical = isCriticalStakes(readCalibrationStakes(root));
++  return { skipped: false, commit, failures, elements: securityCloseElements({ scanners, enabled, critical, exceptions: critical ? readScannerExceptions(root) : null }) };
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) {
+@@ -94,7 +97,13 @@ if (isDirectInvocation(import.meta.url)) {
+     for (const failure of result.failures) console.error(`CLOSE SECURITY COMPLETENESS FAILED: ${failure}`);
+     process.exit(2);
+   }
+-  const notExecuted = result.elements.filter((e) => e.state === "not executed").map((e) => e.element);
++  const notExecuted = unexcusedNotExecuted(result.elements).map((e) => e.element);
++  const excepted = result.elements.filter((e) => e.exception).map((e) => e.element);
++  if (notExecuted.length === 0 && excepted.length > 0) {
++    // Never GREEN: the scanners named here did not run and are admitted only by a recorded, unexpired, human-confirmed exception.
++    console.log(`CLOSE SECURITY COMPLETENESS ADMITTED BY NAMED EXCEPTION: HEAD ${result.commit} is bound; not executed but excepted: ${excepted.join(", ")} (see the lines above for reason, expiry and confirmer).`);
++    process.exit(0);
++  }
+   console.log(notExecuted.length === 0
+     ? `CLOSE SECURITY COMPLETENESS GREEN: HEAD ${result.commit} is bound and complete.`
+     : `CLOSE SECURITY COMPLETENESS ADMITTED, NOT COMPLETE: HEAD ${result.commit} is bound; not executed: ${notExecuted.join(", ")} (this calibration is not critical, so it does not block). Run: ${SECURITY_RUN_COMMAND}`);
+diff --git a/plugins/pipeline-core/scripts/security-close-check.mjs b/plugins/pipeline-core/scripts/security-close-check.mjs
+index ef86be12ddf80fbed76ccea3f9e2d3e4c4423378..5f69832b01f0de4a0ca88bc2c8bd9908dfec7db8 100644
+--- a/plugins/pipeline-core/scripts/security-close-check.mjs
++++ b/plugins/pipeline-core/scripts/security-close-check.mjs
+@@ -12,7 +12,9 @@ import { readFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+-import { elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal, securityGateNotConfiguredRefusal } from "../lib/security-close-status.mjs";
++import {
++  elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, readScannerExceptions, scannerNotExecutedRefusal, securityGateNotConfiguredRefusal, unexcusedNotExecuted,
++} from "../lib/security-close-status.mjs";
+ import { gateConfig, loadManifest } from "../lib/manifest.mjs";
+ 
+ export const SECURITY_SCAN_SCRIPT = fileURLToPath(new URL("./security-scan.mjs", import.meta.url));
+@@ -31,8 +33,11 @@ export function runSecurityCloseCheck(root, env = process.env) {
+   if (!isCriticalStakes(readCalibrationStakes(root))) return 0;
+   let scanners = null;
+   try { scanners = JSON.parse(readFileSync(join(root, "evidence", "security-latest.json"), "utf8")).scanners; } catch { /* unreadable evidence: every configured element is not executed */ }
+-  const notExecuted = elementsOfCompletedScan(scanners).filter((entry) => entry.state === "not executed");
+-  for (const entry of notExecuted) console.error(scannerNotExecutedRefusal(entry.element, "this Verify run"));
++  // Candidate 21h: the critical reading (a skipped license-check did not run) and the named exceptions, the same as the close gate. The scan
++  // above already printed each applied exception in its "Security close status" lines.
++  const exceptions = readScannerExceptions(root);
++  const notExecuted = unexcusedNotExecuted(elementsOfCompletedScan(scanners, { critical: true, exceptions }));
++  for (const entry of notExecuted) console.error(scannerNotExecutedRefusal(entry.element, "this Verify run", { rejected: exceptions.rejected }));
+   return notExecuted.length === 0 ? 0 : 1;
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/security-scan.mjs b/plugins/pipeline-core/scripts/security-scan.mjs
+index cc74460354675949cd6653e4872291e1d45f9b7d..f26c932ae4751867e1e8afbdcfe158153042810e 100644
+--- a/plugins/pipeline-core/scripts/security-scan.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.mjs
+@@ -111,7 +111,9 @@ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ // SHARED absent-key default both consumers use) -- see that function's own doc comment for
+ // why "blocking" was chosen and why it moved rather than staying duplicated here.
+ import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
+-import { deriveReportStatus, elementsOfCompletedScan, formatSecurityCloseStatus } from "../lib/security-close-status.mjs";
++import {
++  deriveReportStatus, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions,
++} from "../lib/security-close-status.mjs";
+ import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
+ import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
+ 
+@@ -1121,7 +1123,7 @@ export function formatScannerLine(s) {
+  * not successful scans; only explicit not-applicable/not-configured skips can be excluded from
+  * an otherwise complete scan. This projection never changes `evidence.exitCode`.
+  */
+-export function deriveSummaryVerdict(evidence) {
++export function deriveSummaryVerdict(evidence, { critical = false } = {}) {
+   if (evidence?.exitCode === 2) return "BLOCKING";
+   if (evidence?.exitCode === 1) return "WARNING";
+ 
+@@ -1129,10 +1131,11 @@ export function deriveSummaryVerdict(evidence) {
+   if (scanners.length === 0) return "NO SCANNERS ENABLED";
+ 
+   const successful = scanners.filter((scanner) => scanner.status === "PASS" || scanner.status === "FINDINGS");
++  // Candidate 21h (CGF-05): in a critical calibration a skipped license-check ("not-configured") did not run, so it is not resolved.
+   const unresolved = scanners.some((scanner) => {
+     if (scanner.status === "PASS" || scanner.status === "FINDINGS") return false;
+     if (scanner.status === "SKIPPED"
+-      && (scanner.reportStatus === "not-applicable" || scanner.reportStatus === "not-configured")) return false;
++      && (scanner.reportStatus === "not-applicable" || (scanner.reportStatus === "not-configured" && !critical))) return false;
+     return true;
+   });
+ 
+@@ -1146,15 +1149,16 @@ export function deriveSummaryVerdict(evidence) {
+   return "CLEAN";
+ }
+ 
+-function printSummary(evidence) {
++function printSummary(evidence, critical = false, exceptions = null) {
+   for (const s of evidence.scanners) {
+     console.log(formatScannerLine(s));
+   }
+   // G20-25: the four-state close status (passed / failed / not executed / not applicable), so a scanner that did not run never
+-  // reads like a passed scan next to a "policy exit 0".
++  // reads like a passed scan next to a "policy exit 0". Candidate 21h: a critical calibration reads a skipped license-check as not
++  // executed and shows every applied named exception on its line.
+   console.log("Security close status:");
+-  for (const line of formatSecurityCloseStatus(elementsOfCompletedScan(evidence.scanners))) console.log(`  ${line}`);
+-  const verdict = deriveSummaryVerdict(evidence);
++  for (const line of formatSecurityCloseStatus(elementsOfCompletedScan(evidence.scanners, { critical, exceptions }))) console.log(`  ${line}`);
++  const verdict = deriveSummaryVerdict(evidence, { critical });
+   const policyNote = evidence.exitCode === 0 && verdict !== "CLEAN" ? ` (policy exit ${evidence.exitCode})` : "";
+   if (evidence.candidate?.destination === "local-only") {
+     console.log("destination: local-only");
+@@ -1233,7 +1237,8 @@ export async function main(argv = process.argv.slice(2)) {
+     ...(opts.scanMode ? { scanMode: opts.scanMode } : {}),
+     ...(outDir ? { evidenceOutDir: outDir } : {}),
+   });
+-  printSummary(evidence);
++  const critical = isCriticalStakes(readCalibrationStakes(rootDir));
++  printSummary(evidence, critical, critical ? readScannerExceptions(rootDir) : null);
+   const evidenceBase = outDir ?? rootDir;
+   console.log(`Evidence written: ${join(evidenceBase, "evidence", "security-latest.json")}`);
+   if (evidenceV2) {

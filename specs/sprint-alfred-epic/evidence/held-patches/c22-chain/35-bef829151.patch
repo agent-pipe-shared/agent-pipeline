@@ -1,0 +1,41 @@
+diff --git a/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs b/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs
+index 3920111e391d70e22997b3fbb6c3f51bb62d4896..b5077452a877628447126155671f70d84fb4f25c 100644
+--- a/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs
++++ b/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs
+@@ -54,9 +54,9 @@ export function hasExactGreenfieldDesignPendingScaffold({ rootDir = process.cwd(
+  * Produces one compact readback that every runner's normal bootstrap can
+  * surface.  It contains no mutation and does not make an adoption decision.
+  */
+-export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd(), now = new Date(), deps = {} } = {}) {
++export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd(), now, deps = {} } = {}) {
+   const root = resolve(rootDir);
+-  const adoption = (deps.resolveAdoptionState ?? resolveAdoptionState)(root, now);
++  const adoption = (deps.resolveAdoptionState ?? resolveAdoptionState)(root, now ?? new Date());
+   const greenfieldScaffold = (deps.hasExactGreenfieldDesignPendingScaffold ?? hasExactGreenfieldDesignPendingScaffold)({
+     rootDir: root,
+     read: deps.read ?? readFileSync,
+@@ -98,7 +98,9 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
+     guidance,
+     // CGF-08/CGF-23: this orientation only reports; it is not bound to a candidate commit and never decides readiness.
+     verdict: architectureVerdictLabel({
+-      source: "architecture-adoption-orientation", verdict: status, candidate: null, observedAt: now.toISOString(),
++      source: "architecture-adoption-orientation", verdict: status, candidate: null,
++      // The bootstrap envelope is byte-compared (AC-245), so no wall clock enters it: the date is named only when the caller supplies the clock.
++      observedAt: now instanceof Date && Number.isFinite(now.getTime()) ? now.toISOString() : null,
+       scope: (Array.isArray(adoption?.scope) ? adoption.scope.filter((entry) => typeof entry === "string").join(", ")
+         : typeof adoption?.scope === "string" ? adoption.scope : "") || "repository (no scope recorded)",
+       effect: "report-only", currency: "current",
+diff --git a/plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs b/plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs
+index 530da3c2554ff565edb57a57987fe9072fb7002c..2f09327f602781afff136f8dfd77b0eb349fd441 100644
+--- a/plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs
+@@ -45,6 +45,9 @@ test("CGF-08 the orientation carries a verdict label: report-only, observation d
+   assert.deepEqual([adopted.verdict.source, adopted.verdict.verdict, adopted.verdict.effect, adopted.verdict.currency, adopted.verdict.candidate, adopted.verdict.observedAt, adopted.verdict.scope],
+     ["architecture-adoption-orientation", "decision-recorded", "report-only", "current", null, "2026-11-09T10:00:00.000Z", "src/**"]);
+   const none = observeArchitectureAdoptionOrientation({ rootDir: root, now });
++  // No wall clock enters the byte-compared bootstrap envelope (AC-245): without a supplied clock the date is typed null.
++  assert.equal(observeArchitectureAdoptionOrientation({ rootDir: root }).verdict.observedAt, null);
++  assert.deepEqual(observeArchitectureAdoptionOrientation({ rootDir: root }), observeArchitectureAdoptionOrientation({ rootDir: root }));
+   assert.equal(none.verdict.verdict, "adoption-required");
+   assert.match(none.verdict.scope, /no scope recorded/u);
+ });

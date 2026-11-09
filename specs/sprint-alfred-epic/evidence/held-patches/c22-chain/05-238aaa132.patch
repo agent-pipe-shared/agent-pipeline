@@ -1,0 +1,40 @@
+diff --git a/plugins/pipeline-core/scripts/push-init.mjs b/plugins/pipeline-core/scripts/push-init.mjs
+index cef2e745c6517c29aa89df2b4087e93b9a4a0f81..0ad42ceed3fce9951c43ac8b090665cef8b6ce75 100644
+--- a/plugins/pipeline-core/scripts/push-init.mjs
++++ b/plugins/pipeline-core/scripts/push-init.mjs
+@@ -608,6 +608,8 @@ function drivePushInitCore({
+   return {
+     schema: SCHEMA, root, by, remote, destination, base, outcome: "signature-required", steps,
+     subjectSha256: prepare.report.subjectSha256,
++    // CGF-07/22: a Codex and a Claude run each spent turn after turn re-checking a signature only the human can produce.
++    humanGate: "Hand the signature command to the human once, then end the turn. Nothing changes until the human answers: do not re-run this driver, poll the proof or repeat the request. An automatic continuation gets one line saying the push waits for the signature. Commit nothing meanwhile, a new commit voids the prepared approval.",
+     signatureCommand: {
+       executedByDriver: false,
+       note: "Run this at the PO's own attended terminal. This driver never executes it and cannot -- "
+diff --git a/plugins/pipeline-core/scripts/push-init.test.mjs b/plugins/pipeline-core/scripts/push-init.test.mjs
+index 97bd4bf4aef751fa64ead62a95a8b11474b6f380..0bd0022fa2b295aee9e513e6f4bb969c705240fc 100644
+--- a/plugins/pipeline-core/scripts/push-init.test.mjs
++++ b/plugins/pipeline-core/scripts/push-init.test.mjs
+@@ -546,6 +546,7 @@ test("drivePushInit: signature preparation keeps the existing signature-required
+     assert.equal(result.outcome, "signature-required", JSON.stringify(result));
+     assert.ok(result.signatureCommand.lines.length > 0);
+     assert.equal(Object.hasOwn(result, "approvePushLines"), false);
++    assert.match(result.humanGate, /end the turn/u, "CGF-07/22: the wait for a human is named as a stop, not as something to poll");
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+index 7988c54b7666624c064f3b3153f3925ac81bf7ed..2cffec2adc0359b4b9211a0b6bedf8f48f8dfa9f 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+@@ -2,7 +2,9 @@
+ 
+ Load this when a session reaches, explains, or is about to discuss the push
+ gate. Everything here is about the moment a **human** has to act; the session's
+-own job is to state it clearly and then wait.
++own job is to state it clearly and then wait. Waiting means ending the turn:
++never re-run the driver, poll the proof or repeat the request, and answer an
++automatic continuation with one line. A new commit voids the prepared approval.
+ 
+ > **Changed under [ADR-0061](../../../../../docs/adr/0061-uniform-human-approval-ceremony.md).**
+ > In `signature` mode the human's part is now **one command, the word

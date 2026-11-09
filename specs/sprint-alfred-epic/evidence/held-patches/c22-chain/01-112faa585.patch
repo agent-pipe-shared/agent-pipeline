@@ -1,0 +1,99 @@
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 443602c5218cb020d46af4588fddc108d0cb7415..34b03996aa16d3bacd05773d04f6523a783e8863 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -241,6 +241,24 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+   }
+   const common = () => { const value = rawGit(["rev-parse", "--git-common-dir"]); return value === null ? null : resolve(root, value); };
+   const failedText = (out) => String(out?.stderr ?? "").trim() || String(out?.stdout ?? "").trim() || "no output";
++  // The Critic packet this close was bound to, read back from its audit request and the Critic/Verify receipt that request names; null when either is unreadable.
++  const packetOfAuditRequest = (path) => {
++    try {
++      const lifecycle = JSON.parse(readFileSync(resolve(root, path), "utf8")).criticVerifyLifecycleId;
++      const receipt = JSON.parse(readFileSync(join(common(), "agent-pipeline", "critic-verify-lifecycle", `${lifecycle}.json`), "utf8"));
++      const known = receipt?.critic?.packetId ?? receipt?.receipt?.critic?.packetId;
++      return HEX32.test(known ?? "") ? known : null;
++    } catch { return null; }
++  };
++  // CGF-21: the push gate reads evidence/verify-latest.json bound to the Critic, which the close never writes; the run had to search for the flags. Named at closed-local instead. Never run here: push stays separate.
++  const pushEvidenceStep = (closedId) => {
++    const packet = criticPacketId ?? packetOfAuditRequest(`specs/${closedId}/evidence/audit-request.json`);
++    if (packet === null) return {};
++    const out = "evidence/verify-latest.json";
++    const argv = [VERIFY_PRODUCER, "--root", root, "--mode", "release", "--critic-packet-id", packet, "--critic-evidence-feature-id", closedId, "--out", out];
++    const aside = existsSync(resolve(root, out)) ? ` The producer never overwrites, so first move the existing ${out} aside.` : "";
++    return { pushEvidence: { executable: "node", argv, command: `node ${argv.join(" ")}`, note: `Before push-init: this produces the Critic-bound Verify the push gate reads, at the current HEAD.${aside}` } };
++  };
+ 
+   // ---- before the commit: Verify evidence, package, Result block, audit request, then the close itself -------------------------------------------------
+   let id = resumeLifecycleId;
+@@ -265,14 +283,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     const again = requalify ? resumeLifecycleId : null;
+     if (resumeLifecycleId === null || requalify) {
+       let packet = criticPacketId;
+-      if (packet === null && requalify) {
+-        try {
+-          const lifecycle = JSON.parse(readFileSync(resolve(root, auditRequestPath), "utf8")).criticVerifyLifecycleId;
+-          const receipt = JSON.parse(readFileSync(join(common(), "agent-pipeline", "critic-verify-lifecycle", `${lifecycle}.json`), "utf8"));
+-          const known = receipt?.critic?.packetId ?? receipt?.receipt?.critic?.packetId;
+-          if (HEX32.test(known ?? "")) packet = known;
+-        } catch { packet = null; }
+-      }
++      if (packet === null && requalify) packet = packetOfAuditRequest(auditRequestPath);
+       if (packet === null) {
+         let found = [];
+         try { const dir = common(); found = (deps.listCriticPackets ?? ((c) => readdirSync(join(c, "agent-pipeline", "critic-packets"))))(dir).filter((name) => HEX32.test(name)).sort(); } catch { found = []; }
+@@ -444,7 +455,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     phase = "closed-local";
+   }
+   if (phase === "closed-local" || phase === "delivered" || phase === "release-eligible" || phase === "promoted") {
+-    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, message: "The feature is closed locally. Publication, push and release are separate human-gated steps and were not touched." });
++    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, ...pushEvidenceStep(closedFeatureId), message: "The feature is closed locally. Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init." });
+   }
+   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
+ }
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 46234bd21ff67595df76e0480e23e7b38ef58d19..bb568da962a72700d2a05005a2389f262955d2d5 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -573,6 +573,27 @@ test("P3: after the commit the next call continues to closed-local; an uncommitt
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++test("CGF-21: closed-local names the Critic-bound push Verify with the packet of the close, argv as the close chain walk runs it", () => {
++  const f = oneShotFixture({ closed: true, startPhase: "cleanup-complete" });
++  try {
++    const resumed = { ...f.input, criticPacketId: null, resumeLifecycleId: "lc-1" };
++    assert.equal(oneShotClose(resumed, { runCommand: f.runner }).pushEvidence, undefined, "no readable audit request, so the close names no packet it cannot prove");
++    mkdirSync(join(f.root, "specs/feature-abc/evidence"), { recursive: true });
++    writeFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), `${JSON.stringify({ criticVerifyLifecycleId: "d".repeat(64) })}\n`);
++    mkdirSync(join(f.root, ".git/agent-pipeline/critic-verify-lifecycle"), { recursive: true });
++    writeFileSync(join(f.root, `.git/agent-pipeline/critic-verify-lifecycle/${"d".repeat(64)}.json`), JSON.stringify({ critic: { packetId: f.packetId } }));
++    const done = oneShotClose(resumed, { runCommand: f.runner });
++    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
++    assert.deepEqual(done.pushEvidence.argv.slice(1), ["--root", f.root, "--mode", "release", "--critic-packet-id", f.packetId, "--critic-evidence-feature-id", "feature-abc", "--out", "evidence/verify-latest.json"]);
++    assert.match(done.pushEvidence.argv[0], /verify-evidence-producer\.mjs$/u);
++    assert.doesNotMatch(done.pushEvidence.note, /aside/u);
++    mkdirSync(join(f.root, "evidence"), { recursive: true }); writeFileSync(join(f.root, "evidence/verify-latest.json"), "{}\n");
++    const again = oneShotClose(resumed, { runCommand: f.runner });
++    assert.match(again.pushEvidence.note, /move the existing evidence\/verify-latest\.json aside/u);
++    assert.deepEqual(forbidden(f.calls), []);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed repair on stderr with exit 2; a bad flag is a usage refusal", () => {
+   const f = oneShotFixture({ closed: true });
+   try {
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 87517e9f321f841c3558b5b238029f28b41f0014..d8a79d019644ce0055c4b2c5f61623632ab06d55 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -23,7 +23,7 @@ node plugins/pipeline-core/scripts/finish-feature.mjs --one-shot --by "<name>" -
+ 
+ It produces the Verify evidence in candidate mode bound to the Critic packet (found on disk when exactly one exists, else pass `--critic-packet-id`), registers it, takes the package to `verifying` and `completed`, writes the audit request and, with Continuity, the Result close block and the close request, then runs the close-feature stage (start, checkpoint, `feature-close-prepared`, `pipeline-state.mjs close-feature`) and the `tracked-close-finalized` evidence. The audit bundle it writes under `audit-bundles/<feature>/<stamp>/proofs/` copies the signed approval proof envelopes that authorized the feature (the plan approval and, when it exists for the candidate commit, the critical push approval), with their digests in the bundle manifest; the bundle verifier checks every digest and every Ed25519 signature, and refuses a tampered proof. A human guard override keeps no proof (it is listed as a typed gap, never blocking). Nothing it does signs or pushes.
+ 
+-The command stops at `commit-required` and prints the paths and the commit message (`git add -- <paths>`, then `git commit`; the pre-commit hook admits exactly the bytes the stages wrote, G20-66). Run that commit, then run the printed `next` command (the same command with `--resume-lifecycle-id <id>`): it freezes the candidate, runs the final Verify and the Security scan, writes the final-verification and cleanup evidence and ends at `closed-local`. Exit code 2 and `status: "stopped"` mean one typed stop with its exact repair on stderr: `ONESHOT-CRITIC-PACKET-MISSING` (finish the Critic review; pass `--critic-packet-id`), `ONESHOT-VERIFY-RED` (fix what the Verify prints, rerun), `ONESHOT-COMMIT-PENDING` (the close outputs are not committed yet), `ONESHOT-SECURITY-BLOCKING`, `ONESHOT-OWNER-ROUTE-REQUIRED` (a project with a session-authority catalogue runs the Result close through `continuity-owner-route.mjs`), or the coordinator's own typed refusal (for example `CLOSE-CRITIC-CALLER-AUTHORED`). Rerunning the identical command is always safe. Publication, push and release stay separate human-gated steps.
++The command stops at `commit-required` and prints the paths and the commit message (`git add -- <paths>`, then `git commit`; the pre-commit hook admits exactly the bytes the stages wrote, G20-66). Run that commit, then run the printed `next` command (the same command with `--resume-lifecycle-id <id>`): it freezes the candidate, runs the final Verify and the Security scan, writes the final-verification and cleanup evidence and ends at `closed-local`. Exit code 2 and `status: "stopped"` mean one typed stop with its exact repair on stderr: `ONESHOT-CRITIC-PACKET-MISSING` (finish the Critic review; pass `--critic-packet-id`), `ONESHOT-VERIFY-RED` (fix what the Verify prints, rerun), `ONESHOT-COMMIT-PENDING` (the close outputs are not committed yet), `ONESHOT-SECURITY-BLOCKING`, `ONESHOT-OWNER-ROUTE-REQUIRED` (a project with a session-authority catalogue runs the Result close through `continuity-owner-route.mjs`), or the coordinator's own typed refusal (for example `CLOSE-CRITIC-CALLER-AUTHORED`). Rerunning the identical command is always safe. Publication, push and release stay separate human-gated steps. At `closed-local` the result's `pushEvidence.command` is the Critic-bound Verify the push gate reads (`evidence/verify-latest.json`): run it, then `push-init.mjs`.
+ 
+ Everything below is the per-stage recovery reference: use it when the one command stops and the repair needs a single stage by hand.
+ 

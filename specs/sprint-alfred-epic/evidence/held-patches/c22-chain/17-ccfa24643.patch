@@ -1,0 +1,148 @@
+diff --git a/guardrails/security.md b/guardrails/security.md
+index b4c677f556c42957846100d6fb6d43445264d58b..b7b03eb0f3917ee2412c0d774f48ae8c6d9e5f24 100644
+--- a/guardrails/security.md
++++ b/guardrails/security.md
+@@ -55,6 +55,7 @@ Rule IDs: `SEC-xx`.
+ - A sandboxed session still needs every SEC-xx rule in this file enforced inside it: secrets stay out of artifacts, staging denies still apply, dependency verification still happens, security-scan still runs where declared. A sandbox narrows the blast radius of a mistake; it does not make the mistake acceptable, and it does not make any guard rule optional.
+ - **Why:** Defense-in-depth means layers that each hold independently. Treating a sandbox as "the guards are handled elsewhere" reintroduces exactly the single point of failure the layered approach exists to avoid.
+ - **Verification:** No standalone check — this is a framing/discipline note. If a future sandbox mechanism is adopted for this pipeline, its calibration entry MUST name which guards remain active inside it; "none, the sandbox is enough" is not a valid answer.
++- **The reverse also holds: a guard is not a sandbox.** The shell guard judges the command handed to the tool. It does not read what a project's own script does once that script runs, so a script can reach a path the guard would refuse as a direct read. Real separation of what a process can reach comes only from the runner's sandbox or the operating system. Do not describe a guard refusal as containment.
+ 
+ ## SEC-08 — The agent never handles deploy-target credentials (Release/Deploy phase)
+ 
+diff --git a/harness/scripts/generate-agent-obligations.mjs b/harness/scripts/generate-agent-obligations.mjs
+index fdf12cfaefb081860e0c183112ae3aa9ff4dc686..c2ba2cd9b3b69126c1eb0c977177d8f0198c3225 100644
+--- a/harness/scripts/generate-agent-obligations.mjs
++++ b/harness/scripts/generate-agent-obligations.mjs
+@@ -333,6 +333,28 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
+   put("Do not change the tracked or untracked tree between handing over a tree-bound");
+   put("signature command and its return.");
+   put();
++  put("While a gate waits for a human, say once what is awaited. Do not re-check an unchanged");
++  put("gate, and answer an automatic continuation in one line until the human has acted.");
++  put();
++
++  put("## 9. Small habits that each cost a retry");
++  put();
++  put("<!-- hand-maintained: drawn from the loops chapters of the 2026-11 greenfield runs on all");
++  put("     three runners; these are working rules, not values a guard exports. -->");
++  put();
++  put("- Give a native file-read tool an absolute path. A relative path fails in child sessions.");
++  put("- Separate a revision from a path with `--`: `git diff <rev> -- <path>`.");
++  put("- Write a commit message to a file and use `git commit -F <file>`. `-m` is refused where a");
++  put("  trailer is required.");
++  put("- Never commit the output of a close or another Pipeline writer by hand. Run the command");
++  put("  that the tool printed; it owns that commit.");
++  put("- On a run longer than a few minutes, say briefly what is running and what comes next,");
++  put("  so that nobody has to ask whether the work is still alive.");
++  put("- Answer a question about what a consent or approval covers from its stored text, never");
++  put("  from memory.");
++  put("- Hand a printed command over unchanged. Where you must wrap a long path yourself, break");
++  put("  only at a token boundary, never inside a path.");
++  put();
+   return `${lines.join("\n")}\n`;
+ }
+ 
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index a62c814c81857662fc8454489eef5fe57c9115d1..b25b6edd5f9389f846cc8163e5c81fa13b4237b0 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -760,6 +760,12 @@ whatever ref
+ `<sha>` lives on) is already correctly published. It does not itself need a
+ `push`-kind proof, because it structurally isn't one.
+ 
++**Pin the build a rollout names.** Every source update during one approved
++change is a new build, so a team that must reproduce a run needs one fixed
++build. A rollout names the exact plugin version, including its build suffix,
++and that version is installed unchanged for the whole change. A build taken
++mid-change is a development candidate and is never the release evidence.
++
+ ## Machine-readable runbook of this flow
+ 
+ The layers below are also available as a generated, machine-readable runbook,
+diff --git a/plugins/pipeline-core/guardrails/security.md b/plugins/pipeline-core/guardrails/security.md
+index b4c677f556c42957846100d6fb6d43445264d58b..b7b03eb0f3917ee2412c0d774f48ae8c6d9e5f24 100644
+--- a/plugins/pipeline-core/guardrails/security.md
++++ b/plugins/pipeline-core/guardrails/security.md
+@@ -55,6 +55,7 @@ Rule IDs: `SEC-xx`.
+ - A sandboxed session still needs every SEC-xx rule in this file enforced inside it: secrets stay out of artifacts, staging denies still apply, dependency verification still happens, security-scan still runs where declared. A sandbox narrows the blast radius of a mistake; it does not make the mistake acceptable, and it does not make any guard rule optional.
+ - **Why:** Defense-in-depth means layers that each hold independently. Treating a sandbox as "the guards are handled elsewhere" reintroduces exactly the single point of failure the layered approach exists to avoid.
+ - **Verification:** No standalone check — this is a framing/discipline note. If a future sandbox mechanism is adopted for this pipeline, its calibration entry MUST name which guards remain active inside it; "none, the sandbox is enough" is not a valid answer.
++- **The reverse also holds: a guard is not a sandbox.** The shell guard judges the command handed to the tool. It does not read what a project's own script does once that script runs, so a script can reach a path the guard would refuse as a direct read. Real separation of what a process can reach comes only from the runner's sandbox or the operating system. Do not describe a guard refusal as containment.
+ 
+ ## SEC-08 — The agent never handles deploy-target credentials (Release/Deploy phase)
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+index 2cffec2adc0359b4b9211a0b6bedf8f48f8dfa9f..7bf5a83f3fc8d089af473c1ea7c65163d19f140d 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+@@ -269,6 +269,11 @@ ask the PO **one** question with context, early, before any further attempt:
+ which credential or remote this repository should push with. Then retry once
+ with what the PO named.
+ 
++Resolve this before the first push is prepared, not after it fails, and ask at
++most once per repository. Record the answer (the credential's name or the
++remote, never its content) in the calibrated handover so that a later session
++reads it there instead of asking again.
++
+ ### The two-step shape (superseded as a human step, still supported)
+ 
+ ```
+diff --git a/plugins/pipeline-core/templates/prompts/agent-obligations.md b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+index d30f26872041608580cdfbf9dba82bf7affdefb2..5042d3d7b37c368086d7fb72ec4ce17ef34c16c6 100644
+--- a/plugins/pipeline-core/templates/prompts/agent-obligations.md
++++ b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+@@ -239,3 +239,24 @@ signature, hand over exactly that one line, then continue after the PO reports b
+ Do not change the tracked or untracked tree between handing over a tree-bound
+ signature command and its return.
+ 
++While a gate waits for a human, say once what is awaited. Do not re-check an unchanged
++gate, and answer an automatic continuation in one line until the human has acted.
++
++## 9. Small habits that each cost a retry
++
++<!-- hand-maintained: drawn from the loops chapters of the 2026-11 greenfield runs on all
++     three runners; these are working rules, not values a guard exports. -->
++
++- Give a native file-read tool an absolute path. A relative path fails in child sessions.
++- Separate a revision from a path with `--`: `git diff <rev> -- <path>`.
++- Write a commit message to a file and use `git commit -F <file>`. `-m` is refused where a
++  trailer is required.
++- Never commit the output of a close or another Pipeline writer by hand. Run the command
++  that the tool printed; it owns that commit.
++- On a run longer than a few minutes, say briefly what is running and what comes next,
++  so that nobody has to ask whether the work is still alive.
++- Answer a question about what a consent or approval covers from its stored text, never
++  from memory.
++- Hand a printed command over unchanged. Where you must wrap a long path yourself, break
++  only at a token boundary, never inside a path.
++
+diff --git a/templates/prompts/agent-obligations.md b/templates/prompts/agent-obligations.md
+index d30f26872041608580cdfbf9dba82bf7affdefb2..5042d3d7b37c368086d7fb72ec4ce17ef34c16c6 100644
+--- a/templates/prompts/agent-obligations.md
++++ b/templates/prompts/agent-obligations.md
+@@ -239,3 +239,24 @@ signature, hand over exactly that one line, then continue after the PO reports b
+ Do not change the tracked or untracked tree between handing over a tree-bound
+ signature command and its return.
+ 
++While a gate waits for a human, say once what is awaited. Do not re-check an unchanged
++gate, and answer an automatic continuation in one line until the human has acted.
++
++## 9. Small habits that each cost a retry
++
++<!-- hand-maintained: drawn from the loops chapters of the 2026-11 greenfield runs on all
++     three runners; these are working rules, not values a guard exports. -->
++
++- Give a native file-read tool an absolute path. A relative path fails in child sessions.
++- Separate a revision from a path with `--`: `git diff <rev> -- <path>`.
++- Write a commit message to a file and use `git commit -F <file>`. `-m` is refused where a
++  trailer is required.
++- Never commit the output of a close or another Pipeline writer by hand. Run the command
++  that the tool printed; it owns that commit.
++- On a run longer than a few minutes, say briefly what is running and what comes next,
++  so that nobody has to ask whether the work is still alive.
++- Answer a question about what a consent or approval covers from its stored text, never
++  from memory.
++- Hand a printed command over unchanged. Where you must wrap a long path yourself, break
++  only at a token boundary, never inside a path.
++

@@ -1,0 +1,582 @@
+diff --git a/.codex/agents/critic-high-risk.toml b/.codex/agents/critic-high-risk.toml
+index 443673d74a7aefdc3ee1919c7e497d5624c96004..42ebeafc600decf8a24764569db632137b1e9e8d 100644
+--- a/.codex/agents/critic-high-risk.toml
++++ b/.codex/agents/critic-high-risk.toml
+@@ -3,3 +3,4 @@ description = "Independent read-only critic for high-risk reviews"
+ model = "gpt-6-sol"
+ model_reasoning_effort = "max"
+ developer_instructions = "Act as an independent, read-only Critic. Your bootstrap role is closed as critic: when pipeline-start is required, use its compact critic path and never Elephant onboarding, State, handover, or history. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity."
++sandbox_mode = "read-only"
+diff --git a/.codex/agents/critic.toml b/.codex/agents/critic.toml
+index 53f174b7f8853461a42da2f8ded8e850e93747e3..3e4575b8d70a4763fd29ee28c67d5a348f2909d2 100644
+--- a/.codex/agents/critic.toml
++++ b/.codex/agents/critic.toml
+@@ -3,3 +3,4 @@ description = "Independent read-only critic"
+ model = "gpt-6-sol"
+ model_reasoning_effort = "medium"
+ developer_instructions = "Act as an independent, read-only Critic. Your bootstrap role is closed as critic: when pipeline-start is required, use its compact critic path and never Elephant onboarding, State, handover, or history. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity."
++sandbox_mode = "read-only"
+diff --git a/plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json b/plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json
+index aeb817a1bc2e294bb26bbadbe0f072e311d15372..355a1f60f933b000720ab1795fc9c3c552a7c6cc 100644
+--- a/plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json
++++ b/plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json
+@@ -56,7 +56,7 @@
+       "path": ".codex/agents/critic.toml",
+       "format": "toml",
+       "projection": "codex-custom-agent-v3",
+-      "ownedKeys": ["model", "model_reasoning_effort"],
++      "ownedKeys": ["model", "model_reasoning_effort", "sandbox_mode"],
+       "cell": { "kind": "duty", "dutyId": "critic_normal" },
+       "decision": 3
+     },
+@@ -64,7 +64,7 @@
+       "path": ".codex/agents/critic-high-risk.toml",
+       "format": "toml",
+       "projection": "codex-custom-agent-v3",
+-      "ownedKeys": ["model", "model_reasoning_effort"],
++      "ownedKeys": ["model", "model_reasoning_effort", "sandbox_mode"],
+       "cell": { "kind": "duty", "dutyId": "critic_high_risk" }
+     },
+     {
+diff --git a/plugins/pipeline-core/lib/codex-critic-launch-route.mjs b/plugins/pipeline-core/lib/codex-critic-launch-route.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f0abd38176ddb1335cf4c30ca95d037e30590a8
+--- /dev/null
++++ b/plugins/pipeline-core/lib/codex-critic-launch-route.mjs
+@@ -0,0 +1,48 @@
++// SPDX-License-Identifier: SUL-1.0
++// Codex Critic launch route (C22, AC-108, PO decision 2026-11-09). `.codex/agents/*.toml` is byte-identical across machines, so whether a Critic can
++// run in its read-only sandbox is decided at launch from THIS machine's sandbox preflight receipt (`codex-sandbox-preflight.mjs`), never in the file.
++// A Critic is mandatory: every outcome ends in a Critic that can run. A host without a usable sandbox gets `default`, labelled instruction-only,
++// never a refusal and never a thrown error. Pure decision: the only I/O is the injected receipt reader.
++import { readFileSync } from "node:fs";
++import { isAbsolute } from "node:path";
++
++export const CRITIC_LAUNCH_ROLES = Object.freeze(["critic", "critic-high-risk"]);
++export const PREFLIGHT_RECEIPT_SCHEMA = "pipeline.codex-sandbox-preflight.v1";
++const SANDBOX_ELIGIBILITY = Object.freeze(["intermediate", "strong"]);
++
++export const CRITIC_LAUNCH_FALLBACK_REASONS = Object.freeze([
++  "no-receipt",
++  "receipt-unreadable",
++  "receipt-schema-mismatch",
++  "eligibility-insufficient",
++  "terminal-code-not-ok",
++  "role-invalid",
++  "route-error",
++]);
++
++function fallback(reason) {
++  return { agentType: "default", sandboxed: false, protection: "instruction-only", reason };
++}
++
++/**
++ * @param {{ role?: string, receiptPath?: string, readText?: (path: string) => string }} input
++ * @returns {{ agentType: string, sandboxed: true } | { agentType: "default", sandboxed: false, protection: "instruction-only", reason: string }}
++ */
++export function decideCodexCriticLaunchRoute(input) {
++  try {
++    const { role, receiptPath, readText = (path) => readFileSync(path, "utf8") } = input;
++    if (!CRITIC_LAUNCH_ROLES.includes(role)) return fallback("role-invalid");
++    if (receiptPath === undefined || receiptPath === null) return fallback("no-receipt");
++    if (typeof receiptPath !== "string" || !isAbsolute(receiptPath)) return fallback("receipt-unreadable");
++    let text;
++    try { text = readText(receiptPath); } catch { return fallback("receipt-unreadable"); }
++    let receipt;
++    try { receipt = JSON.parse(text); } catch { return fallback("receipt-schema-mismatch"); }
++    if (receipt === null || typeof receipt !== "object" || Array.isArray(receipt) || receipt.schema !== PREFLIGHT_RECEIPT_SCHEMA) return fallback("receipt-schema-mismatch");
++    if (!SANDBOX_ELIGIBILITY.includes(receipt.eligibility)) return fallback("eligibility-insufficient");
++    if (receipt.terminalCode !== "ok") return fallback("terminal-code-not-ok");
++    return { agentType: role, sandboxed: true };
++  } catch {
++    return fallback("route-error");
++  }
++}
+diff --git a/plugins/pipeline-core/lib/codex-critic-launch-route.test.mjs b/plugins/pipeline-core/lib/codex-critic-launch-route.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..2252b569767919e7ac47b20dca376f6fa040575d
+--- /dev/null
++++ b/plugins/pipeline-core/lib/codex-critic-launch-route.test.mjs
+@@ -0,0 +1,106 @@
++// SPDX-License-Identifier: SUL-1.0
++// C22 (AC-108, PO decision 2026-11-09): the Codex Critic launch route is decided at launch from this machine's sandbox preflight receipt,
++// because `.codex/agents/*.toml` is byte-identical across machines. Every case exits 0: a sandbox condition never stops the lifecycle.
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++
++import { decideCodexCriticLaunchRoute } from "./codex-critic-launch-route.mjs";
++
++const SCRIPT = fileURLToPath(new URL("../scripts/codex-critic-launch-route.mjs", import.meta.url));
++const SCHEMA = "pipeline.codex-sandbox-preflight.v1";
++
++function receipt(overrides = {}) {
++  return JSON.stringify({ schema: SCHEMA, eligibility: "intermediate", terminalCode: "ok", ...overrides });
++}
++function withRoot(run) {
++  const root = mkdtempSync(join(tmpdir(), "codex-critic-launch-route-"));
++  try { return run(root); } finally { rmSync(root, { recursive: true, force: true }); }
++}
++function receiptFile(root, text, name = "receipt.json") {
++  const path = join(root, name);
++  writeFileSync(path, text);
++  return path;
++}
++function fallback(reason) {
++  return { agentType: "default", sandboxed: false, protection: "instruction-only", reason };
++}
++function runCli(args) {
++  const result = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8" });
++  assert.equal(result.status, 0, `the route never exits non-zero: ${result.stderr}`);
++  const lines = result.stdout.split("\n").filter(Boolean);
++  assert.equal(lines.length, 1, "exactly one JSON object");
++  return JSON.parse(lines[0]);
++}
++
++test("C22 an intermediate or strong receipt with terminal code ok routes the sandboxed role itself", () => withRoot((root) => {
++  for (const role of ["critic", "critic-high-risk"]) {
++    for (const eligibility of ["intermediate", "strong"]) {
++      const path = receiptFile(root, receipt({ eligibility }));
++      assert.deepEqual(decideCodexCriticLaunchRoute({ role, receiptPath: path }), { agentType: role, sandboxed: true }, `${role} ${eligibility}`);
++      assert.deepEqual(runCli(["--role", role, "--receipt", path]), { agentType: role, sandboxed: true }, `cli ${role} ${eligibility}`);
++    }
++  }
++}));
++
++test("C22 no receipt routes default, instruction-only, exit 0", () => {
++  assert.deepEqual(decideCodexCriticLaunchRoute({ role: "critic" }), fallback("no-receipt"));
++  assert.deepEqual(runCli(["--role", "critic"]), fallback("no-receipt"));
++  assert.deepEqual(runCli(["--role", "critic-high-risk"]), fallback("no-receipt"));
++});
++
++test("C22 an unreadable receipt (missing file, directory, relative path) routes default", () => withRoot((root) => {
++  mkdirSync(join(root, "a-directory"));
++  for (const path of [join(root, "missing.json"), join(root, "a-directory"), "relative/receipt.json"]) {
++    assert.deepEqual(decideCodexCriticLaunchRoute({ role: "critic", receiptPath: path }), fallback("receipt-unreadable"), path);
++    assert.deepEqual(runCli(["--role", "critic", "--receipt", path]), fallback("receipt-unreadable"), `cli ${path}`);
++  }
++}));
++
++test("C22 a receipt that is not JSON or has another schema routes default", () => withRoot((root) => {
++  for (const text of ["not json", "[]", "null", receipt({ schema: "pipeline.codex-sandbox-preflight.v0" }), JSON.stringify({ eligibility: "strong", terminalCode: "ok" })]) {
++    const path = receiptFile(root, text);
++    assert.deepEqual(decideCodexCriticLaunchRoute({ role: "critic", receiptPath: path }), fallback("receipt-schema-mismatch"), text);
++    assert.deepEqual(runCli(["--role", "critic", "--receipt", path]), fallback("receipt-schema-mismatch"), `cli ${text}`);
++  }
++}));
++
++test("C22 any other eligibility routes default", () => withRoot((root) => {
++  for (const eligibility of ["diagnostic", "none", "", undefined, 7]) {
++    const path = receiptFile(root, receipt({ eligibility }));
++    assert.deepEqual(decideCodexCriticLaunchRoute({ role: "critic-high-risk", receiptPath: path }), fallback("eligibility-insufficient"), String(eligibility));
++    assert.deepEqual(runCli(["--role", "critic-high-risk", "--receipt", path]), fallback("eligibility-insufficient"));
++  }
++}));
++
++test("C22 any other terminal code routes default even with a sufficient eligibility", () => withRoot((root) => {
++  for (const terminalCode of ["permission-mismatch", "child-stdio-error", "total-timeout", "internal-error", "", undefined]) {
++    const path = receiptFile(root, receipt({ terminalCode }));
++    assert.deepEqual(decideCodexCriticLaunchRoute({ role: "critic", receiptPath: path }), fallback("terminal-code-not-ok"), String(terminalCode));
++    assert.deepEqual(runCli(["--role", "critic", "--receipt", path]), fallback("terminal-code-not-ok"));
++  }
++}));
++
++test("C22 a thrown error or an invalid role routes default and never throws", () => withRoot((root) => {
++  const path = receiptFile(root, receipt());
++  assert.deepEqual(decideCodexCriticLaunchRoute({ role: "critic", receiptPath: path, readText: () => { throw new Error("boom"); } }), fallback("receipt-unreadable"));
++  assert.deepEqual(decideCodexCriticLaunchRoute({ role: "critic", receiptPath: path, readText: () => ({ not: "a string" }) }), fallback("receipt-schema-mismatch"));
++  assert.deepEqual(decideCodexCriticLaunchRoute(null), fallback("route-error"));
++  assert.deepEqual(decideCodexCriticLaunchRoute({ role: "default", receiptPath: path }), fallback("role-invalid"));
++  assert.deepEqual(decideCodexCriticLaunchRoute({ receiptPath: path }), fallback("role-invalid"));
++  assert.deepEqual(runCli(["--role", "elephant", "--receipt", path]), fallback("role-invalid"));
++  assert.deepEqual(runCli([]), fallback("role-invalid"));
++  assert.deepEqual(runCli(["--role", "critic", "--receipt"]), fallback("route-error"));
++  assert.deepEqual(runCli(["--role", "critic", "--bogus", path]), fallback("route-error"));
++}));
++
++test("C22 the route is read-only: it never creates or changes the receipt", () => withRoot((root) => {
++  const path = receiptFile(root, receipt());
++  const before = readFileSync(path, "utf8");
++  runCli(["--role", "critic", "--receipt", path]);
++  assert.equal(readFileSync(path, "utf8"), before);
++}));
+diff --git a/plugins/pipeline-core/lib/runbook-paths.mjs b/plugins/pipeline-core/lib/runbook-paths.mjs
+index 249b5a654fbca4ba84b5ec4b4d4c6f9fa05ffd9d..9e5e3d7108da88f710dac98440e528d6bd25aeb2 100644
+--- a/plugins/pipeline-core/lib/runbook-paths.mjs
++++ b/plugins/pipeline-core/lib/runbook-paths.mjs
+@@ -208,7 +208,7 @@ function criticSteps() {
+     }),
+     finalizerStep("admit", "admit", finalization, { needs: ["a packet-ready preflight"], producer: "the admission record for this packet", next: ["dispatch-critic"] }),
+     otherStep({
+-      id: "dispatch-critic", command: "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template (Codex: agent_type critic, or critic-high-risk for a higher effort, never default, which loses the Source return)",
++      id: "dispatch-critic", command: "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template (Codex: run codex-sandbox-preflight.mjs --run --kind intermediate once on this machine, then codex-critic-launch-route.mjs --role critic, or critic-high-risk for a higher effort, with that receipt, and spawn exactly the agentType it prints; default means model and effort on the call, the round recorded as caller-authored-fallback with its one human acknowledgement at the close, and a final message that names it as protected by instruction only; a sandboxed Critic that still fails on EPERM is launched once more through default with the same labelling)",
+       needs: ["the admission record"], producer: "the Critic's return; a split review returns one per child", next: ["finalize", "split-merge"],
+     }),
+     scriptStep({
+diff --git a/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs b/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
+index 550bf3f5c5ff78e363d4d66518c0cf0a914e7eee..b3ff5088104f3e37ce9934f5e6ab6f83856c62b0 100644
+--- a/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
++++ b/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
+@@ -1366,6 +1366,9 @@ record("legacy V3 Critic route and runnerRoutes refresh through sanctioned re-ap
+   intent.routing.duties.critic_normal.codex.effort = "xhigh";
+   delete intent.critic_export;
+   const root = fixture(yaml(intent));
++  // C22 (AC-108): an existing project whose Critic files carry the seed WITHOUT the sandbox key (the fixture's critic.toml) migrates through this
++  // same route to bytes that carry it; a hand-edited sandbox value (the high-risk file here) is re-projected like the other owned keys.
++  writeFileSync(join(root, ".codex/agents/critic-high-risk.toml"), '# critic-high-risk-prefix-sentinel\nmodel = "old-critic-high-risk"\nmodel_reasoning_effort = "medium"\nname = "keep-critic-high-risk"\nsandbox_mode = "workspace-write"\n[metadata]\nmodel_reasoning_effort = "nested-must-stay"\n');
+   try {
+     const plan = planRunnerProfileMigrationV3({ rootDir: root });
+     assert.equal(plan.status, "ready");
+@@ -1376,6 +1379,10 @@ record("legacy V3 Critic route and runnerRoutes refresh through sanctioned re-ap
+     assert.equal(refreshed.routing.duties.critic_normal.codex.effort, "medium");
+     assert.equal(refreshed.critic_export.schema, "pipeline.critic-export-policy.v1");
+     assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /model = "gpt-6-sol"/u);
++    assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /^# critic-prefix-sentinel\n[\s\S]*name = "keep-critic"\nsandbox_mode = "read-only"\n\[metadata\]\nmodel_reasoning_effort = "nested-must-stay"\n$/u);
++    assert.match(readFileSync(join(root, ".codex/agents/critic-high-risk.toml"), "utf8"), /name = "keep-critic-high-risk"\nsandbox_mode = "read-only"\n\[metadata\]\n/u);
++    assert.doesNotMatch(readFileSync(join(root, ".codex/agents/critic-high-risk.toml"), "utf8"), /workspace-write/u);
++    assert.doesNotMatch(readFileSync(join(root, ".codex/agents/implementor.toml"), "utf8"), /sandbox_mode/u);
+     assert.doesNotMatch(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /runnerRoutes|worktype_mini_advisor/u);
+     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /criticExport:\n  policy: pipeline\.critic-export-policy\.v1/u);
+     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+diff --git a/plugins/pipeline-core/lib/runtime-projection-v3.mjs b/plugins/pipeline-core/lib/runtime-projection-v3.mjs
+index a0fcfc3e60f0806eee398908007323c6363f32b6..77ec245d52316ead41c5f9ea99c6d271c735bc26 100644
+--- a/plugins/pipeline-core/lib/runtime-projection-v3.mjs
++++ b/plugins/pipeline-core/lib/runtime-projection-v3.mjs
+@@ -36,6 +36,8 @@ const EFFECTIVE_MODEL_UNKNOWN = "effective-model-not-observed";
+ // C21H (AC-108, CGF-03): `critic` and `critic-high-risk` are the same closed read-only Critic; only the effort of their duty cell differs.
+ const CRITIC_DEVELOPER_INSTRUCTIONS = "Act as an independent, read-only Critic. Your bootstrap role is closed as critic: when pipeline-start is required, use its compact critic path and never Elephant onboarding, State, handover, or history. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity.";
+ 
++const CRITIC_SANDBOX_MODE = "read-only";
++
+ export const CODEX_CUSTOM_AGENT_METADATA = Object.freeze({
+   implementor: Object.freeze({
+     name: "implementor",
+@@ -46,11 +48,13 @@ export const CODEX_CUSTOM_AGENT_METADATA = Object.freeze({
+     name: "critic",
+     description: "Independent read-only critic",
+     developerInstructions: CRITIC_DEVELOPER_INSTRUCTIONS,
++    sandboxMode: CRITIC_SANDBOX_MODE,
+   }),
+   "critic-high-risk": Object.freeze({
+     name: "critic-high-risk",
+     description: "Independent read-only critic for high-risk reviews",
+     developerInstructions: CRITIC_DEVELOPER_INSTRUCTIONS,
++    sandboxMode: CRITIC_SANDBOX_MODE,
+   }),
+ });
+ 
+@@ -63,10 +67,15 @@ export function codexCustomAgentSeed(role) {
+     'model = ""',
+     'model_reasoning_effort = ""',
+     `developer_instructions = ${JSON.stringify(metadata.developerInstructions)}`,
++    ...(metadata.sandboxMode ? [`sandbox_mode = ${JSON.stringify(metadata.sandboxMode)}`] : []),
+     "",
+   ].join("\n");
+ }
+ 
++// C22 (AC-108, PO decision 2026-11-09): both Critic roles run in a read-only sandbox. `sandbox_mode` is an owned key whose value is fixed
++// (not routed from a duty cell): a hand-edited value is re-projected, a baseline that predates the key gets it inserted.
++const CODEX_FIXED_OWNED_VALUES = Object.freeze({ sandbox_mode: CRITIC_SANDBOX_MODE });
++
+ function clone(value) {
+   return JSON.parse(JSON.stringify(value));
+ }
+@@ -450,8 +459,11 @@ function replaceClaudeTarget(v2Target, target, intent, originalBytes) {
+   };
+ }
+ 
+-function locateTomlTopLevelValues(bytes, keys) {
++// `optionalKeys` (C22) may be absent from the baseline (a file that predates the key); a line that names one in any form the strict reader
++// cannot patch is still refused, so an insert can never produce a duplicate key.
++function locateTomlTopLevelValues(bytes, keys, optionalKeys = []) {
+   const found = new Map();
++  const unreadable = new Set();
+   let offset = 0;
+   let inSection = false;
+   for (const rawLine of bytes.split(/(?<=\n)/u)) {
+@@ -460,7 +472,10 @@ function locateTomlTopLevelValues(bytes, keys) {
+     if (!inSection) {
+       for (const key of keys) {
+         const match = line.match(new RegExp(`^(\\s*${key}\\s*=\\s*)\"([^\"]*)\"\\s*(?:#.*)?$`, "u"));
+-        if (!match) continue;
++        if (!match) {
++          if (optionalKeys.includes(key) && new RegExp(`^\\s*${key}\\s*=`, "u").test(line)) unreadable.add(key);
++          continue;
++        }
+         if (found.has(key)) throw new Error(`duplicate top-level ${key}`);
+         const start = offset + match[1].length + 1;
+         found.set(key, { start, end: start + match[2].length, value: match[2] });
+@@ -468,10 +483,23 @@ function locateTomlTopLevelValues(bytes, keys) {
+     }
+     offset += rawLine.length;
+   }
+-  for (const key of keys) if (!found.has(key)) throw new Error(`missing top-level ${key}`);
++  for (const key of unreadable) if (!found.has(key)) throw new Error(`unreadable top-level ${key}`);
++  for (const key of keys) if (!found.has(key) && !optionalKeys.includes(key)) throw new Error(`missing top-level ${key}`);
+   return found;
+ }
+ 
++/** Insert top-level `key = "value"` lines before the first table (or at the end), keeping the file's line ending. */
++function insertTomlTopLevelValues(bytes, entries) {
++  if (entries.length === 0) return bytes;
++  const eol = bytes.includes("\r\n") ? "\r\n" : "\n";
++  const lines = bytes.split(/(?<=\n)/u);
++  const section = lines.findIndex((line) => /^\s*\[.*\]\s*$/u.test(line.replace(/[\r\n]+$/u, "")));
++  const at = section === -1 ? lines.length : section;
++  if (at === lines.length && lines.length > 0 && !lines.at(-1).endsWith("\n")) lines[lines.length - 1] += eol;
++  lines.splice(at, 0, ...entries.map(([key, value]) => `${key} = ${JSON.stringify(value)}${eol}`));
++  return lines.join("");
++}
++
+ /** Parse the exact top-level string route fields accepted by the V3 projector. */
+ export function parseRuntimeProjectionV3TomlRoute(bytes, keys) {
+   if (typeof bytes !== "string" || !Array.isArray(keys)
+@@ -495,9 +523,11 @@ function replaceCodexAgentTarget(v2Target, target, intent) {
+   const cell = intent.routing.duties[target.cell.dutyId]?.codex;
+   if (!cell?.selector?.value || !cell.effort) throw new Error(`V3 Codex duty is not projectable: ${target.cell.dutyId}`);
+   const keys = target.ownedKeys;
+-  const locations = locateTomlTopLevelValues(v2Target.after.bytes, keys);
+-  const wanted = { model: cell.selector.value, model_reasoning_effort: cell.effort };
+-  const afterBytes = patchTomlValues(v2Target.after.bytes, locations, wanted);
++  const fixedKeys = keys.filter((key) => Object.hasOwn(CODEX_FIXED_OWNED_VALUES, key));
++  const locations = locateTomlTopLevelValues(v2Target.after.bytes, keys, fixedKeys);
++  const wanted = { model: cell.selector.value, model_reasoning_effort: cell.effort, ...CODEX_FIXED_OWNED_VALUES };
++  const patched = patchTomlValues(v2Target.after.bytes, locations, wanted);
++  const afterBytes = insertTomlTopLevelValues(patched, fixedKeys.filter((key) => !locations.has(key)).map((key) => [key, wanted[key]]));
+   return {
+     ...v2Target,
+     projection: target.projection,
+@@ -816,7 +846,9 @@ function projectValidatedIntent(intent, { source, baselines }) {
+     if (!target.decision || target.projection !== "codex-custom-agent-v3") return [];
+     const bytes = baselineBytes(baselines?.[target.path]);
+     if (bytes === null) return [];
+-    const observed = Object.fromEntries(locateTomlTopLevelValues(bytes, target.ownedKeys).entries()
++    // C22: only the routed keys carry a model decision; the fixed sandbox value is never a decision conflict.
++    const routedKeys = target.ownedKeys.filter((key) => !Object.hasOwn(CODEX_FIXED_OWNED_VALUES, key));
++    const observed = Object.fromEntries(locateTomlTopLevelValues(bytes, routedKeys).entries()
+       .map(([key, location]) => [key, location.value]));
+     const cell = intent.routing.duties[target.cell.dutyId].codex;
+     const required = { model: cell.selector.value, model_reasoning_effort: cell.effort };
+diff --git a/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs b/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs
+index 8f4c506c94a51580ef199c82323b93d89d9eacbf..f9b6607392ab414fb18f364d52122d5a3a8ea72d 100644
+--- a/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs
++++ b/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs
+@@ -193,7 +193,8 @@ test("C21H V3 owns the critic-high-risk Codex custom agent with the critic_high_
+   const entry = manifest.targets.find((item) => item.path === HIGH_RISK_PATH);
+   assert.ok(entry, "the owned-key manifest names the second Critic role");
+   assert.equal(entry.projection, "codex-custom-agent-v3");
+-  assert.deepEqual(entry.ownedKeys, ["model", "model_reasoning_effort"]);
++  // C22 (QG-04, restated in place): both Codex Critic roles also own `sandbox_mode` (read-only); the original two keys are unchanged.
++  assert.deepEqual(entry.ownedKeys, ["model", "model_reasoning_effort", "sandbox_mode"]);
+   assert.deepEqual(entry.cell, { kind: "duty", dutyId: "critic_high_risk" });
+   const role = CODEX_CUSTOM_AGENT_METADATA["critic-high-risk"];
+   assert.equal(role.name, "critic-high-risk");
+@@ -221,7 +222,8 @@ test("C21H V3 projects the critic-high-risk model and effort from the critic_hig
+     assert.notEqual(highRisk.route.requested.effort, target(plan, ".codex/agents/critic.toml").route.requested.effort, "the second role exists to carry a different effort");
+     assert.match(highRisk.after.bytes, /name = "keep-high-risk"/u, "unowned top-level keys stay byte-for-byte");
+     assert.match(highRisk.after.bytes, /\[metadata\]\nmodel_reasoning_effort = "nested"\n/u, "a nested key of the same name is not an owned key");
+-    assert.deepEqual(plan.ownedKeyManifest.targets.find((item) => item.path === HIGH_RISK_PATH).ownedKeys, ["model", "model_reasoning_effort"]);
++    // C22 (QG-04, restated in place): the owned key list now also names the sandbox.
++    assert.deepEqual(plan.ownedKeyManifest.targets.find((item) => item.path === HIGH_RISK_PATH).ownedKeys, ["model", "model_reasoning_effort", "sandbox_mode"]);
+   } finally {
+     rmSync(root, { recursive: true, force: true });
+   }
+@@ -252,6 +254,86 @@ test("C21H a project without the critic-high-risk file plans it as a first-time
+   }
+ });
+ 
++// C22 (AC-108, PO decision 2026-11-09): both Codex Critic roles carry a read-only sandbox. `implementor` does not.
++const CRITIC_PATHS = [".codex/agents/critic.toml", HIGH_RISK_PATH];
++const SANDBOX_LINE = 'sandbox_mode = "read-only"';
++
++test("C22 the Critic seeds end with the read-only sandbox after developer_instructions and the implementor seed has none", () => {
++  for (const role of ["critic", "critic-high-risk"]) {
++    const lines = codexCustomAgentSeed(role).split("\n");
++    assert.equal(lines.at(-1), "", "one final LF");
++    assert.equal(lines.at(-2), SANDBOX_LINE, `${role} seed ends with the sandbox line`);
++    assert.match(lines.at(-3), /^developer_instructions = /u, `${role} sandbox line follows developer_instructions`);
++  }
++  assert.doesNotMatch(codexCustomAgentSeed("implementor"), /sandbox_mode/u);
++  const manifest = loadRuntimeProjectionV3OwnedKeys();
++  for (const path of CRITIC_PATHS) {
++    assert.deepEqual(manifest.targets.find((entry) => entry.path === path).ownedKeys, ["model", "model_reasoning_effort", "sandbox_mode"], path);
++  }
++  assert.deepEqual(manifest.targets.find((entry) => entry.path === ".codex/agents/implementor.toml").ownedKeys, ["model", "model_reasoning_effort"]);
++});
++
++test("C22 old Critic seed bytes in, new bytes out: the existing plan adds the sandbox line, byte-identical to the new seed", () => {
++  for (const [path, role, dutyId] of [[CRITIC_PATHS[0], "critic", "critic_normal"], [CRITIC_PATHS[1], "critic-high-risk", "critic_high_risk"]]) {
++    const duty = registry.duties[dutyId].codex;
++    const oldSeed = codexCustomAgentSeed(role).replace(`${SANDBOX_LINE}\n`, "")
++      .replace('model = ""', 'model = "old-model"').replace('model_reasoning_effort = ""', 'model_reasoning_effort = "low"');
++    assert.doesNotMatch(oldSeed, /sandbox_mode/u);
++    const root = fixtureRoot();
++    try {
++      writeFileSync(join(root, path), oldSeed);
++      const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
++      assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
++      const planned = target(plan, path);
++      assert.equal(planned.changed, true);
++      assert.match(planned.after.bytes, /^developer_instructions = .*\nsandbox_mode = "read-only"\n$/mu, "the key follows developer_instructions as the last line");
++      assert.equal(planned.after.bytes, codexCustomAgentSeed(role).replace('model = ""', `model = "${duty.selector.value}"`).replace('model_reasoning_effort = ""', `model_reasoning_effort = "${duty.effort}"`));
++      // A second plan from the planned bytes is a no-change plan.
++      writeFileSync(join(root, path), planned.after.bytes);
++      assert.equal(target(planNoThrow(root), path).changed, false);
++    } finally {
++      rmSync(root, { recursive: true, force: true });
++    }
++  }
++});
++
++function planNoThrow(root) {
++  const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
++  assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
++  return plan;
++}
++
++test("C22 a hand-edited sandbox value is re-projected like the other owned keys and a missing key lands before any table", () => {
++  const root = fixtureRoot();
++  try {
++    writeFileSync(join(root, CRITIC_PATHS[0]), 'model = "old"\nmodel_reasoning_effort = "medium"\nsandbox_mode = "workspace-write"\nname = "keep"\n[metadata]\nsandbox_mode = "nested"\n');
++    const plan = planNoThrow(root);
++    const edited = target(plan, CRITIC_PATHS[0]);
++    assert.match(edited.after.bytes, /^sandbox_mode = "read-only"$/mu);
++    assert.doesNotMatch(edited.after.bytes, /workspace-write/u);
++    assert.match(edited.after.bytes, /\[metadata\]\nsandbox_mode = "nested"\n/u, "a nested key of the same name is not the owned key");
++    // The writeFixture critic-high-risk file has a table and no sandbox key: the key is inserted into the top-level block, never into the table.
++    const inserted = target(plan, HIGH_RISK_PATH).after.bytes;
++    assert.match(inserted, /name = "keep-high-risk"\nsandbox_mode = "read-only"\n\[metadata\]\n/u);
++    assert.equal(plan.decisionConflicts.some((conflict) => CRITIC_PATHS.includes(conflict.target) && conflict.differences.some((d) => d.key === "sandbox_mode")), false, "the sandbox is not a model decision");
++    // The implementor is untouched by the sandbox.
++    assert.doesNotMatch(target(plan, ".codex/agents/implementor.toml").after.bytes, /sandbox_mode/u);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("C22 an absent critic-high-risk file is planned from the new seed with the sandbox", () => {
++  const root = fixtureRoot();
++  try {
++    unlinkSync(join(root, HIGH_RISK_PATH));
++    const plan = planNoThrow(root);
++    assert.match(target(plan, HIGH_RISK_PATH).after.bytes, /\nsandbox_mode = "read-only"\n$/u);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
+ test("V3 planning is deterministic, read-only, and byte-preserving", () => {
+   const root = fixtureRoot();
+   try {
+diff --git a/plugins/pipeline-core/runbooks/critic-path.v1.json b/plugins/pipeline-core/runbooks/critic-path.v1.json
+index f0634dc0f9269d8dd2f063cecccb223f61659f12..8884e517280ac1b7f8fd47d2bfaa2f1cb44e4f6e 100644
+--- a/plugins/pipeline-core/runbooks/critic-path.v1.json
++++ b/plugins/pipeline-core/runbooks/critic-path.v1.json
+@@ -137,7 +137,7 @@
+     {
+       "id": "dispatch-critic",
+       "who": "agent",
+-      "command": "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template (Codex: agent_type critic, or critic-high-risk for a higher effort, never default, which loses the Source return)",
++      "command": "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template (Codex: run codex-sandbox-preflight.mjs --run --kind intermediate once on this machine, then codex-critic-launch-route.mjs --role critic, or critic-high-risk for a higher effort, with that receipt, and spawn exactly the agentType it prints; default means model and effort on the call, the round recorded as caller-authored-fallback with its one human acknowledgement at the close, and a final message that names it as protected by instruction only; a sandboxed Critic that still fails on EPERM is launched once more through default with the same labelling)",
+       "needs": [
+         "the admission record"
+       ],
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+index 2c0831423aad1c0aa1b31e99dac09ea1dd420f24..652c916dad617ce62122124924e33e2a93dce18b 100644
+--- a/plugins/pipeline-core/runbooks/index.v1.json
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -29,7 +29,7 @@
+       "pathId": "critic",
+       "path": "plugins/pipeline-core/runbooks/critic-path.v1.json",
+       "schema": "pipeline.runbook.v1",
+-      "sha256": "a2e8f7064166ebbbda70ec31093b68c02f777d45dc5806953f6b9349cb5e49e4"
++      "sha256": "59dc11c13cbb014f05ca943092d00f3914bf61bf6317a8af977699bbc4c9c17f"
+     },
+     {
+       "pathId": "push",
+diff --git a/plugins/pipeline-core/scripts/codex-critic-launch-route.mjs b/plugins/pipeline-core/scripts/codex-critic-launch-route.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..2e7b40fe5bd50f111509fd8ad12aa9b2af2b6b73
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/codex-critic-launch-route.mjs
+@@ -0,0 +1,21 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++// Purpose: print the agentType a Codex Critic is spawned with on THIS machine (C22, AC-108): the role itself when the sandbox preflight receipt
++// shows a usable sandbox, `default` (instruction-only protection) otherwise. Read-only; one JSON object on stdout; always exits 0.
++// Usage: node codex-critic-launch-route.mjs --role critic|critic-high-risk [--receipt <absolute path of a codex-sandbox-preflight receipt>]
++import { decideCodexCriticLaunchRoute } from "../lib/codex-critic-launch-route.mjs";
++
++function parseArgs(argv) {
++  const values = {};
++  for (let index = 0; index < argv.length; index += 2) {
++    const flag = argv[index];
++    if ((flag !== "--role" && flag !== "--receipt") || index + 1 >= argv.length || Object.hasOwn(values, flag)) throw new Error("invalid arguments");
++    values[flag] = argv[index + 1];
++  }
++  return { role: values["--role"], receiptPath: values["--receipt"] };
++}
++
++let route;
++try { route = decideCodexCriticLaunchRoute(parseArgs(process.argv.slice(2))); }
++catch { route = { agentType: "default", sandboxed: false, protection: "instruction-only", reason: "route-error" }; }
++process.stdout.write(`${JSON.stringify(route)}\n`);
+diff --git a/plugins/pipeline-core/scripts/generate-runbook.test.mjs b/plugins/pipeline-core/scripts/generate-runbook.test.mjs
+index c454e1fdcc886afd93794c0576e84fc0a1fee3d2..dfa0c5261c1b776240069eed5cdb02ec7738329f 100644
+--- a/plugins/pipeline-core/scripts/generate-runbook.test.mjs
++++ b/plugins/pipeline-core/scripts/generate-runbook.test.mjs
+@@ -138,18 +138,33 @@ test("C21C: the happy-path guide names the evidence commands and one close entry
+   assert.equal(guide.includes("--audit-request <json>"), false, "the old Antigravity-only close line is gone");
+ });
+ 
+-test("C21H: the Codex Critic launch names critic-high-risk for a higher effort and never default, in the guide and in the critic runbook step", () => {
++test("C21H: the Codex Critic launch names critic-high-risk for a higher effort, in the guide and in the critic runbook step", () => {
+   const guide = readFileSync(join(PLUGIN_ROOT, "skills/pipeline-start/references/happy-path.md"), "utf8");
+   const criticSection = guide.slice(guide.indexOf("## 3. Critic"), guide.indexOf("## 4."));
+-  assert.match(criticSection, /agent_type: "critic-high-risk"/u);
+-  assert.match(criticSection, /never `default`/u);
++  assert.match(criticSection, /critic-high-risk/u);
+   assert.ok(criticSection.indexOf("session-critic-finalizer.mjs admit") < criticSection.indexOf("critic-high-risk"), "the role is named in the step after admit");
+   const step = docOf("critic").steps.find((s) => s.id === "dispatch-critic");
+   assert.match(step.command, /critic-high-risk/u);
+-  assert.match(step.command, /never default/u);
++  // C22 (QG-04, restated in place): the "never default" sentence is replaced by the launch route of C22 (PO decision 2026-11-09), asserted below.
+   assert.deepEqual(step.next, ["finalize", "split-merge"], "the step keeps its place in the path");
+ });
+ 
++test("C22: the Codex Critic launch runs the preflight once, asks the launch route and spawns exactly the printed agentType, in the guide and in the critic runbook step", () => {
++  const guide = readFileSync(join(PLUGIN_ROOT, "skills/pipeline-start/references/happy-path.md"), "utf8");
++  const criticSection = guide.slice(guide.indexOf("## 3. Critic"), guide.indexOf("## 4."));
++  const step = docOf("critic").steps.find((s) => s.id === "dispatch-critic");
++  for (const [name, text] of [["guide", criticSection], ["runbook step", step.command]]) {
++    assert.match(text, /codex-sandbox-preflight\.mjs --run --kind intermediate/u, `${name}: the preflight`);
++    assert.match(text, /codex-critic-launch-route\.mjs/u, `${name}: the launch route`);
++    assert.match(text, /agentType/u, `${name}: the printed agentType is the spawn`);
++    assert.match(text, /caller-authored-fallback/u, `${name}: the default route is recorded as the fallback`);
++    assert.match(text, /instruction only/u, `${name}: the final message names the unprotected round`);
++    assert.match(text, /EPERM/u, `${name}: a run-time sandbox failure relaunches once through default`);
++    assert.doesNotMatch(text, /never `?default`?/u, `${name}: the old never-default sentence is gone`);
++  }
++  assert.ok(criticSection.indexOf("session-critic-finalizer.mjs admit") < criticSection.indexOf("codex-critic-launch-route.mjs"), "the route follows admit");
++});
++
+ test("the index lists the lifecycle paths, each file with its own sha256", () => {
+   const files = buildRunbookFiles();
+   const idx = JSON.parse(files["plugins/pipeline-core/runbooks/index.v1.json"]);
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 53dd55aafea0ce04b903ab7a57515a46eaa8ba27..062f9e0fae4dfd1d222fe887dc92535c5641f15b 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -99,7 +99,7 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
+    `--candidate`, `--spec`, `--guardrail` and `--evidence` (repository-relative paths for the last three); the refusal chain names the next missing input.
+ 2. `session-critic-finalizer.mjs admit --root "$PWD" --request scratch/session-critic-finalization-request.json`, then dispatch one fresh read-only Critic
+    (Antigravity: no external process; refs-only packets per `references/antigravity-native-dispatch.md`).
+-   Codex: the Critic is the projected role `critic`; a Critic that needs a higher effort than `critic` carries uses `spawn_agent` with `agent_type: "critic-high-risk"` (same read-only instructions, effort from the `critic_high_risk` duty), never `default` with model or effort set on the call, because `default` loses the Source return and the round is recorded as caller-authored.
++   Codex: both projected Critic roles, `critic` and `critic-high-risk` (a higher effort, from the `critic_high_risk` duty), carry a read-only sandbox, which a host may not be able to run. Run the preflight once on this machine (no model call): `node <plugin-root>/scripts/codex-sandbox-preflight.mjs --run --kind intermediate --codex <absolute codex path> --receipt <absolute path of a new file under scratch/>`. Then `node <plugin-root>/scripts/codex-critic-launch-route.mjs --role critic --receipt <that path>` (`--role critic-high-risk` for a higher effort; the receipt is optional; it always exits 0) prints one JSON object. Call `spawn_agent` with exactly the `agentType` it prints, which is the role itself (sandboxed) or `default`. With `default`, set the model and `reasoning_effort` on the call, record the round as `caller-authored-fallback` (it needs its one human acknowledgement at the close) and name the round in your final message as protected by instruction only. If a sandboxed Critic still fails on `EPERM` at run time, launch it once more through `default` with the same labelling.
+ 3. `session-critic-finalizer.mjs finalize --root "$PWD" --request scratch/session-critic-finalization-request.json`, then `... export --root "$PWD" --request scratch/session-critic-export-request.json`.
+    `finalize --help` prints the closed request keys. A split review: `critic-split-merge.mjs --root <root> --packet <packetId>` once every child returned, before `finalize`.
+ 4. Findings: `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` or `--add-delta-request <input.json>`; every later round reuses the first `taskId`.

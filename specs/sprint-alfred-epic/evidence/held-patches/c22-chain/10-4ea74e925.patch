@@ -1,0 +1,215 @@
+diff --git a/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs b/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs
+index 9d015705dbcf813f97310a10013df15874e459a9..79d4ba0b86f9ec58d7a08b1f6105d079578363d7 100644
+--- a/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs
++++ b/plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs
+@@ -71,7 +71,8 @@ const architecture = { schema: "pipeline.architecture-design.v1", repositoryKind
+ let counter = 0;
+ // One fixture per case: the profile receipt fingerprint is bound to this exact repository path.
+ // mode: "chat" | "signature"; reopen: run reopen-design and approve a second time before implementation.
+-function fixture({ mode = "chat", reopen = false } = {}) {
++// toolchainReport: the toolchain preflight's answer at the entry gate; criticalEntry: try set-phase once under a critical calibration first.
++function fixture({ mode = "chat", reopen = false, toolchainReport = null, criticalEntry = null } = {}) {
+   const parent = join(WORK, `fx-${counter += 1}`);
+   mkdirSync(parent, { recursive: true });
+   const root = join(parent, "repo");
+@@ -89,13 +90,18 @@ function fixture({ mode = "chat", reopen = false } = {}) {
+   gitOk("config", "core.autocrlf", "false");
+   assert.equal(realpathSync(root), root);
+   assert.equal(realpathSync(gitOk("rev-parse", "--show-toplevel")), root, "the fixture is its own repository");
+-  const lifecycle = (argv) => {
++  const attempt = (argv, deps = {}) => {
+     const logs = [];
+     const old = { log: console.log, error: console.error, warn: console.warn };
+     for (const name of Object.keys(old)) console[name] = (...args) => { logs.push(args.map(String).join(" ")); };
+     let status;
+-    try { status = run(argv, { dir: root, now: () => AT }); } finally { Object.assign(console, old); }
++    try { status = run(argv, { dir: root, now: () => AT, ...deps }); } finally { Object.assign(console, old); }
++    return { status, logs };
++  };
++  const lifecycle = (argv, deps) => {
++    const { status, logs } = attempt(argv, deps);
+     assert.equal(status, 0, `SETUP ${argv[0]}: ${logs.join("\n")}`);
++    return logs;
+   };
+ 
+   write("README.md", "Synthetic unmet-condition fixture\n");
+@@ -204,14 +210,41 @@ function fixture({ mode = "chat", reopen = false } = {}) {
+   writeJson("specs/e2e/lifecycle.json", { schema: "pipeline.feature-package.v1", feature: { id: FEATURE, rigor: 2 }, state: "approved", artifacts: [artifact("prd", PLAN, true, "mutable", "active"), artifact("spec", SPEC, true, "mutable", "active"), artifact("acceptance", "specs/e2e/acceptance.md", true, "mutable", "active"), artifact("result", "specs/e2e/result.md", true, "mutable", "active"), artifact("candidate-evidence", approved.planApproval.acceptedContract.path, false, "immutable", "retain")], candidate: structuredClone(round.request.approvalIntent.value.candidate), supersedes: null });
+   const packageRead = validateFeaturePackage(root, "specs/e2e/lifecycle.json");
+   assert.ok(packageRead.ok, `SETUP registered package: ${JSON.stringify(packageRead.findings)}`);
+-  lifecycle(["set-phase", "--phase", "implementation"]);
++  const entryDeps = toolchainReport === null ? undefined : { toolchainPreflight: () => toolchainReport };
++  let entered = false;
++  if (criticalEntry !== null) {
++    for (const twin of TWINS) writeJson(twin, { ...baseline, stakes: "critical" });
++    const result = attempt(["set-phase", "--phase", "implementation"], entryDeps);
++    entered = result.status === 0;
++    criticalEntry(result, derivePlanLifecycle(readCurrent()).status);
++    for (const twin of TWINS) writeJson(twin, baseline);
++  }
++  const entryLogs = entered ? [] : lifecycle(["set-phase", "--phase", "implementation"], entryDeps);
+   assert.equal(derivePlanLifecycle(readCurrent()).status, "implementing");
+   const stateRelative = statePath(root).slice(root.length + 1).replaceAll("\\", "/");
+   assert.equal(gitOk("ls-files", "--", stateRelative), "", "the private State stays untracked");
+   const observed = observeCurrentPlanApprovalForCalibration({ rootDir: root });
+-  return { root, git, gitOk, env, write, read, observed, statePath: stateRelative };
++  return { root, git, gitOk, env, write, read, observed, statePath: stateRelative, entryLogs };
+ }
+ 
++test("candidate 22: the real set-phase names a missing scanner: a critical project is stopped with the install route, any other gets a notice and enters", () => {
++  const toolchainReport = { results: [{ tool: "gitleaks", status: "binary_missing", guidance: "Install gitleaks." }] };
++  let refused = null;
++  const ctx = fixture({ toolchainReport, criticalEntry: (result, phase) => { refused = { ...result, phase }; } });
++  assert.equal(refused.status, 2, refused.logs.join("\n"));
++  assert.ok(refused.logs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(line) && /gitleaks/u.test(line) && /Install gitleaks\./u.test(line) && /security-scanner-exceptions\.json/u.test(line)), refused.logs.join("\n"));
++  assert.notEqual(refused.phase, "implementing", "nothing was written before the gate cleared");
++  assert.ok(ctx.entryLogs.some((line) => /^Notice: gitleaks is not ready \(binary_missing\)/u.test(line)), ctx.entryLogs.join("\n"));
++});
++
++test("candidate 22: a toolchain check that could not look never stops the real set-phase, even in a critical project", () => {
++  let entered = null;
++  fixture({ toolchainReport: { results: [{ tool: "gitleaks", status: "probe_error", guidance: "" }] }, criticalEntry: (result, phase) => { entered = { ...result, phase }; } });
++  assert.equal(entered.status, 0, entered.logs.join("\n"));
++  assert.equal(entered.phase, "implementing");
++  assert.ok(!entered.logs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED|^Notice:/u.test(line)), entered.logs.join("\n"));
++});
++
+ // Runs the real configure-verify and returns { code, logs, errorLine, reportedCode }.
+ function configure(ctx, command = COMMAND) {
+   const logs = [];
+diff --git a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+index a165d145999135e31565382953a82028cb326295..59587ba46e6a77a3ad33ad804c0f621562a875da 100644
+--- a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
++++ b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+@@ -578,6 +578,29 @@ test("C20 recorded beforehand is enforced: an exception HEAD does not hold admit
+   assert.match(changed[0], /changed since the last commit/u);
+ });
+ 
++test("C21 a missing scanner is named before the signature: critical refuses, others get a notice, host-boundary states and valid exceptions stop nothing", async () => {
++  const { scannerEntryReadiness } = await import("../security-close-status.mjs");
++  const report = (...rows) => ({ results: [{ tool: "node", status: "binary_missing" }, ...rows.map(([tool, status]) => ({ tool, status, guidance: `install ${tool}` }))] });
++  const critical = scannerEntryReadiness(report(["gitleaks", "binary_missing"], ["license-check", "input_missing"], ["semgrep", "ready"], ["osv-scanner", "not_required"]), { critical: true });
++  assert.deepEqual(critical.notices, []);
++  assert.equal(critical.refusals.length, 2, "node is the toolchain's own concern; ready and not_required are nothing to say");
++  assert.equal(critical.refusals[0].code, "SEC-CLOSE-SCANNER-NOT-EXECUTED");
++  assert.match(critical.refusals[0].text, /gitleaks/u);
++  assert.match(critical.refusals[0].text, /install gitleaks/u, "the installation guidance is in the refusal");
++  assert.match(critical.refusals[0].text, /project\/security-scanner-exceptions\.json/u, "and so is the exception route");
++  for (const status of ["execution_environment", "probe_timeout", "probe_error"]) {
++    const { refusals, notices } = scannerEntryReadiness(report(["gitleaks", status]), { critical: true });
++    assert.deepEqual([refusals, notices], [[], []], `${status}: a check that could not look stops nothing`);
++  }
++  const excepted = scannerEntryReadiness(report(["gitleaks", "binary_missing"]), { critical: true, exceptions: { valid: [exception({ scanner: "gitleaks" })], rejected: [] } });
++  assert.deepEqual(excepted.refusals, []);
++  const standard = scannerEntryReadiness(report(["gitleaks", "binary_missing"]), { critical: false });
++  assert.deepEqual(standard.refusals, []);
++  assert.equal(standard.notices.length, 1);
++  assert.match(standard.notices[0], /gitleaks.*binary_missing/u);
++  assert.deepEqual(scannerEntryReadiness(null, { critical: true }), { refusals: [], notices: [] });
++});
++
+ test("C19 the close quality readback names an applied exception in its security evidence", async () => {
+   const { closeQualityReadback } = await import("../close-quality-readback.mjs");
+   const files = {
+diff --git a/plugins/pipeline-core/lib/security-close-status.mjs b/plugins/pipeline-core/lib/security-close-status.mjs
+index daccf16a08e47bceb974384b4fbbd54947580493..2d2edf0c5cb97336af354b57e852314aa2bca70a 100644
+--- a/plugins/pipeline-core/lib/security-close-status.mjs
++++ b/plugins/pipeline-core/lib/security-close-status.mjs
+@@ -197,6 +197,29 @@ export function securityGateNotConfiguredRefusal(root, where = "this check") {
+     + `calibrated critical (stakes in the project calibration). Run this command to configure it, then run this check again: node ${word(script)} --root ${word(root)}`;
+ }
+ 
++// The toolchain states a person can repair by providing the tool or its input. The host-boundary states (execution_environment, probe_timeout,
++// probe_error) say the check itself could not look, as a sandboxed session does on WSL; they must never stop a project, or the check deadlocks it.
++const SCANNER_PROVISION_STATES = new Set(["binary_missing", "incompatible_version", "incompatible_capability", "input_missing", "untrusted_path"]);
++
++/**
++ * PO 2026-11-09: a scanner the close will need is reported before the signature and before implementation, so it is installed then and not found
++ * missing at the close. `report` is a toolchain preflight result. A critical calibration gets one refusal per scanner, the same one the close
++ * would give; any other calibration gets notices only. A valid named exception answers it here as it does at the close.
++ * @returns {{refusals: {code: string, text: string}[], notices: string[]}}
++ */
++export function scannerEntryReadiness(report, { critical = false, exceptions = null } = {}) {
++  const refusals = [];
++  const notices = [];
++  for (const entry of Array.isArray(report?.results) ? report.results : []) {
++    if (!SECURITY_ELEMENTS.includes(entry?.tool) || !SCANNER_PROVISION_STATES.has(entry.status)) continue;
++    if (critical && exceptions?.valid?.some((e) => e.scanner === entry.tool)) continue;
++    const guidance = typeof entry.guidance === "string" && entry.guidance !== "" ? ` ${entry.guidance}` : "";
++    if (critical) refusals.push({ code: SCANNER_NOT_EXECUTED_CODE, text: `${scannerNotExecutedRefusal(entry.tool, `toolchain check: ${entry.status}`, { rejected: exceptions?.rejected ?? [] })}${guidance}` });
++    else notices.push(`Notice: ${entry.tool} is not ready (${entry.status}); install it now if this project's security gate needs it at the close.${guidance}`);
++  }
++  return { refusals, notices };
++}
++
+ /** The typed refusal of a critical calibration for a scanner that did not execute: names the scanner and the commands that repair it. */
+ export function scannerNotExecutedRefusal(element, where = "the security evidence", { rejected = [] } = {}) {
+   const ignored = rejected.length > 0 ? ` Exception entries ignored: ${rejected.map((r) => `${r.ref}: ${r.why}`).join("; ")}.` : "";
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 833580effd5aeb57e43ce8a23764a7d27b4acc77..4ca46bc2aca36a8fa652d05894a3ba65fa3adca4 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -395,6 +395,9 @@ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
+ import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
+ import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
++import { isCriticalStakes, readCalibrationStakes, readScannerExceptions, scannerEntryReadiness } from "../lib/security-close-status.mjs";
++import { runToolchainPreflight } from "./toolchain-preflight.mjs";
++import { tmpdir as hostTmpdir } from "node:os";
+ import { readPipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
+ import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+ import { awaitSignatureFields, commandText as proofCommandText, proofWaitCommand } from "../lib/signed-proof-wait.mjs";
+@@ -4110,6 +4113,24 @@ function validProfileChangeBinding(binding) {
+     && document(binding.prd) && document(binding.spec);
+ }
+ 
++/**
++ * One entry-gate check, the same before the signature and at set-phase implementation (PO 2026-11-09): a scanner the close will need is named now,
++ * so it is installed now. Only a critical calibration can be refused, and only for a tool a person can provide. If the check itself cannot run it
++ * stays silent: a sandboxed session that cannot look must not be stopped by not looking.
++ */
++function securityScannerEntryCheck(dir, deps) {
++  let readiness;
++  try {
++    const critical = isCriticalStakes(readCalibrationStakes(dir));
++    const report = (deps.toolchainPreflight ?? runToolchainPreflight)({ rootDir: dir, tempDir: hostTmpdir() });
++    readiness = scannerEntryReadiness(report, { critical, exceptions: critical ? readScannerExceptions(dir) : null });
++  } catch {
++    return null;
++  }
++  for (const notice of readiness.notices) console.error(notice);
++  return readiness.refusals;
++}
++
+ function inspectSelectedPlanProfile(dir, state) {
+   const choices = new Set();
+   const add = (value) => {
+@@ -10189,6 +10210,7 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
+   const sources = () => (inputs?.ok ? inputs.currentSources : inputs?.draftSources ?? null);
+   const dcc = (entry) => ({ code: entry.code, path: entry.path, message: entry.expected !== undefined ? `expected ${entry.expected}, found ${entry.observed}` : null, repair: entryGateRepair(entry.code)?.replaceAll("<SUBMISSION_SHA256>", submissionSha256) ?? null });
+   const result = runImplementationEntryGate({ stage: "before-signature", checks: [
++    { id: "security-scanners", run: () => securityScannerEntryCheck(dir, deps) },
+     { id: "profile", run: () => {
+       const selection = inspectSelectedPlanProfile(dir, state);
+       return selection.ok ? null : { code: selection.code, message: "the persisted profile sources must agree" };
+@@ -11935,6 +11957,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       let architecture = null;
+       // The entry gate (PO 2026-11-08): every condition of the implementation phase, all open points in one output, nothing written before it is clear.
+       const implementationEntry = runImplementationEntryGate({ stage: "before-implementation", checks: [
++        { id: "security-scanners", run: () => securityScannerEntryCheck(dir, deps) },
+         { id: "profile", run: () => (entrySelectionRefusal === null ? null : { code: entrySelection.code, text: entrySelectionRefusal }) },
+         { id: "architecture-entry", run: () => {
+           architecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 51c83d60d3ae19b3f67ec2f57b97a0bb67e92848..d067f429db9aea719fb636d614420a90c88ca798 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -37,7 +37,7 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
+    the design input). It writes `scratch/seal-plan.json` (the digest-bound seal plan) and never State; it also replaces a damaged plan file. `inspect` -> `sealSituation`
+    names the next command in every state (`none`, `draft`, `bound-unapproved`, `sealed`).
+ 4. `pipeline-state.mjs present-plan --by <name> [--review-receipt <repo-relative-json>]` (agent). Needs the exact current submission from step 3 and, for a draft, the prepared seal plan (step 3b):
+-   present the plan to the PO; its digest is part of what the one signature covers.
++   present the plan to the PO; its digest is part of what the one signature covers. This step and `set-phase implementation` also check the scanners the close will need: in a critical calibration a missing one is refused here with its install guidance or the named exception route, otherwise it prints a notice. Ask the PO to install it now, while nothing waits on it. The first `pipeline-start-preflight` output carries the same facts in `environmentReadiness` once the project's manifest enables scanners.
+ 5. `pipeline-state.mjs approve-plan` (PO ceremony): in `signature` mode the flag `--by` is forbidden; in `chat` mode the PO's explicit actor name is
+    required. A bootstrap acknowledgement receipt and a prior `present-plan` for this exact submission are required. **No further syntax documented**: follow
+    the action `pipeline-state.mjs inspect` returns. **For a draft package this one signature is the seal:** the approval writes the PRD and Spec digests into the State in the

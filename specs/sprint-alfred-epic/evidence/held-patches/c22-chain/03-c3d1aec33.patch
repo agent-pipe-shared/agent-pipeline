@@ -1,0 +1,70 @@
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 34b03996aa16d3bacd05773d04f6523a783e8863..44c03c9c43b8dc766870ad3addc54299b2082e16 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -9,7 +9,7 @@
+  * invocation.  The protected State writer remains the sole closer.
+  */
+ import { createHash, randomBytes } from "node:crypto";
+-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+ import { spawnSync } from "node:child_process";
+ import { fileURLToPath } from "node:url";
+@@ -321,6 +321,17 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+           commit: { paths: addenda.commitPaths, excluded: [], capability: null, message: addenda.subject, steps }, next: rerun(again),
+           message: "The close derived the Critic addenda from the passed review and wrote them; Verify has not run yet. Run the commit, then the next command. Do not build addenda by hand." });
+       }
++      // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward
++      // (VEP-CVL-CARRY-RANGE; a human had to reset). Only a tree whose every dirty path is such an output, with an evidence file proving an earlier attempt, is rolled back; the stages write the same again.
++      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath]);
++      const leftovers = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
++      const dirtyOutputs = leftovers?.status === 0 ? String(leftovers.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => ({ tracked: !line.startsWith("??"), path: line.slice(3) })) : [];
++      if (dirtyOutputs.some(({ tracked, path }) => !tracked && (path === auditRequestPath || path === verifyPath)) && dirtyOutputs.every(({ path }) => ownOutputs.has(path))) {
++        stages.push("discard-own-leftovers");
++        for (const { tracked, path } of dirtyOutputs) {
++          if (tracked) runner("git", ["checkout", "--", path]); else rmSync(resolve(root, path), { force: true });
++        }
++      }
+       if (requalify) stages.push("requalify-candidate");
+       stages.push("verify-candidate");
+       const verify = runner(process.execPath, [VERIFY_PRODUCER, "--root", root, "--mode", "candidate", "--critic-packet-id", packet, "--critic-evidence-feature-id", featureId, "--out", verifyPath]);
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index bb568da962a72700d2a05005a2389f262955d2d5..2bdc15630e6a2a7f6a3d09bf21b2e5b5534f446e 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -573,6 +573,34 @@ test("P3: after the commit the next call continues to closed-local; an uncommitt
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++test("CFC-2: a rerun rolls back only its own uncommitted outputs of an earlier attempt, and leaves any other dirty tree to the Verify", () => {
++  const f = oneShotFixture({ verifyRed: true });
++  try {
++    const manifest = join(f.root, "specs/feature-abc/lifecycle.json");
++    writeFileSync(manifest, "{\"state\":\"implementing\"}\n"); f.git("add", "-A"); f.git("commit", "-q", "-m", "package");
++    const leaveAttempt = () => {
++      writeFileSync(manifest, "{\"state\":\"completed\"}\n");
++      for (const name of ["audit-request.json", "verify-candidate.json"]) writeFileSync(join(f.root, "specs/feature-abc/evidence", name), "{}\n");
++    };
++    leaveAttempt();
++    writeFileSync(join(f.root, "foreign.txt"), "x\n");
++    oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(readFileSync(manifest, "utf8"), "{\"state\":\"completed\"}\n", "a foreign dirty path keeps every output");
++    assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/audit-request.json")), true);
++    rmSync(join(f.root, "foreign.txt"));
++    for (const name of ["audit-request.json", "verify-candidate.json"]) rmSync(join(f.root, "specs/feature-abc/evidence", name));
++    oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(readFileSync(manifest, "utf8"), "{\"state\":\"completed\"}\n", "a modified package with no evidence of an earlier attempt is not touched");
++    leaveAttempt();
++    const before = f.calls.length;
++    oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(readFileSync(manifest, "utf8"), "{\"state\":\"implementing\"}\n");
++    assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/audit-request.json")), false);
++    assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/verify-candidate.json")), false);
++    assert.deepEqual(f.calls.slice(before), ["verify-evidence-producer.mjs"], "the Verify runs on the rolled back tree");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("CGF-21: closed-local names the Critic-bound push Verify with the packet of the close, argv as the close chain walk runs it", () => {
+   const f = oneShotFixture({ closed: true, startPhase: "cleanup-complete" });
+   try {

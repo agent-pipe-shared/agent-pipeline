@@ -1,0 +1,12 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index 4b8472218b7eeef2239ac91fff31fdb111dabf12..145fb1e5cdd27cf1784187a40d9270998b3d9d1c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -316,6 +316,7 @@ test('D168-S7b a private-state root cause with its icacls repairPreview reaches
+ 
+ test('trusted Windows custody leaves bootstrap ready', () => {
+   const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32',
++    pluginList: pluginList(), read: () => manifest,
+     assessWindowsAuthorityReadinessFn: () => ({ schema: 'pipeline.windows-authority-readiness.v1', status: 'ready', causes: [] }),
+   });
+   assert.equal(result.status, 'ready');

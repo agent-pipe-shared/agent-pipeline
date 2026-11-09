@@ -1,0 +1,102 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 9860dd2ee0976911be7e5e4a703d1ecb29242c79..e359c60f61f64b8766c7d8f1a2730df9139df396 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -1754,6 +1754,12 @@
+       "invariantPinned": "A branch workspace prepare names the untracked files before the host can refuse, without counting its own request file and without refusing",
+       "nonOverlapNote": "Prepare-script notice only, distinct from the coordinator and pretool suites of the Antigravity native dispatch"
+     },
++    {
++      "name": "open-minors-tests",
++      "file": "plugins/pipeline-core/lib/open-minors.test.mjs",
++      "invariantPinned": "Open minor Critic findings are kept in one managed handover block, an accepted entry is never reopened, and the close line counts only what the block lists",
++      "nonOverlapNote": "Text and file functions of the handover block; the one-shot close wiring is covered in the finish-feature suite"
++    },
+     {
+       "name": "codex-critic-selected-host-fallback-tests",
+       "file": "plugins/pipeline-core/scripts/codex-critic-selected-host-fallback.test.mjs",
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 95619d9481042fcebaa83b6b4e8ce09dc7b4c116..aedacd14efc3d15515aedba828287d98da30f7b7 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -17,6 +17,8 @@ import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWrit
+ import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+ import { acceptanceQuestion, acceptanceTarget, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
++import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
++import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
+ 
+ const HERE = new URL(".", import.meta.url);
+ const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
+@@ -469,13 +471,26 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+       const updated = runner(process.execPath, [STATE_WRITER, "update-public-handover"]);
+       handover = { path: handoverPath, status: updated?.status === 0 ? "current" : "not-updated", ...(updated?.status === 0 ? {} : { reason: failedText(updated).slice(0, 300) }) };
+     }
++    // C22 (CGR-22): the minors of the Critic round this close is bound to are what the close leaves open (a later round supersedes an earlier one: the lineage marks carried findings fixed on a pass).
++    // They go into the calibrated handover before its digest, so they travel in the one close commit. Never blocks: a packet that cannot be read adds nothing, and the line still reports what is listed.
++    let openMinors = null;
++    if (existsSync(resolve(root, handoverPath))) {
++      try {
++        const bound = criticPacketId ?? packetOfAuditRequest(`specs/${closedFeatureId}/evidence/audit-request.json`);
++        const readResult = deps.readConsumedCandidateResultFn ?? readConsumedCandidateResult;
++        const consumed = bound === null ? null : readResult({ controlRoot: join(common() ?? root, "agent-pipeline", "critic-packets"), packetId: bound });
++        const entries = consumed === null ? [] : minorsFromVerdictFindings({ featureId: closedFeatureId, packetId: bound, findings: consumed.result.verdict.findings });
++        if (entries.length > 0) recordOpenMinors({ root, handoverPath, entries });
++      } catch { /* the close line below reports only what the handover really lists */ }
++      openMinors = openMinorsCloseLine(summarizeOpenMinors({ root, handoverPath }), handoverPath);
++    }
+     // C22 (CGR-05): hash what exists. Measured, the project-defined files are the calibrated handover and the telemetry ledger the close-feature skill names (telemetry/costs.md); a project has no defined
+     // file for backlog, history or retrospective (the backlog is a directory), so those keep the marked empty digest (PO rule 2026-11-01). Only resultSha256 and pipelineStateSha256 are compared by the coordinator.
+     const digestOf = (relative) => { try { return sha256Hex(readFileSync(resolve(root, relative))); } catch { return EMPTY_SHA256; } };
+     writeRepoJson(root, trackedPath, { schema: "pipeline.close-tracked-effects.v1", resultSha256: sha256Hex(resultBytes), backlogSha256: EMPTY_SHA256, handoverSha256: digestOf(handoverPath), historySha256: EMPTY_SHA256, telemetrySha256: digestOf("telemetry/costs.md"), retrospectiveSha256: EMPTY_SHA256, pipelineStateSha256: sha256Hex(readFileSync(resolve(root, statePath))) });
+     const tracked = step("tracked-close-finalized", () => transition("tracked-close-finalized", { evidence: trackedPath })); if (tracked.stop) return tracked.stop;
+     const commit = commitFacts();
+-    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId: closedFeatureId, lifecycleId: id, resumeLifecycleId: id, stages, commit, ...(handover === null ? {} : { handover }),
++    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId: closedFeatureId, lifecycleId: id, resumeLifecycleId: id, stages, commit, ...(handover === null ? {} : { handover }), ...(openMinors === null ? {} : { openMinors }),
+       next: rerun(id), message: "Run the commit (the pre-commit hook admits exactly these bytes), then run the next command: it continues to closed-local. Nothing here signs or pushes." });
+   }
+   if (phase === "tracked-close-finalized") {
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 1be3b8c07b84316046ab1a2bffcd695f1b7d80f6..55c8e86e3670e6796f39a0e3e8cfddcbe9746f12 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -768,6 +768,26 @@ test("C22 CGR-12: the audit request carries every Critic round report of the fea
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++test("C22 CGR-22: the minors of the bound Critic round are listed in the handover inside the close commit, the result names them, and an unreadable packet never blocks", () => {
++  const verdict = { verdict: { findings: [{ severity: "minor", gap: "a small gap" }, { severity: "major", gap: "not a minor" }] } };
++  const withHandover = () => { const fixture = oneShotFixture(); mkdirSync(join(fixture.root, "docs"), { recursive: true }); writeFileSync(join(fixture.root, "docs/state.md"), "# State\n"); return fixture; };
++  const f = withHandover();
++  try {
++    const result = oneShotClose(f.input, { runCommand: f.runner, readConsumedCandidateResultFn: () => ({ result: verdict }) });
++    assert.equal(result.status, "commit-required");
++    const text = readFileSync(join(f.root, "docs/state.md"), "utf8");
++    assert.ok(text.includes(`CRF-${f.packetId}-1`) && text.includes("a small gap") && !text.includes("not a minor"), text);
++    assert.match(result.openMinors, /1 open, 0 accepted/u);
++    assert.ok(result.commit.paths.includes("docs/state.md"));
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++  const unreadable = withHandover();
++  try {
++    const result = oneShotClose(unreadable.input, { runCommand: unreadable.runner, readConsumedCandidateResultFn: () => { throw new Error("packet cleaned up"); } });
++    assert.equal(result.status, "commit-required");
++    assert.match(result.openMinors, /none recorded/u);
++  } finally { rmSync(unreadable.root, { recursive: true, force: true }); }
++});
++
+ test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed repair on stderr with exit 2; a bad flag is a usage refusal", () => {
+   const f = oneShotFixture({ closed: true });
+   try {
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index a610175543b5299063e61a048ecd922d1ae786ba..57672da350ddb13192bc1d8ca05696d54d30638e 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -27,7 +27,7 @@ The command stops at `commit-required` and prints the paths and the commit messa
+ 
+ **The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. Rerun the identical command with `--human-acceptance "<the human's literal answer>"` (pass it only when the human accepted; a decline means the close does not run). The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
+ 
+-**What the close touches.** The tracked-effects digests hash what exists: the calibrated handover (`project/pipeline.json` `handover`, first brought to the closed state by `pipeline-state.mjs update-public-handover`, the existing writer: closed-local, the verified candidate, and technical close, product acceptance and push as three separate facts) and `telemetry/costs.md`; backlog, history and retrospective have no defined project file and keep the marked empty digest. The audit request names every Critic round of the feature (`evidence.criticReports`); the bundle under `audit-bundles/<feature>/<commit>/` carries each exported round report (`specs/<feature>/evidence/critic/<packet>/report.md`) and its README section "Critic round reports" names a round whose report was never exported instead of omitting it: export it with `session-critic-finalizer.mjs export` before the close.
++**What the close touches.** The tracked-effects digests hash what exists: the calibrated handover (`project/pipeline.json` `handover`, first brought to the closed state by `pipeline-state.mjs update-public-handover`, the existing writer: closed-local, the verified candidate, and technical close, product acceptance and push as three separate facts) and `telemetry/costs.md`; backlog, history and retrospective have no defined project file and keep the marked empty digest. The audit request names every Critic round of the feature (`evidence.criticReports`); the bundle under `audit-bundles/<feature>/<commit>/` carries each exported round report (`specs/<feature>/evidence/critic/<packet>/report.md`) and its README section "Critic round reports" names a round whose report was never exported instead of omitting it: export it with `session-critic-finalizer.mjs export` before the close. The minors of the Critic round this close is bound to go into the handover under "Open minor findings", and the result's `openMinors` line says how many are open and where: put that line in the close report.
+ 
+ Everything below is the per-stage recovery reference: use it when the one command stops and the repair needs a single stage by hand.
+ 

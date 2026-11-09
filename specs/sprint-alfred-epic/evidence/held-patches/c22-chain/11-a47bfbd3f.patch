@@ -1,0 +1,172 @@
+diff --git a/plugins/pipeline-core/hooks/post-compact-reground.mjs b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+index d85dc7af3149221edd28f60edaf00a572353e4ff..5b54aadb07766e80238e508e82dc61fb5c49d9b9 100644
+--- a/plugins/pipeline-core/hooks/post-compact-reground.mjs
++++ b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+@@ -96,6 +96,7 @@ export const REGROUND_CODES = Object.freeze([
+   "PCR-DECISION-PENDING",
+   "PCR-OUTER-INVALID",
+   "PCR-ACTIVE-FEATURE-INVALID",
++  "PCR-NO-ACTIVE-FEATURE",
+   "PCR-CONTINUITY-MISSING",
+   "PCR-FEATURE-MISMATCH",
+   "PCR-CONTINUITY-INVALID",
+@@ -220,6 +221,11 @@ export function resolveRegroundProjection(state, input = null, { rootDir = null
+   if (!isObject(state) || state.schema !== OUTER_SCHEMA) {
+     return stoppedProjection("PCR-OUTER-INVALID");
+   }
++  // A closed feature clears activeFeature: that is a clean state with nothing to resume, and it must not read like a damaged one (Claude greenfield report).
++  if ((state.activeFeature === null || state.activeFeature === undefined)
++    && Array.isArray(state.closedFeatures) && state.closedFeatures.length > 0) {
++    return stoppedProjection("PCR-NO-ACTIVE-FEATURE");
++  }
+   const featureId = state.activeFeature?.id;
+   const phase = state.activeFeature?.phase;
+   if (typeof featureId !== "string" || featureId.length === 0
+diff --git a/plugins/pipeline-core/hooks/post-compact-reground.test.mjs b/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
+index fbfbf2b5dc8d90f28f21077a35add75ce59cdfe3..c91edce9f2031a79a9d1699cc3e81c1ea8c39edf 100644
+--- a/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
++++ b/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
+@@ -385,6 +385,8 @@ for (const [name, value, code] of [
+   ["null state", null, "PCR-OUTER-INVALID"],
+   ["wrong outer schema", { ...outer(), schema: "pipeline.state.v1" }, "PCR-OUTER-INVALID"],
+   ["missing active feature", { ...outer(), activeFeature: undefined }, "PCR-ACTIVE-FEATURE-INVALID"],
++  ["no active feature after a close", { schema: "pipeline.state.v0", activeFeature: null, closedFeatures: [{ id: FEATURE }] }, "PCR-NO-ACTIVE-FEATURE"],
++  ["an empty close history is not a close", { schema: "pipeline.state.v0", activeFeature: null, closedFeatures: [] }, "PCR-ACTIVE-FEATURE-INVALID"],
+   ["missing continuity", { schema: "pipeline.state.v0", activeFeature: { id: FEATURE, phase: "implementation" } }, "PCR-CONTINUITY-MISSING"],
+   ["mismatched feature", outer({}, { activeFeature: { id: "other", phase: "implementation" } }), "PCR-FEATURE-MISMATCH"],
+ ]) {
+diff --git a/plugins/pipeline-core/scripts/push-init.mjs b/plugins/pipeline-core/scripts/push-init.mjs
+index 0ad42ceed3fce9951c43ac8b090665cef8b6ce75..064480aac5b9869b42ea6259200acb5aa10b5bd7 100644
+--- a/plugins/pipeline-core/scripts/push-init.mjs
++++ b/plugins/pipeline-core/scripts/push-init.mjs
+@@ -609,7 +609,9 @@ function drivePushInitCore({
+     schema: SCHEMA, root, by, remote, destination, base, outcome: "signature-required", steps,
+     subjectSha256: prepare.report.subjectSha256,
+     // CGF-07/22: a Codex and a Claude run each spent turn after turn re-checking a signature only the human can produce.
+-    humanGate: "Hand the signature command to the human once, then end the turn. Nothing changes until the human answers: do not re-run this driver, poll the proof or repeat the request. An automatic continuation gets one line saying the push waits for the signature. Commit nothing meanwhile, a new commit voids the prepared approval.",
++    // Claude greenfield report: the design step sees its own signature arrive, the push made the PO paste the output back. The same bounded wait, when the proof lands where it can be watched.
++    ...(prepare.report.awaitSignature ? { awaitSignature: prepare.report.awaitSignature } : {}),
++    humanGate: `Hand the signature command to the human once.${prepare.report.awaitSignature ? " Then run awaitSignature.waitAction exactly once: it returns by itself when the proof arrives or its window ends, and the human reports nothing back. If it ends without a proof," : " Then"} end the turn. Nothing changes until the human answers: do not re-run this driver, poll the proof by hand or repeat the request. An automatic continuation gets one line saying the push waits for the signature. Commit nothing meanwhile, a new commit voids the prepared approval.`,
+     signatureCommand: {
+       executedByDriver: false,
+       note: "Run this at the PO's own attended terminal. This driver never executes it and cannot -- "
+diff --git a/plugins/pipeline-core/scripts/push-init.test.mjs b/plugins/pipeline-core/scripts/push-init.test.mjs
+index 0bd0022fa2b295aee9e513e6f4bb969c705240fc..bc42114a690359f4dc5252c7d01ba9dc35e88669 100644
+--- a/plugins/pipeline-core/scripts/push-init.test.mjs
++++ b/plugins/pipeline-core/scripts/push-init.test.mjs
+@@ -550,6 +550,33 @@ test("drivePushInit: signature preparation keeps the existing signature-required
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++test("drivePushInit: a proof that can be watched is handed over with its wait action, so the human reports nothing back; without one the turn ends", async () => {
++  const { pushPrepareReport: real } = await import("./push-prepare.mjs");
++  const waitAction = { executable: "node", argv: ["proof-wait.mjs"] };
++  const root = freshFixtureRoot();
++  try {
++    const drive = (awaitSignature) => drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(),
++      pushPrepareReport: (...args) => {
++        const prepared = real(...args);
++        if (awaitSignature) prepared.report.awaitSignature = { waitAction }; else delete prepared.report.awaitSignature;
++        return prepared;
++      },
++    });
++    const watched = drive(true);
++    assert.equal(watched.outcome, "signature-required", JSON.stringify(watched));
++    assert.deepEqual(watched.awaitSignature.waitAction, waitAction);
++    assert.match(watched.humanGate, /run awaitSignature\.waitAction exactly once/u);
++    assert.match(watched.humanGate, /human reports nothing back/u);
++    assert.match(watched.humanGate, /end the turn/u, "a wait that ended without a proof still stops");
++    const unwatched = drive(false);
++    assert.equal(Object.hasOwn(unwatched, "awaitSignature"), false);
++    assert.doesNotMatch(unwatched.humanGate, /waitAction/u);
++    assert.match(unwatched.humanGate, /end the turn/u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("drivePushInit: precondition failure remains precondition-unmet and has no chat or signature terminal output", () => {
+   const root = freshFixtureRoot();
+   try {
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+index 889443f6ff3b37c6bee26d8107aeaf5929466a7e..f066e945f3dc48d20089bae2aafab9fb9159c0b2 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+@@ -401,6 +401,16 @@ async function locateKeyDirectory(rootDir, signingDeps) {
+   return { directory: null, legacy: false, invalid: null };
+ }
+ 
++const CLOUD_SYNC_SEGMENTS = Object.freeze([[/^onedrive/iu, "OneDrive"], [/^dropbox/iu, "Dropbox"], [/^icloud ?drive$/iu, "iCloud"], [/^mobile documents$/iu, "iCloud"], [/^google ?drive$/iu, "Google Drive"], [/^cloudstorage$/iu, "a macOS cloud provider"]]);
++
++/** The sync provider whose folder holds `directory`, by path segment, or null. Exported for its test. */
++export function cloudSyncProvider(directory) {
++  for (const segment of String(directory).split(/[\\/]/u)) {
++    for (const [pattern, provider] of CLOUD_SYNC_SEGMENTS) if (pattern.test(segment)) return provider;
++  }
++  return null;
++}
++
+ /** One signing-readiness observation per report, shared by the three signing findings. */
+ function observeSigning(context) {
+   context.signing ??= (async () => {
+@@ -417,6 +427,12 @@ function observeSigning(context) {
+       byId.set("po-key-directory", located.invalid ?? approval.keyDirectoryUnsetFinding());
+       byId.delete("trust-anchor-match");
+     }
++    // Claude greenfield report: the private key sat in a cloud-synced folder and nothing said so. This report never gates and never reaches
++    // sign-intent, so a warning here cannot stop a signature. Only the provider is named, the path stays unprinted.
++    const provider = located.directory === null ? null : cloudSyncProvider(located.directory);
++    if (provider !== null && byId.get("po-key-directory")?.status === "ok") {
++      byId.set("po-key-directory", { findingId: "po-key-directory", status: "attended", cause: `key-directory-cloud-synced: the PO key directory lies in a folder synchronised by ${provider}, so the private key leaves this machine`, repair: attendedPrerequisite("po-key-directory-local", "move the key directory to a local folder outside any synchronised location, point the PO key directory at it in your own terminal, then re-run the readiness report.") });
++    }
+     return byId;
+   })();
+   return context.signing;
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+index 3bd0ad2ecc8feee780c85f3f69eea4bd88b6b77f..e9b6c4f94f880b721932073dcb2642677d5e0c9e 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+@@ -782,6 +782,43 @@ check("R7-6n: an invalid legacy per-repository store is a failure, never absent"
+     rmSync(base, { recursive: true, force: true, maxRetries: 3 });
+   }
+ });
++check("CGR-04: a synchronised folder is named by its provider, an ordinary folder by nobody", async () => {
++  const { cloudSyncProvider } = await import("./toolchain-preflight.mjs");
++  assert.equal(cloudSyncProvider(join("C:", "Users", "someone", "OneDrive - Contoso", "keys")), "OneDrive");
++  assert.equal(cloudSyncProvider("/home/someone/Dropbox/keys"), "Dropbox");
++  assert.equal(cloudSyncProvider("/Users/someone/Library/Mobile Documents/keys"), "iCloud");
++  assert.equal(cloudSyncProvider("/home/someone/Google Drive/keys"), "Google Drive");
++  assert.equal(cloudSyncProvider("/home/someone/.config/po-keys"), null);
++  assert.equal(cloudSyncProvider("/home/someone/my-onedrive-notes/keys"), null, "only a segment that starts with the provider counts");
++});
++check("CGR-04: a key directory in a synchronised folder is reported without its path and without a sign-intent effect; the same directory elsewhere stays as it was", async () => {
++  const base = mkdtempSync(join(tmpdir(), "cgr04-"));
++  const savedEnv = process.env[R76J_ENV];
++  try {
++    const fixture = r76jBuild(join(base, "row"), { plane: "absent", legacy: false });
++    const plain = await (async () => { process.env[R76J_ENV] = fixture.keys.environment; return r76tReport(fixture); })();
++    const plainFinding = plain.findings.find((entry) => entry.findingId === "po-key-directory");
++    assert.doesNotMatch(String(plainFinding.cause), /cloud-synced/u);
++    const synced = join(base, "row", "OneDrive - Contoso", "keys");
++    mkdirSync(synced, { recursive: true });
++    for (const name of ["po-public.pem", "trust-policy.json"]) writeFileSync(join(synced, name), readFileSync(join(fixture.keys.environment, name)));
++    process.env[R76J_ENV] = synced;
++    const report = await r76tReport(fixture);
++    const finding = report.findings.find((entry) => entry.findingId === "po-key-directory");
++    if (plainFinding.status === "ok") {
++      assert.equal(finding.status, "attended", JSON.stringify(finding));
++      assert.match(String(finding.cause), /^key-directory-cloud-synced/u);
++      assert.match(String(finding.cause), /OneDrive/u);
++      assert.doesNotMatch(JSON.stringify(finding), /Contoso/u, "the machine path stays unprinted");
++      assert.equal(finding.repair?.prerequisite, "po-key-directory-local");
++    } else {
++      assert.fail(`the fixture must be ok outside the synchronised folder, got ${plainFinding.status}: ${String(plainFinding.cause).slice(0, 120)}`);
++    }
++  } finally {
++    if (savedEnv === undefined) delete process.env[R76J_ENV]; else process.env[R76J_ENV] = savedEnv;
++    rmSync(base, { recursive: true, force: true, maxRetries: 3 });
++  }
++});
+ // W7 preflight slice 1: gitleaks, osv-scanner and semgrep are typed prerequisite findings (AC-264 slice; the environment
+ // readiness never reports a missing scanner as ready or clean). Fixtures inject the resolver and probes; nothing is spawned.
+ const W7_SCANNER_TOOLS = Object.freeze({ "scanner-gitleaks": "gitleaks", "scanner-osv-scanner": "osv-scanner", "scanner-semgrep": "semgrep" });

@@ -1,0 +1,69 @@
+diff --git a/plugins/pipeline-core/lib/close-chain-guide.mjs b/plugins/pipeline-core/lib/close-chain-guide.mjs
+index be18399f37844eea0056d3ec152e766d0c077287..6dac1b21b6b989aa2db9cbb393d5040386bd815d 100644
+--- a/plugins/pipeline-core/lib/close-chain-guide.mjs
++++ b/plugins/pipeline-core/lib/close-chain-guide.mjs
+@@ -24,12 +24,12 @@ export const CLOSE_STEP_REQUIREMENTS = Object.freeze({
+     requires: ["architectureImpact"], needsAuthorized: false,
+     flags: ["--architecture-impact <typed impact>", "--continuity-close-request <path> (when the feature has one)", "--audit-request <path> --critic-verify-lifecycle <id> (required at rigor >= 1)"],
+     evidenceSchema: "pipeline.feature-close-audit-request.v1", humanGate: false,
+-    producer: "the Critic/Verify lifecycle records and the audit request file; the plan prints the next action",
++    producer: "the Critic/Verify lifecycle records and the audit request file (its evidence.criticReports names every Critic round, so the audit bundle carries each exported report and names a missing one); the one-shot close first asks the human once whether the feature package is accepted and records the answer in the feature's acceptance record (an attribution record, not a signature); the plan prints the next action",
+   },
+   "tracked-close-finalized": {
+     requires: ["evidence"], needsAuthorized: false, flags: ["--evidence <path>"],
+     evidenceSchema: "pipeline.close-tracked-effects.v1", humanGate: false,
+-    producer: "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close",
++    producer: "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close; the one-shot close hashes the calibrated handover (first brought to the closed state by update-public-handover) and telemetry/costs.md when they exist, and keeps the marked empty digest for what has no defined file",
+   },
+   "candidate-frozen": {
+     requires: [], needsAuthorized: false, flags: [], evidenceSchema: null, humanGate: false,
+diff --git a/plugins/pipeline-core/runbooks/close-path.v1.json b/plugins/pipeline-core/runbooks/close-path.v1.json
+index adac02d0f1343826e60f83f419b6548e5a039b0c..d07ea6add3c1bff02619c0f8d10b7d42ebd6f5d7 100644
+--- a/plugins/pipeline-core/runbooks/close-path.v1.json
++++ b/plugins/pipeline-core/runbooks/close-path.v1.json
+@@ -95,7 +95,7 @@
+         "--audit-request <path> --critic-verify-lifecycle <id> (required at rigor >= 1)"
+       ],
+       "evidenceSchema": "pipeline.feature-close-audit-request.v1",
+-      "producer": "the Critic/Verify lifecycle records and the audit request file; the plan prints the next action",
++      "producer": "the Critic/Verify lifecycle records and the audit request file (its evidence.criticReports names every Critic round, so the audit bundle carries each exported report and names a missing one); the one-shot close first asks the human once whether the feature package is accepted and records the answer in the feature's acceptance record (an attribution record, not a signature); the plan prints the next action",
+       "humanGate": false,
+       "next": [
+         "tracked-close-finalized"
+@@ -109,7 +109,7 @@
+         "--evidence <path>"
+       ],
+       "evidenceSchema": "pipeline.close-tracked-effects.v1",
+-      "producer": "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close",
++      "producer": "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close; the one-shot close hashes the calibrated handover (first brought to the closed state by update-public-handover) and telemetry/costs.md when they exist, and keeps the marked empty digest for what has no defined file",
+       "humanGate": false,
+       "next": [
+         "candidate-frozen"
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+index 652c916dad617ce62122124924e33e2a93dce18b..eee39ffc6e4ccc11b6f8bf67a079249d053bf9f0 100644
+--- a/plugins/pipeline-core/runbooks/index.v1.json
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -5,7 +5,7 @@
+       "pathId": "close",
+       "path": "plugins/pipeline-core/runbooks/close-path.v1.json",
+       "schema": "pipeline.runbook.v1",
+-      "sha256": "32b7800bdfe0144ad62e0a1b92202da137778b1cd606a8519ea64c850461f407"
++      "sha256": "3041e407946880a6f639d7bf5e18c90829c9bdfba923df643418c96fbc98c51e"
+     },
+     {
+       "pathId": "start",
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 2912904bb4d454be2a6db5b6849dbfb533535733..0db6a9c95832913bea67407ecb5012886b1ab459 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -25,6 +25,10 @@ It produces the Verify evidence in candidate mode bound to the Critic packet (fo
+ 
+ The command stops at `commit-required` and prints the paths and the commit message (`git add -- <paths>`, then `git commit`; the pre-commit hook admits exactly the bytes the stages wrote, G20-66). Run that commit, then run the printed `next` command (the same command with `--resume-lifecycle-id <id>`): it freezes the candidate, runs the final Verify and the Security scan, writes the final-verification and cleanup evidence and ends at `closed-local`. Exit code 2 and `status: "stopped"` mean one typed stop with its exact repair on stderr: `ONESHOT-CRITIC-PACKET-MISSING` (finish the Critic review; pass `--critic-packet-id`), `ONESHOT-VERIFY-RED` (fix what the Verify prints, rerun), `ONESHOT-COMMIT-PENDING` (the close outputs are not committed yet), `ONESHOT-SECURITY-BLOCKING`, `ONESHOT-OWNER-ROUTE-REQUIRED` (a project with a session-authority catalogue runs the Result close through `continuity-owner-route.mjs`), or the coordinator's own typed refusal (for example `CLOSE-CRITIC-CALLER-AUTHORED`). Rerunning the identical command is always safe. Publication, push and release stay separate human-gated steps. At `closed-local` the result's `pushEvidence.command` is the Critic-bound Verify the push gate reads (`evidence/verify-latest.json`): run it, then `push-init.mjs`.
+ 
++**The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. Rerun the identical command with `--human-acceptance "<the human's literal answer>"` (pass it only when the human accepted; a decline means the close does not run). The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
++
++**What the close touches.** The tracked-effects digests hash what exists: the calibrated handover (`project/pipeline.json` `handover`, first brought to the closed state by `pipeline-state.mjs update-public-handover`, the existing writer: closed-local, the verified candidate, and technical close, product acceptance and push as three separate facts) and `telemetry/costs.md`; backlog, history and retrospective have no defined project file and keep the marked empty digest. The audit request names every Critic round of the feature (`evidence.criticReports`); the bundle under `audit-bundles/<feature>/<commit>/` carries each exported round report (`specs/<feature>/evidence/critic/<packet>/report.md`) and its README section "Critic round reports" names a round whose report was never exported instead of omitting it: export it with `session-critic-finalizer.mjs export` before the close.
++
+ Everything below is the per-stage recovery reference: use it when the one command stops and the repair needs a single stage by hand.
+ 
+ Closes the feature currently tracked in `.claude/pipeline-state.json` (`activeFeature`). This is a

@@ -1,0 +1,118 @@
+diff --git a/.codex/agents/critic-high-risk.toml b/.codex/agents/critic-high-risk.toml
+new file mode 100644
+index 0000000000000000000000000000000000000000..443673d74a7aefdc3ee1919c7e497d5624c96004
+--- /dev/null
++++ b/.codex/agents/critic-high-risk.toml
+@@ -0,0 +1,5 @@
++name = "critic-high-risk"
++description = "Independent read-only critic for high-risk reviews"
++model = "gpt-6-sol"
++model_reasoning_effort = "max"
++developer_instructions = "Act as an independent, read-only Critic. Your bootstrap role is closed as critic: when pipeline-start is required, use its compact critic path and never Elephant onboarding, State, handover, or history. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity."
+diff --git a/plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs b/plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs
+index b5ab2cedbfc837993046f701f0227df98ea87564..26978bdb6ee60c639e5481131d1fb859fe33d988 100644
+--- a/plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs
++++ b/plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs
+@@ -1163,7 +1163,8 @@ test("P0 regression: a normal exact Codex project runtime layout does not hide a
+   const existing = localRepository("existing protected Git mount with project Codex runtime");
+   mkdirSync(join(existing, ".codex", "agents"), { recursive: true });
+   writeFileSync(join(existing, ".codex", "config.toml"), "");
+-  for (const name of ["consult-advisor.toml", "critic.toml", "implementor.toml"]) {
++  // C21H (QG-04, restated in place): the second Critic role file is part of the exact project runtime layout.
++  for (const name of ["consult-advisor.toml", "critic-high-risk.toml", "critic.toml", "implementor.toml"]) {
+     writeFileSync(join(existing, ".codex", "agents", name), "");
+   }
+   chmodSync(join(existing, ".git"), 0o500);
+diff --git a/plugins/pipeline-core/lib/governance-scope.test.mjs b/plugins/pipeline-core/lib/governance-scope.test.mjs
+index 20acf5c1d9d30e9dece49771cd466f060b332739..eb62d108cf2472d9c61a18f40c93c86c37a1adc7 100644
+--- a/plugins/pipeline-core/lib/governance-scope.test.mjs
++++ b/plugins/pipeline-core/lib/governance-scope.test.mjs
+@@ -38,7 +38,7 @@ function fixtureYaml(value,indent=''){
+ }
+ function seedV3(root){
+   const registry=loadRunnerProfilesV3Registry(),intent={schema:'pipeline.user.v3',language:{human_facing:'de',agent_facing:'en'},agent_runtime:'other',runners:{enabled:['claude','codex'],default:'codex'},routing:{profiles:registry.profiles,duties:registry.duties},usage:{common_projection:'pipeline.runner-usage.v1',raw_persistence:'none'},autonomy:{push_policy:'gated',branch_model:'feature-branch',wip_limit:1},gates:{dev_plan:'blocking',push:'blocking',security:'warn',claude_md_max_lines:300},critic_export:registry.criticExportPolicy,session:{keep_awake:true}};
+-  const values={'.claude/pipeline.yaml':freshManifestBytes(),'.claude/settings.json':'{}\n','.claude/pipeline.json':'{}\n','.codex/config.toml':'','.codex/agents/implementor.toml':codexCustomAgentSeed('implementor'),'.codex/agents/critic.toml':codexCustomAgentSeed('critic'),'.codex/agents/consult-advisor.toml':''};
++  const values={'.claude/pipeline.yaml':freshManifestBytes(),'.claude/settings.json':'{}\n','.claude/pipeline.json':'{}\n','.codex/config.toml':'','.codex/agents/implementor.toml':codexCustomAgentSeed('implementor'),'.codex/agents/critic.toml':codexCustomAgentSeed('critic'),'.codex/agents/critic-high-risk.toml':codexCustomAgentSeed('critic-high-risk'),'.codex/agents/consult-advisor.toml':''};
+   const baselines=Object.fromEntries(Object.entries(values).map(([path,bytes])=>[path,{status:'present',bytes}]));
+   const plan=planRuntimeProjectionV3(intent,{baselines});assert.equal(plan.status,'ready',JSON.stringify(plan.diagnostics));
+   const manifest=plan.targets.find(row=>row.path==='.claude/pipeline.yaml').after.bytes;put(root,'pipeline.user.yaml',fixtureYaml(intent));put(root,'.claude/pipeline.yaml',manifest);return manifest;
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
+index 21d2f61985d8710755557dd2a63589ac74acce3c..58f972c938da5cf8ce2e20a291d4874abb3b1e98 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
+@@ -83,7 +83,7 @@ test("staged lifecycle policy blocks indirect implementation and package outputs
+ test("the generated Codex projection is committable in a draft lifecycle, and no other path under .codex is", () => {
+   const root = lifecycleFixture();
+   try {
+-    const generated = [".codex/config.toml", ".codex/agents/implementor.toml", ".codex/agents/critic.toml", ".codex/agents/consult-advisor.toml"];
++    const generated = [".codex/config.toml", ".codex/agents/implementor.toml", ".codex/agents/critic.toml", ".codex/agents/critic-high-risk.toml" /* C21H, restated in place */, ".codex/agents/consult-advisor.toml"];
+     assert.deepEqual(evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: generated }), { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings: [] });
+     for (const path of [".codex/agents/other.toml", ".codex/hooks.mjs", "sub/.codex/config.toml"]) {
+       const result = evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: [path] });
+diff --git a/plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs b/plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs
+index 520bfeada06ec1a354fe144702c98457285f910d..47ddf97459e3a9aa24b22957eaf5f11b21633b20 100644
+--- a/plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs
+@@ -116,6 +116,8 @@ const baselines = {
+   ".codex/config.toml": "# config-unowned-sentinel\nprofile = \"keep\"\n",
+   ".codex/agents/implementor.toml": "# implementor-prefix-sentinel\nmodel = \"old-implementor\"\nmodel_reasoning_effort = \"low\"\n",
+   ".codex/agents/critic.toml": "# critic-prefix-sentinel\nmodel = \"old-critic\"\nmodel_reasoning_effort = \"medium\"\n",
++  // C21H (QG-04, restated in place): the second Codex Critic role is one more owned runtime target.
++  ".codex/agents/critic-high-risk.toml": "# critic-high-risk-prefix-sentinel\nmodel = \"old-critic-high-risk\"\nmodel_reasoning_effort = \"medium\"\n",
+   ".codex/agents/consult-advisor.toml": "# advisor-prefix-sentinel\nname = \"old-advisor\"\nmodel = \"old-advisor\"\n",
+ };
+ function migrationRoot(label, enabled, { withCodex }) {
+diff --git a/plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs b/plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs
+index 8e22f90aa726910d5a82f32f293868944b3f4c32..2c922e3e0a5eca1806c5b2e5193582d259ca089f 100644
+--- a/plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs
++++ b/plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs
+@@ -47,7 +47,7 @@ function yaml(value, indent = "") {
+ function seedV3(root) {
+   const registry = loadRunnerProfilesV3Registry();
+   const intent = { schema: "pipeline.user.v3", language: { human_facing: "de", agent_facing: "en" }, agent_runtime: "other", runners: { enabled: ["claude", "codex"], default: "codex" }, routing: { profiles: registry.profiles, duties: registry.duties }, usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" }, autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 }, gates: { dev_plan: "blocking", push: "blocking", security: "warn", claude_md_max_lines: 300 }, critic_export: registry.criticExportPolicy, session: { keep_awake: true } };
+-  const values = { ".claude/pipeline.yaml": freshManifestBytes(), ".claude/settings.json": "{}\n", ".claude/pipeline.json": "{}\n", ".codex/config.toml": "", ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"), ".codex/agents/critic.toml": codexCustomAgentSeed("critic"), ".codex/agents/consult-advisor.toml": "" };
++  const values = { ".claude/pipeline.yaml": freshManifestBytes(), ".claude/settings.json": "{}\n", ".claude/pipeline.json": "{}\n", ".codex/config.toml": "", ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"), ".codex/agents/critic.toml": codexCustomAgentSeed("critic"), /* C21H, restated in place */ ".codex/agents/critic-high-risk.toml": codexCustomAgentSeed("critic-high-risk"), ".codex/agents/consult-advisor.toml": "" };
+   const baselines = Object.fromEntries(Object.entries(values).map(([p, bytes]) => [p, { status: "present", bytes }]));
+   const plan = planRuntimeProjectionV3(intent, { baselines });
+   assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index b23a1b299c8b610369d8e17338a19b7be7713302..e4ee113efe63fbbdf66ba8896b32f2f1d229d85b 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -2847,7 +2847,8 @@ test("the codex runtime apply is unchanged: bound executable, frozen .codex dige
+     assert.equal(publications.length, 1);
+     assert.equal(bindings[0].codexExecutable, process.execPath);
+     assert.deepEqual(bindings[0].runtimeTargets.map((target) => target.path), [
+-      ".codex/agents/consult-advisor.toml", ".codex/agents/critic.toml", ".codex/agents/implementor.toml", ".codex/config.toml",
++      // C21H (QG-04, restated in place): the second Codex Critic role is one more frozen .codex target of the runtime apply.
++      ".codex/agents/consult-advisor.toml", ".codex/agents/critic-high-risk.toml", ".codex/agents/critic.toml", ".codex/agents/implementor.toml", ".codex/config.toml",
+     ]);
+     assert.equal(publications[0].codexTargetWritten, false);
+     assert.equal(publications[0].claudeTargetWritten, false);
+diff --git a/plugins/pipeline-core/scripts/check-routing-projections.test.mjs b/plugins/pipeline-core/scripts/check-routing-projections.test.mjs
+index 7e7753c2855e31d9d1f82ca589b84c8503d64c2f..01ae738411a2582c18ae0945626e3e5f6c4ac8a0 100644
+--- a/plugins/pipeline-core/scripts/check-routing-projections.test.mjs
++++ b/plugins/pipeline-core/scripts/check-routing-projections.test.mjs
+@@ -182,6 +182,8 @@ try {
+     ".codex/config.toml": "profile = \"keep\"\n",
+     ".codex/agents/implementor.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\n",
+     ".codex/agents/critic.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\n",
++    // C21H (QG-04, restated in place): the second Codex Critic role is an owned target of the V3 projection too.
++    ".codex/agents/critic-high-risk.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\n",
+     ".codex/agents/consult-advisor.toml": "name = \"stale\"\n",
+   };
+   for (const [path, bytes] of Object.entries(baselines)) {
+diff --git a/plugins/pipeline-core/scripts/project-reset.test.mjs b/plugins/pipeline-core/scripts/project-reset.test.mjs
+index 343d2ddd66404ea0076bdc76e87dcbf80f2a1ddc..fb7a61431204bc3ec356e0183b97a607b2bd4830 100644
+--- a/plugins/pipeline-core/scripts/project-reset.test.mjs
++++ b/plugins/pipeline-core/scripts/project-reset.test.mjs
+@@ -647,7 +647,8 @@ test("R2C AC-1/AC-2: each of the seven manifest targets lands in the documented
+     // AC-2 pin: the three Pipeline-seeded Codex agent files are whole-file
+     // removals, never a keys entry that would leave a Pipeline-authored stub
+     // (name/description/developer_instructions) behind.
+-    for (const path of [".codex/agents/implementor.toml", ".codex/agents/critic.toml", ".codex/agents/consult-advisor.toml"]) {
++    // C21H (QG-04, restated in place): the fourth Pipeline-seeded Codex agent file, critic-high-risk, is a whole-file removal too.
++    for (const path of [".codex/agents/implementor.toml", ".codex/agents/critic.toml", ".codex/agents/critic-high-risk.toml", ".codex/agents/consult-advisor.toml"]) {
+       assert.deepEqual(
+         { set: byPath[path].set, kind: byPath[path].kind, type: byPath[path].type },
+         { set: "remove", kind: "runtimeSeededFile", type: "file" },

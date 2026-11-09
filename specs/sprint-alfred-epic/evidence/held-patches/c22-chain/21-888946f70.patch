@@ -1,0 +1,621 @@
+diff --git a/plugins/pipeline-core/lib/push-threat-model-gate.mjs b/plugins/pipeline-core/lib/push-threat-model-gate.mjs
+index 4fad357d856501e876ae3784537e0c91450c0c5d..025698175498f4b19df4f79f7319969b5e703f07 100644
+--- a/plugins/pipeline-core/lib/push-threat-model-gate.mjs
++++ b/plugins/pipeline-core/lib/push-threat-model-gate.mjs
+@@ -15,8 +15,11 @@
+  */
+ import { lstatSync, readFileSync } from "node:fs";
+ import { join } from "node:path";
++import { fileURLToPath } from "node:url";
+ 
+ import { gateConfig, loadManifestSafe } from "./manifest.mjs";
++import { isPushThreatModelTemplateUnchanged } from "./push-threat-model-materialize.mjs";
++import { isCriticalStakes, readCalibrationStakes } from "./security-close-status.mjs";
+ 
+ export const PUSH_THREAT_MODEL_FILE = "project/push-threat-model.md";
+ export const PUSH_THREAT_MODEL_GATE_SCHEMA = "pipeline.push-threat-model-gate.v1";
+@@ -36,7 +39,30 @@ const refused = (code, message, repairCommand) => ({
+   schema: PUSH_THREAT_MODEL_GATE_SCHEMA, active: true, ok: false, code, path: PUSH_THREAT_MODEL_FILE, message,
+   repair: { command: repairCommand, commitRule: PUSH_THREAT_MODEL_COMMIT_RULE },
+ });
+-const REPLACE_COMMAND = `write the reviewed threat model into ${PUSH_THREAT_MODEL_FILE} (start from the shipped template plugins/pipeline-core/docs/default-push-threat-model.md; the command that creates the file from that template refuses while a file exists)`;
++// Candidate 22 (CGR-18, CGF-19): a file that is still the shipped template, or still carries the judgement marker `materialize-push-threat-model` leaves,
++// is named `template-unchanged`. It blocks only in the critical profile (stakes in the project calibration), the way a scanner that did not execute does.
++export const PUSH_THREAT_MODEL_TEMPLATE_STATE = "template-unchanged";
++export const PUSH_THREAT_MODEL_TEMPLATE_CODE = "PUSH-THREAT-MODEL-TEMPLATE-UNCHANGED";
++const SHIPPED_TEMPLATE_PATH = fileURLToPath(new URL("../docs/default-push-threat-model.md", import.meta.url));
++const TEMPLATE_UNCHANGED_FACT = `${PUSH_THREAT_MODEL_FILE} is still the unchanged shipped template (${PUSH_THREAT_MODEL_TEMPLATE_STATE}): it describes the signing ceremony, not this project`;
++export const PUSH_THREAT_MODEL_TEMPLATE_NOTICE = `Notice: ${TEMPLATE_UNCHANGED_FACT}. Answer the questions of its "Project judgement" section and delete the marker line above them; this does not block outside the critical profile.`;
++const TEMPLATE_UNCHANGED_REPAIR = `answer the questions of the "Project judgement" section of ${PUSH_THREAT_MODEL_FILE} for this project and delete the marker line above them (a file that was never created from the template needs the same: write the project's own threat model; the command that creates the file refuses while a file exists)`;
++
++function shippedTemplate() {
++  try { return readFileSync(SHIPPED_TEMPLATE_PATH, "utf8"); } catch { return null; }
++}
++
++/** True when the file at the conventional path exists as a regular file and reads template-unchanged. Never throws; false for anything unreadable. */
++export function pushThreatModelFileUnchanged(root) {
++  try {
++    const target = join(root, PUSH_THREAT_MODEL_FILE);
++    const info = lstatSync(target);
++    if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_MODEL_BYTES) return false;
++    return isPushThreatModelTemplateUnchanged(readFileSync(target, "utf8"), shippedTemplate());
++  } catch { return false; }
++}
++
++const REPLACE_COMMAND =`write the reviewed threat model into ${PUSH_THREAT_MODEL_FILE} (start from the shipped template plugins/pipeline-core/docs/default-push-threat-model.md; the command that creates the file from that template refuses while a file exists)`;
+ 
+ /** @returns {{schema: string, active: boolean, ok: boolean, code: string|null, path: string, message: string|null, repair: {command: string, commitRule: string}|null}} */
+ export function pushThreatModelVerdict(root, deps = {}) {
+@@ -53,6 +79,11 @@ export function pushThreatModelVerdict(root, deps = {}) {
+   try { text = readFileSync(target, "utf8"); } catch (error) { return refused("PUSH-THREAT-MODEL-INVALID", `${PUSH_THREAT_MODEL_FILE} cannot be read (${error?.code ?? "error"})`, REPLACE_COMMAND); }
+   if (text.trim() === "") return refused("PUSH-THREAT-MODEL-EMPTY", `${PUSH_THREAT_MODEL_FILE} is empty and the push approval is active`, REPLACE_COMMAND);
+   if (!HEADING.test(text)) return refused("PUSH-THREAT-MODEL-INVALID", `${PUSH_THREAT_MODEL_FILE} has no markdown heading, so it is not a threat model document`, REPLACE_COMMAND);
++  if (isPushThreatModelTemplateUnchanged(text, shippedTemplate())) {
++    const ok = !isCriticalStakes(readCalibrationStakes(root));
++    if (!ok) return { ...refused(PUSH_THREAT_MODEL_TEMPLATE_CODE, `${TEMPLATE_UNCHANGED_FACT}, and this project is calibrated critical (stakes in the project calibration)`, TEMPLATE_UNCHANGED_REPAIR), templateState: PUSH_THREAT_MODEL_TEMPLATE_STATE };
++    return { schema: PUSH_THREAT_MODEL_GATE_SCHEMA, active: true, ok: true, code: null, path: PUSH_THREAT_MODEL_FILE, message: null, repair: null, templateState: PUSH_THREAT_MODEL_TEMPLATE_STATE, notice: PUSH_THREAT_MODEL_TEMPLATE_NOTICE };
++  }
+   return { schema: PUSH_THREAT_MODEL_GATE_SCHEMA, active: true, ok: true, code: null, path: PUSH_THREAT_MODEL_FILE, message: null, repair: null };
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/push-threat-model-materialize.mjs b/plugins/pipeline-core/lib/push-threat-model-materialize.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..79b62d67db52dedb2996ea45d73d78bc926b55d2
+--- /dev/null
++++ b/plugins/pipeline-core/lib/push-threat-model-materialize.mjs
+@@ -0,0 +1,107 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Candidate 22 (CGR-18, CGF-19): what `materialize-push-threat-model` writes, and how an unchanged copy is recognised.
++ *
++ * The shipped template describes the signing ceremony and nothing about the project, so a copy of it that nobody completed still passed the
++ * push threat-model gate and the push was signed under a document that never named the project. Materialising now fills every field the
++ * project already knows (name, stakes, repository mode, push approval, how the human clears it, destination policy, branch, remote names) and
++ * leaves the agent exactly the part that is judgement: one marked section. Deleting the marker line is the agent's statement that the section
++ * is written; the gate (`push-threat-model-gate.mjs`) reports the file `template-unchanged` while the marker is there or while the file is
++ * still the shipped template byte for byte (line endings aside, so a Windows checkout reads the same).
++ *
++ * Reading only: nothing here writes a file. Remote URLs are never copied (they can carry credentials); names only.
++ */
++import { spawnSync } from "node:child_process";
++import { existsSync, readFileSync } from "node:fs";
++import { join } from "node:path";
++
++import { readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
++import { gateConfig, loadManifestSafe } from "./manifest.mjs";
++
++export const PUSH_THREAT_MODEL_UNCHANGED_MARKER = "<!-- push-threat-model: project judgement pending; delete this whole line once the questions below are answered for this project -->";
++
++const lf = (text) => String(text).replace(/\r\n/gu, "\n");
++
++function readCalibration(root) {
++  for (const rel of ["project/pipeline.json", ".claude/pipeline.json"]) {
++    const path = join(root, rel);
++    if (!existsSync(path)) continue;
++    try { const parsed = JSON.parse(readFileSync(path, "utf8")); return parsed !== null && typeof parsed === "object" ? parsed : {}; } catch { return {}; }
++  }
++  return {};
++}
++
++function gitLines(root, args) {
++  try {
++    const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 5000, shell: false });
++    return result.status === 0 && typeof result.stdout === "string" ? result.stdout.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
++  } catch { return []; }
++}
++
++const text = (value) => (typeof value === "string" && value.trim() !== "" ? value : null);
++
++/**
++ * The project-known facts. `deps` (`branch`, `remotes`, `approvalMode`) are test seams; absent, they are read from the repository.
++ * @returns {{project: string|null, stakes: string|null, repositoryMode: string|null, pushApproval: string|null, approvalMode: string|null,
++ *   checkpointNamespace: string|null, branch: string|null, remotes: string[]}}
++ */
++export function collectPushThreatModelFacts(root, deps = {}) {
++  const calibration = readCalibration(root);
++  let manifest = null;
++  try { manifest = loadManifestSafe(root); } catch { manifest = null; }
++  let pushApproval = null;
++  try { pushApproval = text(gateConfig(manifest, "push")?.approval); } catch { pushApproval = null; }
++  let approvalMode = deps.approvalMode ?? null;
++  if (approvalMode === null) { try { approvalMode = text(readHumanApprovalMode(root, { legacyKind: "push" })?.mode); } catch { approvalMode = null; } }
++  return {
++    project: text(calibration.project),
++    stakes: text(calibration.stakes),
++    repositoryMode: text(calibration.repositoryMode),
++    pushApproval,
++    approvalMode,
++    checkpointNamespace: text(manifest?.pushDestinationPolicy?.checkpointNamespace),
++    branch: deps.branch !== undefined ? deps.branch : (gitLines(root, ["symbolic-ref", "--short", "-q", "HEAD"])[0] ?? null),
++    remotes: deps.remotes !== undefined ? deps.remotes : gitLines(root, ["remote"]),
++  };
++}
++
++/** The shipped template, whole and first, then the filled facts, then the one judgement section with its marker. */
++export function renderPushThreatModel(templateText, facts) {
++  const one = (value) => (value === null || value === undefined || value === "" ? "not set" : `\`${String(value).replace(/[`\r\n]+/gu, " ").trim()}\``);
++  const remotes = Array.isArray(facts.remotes) && facts.remotes.length > 0 ? facts.remotes.map(one).join(", ") : "not set";
++  const lines = [
++    "",
++    "## Project facts (filled in when this file was created)",
++    "",
++    "These are read from the project, not judged: correct a line below if the project changed since.",
++    "",
++    `- Project: ${one(facts.project)}`,
++    `- Calibrated stakes: ${one(facts.stakes)}`,
++    `- Repository mode (calibration): ${one(facts.repositoryMode)}`,
++    `- Push approval gate (manifest): ${one(facts.pushApproval)}`,
++    `- How the human clears the push gate (\`gates.push_approval\`): ${one(facts.approvalMode)}`,
++    `- Checkpoint destination namespace (manifest): ${one(facts.checkpointNamespace)}`,
++    `- Branch when this file was created: ${one(facts.branch)}`,
++    `- Configured remotes (names only): ${remotes}`,
++    "",
++    "## Project judgement (the part only the project can answer)",
++    "",
++    PUSH_THREAT_MODEL_UNCHANGED_MARKER,
++    "",
++    "Answer each question for this project in plain words, then delete the marker line above. Until then this file reads as the unchanged template.",
++    "",
++    "1. What does a push of this project release, to whom, and which remote and branch does it really reach?",
++    "2. Which branch rules, deploy targets or consumers depend on that remote, and what happens when a wrong commit lands there?",
++    "3. How is a pushed commit rolled back or superseded here?",
++    "4. Which residual risk does the generic table above not cover for this project?",
++    "",
++  ];
++  const head = String(templateText);
++  return `${head}${head.endsWith("\n") ? "" : "\n"}${lines.join("\n")}`;
++}
++
++/** True while the marker is still there, or the file is the shipped template itself (line endings aside). */
++export function isPushThreatModelTemplateUnchanged(fileText, templateText) {
++  const body = lf(fileText);
++  return body.includes(PUSH_THREAT_MODEL_UNCHANGED_MARKER) || (typeof templateText === "string" && body.trimEnd() === lf(templateText).trimEnd());
++}
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 8be88613a9f03a95635f055c4d99ed276d977ce9..981729f79df049f292c9af6c2eb2cffa01365c68 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -404,6 +404,7 @@ import { awaitSignatureFields, commandText as proofCommandText, proofWaitCommand
+ import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
++import { collectPushThreatModelFacts, renderPushThreatModel } from "../lib/push-threat-model-materialize.mjs";
+ import { fileURLToPath } from "node:url";
+ import {
+   applyCourseDecisionIntent,
+@@ -12234,11 +12235,14 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       }
+       // D4a (candidate 19): with an active push approval the push threat model has to be usable before the plan is submitted for approval,
+       // so it is in the same draft commit as the feature package; created later it moves the candidate after the Critic and Verify ran.
+-      const threatModelRefusal = pushThreatModelRefusalText(pushThreatModelVerdict(dir), "submit-plan");
++      const threatModelVerdict = pushThreatModelVerdict(dir);
++      const threatModelRefusal = pushThreatModelRefusalText(threatModelVerdict, "submit-plan");
+       if (threatModelRefusal !== null) {
+         console.error(`Error: ${threatModelRefusal} No submission or signature request was recorded.`);
+         return 2;
+       }
++      // Candidate 22 (CGF-19): an unchanged template is named here too, as a notice outside the critical profile (the verdict refuses in it).
++      if (typeof threatModelVerdict.notice === "string") console.error(threatModelVerdict.notice);
+       let submitDesignDraft = null;
+       if (["epic", "feature"].includes(profileName)) {
+         const designDraft = (deps.architectureDesignDraft ?? inspectArchitectureDesignDraft)({ rootDir: dir,
+@@ -13738,7 +13742,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       }
+       let templateBytes;
+       try {
+-        templateBytes = readFileSync(DEFAULT_PUSH_THREAT_MODEL_DOC);
++        // Candidate 22 (CGF-19): the template stays whole and first; every project-known fact is filled in after it and the agent keeps one
++        // marked judgement section, so the file is reported template-unchanged until that is written (lib/push-threat-model-materialize.mjs).
++        templateBytes = Buffer.from(renderPushThreatModel(readFileSync(DEFAULT_PUSH_THREAT_MODEL_DOC, "utf8"), collectPushThreatModelFacts(dir)), "utf8");
+       } catch (err) {
+         console.error(`Error: materialize-push-threat-model refused -- the plugin's shipped template could not be read (${err.message}).`);
+         return 2;
+@@ -13757,7 +13763,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         if (fd !== undefined) closeSync(fd);
+       }
+       console.log(
+-        `Created ${PUSH_THREAT_MODEL_DEFAULT_PATH} from the plugin's shipped template. Review it, then commit it ` +
++        `Created ${PUSH_THREAT_MODEL_DEFAULT_PATH} from the plugin's shipped template with this project's known facts filled in. ` +
++        "It still reads template-unchanged (a notice outside the critical profile, a refusal in it): answer the questions of its " +
++        "\"Project judgement\" section for this project and delete the marker line above them. Then review it and commit it " +
+         `(git add ${PUSH_THREAT_MODEL_DEFAULT_PATH}; git commit) BEFORE running approve-push -- the human's ` +
+         "signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an " +
+         "uncommitted file sits only in the working copy and is never part of what git push transmits.",
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index d2a46736bd0c45e97d744af68bcc66ed7f9def11..9a495764749e2fc936a3dd9873059680cf496c9c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -545,6 +545,23 @@ for (const kind of ["closed", "discarded"]) {
+   assert.equal(readFileSync(join(root, "project", "push-threat-model.md"), "utf8"), before, "an existing artifact must be byte-for-byte untouched");
+ }
+ 
++// AC-108 (closest accepted criterion), CGF-19 (candidate 22): the verb fills every project-known field of the file it creates and names the
++// one judgement section left to the agent; the file it creates is reported template-unchanged until that marker is deleted.
++{
++  const { root, deps } = freshFixture();
++  writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ project: "fixture-project", stakes: "standard", repositoryMode: "remote-tracked" }));
++  const { PUSH_THREAT_MODEL_UNCHANGED_MARKER } = await import("../lib/push-threat-model-materialize.mjs");
++  const out = [];
++  const originalLog = console.log;
++  console.log = (...args) => { out.push(args.join(" ")); };
++  try { assert.equal(run(["materialize-push-threat-model"], deps), 0); } finally { console.log = originalLog; }
++  const text = readFileSync(join(root, "project", "push-threat-model.md"), "utf8");
++  assert.ok(text.startsWith(readFileSync(new URL("../docs/default-push-threat-model.md", import.meta.url), "utf8")), "the shipped template stays whole and first");
++  assert.ok(text.includes("fixture-project") && text.includes("remote-tracked") && text.includes("standard"), "project, repository mode and stakes are filled in");
++  assert.ok(text.includes(PUSH_THREAT_MODEL_UNCHANGED_MARKER), "the judgement section is marked");
++  assert.ok(out.some((line) => /template-unchanged/u.test(line)), "the command output names what is left for the agent");
++}
++
+ // A non-UNAVAILABLE refusal (an unsafe file already at the conventional path)
+ // is reported plainly and does NOT steer the operator at
+ // materialize-push-threat-model, which would only refuse again there.
+diff --git a/plugins/pipeline-core/scripts/push-init.mjs b/plugins/pipeline-core/scripts/push-init.mjs
+index 064480aac5b9869b42ea6259200acb5aa10b5bd7..e9c437b11912a27fce896cc2f6e0b2aed07de668 100644
+--- a/plugins/pipeline-core/scripts/push-init.mjs
++++ b/plugins/pipeline-core/scripts/push-init.mjs
+@@ -579,10 +579,13 @@ function drivePushInitCore({
+     return { schema: SCHEMA, root, outcome: "error", steps, error: { faultCode: "usage-error", message: prepare.error } };
+   }
+   if (!prepare.report.ready) failedChecks.push(...prepare.report.checks.filter((check) => !check.ok));
++  // Candidate 22 (CGR-19, CGF-19): the prepare report's named notices (a repository mode that does not match the push target, an unchanged
++  // threat-model template) reach the result as advice; they move neither the outcome nor the checks.
++  const noticeFields = Array.isArray(prepare.report.notices) && prepare.report.notices.length > 0 ? { notices: prepare.report.notices } : {};
+ 
+   if (failedChecks.length > 0) {
+     return {
+-      schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks,
++      schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks, ...noticeFields,
+       recovery: buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks: failedChecks, actions: recoveryActions }),
+     };
+   }
+@@ -595,7 +598,7 @@ function drivePushInitCore({
+   if (["chat", "chat-attributed-unattested"].includes(prepare.report.humanApproval)) {
+     return {
+       schema: SCHEMA, root, by, remote, destination, base,
+-      outcome: "chat-ready", humanApproval: prepare.report.humanApproval, steps,
++      outcome: "chat-ready", humanApproval: prepare.report.humanApproval, steps, ...noticeFields,
+       approvePushLines: prepare.lines.approvePush,
+       gitPushLine: prepare.lines.gitPush,
+     };
+@@ -606,7 +609,7 @@ function drivePushInitCore({
+   // there is no code path above this line, or below it, that spawns or imports
+   // po-human-approval.mjs.
+   return {
+-    schema: SCHEMA, root, by, remote, destination, base, outcome: "signature-required", steps,
++    schema: SCHEMA, root, by, remote, destination, base, outcome: "signature-required", steps, ...noticeFields,
+     subjectSha256: prepare.report.subjectSha256,
+     // CGF-07/22: a Codex and a Claude run each spent turn after turn re-checking a signature only the human can produce.
+     // Claude greenfield report: the design step sees its own signature arrive, the push made the PO paste the output back. The same bounded wait, when the proof lands where it can be watched.
+diff --git a/plugins/pipeline-core/scripts/push-init.test.mjs b/plugins/pipeline-core/scripts/push-init.test.mjs
+index bc42114a690359f4dc5252c7d01ba9dc35e88669..806d6efdc8028f18f44c4850c5282b1250402628 100644
+--- a/plugins/pipeline-core/scripts/push-init.test.mjs
++++ b/plugins/pipeline-core/scripts/push-init.test.mjs
+@@ -550,6 +550,36 @@ test("drivePushInit: signature preparation keeps the existing signature-required
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// AC-108 (closest accepted criterion), CGR-19 / CGF-19: the named notices of the prepare report (a repository mode that does not match the push
++// target, an unchanged threat-model template) reach the driver's result; they are advice, so the outcome stays what it was.
++test("drivePushInit: the prepare report's notices are carried into the result and move neither the outcome nor the checks", async () => {
++  const { pushPrepareReport: real } = await import("./push-prepare.mjs");
++  const notices = [{ id: "repository-mode", code: "PUSH-REPOSITORY-MODE-MISMATCH", message: "named notice" }];
++  const root = freshFixtureRoot();
++  try {
++    const drive = (withNotices) => drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(),
++      pushPrepareReport: (...args) => {
++        const prepared = real(...args);
++        if (withNotices) prepared.report.notices = notices; else delete prepared.report.notices;
++        return prepared;
++      },
++    });
++    const noted = drive(true);
++    assert.equal(noted.outcome, "signature-required", JSON.stringify(noted));
++    assert.deepEqual(noted.notices, notices);
++    assert.equal(Object.hasOwn(drive(false), "notices"), false, "no notice, no field");
++    const unmet = drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      assessPushGateSatisfiability: () => ({ ok: true, report: { satisfiable: true, checks: [] } }),
++      pushPrepareReport: () => ({ ok: true, report: { ready: false, notices, checks: [{ id: "working-tree-clean", ok: false, message: "dirty" }] } }),
++    });
++    assert.equal(unmet.outcome, "precondition-unmet");
++    assert.deepEqual(unmet.notices, notices, "a refused preparation still shows its notices");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("drivePushInit: a proof that can be watched is handed over with its wait action, so the human reports nothing back; without one the turn ends", async () => {
+   const { pushPrepareReport: real } = await import("./push-prepare.mjs");
+   const waitAction = { executable: "node", argv: ["proof-wait.mjs"] };
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 21cbc29ef194a967874d1c5a75236e82834468a0..6c061657b505b28bec9ecfdf90bf7bc55040f8c7 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -51,7 +51,8 @@ import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-
+ import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
+ import { CHECKPOINT_LANE, PUSH_DESTINATION_POLICY_SCHEMA, classifyPushDestination } from "../lib/push-destination-policy.mjs";
+ import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
+-import { pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
++import { PUSH_THREAT_MODEL_TEMPLATE_NOTICE, PUSH_THREAT_MODEL_TEMPLATE_STATE, pushThreatModelFileUnchanged, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
++import { declaredRepositoryMode } from "./repository-freshness.mjs";
+ import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { exportHandoverQueue, sliceQueueLocation } from "../lib/slice-queue-location.mjs";
+@@ -345,9 +346,38 @@ export function checkPushThreatModel(dir, deps = {}) {
+       remedy: PUSH_THREAT_MODEL_REMEDY,
+     };
+   }
++  // Candidate 22 (CGR-18, CGF-19): an unchanged template is named template-unchanged. The critical profile already refused it above (active gate);
++  // everywhere else it is a notice (the verdict carries it when the gate is active, the file itself is read when it is not).
++  if (verdict.templateState === PUSH_THREAT_MODEL_TEMPLATE_STATE || (!verdict.active && pushThreatModelFileUnchanged(dir))) {
++    return { id: "push-threat-model", ok: true, code: PUSH_THREAT_MODEL_TEMPLATE_STATE, message: verdict.notice ?? PUSH_THREAT_MODEL_TEMPLATE_NOTICE };
++  }
+   return { id: "push-threat-model", ok: true, message: `${PUSH_THREAT_MODEL_PATH} is present.` };
+ }
+ 
++/**
++ * Candidate 22 (CGR-19): `repositoryMode` is written once at onboarding and nothing read it, so a project that says `local-only` was pushed.
++ * Compares the calibrated mode with the real push target (a remote this repository has) and names ONE notice on a mismatch, null otherwise.
++ * Advice only: it writes nothing and refuses nothing, so the report's `ready` does not move. There is no verb that writes the field; the notice names
++ * the route that exists (the calibration is gate-strength protected, so a PO-approved override) and that the fix is a commit, hence before the candidate.
++ */
++export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
++  let declared;
++  try { declared = (deps.declaredRepositoryMode ?? declaredRepositoryMode)(dir); } catch { return null; }
++  if (declared?.mode !== "local-only") return null;
++  const remotes = (gitOutput(dir, ["remote"], deps) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
++  if (!remotes.includes(remote)) return null;
++  const file = existsSync(join(dir, "project", "pipeline.json")) ? "project/pipeline.json" : ".claude/pipeline.json";
++  const mirror = existsSync(join(dir, "project", "pipeline.json")) && existsSync(join(dir, ".claude", "pipeline.json")) ? " and in its byte-equal mirror .claude/pipeline.json" : "";
++  return {
++    id: "repository-mode",
++    code: "PUSH-REPOSITORY-MODE-MISMATCH",
++    message: `the calibration (${file}) declares repositoryMode "local-only" (written once at onboarding), but this push targets the configured remote "${remote}" (${destination}). `
++      + `Correct the calibration: set "repositoryMode" to "remote-tracked" in ${file}${mirror}. There is no sanctioned writer (no verb) for this field and the file is gate-strength protected, `
++      + "so the change goes through a PO-approved guard override (plan it with node <plugin-root>/scripts/guard-human-override.mjs plan); it is a commit, so make it before the candidate is fixed and run push-prepare again. "
++      + "Nothing was written now and nothing is refused; if \"local-only\" is the truth, the push target is what is wrong.",
++  };
++}
++
+ /**
+  * D2(e): reports whether the critical-human-proof posture is an unrestricted
+  * set (any well-formed key may sign) or a pinned set, and -- when pinned --
+@@ -903,6 +933,13 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+     ready: checks.every((check) => check.ok),
+   };
+   if (slim) report.profile = "feature-checkpoint";
++  // Candidate 22: named notices (advice, never a check): an unchanged threat-model template, a repository mode that does not match the push target.
++  const notices = [];
++  const modelCheck = checks.find((check) => check.id === "push-threat-model");
++  if (modelCheck?.ok === true && modelCheck.code === PUSH_THREAT_MODEL_TEMPLATE_STATE) notices.push({ id: modelCheck.id, code: modelCheck.code, message: modelCheck.message });
++  const modeNotice = repositoryModeNotice(dir, { remote, destination }, deps);
++  if (modeNotice !== null) notices.push(modeNotice);
++  if (notices.length > 0) report.notices = notices;
+   // Slim profile pushes the exact checked-out branch; the default profile keeps HEAD.
+   const sourceRef = slim ? checkpointSourceRef() : "HEAD";
+   const profileNote = slim
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index e69db51821405257a619b055390cf94085e7a3a1..52bb4164b0dc1335724db33c25cb29c0bfd60104 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -1877,3 +1877,85 @@ test("AC-108: the export never runs while a recorded approval is outstanding for
+   assert.deepEqual(exportGovernedQueueHandover(root, outstanding), { exported: false, reason: "approval-outstanding" });
+   assert.equal(gitAtFold(root, "rev-parse", "HEAD").stdout.trim(), head);
+ });
++
++// AC-108 (closest accepted criterion), CGR-19 (candidate 22): the calibrated repository mode is written once at onboarding and nothing read it, so a
++// project that says local-only was pushed. The report now names one notice; it is advice: ready does not move, nothing is written, nothing is refused.
++test("CGR-19: a calibrated local-only mode against a configured push remote is named once with the sanctioned correction; nothing is written or refused", () => {
++  const root = mkdtempSync(join(tmpdir(), "cgr19-"));
++  try {
++    for (const args of [["init", "-q", "-b", "main"], ["remote", "add", "origin", "https://example.invalid/project.git"]]) {
++      assert.equal(spawnSync("git", ["-C", root, ...args], { encoding: "utf8" }).status, 0);
++    }
++    mkdirSync(join(root, "project"), { recursive: true });
++    const calibrationPath = join(root, "project", "pipeline.json");
++    const argv = (remote) => ["--by", "tester", "--remote", remote, "--destination", "refs/heads/main"];
++    const prepare = (remote = "origin") => pushPrepareReport(argv(remote), readyDeps({ dir: root }), { foldPendingApprovalWrite: false });
++    const tree = () => spawnSync("git", ["-C", root, "status", "--porcelain=v1", "--untracked-files=all"], { encoding: "utf8" }).stdout;
++
++    writeFileSync(calibrationPath, `${JSON.stringify({ project: "p", repositoryMode: "local-only" }, null, 2)}\r\n`);
++    const treeBefore = tree();
++    const bytesBefore = readFileSync(calibrationPath);
++    const mismatch = prepare();
++    assert.equal(mismatch.report.ready, true, "a notice is never a refusal");
++    assert.equal(mismatch.report.notices.length, 1);
++    const [notice] = mismatch.report.notices;
++    assert.equal(notice.code, "PUSH-REPOSITORY-MODE-MISMATCH");
++    assert.match(notice.message, /local-only/u);
++    assert.match(notice.message, /"origin"/u, "names the real push target");
++    assert.match(notice.message, /refs\/heads\/main/u);
++    assert.match(notice.message, /"remote-tracked"/u, "names the value the calibration is corrected to");
++    assert.match(notice.message, /project\/pipeline\.json/u, "names the file that holds it");
++    assert.match(notice.message, /override/u, "names the sanctioned route: the calibration is gate-strength protected, no direct edit");
++    assert.match(notice.message, /no verb|no sanctioned writer/u, "says there is no dedicated verb for this field");
++    assert.deepEqual(readFileSync(calibrationPath), bytesBefore, "the calibration (CRLF included) is untouched");
++    assert.equal(tree(), treeBefore, "nothing was written into the tree by the report");
++
++    writeFileSync(calibrationPath, JSON.stringify({ project: "p", repositoryMode: "remote-tracked" }));
++    assert.equal(Object.hasOwn(prepare().report, "notices"), false, "a matching mode adds no notice");
++    writeFileSync(calibrationPath, JSON.stringify({ project: "p" }));
++    assert.equal(Object.hasOwn(prepare().report, "notices"), false, "an absent mode reads remote-tracked, as everywhere else");
++    writeFileSync(calibrationPath, JSON.stringify({ project: "p", repositoryMode: "local-only" }));
++    assert.equal(Object.hasOwn(prepare("nowhere").report, "notices"), false, "a remote this repository does not have cannot be compared, so no notice");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++// AC-108 (closest accepted criterion), CGR-18 / CGF-19: the unchanged shipped template passed the push threat-model gate; it is now named
++// template-unchanged everywhere the gate result is shown, and blocks only in the critical profile (as a scanner that did not execute does).
++test("CGF-19: an unchanged threat-model template is named template-unchanged in the check and the notices; it blocks only in the critical profile", () => {
++  const template = readFileSync(join(REPO_ROOT, "plugins", "pipeline-core", "docs", "default-push-threat-model.md"), "utf8");
++  const manifest = "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nphases:\n  - name: design\n    enabled: true\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n";
++  const roots = [];
++  const make = ({ model, stakes = null, withManifest = true }) => {
++    const root = mkdtempSync(join(tmpdir(), "cgf19-"));
++    roots.push(root);
++    mkdirSync(join(root, "project"), { recursive: true });
++    if (withManifest) { mkdirSync(join(root, ".claude"), { recursive: true }); writeFileSync(join(root, ".claude", "pipeline.yaml"), manifest); }
++    writeFileSync(join(root, "project", "push-threat-model.md"), model);
++    if (stakes !== null) writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ project: "p", stakes }));
++    return root;
++  };
++  try {
++    const standard = checkPushThreatModel(make({ model: template, stakes: "standard" }));
++    assert.equal(standard.ok, true, "outside the critical profile it is a named notice, not a refusal");
++    assert.equal(standard.code, "template-unchanged");
++    assert.match(standard.message, /template-unchanged/u);
++    const crlf = checkPushThreatModel(make({ model: template.replace(/\n/gu, "\r\n") }));
++    assert.equal(crlf.code, "template-unchanged", "a Windows checkout of the same template reads the same");
++    assert.equal(checkPushThreatModel(make({ model: template, withManifest: false })).code, "template-unchanged", "the check also names it when no push approval is active");
++    const critical = checkPushThreatModel(make({ model: template, stakes: "critical" }));
++    assert.equal(critical.ok, false);
++    assert.equal(critical.code, "PUSH-THREAT-MODEL-TEMPLATE-UNCHANGED");
++    assert.match(critical.message, /template-unchanged/u);
++    assert.doesNotMatch(critical.remedy, /materialize-push-threat-model/u, "materialize refuses while the file exists");
++    const written = checkPushThreatModel(make({ model: "# Threat model of this project\n\nWhat a signature binds here.\n", stakes: "critical" }));
++    assert.deepEqual({ ok: written.ok, code: written.code }, { ok: true, code: undefined }, "a project-specific model passes in every profile");
++
++    const root = make({ model: template, stakes: "standard" });
++    const prepared = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({ dir: root }), { foldPendingApprovalWrite: false });
++    assert.equal(prepared.report.ready, true);
++    assert.deepEqual(prepared.report.notices.map((entry) => [entry.id, entry.code]), [["push-threat-model", "template-unchanged"]]);
++    const refused = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({ dir: make({ model: template, stakes: "critical" }) }), { foldPendingApprovalWrite: false });
++    assert.equal(refused.report.ready, false);
++    assert.equal(refused.report.checks.find((entry) => entry.id === "push-threat-model").code, "PUSH-THREAT-MODEL-TEMPLATE-UNCHANGED");
++  } finally { for (const root of roots) rmSync(root, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+index 347d4b2f776bf085398c8d78ae331470465ff1b0..a800135474b626a0aecab9b88e76923d9cbc1841 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package-readback.test.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import test from "node:test";
+@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
+ 
+ import { PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
+ import { PUSH_THREAT_MODEL_GATE_SCHEMA, pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
++import {
++  PUSH_THREAT_MODEL_UNCHANGED_MARKER, collectPushThreatModelFacts, isPushThreatModelTemplateUnchanged, renderPushThreatModel,
++} from "../lib/push-threat-model-materialize.mjs";
+ import { pushThreatModelReadback } from "./register-feature-package.mjs";
+ 
+ const SHIPPED_TEMPLATE = join(dirname(fileURLToPath(import.meta.url)), "..", "docs", "default-push-threat-model.md");
+@@ -103,6 +106,52 @@ test("PTG5: a present threat model passes: a handwritten one and the shipped tem
+   assert.equal(pushThreatModelVerdict(copied).ok, true);
+ });
+ 
++// AC-108 (closest accepted criterion), CGR-18 / CGF-19 (candidate 22): an unchanged template is named, and blocks only in the critical profile.
++const withCalibration = (root, calibration) => { mkdirSync(join(root, "project"), { recursive: true }); writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify(calibration)); return root; };
++
++test("PTG8: the unchanged shipped template passes outside the critical profile but is named template-unchanged, also with CRLF line ends", () => {
++  const template = readFileSync(SHIPPED_TEMPLATE, "utf8");
++  for (const model of [template, template.replace(/\n/gu, "\r\n")]) {
++    const verdict = pushThreatModelVerdict(withCalibration(project({ approval: "required", model }), { project: "p", stakes: "standard" }));
++    assert.equal(verdict.ok, true);
++    assert.equal(verdict.templateState, "template-unchanged");
++    assert.match(verdict.notice, /template-unchanged/u);
++  }
++  const written = pushThreatModelVerdict(project({ approval: "required", model: "# Threat model\n\nwhat a signature binds\n" }));
++  assert.equal(Object.hasOwn(written, "templateState"), false);
++  assert.equal(Object.hasOwn(written, "notice"), false);
++});
++
++test("PTG9: in the critical profile an unchanged template is refused with a typed code, a repair that does not offer materialize, and the commit rule", () => {
++  const verdict = pushThreatModelVerdict(withCalibration(project({ approval: "required", model: readFileSync(SHIPPED_TEMPLATE, "utf8") }), { project: "p", stakes: "critical" }));
++  assert.equal(verdict.ok, false);
++  assert.equal(verdict.code, "PUSH-THREAT-MODEL-TEMPLATE-UNCHANGED");
++  assert.equal(verdict.templateState, "template-unchanged");
++  assert.ok(!verdict.repair.command.includes("materialize-push-threat-model"));
++  assert.match(pushThreatModelRefusalText(verdict, "the close"), /template-unchanged/u);
++  const handwritten = pushThreatModelVerdict(withCalibration(project({ approval: "required", model: "# Threat model\n\nwhat a signature binds\n" }), { project: "p", stakes: "critical" }));
++  assert.equal(handwritten.ok, true);
++});
++
++test("PTG10: materialising fills every project-known field and leaves one marked judgement section; deleting the marker is the agent's claim that it is written", () => {
++  const root = withCalibration(project({ approval: "required" }), { project: "demo-project", stakes: "critical", repositoryMode: "remote-tracked" });
++  const facts = collectPushThreatModelFacts(root, { branch: "main", remotes: ["origin"], approvalMode: "signature" });
++  assert.deepEqual(facts, {
++    project: "demo-project", stakes: "critical", repositoryMode: "remote-tracked", pushApproval: "required", approvalMode: "signature",
++    checkpointNamespace: null, branch: "main", remotes: ["origin"],
++  });
++  const template = readFileSync(SHIPPED_TEMPLATE, "utf8");
++  const rendered = renderPushThreatModel(template, facts);
++  assert.ok(rendered.startsWith(template), "the shipped template stays whole and first");
++  for (const value of ["demo-project", "critical", "remote-tracked", "required", "signature", "main", "origin"]) assert.ok(rendered.includes(value), value);
++  assert.equal(rendered.split(PUSH_THREAT_MODEL_UNCHANGED_MARKER).length, 2, "exactly one marker");
++  assert.equal(isPushThreatModelTemplateUnchanged(rendered, template), true);
++  assert.equal(isPushThreatModelTemplateUnchanged(rendered.replace(`${PUSH_THREAT_MODEL_UNCHANGED_MARKER}\n`, ""), template), false);
++  assert.equal(isPushThreatModelTemplateUnchanged(template, template), true);
++  assert.equal(pushThreatModelVerdict(withCalibration(project({ approval: "required", model: rendered }), { project: "p", stakes: "critical" })).code, "PUSH-THREAT-MODEL-TEMPLATE-UNCHANGED");
++  assert.equal(renderPushThreatModel(template, { ...facts, remotes: [], branch: null }).includes("not set"), true, "an unknown fact reads as not set, never invented");
++});
++
+ test("PTG6: the refusal text carries the code, the path, the repair command and the commit rule; a passing verdict has no text", () => {
+   const text = pushThreatModelRefusalText(pushThreatModelVerdict(project({ approval: "required" })), "the close");
+   assert.match(text, /PUSH-THREAT-MODEL-MISSING/u);
+diff --git a/plugins/pipeline-core/scripts/repository-freshness.mjs b/plugins/pipeline-core/scripts/repository-freshness.mjs
+index 6170b4f08b1112eaa62e7302550526bd14ccabaf..d9caa2218e77053ef2236a760f6a208fcb00ddb6 100644
+--- a/plugins/pipeline-core/scripts/repository-freshness.mjs
++++ b/plugins/pipeline-core/scripts/repository-freshness.mjs
+@@ -73,7 +73,8 @@ function outputBase(status, fields = {}) {
+   };
+ }
+ 
+-function declaredRepositoryMode(repo) {
++// Exported for push-prepare (candidate 22, CGR-19): the one reader of the calibrated repository mode.
++export function declaredRepositoryMode(repo) {
+   const authority = resolveProjectAuthorityPaths({ rootDir: repo });
+   const calibration = join(
+     repo,
+diff --git a/plugins/pipeline-core/scripts/security-scan.test.mjs b/plugins/pipeline-core/scripts/security-scan.test.mjs
+index e18b8100c344af86eebe09bb926d554b0e8c7f03..2777ad28c35c657c26a5da53f6901d276905a32a 100644
+--- a/plugins/pipeline-core/scripts/security-scan.test.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.test.mjs
+@@ -33,6 +33,7 @@ import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ import * as scanModule from "./security-scan.mjs";
+ import { deriveSummaryVerdict, formatScannerLine, resolveEvidenceRoot, runSecurityScan } from "./security-scan.mjs";
++import { elementsOfCompletedScan, formatSecurityCloseStatus } from "../lib/security-close-status.mjs";
+ // NVA-SECGATE-1: security-scan.mjs's own gate-mode resolution now delegates to this exact
+ // shared function -- see the pinning test below.
+ // NVA-R18-SCANBOOT: also imports checkSecurityCompleteness -- the SAME function guard-push.mjs
+@@ -2165,6 +2166,33 @@ security:
+   assertIncludes("local-only: CLI says the evidence cannot be used for a push", cli.stdout, "cannot be used for a push");
+ }
+ 
++// AC-108 (closest accepted criterion), CGR-10 (candidate 22): the scan result and the close summary show which rules or rule sets really ran,
++// for each scanner, and the v2 plan source says what it is (a project without the Pipeline's own control catalog reads catalog-unavailable BY DESIGN).
++{
++  const rootDir = makeRootDir("rule-provenance-root");
++  writeManifest(rootDir, "schema: pipeline.manifest.v0\n\ngates:\n  security:\n    mode: blocking\n    type: automated\n");
++  commitFixture(rootDir);
++  const { evidence, verdictV2 } = await runSecurityScan({
++    rootDir, spawnFn: fixtureSpawnFn, timeoutMs: 30000, assessTrustedExecutablePath: mockAssessFixtureBinary,
++    env: { PIPELINE_GITLEAKS_PATH: gitleaksClean, PIPELINE_OSV_SCANNER_PATH: osvClean, PIPELINE_SEMGREP_PATH: semgrepClean },
++  });
++  const byTool = (tool) => evidence.scanners.find((s) => s.tool === tool);
++  const semgrep = byTool("semgrep")?.ruleSet;
++  assertEqual("rule provenance: semgrep names the plugin default rule file it really passed to --config", [semgrep?.source, semgrep?.ref], ["plugin-default", "plugin:security/semgrep/pipeline.yml"]);
++  assertEqual("rule provenance: semgrep lists the rule ids of that file", semgrep?.ruleIds, ["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval"]);
++  assertTrue("rule provenance: semgrep binds the rule file bytes by digest", /^[0-9a-f]{64}$/u.test(semgrep?.sha256 ?? ""), JSON.stringify(semgrep));
++  assertEqual("rule provenance: gitleaks names its config and says it extends the built-in default ruleset", [byTool("gitleaks")?.ruleSet?.ref?.endsWith("gitleaks-default.toml") || byTool("gitleaks")?.ruleSet?.ref === ".gitleaks.toml", /built-in default/u.test(byTool("gitleaks")?.ruleSet?.description ?? "")], [true, true]);
++  assertEqual("rule provenance: osv-scanner says it uses the advisory database of the detected package sources, not a rule file", byTool("osv-scanner")?.ruleSet?.source, "builtin");
++  assertEqual("rule provenance: license-check names the allowlist it used", [byTool("license-check")?.ruleSet?.source, byTool("license-check")?.ruleSet?.ref], ["plugin-default", "plugin:config/security/license-allowlist.default.json"]);
++  const lines = scanModule.formatRuleSetLines(evidence.scanners);
++  assertTrue("rule provenance: one printed line per scanner, semgrep's with its rule ids", lines.length === 4 && lines.some((l) => l.startsWith("semgrep: ") && l.includes("pipeline-default-hardcoded-private-key")), JSON.stringify(lines));
++  assertTrue("rule provenance: a scanner that did not run reads as not run, never with a rule set", scanModule.formatRuleSetLines([{ tool: "semgrep", status: "SKIPPED", classification: "binary_missing" }])[0] === "semgrep: no rules ran (scanner did not execute)", "skipped line");
++  assertEqual("rule provenance: the v2 verdict names the plan source and says what it means", [verdictV2?.plan?.source, /by design/u.test(verdictV2?.plan?.sourceNote ?? ""), /exit code/u.test(verdictV2?.plan?.sourceNote ?? "")], ["catalog-unavailable", true, true]);
++  assertEqual("rule provenance: the v2 rule pack ref agrees with the v1 rule set ref", scanModule.formatRuleSetLines(evidence.scanners).find((l) => l.startsWith("semgrep: ")).includes(semgrep.ref), true);
++  const closeLines = formatSecurityCloseStatus(elementsOfCompletedScan(evidence.scanners));
++  assertTrue("rule provenance: the close summary lines carry the rule set of each scanner that ran", closeLines.find((l) => l.startsWith("semgrep: "))?.includes("pipeline-default-hardcoded-private-key"), JSON.stringify(closeLines));
++}
++
+ // ---- Summary -------------------------------------------------------------------------------------
+ try {
+   rmSync(FIXTURE_ROOT, { recursive: true, force: true });

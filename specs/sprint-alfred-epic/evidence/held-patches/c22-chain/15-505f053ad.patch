@@ -1,0 +1,37 @@
+diff --git a/plugins/pipeline-core/lib/codex-onboarding-runtime.test.mjs b/plugins/pipeline-core/lib/codex-onboarding-runtime.test.mjs
+index 514d3ec81878b36bc04e0939cab562e2ac12895a..d2d50d9beaa0c9f50ac1559c3e9c53754c7edac8 100644
+--- a/plugins/pipeline-core/lib/codex-onboarding-runtime.test.mjs
++++ b/plugins/pipeline-core/lib/codex-onboarding-runtime.test.mjs
+@@ -986,8 +986,15 @@ test("the strict host helper requires a bound executable, ticket, fresh generati
+     });
+     assert.notEqual(produced.receipt.readerGenerationSha256, stored.barrier.writerGenerationSha256);
+     assert.equal(produced.receipt.effectiveConfigSha256, canonicalSha256({}));
+-    assert.equal(produced.agents.length, 3);
++    // QG-04, restated in place with a comment: the strict helper reads one agent per `.codex/agents/` target of the owned-key manifest, which has
++    // listed four since the second Critic role (C21H: implementor, critic, critic-high-risk, consult-advisor); the old count of 3 predates it.
++    assert.equal(produced.agents.length, 4);
+     assert.deepEqual(Object.keys(produced.agents.find((agent) => agent.path.endsWith("implementor.toml")).route).sort(), ["model", "model_reasoning_effort"]);
++    // C22: both Critic roles also own the sandbox key, so their read-back route carries it (the fixture writes placeholder values for every owned key).
++    for (const critic of ["critic.toml", "critic-high-risk.toml"]) {
++      const route = produced.agents.find((agent) => agent.path.endsWith(`/${critic}`) || agent.path === `.codex/agents/${critic}`).route;
++      assert.deepEqual(Object.keys(route).sort(), ["model", "model_reasoning_effort", "sandbox_mode"], critic);
++    }
+     assert.equal(produced.consumed.barrier.state, "cleared");
+     await assert.rejects(
+       produceRuntimeReadback({
+diff --git a/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs b/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs
+index f9b6607392ab414fb18f364d52122d5a3a8ea72d..ec37b76aebe9ef0b73c5250f0caee9cb8836535f 100644
+--- a/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs
++++ b/plugins/pipeline-core/lib/runtime-projection-v3.test.mjs
+@@ -318,6 +318,11 @@ test("C22 a hand-edited sandbox value is re-projected like the other owned keys
+     assert.equal(plan.decisionConflicts.some((conflict) => CRITIC_PATHS.includes(conflict.target) && conflict.differences.some((d) => d.key === "sandbox_mode")), false, "the sandbox is not a model decision");
+     // The implementor is untouched by the sandbox.
+     assert.doesNotMatch(target(plan, ".codex/agents/implementor.toml").after.bytes, /sandbox_mode/u);
++    // A key the strict reader cannot patch (single-quoted) is refused as an unreadable baseline, never duplicated by an insert.
++    writeFileSync(join(root, CRITIC_PATHS[0]), "model = \"old\"\nmodel_reasoning_effort = \"medium\"\nsandbox_mode = 'read-only'\n");
++    const refused = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
++    assert.equal(refused.status, "invalid-baseline");
++    assert.match(JSON.stringify(refused.diagnostics), /unreadable top-level sandbox_mode/u);
+   } finally {
+     rmSync(root, { recursive: true, force: true });
+   }
