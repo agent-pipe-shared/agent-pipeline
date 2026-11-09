@@ -38,10 +38,6 @@ Candidate 22 (40 patches, stamp `ef16e1b86`) carries the P0 to P2 findings of th
 
 - **w307:** a single unreachable foreign Antigravity descriptor is inferred as the session's own. It is labelled `inferred-single-antigravity-descriptor` and affects only the status `unavailable`. The `ls-files` probe runs for 4 s after a 4.5 s deadline.
 
-## Not triaged
-
-- **Antigravity report of the 2026-11-08 run:** only its chapter on loops, failed attempts and interventions was taken in (LOOP-A1 to LOOP-A10). Its other chapters have no finding list checked against the code.
-
 ## Recheck in the next greenfield
 
 - **LOOP-A3:** `verifyTestInventory` and `antigravity-native-dispatch-consume.mjs` do not exist in the tree. `FCA-PACKAGE` comes from `lib/feature-close-audit-preflight.mjs`.
