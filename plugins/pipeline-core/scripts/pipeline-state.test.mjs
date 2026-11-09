@@ -139,6 +139,8 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   const afterMaterialize = approvePushAttempt(root, deps);
   assert.ok(!afterMaterialize.lines.some((line) => line.includes("CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE")),
     "AC-6: after materializing, the artifact resolves -- the refusal is no longer the artifact-unavailable one");
+  assert.ok(afterMaterialize.lines.some((line) => /CRITICAL-PROOF-EXTERNAL-PATH\); external proof was not consumed\. The three proof paths must be absolute/u.test(line)),
+    `a refused proof path names its cause: ${afterMaterialize.lines.join(" ")}`);
 
   // End-to-end: a real signed approval, over the artifact exactly as materialized.
   const external = mktempProjectDir();
