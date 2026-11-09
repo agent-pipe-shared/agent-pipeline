@@ -90,6 +90,10 @@ general impression:
   response. Cached input is not a price and not a count of words read.
 - A session span is not working time: it contains idle and parallel periods.
 - A missing raw transcript means "not established", never zero.
+- A `chat-gate-ceremonies/*.terminal-observed.json` record is one entry
+  lifecycle reaching its terminal phase (`reserved`, `running`,
+  `terminal-observed`). It is not a chat approval, so never count these files
+  as approvals by the human.
 
 ## Report shape — one section per claim, independently traceable
 
