@@ -22,7 +22,7 @@ Candidate 22 (40 patches, stamp `ef16e1b86`) carries the P0 to P2 findings of th
 
 ## Built only partly
 
-- **CGF-08:** the verdict labels are delivered, but preflight and Verify do not print them yet. The single architecture projection needs an authority decision on which verdict wins.
+- **CGF-08:** the verdict labels are delivered and the preflight orientation carries one, but Verify does not print them yet. The single architecture projection needs an authority decision on which verdict wins.
 - **CGF-03:** the critical profile shows a named notice and the existing exception route. A real Codex CLI session prints the conditional form because the CLI takes no receipt flag. Whether every report producer avoids a stronger word was not checked.
 - **CGR-19:** no sanctioned writer exists for `repositoryMode` after onboarding. The notice names the guard-override route.
 - **CGR-18:** an unchanged threat model blocks only in the critical profile (`PUSH-THREAT-MODEL-TEMPLATE-UNCHANGED`). Other profiles get a notice.
@@ -37,6 +37,10 @@ Candidate 22 (40 patches, stamp `ef16e1b86`) carries the P0 to P2 findings of th
 ## Accepted risk
 
 - **w307:** a single unreachable foreign Antigravity descriptor is inferred as the session's own. It is labelled `inferred-single-antigravity-descriptor` and affects only the status `unavailable`. The `ls-files` probe runs for 4 s after a 4.5 s deadline.
+
+## Not triaged
+
+- **Antigravity report of the 2026-11-08 run:** only its chapter on loops, failed attempts and interventions was taken in (LOOP-A1 to LOOP-A10). Its other chapters have no finding list checked against the code.
 
 ## Recheck in the next greenfield
 
