@@ -318,6 +318,11 @@ test("C22 a hand-edited sandbox value is re-projected like the other owned keys 
     assert.equal(plan.decisionConflicts.some((conflict) => CRITIC_PATHS.includes(conflict.target) && conflict.differences.some((d) => d.key === "sandbox_mode")), false, "the sandbox is not a model decision");
     // The implementor is untouched by the sandbox.
     assert.doesNotMatch(target(plan, ".codex/agents/implementor.toml").after.bytes, /sandbox_mode/u);
+    // A key the strict reader cannot patch (single-quoted) is refused as an unreadable baseline, never duplicated by an insert.
+    writeFileSync(join(root, CRITIC_PATHS[0]), "model = \"old\"\nmodel_reasoning_effort = \"medium\"\nsandbox_mode = 'read-only'\n");
+    const refused = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    assert.equal(refused.status, "invalid-baseline");
+    assert.match(JSON.stringify(refused.diagnostics), /unreadable top-level sandbox_mode/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

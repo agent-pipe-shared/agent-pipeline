@@ -986,8 +986,15 @@ test("the strict host helper requires a bound executable, ticket, fresh generati
     });
     assert.notEqual(produced.receipt.readerGenerationSha256, stored.barrier.writerGenerationSha256);
     assert.equal(produced.receipt.effectiveConfigSha256, canonicalSha256({}));
-    assert.equal(produced.agents.length, 3);
+    // QG-04, restated in place with a comment: the strict helper reads one agent per `.codex/agents/` target of the owned-key manifest, which has
+    // listed four since the second Critic role (C21H: implementor, critic, critic-high-risk, consult-advisor); the old count of 3 predates it.
+    assert.equal(produced.agents.length, 4);
     assert.deepEqual(Object.keys(produced.agents.find((agent) => agent.path.endsWith("implementor.toml")).route).sort(), ["model", "model_reasoning_effort"]);
+    // C22: both Critic roles also own the sandbox key, so their read-back route carries it (the fixture writes placeholder values for every owned key).
+    for (const critic of ["critic.toml", "critic-high-risk.toml"]) {
+      const route = produced.agents.find((agent) => agent.path.endsWith(`/${critic}`) || agent.path === `.codex/agents/${critic}`).route;
+      assert.deepEqual(Object.keys(route).sort(), ["model", "model_reasoning_effort", "sandbox_mode"], critic);
+    }
     assert.equal(produced.consumed.barrier.state, "cleared");
     await assert.rejects(
       produceRuntimeReadback({
