@@ -208,7 +208,7 @@ export function criticSplitProblem(split) {
 /** The entry a returned verdict belongs to: its `trajectory_evidence` starts with `scope:<entryId>` (the marker the dispatch prompt asks for); null when it names none of the split. */
 export function attributeVerdict(split, verdict) {
   const text = verdict?.trajectory_evidence;
-  const id = typeof text === "string" ? /^scope:([a-z][a-z0-9-]*)(?=\s|$)/u.exec(text)?.[1] : undefined;
+  const id = typeof text === "string" ? /^scope:([a-z][a-z0-9-]*)(?=[\s.,:;]|$)/u.exec(text)?.[1] : undefined;
   return id !== undefined && split.entries.some((entry) => entry.id === id) ? id : null;
 }
 

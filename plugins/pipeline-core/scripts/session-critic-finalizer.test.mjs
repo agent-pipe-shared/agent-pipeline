@@ -2763,6 +2763,15 @@ test("G20-72 the merge script refuses a missing child, an unknown or duplicated 
   } finally { cleanup(fx); }
 });
 
+test("C21B a scope marker followed by punctuation still names its entry, and a longer id does not", async () => {
+  const { attributeVerdict } = await import("../lib/critic-split.mjs");
+  const split = { entries: [{ id: "core" }, { id: "core-ui" }] };
+  assert.equal(attributeVerdict(split, { trajectory_evidence: "scope:core. Recomputed the diff" }), "core");
+  assert.equal(attributeVerdict(split, { trajectory_evidence: "scope:core: recomputed" }), "core");
+  assert.equal(attributeVerdict(split, { trajectory_evidence: "scope:core-ui recomputed" }), "core-ui");
+  assert.equal(attributeVerdict(split, { trajectory_evidence: "scope:corex recomputed" }), null);
+});
+
 test("C21B a child verdict that passes against its own fields issues no Source return, so the corrected return is the only record and the merge says what to do", () => {
   const fx = g2072Fixture();
   try {
