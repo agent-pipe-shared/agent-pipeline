@@ -395,6 +395,9 @@ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
 import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
 import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
+import { isCriticalStakes, readCalibrationStakes, readScannerExceptions, scannerEntryReadiness } from "../lib/security-close-status.mjs";
+import { runToolchainPreflight } from "./toolchain-preflight.mjs";
+import { tmpdir as hostTmpdir } from "node:os";
 import { readPipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
 import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { awaitSignatureFields, commandText as proofCommandText, proofWaitCommand } from "../lib/signed-proof-wait.mjs";
@@ -4108,6 +4111,24 @@ function validProfileChangeBinding(binding) {
     && (binding.intakeProfile === null || DRAFT_PLAN_PROFILES.has(binding.intakeProfile))
     && (binding.intakeSha256 === null || SHA256_RE.test(binding.intakeSha256))
     && document(binding.prd) && document(binding.spec);
+}
+
+/**
+ * One entry-gate check, the same before the signature and at set-phase implementation (PO 2026-11-09): a scanner the close will need is named now,
+ * so it is installed now. Only a critical calibration can be refused, and only for a tool a person can provide. If the check itself cannot run it
+ * stays silent: a sandboxed session that cannot look must not be stopped by not looking.
+ */
+function securityScannerEntryCheck(dir, deps) {
+  let readiness;
+  try {
+    const critical = isCriticalStakes(readCalibrationStakes(dir));
+    const report = (deps.toolchainPreflight ?? runToolchainPreflight)({ rootDir: dir, tempDir: hostTmpdir() });
+    readiness = scannerEntryReadiness(report, { critical, exceptions: critical ? readScannerExceptions(dir) : null });
+  } catch {
+    return null;
+  }
+  for (const notice of readiness.notices) console.error(notice);
+  return readiness.refusals;
 }
 
 function inspectSelectedPlanProfile(dir, state) {
@@ -10189,6 +10210,7 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
   const sources = () => (inputs?.ok ? inputs.currentSources : inputs?.draftSources ?? null);
   const dcc = (entry) => ({ code: entry.code, path: entry.path, message: entry.expected !== undefined ? `expected ${entry.expected}, found ${entry.observed}` : null, repair: entryGateRepair(entry.code)?.replaceAll("<SUBMISSION_SHA256>", submissionSha256) ?? null });
   const result = runImplementationEntryGate({ stage: "before-signature", checks: [
+    { id: "security-scanners", run: () => securityScannerEntryCheck(dir, deps) },
     { id: "profile", run: () => {
       const selection = inspectSelectedPlanProfile(dir, state);
       return selection.ok ? null : { code: selection.code, message: "the persisted profile sources must agree" };
@@ -11935,6 +11957,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       let architecture = null;
       // The entry gate (PO 2026-11-08): every condition of the implementation phase, all open points in one output, nothing written before it is clear.
       const implementationEntry = runImplementationEntryGate({ stage: "before-implementation", checks: [
+        { id: "security-scanners", run: () => securityScannerEntryCheck(dir, deps) },
         { id: "profile", run: () => (entrySelectionRefusal === null ? null : { code: entrySelection.code, text: entrySelectionRefusal }) },
         { id: "architecture-entry", run: () => {
           architecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({

@@ -578,6 +578,29 @@ test("C20 recorded beforehand is enforced: an exception HEAD does not hold admit
   assert.match(changed[0], /changed since the last commit/u);
 });
 
+test("C21 a missing scanner is named before the signature: critical refuses, others get a notice, host-boundary states and valid exceptions stop nothing", async () => {
+  const { scannerEntryReadiness } = await import("../security-close-status.mjs");
+  const report = (...rows) => ({ results: [{ tool: "node", status: "binary_missing" }, ...rows.map(([tool, status]) => ({ tool, status, guidance: `install ${tool}` }))] });
+  const critical = scannerEntryReadiness(report(["gitleaks", "binary_missing"], ["license-check", "input_missing"], ["semgrep", "ready"], ["osv-scanner", "not_required"]), { critical: true });
+  assert.deepEqual(critical.notices, []);
+  assert.equal(critical.refusals.length, 2, "node is the toolchain's own concern; ready and not_required are nothing to say");
+  assert.equal(critical.refusals[0].code, "SEC-CLOSE-SCANNER-NOT-EXECUTED");
+  assert.match(critical.refusals[0].text, /gitleaks/u);
+  assert.match(critical.refusals[0].text, /install gitleaks/u, "the installation guidance is in the refusal");
+  assert.match(critical.refusals[0].text, /project\/security-scanner-exceptions\.json/u, "and so is the exception route");
+  for (const status of ["execution_environment", "probe_timeout", "probe_error"]) {
+    const { refusals, notices } = scannerEntryReadiness(report(["gitleaks", status]), { critical: true });
+    assert.deepEqual([refusals, notices], [[], []], `${status}: a check that could not look stops nothing`);
+  }
+  const excepted = scannerEntryReadiness(report(["gitleaks", "binary_missing"]), { critical: true, exceptions: { valid: [exception({ scanner: "gitleaks" })], rejected: [] } });
+  assert.deepEqual(excepted.refusals, []);
+  const standard = scannerEntryReadiness(report(["gitleaks", "binary_missing"]), { critical: false });
+  assert.deepEqual(standard.refusals, []);
+  assert.equal(standard.notices.length, 1);
+  assert.match(standard.notices[0], /gitleaks.*binary_missing/u);
+  assert.deepEqual(scannerEntryReadiness(null, { critical: true }), { refusals: [], notices: [] });
+});
+
 test("C19 the close quality readback names an applied exception in its security evidence", async () => {
   const { closeQualityReadback } = await import("../close-quality-readback.mjs");
   const files = {

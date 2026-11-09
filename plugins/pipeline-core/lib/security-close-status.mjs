@@ -197,6 +197,29 @@ export function securityGateNotConfiguredRefusal(root, where = "this check") {
     + `calibrated critical (stakes in the project calibration). Run this command to configure it, then run this check again: node ${word(script)} --root ${word(root)}`;
 }
 
+// The toolchain states a person can repair by providing the tool or its input. The host-boundary states (execution_environment, probe_timeout,
+// probe_error) say the check itself could not look, as a sandboxed session does on WSL; they must never stop a project, or the check deadlocks it.
+const SCANNER_PROVISION_STATES = new Set(["binary_missing", "incompatible_version", "incompatible_capability", "input_missing", "untrusted_path"]);
+
+/**
+ * PO 2026-11-09: a scanner the close will need is reported before the signature and before implementation, so it is installed then and not found
+ * missing at the close. `report` is a toolchain preflight result. A critical calibration gets one refusal per scanner, the same one the close
+ * would give; any other calibration gets notices only. A valid named exception answers it here as it does at the close.
+ * @returns {{refusals: {code: string, text: string}[], notices: string[]}}
+ */
+export function scannerEntryReadiness(report, { critical = false, exceptions = null } = {}) {
+  const refusals = [];
+  const notices = [];
+  for (const entry of Array.isArray(report?.results) ? report.results : []) {
+    if (!SECURITY_ELEMENTS.includes(entry?.tool) || !SCANNER_PROVISION_STATES.has(entry.status)) continue;
+    if (critical && exceptions?.valid?.some((e) => e.scanner === entry.tool)) continue;
+    const guidance = typeof entry.guidance === "string" && entry.guidance !== "" ? ` ${entry.guidance}` : "";
+    if (critical) refusals.push({ code: SCANNER_NOT_EXECUTED_CODE, text: `${scannerNotExecutedRefusal(entry.tool, `toolchain check: ${entry.status}`, { rejected: exceptions?.rejected ?? [] })}${guidance}` });
+    else notices.push(`Notice: ${entry.tool} is not ready (${entry.status}); install it now if this project's security gate needs it at the close.${guidance}`);
+  }
+  return { refusals, notices };
+}
+
 /** The typed refusal of a critical calibration for a scanner that did not execute: names the scanner and the commands that repair it. */
 export function scannerNotExecutedRefusal(element, where = "the security evidence", { rejected = [] } = {}) {
   const ignored = rejected.length > 0 ? ` Exception entries ignored: ${rejected.map((r) => `${r.ref}: ${r.why}`).join("; ")}.` : "";

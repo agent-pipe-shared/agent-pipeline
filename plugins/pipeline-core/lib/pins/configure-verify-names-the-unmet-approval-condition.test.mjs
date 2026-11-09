@@ -71,7 +71,8 @@ const architecture = { schema: "pipeline.architecture-design.v1", repositoryKind
 let counter = 0;
 // One fixture per case: the profile receipt fingerprint is bound to this exact repository path.
 // mode: "chat" | "signature"; reopen: run reopen-design and approve a second time before implementation.
-function fixture({ mode = "chat", reopen = false } = {}) {
+// toolchainReport: the toolchain preflight's answer at the entry gate; criticalEntry: try set-phase once under a critical calibration first.
+function fixture({ mode = "chat", reopen = false, toolchainReport = null, criticalEntry = null } = {}) {
   const parent = join(WORK, `fx-${counter += 1}`);
   mkdirSync(parent, { recursive: true });
   const root = join(parent, "repo");
@@ -89,13 +90,18 @@ function fixture({ mode = "chat", reopen = false } = {}) {
   gitOk("config", "core.autocrlf", "false");
   assert.equal(realpathSync(root), root);
   assert.equal(realpathSync(gitOk("rev-parse", "--show-toplevel")), root, "the fixture is its own repository");
-  const lifecycle = (argv) => {
+  const attempt = (argv, deps = {}) => {
     const logs = [];
     const old = { log: console.log, error: console.error, warn: console.warn };
     for (const name of Object.keys(old)) console[name] = (...args) => { logs.push(args.map(String).join(" ")); };
     let status;
-    try { status = run(argv, { dir: root, now: () => AT }); } finally { Object.assign(console, old); }
+    try { status = run(argv, { dir: root, now: () => AT, ...deps }); } finally { Object.assign(console, old); }
+    return { status, logs };
+  };
+  const lifecycle = (argv, deps) => {
+    const { status, logs } = attempt(argv, deps);
     assert.equal(status, 0, `SETUP ${argv[0]}: ${logs.join("\n")}`);
+    return logs;
   };
 
   write("README.md", "Synthetic unmet-condition fixture\n");
@@ -204,13 +210,40 @@ function fixture({ mode = "chat", reopen = false } = {}) {
   writeJson("specs/e2e/lifecycle.json", { schema: "pipeline.feature-package.v1", feature: { id: FEATURE, rigor: 2 }, state: "approved", artifacts: [artifact("prd", PLAN, true, "mutable", "active"), artifact("spec", SPEC, true, "mutable", "active"), artifact("acceptance", "specs/e2e/acceptance.md", true, "mutable", "active"), artifact("result", "specs/e2e/result.md", true, "mutable", "active"), artifact("candidate-evidence", approved.planApproval.acceptedContract.path, false, "immutable", "retain")], candidate: structuredClone(round.request.approvalIntent.value.candidate), supersedes: null });
   const packageRead = validateFeaturePackage(root, "specs/e2e/lifecycle.json");
   assert.ok(packageRead.ok, `SETUP registered package: ${JSON.stringify(packageRead.findings)}`);
-  lifecycle(["set-phase", "--phase", "implementation"]);
+  const entryDeps = toolchainReport === null ? undefined : { toolchainPreflight: () => toolchainReport };
+  let entered = false;
+  if (criticalEntry !== null) {
+    for (const twin of TWINS) writeJson(twin, { ...baseline, stakes: "critical" });
+    const result = attempt(["set-phase", "--phase", "implementation"], entryDeps);
+    entered = result.status === 0;
+    criticalEntry(result, derivePlanLifecycle(readCurrent()).status);
+    for (const twin of TWINS) writeJson(twin, baseline);
+  }
+  const entryLogs = entered ? [] : lifecycle(["set-phase", "--phase", "implementation"], entryDeps);
   assert.equal(derivePlanLifecycle(readCurrent()).status, "implementing");
   const stateRelative = statePath(root).slice(root.length + 1).replaceAll("\\", "/");
   assert.equal(gitOk("ls-files", "--", stateRelative), "", "the private State stays untracked");
   const observed = observeCurrentPlanApprovalForCalibration({ rootDir: root });
-  return { root, git, gitOk, env, write, read, observed, statePath: stateRelative };
+  return { root, git, gitOk, env, write, read, observed, statePath: stateRelative, entryLogs };
 }
+
+test("candidate 22: the real set-phase names a missing scanner: a critical project is stopped with the install route, any other gets a notice and enters", () => {
+  const toolchainReport = { results: [{ tool: "gitleaks", status: "binary_missing", guidance: "Install gitleaks." }] };
+  let refused = null;
+  const ctx = fixture({ toolchainReport, criticalEntry: (result, phase) => { refused = { ...result, phase }; } });
+  assert.equal(refused.status, 2, refused.logs.join("\n"));
+  assert.ok(refused.logs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(line) && /gitleaks/u.test(line) && /Install gitleaks\./u.test(line) && /security-scanner-exceptions\.json/u.test(line)), refused.logs.join("\n"));
+  assert.notEqual(refused.phase, "implementing", "nothing was written before the gate cleared");
+  assert.ok(ctx.entryLogs.some((line) => /^Notice: gitleaks is not ready \(binary_missing\)/u.test(line)), ctx.entryLogs.join("\n"));
+});
+
+test("candidate 22: a toolchain check that could not look never stops the real set-phase, even in a critical project", () => {
+  let entered = null;
+  fixture({ toolchainReport: { results: [{ tool: "gitleaks", status: "probe_error", guidance: "" }] }, criticalEntry: (result, phase) => { entered = { ...result, phase }; } });
+  assert.equal(entered.status, 0, entered.logs.join("\n"));
+  assert.equal(entered.phase, "implementing");
+  assert.ok(!entered.logs.some((line) => /SEC-CLOSE-SCANNER-NOT-EXECUTED|^Notice:/u.test(line)), entered.logs.join("\n"));
+});
 
 // Runs the real configure-verify and returns { code, logs, errorLine, reportedCode }.
 function configure(ctx, command = COMMAND) {

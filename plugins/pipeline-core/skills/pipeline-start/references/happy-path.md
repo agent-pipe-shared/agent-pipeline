@@ -37,7 +37,7 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
    the design input). It writes `scratch/seal-plan.json` (the digest-bound seal plan) and never State; it also replaces a damaged plan file. `inspect` -> `sealSituation`
    names the next command in every state (`none`, `draft`, `bound-unapproved`, `sealed`).
 4. `pipeline-state.mjs present-plan --by <name> [--review-receipt <repo-relative-json>]` (agent). Needs the exact current submission from step 3 and, for a draft, the prepared seal plan (step 3b):
-   present the plan to the PO; its digest is part of what the one signature covers.
+   present the plan to the PO; its digest is part of what the one signature covers. This step and `set-phase implementation` also check the scanners the close will need: in a critical calibration a missing one is refused here with its install guidance or the named exception route, otherwise it prints a notice. Ask the PO to install it now, while nothing waits on it. The first `pipeline-start-preflight` output carries the same facts in `environmentReadiness` once the project's manifest enables scanners.
 5. `pipeline-state.mjs approve-plan` (PO ceremony): in `signature` mode the flag `--by` is forbidden; in `chat` mode the PO's explicit actor name is
    required. A bootstrap acknowledgement receipt and a prior `present-plan` for this exact submission are required. **No further syntax documented**: follow
    the action `pipeline-state.mjs inspect` returns. **For a draft package this one signature is the seal:** the approval writes the PRD and Spec digests into the State in the
