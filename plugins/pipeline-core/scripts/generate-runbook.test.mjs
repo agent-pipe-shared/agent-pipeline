@@ -138,16 +138,31 @@ test("C21C: the happy-path guide names the evidence commands and one close entry
   assert.equal(guide.includes("--audit-request <json>"), false, "the old Antigravity-only close line is gone");
 });
 
-test("C21H: the Codex Critic launch names critic-high-risk for a higher effort and never default, in the guide and in the critic runbook step", () => {
+test("C21H: the Codex Critic launch names critic-high-risk for a higher effort, in the guide and in the critic runbook step", () => {
   const guide = readFileSync(join(PLUGIN_ROOT, "skills/pipeline-start/references/happy-path.md"), "utf8");
   const criticSection = guide.slice(guide.indexOf("## 3. Critic"), guide.indexOf("## 4."));
-  assert.match(criticSection, /agent_type: "critic-high-risk"/u);
-  assert.match(criticSection, /never `default`/u);
+  assert.match(criticSection, /critic-high-risk/u);
   assert.ok(criticSection.indexOf("session-critic-finalizer.mjs admit") < criticSection.indexOf("critic-high-risk"), "the role is named in the step after admit");
   const step = docOf("critic").steps.find((s) => s.id === "dispatch-critic");
   assert.match(step.command, /critic-high-risk/u);
-  assert.match(step.command, /never default/u);
+  // C22 (QG-04, restated in place): the "never default" sentence is replaced by the launch route of C22 (PO decision 2026-11-09), asserted below.
   assert.deepEqual(step.next, ["finalize", "split-merge"], "the step keeps its place in the path");
+});
+
+test("C22: the Codex Critic launch runs the preflight once, asks the launch route and spawns exactly the printed agentType, in the guide and in the critic runbook step", () => {
+  const guide = readFileSync(join(PLUGIN_ROOT, "skills/pipeline-start/references/happy-path.md"), "utf8");
+  const criticSection = guide.slice(guide.indexOf("## 3. Critic"), guide.indexOf("## 4."));
+  const step = docOf("critic").steps.find((s) => s.id === "dispatch-critic");
+  for (const [name, text] of [["guide", criticSection], ["runbook step", step.command]]) {
+    assert.match(text, /codex-sandbox-preflight\.mjs --run --kind intermediate/u, `${name}: the preflight`);
+    assert.match(text, /codex-critic-launch-route\.mjs/u, `${name}: the launch route`);
+    assert.match(text, /agentType/u, `${name}: the printed agentType is the spawn`);
+    assert.match(text, /caller-authored-fallback/u, `${name}: the default route is recorded as the fallback`);
+    assert.match(text, /instruction only/u, `${name}: the final message names the unprotected round`);
+    assert.match(text, /EPERM/u, `${name}: a run-time sandbox failure relaunches once through default`);
+    assert.doesNotMatch(text, /never `?default`?/u, `${name}: the old never-default sentence is gone`);
+  }
+  assert.ok(criticSection.indexOf("session-critic-finalizer.mjs admit") < criticSection.indexOf("codex-critic-launch-route.mjs"), "the route follows admit");
 });
 
 test("the index lists the lifecycle paths, each file with its own sha256", () => {

@@ -193,7 +193,8 @@ test("C21H V3 owns the critic-high-risk Codex custom agent with the critic_high_
   const entry = manifest.targets.find((item) => item.path === HIGH_RISK_PATH);
   assert.ok(entry, "the owned-key manifest names the second Critic role");
   assert.equal(entry.projection, "codex-custom-agent-v3");
-  assert.deepEqual(entry.ownedKeys, ["model", "model_reasoning_effort"]);
+  // C22 (QG-04, restated in place): both Codex Critic roles also own `sandbox_mode` (read-only); the original two keys are unchanged.
+  assert.deepEqual(entry.ownedKeys, ["model", "model_reasoning_effort", "sandbox_mode"]);
   assert.deepEqual(entry.cell, { kind: "duty", dutyId: "critic_high_risk" });
   const role = CODEX_CUSTOM_AGENT_METADATA["critic-high-risk"];
   assert.equal(role.name, "critic-high-risk");
@@ -221,7 +222,8 @@ test("C21H V3 projects the critic-high-risk model and effort from the critic_hig
     assert.notEqual(highRisk.route.requested.effort, target(plan, ".codex/agents/critic.toml").route.requested.effort, "the second role exists to carry a different effort");
     assert.match(highRisk.after.bytes, /name = "keep-high-risk"/u, "unowned top-level keys stay byte-for-byte");
     assert.match(highRisk.after.bytes, /\[metadata\]\nmodel_reasoning_effort = "nested"\n/u, "a nested key of the same name is not an owned key");
-    assert.deepEqual(plan.ownedKeyManifest.targets.find((item) => item.path === HIGH_RISK_PATH).ownedKeys, ["model", "model_reasoning_effort"]);
+    // C22 (QG-04, restated in place): the owned key list now also names the sandbox.
+    assert.deepEqual(plan.ownedKeyManifest.targets.find((item) => item.path === HIGH_RISK_PATH).ownedKeys, ["model", "model_reasoning_effort", "sandbox_mode"]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -247,6 +249,86 @@ test("C21H a project without the critic-high-risk file plans it as a first-time 
     const withoutKey = { ...baselines };
     delete withoutKey[HIGH_RISK_PATH];
     assert.equal(planRuntimeProjectionV3(completeIntent(), { baselines: withoutKey }).status, "ready");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// C22 (AC-108, PO decision 2026-11-09): both Codex Critic roles carry a read-only sandbox. `implementor` does not.
+const CRITIC_PATHS = [".codex/agents/critic.toml", HIGH_RISK_PATH];
+const SANDBOX_LINE = 'sandbox_mode = "read-only"';
+
+test("C22 the Critic seeds end with the read-only sandbox after developer_instructions and the implementor seed has none", () => {
+  for (const role of ["critic", "critic-high-risk"]) {
+    const lines = codexCustomAgentSeed(role).split("\n");
+    assert.equal(lines.at(-1), "", "one final LF");
+    assert.equal(lines.at(-2), SANDBOX_LINE, `${role} seed ends with the sandbox line`);
+    assert.match(lines.at(-3), /^developer_instructions = /u, `${role} sandbox line follows developer_instructions`);
+  }
+  assert.doesNotMatch(codexCustomAgentSeed("implementor"), /sandbox_mode/u);
+  const manifest = loadRuntimeProjectionV3OwnedKeys();
+  for (const path of CRITIC_PATHS) {
+    assert.deepEqual(manifest.targets.find((entry) => entry.path === path).ownedKeys, ["model", "model_reasoning_effort", "sandbox_mode"], path);
+  }
+  assert.deepEqual(manifest.targets.find((entry) => entry.path === ".codex/agents/implementor.toml").ownedKeys, ["model", "model_reasoning_effort"]);
+});
+
+test("C22 old Critic seed bytes in, new bytes out: the existing plan adds the sandbox line, byte-identical to the new seed", () => {
+  for (const [path, role, dutyId] of [[CRITIC_PATHS[0], "critic", "critic_normal"], [CRITIC_PATHS[1], "critic-high-risk", "critic_high_risk"]]) {
+    const duty = registry.duties[dutyId].codex;
+    const oldSeed = codexCustomAgentSeed(role).replace(`${SANDBOX_LINE}\n`, "")
+      .replace('model = ""', 'model = "old-model"').replace('model_reasoning_effort = ""', 'model_reasoning_effort = "low"');
+    assert.doesNotMatch(oldSeed, /sandbox_mode/u);
+    const root = fixtureRoot();
+    try {
+      writeFileSync(join(root, path), oldSeed);
+      const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+      assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
+      const planned = target(plan, path);
+      assert.equal(planned.changed, true);
+      assert.match(planned.after.bytes, /^developer_instructions = .*\nsandbox_mode = "read-only"\n$/mu, "the key follows developer_instructions as the last line");
+      assert.equal(planned.after.bytes, codexCustomAgentSeed(role).replace('model = ""', `model = "${duty.selector.value}"`).replace('model_reasoning_effort = ""', `model_reasoning_effort = "${duty.effort}"`));
+      // A second plan from the planned bytes is a no-change plan.
+      writeFileSync(join(root, path), planned.after.bytes);
+      assert.equal(target(planNoThrow(root), path).changed, false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+function planNoThrow(root) {
+  const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+  assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
+  return plan;
+}
+
+test("C22 a hand-edited sandbox value is re-projected like the other owned keys and a missing key lands before any table", () => {
+  const root = fixtureRoot();
+  try {
+    writeFileSync(join(root, CRITIC_PATHS[0]), 'model = "old"\nmodel_reasoning_effort = "medium"\nsandbox_mode = "workspace-write"\nname = "keep"\n[metadata]\nsandbox_mode = "nested"\n');
+    const plan = planNoThrow(root);
+    const edited = target(plan, CRITIC_PATHS[0]);
+    assert.match(edited.after.bytes, /^sandbox_mode = "read-only"$/mu);
+    assert.doesNotMatch(edited.after.bytes, /workspace-write/u);
+    assert.match(edited.after.bytes, /\[metadata\]\nsandbox_mode = "nested"\n/u, "a nested key of the same name is not the owned key");
+    // The writeFixture critic-high-risk file has a table and no sandbox key: the key is inserted into the top-level block, never into the table.
+    const inserted = target(plan, HIGH_RISK_PATH).after.bytes;
+    assert.match(inserted, /name = "keep-high-risk"\nsandbox_mode = "read-only"\n\[metadata\]\n/u);
+    assert.equal(plan.decisionConflicts.some((conflict) => CRITIC_PATHS.includes(conflict.target) && conflict.differences.some((d) => d.key === "sandbox_mode")), false, "the sandbox is not a model decision");
+    // The implementor is untouched by the sandbox.
+    assert.doesNotMatch(target(plan, ".codex/agents/implementor.toml").after.bytes, /sandbox_mode/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("C22 an absent critic-high-risk file is planned from the new seed with the sandbox", () => {
+  const root = fixtureRoot();
+  try {
+    unlinkSync(join(root, HIGH_RISK_PATH));
+    const plan = planNoThrow(root);
+    assert.match(target(plan, HIGH_RISK_PATH).after.bytes, /\nsandbox_mode = "read-only"\n$/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

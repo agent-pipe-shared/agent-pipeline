@@ -1366,6 +1366,9 @@ record("legacy V3 Critic route and runnerRoutes refresh through sanctioned re-ap
   intent.routing.duties.critic_normal.codex.effort = "xhigh";
   delete intent.critic_export;
   const root = fixture(yaml(intent));
+  // C22 (AC-108): an existing project whose Critic files carry the seed WITHOUT the sandbox key (the fixture's critic.toml) migrates through this
+  // same route to bytes that carry it; a hand-edited sandbox value (the high-risk file here) is re-projected like the other owned keys.
+  writeFileSync(join(root, ".codex/agents/critic-high-risk.toml"), '# critic-high-risk-prefix-sentinel\nmodel = "old-critic-high-risk"\nmodel_reasoning_effort = "medium"\nname = "keep-critic-high-risk"\nsandbox_mode = "workspace-write"\n[metadata]\nmodel_reasoning_effort = "nested-must-stay"\n');
   try {
     const plan = planRunnerProfileMigrationV3({ rootDir: root });
     assert.equal(plan.status, "ready");
@@ -1376,6 +1379,10 @@ record("legacy V3 Critic route and runnerRoutes refresh through sanctioned re-ap
     assert.equal(refreshed.routing.duties.critic_normal.codex.effort, "medium");
     assert.equal(refreshed.critic_export.schema, "pipeline.critic-export-policy.v1");
     assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /model = "gpt-6-sol"/u);
+    assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /^# critic-prefix-sentinel\n[\s\S]*name = "keep-critic"\nsandbox_mode = "read-only"\n\[metadata\]\nmodel_reasoning_effort = "nested-must-stay"\n$/u);
+    assert.match(readFileSync(join(root, ".codex/agents/critic-high-risk.toml"), "utf8"), /name = "keep-critic-high-risk"\nsandbox_mode = "read-only"\n\[metadata\]\n/u);
+    assert.doesNotMatch(readFileSync(join(root, ".codex/agents/critic-high-risk.toml"), "utf8"), /workspace-write/u);
+    assert.doesNotMatch(readFileSync(join(root, ".codex/agents/implementor.toml"), "utf8"), /sandbox_mode/u);
     assert.doesNotMatch(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /runnerRoutes|worktype_mini_advisor/u);
     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /criticExport:\n  policy: pipeline\.critic-export-policy\.v1/u);
     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");

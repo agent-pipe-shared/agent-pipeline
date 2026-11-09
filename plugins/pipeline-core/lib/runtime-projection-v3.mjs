@@ -36,6 +36,8 @@ const EFFECTIVE_MODEL_UNKNOWN = "effective-model-not-observed";
 // C21H (AC-108, CGF-03): `critic` and `critic-high-risk` are the same closed read-only Critic; only the effort of their duty cell differs.
 const CRITIC_DEVELOPER_INSTRUCTIONS = "Act as an independent, read-only Critic. Your bootstrap role is closed as critic: when pipeline-start is required, use its compact critic path and never Elephant onboarding, State, handover, or history. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity.";
 
+const CRITIC_SANDBOX_MODE = "read-only";
+
 export const CODEX_CUSTOM_AGENT_METADATA = Object.freeze({
   implementor: Object.freeze({
     name: "implementor",
@@ -46,11 +48,13 @@ export const CODEX_CUSTOM_AGENT_METADATA = Object.freeze({
     name: "critic",
     description: "Independent read-only critic",
     developerInstructions: CRITIC_DEVELOPER_INSTRUCTIONS,
+    sandboxMode: CRITIC_SANDBOX_MODE,
   }),
   "critic-high-risk": Object.freeze({
     name: "critic-high-risk",
     description: "Independent read-only critic for high-risk reviews",
     developerInstructions: CRITIC_DEVELOPER_INSTRUCTIONS,
+    sandboxMode: CRITIC_SANDBOX_MODE,
   }),
 });
 
@@ -63,9 +67,14 @@ export function codexCustomAgentSeed(role) {
     'model = ""',
     'model_reasoning_effort = ""',
     `developer_instructions = ${JSON.stringify(metadata.developerInstructions)}`,
+    ...(metadata.sandboxMode ? [`sandbox_mode = ${JSON.stringify(metadata.sandboxMode)}`] : []),
     "",
   ].join("\n");
 }
+
+// C22 (AC-108, PO decision 2026-11-09): both Critic roles run in a read-only sandbox. `sandbox_mode` is an owned key whose value is fixed
+// (not routed from a duty cell): a hand-edited value is re-projected, a baseline that predates the key gets it inserted.
+const CODEX_FIXED_OWNED_VALUES = Object.freeze({ sandbox_mode: CRITIC_SANDBOX_MODE });
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -450,8 +459,11 @@ function replaceClaudeTarget(v2Target, target, intent, originalBytes) {
   };
 }
 
-function locateTomlTopLevelValues(bytes, keys) {
+// `optionalKeys` (C22) may be absent from the baseline (a file that predates the key); a line that names one in any form the strict reader
+// cannot patch is still refused, so an insert can never produce a duplicate key.
+function locateTomlTopLevelValues(bytes, keys, optionalKeys = []) {
   const found = new Map();
+  const unreadable = new Set();
   let offset = 0;
   let inSection = false;
   for (const rawLine of bytes.split(/(?<=\n)/u)) {
@@ -460,7 +472,10 @@ function locateTomlTopLevelValues(bytes, keys) {
     if (!inSection) {
       for (const key of keys) {
         const match = line.match(new RegExp(`^(\\s*${key}\\s*=\\s*)\"([^\"]*)\"\\s*(?:#.*)?$`, "u"));
-        if (!match) continue;
+        if (!match) {
+          if (optionalKeys.includes(key) && new RegExp(`^\\s*${key}\\s*=`, "u").test(line)) unreadable.add(key);
+          continue;
+        }
         if (found.has(key)) throw new Error(`duplicate top-level ${key}`);
         const start = offset + match[1].length + 1;
         found.set(key, { start, end: start + match[2].length, value: match[2] });
@@ -468,8 +483,21 @@ function locateTomlTopLevelValues(bytes, keys) {
     }
     offset += rawLine.length;
   }
-  for (const key of keys) if (!found.has(key)) throw new Error(`missing top-level ${key}`);
+  for (const key of unreadable) if (!found.has(key)) throw new Error(`unreadable top-level ${key}`);
+  for (const key of keys) if (!found.has(key) && !optionalKeys.includes(key)) throw new Error(`missing top-level ${key}`);
   return found;
+}
+
+/** Insert top-level `key = "value"` lines before the first table (or at the end), keeping the file's line ending. */
+function insertTomlTopLevelValues(bytes, entries) {
+  if (entries.length === 0) return bytes;
+  const eol = bytes.includes("\r\n") ? "\r\n" : "\n";
+  const lines = bytes.split(/(?<=\n)/u);
+  const section = lines.findIndex((line) => /^\s*\[.*\]\s*$/u.test(line.replace(/[\r\n]+$/u, "")));
+  const at = section === -1 ? lines.length : section;
+  if (at === lines.length && lines.length > 0 && !lines.at(-1).endsWith("\n")) lines[lines.length - 1] += eol;
+  lines.splice(at, 0, ...entries.map(([key, value]) => `${key} = ${JSON.stringify(value)}${eol}`));
+  return lines.join("");
 }
 
 /** Parse the exact top-level string route fields accepted by the V3 projector. */
@@ -495,9 +523,11 @@ function replaceCodexAgentTarget(v2Target, target, intent) {
   const cell = intent.routing.duties[target.cell.dutyId]?.codex;
   if (!cell?.selector?.value || !cell.effort) throw new Error(`V3 Codex duty is not projectable: ${target.cell.dutyId}`);
   const keys = target.ownedKeys;
-  const locations = locateTomlTopLevelValues(v2Target.after.bytes, keys);
-  const wanted = { model: cell.selector.value, model_reasoning_effort: cell.effort };
-  const afterBytes = patchTomlValues(v2Target.after.bytes, locations, wanted);
+  const fixedKeys = keys.filter((key) => Object.hasOwn(CODEX_FIXED_OWNED_VALUES, key));
+  const locations = locateTomlTopLevelValues(v2Target.after.bytes, keys, fixedKeys);
+  const wanted = { model: cell.selector.value, model_reasoning_effort: cell.effort, ...CODEX_FIXED_OWNED_VALUES };
+  const patched = patchTomlValues(v2Target.after.bytes, locations, wanted);
+  const afterBytes = insertTomlTopLevelValues(patched, fixedKeys.filter((key) => !locations.has(key)).map((key) => [key, wanted[key]]));
   return {
     ...v2Target,
     projection: target.projection,
@@ -816,7 +846,9 @@ function projectValidatedIntent(intent, { source, baselines }) {
     if (!target.decision || target.projection !== "codex-custom-agent-v3") return [];
     const bytes = baselineBytes(baselines?.[target.path]);
     if (bytes === null) return [];
-    const observed = Object.fromEntries(locateTomlTopLevelValues(bytes, target.ownedKeys).entries()
+    // C22: only the routed keys carry a model decision; the fixed sandbox value is never a decision conflict.
+    const routedKeys = target.ownedKeys.filter((key) => !Object.hasOwn(CODEX_FIXED_OWNED_VALUES, key));
+    const observed = Object.fromEntries(locateTomlTopLevelValues(bytes, routedKeys).entries()
       .map(([key, location]) => [key, location.value]));
     const cell = intent.routing.duties[target.cell.dutyId].codex;
     const required = { model: cell.selector.value, model_reasoning_effort: cell.effort };

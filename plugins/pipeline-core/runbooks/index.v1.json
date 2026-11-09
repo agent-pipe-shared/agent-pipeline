@@ -29,7 +29,7 @@
       "pathId": "critic",
       "path": "plugins/pipeline-core/runbooks/critic-path.v1.json",
       "schema": "pipeline.runbook.v1",
-      "sha256": "a2e8f7064166ebbbda70ec31093b68c02f777d45dc5806953f6b9349cb5e49e4"
+      "sha256": "59dc11c13cbb014f05ca943092d00f3914bf61bf6317a8af977699bbc4c9c17f"
     },
     {
       "pathId": "push",
