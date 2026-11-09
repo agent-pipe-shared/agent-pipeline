@@ -647,7 +647,8 @@ test("R2C AC-1/AC-2: each of the seven manifest targets lands in the documented 
     // AC-2 pin: the three Pipeline-seeded Codex agent files are whole-file
     // removals, never a keys entry that would leave a Pipeline-authored stub
     // (name/description/developer_instructions) behind.
-    for (const path of [".codex/agents/implementor.toml", ".codex/agents/critic.toml", ".codex/agents/consult-advisor.toml"]) {
+    // C21H (QG-04, restated in place): the fourth Pipeline-seeded Codex agent file, critic-high-risk, is a whole-file removal too.
+    for (const path of [".codex/agents/implementor.toml", ".codex/agents/critic.toml", ".codex/agents/critic-high-risk.toml", ".codex/agents/consult-advisor.toml"]) {
       assert.deepEqual(
         { set: byPath[path].set, kind: byPath[path].kind, type: byPath[path].type },
         { set: "remove", kind: "runtimeSeededFile", type: "file" },

@@ -47,7 +47,7 @@ function yaml(value, indent = "") {
 function seedV3(root) {
   const registry = loadRunnerProfilesV3Registry();
   const intent = { schema: "pipeline.user.v3", language: { human_facing: "de", agent_facing: "en" }, agent_runtime: "other", runners: { enabled: ["claude", "codex"], default: "codex" }, routing: { profiles: registry.profiles, duties: registry.duties }, usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" }, autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 }, gates: { dev_plan: "blocking", push: "blocking", security: "warn", claude_md_max_lines: 300 }, critic_export: registry.criticExportPolicy, session: { keep_awake: true } };
-  const values = { ".claude/pipeline.yaml": freshManifestBytes(), ".claude/settings.json": "{}\n", ".claude/pipeline.json": "{}\n", ".codex/config.toml": "", ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"), ".codex/agents/critic.toml": codexCustomAgentSeed("critic"), ".codex/agents/consult-advisor.toml": "" };
+  const values = { ".claude/pipeline.yaml": freshManifestBytes(), ".claude/settings.json": "{}\n", ".claude/pipeline.json": "{}\n", ".codex/config.toml": "", ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"), ".codex/agents/critic.toml": codexCustomAgentSeed("critic"), /* C21H, restated in place */ ".codex/agents/critic-high-risk.toml": codexCustomAgentSeed("critic-high-risk"), ".codex/agents/consult-advisor.toml": "" };
   const baselines = Object.fromEntries(Object.entries(values).map(([p, bytes]) => [p, { status: "present", bytes }]));
   const plan = planRuntimeProjectionV3(intent, { baselines });
   assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));

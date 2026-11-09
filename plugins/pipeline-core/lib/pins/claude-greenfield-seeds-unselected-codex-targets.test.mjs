@@ -116,6 +116,8 @@ const baselines = {
   ".codex/config.toml": "# config-unowned-sentinel\nprofile = \"keep\"\n",
   ".codex/agents/implementor.toml": "# implementor-prefix-sentinel\nmodel = \"old-implementor\"\nmodel_reasoning_effort = \"low\"\n",
   ".codex/agents/critic.toml": "# critic-prefix-sentinel\nmodel = \"old-critic\"\nmodel_reasoning_effort = \"medium\"\n",
+  // C21H (QG-04, restated in place): the second Codex Critic role is one more owned runtime target.
+  ".codex/agents/critic-high-risk.toml": "# critic-high-risk-prefix-sentinel\nmodel = \"old-critic-high-risk\"\nmodel_reasoning_effort = \"medium\"\n",
   ".codex/agents/consult-advisor.toml": "# advisor-prefix-sentinel\nname = \"old-advisor\"\nmodel = \"old-advisor\"\n",
 };
 function migrationRoot(label, enabled, { withCodex }) {

@@ -1163,7 +1163,8 @@ test("P0 regression: a normal exact Codex project runtime layout does not hide a
   const existing = localRepository("existing protected Git mount with project Codex runtime");
   mkdirSync(join(existing, ".codex", "agents"), { recursive: true });
   writeFileSync(join(existing, ".codex", "config.toml"), "");
-  for (const name of ["consult-advisor.toml", "critic.toml", "implementor.toml"]) {
+  // C21H (QG-04, restated in place): the second Critic role file is part of the exact project runtime layout.
+  for (const name of ["consult-advisor.toml", "critic-high-risk.toml", "critic.toml", "implementor.toml"]) {
     writeFileSync(join(existing, ".codex", "agents", name), "");
   }
   chmodSync(join(existing, ".git"), 0o500);

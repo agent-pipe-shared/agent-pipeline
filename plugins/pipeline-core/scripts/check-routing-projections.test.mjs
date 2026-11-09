@@ -182,6 +182,8 @@ try {
     ".codex/config.toml": "profile = \"keep\"\n",
     ".codex/agents/implementor.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\n",
     ".codex/agents/critic.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\n",
+    // C21H (QG-04, restated in place): the second Codex Critic role is an owned target of the V3 projection too.
+    ".codex/agents/critic-high-risk.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\n",
     ".codex/agents/consult-advisor.toml": "name = \"stale\"\n",
   };
   for (const [path, bytes] of Object.entries(baselines)) {

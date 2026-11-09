@@ -2847,7 +2847,8 @@ test("the codex runtime apply is unchanged: bound executable, frozen .codex dige
     assert.equal(publications.length, 1);
     assert.equal(bindings[0].codexExecutable, process.execPath);
     assert.deepEqual(bindings[0].runtimeTargets.map((target) => target.path), [
-      ".codex/agents/consult-advisor.toml", ".codex/agents/critic.toml", ".codex/agents/implementor.toml", ".codex/config.toml",
+      // C21H (QG-04, restated in place): the second Codex Critic role is one more frozen .codex target of the runtime apply.
+      ".codex/agents/consult-advisor.toml", ".codex/agents/critic-high-risk.toml", ".codex/agents/critic.toml", ".codex/agents/implementor.toml", ".codex/config.toml",
     ]);
     assert.equal(publications[0].codexTargetWritten, false);
     assert.equal(publications[0].claudeTargetWritten, false);
