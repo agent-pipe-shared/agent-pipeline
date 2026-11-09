@@ -573,6 +573,34 @@ test("P3: after the commit the next call continues to closed-local; an uncommitt
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test("CFC-2: a rerun rolls back only its own uncommitted outputs of an earlier attempt, and leaves any other dirty tree to the Verify", () => {
+  const f = oneShotFixture({ verifyRed: true });
+  try {
+    const manifest = join(f.root, "specs/feature-abc/lifecycle.json");
+    writeFileSync(manifest, "{\"state\":\"implementing\"}\n"); f.git("add", "-A"); f.git("commit", "-q", "-m", "package");
+    const leaveAttempt = () => {
+      writeFileSync(manifest, "{\"state\":\"completed\"}\n");
+      for (const name of ["audit-request.json", "verify-candidate.json"]) writeFileSync(join(f.root, "specs/feature-abc/evidence", name), "{}\n");
+    };
+    leaveAttempt();
+    writeFileSync(join(f.root, "foreign.txt"), "x\n");
+    oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(readFileSync(manifest, "utf8"), "{\"state\":\"completed\"}\n", "a foreign dirty path keeps every output");
+    assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/audit-request.json")), true);
+    rmSync(join(f.root, "foreign.txt"));
+    for (const name of ["audit-request.json", "verify-candidate.json"]) rmSync(join(f.root, "specs/feature-abc/evidence", name));
+    oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(readFileSync(manifest, "utf8"), "{\"state\":\"completed\"}\n", "a modified package with no evidence of an earlier attempt is not touched");
+    leaveAttempt();
+    const before = f.calls.length;
+    oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(readFileSync(manifest, "utf8"), "{\"state\":\"implementing\"}\n");
+    assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/audit-request.json")), false);
+    assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/verify-candidate.json")), false);
+    assert.deepEqual(f.calls.slice(before), ["verify-evidence-producer.mjs"], "the Verify runs on the rolled back tree");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("CGF-21: closed-local names the Critic-bound push Verify with the packet of the close, argv as the close chain walk runs it", () => {
   const f = oneShotFixture({ closed: true, startPhase: "cleanup-complete" });
   try {

@@ -9,7 +9,7 @@
  * invocation.  The protected State writer remains the sole closer.
  */
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -320,6 +320,17 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId, lifecycleId: again, resumeLifecycleId: again, stages: [...stages, "critic-addenda"],
           commit: { paths: addenda.commitPaths, excluded: [], capability: null, message: addenda.subject, steps }, next: rerun(again),
           message: "The close derived the Critic addenda from the passed review and wrote them; Verify has not run yet. Run the commit, then the next command. Do not build addenda by hand." });
+      }
+      // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward
+      // (VEP-CVL-CARRY-RANGE; a human had to reset). Only a tree whose every dirty path is such an output, with an evidence file proving an earlier attempt, is rolled back; the stages write the same again.
+      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath]);
+      const leftovers = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
+      const dirtyOutputs = leftovers?.status === 0 ? String(leftovers.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => ({ tracked: !line.startsWith("??"), path: line.slice(3) })) : [];
+      if (dirtyOutputs.some(({ tracked, path }) => !tracked && (path === auditRequestPath || path === verifyPath)) && dirtyOutputs.every(({ path }) => ownOutputs.has(path))) {
+        stages.push("discard-own-leftovers");
+        for (const { tracked, path } of dirtyOutputs) {
+          if (tracked) runner("git", ["checkout", "--", path]); else rmSync(resolve(root, path), { force: true });
+        }
       }
       if (requalify) stages.push("requalify-candidate");
       stages.push("verify-candidate");
