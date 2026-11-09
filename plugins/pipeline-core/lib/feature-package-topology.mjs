@@ -228,6 +228,14 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
   if (!FEATURE_STATES.includes(nextState)) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-target-state", findings: [] };
   if (checked.receipt.state === nextState) return { schema: "pipeline.feature-package-transition-plan.v1", status: "noop", manifest: checked.receipt.manifest, from: nextState, to: nextState, changes: [] };
   const from = checked.receipt.state;
+  // C21C (Codex greenfield): the close's own evidence commits move HEAD past a package that is already `completed`, and the close then demands
+  // a package bound to HEAD. `completed` had no way out, so that was a dead end. The one exit: the active feature, HEAD really moved, and
+  // (checked below) a registered, passing Verify for exactly that HEAD. It goes back through `verifying`, so the second move to `completed` is the normal one.
+  const head = options?.head;
+  const candidateMoved = checked.receipt.candidate !== null && exact(head, ["commit", "tree"])
+    && (checked.receipt.candidate.commit !== head.commit || checked.receipt.candidate.tree !== head.tree);
+  const requalifies = from === "completed" && nextState === "verifying" && candidateMoved
+    && typeof options?.activeFeatureId === "string" && options.activeFeatureId === checked.receipt.featureId;
   const admitted = new Set([
     "draft:awaiting-approval",
     "awaiting-approval:draft",
@@ -239,17 +247,18 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
     "verifying:completed",
     "verifying:implementing",
   ]);
-  if (!admitted.has(`${from}:${nextState}`)) {
+  if (!admitted.has(`${from}:${nextState}`) && !requalifies) {
     // 17 (AGY greenfield): the agent asked for implementing -> completed in one step and had to read this file to learn the chain.
     const next = [...admitted].filter((key) => key.startsWith(`${from}:`)).map((key) => key.slice(from.length + 1));
     return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", from, to: nextState,
-      repair: `a package moves one admitted step at a time (draft > awaiting-approval > approved > implementing > verifying > completed); from ${from} the admitted next states are ${next.length === 0 ? "none" : next.join(", ")}; plan and apply each step in turn`, findings: [] };
+      repair: `a package moves one admitted step at a time (draft > awaiting-approval > approved > implementing > verifying > completed); from ${from} the admitted next states are ${next.length === 0 ? "none" : next.join(", ")}; plan and apply each step in turn${from === "completed" ? "; a completed package of the active feature returns to verifying only when HEAD has moved past its candidate" : ""}`, findings: [] };
   }
   // The first move into `verifying` binds the package candidate: no other verb writes it, and `verifying`/`completed`
   // require one (FTP-CANDIDATE). It is the current HEAD, and only when a registered, passing Verify evidence for exactly
   // that commit and tree is already in the package; the caller resolves HEAD (`options.head`), this library never runs git.
+  // C21C: a later move into `verifying` rebinds under the same condition when HEAD moved past the bound candidate.
   let candidate = null;
-  if (from === "implementing" && nextState === "verifying" && checked.receipt.candidate === null) {
+  if (requalifies || (from === "implementing" && nextState === "verifying" && (checked.receipt.candidate === null || candidateMoved))) {
     const bound = verifiedCandidateOfPackage(resolve(rootDir), checked.receipt.manifest, options?.head);
     if (bound.reason) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: bound.reason, findings: bound.findings };
     candidate = bound.candidate;

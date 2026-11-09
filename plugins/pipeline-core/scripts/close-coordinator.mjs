@@ -1360,6 +1360,18 @@ try {
       evidenceDirectory: join(publicationClosePaths(common, parsed.values.lifecycle).directory, "evidence"),
       next: coordinatorNextPhases(stored.coordinator.phase),
     });
+  } else if (command === "critic-independence") {
+    // C21C: read-only, so the one-shot close can name a missing PO acknowledgement BEFORE it spends a Verify and moves the package. The close keeps its own check.
+    const parsed = exactArgs(argv, new Set(["root", "packet"]));
+    if (!parsed || !parsed.values.root || !/^[a-f0-9]{32}$/u.test(parsed.values.packet ?? "")) fail("CLOSE-ARGS", "critic-independence arguments invalid");
+    const root = physicalRoot(parsed.values.root);
+    try {
+      assertCriticIndependenceForClose({ root, common: gitCommonDir(root), lifecycle: { receipt: { critic: { packetId: parsed.values.packet } } } });
+      emit({ schema: "pipeline.close-critic-independence.v1", status: "satisfied" });
+    } catch (error) {
+      if (error?.code === "CLOSE-CRITIC-CALLER-AUTHORED" && /authored by the calling agent/u.test(error.message)) emit({ schema: "pipeline.close-critic-independence.v1", status: "acknowledgement-required", code: error.code, message: error.message });
+      else emit({ schema: "pipeline.close-critic-independence.v1", status: "unknown" });
+    }
   } else if (command === "drive") {
     const parsed = exactArgs(argv, new Set([
       "root", "lifecycle", "actor", "phase", "evidence", "publication",

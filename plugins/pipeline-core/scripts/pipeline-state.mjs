@@ -8883,7 +8883,7 @@ function runFeaturePackageReadCommand(sub, argv) {
     if (flags.proposal !== undefined) {
       return refuseFeaturePackageRead(sub, `argument "--proposal" applies only to an absent manifest, and ${manifest} exists`);
     }
-    const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root) });
+    const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root), activeFeatureId: featurePackageActiveFeatureId(root) });
     // A previewed transition prints the digest `feature-package-apply --plan-sha256` expects (the digest of the plan object itself,
     // computed before this field is added), so a consumer does not have to re-derive it.
     console.log(JSON.stringify(plan.status === "preview" ? { ...plan, planSha256: sha256CanonicalJson(plan) } : plan, null, 2));
@@ -9110,6 +9110,12 @@ function featurePackageHead(root, deps = {}) {
   return candidate?.ok === true ? { commit: candidate.commit, tree: candidate.tree } : null;
 }
 
+/** The active feature id the planner needs to admit a completed package back to `verifying` (C21C); null when State is unreadable or no feature is active. */
+function featurePackageActiveFeatureId(root) {
+  const current = readStateRaw(root);
+  return current.status === "ok" ? current.state.activeFeature?.id ?? null : null;
+}
+
 function buildFeaturePackageApplyPreview(flags, deps = {}) {
   if (flags.root === undefined) return { ok: false, error: 'argument "--root <dir>" is required' };
   const root = resolve(flags.root);
@@ -9131,7 +9137,7 @@ function buildFeaturePackageApplyPreview(flags, deps = {}) {
   if (manifestExists) {
     if (nextState === undefined) return { ok: false, error: 'argument "--next-state <state>" is required for an existing manifest' };
     if (flags.proposal !== undefined) return { ok: false, error: `argument "--proposal" applies only to an absent manifest, and ${manifest} exists` };
-    plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root, deps) });
+    plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root, deps), activeFeatureId: featurePackageActiveFeatureId(root) });
     kind = "transition";
   } else {
     if (flags.proposal === undefined) return { ok: false, error: `argument "--proposal <repo-relative-path>" is required because ${manifest} is absent; the bootstrap preview validates the proposed manifest bytes in memory and creates nothing` };

@@ -40,7 +40,7 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
       const why = !check.ok ? `the package does not validate (${check.code ?? check.reason ?? "invalid"})`
         : check.receipt.featureId !== featureId ? `the package belongs to feature ${check.receipt.featureId}, not ${featureId}`
         : check.receipt.state !== "completed" ? `the package state is ${check.receipt.state}, completed is required`
-        : `the package candidate ${String(check.receipt.candidate?.commit).slice(0, 12)} is not the requested candidate ${candidate.commit.slice(0, 12)} (HEAD moved after the registration: register the package again for the current HEAD)`;
+        : `the package candidate ${String(check.receipt.candidate?.commit).slice(0, 12)} is not the requested candidate ${candidate.commit.slice(0, 12)} (HEAD moved after the registration. Rerun finish-feature.mjs --one-shot with its --resume-lifecycle-id: it verifies the current HEAD and moves the package through verifying back to completed. By hand: verify-evidence-producer.mjs --mode candidate, register-feature-package.mjs --add-verify-evidence, then feature-package-plan and feature-package-apply to verifying and to completed)`;
       return blocked("FCA-PACKAGE", `Complete and reconcile the exact feature package, Result and candidate evidence before snapshot planning. Observed: ${why}.`);
     }
     const git = args => {

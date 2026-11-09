@@ -4,7 +4,7 @@ import test from "node:test";
 
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { finishFeature, oneShotClose } from "./finish-feature.mjs";
@@ -248,7 +248,8 @@ const sha256Of = (value) => createHash("sha256").update(value).digest("hex");
 const STATE_PATH = ".claude/pipeline-state.json";
 const COORD = new URL("./close-coordinator.mjs", import.meta.url).pathname;
 const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false } = {}) {
+function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false } = {}) {
+  const independenceChecks = [];
   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
   git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
@@ -267,7 +268,9 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
   const flag = (argv, name) => argv[argv.indexOf(name) + 1];
   const runner = (executable, argv) => {
     if (executable === "git") return spawnSync("git", argv, { cwd: root, encoding: "utf8" });
-    const script = argv[0].split("/").at(-1); const sub = argv[1]; calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
+    const script = argv[0].split("/").at(-1); const sub = argv[1];
+    if (script === "close-coordinator.mjs" && sub === "critic-independence") { independenceChecks.push(flag(argv, "--packet")); return json(acknowledgementMissing ? { status: "acknowledgement-required", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "authored by the calling agent; record it with approve-critic-acknowledgement" } : { status: "satisfied" }); }
+    calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
     if (script === "verify-evidence-producer.mjs") {
       if (verifyRed) return { status: 2, stdout: "", stderr: "verify-evidence-producer: VEP-FAILED: suite red\n" };
       const head = git("rev-parse", "HEAD").trim(); const tree = git("rev-parse", "HEAD^{tree}").trim();
@@ -299,7 +302,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
     }
     throw new Error(`unexpected ${script} ${sub}`);
   };
-  return { root, git, calls, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId } };
+  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId } };
 }
 const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
 
@@ -344,6 +347,105 @@ test("C21B: a Continuity feature with no bound Result stops before Verify with t
     assert.deepEqual(f.calls, [], "Verify and the package stages must not run");
     for (const needle of ["continuity-result-bootstrap-plan", "applyAction", "reconcileCommand", "commit-pipeline-owned.mjs", `--critic-packet-id ${f.packetId}`]) assert.ok(stopped.stop.repair.includes(needle), needle);
     for (const name of ["audit-request.json", "verify-candidate.json", "close-request.json"]) assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence", name)), false, name);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C21C: a missing PO acknowledgement of a caller-authored Critic stops before Verify and writes nothing", () => {
+  const f = oneShotFixture({ acknowledgementMissing: true });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
+    assert.equal(stopped.stage, "critic-acknowledgement"); assert.equal(stopped.stop.code, "CLOSE-CRITIC-CALLER-AUTHORED");
+    assert.match(stopped.stop.reason, /approve-critic-acknowledgement/u);
+    assert.deepEqual(f.independenceChecks, [f.packetId]); assert.deepEqual(f.calls, [], "Verify, the package and the close must not run");
+    for (const name of ["audit-request.json", "verify-candidate.json"]) assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence", name)), false, name);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// The real writer's session authority refuses a group or world accessible entry below the control directory; the stubs above create theirs with default modes.
+function privateControlTree(path) {
+  if (!existsSync(path)) return;
+  chmodSync(path, statSync(path).isDirectory() ? 0o700 : 0o600);
+  if (statSync(path).isDirectory()) for (const name of readdirSync(path)) privateControlTree(join(path, name));
+}
+
+// The real package verbs and the real planner; only Verify, registration and the coordinator are stubbed.
+function withRealPackage(f, { state = "completed" } = {}) {
+  const base = "specs/feature-abc";
+  const artifact = (klass, name, authority, mutability, retention) => { const path = `${base}/${name}`; const bytes = `${klass}\n`; mkdirSync(dirname(join(f.root, path)), { recursive: true }); writeFileSync(join(f.root, path), bytes); return { class: klass, path, sha256: sha256Of(bytes), authority, mutability, retention }; };
+  const artifacts = [artifact("prd", "prd.md", true, "mutable", "active"), artifact("spec", "spec.md", true, "mutable", "active"), artifact("acceptance", "acceptance.md", true, "mutable", "active"),
+    { class: "result", path: `${base}/result.md`, sha256: f.resultSha, authority: true, mutability: "append-only", retention: "retain" }, artifact("candidate-evidence", "evidence/verify-old.json", false, "immutable", "retain")];
+  const manifestPath = join(f.root, base, "lifecycle.json");
+  const read = () => JSON.parse(readFileSync(manifestPath, "utf8"));
+  f.git("add", "-A"); f.git("commit", "-q", "-m", "package files");
+  const head = f.git("rev-parse", "HEAD").trim(); const tree = f.git("rev-parse", "HEAD^{tree}").trim();
+  writeFileSync(manifestPath, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: "feature-abc", rigor: 2 }, state, artifacts, candidate: { commit: head, tree }, supersedes: null }, null, 2)}\n`);
+  f.git("add", "-A"); f.git("commit", "-q", "-m", "the close evidence commit moves HEAD past the candidate");
+  const packaged = (executable, argv) => {
+    const script = String(argv[0]).split("/").at(-1);
+    if (script === "pipeline-state.mjs" && String(argv[1]).startsWith("feature-package-")) { f.calls.push(`pipeline-state ${argv[1]}`); privateControlTree(join(f.root, ".git/agent-pipeline")); return spawnSync(process.execPath, argv, { cwd: f.root, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: f.root } }); }
+    if (script === "register-feature-package.mjs") {
+      f.calls.push(script);
+      const path = argv[argv.indexOf("--add-verify-evidence") + 1]; const value = read();
+      value.artifacts = [...value.artifacts.filter((entry) => entry.path !== path), { class: "candidate-evidence", path, sha256: sha256Of(readFileSync(join(f.root, path))), authority: false, mutability: "immutable", retention: "retain" }];
+      writeFileSync(manifestPath, `${JSON.stringify(value, null, 2)}\n`);
+      return { status: 0, stdout: "{\"status\":\"registered\"}", stderr: "" };
+    }
+    return f.runner(executable, argv);
+  };
+  return { packaged, read, oldCandidate: head };
+}
+
+test("C21C: a resumed close whose package is completed on an older HEAD qualifies the new HEAD and rebinds the package instead of refusing", () => {
+  const f = oneShotFixture({ startPhase: "checkpointed" });
+  try {
+    const { packaged, read, oldCandidate } = withRealPackage(f);
+    writeFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), `${JSON.stringify({ criticVerifyLifecycleId: "d".repeat(64) })}\n`);
+    mkdirSync(join(f.root, ".git/agent-pipeline/critic-verify-lifecycle"), { recursive: true });
+    writeFileSync(join(f.root, `.git/agent-pipeline/critic-verify-lifecycle/${"d".repeat(64)}.json`), JSON.stringify({ critic: { packetId: f.packetId } }));
+    const result = oneShotClose({ ...f.input, criticPacketId: null, resumeLifecycleId: "lc-1" }, { runCommand: packaged });
+    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 600));
+    const head = f.git("rev-parse", "HEAD").trim();
+    assert.notEqual(oldCandidate, head);
+    assert.equal(read().state, "completed"); assert.equal(read().candidate.commit, head, "the package is bound to the current HEAD");
+    assert.deepEqual(f.independenceChecks, [f.packetId], "the packet comes from the earlier close's own receipt");
+    assert.ok(result.stages.includes("requalify-candidate"), result.stages.join());
+    assert.equal(JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), "utf8")).criticVerifyLifecycleId, f.lifecycleId, "the audit request names the receipt of the new Verify");
+    const moves = f.calls.filter((call) => call.startsWith("pipeline-state feature-package-"));
+    assert.deepEqual(moves, ["pipeline-state feature-package-plan", "pipeline-state feature-package-apply", "pipeline-state feature-package-plan", "pipeline-state feature-package-apply"]);
+    assert.deepEqual(forbidden(f.calls), []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C21C: the owner route names the typed reason of a refused requester instead of only its code", async () => {
+  const { ownerRouteRequesterRefusal } = await import("./continuity-owner-route.mjs");
+  const platform = ownerRouteRequesterRefusal(Object.assign(new Error("x"), { code: "SDC-AUTHORITY-UNAVAILABLE", reason: "WINDOWS-REQUESTER-STORAGE" }), "/repo");
+  assert.match(platform, /\(SDC-AUTHORITY-UNAVAILABLE: WINDOWS-REQUESTER-STORAGE\)/u);
+  assert.match(platform, /session-authority-repair\.mjs inspect --root \/repo/u);
+  assert.match(ownerRouteRequesterRefusal(Object.assign(new Error("x"), { code: "OSV-REPLAY" }), "/repo"), /\(OSV-REPLAY\)/u, "no reason, no empty colon");
+});
+
+test("C21C: a resumed close past the prepared phase is not requalified", () => {
+  const prepared = oneShotFixture({ startPhase: "tracked-close-finalized" });
+  try {
+    withRealPackage(prepared);
+    writeFileSync(join(prepared.root, "specs/feature-abc/evidence/audit-request.json"), `${JSON.stringify({ criticVerifyLifecycleId: "d".repeat(64) })}\n`);
+    const result = oneShotClose({ ...prepared.input, resumeLifecycleId: "lc-1" }, { runCommand: prepared.runner });
+    assert.equal(result.stages?.includes("requalify-candidate") ?? false, false, JSON.stringify(result).slice(0, 300));
+    assert.equal(prepared.calls.includes("verify-evidence-producer.mjs"), false, "no new Verify once the close is past prepared");
+    assert.deepEqual(prepared.independenceChecks, []);
+  } finally { rmSync(prepared.root, { recursive: true, force: true }); }
+});
+
+test("C21C: a first run that finds its package already completed on this HEAD does not move it again", () => {
+  const f = oneShotFixture();
+  try {
+    const { packaged, read } = withRealPackage(f);
+    const value = read(); value.candidate = { commit: f.git("rev-parse", "HEAD").trim(), tree: f.git("rev-parse", "HEAD^{tree}").trim() };
+    writeFileSync(join(f.root, "specs/feature-abc/lifecycle.json"), `${JSON.stringify(value, null, 2)}\n`);
+    const result = oneShotClose(f.input, { runCommand: packaged });
+    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 400));
+    assert.deepEqual(f.calls.filter((call) => call.startsWith("pipeline-state feature-package-")), []);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

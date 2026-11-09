@@ -28,6 +28,25 @@ try {
   assert.equal(skipped.from, "verifying");
   assert.match(skipped.repair, /from verifying the admitted next states are completed, implementing/u);
   assert.match(skipped.repair, /draft > awaiting-approval > approved > implementing > verifying > completed/u);
+  // C21C: the one way out of `completed`: the active feature, HEAD moved past the candidate, and a registered passing Verify for exactly that HEAD.
+  {
+    const c21 = "completed-feature"; const c21Base = `specs/${c21}`;
+    const oldCandidate = { commit: "a".repeat(40), tree: "b".repeat(40) }; const newHead = { commit: "c".repeat(40), tree: "d".repeat(40) };
+    const c21Artifact = (klass, name, authority, mutability, retention, bytes = `${klass}\n`) => ({ class: klass, ...file(`${c21Base}/${name}`, bytes), authority, mutability, retention });
+    const c21Base5 = [c21Artifact("prd", "prd.md", true, "mutable", "active"), c21Artifact("spec", "spec.md", true, "mutable", "active"), c21Artifact("acceptance", "acceptance.md", true, "mutable", "active"), c21Artifact("result", "result.md", true, "append-only", "retain")];
+    const passing = (head) => JSON.stringify({ schema: "pipeline.verify-evidence.v0", exitCode: 0, commit: head.commit, tree: head.tree, candidate: head });
+    const write = (evidenceFor) => file(`${c21Base}/lifecycle.json`, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: c21, rigor: 2 }, state: "completed", artifacts: [...c21Base5, c21Artifact("candidate-evidence", "evidence/verify.json", false, "immutable", "retain", passing(evidenceFor))], candidate: oldCandidate, supersedes: null })}\n`);
+    const plan = (options) => planFeaturePackageTransition(root, `${c21Base}/lifecycle.json`, "verifying", options);
+    write(newHead);
+    const rebinding = plan({ head: newHead, activeFeatureId: c21 });
+    assert.equal(rebinding.status, "preview", JSON.stringify(rebinding)); assert.deepEqual(rebinding.candidate, newHead); assert.equal(rebinding.from, "completed");
+    assert.equal(plan({ head: oldCandidate, activeFeatureId: c21 }).reason, "invalid-transition", "HEAD did not move: nothing to requalify");
+    assert.equal(plan({ head: newHead, activeFeatureId: "another-feature" }).reason, "invalid-transition", "a closed or foreign feature stays completed");
+    assert.equal(plan({ head: newHead }).reason, "invalid-transition", "no active feature named");
+    assert.match(plan({ head: newHead }).repair, /returns to verifying only when HEAD has moved/u);
+    write(oldCandidate);
+    assert.equal(plan({ head: newHead, activeFeatureId: c21 }).reason, "verify-evidence-required", "no Verify for the new HEAD, no rebinding");
+  }
   const bootstrapId = "bootstrap-feature";
   const bootstrapBase = `specs/${bootstrapId}`;
   const bootstrapPrd = file(`${bootstrapBase}/prd.md`, "# Bootstrap PRD\n");

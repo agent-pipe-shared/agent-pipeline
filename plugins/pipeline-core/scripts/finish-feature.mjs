@@ -249,14 +249,36 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   const verifyPath = featureId === undefined ? null : `${evidenceDir}/verify-candidate.json`;
   if (featureId !== undefined) {
     let criticVerifyLifecycle;
-    if (resumeLifecycleId === null) {
+    // C21C (Codex greenfield): the commits a close needs on its way (the proof, its own evidence) move HEAD past the candidate of a package that is
+    // already `completed`; a resumed close skipped the evidence stages and then refused with FCA-PACKAGE, with no way out. It now qualifies the new HEAD again.
+    const packageManifest = `specs/${featureId}/lifecycle.json`;
+    const packageAt = () => {
+      let value = null;
+      try { value = JSON.parse(readFileSync(resolve(root, packageManifest), "utf8")); } catch { return { state: null, moved: false }; }
+      const head = rawGit(["rev-parse", "HEAD"]);
+      return { state: value?.state ?? null, moved: typeof value?.candidate?.commit === "string" && head !== null && head !== value.candidate.commit };
+    };
+    const coordinatorStillBeforePrepared = () => {
+      try { return new Set(["active", "checkpointed"]).has(command(runner, process.execPath, [COORDINATOR, "inspect", "--root", root, "--lifecycle", resumeLifecycleId], "ONESHOT-INSPECT")?.coordinator?.phase); } catch { return false; }
+    };
+    const requalify = resumeLifecycleId !== null && packageAt().moved && coordinatorStillBeforePrepared();
+    const again = requalify ? resumeLifecycleId : null;
+    if (resumeLifecycleId === null || requalify) {
       let packet = criticPacketId;
+      if (packet === null && requalify) {
+        try {
+          const lifecycle = JSON.parse(readFileSync(resolve(root, auditRequestPath), "utf8")).criticVerifyLifecycleId;
+          const receipt = JSON.parse(readFileSync(join(common(), "agent-pipeline", "critic-verify-lifecycle", `${lifecycle}.json`), "utf8"));
+          const known = receipt?.critic?.packetId ?? receipt?.receipt?.critic?.packetId;
+          if (HEX32.test(known ?? "")) packet = known;
+        } catch { packet = null; }
+      }
       if (packet === null) {
         let found = [];
         try { const dir = common(); found = (deps.listCriticPackets ?? ((c) => readdirSync(join(c, "agent-pipeline", "critic-packets"))))(dir).filter((name) => HEX32.test(name)).sort(); } catch { found = []; }
         if (found.length === 1) packet = found[0];
         else return stopResult("critic-packet", "ONESHOT-CRITIC-PACKET-MISSING", found.length === 0 ? "No consumed Critic packet exists for this repository, so the candidate Verify cannot be bound to a Critic review." : `Several Critic packets exist (${found.join(", ")}); the close will not guess which one reviewed this candidate.`,
-          `finish the Critic review (it records the packet), then run: ${rerunBase} --critic-packet-id <packet-id>`);
+          `finish the Critic review (it records the packet), then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <packet-id>`);
       }
       packetForRerun = packet;
       // C21B: a Continuity feature without a bound Result cannot pass the Result close block below; stop BEFORE Verify, so no partial close evidence has to be cleaned up by hand.
@@ -264,19 +286,33 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         return stopResult("result-bootstrap", "ONESHOT-RESULT-NOT-BOUND", "Continuity authority.result is null, so this feature has no bound Implementation Result; nothing was written.",
           `in the project root ${root} (the first command takes no flags and reads the working directory): (1) node ${STATE_WRITER} continuity-result-bootstrap-plan; (2) run the applyAction it returns; (3) when its completion prints a reconcileCommand, run it, and a plan that needs the PO also prints the signatureCommand for the PO; (4) node ${join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs")} --root ${root} --agent; (5) ${rerun(null)}`);
       }
+      // C21C: the missing PO acknowledgement of a caller-authored Critic used to surface only inside the close, after Verify and the package move. Its signature needs
+      // a clean tree, so the close's evidence had to be committed and the bound candidate went stale. Named here, it stops before anything was written.
+      let acknowledgementGap = null;
+      try {
+        const independence = command(runner, process.execPath, [COORDINATOR, "critic-independence", "--root", root, "--packet", packet], "ONESHOT-CRITIC-INDEPENDENCE");
+        if (independence?.status === "acknowledgement-required") acknowledgementGap = String(independence.message ?? "");
+      } catch { acknowledgementGap = null; /* the close keeps its own check */ }
+      if (acknowledgementGap !== null) return stopResult("critic-acknowledgement", "CLOSE-CRITIC-CALLER-AUTHORED", acknowledgementGap, `nothing was written; record the acknowledgement as the reason says, then rerun the identical command: ${rerun(again)}`);
+      if (requalify) stages.push("requalify-candidate");
       stages.push("verify-candidate");
       const verify = runner(process.execPath, [VERIFY_PRODUCER, "--root", root, "--mode", "candidate", "--critic-packet-id", packet, "--critic-evidence-feature-id", featureId, "--out", verifyPath]);
-      if (verify?.status !== 0) return stopResult("verify-candidate", "ONESHOT-VERIFY-RED", failedText(verify), `fix what the Verify output names without committing, then rerun the identical command: ${rerun(null)}`);
+      if (verify?.status !== 0) return stopResult("verify-candidate", "ONESHOT-VERIFY-RED", failedText(verify), `fix what the Verify output names without committing, then rerun the identical command: ${rerun(again)}`);
       stages.push("register-verify-evidence");
       const register = runner(process.execPath, [REGISTER_PACKAGE, "--root", root, "--add-verify-evidence", verifyPath]);
       if (register?.status !== 0) return stopResult("register-verify-evidence", "ONESHOT-REGISTER-FAILED", failedText(register), `register the evidence by hand to see the typed refusal: node ${REGISTER_PACKAGE} --root ${root} --add-verify-evidence ${verifyPath}`);
-      const manifest = `specs/${featureId}/lifecycle.json`;
-      for (const nextState of ["verifying", "completed"]) {
+      const manifest = packageManifest;
+      // C21C: a rerun finds the package where the last one left it. Unmoved it goes on from there; moved past its candidate it goes back through `verifying`, which rebinds it.
+      const { state: packageState, moved: packageMoved } = packageAt();
+      const packageMoves = packageState === "completed" ? (packageMoved ? ["verifying", "completed"] : [])
+        : packageState === "verifying" ? (packageMoved ? ["implementing", "verifying", "completed"] : ["completed"])
+          : ["verifying", "completed"];
+      for (const nextState of packageMoves) {
         stages.push(`feature-package-${nextState}`);
         try {
           const plan = command(runner, process.execPath, [STATE_WRITER, "feature-package-plan", "--root", root, "--manifest", manifest, "--next-state", nextState], "ONESHOT-PACKAGE-PLAN");
           command(runner, process.execPath, [STATE_WRITER, "feature-package-apply", "--root", root, "--manifest", manifest, "--next-state", nextState, "--plan-sha256", plan.planSha256], "ONESHOT-PACKAGE-APPLY");
-        } catch (error) { return stopResult(`feature-package-${nextState}`, error.refusalCode ?? error.code, error.message, `nothing was committed; ${repairFor(error, null)}`); }
+        } catch (error) { return stopResult(`feature-package-${nextState}`, error.refusalCode ?? error.code, error.message, `nothing was committed; ${repairFor(error, again)}`); }
       }
       let lifecycleFile = null;
       try {
