@@ -855,6 +855,47 @@ test("17 cleanup receipt: an own session that could not be derived is a typed re
   assert.equal(legacy.ownSessionCode, null);
 });
 
+// LOOP-A2 (Antigravity greenfield 2026-11-09): a close stopped at CLOSE-CLEANUP-OWN-SESSION-UNDERIVED although the only descriptor was its own.
+// The hook record is the observation; when it is missing, exactly ONE antigravity descriptor in the listing of a close that the Antigravity
+// hook admitted can only be the closing conversation's own. It is labelled inferred in what the digest binds. Several are never guessed between.
+test("C22 A2 cleanup receipt: one Antigravity descriptor is the closing session, several are named and never guessed", () => {
+  const oid = h("c", 40); const tree = h("d", 40);
+  const agy = { runner: "antigravity", derivation: "unavailable", reason: "the antigravity hook recorded no current conversation for this close" };
+  const own = { sessionId: "antigravity-1a41c1ed-bb39-40db-b45a-866595bab590", descriptorSha256: h("1"), status: "unavailable" };
+  const other = { sessionId: "antigravity-99999999-aaaa-bbbb-cccc-dddddddddddd", descriptorSha256: h("2"), status: "unavailable" };
+  const build = (descriptors, ownSession = agy, ownSessionId = null) => buildCleanupReceipt({ descriptors, ownSessionId, candidateOid: oid, candidateTree: tree, ownSession });
+
+  const inferred = build([own]);
+  assert.equal(inferred.receipt.status, "complete");
+  assert.equal(inferred.ownSessionCode, null);
+  assert.equal(inferred.observation.ownSessionDerived, true);
+  assert.equal(inferred.observation.ownSessionDerivation, "inferred-single-antigravity-descriptor");
+  assert.equal(inferred.observation.excludedOwnSession.sessionId, own.sessionId, "the exclusion is named, never silent");
+  assert.deepEqual(inferred.observation.otherActiveDescriptors, []);
+  assert.equal(inferred.ownSession.derivation, "inferred-single-antigravity-descriptor", "the caller prints the derivation that was really used");
+  const observed = build([own], { runner: "antigravity", derivation: "observed", reason: "x" }, own.sessionId);
+  assert.notEqual(inferred.observationSha256, observed.observationSha256, "an inferred own session is not digest-equal to an observed one");
+
+  const several = build([own, other]);
+  assert.equal(several.receipt.status, "uncertain");
+  assert.equal(several.ownSessionCode, "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED");
+  assert.equal(several.observation.ownSessionDerived, false);
+  assert.deepEqual(several.ownSessionCandidates, [own.sessionId, other.sessionId].sort());
+  for (const id of several.ownSessionCandidates) assert.ok(several.ownSessionHint.includes(id), several.ownSessionHint);
+  assert.match(several.ownSessionHint, /session-cleanup\.mjs status/u);
+  assert.match(several.ownSessionHint, /directly as a shell command/u, "the hint names the exact way the hook records the closing conversation");
+
+  const foreignRunner = build([own, { sessionId: "codex-33333333", descriptorSha256: h("3"), status: "unavailable" }]);
+  assert.equal(foreignRunner.receipt.status, "uncertain", "a non-Antigravity descriptor still counts as another session");
+  assert.equal(foreignRunner.observation.excludedOwnSession.sessionId, own.sessionId);
+  assert.equal(foreignRunner.ownSessionCode, null, "the own session is inferred, so what remains is the ordinary 'others remain' result");
+
+  assert.equal(build([own], { ...agy, runner: "codex" }).ownSessionCode, "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED", "only an Antigravity close infers");
+  assert.equal(build([{ ...own, status: "live" }]).ownSessionCode, "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED", "a descriptor that answers as live is not the still-running closing session");
+  assert.equal(build([{ ...own, status: "not-live" }]).receipt.status, "uncertain");
+  assert.equal(build([own], agy, own.sessionId).observation.ownSessionDerivation, "unavailable", "a derived own session leaves the observation as the caller reported it");
+});
+
 test("process: drive names the missing input, plans without writing, applies one step, writes the cleanup receipt itself and stops at a human gate", () => {
   const f = processFixture("drive", { stopAfterFreeze: true });
   const drive = (extra, status = 0) => f.invoke(["drive", "--root", f.root, "--lifecycle", f.lifecycle, "--actor", "PO", ...extra], status);

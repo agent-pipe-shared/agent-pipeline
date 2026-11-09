@@ -1030,14 +1030,17 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
     excludedOwnSession: built.observation.excludedOwnSession,
     ownSessionDerived: built.observation.ownSessionDerived,
     otherActiveDescriptors: built.observation.otherActiveDescriptors,
-    runner: ownSession.runner,
-    ownSessionDerivation: ownSession.derivation,
-    ownSessionReason: ownSession.reason,
+    runner: built.ownSession.runner,
+    ownSessionDerivation: built.ownSession.derivation,
+    ownSessionReason: built.ownSession.reason,
+    ...(built.ownSessionCandidates === undefined ? {} : { ownSessionCandidates: built.ownSessionCandidates }),
     ...(built.ownSessionCode === null ? {} : { code: built.ownSessionCode }),
     next: built.receipt.status === "complete"
       ? `close-coordinator.mjs plan-transition --root ${root} --lifecycle ${values.lifecycle} --actor <name> --phase cleanup-complete --evidence ${receiptPath}`
+      : built.ownSessionHint !== undefined
+        ? `${built.ownSessionCode}: ${built.ownSessionHint} An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).`
       : built.ownSessionCode !== null
-        ? `${built.ownSessionCode}: this ${ownSession.runner} process could not tell which active session descriptor is its own (${ownSession.reason}), so it cannot exclude it and the receipt stays uncertain. Look at the listed descriptors (session-cleanup.mjs status): if the only remaining one is this closing session's own, the close needs the PO-accepted empty-input receipt convention (skills/close-feature, labelled operator-asserted); if another session is listed, end or clear it and write the receipt again. An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).`
+        ? `${built.ownSessionCode}: this ${built.ownSession.runner} process could not tell which active session descriptor is its own (${built.ownSession.reason}), so it cannot exclude it and the receipt stays uncertain. Look at the listed descriptors (session-cleanup.mjs status): if the only remaining one is this closing session's own, the close needs the PO-accepted empty-input receipt convention (skills/close-feature, labelled operator-asserted); if another session is listed, end or clear it and write the receipt again. An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).`
         : "other active session descriptors remain; end or clear those sessions (session-cleanup.mjs status lists them), then write the receipt again. An uncertain receipt passes cleanup-complete but closed-local refuses it (CLOSE-CLEANUP).",
   };
 }

@@ -220,7 +220,9 @@ named in the stored observation (`cleanup-observation.json`, beside the receipt)
 the SHA-256 of that observation. Every OTHER active descriptor counts: `complete` only when none remains, otherwise
 `uncertain`, and the output lists them. When the own session cannot be derived (the runner exposed no usable session
 id), nothing is excluded, the receipt cannot be `complete` while any descriptor exists, and the output carries the
-typed code `CLOSE-CLEANUP-OWN-SESSION-UNDERIVED` instead of claiming that other sessions remain. A project with no descriptor at all
+typed code `CLOSE-CLEANUP-OWN-SESSION-UNDERIVED` instead of claiming that other sessions remain. On Antigravity, exactly one
+`antigravity-` descriptor answering `unavailable` is taken as the closing conversation and labelled
+`inferred-single-antigravity-descriptor`; with several, none is excluded and the output names them and the way out. A project with no descriptor at all
 gets `complete` with an observation that says so (no hand-chosen digest is needed any more). `uncertain` is accepted
 by `cleanup-complete`, but `closed-local` is then refused with `CLOSE-CLEANUP`; end or clear the other sessions,
 write the receipt again, and run `cleanup-complete` again with the new file (a later `cleanup-complete` with

@@ -49,6 +49,16 @@ export function buildCleanupReceipt({ descriptors, ownSessionId, candidateOid, c
       || seen.has(descriptor.sessionId)) refuse("descriptor entry is invalid");
     seen.add(descriptor.sessionId);
   }
+  // LOOP-A2. An Antigravity close whose hook record is missing cannot name its own conversation, but the close was admitted by that
+  // runner's hook, so the one Antigravity descriptor of the listing that answers `unavailable` (all a still-running session can say of
+  // itself) is its own. The inference is labelled in what the digest binds. Several are never guessed between: they are named instead.
+  const antigravity = ownSessionId === null && ownSession?.runner === "antigravity"
+    ? descriptors.filter((descriptor) => descriptor.sessionId.startsWith("antigravity-")).map((descriptor) => descriptor.sessionId).sort()
+    : [];
+  if (antigravity.length === 1 && descriptors.find((descriptor) => descriptor.sessionId === antigravity[0]).status === "unavailable") {
+    ownSessionId = antigravity[0];
+    ownSession = { ...ownSession, derivation: "inferred-single-antigravity-descriptor", reason: "no hook record for this close; the only antigravity session descriptor, answering unavailable as a running session does for itself, is taken as the closing conversation (inferred, not observed)" };
+  }
   const own = ownSessionId === null ? null : descriptors.find((descriptor) => descriptor.sessionId === ownSessionId) ?? null;
   const others = descriptors
     .filter((descriptor) => descriptor.sessionId !== ownSessionId)
@@ -70,10 +80,17 @@ export function buildCleanupReceipt({ descriptors, ownSessionId, candidateOid, c
   // A typed result for the case the old text got wrong: the own session could not be derived, so the closing session's own
   // descriptor (if it has one) is among the "others". That is not "other sessions remain"; the person has to know which it is.
   const ownSessionCode = ownSessionId === null && others.length > 0 && ownSession !== null ? "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED" : null;
+  const named = ownSessionCode !== null && antigravity.length > 0;
   return {
     observation,
     observationSha256,
     ownSessionCode,
+    // The own-session record that was really used, so a caller prints the inferred derivation and not the one it passed in.
+    ownSession,
+    ...(!named ? {} : {
+      ownSessionCandidates: antigravity,
+      ownSessionHint: `${antigravity.length} active antigravity session descriptor(s) exist (${antigravity.join(", ")}) and the closing conversation could not be told among them, so none is excluded. Run write-cleanup-receipt directly as a shell command (not inside another script): the Antigravity hook records the conversation of a command that names close-coordinator.mjs or finish-feature.mjs, and the receipt then excludes exactly that one. Otherwise check them with session-cleanup.mjs status, end or clear every one that is not this conversation, and write the receipt again.`,
+    }),
     receipt: {
       schema: CLEANUP_RECEIPT_SCHEMA,
       status: others.length === 0 ? "complete" : "uncertain",
