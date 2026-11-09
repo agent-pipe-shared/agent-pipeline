@@ -1,0 +1,37 @@
+# w320 — A broken Goldfish handback is refused while the worker can still repair it (candidate 23)
+
+Delta on the candidate 23 integration state (clone base 7ecd5f42ebf, three change commits on top: the first holds the tests of all three suites plus the validator detail, the second the finalizer, hook and briefing changes, the third the cleanup of the refusal count on success). Closest accepted criterion: AC-108 (PRD and Spec unchanged). Built by a Goldfish in a clone; delivered as a held patch the PO applies. `git apply --check` against the real HEAD passed when the patch was saved.
+
+## Why
+
+A live Claude Goldfish finished green, but its `SubagentHandback` message was the host-return JSON cut off after the `report` value (no `changedPaths`, no closing brace). At SubagentStop `validateNativeGoldfishFinal` returned `NGHR-FINAL-JSON`, the child was already gone, nothing reaches the Coordinator from SubagentStop, and the host commit was lost silently. The Coordinator learned of it only from `DBG-HOST-COMMIT-STOP-FAILURE` at the next briefing build, which said "no reason recorded". About 15 calls were lost.
+
+## What
+
+1. **Validator detail (shared by every runner).** `lib/native-goldfish-host-return.mjs`:
+   - `NGHR-FINAL-JSON` now carries a closed `detail`: `condition` is `json-truncated` (the text ends inside the value, the cut-off shape), `json-syntax`, `json-duplicate-key` or `json-not-strict`, and `errorMessage` is `parse failed at position N of M characters` when a position is known. The strict parser reports no offset, so the position is read from the engine's own message by a second, diagnostic-only `JSON.parse`; nothing that parse accepts is admitted (no lenient parser). The message text is never echoed.
+   - `NGHR-FINAL-SHAPE` with `condition: "fields"` now adds `missingKeys` and `unexpectedKeys` (at most 5 each; a misspelling shows as one of each). Every other sub-condition and every code string is unchanged.
+2. **Stop-failure record and briefing text (shared).** `recordSubagentStopOutcome` already writes the sanitized `detail`, so the validator's detail reaches the record with no change there; `sanitizeStopFailureDetail` admits the two new key lists as bounded slugs (a key that is no slug is dropped). The stop notice (`describeFailureDetail`) names them. `scripts/dispatch-briefing.mjs` `stopFailureCauseText` prints `condition`, `missing keys`, `unexpected keys` and `message "..."` after the stage and reason, each bounded to 160 characters and five keys, so "no reason recorded" is gone for this case.
+3. **Early refusal (Claude adapter).** `hooks/native-goldfish-host.mjs` gets a PreToolUse branch: for the marked Goldfish's own `SubagentHandback` it calls `checkSubagentHandbackBeforeStop` (`lib/native-goldfish-host-finalizer.mjs`), which
+   - correlates the call exactly as the stop does (`readSubagentStopPending`: the child's meta file, its pending state, the Goldfish role set) and adds no second correlation;
+   - validates `tool_input.message` with the same `validateNativeGoldfishFinal`, the same binding, `allowCheckpoint: true`;
+   - on an invalid one exits 2 with the exact code, the bounded detail and the repair sentence ("send the complete JSON object again as the whole message ... shorten report if it was long"), refusal number and limit; the return text is not echoed.
+   - never traps a worker: an unmarked child, a Critic, another tool, a missing message string, no or unreadable meta or pending state, a foreground state, a foreign session or root, bad stdin and any fault all exit 0. After 3 refusals of one dispatch (counter file `handback-refusals-<hash>.json` beside the stop-failure diagnostics, never in the host-commit private state; a counter that cannot be read or written allows) the next attempt is allowed and the failure stays visible through today's stop path (record plus notice).
+
+## Cases (all new, nothing existing changed)
+
+`lib/native-goldfish-host-return.test.mjs` NGHR12 (JSON detail: truncated, fenced, syntax, prose, duplicate key, not-strict) and NGHR13 (field keys, bounded). `lib/native-goldfish-host-finalizer.test.mjs` NGHF43 (cut return refused at the real hook entry: code, position, repair, no path, nothing consumed), NGHF44 (misspelled key, wrong candidate, checkpoint allowed), NGHF45 (well-formed passes silently and the later SubagentStop still commits once), NGHF46 (thirteen fail-open cases, nothing counted), NGHF47 (foreground state), NGHF48 (refusals 2,2,2 then 0,0; the stop path records `json-truncated` with the position and the notice names it), NGHF49 (sanitizer). `scripts/dispatch-briefing.test.mjs`: one C23 case. RED against the original code before the first production edit: NGHR12, the dispatch-briefing case, and the finalizer suite (it stops at its first failing case, NGHF43: exit 0 where the refusal exit 2 was expected; the later new cases were not observed red one by one). One new case, NGHF49, was corrected after the implementation because it miscounted the five-key bound of its own input (the sanitizer admits five slugs after filtering); the bound itself was not loosened.
+
+## Not changed
+
+- `hooks/hooks.json` (TP-4, protected, outside this write scope). **The PreToolUse entry that makes the refusal fire is not in this patch.** The dispatcher must land it as a protected-file change:
+  `{ "matcher": "SubagentHandback", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude", "timeout": 120 } ] }` in the `PreToolUse` list. Timeout: the pending read inherits the existing 90 s registry-lock wait bound (`NATIVE_GOLDFISH_STOP_LOCK_WAIT_MS`); a longer wait is cut by the hook timeout, which Claude treats as non-blocking. No hook timing was changed here.
+- `recordSubagentStopOutcome` (still diagnostic only, still swallows its own faults), the Windows authority retries, the Critic preimage and every file it covers, the codex and antigravity hooks (no early channel there; they get the shared detail).
+- The refusal count file `handback-refusals-<hash>.json` is ignored by every reader of the diagnostics directory (the routine-repair and recover scans filter by `stop-failure-*`), and the success branch of `recordSubagentStopOutcome` removes it together with the stop-failure records of that dispatch (NGHF48 asserts the directory is empty after the repaired return commits). A dispatch that never completes leaves a few bytes.
+- A foreground marked Goldfish (PostToolUse completion route) gets no early check: `readSubagentStopPending` answers `NGHF-NOT-SUBAGENT-STOP-ROUTE` and the call is allowed (NGHF47). That is the chosen boundary of "reuse the existing correlation", not an oversight.
+
+## Not proven
+
+- Whether Claude fires a PreToolUse hook for the host tool `SubagentHandback` cannot be proven in this clone (the name is read from the child's transcript by the existing finalizer). The cases drive the real hook entry with a PreToolUse-shaped input that mirrors the measured subagent payload (parent `session_id` and `transcript_path`, the child's `agent_id` and `agent_type`). **Live check for the next Claude greenfield:** after the matcher is wired, a Goldfish returns a cut-off handback and is refused with the text above; then a valid one passes.
+- Windows path spelling: the new code adds no path handling (it reuses the stop's meta-file and pending reads); only Linux was run.
+- Full Verify, independent Critic review and PO acceptance are pending (Coordinator).
