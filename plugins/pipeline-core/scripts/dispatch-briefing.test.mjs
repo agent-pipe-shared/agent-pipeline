@@ -1802,7 +1802,8 @@ test("D196 R1: a started, unfinished slice of the same item warns DBG-CHECKPOINT
   const warning = result.warnings.find((entry) => entry.code === "DBG-CHECKPOINTED-OWNER");
   assert.ok(warning, JSON.stringify(result.warnings));
   assert.match(warning.message, /ALF-T0/u);
-  assert.match(warning.message, /dispatch-budget-grant\.mjs --agent-id <the agent id of that run> --extra <1\.\.30> --reason/u);
+  // QG-04: restated in place. The per-grant limit is 40 since c34f9a2ef; this pin had kept the old 30.
+  assert.match(warning.message, /dispatch-budget-grant\.mjs --agent-id <the agent id of that run> --extra <1\.\.40> --reason/u);
   assert.match(warning.message, /SendMessage/u);
   assert.match(warning.message, /elephant-restart, owner-lost, context-poisoned or new-vertical-outcome/u);
   assert.match(warning.message, /slice-queue\.mjs cancel ALF-T0 --started --reason "<why>" --class budget/u);
