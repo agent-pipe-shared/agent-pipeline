@@ -942,6 +942,7 @@ process.exit(0);
     { classification: "success", findingCount: 0 },
   );
   assertIncludes("license-check run: missing declared file reason names the missing file", result.reason, "no declared third-party-licenses.json found");
+  assertEqual("C21F license-check: the reason names the file below the root, never the host path", result.reason, "no declared third-party-licenses.json found: third-party-licenses.json");
 }
 {
   const rootDir = makeRootDir("license-missing-allowlist-root");

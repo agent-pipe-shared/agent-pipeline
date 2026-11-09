@@ -45,6 +45,7 @@
  * change any existing behavior in this file.
  */
 import { existsSync, readFileSync } from "node:fs";
+import { basename, isAbsolute, relative, sep } from "node:path";
 
 export const name = "license-check";
 
@@ -74,7 +75,14 @@ function validDeclaration(value) {
       && (dependency.version === undefined || typeof dependency.version === "string"));
 }
 
-export async function run({ config = {} } = {}) {
+/** Evidence may be committed: a reason names a path below the scanned root, never the host's temporary snapshot directory. */
+function evidencePath(path, rootDir) {
+  if (typeof path !== "string" || path === "") return "(no path configured)";
+  const inside = typeof rootDir === "string" && rootDir !== "" ? relative(rootDir, path) : "";
+  return inside !== "" && !inside.startsWith("..") && !isAbsolute(inside) ? inside.split(sep).join("/") : basename(path);
+}
+
+export async function run({ rootDir, config = {} } = {}) {
   const allowlistPath = config.allowlistPath;
   const declaredPath = config.declaredPath;
 
@@ -93,7 +101,7 @@ export async function run({ config = {} } = {}) {
       classification: "success",
       findings: [],
       raw: null,
-      reason: `license allowlist not configured: ${allowlistPath ?? "(no path configured)"}`,
+      reason: `license allowlist not configured: ${evidencePath(allowlistPath, rootDir)}`,
     };
   }
   if (!declaredPath || !existsSync(declaredPath)) {
@@ -108,7 +116,7 @@ export async function run({ config = {} } = {}) {
       classification: "success",
       findings: [],
       raw: null,
-      reason: `no declared third-party-licenses.json found: ${declaredPath ?? "(no path configured)"}`,
+      reason: `no declared third-party-licenses.json found: ${evidencePath(declaredPath, rootDir)}`,
     };
   }
 
@@ -116,14 +124,14 @@ export async function run({ config = {} } = {}) {
   try {
     allowlist = JSON.parse(readFileSync(allowlistPath, "utf8"));
   } catch (err) {
-    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: `malformed license-allowlist.json (${allowlistPath}): ${err.message}` };
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: `malformed license-allowlist.json (${evidencePath(allowlistPath, rootDir)}): ${err.message}` };
   }
 
   let declared;
   try {
     declared = JSON.parse(readFileSync(declaredPath, "utf8"));
   } catch (err) {
-    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: `malformed third-party-licenses.json (${declaredPath}): ${err.message}` };
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: `malformed third-party-licenses.json (${evidencePath(declaredPath, rootDir)}): ${err.message}` };
   }
 
   if (!validAllowlist(allowlist)) {
