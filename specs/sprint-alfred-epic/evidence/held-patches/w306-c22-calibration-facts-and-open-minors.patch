@@ -1,0 +1,501 @@
+diff --git a/plugins/pipeline-core/lib/open-minors.mjs b/plugins/pipeline-core/lib/open-minors.mjs
+new file mode 100644
+index 000000000..e57ba9891
+--- /dev/null
++++ b/plugins/pipeline-core/lib/open-minors.mjs
+@@ -0,0 +1,110 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * open-minors.mjs -- where minor Critic findings that a round or a close leaves open are written down (CGR-22, candidate 22).
++ *
++ * Measured places: the Critic lineage record carries only digests of a finding (no text), the PO residual acceptance is private
++ * (git common directory, never readable from a fresh clone), and a project without a backlog has no other tracked list. The one
++ * place every project has, tracked and human-readable, is its handover (`project/pipeline.json` `handover`, default
++ * `docs/state.md`). The minors go into one managed block under "## Open minor findings" there. No new store, no new gate.
++ *
++ * Accepted minors stay listed (status `accepted`), so they remain readable after the close; an accepted entry is never turned back
++ * to open. Pure text functions first, then two thin file wrappers. Platform neutral: the file's own line ending is kept (LF or
++ * CRLF), paths are repository-relative with `/`.
++ *
++ * Wiring (done by the close, not here): a Critic round or the close calls `recordOpenMinors` with the minors of the consumed
++ * verdict; the close summary prints `openMinorsCloseLine(...)` (its value comes from `summarizeOpenMinors`).
++ */
++import { lstatSync, readFileSync, renameSync, writeFileSync } from "node:fs";
++import { dirname, isAbsolute, join } from "node:path";
++
++export const OPEN_MINORS_HEADING = "## Open minor findings";
++export const OPEN_MINORS_BEGIN = "<!-- open-minors:begin -->";
++export const OPEN_MINORS_END = "<!-- open-minors:end -->";
++const MAX_SUMMARY = 240;
++const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
++const ENTRY_LINE = /^- \[(open|accepted)(?: by ([^\],]{1,80}), ([0-9T:.Z-]{10,32}))?\] (\S+) \(([^)]*)\): (.*)$/u;
++
++const oneLine = (value) => String(value ?? "").replace(/<!--|-->/gu, "").replace(/\s+/gu, " ").trim().slice(0, MAX_SUMMARY);
++
++/** The minor findings of one consumed verdict as entries. Ids follow `projectConsumedCriticFindings` (`CRF-<packet>-<index + 1>`). */
++export function minorsFromVerdictFindings({ featureId, packetId, findings }) {
++  if (!Array.isArray(findings) || !ID.test(packetId ?? "")) throw new TypeError("OPEN-MINORS-INPUT");
++  return findings.flatMap((finding, index) => finding?.severity === "minor"
++    ? [{ id: `CRF-${packetId}-${index + 1}`, status: "open", scope: oneLine(`feature ${featureId ?? "unknown"}`), summary: oneLine(finding.gap || finding.risk || "(no text)") }]
++    : []);
++}
++
++function parseBlock(text) {
++  const begin = text.indexOf(OPEN_MINORS_BEGIN);
++  const end = begin < 0 ? -1 : text.indexOf(OPEN_MINORS_END, begin);
++  if (begin < 0 || end < 0) return { begin: -1, end: -1, entries: [] };
++  const entries = [];
++  for (const line of text.slice(begin + OPEN_MINORS_BEGIN.length, end).split(/\r?\n/u)) {
++    const match = ENTRY_LINE.exec(line);
++    if (match) entries.push({ id: match[4], status: match[1], ...(match[2] === undefined ? {} : { acceptedBy: match[2], acceptedAt: match[3] }), scope: match[5], summary: match[6] });
++  }
++  return { begin, end: end + OPEN_MINORS_END.length, entries };
++}
++
++/** Counts and entries of the managed block in a handover text; zero everything when the block does not exist. */
++export function readOpenMinors(text) {
++  const { entries } = parseBlock(String(text ?? ""));
++  return { open: entries.filter((entry) => entry.status === "open").length, accepted: entries.filter((entry) => entry.status === "accepted").length, entries };
++}
++
++const entryLine = (entry) => `- [${entry.status}${entry.status === "accepted" ? ` by ${oneLine(entry.acceptedBy ?? "PO").replace(/[\],]/gu, " ")}, ${entry.acceptedAt}` : ""}] ${entry.id} (${oneLine(entry.scope).replace(/[()]/gu, " ")}): ${oneLine(entry.summary)}`;
++
++/**
++ * The handover text with `entries` merged into the managed block (by id; an accepted entry is never reopened), the block created
++ * at the end of the text when it does not exist yet. A second call with the same entries returns the same text.
++ */
++export function upsertOpenMinors(handoverText, entries) {
++  const text = String(handoverText ?? "");
++  if (!Array.isArray(entries) || entries.some((entry) => !ID.test(entry?.id ?? "") || !["open", "accepted"].includes(entry?.status)
++    || (entry.status === "accepted" && !/^[0-9T:.Z-]{10,32}$/u.test(entry.acceptedAt ?? "")))) throw new TypeError("OPEN-MINORS-ENTRY");
++  const eol = text.includes("\r\n") ? "\r\n" : "\n";
++  const block = parseBlock(text);
++  const merged = new Map(block.entries.map((entry) => [entry.id, entry]));
++  for (const entry of entries) {
++    const previous = merged.get(entry.id);
++    merged.set(entry.id, previous?.status === "accepted" && entry.status === "open" ? previous : { ...previous, ...entry });
++  }
++  const lines = [OPEN_MINORS_BEGIN, "Managed list: minor Critic findings a round or the close left open; accepted ones stay listed. Do not edit between the markers.",
++    ...[...merged.values()].map(entryLine), OPEN_MINORS_END];
++  const rendered = lines.join(eol);
++  if (block.begin >= 0) return text.slice(0, block.begin) + rendered + text.slice(block.end);
++  const body = text.length === 0 || text.endsWith("\n") ? text : text + eol;
++  return `${body}${body.length === 0 ? "" : eol}${OPEN_MINORS_HEADING}${eol}${eol}${rendered}${eol}`;
++}
++
++/** The close-summary line: how many minors are open, how many accepted, and where they are. */
++export function openMinorsCloseLine({ open, accepted }, handoverPath) {
++  return open === 0 && accepted === 0
++    ? "Open minor findings: none recorded."
++    : `Open minor findings: ${open} open, ${accepted} accepted; listed in ${handoverPath} under "${OPEN_MINORS_HEADING.slice(3)}".`;
++}
++
++function handoverFile(root, handoverPath) {
++  if (typeof handoverPath !== "string" || handoverPath === "" || isAbsolute(handoverPath) || handoverPath.includes("\\") || handoverPath.includes("\0")
++    || handoverPath.split("/").some((part) => part === "" || part === "." || part === "..")) throw new TypeError("OPEN-MINORS-PATH");
++  const file = join(root, ...handoverPath.split("/"));
++  if (lstatSync(file).isSymbolicLink()) throw new TypeError("OPEN-MINORS-PATH");
++  return file;
++}
++
++/** Read the counts from the handover file; `{open: 0, accepted: 0}` and `readable: false` when the file cannot be read. */
++export function summarizeOpenMinors({ root, handoverPath }) {
++  try {
++    return { ...readOpenMinors(readFileSync(handoverFile(root, handoverPath), "utf8")), readable: true, handoverPath };
++  } catch { return { open: 0, accepted: 0, entries: [], readable: false, handoverPath }; }
++}
++
++/** Merge `entries` into the handover file (temp file, then rename in the same directory). Returns the new counts. */
++export function recordOpenMinors({ root, handoverPath, entries }) {
++  const file = handoverFile(root, handoverPath);
++  const next = upsertOpenMinors(readFileSync(file, "utf8"), entries);
++  const temp = join(dirname(file), `.open-minors-${process.pid}.tmp`);
++  writeFileSync(temp, next, "utf8");
++  renameSync(temp, file);
++  return { ...readOpenMinors(next), readable: true, handoverPath };
++}
+diff --git a/plugins/pipeline-core/lib/open-minors.test.mjs b/plugins/pipeline-core/lib/open-minors.test.mjs
+new file mode 100644
+index 000000000..65901963a
+--- /dev/null
++++ b/plugins/pipeline-core/lib/open-minors.test.mjs
+@@ -0,0 +1,83 @@
++// SPDX-License-Identifier: SUL-1.0
++// CGR-22 (candidate 22, w306): minor Critic findings left open land in the handover, are counted in the close line and stay readable
++// once accepted. Cases come from the finding text, not from the code.
++import assert from "node:assert/strict";
++import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { test } from "node:test";
++import {
++  OPEN_MINORS_BEGIN, OPEN_MINORS_END, OPEN_MINORS_HEADING, minorsFromVerdictFindings, openMinorsCloseLine, readOpenMinors,
++  recordOpenMinors, summarizeOpenMinors, upsertOpenMinors,
++} from "./open-minors.mjs";
++
++const PACKET = "0123456789abcdef0123456789abcdef";
++const finding = (severity, gap) => ({ gap, risk: "r", severity, evidence: "e", spec_ref: "s" });
++const verdict = [finding("major", "a major"), finding("minor", "first minor gap"), finding("minor", "second\nminor   gap")];
++
++test("only the minor findings become entries and their ids follow the consumed-finding ids", () => {
++  const entries = minorsFromVerdictFindings({ featureId: "shop", packetId: PACKET, findings: verdict });
++  assert.deepEqual(entries.map((entry) => [entry.id, entry.status, entry.summary]), [
++    [`CRF-${PACKET}-2`, "open", "first minor gap"], [`CRF-${PACKET}-3`, "open", "second minor gap"]]);
++  assert.throws(() => minorsFromVerdictFindings({ featureId: "shop", packetId: "../x", findings: verdict }), /OPEN-MINORS-INPUT/u);
++});
++
++test("a handover without the block gets the section once; the same entries again change nothing", () => {
++  const entries = minorsFromVerdictFindings({ featureId: "shop", packetId: PACKET, findings: verdict });
++  const first = upsertOpenMinors("# State\n\nText.\n", entries);
++  assert.ok(first.includes(`${OPEN_MINORS_HEADING}\n\n${OPEN_MINORS_BEGIN}`));
++  assert.equal(upsertOpenMinors(first, entries), first);
++  assert.deepEqual(readOpenMinors(first), { open: 2, accepted: 0, entries: readOpenMinors(first).entries });
++  assert.equal(upsertOpenMinors("", entries).startsWith(OPEN_MINORS_HEADING), true);
++});
++
++test("an accepted minor stays listed after the close and is never reopened; an open one can be accepted", () => {
++  const entries = minorsFromVerdictFindings({ featureId: "shop", packetId: PACKET, findings: verdict });
++  const opened = upsertOpenMinors("# State\n", entries);
++  const accepted = upsertOpenMinors(opened, [{ ...entries[0], status: "accepted", acceptedBy: "PO", acceptedAt: "2026-11-09T10:00:00.000Z" }]);
++  const read = readOpenMinors(accepted);
++  assert.deepEqual([read.open, read.accepted], [1, 1]);
++  assert.match(accepted, /- \[accepted by PO, 2026-11-09T10:00:00\.000Z\] CRF-.*-2 \(feature shop\): first minor gap/u);
++  assert.deepEqual([readOpenMinors(upsertOpenMinors(accepted, entries)).open, readOpenMinors(upsertOpenMinors(accepted, entries)).accepted], [1, 1], "a later round does not reopen it");
++  assert.throws(() => upsertOpenMinors(accepted, [{ ...entries[0], status: "accepted" }]), /OPEN-MINORS-ENTRY/u, "an acceptance needs its date");
++});
++
++test("text outside the block is untouched, CRLF stays CRLF, and a marker inside a finding cannot break the block", () => {
++  const crlf = "# State\r\n\r\nBefore.\r\n";
++  const entries = [{ id: "CRF-1", status: "open", scope: "feature x", summary: `evil ${OPEN_MINORS_END} text <!-- x` }];
++  const written = upsertOpenMinors(crlf, entries);
++  assert.ok(written.startsWith(crlf));
++  assert.equal(written.includes("\r\n") && !/[^\r]\n/u.test(written), true, "no bare LF in a CRLF file");
++  assert.equal(readOpenMinors(written).open, 1);
++  const tail = `${written}After the block.\r\n`;
++  const again = upsertOpenMinors(tail, [{ id: "CRF-2", status: "open", scope: "feature x", summary: "two" }]);
++  assert.ok(again.endsWith("After the block.\r\n"));
++  assert.equal(readOpenMinors(again).open, 2);
++});
++
++test("the close line names the counts and the place, or says none are recorded", () => {
++  assert.equal(openMinorsCloseLine({ open: 2, accepted: 1 }, "docs/state.md"), 'Open minor findings: 2 open, 1 accepted; listed in docs/state.md under "Open minor findings".');
++  assert.equal(openMinorsCloseLine({ open: 0, accepted: 0 }, "docs/state.md"), "Open minor findings: none recorded.");
++});
++
++test("record and summarize work on the real handover file and refuse a path that leaves the project", () => {
++  const root = mkdtempSync(join(tmpdir(), "w306-minors-"));
++  try {
++    mkdirSync(join(root, "docs"));
++    writeFileSync(join(root, "docs", "state.md"), "# State\n");
++    const entries = minorsFromVerdictFindings({ featureId: "shop", packetId: PACKET, findings: verdict });
++    const counts = recordOpenMinors({ root, handoverPath: "docs/state.md", entries });
++    assert.deepEqual([counts.open, counts.accepted], [2, 0]);
++    assert.equal(readFileSync(join(root, "docs", "state.md"), "utf8").includes(OPEN_MINORS_BEGIN), true);
++    assert.deepEqual([summarizeOpenMinors({ root, handoverPath: "docs/state.md" }).open, summarizeOpenMinors({ root, handoverPath: "docs/state.md" }).readable], [2, true]);
++    assert.equal(summarizeOpenMinors({ root, handoverPath: "docs/missing.md" }).readable, false);
++    for (const bad of ["../state.md", "/etc/state.md", "docs\\state.md", "docs//state.md", ""]) {
++      assert.throws(() => recordOpenMinors({ root, handoverPath: bad, entries }), /OPEN-MINORS-PATH/u, bad);
++      assert.equal(summarizeOpenMinors({ root, handoverPath: bad }).readable, false, bad);
++    }
++    try {
++      symlinkSync(join(root, "docs", "state.md"), join(root, "docs", "link.md"));
++      assert.throws(() => recordOpenMinors({ root, handoverPath: "docs/link.md", entries }), /OPEN-MINORS-PATH/u);
++    } catch (error) { if (error?.code !== "EPERM") throw error; }
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/lib/rigor-lifecycle.mjs b/plugins/pipeline-core/lib/rigor-lifecycle.mjs
+index 443b94822..f77f4d6f1 100644
+--- a/plugins/pipeline-core/lib/rigor-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/rigor-lifecycle.mjs
+@@ -218,7 +218,11 @@ export function collectRigorJournalEntry({ rootDir, state, boundary, selectedPro
+   try {
+     const protectedSurface = (deps.protectedBaseline ?? resolveProtectedBaseline)({ rootDir: root });
+     if (protectedSurface.status === "ready" && protectedSurface.dynamic?.status === "available") {
+-      inputs.protectedIdentity = envelope(protectedSurface.identity, "available", "pipeline.protected-baseline.v1");
++      // CGR-16: the shipped baseline spells its revision as a decimal string ("1", schema type string); the accepted input needs the
++      // integer, otherwise a resolvable identity was always read as unknown. Anything but a plain positive decimal stays unknown.
++      const revision = protectedSurface.identity?.baselineRevision;
++      inputs.protectedIdentity = envelope(typeof revision === "string" && /^[1-9][0-9]{0,14}$/u.test(revision)
++        ? { ...protectedSurface.identity, baselineRevision: Number(revision) } : protectedSurface.identity, "available", "pipeline.protected-baseline.v1");
+       bindings.protected = protectedSurface.identity;
+       if (inputs.actualPaths.status === "available") inputs.protectedTouches = envelope(inputs.actualPaths.value.some(path =>
+         protectedSurface.entries.some(entry => new RegExp(entry.pathPattern, "u").test(path))), "available", "pipeline.protected-baseline.v1");
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 29f97f9fd..f310f4f33 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -647,7 +647,9 @@ function opusCriticPromptLines({ root, result, env, registry, trigger }) {
+   const counts = names === null ? "" : ` (${files.length} changed file${files.length === 1 ? "" : "s"} in ${modules.size} top-level path${modules.size === 1 ? "" : "s"})`;
+   return [
+     `Batch scope (MP-07): the reviewed range ${base.slice(0, 12)}..${head.slice(0, 12)}${counts}, one batch.`,
+-    `Rationale (MP-07): the registered Critic route duty.${duty} is ${cell.selector.value} at effort ${cell.effort}; it is used for critical architecture or security review of this one batch only.`,
++    // CGR-20: the cell is what the route REQUESTS. Nothing at this point observes the effort that is applied, and the project calibration is
++    // a different value that this line neither reads nor overwrites, so the line says "requests" and states the missing observation.
++    `Rationale (MP-07): the registered Critic route duty.${duty} requests ${cell.selector.value} at effort ${cell.effort}; it is used for critical architecture or security review of this one batch only. The applied effort is not observed by this packet: report the requested effort as requested, and name an applied effort only where a dispatch receipt shows it.`,
+   ];
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index c0bcbe94b..f106bfa7f 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -2139,6 +2139,30 @@ test("G20-71 an Opus Critic route carries the MP-07 prompt lines the dispatch po
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++// CGR-20 (candidate 22, w306): a Critic report named effort max while the calibration said medium and nothing showed what was applied.
++// The printed rationale states the effort the route REQUESTS (the registry cell, per duty) and, separately, that the applied effort is
++// not observed here; it never presents the requested value as an observed fact and never reads the project calibration.
++test("CGR-20 the Opus Critic rationale names the requested effort and says the applied effort is not observed", () => {
++  const fx = fixture();
++  try {
++    const claude = { env: { CLAUDE_CODE_SESSION_ID: "session-cgr20" } };
++    // No matched record row: the strictest default, the high-risk Critic duty. The effort printed is the registry cell, whatever it is.
++    for (const requested of [loadRunnerProfilesV3Registry().duties.critic_high_risk.claude.effort, "medium"]) {
++      const registry = structuredClone(loadRunnerProfilesV3Registry());
++      registry.duties.critic_high_risk.claude.effort = requested;
++      const line = g2069Printed(fx, {}, { ...claude, registry }).criticDispatchPromptLines[1];
++      assert.match(line, new RegExp(`duty\\.critic_high_risk requests \\S+ at effort ${requested}\\b`, "u"), line);
++      assert.doesNotMatch(line, /duty\.critic_high_risk is /u, "the request is not worded as a fact");
++      assert.match(line, /applied effort is not observed/iu, line);
++      assert.match(line, /rationale/iu);
++      assert.match(line, /\b(?:architecture|security)\b/iu, "the dispatch policy still admits the line");
++    }
++    const prompt = (extra) => ["Model/effort for this run: claude-opus-4-1 / max", `Ruleset SHA: ${fx.candidate}`, ...extra].join("\n");
++    const lines = g2069Printed(fx, {}, claude).criticDispatchPromptLines;
++    assert.equal(dispatchFindings({ subagentType: "critic", prompt: prompt(lines) }).findings.some(({ code }) => code === "DISPATCH-OPUS-NO-BATCH-RATIONALE"), false);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ test("G20-69 the request trigger is the applied Critic row of the matched dispatch record where admit has that trigger, else the strictest default", () => {
+   const fx = fixture();
+   try {
+diff --git a/plugins/pipeline-core/scripts/rigor-floor.mjs b/plugins/pipeline-core/scripts/rigor-floor.mjs
+index 33463c01c..5d08ca152 100644
+--- a/plugins/pipeline-core/scripts/rigor-floor.mjs
++++ b/plugins/pipeline-core/scripts/rigor-floor.mjs
+@@ -500,6 +500,46 @@ export function deriveMinimumRigor(inputs, policy = null) {
+   return result;
+ }
+ 
++const UNTRACKED_MAX_FILES = 256;
++const UNTRACKED_MAX_FILE_BYTES = 1024 * 1024;
++
++/**
++ * Total line count of untracked files, or null when any of them cannot be counted exactly. A line is a newline byte, plus one
++ * for a final unterminated line, so LF and CRLF files count alike. Never follows a link, never reads outside `root`, bounded.
++ */
++function countUntrackedLines(root, names) {
++  if (names.length === 0) return 0;
++  if (names.length > UNTRACKED_MAX_FILES) return null;
++  let total = 0;
++  for (const name of names) {
++    const parts = name.split("/");
++    if (path.isAbsolute(name) || parts.some((part) => part === "" || part === "." || part === "..")) return null;
++    try {
++      const file = path.join(root, ...parts);
++      const info = fs.lstatSync(file);
++      if (!info.isFile() || info.size > UNTRACKED_MAX_FILE_BYTES) return null;
++      const bytes = fs.readFileSync(file);
++      if (bytes.includes(0)) return null;
++      for (const byte of bytes) if (byte === 10) total += 1;
++      if (bytes.length > 0 && bytes[bytes.length - 1] !== 10) total += 1;
++    } catch { return null; }
++  }
++  return total;
++}
++
++/**
++ * CGR-16: the readout of a derivation. An escalation caused by an input nobody could observe is a precaution, not a finding about
++ * the change, so the two are listed apart. Pure projection; the derivation (and therefore its digest) is not touched.
++ */
++export function rigorReadout(result) {
++  const prefix = "UNAVAILABLE_OR_UNKNOWN_INPUT:";
++  const all = Array.isArray(result?.escalationTriggers) ? result.escalationTriggers : [];
++  return {
++    unknownInputs: all.filter((code) => code.startsWith(prefix)).map((code) => code.slice(prefix.length)),
++    triggers: all.filter((code) => !code.startsWith(prefix)),
++  };
++}
++
+ /**
+  * Infer inputs from working tree if no inputs file is supplied.
+  *
+@@ -541,15 +581,19 @@ export function inferInputsFromRepo(root, { execFileSyncFn = execFileSync, conti
+   } catch { /* unknown, not empty */ }
+ 
+   let diffStats = null;
+-  if (actualPaths !== null && untrackedPaths.length === 0) {
++  if (actualPaths !== null) {
+     try {
++      // CGR-16: a greenfield change is mostly untracked files, which `git diff` never counts. Their lines are counted from the
++      // files themselves; a file that cannot be counted exactly (binary, large, a link, unreadable) leaves the count unknown.
++      const untrackedLines = countUntrackedLines(root, untrackedPaths);
++      if (untrackedLines === null) throw new Error("untracked line count unavailable");
+       const output = git(["diff", "--shortstat", "HEAD"]);
+       if (!Buffer.isBuffer(output)) throw new Error("invalid Git stat output");
+       const stat = new TextDecoder("utf-8", { fatal: true }).decode(output).trim();
+       const insertions = /(?:^|,\s*)(\d+) insertions?\(\+\)/u.exec(stat);
+       const deletions = /(?:^|,\s*)(\d+) deletions?\(-\)/u.exec(stat);
+       if (stat && !insertions && !deletions) throw new Error("unrecognized Git stat output");
+-      diffStats = { files: actualPaths.length, lines: Number(insertions?.[1] ?? 0) + Number(deletions?.[1] ?? 0) };
++      diffStats = { files: actualPaths.length, lines: Number(insertions?.[1] ?? 0) + Number(deletions?.[1] ?? 0) + untrackedLines };
+     } catch { /* unknown line count */ }
+   }
+ 
+@@ -676,7 +720,10 @@ export function main() {
+ 
+   const result = deriveMinimumRigor(rawInputs, policy);
+ 
++  const readout = rigorReadout(result);
+   if (options.format === "json") {
++    // The JSON form is the schema-bound derivation (schemas/pipeline.rigor-derivation.v1.json forbids extra keys); a consumer
++    // that wants the split calls rigorReadout(result).
+     console.log(JSON.stringify(result, null, 2));
+   } else {
+     console.log("Minimum Rigor Floor Derivation");
+@@ -685,7 +732,9 @@ export function main() {
+     console.log("derivationRevision:      " + result.derivationRevision);
+     console.log("inputDigest:             " + result.inputDigest);
+     console.log("requiredEvidenceClasses: " + result.requiredEvidenceClasses.join(", "));
+-    console.log("escalationTriggers:      " + (result.escalationTriggers.length > 0 ? result.escalationTriggers.join(", ") : "none"));
++    console.log("triggers:                " + (readout.triggers.length > 0 ? readout.triggers.join(", ") : "none"));
++    console.log("unknown inputs (not triggers): " + (readout.unknownInputs.length > 0 ? readout.unknownInputs.join(", ") : "none")
++      + (readout.unknownInputs.length > 0 ? " (each raises the floor as a precaution until it is observed)" : ""));
+     if (result.disagreementLog) {
+       console.log("");
+       console.log("DISAGREEMENT LOG:");
+diff --git a/plugins/pipeline-core/scripts/rigor-floor.test.mjs b/plugins/pipeline-core/scripts/rigor-floor.test.mjs
+index e709bafe4..76ab8fbf3 100644
+--- a/plugins/pipeline-core/scripts/rigor-floor.test.mjs
++++ b/plugins/pipeline-core/scripts/rigor-floor.test.mjs
+@@ -20,6 +20,9 @@ import {
+   DEFAULT_DERIVATION_REVISION
+ } from "./rigor-floor.mjs";
+ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
++import * as rigorModule from "./rigor-floor.mjs";
++import { collectRigorJournalEntry } from "../lib/rigor-lifecycle.mjs";
++import os from "node:os";
+ 
+ const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../../");
+ const POLICY_PATH = path.join(REPO_ROOT, "policies", "rigor-derivation.v1.json");
+@@ -62,7 +65,10 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
+     assert.equal(observed.actualPaths.status, "available");
+     assert.equal(observed.plannedPaths.status, "unknown", "actual files are not a PO-approved plan");
+     assert.equal(observed.selectedProfile.status, "unknown", "the CLI cannot invent a PO selection");
+-    assert.equal(observed.diffStats.status, "unknown", "untracked file lines were not counted");
++    // Restated in place (QG-04, CGR-16 / w306), assertion unchanged: since w306 an untracked file that exists IS counted. This stub names
++    // "src/new file.mjs", which is not on disk under REPO_ROOT, so its lines cannot be counted and the count must stay unknown. The
++    // counted case is pinned in the CGR-16 block below.
++    assert.equal(observed.diffStats.status, "unknown", "untracked file lines could not be counted (the file is not on disk)");
+ 
+     const deletionOnly = inferInputsFromRepo(REPO_ROOT, { execFileSyncFn(_command, argv) {
+       if (argv[3] === "diff" && argv[4] === "--name-only") return Buffer.from("src/deleted.mjs\0");
+@@ -494,3 +500,107 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
+     assert.equal(valPartial.valid, true, "Partial input derivation must satisfy schema");
+   });
+ });
++
++// CGR-16 (candidate 22, w306): a greenfield floor read four of five "triggers" from ignorance. The floor itself stays fail-safe
++// (an unavailable input still escalates, and the derivation bytes are unchanged); what changes is that the readout names an
++// unknown input apart from a real trigger, and that the inputs the project state CAN answer are answered.
++describe("CGR-16: unknown inputs are named apart from real triggers, and answerable inputs are supplied", () => {
++  const HEX = "a".repeat(64);
++  const emptyRepo = () => {
++    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "w306-rigor-"));
++    const git = (...args) => execFileSync("git", ["-C", dir, ...args], { stdio: "pipe" });
++    git("init", "-q");
++    git("config", "user.email", "t@example.invalid");
++    git("config", "user.name", "t");
++    fs.writeFileSync(path.join(dir, "seed.txt"), "seed\n");
++    git("add", "-A");
++    git("commit", "-q", "-m", "seed");
++    return dir;
++  };
++
++  test("rigorReadout separates unknown inputs from real triggers and leaves the derivation untouched", () => {
++    const derived = deriveMinimumRigor({
++      actualPaths: ["package.json"],
++      reversibility: { value: "high", status: "available", sourceContract: "t" },
++    }, policy);
++    const before = JSON.stringify(derived);
++    const readout = rigorModule.rigorReadout(derived);
++    assert.deepEqual(readout.triggers, ["CONTRACT_OR_SCHEMA_DELTA"]);
++    assert.ok(readout.unknownInputs.includes("protectedIdentity"));
++    assert.ok(readout.unknownInputs.includes("diffStats"));
++    assert.ok(readout.unknownInputs.every(name => !name.startsWith("UNAVAILABLE_OR_UNKNOWN_INPUT")), "names, not trigger codes");
++    assert.equal(readout.unknownInputs.length + readout.triggers.length, derived.escalationTriggers.length);
++    assert.equal(JSON.stringify(derived), before, "the hashed derivation is not changed by the readout");
++    assert.deepEqual(rigorModule.rigorReadout(null), { unknownInputs: [], triggers: [] });
++  });
++
++  test("the command readout prints unknown inputs on their own line in text; the JSON form stays the schema-bound derivation", () => {
++    const dir = emptyRepo();
++    try {
++      const inputs = path.join(dir, "inputs.json");
++      fs.writeFileSync(inputs, JSON.stringify({ actualPaths: { value: ["package.json"], status: "available", sourceContract: "t" } }));
++      const script = new URL("./rigor-floor.mjs", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/u, "$1");
++      const run = format => execFileSync(process.execPath, [script, "--root", dir, "--inputs", inputs, "--format", format], { encoding: "utf8" });
++      const parsed = JSON.parse(run("json"));
++      assert.equal(parsed.readout, undefined, "the schema forbids extra keys");
++      assert.deepEqual(rigorModule.rigorReadout(parsed).triggers, ["CONTRACT_OR_SCHEMA_DELTA"]);
++      assert.deepEqual(parsed.escalationTriggers, rigorModule.deriveMinimumRigor(JSON.parse(fs.readFileSync(inputs, "utf8")), loadPolicy(dir)).escalationTriggers);
++      const text = run("text").split(/\r?\n/u);
++      assert.ok(text.some(line => /^triggers:\s+CONTRACT_OR_SCHEMA_DELTA$/u.test(line)), text.join("\n"));
++      assert.ok(text.some(line => /^unknown inputs \(not triggers\):\s.*protectedIdentity/u.test(line)), text.join("\n"));
++    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
++  });
++
++  test("a new greenfield file set gets a measured line count instead of an unknown one (LF, CRLF, unterminated line)", () => {
++    const dir = emptyRepo();
++    try {
++      fs.mkdirSync(path.join(dir, "src"));
++      fs.writeFileSync(path.join(dir, "src", "a.js"), "one\ntwo\nthree\n");
++      fs.writeFileSync(path.join(dir, "src", "b.js"), "one\r\ntwo\r\n");
++      fs.writeFileSync(path.join(dir, "src", "c.js"), "no newline at the end");
++      fs.writeFileSync(path.join(dir, "src", "empty.js"), "");
++      const inputs = inferInputsFromRepo(dir);
++      assert.equal(inputs.diffStats.status, "available");
++      assert.deepEqual(inputs.diffStats.value, { files: 4, lines: 3 + 2 + 1 });
++      // A tracked edit is added to the untracked lines, not replaced by them.
++      fs.writeFileSync(path.join(dir, "seed.txt"), "seed\nmore\n");
++      const mixed = inferInputsFromRepo(dir);
++      assert.deepEqual(mixed.diffStats.value, { files: 5, lines: 6 + 1 });
++    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
++  });
++
++  test("an untracked file whose lines cannot be counted keeps the line count unknown", () => {
++    const dir = emptyRepo();
++    try {
++      fs.writeFileSync(path.join(dir, "blob.bin"), Buffer.from([1, 2, 0, 3]));
++      assert.equal(inferInputsFromRepo(dir).diffStats.status, "unknown", "a binary file");
++      fs.rmSync(path.join(dir, "blob.bin"));
++      fs.writeFileSync(path.join(dir, "big.txt"), "x\n".repeat(600 * 1024));
++      assert.equal(inferInputsFromRepo(dir).diffStats.status, "unknown", "a file above the read bound");
++      fs.rmSync(path.join(dir, "big.txt"));
++      fs.writeFileSync(path.join(dir, "ok.txt"), "x\n");
++      let linked = true;
++      try { fs.symlinkSync("ok.txt", path.join(dir, "link.txt")); } catch { linked = false; }
++      if (linked) assert.equal(inferInputsFromRepo(dir).diffStats.status, "unknown", "a symbolic link is never followed");
++    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
++  });
++
++  test("the protected baseline identity the resolver returns is supplied as an accepted input", () => {
++    // The shipped baseline file spells baselineRevision as the string "1" (schema type string); the input envelope needs an integer.
++    const resolved = revision => ({ status: "ready", dynamic: { status: "available", entries: [] }, entries: [],
++      identity: { baselineRevision: revision, baselineDigest: HEX, mergedDigest: "b".repeat(64) } });
++    const collect = revision => collectRigorJournalEntry({
++      rootDir: REPO_ROOT, state: { activeFeature: { id: "w306-feature", planPath: "specs/w306/plan.md" }, rigorHistory: [] },
++      boundary: "plan-submission", selectedProfile: "feature", observedAt: "2026-11-09T00:00:00.000Z",
++    }, {
++      currentCandidate: () => ({ commit: "1".repeat(40), tree: "2".repeat(40) }),
++      inferInputs: () => ({ actualPaths: { value: [], status: "available", sourceContract: "t" } }),
++      planningSurface: () => null, interruptionReport: () => ({ ok: false }), protectedBaseline: () => resolved(revision),
++    }).body.inputs.protectedIdentity;
++    const fromString = collect("1");
++    assert.equal(fromString.status, "available");
++    assert.equal(fromString.value.baselineRevision, 1);
++    assert.equal(collect(1).status, "available");
++    for (const bad of ["", "0", "01", "1.5", "x", -1, null]) assert.equal(collect(bad).status, "unknown", String(bad));
++  });
++});
