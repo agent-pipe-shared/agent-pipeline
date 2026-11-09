@@ -31,6 +31,7 @@ The owner-route slice stays open for 0.7.1 or later: retiring the per-invocation
 | CFC-3 | `CLOSE-CRITIC-EVIDENCE-MISSING`: a later Critic round invalidates the addenda of earlier rounds, `dispatch-record-write.mjs` writes exclusively, no route replaces them, and the PO moved 16 files by hand. | open: supersede route, or coverage over the connected course |
 | CFC-4 | The close skill named an "attended close" that does not exist. | built-c21f |
 | CFC-5 | A negative check in a chores test of the run flaked once, reported by the run itself. | open, unmeasured |
+| CFC-6 | Regression of candidate 21f: `GUARD-FEATURE-PACKAGE-HAND-EDIT` also ran at the commit boundary, so the commit-msg hook refused the close writer's own `lifecycle.json` at `completed`. A hand rewind reads an earlier state there, so that lane could only ever hit writer output. The fixture walks commit without hooks, which is why the walk stayed green. | built-c21g: the refusal stays on the edit lanes, a real commit-hook case and a staged-policy check over the close's real output pin it |
 
 ## Open evidence
 
