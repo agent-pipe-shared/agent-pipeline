@@ -18,7 +18,7 @@ import {readdirSync,readlinkSync,fsyncSync,renameSync} from "node:fs";
 import * as CGB from "./critic-generic-batch.mjs";
 import {releaseCriticPacket} from "./critic-packet-release.mjs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035", "CGB036", "CGB037", "CGB038", "CGB039"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035", "CGB036", "CGB037", "CGB038", "CGB039", "CGB040"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -581,11 +581,12 @@ test("D58 default seams equal today's behaviour: real platform and real fsync",(
   assert.equal(io.fsyncFileFn,fsyncSync);
 });
 // PF-94 c19: a feature-course batch built through the real reserve path (claimed, not consumed).
-function reservedCourse(fx){
-  const logPath="specs/course-feature/evidence/targeted.log",jsonPath="specs/course-feature/evidence/diagnostic.json";
+function reservedCourse(fx){return reserveCourseRound(fx,registerCourseDiagnostic(fx),"e".repeat(32));}
+function registerCourseDiagnostic(fx,suffix=""){
+  const logPath=`specs/course-feature/evidence/targeted${suffix}.log`,jsonPath=`specs/course-feature/evidence/diagnostic${suffix}.json`;
   const diagnostic=produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,specPath:"specs/course-feature/spec.md",
-    command:[process.execPath,"-e","console.log('feature fixture pass')"],logPath:"evidence/feature-targeted.log"});
-  const log=readFileSync(join(fx.root,"evidence/feature-targeted.log"));
+    command:[process.execPath,"-e","console.log('feature fixture pass')"],logPath:`evidence/feature-targeted${suffix}.log`});
+  const log=readFileSync(join(fx.root,`evidence/feature-targeted${suffix}.log`));
   writeFileSync(join(fx.root,logPath),log);diagnostic.targeted.log.path=logPath;
   const bytes=`${JSON.stringify(diagnostic)}\n`;writeFileSync(join(fx.root,jsonPath),bytes);
   const manifestPath=join(fx.root,"specs/course-feature/lifecycle.json"),manifest=JSON.parse(readFileSync(manifestPath));
@@ -594,12 +595,14 @@ function reservedCourse(fx){
   git(fx.root,["add","specs/course-feature/lifecycle.json",logPath,jsonPath]);
   git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","register feature diagnostic"]);
   const registrationCommit=git(fx.root,["rev-parse","HEAD"]);
-  const courseInput={repoRoot:fx.root,featureId:"course-feature",baseCommit:fx.base,candidateCommit:fx.candidate,registrationCommit,requestedMode:"full",acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
+  return {repoRoot:fx.root,featureId:"course-feature",baseCommit:fx.base,candidateCommit:fx.candidate,registrationCommit,requestedMode:"full",acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
+}
+function reserveCourseRound(fx,courseInput,packetId){
   const projection=readCriticCourseAdmission(courseInput),{decision,...subject}=projection;
   const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
   mkdirSync(controlRoot,{recursive:true,mode:0o700});chmodSync(join(fx.root,".git/agent-pipeline"),0o700);chmodSync(controlRoot,0o700);
   const route={routeId:"feature-fixture",runner:"codex",adapter:"session-functional-equivalent",provider:"openai",modelTier:"higher-capability",effortTier:"xhigh",assurance:"functional-equivalent-read-only; OS isolation not asserted",projectionDigest:"a".repeat(64)};
-  const preflightSha256="b".repeat(64),packetId="e".repeat(32);
+  const preflightSha256="b".repeat(64);
   const sessionBinding={schema:"pipeline.session-critic-packet-binding.v1",sessionId:"feature-fixture",preflightSha256,assurance:route.assurance,freshContext:true,historyInherited:false,mayDelegate:false};
   prepareCandidatePacket({repoRoot:fx.root,controlRoot,packetId,taskId:fx.taskId,projectId:"pipeline",baseCommit:fx.base,candidateCommit:fx.candidate,rulesetOid:fx.base,route,sessionBinding,
     references:[{kind:"spec",path:"specs/course-feature/spec.md"},{kind:"guardrail",path:".claude/pipeline.json"}]});
@@ -742,6 +745,29 @@ test("a takeover retires an earlier-key feature course whose packets were all re
     assert.equal(CGB.inspectFeatureCourseTakeover({...input,courseHistoryRegistered:true}).refusalCode,"CGB-TAKEOVER-HISTORY");
     assert.equal(CGB.supersedeFeatureCourseTakeover({...input,digestSha256:released.digestSha256,reason:"released round"}).status,"superseded");
     assert.deepEqual(assertFeatureCriticReviewUnitOwnership({repoRoot:fx.root,courseKey:other,logicalWorkIds:["AC-1","AC-2"]}),{claimed:false,batchRef:null});
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("the whole chain after a released round: the corrected candidate is refused with its repair, the two verbs retire the old batch, and the round reserves at the corrected candidate",()=>{
+  const fx=fixture({feature:true});try{
+    const c=reservedCourse(fx);
+    releaseCriticPacket({controlRoot:c.controlRoot,packetId:"e".repeat(32),reason:"round lost"});
+    writeFileSync(join(fx.root,"repair.txt"),"correction\n");
+    git(fx.root,["add","repair.txt"]);git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","correction"]);
+    fx.candidate=git(fx.root,["rev-parse","HEAD"]);
+    const courseInput=registerCourseDiagnostic(fx,"-2");
+    const refused=readCriticCourseAdmission(courseInput);
+    assert.equal(refused.decision.code,"CGB-CONFLICT",JSON.stringify(refused.decision));
+    assert.match(refused.decision.reason,/inspect-course-takeover.*supersede-course-takeover/u);
+    mkdirSync(join(fx.root,"scratch"),{recursive:true});
+    writeFileSync(join(fx.root,"scratch/inspect.json"),JSON.stringify({schema:"pipeline.session-critic-course-takeover-inspect-request.v1",featureId:"course-feature"}));
+    const inspected=runSessionCriticFinalizerCli(["inspect-course-takeover","--root",fx.root,"--request","scratch/inspect.json"]);
+    assert.equal(inspected.exitCode,0,JSON.stringify(inspected.output));
+    assert.equal(inspected.output.refusalCode,null,JSON.stringify(inspected.output));
+    writeFileSync(join(fx.root,"scratch/supersede.json"),JSON.stringify({schema:"pipeline.session-critic-course-takeover-supersede-request.v1",featureId:"course-feature",digestSha256:inspected.output.digestSha256,reason:"released round"}));
+    const superseded=runSessionCriticFinalizerCli(["supersede-course-takeover","--root",fx.root,"--request","scratch/supersede.json"]);
+    assert.equal(superseded.output.status,"superseded",JSON.stringify(superseded.output));
+    const again=reserveCourseRound(fx,courseInput,"f".repeat(32));
+    assert.equal(assertFeatureCriticReviewUnitOwnership({repoRoot:fx.root,courseKey:again.courseKey,logicalWorkIds:["AC-1","AC-2"]}).claimed,true);
   }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});
