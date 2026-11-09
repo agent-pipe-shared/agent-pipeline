@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6480c57b8db4472701c6948bee2c290a728bf00b12026585506590f16770c8e5"
+    "transitionHead": "029729fd8dd0a45fe941ca33acddcd48f859ead3c57cf50d7d811b8594cefed3"
   },
   "counts": {
-    "open": 381,
+    "open": 383,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -2460,6 +2460,15 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.close-feature-refused-in-a-catalogue-project",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-11-09",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.close-feature-unreachable-without-result-authority",
       "status": "open",
       "type": "defect",
@@ -2603,6 +2612,15 @@
       "owner": "pipeline",
       "created": "2026-09-28",
       "source": "Local Codex 0.157.1 design-readiness replay on 2026-09-27/28; scratch/codex-readiness-provisional-report.json and scratch/codex-readiness-fix.patch.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.codex-greenfield-report-findings",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-11-09",
       "deferred": false,
       "sprint": "alfred"
     },

@@ -202,6 +202,7 @@
 | pipeline.claude-windows-guard-refuses-every-in-repo-read | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.cli-docs-generated-from-parser | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.close-addendum-ignores-residual-acceptance-and-course-chain | open | defect | pipeline | alfred | 2026-10-31 | — | — |
+| pipeline.close-feature-refused-in-a-catalogue-project | open | defect | pipeline | alfred | 2026-11-09 | — | — |
 | pipeline.close-feature-unreachable-without-result-authority | open | defect | pipeline | alfred | 2026-10-30 | — | — |
 | pipeline.close-gate-rejects-critic-evidence-for-attested-records | open | defect | pipeline | alfred | 2026-10-30 | — | — |
 | pipeline.close-spec-retention-and-consent | closed | workflow-improvement | pipeline | — | 2026-07-21 | — | — |
@@ -214,6 +215,7 @@
 | pipeline.codex-compact-sessionstart-json-rejects-measurement-fields | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.codex-design-readiness-child-rejects-valid-review | open | defect | pipeline | alfred | 2026-09-28 | — | — |
+| pipeline.codex-greenfield-report-findings | open | defect | pipeline | alfred | 2026-11-09 | — | — |
 | pipeline.codex-lifecycle-guard-can-contradict-ready-bootstrap | closed | defect | pipeline | nova-b | 2026-09-20 | — | — |
 | pipeline.codex-own-session-audit-export-missing | open | workflow-improvement | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.codex-plugin-validator-host-parity | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
@@ -1077,7 +1079,7 @@
 
 ## Counts
 
-- open: 381
+- open: 383
 - in_progress: 0
 - closed: 674
 - rejected: 3
