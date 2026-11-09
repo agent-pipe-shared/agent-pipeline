@@ -54,7 +54,7 @@ import {
 import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
 import { evaluateLifecycleReadyGuard, isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
 import { confirmTrustAnchorKey, readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
-import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
+import { applyRunnerProfileMigrationV3, planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { main as runnerProfileMigrationCli } from "../scripts/runner-profile-migration-v3.mjs";
 import { planInstall as planPrePushHookInstall } from "../scripts/pre-push-hook-install.mjs";
 import { applyInstall as applyPreCommitHookInstall, planInstall as planPreCommitHookInstall } from "../scripts/pre-commit-hook-install.mjs";
@@ -62,7 +62,7 @@ import { planInstall as planCommitMsgHookInstall } from "../scripts/commit-msg-h
 import { applySettingsAllowlistMerge, planSettingsAllowlistMerge } from "../scripts/settings-allowlist-merge.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
-import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
+import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { validCurrentPlanApproval, validPreviousCurrentPlanApproval, validPlanSubmission } from "./plan-spec-state-v2.mjs";
 import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
 import { applyInitialOnboardingAnswers, driveOnboardingInit } from "../scripts/onboarding-init.mjs";
@@ -7848,6 +7848,23 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(existsSync(join(path, ".codex/agents/consult-advisor.toml")), true);
     assert.match(readFileSync(join(path, ".codex/agents/implementor.toml"), "utf8"), /developer_instructions\s*=/u);
     assert.match(readFileSync(join(path, ".codex/agents/critic.toml"), "utf8"), /developer_instructions\s*=/u);
+    // C21H (AC-108, CGF-03): the second Codex Critic role is materialized with the others, with its own effort from the critic_high_risk duty.
+    assert.equal(existsSync(join(path, ".codex/agents/critic-high-risk.toml")), true);
+    const highRisk = readFileSync(join(path, ".codex/agents/critic-high-risk.toml"), "utf8");
+    assert.match(highRisk, /^name = "critic-high-risk"$/mu);
+    assert.match(highRisk, /developer_instructions\s*=/u);
+    assert.match(highRisk, new RegExp(`^model_reasoning_effort = "${loadRunnerProfilesV3Registry().duties.critic_high_risk.codex.effort}"$`, "mu"));
+    assert.equal(readFileSync(join(path, ".codex/agents/critic.toml"), "utf8").includes('model_reasoning_effort = "medium"'), true, "the first role keeps its own effort");
+    // An existing project that lacks the new file (it was onboarded before the role existed) is not broken: the plain plan names the absent owned
+    // file as a baseline fault exactly like any other missing owned file, the initialization plan adds it as a first-time target, and the
+    // existing activation writes it. No new manual step.
+    unlinkSync(join(path, ".codex/agents/critic-high-risk.toml"));
+    const lacking = planRunnerProfileMigrationV3({ rootDir: path, initializeMissingRuntimeForSlimV3: true });
+    assert.equal(lacking.status, "ready", JSON.stringify(lacking.diagnostics));
+    assert.deepEqual(lacking.changes.map((change) => change.path), [".codex/agents/critic-high-risk.toml"]);
+    assert.deepEqual(lacking.targets.find((target) => target.path === ".codex/agents/critic-high-risk.toml").before, { status: "absent", sha256: null, byteLength: 0 });
+    assert.equal(applyRunnerProfileMigrationV3(lacking, { rootDir: path, activate: true }).status, "applied");
+    assert.equal(readFileSync(join(path, ".codex/agents/critic-high-risk.toml"), "utf8"), highRisk, "the repaired file is byte-identical to the original projection");
     assert.equal(existsSync(join(path, "setup.mjs")), false);
     assert.equal(existsSync(join(path, ".agent-pipeline/core.lock.json")), false);
     assert.equal(validatePipelineUserV3(parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"))).ok, true);

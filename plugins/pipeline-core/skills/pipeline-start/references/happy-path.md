@@ -99,6 +99,7 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
    `--candidate`, `--spec`, `--guardrail` and `--evidence` (repository-relative paths for the last three); the refusal chain names the next missing input.
 2. `session-critic-finalizer.mjs admit --root "$PWD" --request scratch/session-critic-finalization-request.json`, then dispatch one fresh read-only Critic
    (Antigravity: no external process; refs-only packets per `references/antigravity-native-dispatch.md`).
+   Codex: the Critic is the projected role `critic`; a Critic that needs a higher effort than `critic` carries uses `spawn_agent` with `agent_type: "critic-high-risk"` (same read-only instructions, effort from the `critic_high_risk` duty), never `default` with model or effort set on the call, because `default` loses the Source return and the round is recorded as caller-authored.
 3. `session-critic-finalizer.mjs finalize --root "$PWD" --request scratch/session-critic-finalization-request.json`, then `... export --root "$PWD" --request scratch/session-critic-export-request.json`.
    `finalize --help` prints the closed request keys. A split review: `critic-split-merge.mjs --root <root> --packet <packetId>` once every child returned, before `finalize`.
 4. Findings: `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` or `--add-delta-request <input.json>`; every later round reuses the first `taskId`.

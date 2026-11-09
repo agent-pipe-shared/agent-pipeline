@@ -27,6 +27,7 @@ const targetPaths = [
   ".codex/config.toml",
   ".codex/agents/implementor.toml",
   ".codex/agents/critic.toml",
+  ".codex/agents/critic-high-risk.toml",
   ".codex/agents/consult-advisor.toml",
 ];
 
@@ -74,6 +75,7 @@ function writeFixture(root, { pipelineYaml = `${PREFIX}${OWNED}${LEGACY_RUNNER_R
     ".codex/config.toml": "profile = \"keep\"\n",
     ".codex/agents/implementor.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\nname = \"keep\"\n[metadata]\nmodel = \"nested\"\n",
     ".codex/agents/critic.toml": "model = \"old\"\nmodel_reasoning_effort = \"medium\"\nname = \"keep\"\n[metadata]\nmodel_reasoning_effort = \"nested\"\n",
+    ".codex/agents/critic-high-risk.toml": "model = \"old\"\nmodel_reasoning_effort = \"medium\"\nname = \"keep-high-risk\"\n[metadata]\nmodel_reasoning_effort = \"nested\"\n",
     ".codex/agents/consult-advisor.toml": "name = \"stale\"\n",
   };
   for (const [path, bytes] of Object.entries(files)) {
@@ -180,6 +182,74 @@ test("V3 owns the Codex advisor custom-agent target", () => {
   assert.equal(claude.bindings.some((entry) => entry.targetKey === "advisor_mini"), false);
   assert.ok(claude.ownedKeys.includes("runnerRoutes"), "legacy runnerRoutes must be removed as an owned V3 projection");
   assert.ok(claude.ownedKeys.includes("session.keep_awake"), "session power is an explicit owned V3 projection");
+});
+
+// C21H (AC-108, CGF-03): the second projected Codex Critic role. Same closed read-only developer instructions as `critic`, its own effort from the
+// registered `critic_high_risk` duty cell (no new configuration key), and a project that lacks the file gets it through the existing plan.
+const HIGH_RISK_PATH = ".codex/agents/critic-high-risk.toml";
+
+test("C21H V3 owns the critic-high-risk Codex custom agent with the critic_high_risk duty and the critic developer instructions", () => {
+  const manifest = loadRuntimeProjectionV3OwnedKeys();
+  const entry = manifest.targets.find((item) => item.path === HIGH_RISK_PATH);
+  assert.ok(entry, "the owned-key manifest names the second Critic role");
+  assert.equal(entry.projection, "codex-custom-agent-v3");
+  assert.deepEqual(entry.ownedKeys, ["model", "model_reasoning_effort"]);
+  assert.deepEqual(entry.cell, { kind: "duty", dutyId: "critic_high_risk" });
+  const role = CODEX_CUSTOM_AGENT_METADATA["critic-high-risk"];
+  assert.equal(role.name, "critic-high-risk");
+  assert.equal(role.developerInstructions, CODEX_CUSTOM_AGENT_METADATA.critic.developerInstructions);
+  assert.match(codexCustomAgentSeed("critic-high-risk"), /^name = "critic-high-risk"\n/u);
+  const instructionLine = (seed) => seed.match(/^developer_instructions = (.+)$/mu)?.[1];
+  assert.ok(instructionLine(codexCustomAgentSeed("critic-high-risk")), "the seed carries developer instructions");
+  assert.equal(instructionLine(codexCustomAgentSeed("critic-high-risk")), instructionLine(codexCustomAgentSeed("critic")), "same closed read-only Critic instructions");
+  assert.throws(() => codexCustomAgentSeed("not-a-role"), /unknown Codex custom-agent role/u);
+});
+
+test("C21H V3 projects the critic-high-risk model and effort from the critic_high_risk duty, apart from critic", () => {
+  const root = fixtureRoot();
+  try {
+    const baselines = readRuntimeProjectionV3Baselines(root);
+    assert.equal(baselines[HIGH_RISK_PATH].status, "present", "the baseline reader reads the second Critic role like the advisor");
+    const plan = planRuntimeProjectionV3(completeIntent(), { baselines });
+    assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
+    const highRisk = target(plan, HIGH_RISK_PATH);
+    const duty = registry.duties.critic_high_risk.codex;
+    assert.match(highRisk.after.bytes, new RegExp(`^model = "${duty.selector.value}"$`, "mu"));
+    assert.match(highRisk.after.bytes, new RegExp(`^model_reasoning_effort = "${duty.effort}"$`, "mu"));
+    assert.deepEqual(highRisk.route.cell, { kind: "duty", dutyId: "critic_high_risk" });
+    assert.equal(highRisk.route.requested.effort, duty.effort);
+    assert.notEqual(highRisk.route.requested.effort, target(plan, ".codex/agents/critic.toml").route.requested.effort, "the second role exists to carry a different effort");
+    assert.match(highRisk.after.bytes, /name = "keep-high-risk"/u, "unowned top-level keys stay byte-for-byte");
+    assert.match(highRisk.after.bytes, /\[metadata\]\nmodel_reasoning_effort = "nested"\n/u, "a nested key of the same name is not an owned key");
+    assert.deepEqual(plan.ownedKeyManifest.targets.find((item) => item.path === HIGH_RISK_PATH).ownedKeys, ["model", "model_reasoning_effort"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("C21H a project without the critic-high-risk file plans it as a first-time addition from the seed instead of failing", () => {
+  const root = fixtureRoot();
+  try {
+    unlinkSync(join(root, HIGH_RISK_PATH));
+    const baselines = readRuntimeProjectionV3Baselines(root);
+    assert.equal(baselines[HIGH_RISK_PATH].status, "absent");
+    const plan = planRuntimeProjectionV3(completeIntent(), { baselines });
+    assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
+    const highRisk = target(plan, HIGH_RISK_PATH);
+    assert.equal(highRisk.before.status, "absent");
+    assert.equal(highRisk.changed, true);
+    assert.equal(highRisk.after.status, "present");
+    const duty = registry.duties.critic_high_risk.codex;
+    assert.equal(highRisk.after.bytes, codexCustomAgentSeed("critic-high-risk").replace('model = ""', `model = "${duty.selector.value}"`).replace('model_reasoning_effort = ""', `model_reasoning_effort = "${duty.effort}"`));
+    assert.equal(plan.decisionConflicts.some((conflict) => conflict.target === HIGH_RISK_PATH), false, "an absent file owes no model decision");
+    for (const path of targetPaths.filter((item) => item !== HIGH_RISK_PATH)) assert.ok(target(plan, path), `${path} is still planned`);
+    // The same plan from baselines that never heard of the new file (a caller that predates it) still plans, never throws.
+    const withoutKey = { ...baselines };
+    delete withoutKey[HIGH_RISK_PATH];
+    assert.equal(planRuntimeProjectionV3(completeIntent(), { baselines: withoutKey }).status, "ready");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("V3 planning is deterministic, read-only, and byte-preserving", () => {

@@ -1949,6 +1949,43 @@ test("G20-39 (e) an unmarked or non-Critic stop, a stop without a schema-shaped 
   } finally { cleanup(fx); }
 });
 
+// C21H (AC-108, CGF-03): the second projected Codex Critic role `critic-high-risk` is the Critic for the Source return exactly like `critic`;
+// `default` with a model and effort set on the spawn call (what every Codex round used before) and every other agent type stay not-applicable.
+test("C21H (a) a Codex Critic stop under the agent type critic-high-risk issues the Source return like critic; default and every other type stay a silent no-op", async () => {
+  const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
+  const fx = fixture();
+  try {
+    const admitted = admitViaCli(fx);
+    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
+    for (const agentType of ["default", "worker", "critic-high-risk-extra", "high-risk", "critic-high", "pipeline-core:goldfish-deep"]) {
+      const outcome = issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(), { agent_type: agentType }) });
+      assert.equal(outcome.status, "not-applicable", agentType);
+      assert.equal(existsSync(target), false, agentType);
+    }
+    const issued = issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(), { agent_type: "critic-high-risk" }) });
+    assert.equal(issued.status, "issued", JSON.stringify(issued));
+    assert.equal(issued.packetId, admitted.packetId);
+    const record = JSON.parse(readFileSync(target, "utf8"));
+    assert.equal(record.packetDigest, admitted.admission.packetDigest);
+    assert.deepEqual(record.claimant, { runner: "codex", adapter: "session-functional-equivalent" });
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+    assert.equal(runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]).output.independence, "source-issued-origin");
+  } finally { cleanup(fx); }
+});
+
+test("C21H (b) the namespaced critic-high-risk type is the Critic as well, and only the codex and claude stop events issue it", async () => {
+  const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
+  const fx = fixture();
+  try {
+    const admitted = admitViaCli(fx);
+    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
+    assert.notEqual(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "antigravity", input: stopInput(criticReturn(), { agent_type: "critic-high-risk" }) }).status, "issued");
+    assert.notEqual(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(), { agent_type: "critic-high-risk", hook_event_name: "PostToolUse" }) }).status, "issued");
+    assert.equal(existsSync(target), false);
+    assert.equal(issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput(criticReturn(), { agent_type: "pipeline-core:critic-high-risk" }) }).status, "issued");
+  } finally { cleanup(fx); }
+});
+
 // G20-41 (candidate 20, AC-108): on Antigravity the Critic CHILD's final `send_message` to its parent conversation issues the same record.
 // Criterion-bound cases, written before the producer existed. The child is recognised only through runner-written facts: its own conversationId,
 // the descriptor the host wrote under the PARENT's brain directory, and the Recipient; payloads are shaped like the M4c measurement.

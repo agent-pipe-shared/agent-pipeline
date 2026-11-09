@@ -61,6 +61,13 @@
       "decision": 3
     },
     {
+      "path": ".codex/agents/critic-high-risk.toml",
+      "format": "toml",
+      "projection": "codex-custom-agent-v3",
+      "ownedKeys": ["model", "model_reasoning_effort"],
+      "cell": { "kind": "duty", "dutyId": "critic_high_risk" }
+    },
+    {
       "path": ".codex/agents/consult-advisor.toml",
       "format": "toml",
       "projection": "codex-advisor-agent-v3",

@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import {
   closeSync, existsSync, fsyncSync, lstatSync, openSync, readFileSync, writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadRunnerProfilesV2Registry } from "./runner-profiles-v2.mjs";
@@ -33,6 +33,9 @@ const OWNED_KEYS_PATH = join(HERE, "..", "config", "runtime-projection-v3-owned-
 const PLAN_SCHEMA = "pipeline.runtime-projection-plan.v3";
 const EFFECTIVE_MODEL_UNKNOWN = "effective-model-not-observed";
 
+// C21H (AC-108, CGF-03): `critic` and `critic-high-risk` are the same closed read-only Critic; only the effort of their duty cell differs.
+const CRITIC_DEVELOPER_INSTRUCTIONS = "Act as an independent, read-only Critic. Your bootstrap role is closed as critic: when pipeline-start is required, use its compact critic path and never Elephant onboarding, State, handover, or history. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity.";
+
 export const CODEX_CUSTOM_AGENT_METADATA = Object.freeze({
   implementor: Object.freeze({
     name: "implementor",
@@ -42,7 +45,12 @@ export const CODEX_CUSTOM_AGENT_METADATA = Object.freeze({
   critic: Object.freeze({
     name: "critic",
     description: "Independent read-only critic",
-    developerInstructions: "Act as an independent, read-only Critic. Your bootstrap role is closed as critic: when pipeline-start is required, use its compact critic path and never Elephant onboarding, State, handover, or history. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity.",
+    developerInstructions: CRITIC_DEVELOPER_INSTRUCTIONS,
+  }),
+  "critic-high-risk": Object.freeze({
+    name: "critic-high-risk",
+    description: "Independent read-only critic for high-risk reviews",
+    developerInstructions: CRITIC_DEVELOPER_INSTRUCTIONS,
   }),
 });
 
@@ -508,7 +516,22 @@ function replaceCodexAgentTarget(v2Target, target, intent) {
   };
 }
 
-const ADVISOR_DESCRIPTION = "Fresh independent read-only advisor; answer one supplied question with repository evidence only.";
+/**
+ * A Codex custom agent the frozen V2 kernel does not enumerate (C21H: `critic-high-risk`). Projected like the advisor: from the baseline when
+ * the file exists, from the role seed when it does not, so a project onboarded before the role existed plans it as a first-time addition.
+ */
+function replaceAddedCodexAgentTarget(target, intent, baseline) {
+  const beforeBytes = baselineBytes(baseline);
+  const seeded = beforeBytes ?? codexCustomAgentSeed(basename(target.path, ".toml"));
+  return replaceCodexAgentTarget({
+    path: target.path,
+    format: target.format,
+    before: describeBytes(beforeBytes),
+    after: { bytes: seeded },
+  }, target, intent);
+}
+
+const ADVISOR_DESCRIPTION ="Fresh independent read-only advisor; answer one supplied question with repository evidence only.";
 const ADVISOR_INSTRUCTIONS = "Use fresh context and answer exactly one supplied question. Read-only sandbox only: no chat, handover, memory, mutation, persistence, auto-apply, or gate decisions; no separate network tool or third-party export. Report evidence and insufficiency without claiming unobserved model identity or OS isolation.";
 
 function renderCodexAdvisorAgent(intent) {
@@ -740,6 +763,10 @@ function projectValidatedIntent(intent, { source, baselines }) {
       intent,
       baselines?.[".codex/agents/consult-advisor.toml"],
     ));
+    for (const manifestTarget of committedOwnedKeys.manifest.targets) {
+      if (manifestTarget.projection !== "codex-custom-agent-v3" || targets.some((entry) => entry.path === manifestTarget.path)) continue;
+      targets.push(replaceAddedCodexAgentTarget(manifestTarget, intent, baselines?.[manifestTarget.path]));
+    }
     targets.push(replaceHumanRoleCalibrationTarget(
       manifestTargets[".claude/pipeline.json"],
       intent,
@@ -860,9 +887,10 @@ export function readRuntimeProjectionV3Baselines(rootDir) {
   const ownedTargets = frozenOwnedKeys().manifest.targets;
   const target = ownedTargets.find((entry) => entry.path === ".claude/pipeline.json");
   const advisor = ownedTargets.find((entry) => entry.path === ".codex/agents/consult-advisor.toml");
-  if (!target || !advisor) throw new Error("V3 owned target is missing");
+  const criticHighRisk = ownedTargets.find((entry) => entry.path === ".codex/agents/critic-high-risk.toml");
+  if (!target || !advisor || !criticHighRisk) throw new Error("V3 owned target is missing");
   const root = resolve(rootDir);
-  for (const entry of [target, advisor]) {
+  for (const entry of [target, advisor, criticHighRisk]) {
     const path = resolve(root, entry.path);
     if (!isPhysicalPathContained(root, path)) throw new Error(`Unsafe owned target path: ${entry.path}`);
     baselines[entry.path] = existsSync(path)

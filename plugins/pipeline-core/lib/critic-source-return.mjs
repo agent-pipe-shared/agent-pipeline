@@ -30,6 +30,9 @@ const MAX_PACKETS = 4096;
 const RUNNERS = new Set(["claude", "codex"]); // the runners whose subagent STOP event issues the record
 const MESSAGE_RUNNERS = new Set(["antigravity"]); // the runners whose Critic child's final message to its parent issues it (G20-41)
 
+// C21H (CGF-03): the projected Codex roles `critic` and `critic-high-risk` are both the Critic; `default` with effort overrides is not.
+const CRITIC_AGENT_TYPES = new Set(["critic", "critic-high-risk"]);
+
 const normalizedAgentType = (value) => typeof value !== "string" ? null : value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
 
 /** The verdict a Critic returned: its whole message, else the content of the LAST fenced block, as a schema-shaped object; otherwise null. */
@@ -81,7 +84,7 @@ function openAdmittedPackets(controlRoot, runner, nowMs) {
  */
 export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date.now(), readHandbackFn = null } = {}) {
   try {
-    if (!RUNNERS.has(runner) || input?.hook_event_name !== "SubagentStop" || normalizedAgentType(input.agent_type) !== "critic") return { status: "not-applicable" };
+    if (!RUNNERS.has(runner) || input?.hook_event_name !== "SubagentStop" || !CRITIC_AGENT_TYPES.has(normalizedAgentType(input.agent_type))) return { status: "not-applicable" };
     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
     let verdict = extractCriticVerdict(input.last_assistant_message);
     if (verdict === null && typeof readHandbackFn === "function") {

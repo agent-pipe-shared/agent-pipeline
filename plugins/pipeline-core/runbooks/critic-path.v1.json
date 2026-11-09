@@ -137,7 +137,7 @@
     {
       "id": "dispatch-critic",
       "who": "agent",
-      "command": "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template",
+      "command": "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template (Codex: agent_type critic, or critic-high-risk for a higher effort, never default, which loses the Source return)",
       "needs": [
         "the admission record"
       ],

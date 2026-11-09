@@ -94,6 +94,7 @@ const LEGACY_CLASSIFIER_BASELINES = Object.freeze({
   ".codex/config.toml": "# classifier baseline\n",
   ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
   ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
+  ".codex/agents/critic-high-risk.toml": codexCustomAgentSeed("critic-high-risk"),
   ".codex/agents/consult-advisor.toml": "",
 });
 // These seeds exist only in authenticated legacy -> V3 planning memory. They
@@ -127,6 +128,7 @@ const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
   ".codex/config.toml": "",
   ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
   ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
+  ".codex/agents/critic-high-risk.toml": codexCustomAgentSeed("critic-high-risk"),
   ".codex/agents/consult-advisor.toml": "",
 });
 // Single owner for `.claude/pipeline.yaml` across every branch of
@@ -179,6 +181,7 @@ const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
   ".codex/config.toml": "",
   ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
   ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
+  ".codex/agents/critic-high-risk.toml": codexCustomAgentSeed("critic-high-risk"),
   ".codex/agents/consult-advisor.toml": "",
 });
 // Resolved per use, never at module evaluation: project-onboarding-v3.mjs

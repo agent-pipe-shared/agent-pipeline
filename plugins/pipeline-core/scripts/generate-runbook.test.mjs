@@ -138,6 +138,18 @@ test("C21C: the happy-path guide names the evidence commands and one close entry
   assert.equal(guide.includes("--audit-request <json>"), false, "the old Antigravity-only close line is gone");
 });
 
+test("C21H: the Codex Critic launch names critic-high-risk for a higher effort and never default, in the guide and in the critic runbook step", () => {
+  const guide = readFileSync(join(PLUGIN_ROOT, "skills/pipeline-start/references/happy-path.md"), "utf8");
+  const criticSection = guide.slice(guide.indexOf("## 3. Critic"), guide.indexOf("## 4."));
+  assert.match(criticSection, /agent_type: "critic-high-risk"/u);
+  assert.match(criticSection, /never `default`/u);
+  assert.ok(criticSection.indexOf("session-critic-finalizer.mjs admit") < criticSection.indexOf("critic-high-risk"), "the role is named in the step after admit");
+  const step = docOf("critic").steps.find((s) => s.id === "dispatch-critic");
+  assert.match(step.command, /critic-high-risk/u);
+  assert.match(step.command, /never default/u);
+  assert.deepEqual(step.next, ["finalize", "split-merge"], "the step keeps its place in the path");
+});
+
 test("the index lists the lifecycle paths, each file with its own sha256", () => {
   const files = buildRunbookFiles();
   const idx = JSON.parse(files["plugins/pipeline-core/runbooks/index.v1.json"]);

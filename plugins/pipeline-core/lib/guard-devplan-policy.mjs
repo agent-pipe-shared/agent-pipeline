@@ -638,6 +638,7 @@ const GENERATED_CODEX_PROJECTION_PATHS = new Set([
   ".codex/config.toml",
   ".codex/agents/implementor.toml",
   ".codex/agents/critic.toml",
+  ".codex/agents/critic-high-risk.toml",
   ".codex/agents/consult-advisor.toml",
 ]);
 

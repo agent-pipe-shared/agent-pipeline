@@ -50,7 +50,7 @@
  * `.codex/config.toml`) is `keep`, never `remove`. A whole-file-seed
  * projection (`codex-custom-agent-v3`, `codex-advisor-agent-v3`) whose
  * renderer emits the COMPLETE file body from static role metadata / intent
- * alone -- the three `.codex/agents/*.toml` files -- is a whole-file
+ * alone -- the `.codex/agents/*.toml` files -- is a whole-file
  * `remove`, exactly like the authority artifacts above, because the whole
  * file is Pipeline prose. A keys-patch projection (`human-role-display-v3`,
  * `claude-model-routing-v3`) whose renderer instead patches specific keys

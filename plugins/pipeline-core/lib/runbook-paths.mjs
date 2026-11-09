@@ -208,7 +208,7 @@ function criticSteps() {
     }),
     finalizerStep("admit", "admit", finalization, { needs: ["a packet-ready preflight"], producer: "the admission record for this packet", next: ["dispatch-critic"] }),
     otherStep({
-      id: "dispatch-critic", command: "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template",
+      id: "dispatch-critic", command: "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template (Codex: agent_type critic, or critic-high-risk for a higher effort, never default, which loses the Source return)",
       needs: ["the admission record"], producer: "the Critic's return; a split review returns one per child", next: ["finalize", "split-merge"],
     }),
     scriptStep({

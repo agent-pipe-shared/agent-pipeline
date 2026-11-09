@@ -1822,6 +1822,7 @@ function freshBaselines(intent, { rootDir, hostManaged = false, profile = null, 
     ".codex/config.toml": { status: "present", bytes: "" },
     ".codex/agents/implementor.toml": { status: "present", bytes: codexCustomAgentSeed("implementor") },
     ".codex/agents/critic.toml": { status: "present", bytes: codexCustomAgentSeed("critic") },
+    ".codex/agents/critic-high-risk.toml": { status: "present", bytes: codexCustomAgentSeed("critic-high-risk") },
     ".codex/agents/consult-advisor.toml": { status: "present", bytes: "" },
   };
   const projection = planRuntimeProjectionV3(intent, { baselines });

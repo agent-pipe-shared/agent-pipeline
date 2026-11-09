@@ -34,6 +34,7 @@ export const CODEX_HOST_REPOSITORY_INIT_MARKER = `${CODEX_HOST_REPOSITORY_INIT_D
 const REQUIRED_CODEX_HOST_CONTROL_PATHS = Object.freeze([".codex", ".git"]);
 const CODEX_PROJECT_AGENT_PROFILES = Object.freeze([
   "consult-advisor.toml",
+  "critic-high-risk.toml",
   "critic.toml",
   "implementor.toml",
 ]);
