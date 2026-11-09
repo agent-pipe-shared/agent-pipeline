@@ -1761,6 +1761,18 @@
       "nonOverlapNote": "Text and file functions of the handover block; the one-shot close wiring is covered in the finish-feature suite"
     },
     {
+      "name": "critic-route-assurance-tests",
+      "file": "plugins/pipeline-core/lib/critic-route-assurance.test.mjs",
+      "invariantPinned": "Before dispatch a planned Critic route states exactly the assurance it delivers and whether the close needs an acknowledgement, never a stronger word",
+      "nonOverlapNote": "Pure assurance projection; the printed preflight field is covered in the Critic dispatch preflight suite"
+    },
+    {
+      "name": "architecture-verdict-label-tests",
+      "file": "plugins/pipeline-core/lib/architecture-verdict-label.test.mjs",
+      "invariantPinned": "Every architecture verdict label carries candidate, observation date, scope, whether it blocks and whether it is current",
+      "nonOverlapNote": "Pure label builder; its use is covered in the boundary check, orientation and readback suites"
+    },
+    {
       "name": "codex-critic-selected-host-fallback-tests",
       "file": "plugins/pipeline-core/scripts/codex-critic-selected-host-fallback.test.mjs",
       "invariantPinned": "A selected-host Codex Critic pre-launch failure keeps its code and carries the typed lane fallback with its lane record, failure class and terminal code",
