@@ -240,9 +240,12 @@ test("AP9b a native Glob may end in any literal extension that is not credential
     assert.equal(glob(`**/*.${extension}`), 2, `**/ ${extension}`);
     assert.equal(glob(`*.{md,${extension}}`), 2, `brace ${extension}`);
   }
-  for (const pattern of ["*.{pem,md}", "*.{md,pem}", "*.{md}", "{docs,scratch}/*.md", "docs/{a,b}/*.md", "*.{md,mjs}x", "*.{md,mjs}/*", "*.{md,.env}", ".*/*.{md,mjs}", "../*.{md,mjs}", "docs/*.{md,mjs", "*.m*", "*.*", "*.js?", "id_rsa*", "**/*", "*.thirteenchars", "*.{a,b,c,d,e,f,g,h,i}"]) {
+  for (const pattern of ["*.{pem,md}", "*.{md,pem}", "*.{md}", "{docs,scratch}/*.md", "docs/{a,b}/*.md", "*.{md,mjs}x", "*.{md,mjs}/*", "*.{md,.env}", ".*/*.{md,mjs}", "../*.{md,mjs}", "docs/*.{md,mjs", "*.m*", "*.*", "*.js?", "id_rsa*", "*.thirteenchars", "*.{a,b,c,d,e,f,g,h,i}"]) {
     assert.equal(glob(pattern), 2, pattern);
   }
+  // QG-04 restated (C21E): candidate 21 (AC-108) deliberately admits `<directory>/**/*` as a names-only listing of one contained directory; the project root stays refused.
+  assert.equal(glob("**/*"), 0, "a names-only listing below a contained directory");
+  assert.equal(glob("**/*", path), 2, "never the project root");
   assert.equal(glob("*.{md,mjs}", join(path, ".git")), 2);
   assert.equal(glob("../*.{md,mjs}", join(path, "docs")), 2);
 }));

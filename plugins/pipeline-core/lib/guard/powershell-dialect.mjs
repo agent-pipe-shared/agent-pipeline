@@ -221,7 +221,7 @@ export function powerShellScopeVerdict(input, root, dependencies) {
   if (["node", "node.exe"].includes(name) && argv.length > 0) {
     const script = argv[0];
     const own = typeof script === "string" && scriptIsSanctioned(script);
-    return verdict(2, powerShellRefusal("node is admitted for a sanctioned Pipeline script exactly as the bootstrap or `pipeline-state.mjs inspect` prints it, and for the read-only plan, inspect and binding verbs of a sanctioned script in a ready session; this invocation is neither.",
+    return verdict(2, powerShellRefusal("node is admitted for a sanctioned Pipeline script exactly as the bootstrap or `pipeline-state.mjs inspect` prints it, and for the read-only plan, inspect and binding verbs of a sanctioned script in a ready session; this invocation is neither. If this runner also has a Bash tool, submit the same command there: the Bash lane admits the Pipeline's own scripts in a ready session.",
       "literal", own ? `node "${script}" --help` : "node \"<plugin-root>/scripts/pipeline-state.mjs\" inspect"));
   }
   return verdict(2, powerShellGrammarDenial("use a sanctioned Pipeline action or a contained literal read.", "literal"));
