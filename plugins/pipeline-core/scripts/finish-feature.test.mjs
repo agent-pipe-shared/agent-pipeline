@@ -4,7 +4,7 @@ import test from "node:test";
 
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { finishFeature, oneShotClose } from "./finish-feature.mjs";
@@ -248,7 +248,7 @@ const sha256Of = (value) => createHash("sha256").update(value).digest("hex");
 const STATE_PATH = ".claude/pipeline-state.json";
 const COORD = new URL("./close-coordinator.mjs", import.meta.url).pathname;
 const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
-function oneShotFixture({ continuity = false, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false } = {}) {
+function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
   git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
@@ -256,7 +256,7 @@ function oneShotFixture({ continuity = false, verifyRed = false, securityBlockin
   writeFileSync(join(root, "specs/feature-abc/result.md"), "# Result\n");
   const resultSha = sha256Of("# Result\n");
   const stateValue = (nextAction) => ({ schema: "pipeline.state.v0", activeFeature: { id: "feature-abc" },
-    ...(continuity ? { continuity: { revision: 3, queueHead: { nextAction }, authority: { result: { path: "specs/feature-abc/result.md", sha256: resultSha } } } } : {}) });
+    ...(continuity ? { continuity: { revision: 3, queueHead: { nextAction }, authority: { result: resultBound ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
   const writeState = (value) => writeFileSync(join(root, STATE_PATH), `${JSON.stringify(value)}\n`);
   writeState(closed ? { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] } : stateValue("review"));
   git("add", "-A"); git("commit", "-q", "-m", "baseline");
@@ -332,6 +332,18 @@ test("P3: a feature with Continuity gets its Result close block and close reques
     assert.equal(f.calls[f.calls.indexOf("pipeline-state continuity-result-close-plan") + 1], "pipeline-state continuity-result-close-apply");
     const request = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/close-request.json"), "utf8"));
     assert.deepEqual(request, { schema: "pipeline.continuity-close.v0", featureId: "feature-abc", expectedRevision: 3, result: { path: "specs/feature-abc/result.md", sha256: f.resultSha }, closeEvidence: { path: "specs/feature-abc/evidence/verify-candidate.json", sha256: sha256Of(readFileSync(join(f.root, "specs/feature-abc/evidence/verify-candidate.json"))) } });
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C21B: a Continuity feature with no bound Result stops before Verify with the exact bootstrap chain and writes no close evidence", () => {
+  const f = oneShotFixture({ continuity: true, resultBound: false });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
+    assert.equal(stopped.stop.code, "ONESHOT-RESULT-NOT-BOUND");
+    assert.deepEqual(f.calls, [], "Verify and the package stages must not run");
+    for (const needle of ["continuity-result-bootstrap-plan", "applyAction", "reconcileCommand", "commit-pipeline-owned.mjs", `--critic-packet-id ${f.packetId}`]) assert.ok(stopped.stop.repair.includes(needle), needle);
+    for (const name of ["audit-request.json", "verify-candidate.json", "close-request.json"]) assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence", name)), false, name);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

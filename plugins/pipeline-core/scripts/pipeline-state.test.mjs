@@ -3443,6 +3443,29 @@ function c11SignatureFiles(fx, findings, { cand = candidate, reasonClass } = {})
 
 const c11Minor = [c11Finding("gap one", "minor"), c11Finding("gap two", "minor")];
 
+c11Case("C21B approve-critic-acknowledgement without proof flags prints the signing command, a partial proof set stays an error, and a proof path inside the repository names its cause", () => {
+  const fx = c11Fixture({ findings: c11Minor });
+  const printed = []; const originalLog = console.log; console.log = (line) => { printed.push(String(line)); };
+  try {
+    const receipt = { ...fx.made.receipt, independence: "caller-authored-fallback" };
+    const deps = { ...fx.deps, readConsumedCandidateReceiptFn: () => ({ packet: fx.made.packet, receipt }) };
+    const verb = ["approve-critic-acknowledgement", "--by", "PO", "--critic-packet", receipt.packetId];
+    const bound = JSON.parse(readFileSync(fx.statePathFile, "utf8")); // the signing command names the Continuity Spec, which this fixture otherwise leaves out
+    bound.continuity = { authority: { spec: { path: "specs/sprint-nova-epic/spec.md" } } };
+    writeFileSync(fx.statePathFile, JSON.stringify(bound, null, 2));
+    const omitted = capturedStderr(() => run(verb, deps));
+    assert.equal(omitted.result, 2, omitted.lines.join(" "));
+    assert.match(omitted.lines.join(" "), /CRITICAL-PROOF-FLAGS-PROOF-REQUIRED/u);
+    const signing = JSON.parse(printed.at(-1));
+    assert.equal(signing.schema, "pipeline.critic-acknowledgement-signing.v1"); assert.equal(signing.status, "signature-required"); assert.equal(signing.signatureCommand.executed, false);
+    const partial = capturedStderr(() => run([...verb, "--proof", join(fx.root, "proof.json")], deps));
+    assert.match(partial.lines.join(" "), /requires --by and --critic-packet/u);
+    const inside = join(fx.root, "scratch", "copy.json");
+    const copied = capturedStderr(() => run([...verb, "--proof-request", inside, "--proof-authority", inside, "--proof", inside], deps));
+    assert.match(copied.lines.join(" "), /CRITICAL-PROOF-EXTERNAL-PATH\)\. The three proof paths must be absolute/u);
+  } finally { console.log = originalLog; fx.cleanup(); }
+});
+
 c11Case("C11-a chat mode records an attended residual acceptance and the lifecycle then qualifies the failed all-minor receipt", () => {
   const fx = c11Fixture({ chat: true, findings: c11Minor });
   try {

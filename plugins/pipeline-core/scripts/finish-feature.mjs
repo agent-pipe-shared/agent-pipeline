@@ -259,6 +259,11 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
           `finish the Critic review (it records the packet), then run: ${rerunBase} --critic-packet-id <packet-id>`);
       }
       packetForRerun = packet;
+      // C21B: a Continuity feature without a bound Result cannot pass the Result close block below; stop BEFORE Verify, so no partial close evidence has to be cleaned up by hand.
+      if (state.continuity !== null && typeof state.continuity === "object" && state.continuity.queueHead?.nextAction !== "close" && !state.continuity.authority?.result) {
+        return stopResult("result-bootstrap", "ONESHOT-RESULT-NOT-BOUND", "Continuity authority.result is null, so this feature has no bound Implementation Result; nothing was written.",
+          `in the project root ${root} (the first command takes no flags and reads the working directory): (1) node ${STATE_WRITER} continuity-result-bootstrap-plan; (2) run the applyAction it returns; (3) when its completion prints a reconcileCommand, run it, and a plan that needs the PO also prints the signatureCommand for the PO; (4) node ${join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs")} --root ${root} --agent; (5) ${rerun(null)}`);
+      }
       stages.push("verify-candidate");
       const verify = runner(process.execPath, [VERIFY_PRODUCER, "--root", root, "--mode", "candidate", "--critic-packet-id", packet, "--critic-evidence-feature-id", featureId, "--out", verifyPath]);
       if (verify?.status !== 0) return stopResult("verify-candidate", "ONESHOT-VERIFY-RED", failedText(verify), `fix what the Verify output names without committing, then rerun the identical command: ${rerun(null)}`);

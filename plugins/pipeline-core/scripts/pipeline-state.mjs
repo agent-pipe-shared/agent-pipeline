@@ -9888,13 +9888,22 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
 // G20-39 (candidate 20): a PO acknowledgement of a caller-authored Critic for exactly one consumed packet and the candidate it reviewed. This is the
 // bridge for a runner that issues no Source return record; the close gate names this command as its one runnable repair. Recorded through the same
 // human-approval route as `feature-package-reconcile` (signature or chat per `gates.human_approval`), into the private approval store, never inferred.
+/** C21B: the cause and the next step behind the two proof refusals that otherwise leave an agent reading plugin source. Empty for every other code. */
+function criticalProofRefusalHint(code) {
+  if (code === "CRITICAL-PROOF-EXTERNAL-PATH") return " The three proof paths must be absolute, must exist and must lie outside this repository: pass the requestPath, authorityPath and proofPath the signing step printed, never a copy under scratch/ or anywhere else in the project.";
+  if (code === "CRITICAL-ACTION-REQUEST-MISMATCH") return " The signed request is not the one this action expects: sign the printed signatureCommand unchanged, because any edited value, --expires-at included, makes a different request. When its window has passed, run this command again without the proof flags to get a fresh one.";
+  return "";
+}
+
 function runApproveCriticAcknowledgement({ dir, rest, base, now, deps }) {
   const kind = CRITIC_ACKNOWLEDGEMENT_KIND;
-  const refuse = (code) => { console.error(`Error: approve-critic-acknowledgement refused (${code}).`); return 2; };
+  const refuse = (code) => { console.error(`Error: approve-critic-acknowledgement refused (${code}).${criticalProofRefusalHint(code)}`); return 2; };
   const configured = criticalProofWaiverFor(dir, kind);
   if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
   const waived = configured.waived === true;
-  const parsed = parseExactFlags(rest, new Set(waived ? ["by", "critic-packet"] : ["by", "critic-packet", "proof-request", "proof-authority", "proof"]));
+  // C21B: leaving all three proof flags out asks for the signing command, the same answer blank values get below; a partial set stays an error.
+  const proofOmitted = !["--proof-request", "--proof-authority", "--proof"].some((flag) => rest.includes(flag));
+  const parsed = parseExactFlags(rest, new Set(waived || proofOmitted ? ["by", "critic-packet"] : ["by", "critic-packet", "proof-request", "proof-authority", "proof"]));
   const flags = parsed.value ?? {};
   if (!parsed.ok || isBlank(flags.by) || isBlank(flags["critic-packet"])) {
     console.error("Error: approve-critic-acknowledgement requires --by and --critic-packet and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.");
