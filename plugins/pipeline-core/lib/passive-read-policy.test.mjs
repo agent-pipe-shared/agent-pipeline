@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import * as policyModule from "./passive-read-policy.mjs";
 import { isAllowedPassiveReadTarget } from "./passive-read-policy.mjs";
@@ -449,4 +449,172 @@ test("D109 native Windows spellings are classified by the same rules (string-lev
   assert.equal(refuses("C:\\Users\\Alice\\AppData\\Local\\Temp\\x.txt", { ...options, now: Date.parse("2099-01-01T00:00:00Z") }), true, "expired");
   assert.equal(refuses("C:\\Users", { ...options, recursive: true }), true);
   assert.equal(refuses("C:\\Users", { ...options, directoryListing: true }), false);
+});
+
+// C22B (AC-108, PO decision 2026-11-09): a recursive grep gets its own tree screen (option `allFiles`), because the rg inventory above follows rg's
+// hidden and ignore rules and grep -r does not: the measured gap was build/deploy.key under an ignored directory, .cache/deploy.key and .git/config,
+// which the rg screen passes and grep -r reads. The screen walks every entry under the operand, prunes only the directories named in `excludeDirs`,
+// does not descend a symbolic link (grep -r does not follow one met during the walk) and refuses beyond 10000 entries.
+function grepTreeFixture(t, { files = {}, links = {}, outside = {} } = {}) {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), "grep-tree-screen-")));
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  const root = join(fixture, "repo"), home = join(fixture, "home"), away = join(fixture, "away");
+  for (const directory of [root, home, away]) mkdirSync(directory);
+  const put = (base, table) => {
+    for (const [path, content] of Object.entries(table)) {
+      mkdirSync(dirname(join(base, path)), { recursive: true });
+      writeFileSync(join(base, path), content);
+    }
+  };
+  put(root, files);
+  put(away, outside);
+  for (const [path, target] of Object.entries(links)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    symlinkSync(typeof target === "function" ? target({ root, home, away }) : target, join(root, path));
+  }
+  const screen = (operand = ".", extra = {}) => isAllowedPassiveReadTarget(operand, {
+    rootDir: root, homeDir: home, recursive: true, allFiles: true,
+    machinePlaneRead: () => ({ status: "absent" }), repoKeyDirectory: () => ({ status: "absent" }), ...extra,
+  });
+  return { fixture, root, home, away, screen };
+}
+
+test("C22B grep screen: a secret name is refused wherever it sits, including under hidden and ignored directories that the rg inventory skips", (t) => {
+  const plain = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", "src/deep/b.txt": "NEEDLE", "docs/c.md": "NEEDLE" } });
+  assert.equal(plain.screen("."), true, "an ordinary tree is admitted");
+  assert.equal(plain.screen("src"), true, "a subdirectory is admitted");
+  for (const [name, files] of Object.entries({
+    "dotenv at the top": { "src/a.txt": "NEEDLE", ".env": "NEEDLE=fake" },
+    "dotenv variant": { "src/a.txt": "NEEDLE", "config/.env.local": "NEEDLE=fake" },
+    "key under an ignored directory": { "src/a.txt": "NEEDLE", "build/deploy.key": "NEEDLE fake", ".ignore": "build/\n", ".gitignore": "build/\n" },
+    "key under a hidden directory": { "src/a.txt": "NEEDLE", ".cache/deploy.key": "NEEDLE fake" },
+    "pem deep in a tree": { "src/a.txt": "NEEDLE", "a/b/c/d/server.pem": "NEEDLE fake" },
+    "credentials file in a hidden directory": { "src/a.txt": "NEEDLE", ".aws-local/credentials": "NEEDLE fake" },
+  })) {
+    const tree = grepTreeFixture(t, { files });
+    assert.equal(tree.screen("."), false, name);
+  }
+});
+
+test("C22B grep screen: a .git directory or a .git file refuses the operand unless the command excludes it by name; the operand itself may not sit inside .git", (t) => {
+  const directory = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".git/config": "url = https://NEEDLE:fake@example.invalid/x\n", ".git/HEAD": "ref: refs/heads/main\n", ".git/refs/heads/main": "0000\n" } });
+  assert.equal(directory.screen("."), false, ".git directory");
+  assert.equal(directory.screen(".", { excludeDirs: [".git"] }), true, "excluded by name");
+  assert.equal(directory.screen(".", { excludeDirs: ["node_modules"] }), false, "another excluded name does not help");
+  assert.equal(directory.screen(".git"), false, "the operand is the .git directory");
+  assert.equal(directory.screen(".git", { excludeDirs: [".git"] }), false, "excluding the name does not exempt an operand that is already inside it");
+  assert.equal(directory.screen(".git/refs"), false, "an operand inside .git");
+  const worktree = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".git": "gitdir: ../elsewhere/.git/worktrees/w\n" } });
+  assert.equal(worktree.screen("."), false, ".git file (a worktree)");
+  assert.equal(worktree.screen(".", { excludeDirs: [".git"] }), true, "excluded by name");
+  const nested = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", "vendor/lib/.git/config": "x\n" } });
+  assert.equal(nested.screen("."), false, "a nested .git directory");
+  assert.equal(nested.screen(".", { excludeDirs: [".git"] }), true, "excluded at any depth by name");
+  const shouting = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".GIT/config": "x\n" } });
+  assert.equal(shouting.screen(".", { excludeDirs: [".git"] }), false, "the name is compared case-insensitively for refusal and exactly for exclusion");
+});
+
+test("C22B grep screen: excludeDirs prunes exactly the directories it names, at any depth, and relaxes nothing else", (t) => {
+  const tree = grepTreeFixture(t, { files: {
+    "src/a.txt": "NEEDLE", ".git/config": "x\n", "node_modules/pkg/deploy.key": "fake\n", "src/node_modules/pkg/x.pem": "fake\n", "node_modules_extra/y.key": "fake\n",
+  } });
+  assert.equal(tree.screen(".", { excludeDirs: [".git", "node_modules"] }), false, "a similar name is not the named directory: node_modules_extra holds a key");
+  const only = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".git/config": "x\n", "node_modules/pkg/deploy.key": "fake\n", "src/node_modules/pkg/x.pem": "fake\n" } });
+  assert.equal(only.screen(".", { excludeDirs: [".git"] }), false, "a key under node_modules is not pruned by .git");
+  assert.equal(only.screen(".", { excludeDirs: [".git", "node_modules"] }), true, "both named directories pruned at every depth");
+  const topKey = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".env": "NEEDLE=fake", ".git/config": "x\n" } });
+  assert.equal(topKey.screen(".", { excludeDirs: [".git", "node_modules"] }), false, "a secret name is never relaxed by an exclusion");
+  for (const bad of [[".git/hooks"], ["*"], [""], [".."], [".git\\hooks"], "node_modules", null]) {
+    assert.equal(only.screen(".", { excludeDirs: bad }), false, `a name that is not a plain directory name prunes nothing: ${JSON.stringify(bad)}`);
+  }
+});
+
+test("C22B grep screen: a symbolic link is not descended, but its name and its resolved target are screened; a link out of the tree is refused; a dangling link is ignored", (t) => {
+  const inside = grepTreeFixture(t, {
+    files: { "src/a.txt": "NEEDLE", "docs/b.md": "NEEDLE" },
+    links: { "alias.txt": "src/a.txt", "docs/up": "..", "loop": ".", "dangling": "does-not-exist", "dangling-out": ({ away }) => join(away, "missing") },
+  });
+  assert.equal(inside.screen("."), true, "links to in-tree targets, a cycle and dangling links are admitted without a walk through them");
+  const secretName = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE" }, links: { "deploy.key": "src/a.txt" } });
+  assert.equal(secretName.screen("."), false, "the link NAME is screened");
+  const toSecret = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE" }, outside: { "id_rsa": "fake\n" }, links: { "notes.txt": ({ away }) => join(away, "id_rsa") } });
+  assert.equal(toSecret.screen("."), false, "the resolved target is screened");
+  const toRoot = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE" }, links: { "mine": ({ home }) => home } });
+  mkdirSync(join(toRoot.home, ".ssh"));
+  assert.equal(toRoot.screen(".", { credentialRoots: [join(toRoot.home, ".ssh")] }), false, "a link out of the tree to a directory holding a protected root");
+  const leaves = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE" }, outside: { "plain.txt": "harmless\n" }, links: { "out.txt": ({ away }) => join(away, "plain.txt"), "outdir": ({ away }) => away } });
+  assert.equal(leaves.screen("."), false, "a link that leads out of the tree is refused, although grep -r would not read through it (conservative on purpose)");
+  const viaOperand = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", "other/.env": "NEEDLE=fake" }, links: { "view": "src", "bad": "other" } });
+  assert.equal(viaOperand.screen("view"), true, "grep -r follows a link given on the command line, so the operand is walked through its target");
+  assert.equal(viaOperand.screen("bad"), false, "and the target's content is judged");
+});
+
+test("C22B grep screen: more than 10000 entries are refused, exactly 10000 are admitted", (t) => {
+  const tree = grepTreeFixture(t, { files: { "a.txt": "x" } });
+  mkdirSync(join(tree.root, "many"));
+  for (let index = 0; index < 9998; index += 1) writeFileSync(join(tree.root, "many", `f${index}.txt`), "");
+  // root + many/ + a.txt + 9998 files = 10001 entries
+  assert.equal(tree.screen("many"), true, "9998 files + the directory = 9999 entries");
+  assert.equal(tree.screen("."), false, "10001 entries");
+  writeFileSync(join(tree.root, "many", "one-more.txt"), "");
+  assert.equal(tree.screen("many"), true, "exactly 10000 entries (9999 files + the directory) are admitted");
+  writeFileSync(join(tree.root, "many", "two-more.txt"), "");
+  assert.equal(tree.screen("many"), false, "10001 entries are refused");
+});
+
+test("C22B grep screen: the rg route is unchanged and the option is off by default", (t) => {
+  const hidden = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".cache/deploy.key": "NEEDLE fake", ".git/config": "x\n" } });
+  assert.equal(hidden.screen(".", { allFiles: true }), false);
+  const rg = spawnSync("rg", ["--version"], { encoding: "utf8" });
+  if (rg.status === 0) {
+    assert.equal(hidden.screen(".", { allFiles: false }), true, "the rg inventory skips hidden directories: byte for byte the previous verdict");
+    assert.equal(hidden.screen(".", { allFiles: undefined }), true, "the option is off unless asked for");
+  }
+  assert.equal(hidden.screen("src/a.txt", { allFiles: true }), true, "a single file is judged like any exact file");
+  assert.equal(hidden.screen(".cache/deploy.key", { allFiles: true }), false, "a secret file operand stays refused");
+});
+
+// The measurement that backs the screen: run the REAL grep -r over each fixture and compare what it opened with what the screen approved.
+// `grep -rc` prints one line per file it reads, matching or not. Read oracle (independent of the screen): a file is sensitive when its name
+// is a secret name or when it sits inside a .git directory. A `.git` FILE (worktree pointer) holds only a gitdir line and is not sensitive;
+// the screen refuses it unless the command excludes the name, as the briefing for this change states.
+const SENSITIVE_NAME = /^(?:\.env(?:\..*)?|id_rsa|credentials|.*\.(?:key|pem|p12|pfx))$/u;
+function sensitiveRead(relative) {
+  const parts = relative.split("/");
+  return parts.slice(0, -1).includes(".git") || SENSITIVE_NAME.test(parts[parts.length - 1]);
+}
+function gnuGrep() {
+  const probe = spawnSync("grep", ["--version"], { encoding: "utf8" });
+  return probe.status === 0 && /GNU grep/u.test(probe.stdout) ? "grep" : null;
+}
+
+test("C22B grep screen: what the real grep -r opens is inside what the screen approved (the screen admits only trees in which nothing sensitive is read)", (t) => {
+  if (gnuGrep() === null) { t.skip("GNU grep is not available on this host"); return; }
+  const fixtures = [
+    { name: "plain", files: { "src/a.txt": "NEEDLE", "docs/b.md": "NEEDLE" }, admit: true },
+    { name: "dotenv at the top", files: { "src/a.txt": "NEEDLE", ".env": "NEEDLE=fake" }, admit: false },
+    { name: "dotenv ignored by name", files: { "src/a.txt": "NEEDLE", ".env": "NEEDLE=fake", ".ignore": ".env\n" }, admit: false },
+    { name: "key under an ignored directory", files: { "src/a.txt": "NEEDLE", "build/deploy.key": "NEEDLE fake", ".ignore": "build/\n", ".gitignore": "build/\n" }, admit: false },
+    { name: "key under a hidden directory", files: { "src/a.txt": "NEEDLE", ".cache/deploy.key": "NEEDLE fake" }, admit: false },
+    { name: ".git directory", files: { "src/a.txt": "NEEDLE", ".git/config": "url = https://NEEDLE:fake@example.invalid/x\n" }, admit: false },
+    { name: ".git directory, excluded by name", files: { "src/a.txt": "NEEDLE", ".git/config": "url = https://NEEDLE:fake@example.invalid/x\n" }, excludeDirs: [".git"], admit: true },
+    { name: ".git file, excluded by name", files: { "src/a.txt": "NEEDLE", ".git": "gitdir: ../w/.git/worktrees/w\n" }, excludeDirs: [".git"], admit: true },
+    { name: "node_modules pruned and key kept out of reach", files: { "src/a.txt": "NEEDLE", "node_modules/p/deploy.key": "NEEDLE fake" }, excludeDirs: ["node_modules"], admit: true },
+    { name: "link to a secret outside the tree", files: { "src/a.txt": "NEEDLE" }, outside: { "id_rsa": "NEEDLE fake\n" }, links: { "notes.txt": ({ away }) => join(away, "id_rsa") }, admit: false, linkNotRead: "notes.txt" },
+    { name: "link out of the tree to a directory", files: { "src/a.txt": "NEEDLE" }, outside: { "plain.txt": "NEEDLE\n" }, links: { "outdir": ({ away }) => away }, admit: false, linkNotRead: "outdir" },
+    { name: "link inside the tree", files: { "src/a.txt": "NEEDLE" }, links: { "alias.txt": "src/a.txt", "loop": "." }, admit: true, linkNotRead: "alias.txt" },
+  ];
+  for (const fixture of fixtures) {
+    const tree = grepTreeFixture(t, fixture);
+    const args = ["-rc", "NEEDLE", ".", ...(fixture.excludeDirs ?? []).map((name) => `--exclude-dir=${name}`)];
+    const real = spawnSync("grep", args, { cwd: tree.root, encoding: "utf8", env: { ...process.env, LC_ALL: "C" } });
+    const opened = real.stdout.split("\n").filter(Boolean).map((line) => line.slice(0, line.lastIndexOf(":")).replace(/^\.\//u, ""));
+    assert.ok(opened.length > 0, `${fixture.name}: grep opened something`);
+    const sensitive = opened.filter(sensitiveRead);
+    const admitted = tree.screen(".", { excludeDirs: fixture.excludeDirs });
+    assert.equal(admitted, fixture.admit, `${fixture.name}: screen verdict`);
+    if (admitted) assert.deepEqual(sensitive, [], `${fixture.name}: the screen approved a tree in which grep -r opened a sensitive file`);
+    else if (fixture.linkNotRead === undefined) assert.ok(sensitive.length > 0, `${fixture.name}: a refusal in this table must be a read that really happens (${opened.join(", ")})`);
+    if (fixture.linkNotRead !== undefined) assert.equal(opened.includes(fixture.linkNotRead), false, `${fixture.name}: grep -r does not read a link met during the walk`);
+  }
 });

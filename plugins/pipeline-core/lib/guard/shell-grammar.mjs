@@ -9,7 +9,7 @@ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
 // Expose the policy-owned binding; shell decisions continue through the same policy function.
 export { PASSIVE_READ_CREDENTIAL_ROOTS };
-import { expandBooleanShortClusters, gitShowObjectOperand, isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+import { expandBooleanShortClusters, gitShowObjectOperand, isBoundedFilenameFilter, isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM } from "./constants.mjs";
 import { MAX_AND_CHAIN_SEGMENTS } from "./grammar-denials.mjs";
 import { commandPath, isProjectWritePath, isRealpathedWithinBoundary, pathInside, rawReadCandidatePath } from "./path-containment.mjs";
@@ -922,15 +922,63 @@ export function isSafeExactPassiveFile(raw, root, extraRoots = []) {
 
 const GREP_CONTEXT_FLAG = /^-([ABC])([0-9]{1,3})?$/u;
 
+// C22B (AC-108, PO decision 2026-11-09): the narrowing filters of a recursive grep. `--include`/`--exclude` take the bounded filename shape rg's `-g` has;
+// `--exclude-dir` takes one plain directory name (no slash, no glob). Each kind may appear at most 8 times. Only `--exclude-dir` changes what the tree
+// screen visits (it prunes exactly that name); `--include` and `--exclude` only narrow what grep prints and relax nothing.
+const GREP_FILTER_LIMIT = 8;
+const GREP_EXCLUDE_DIR_NAME = /^[A-Za-z0-9._][A-Za-z0-9._-]{0,63}$/u;
+
+/** @returns {{kind: string, value: string|undefined, used: number}|null} the filter spelled at `at` (`--include=G`, `--include G`, `--exclude=G`, `--exclude-dir=N`), else null. Pure. */
+function parseGrepFilter(list, at) {
+  const token = list[at];
+  if (typeof token !== "string") return null;
+  const attached = /^--(include|exclude|exclude-dir)=(.*)$/su.exec(token);
+  if (attached !== null) return { kind: attached[1], value: attached[2], used: 1 };
+  return token === "--include" ? { kind: "include", value: list[at + 1], used: 2 } : null;
+}
+
+/** True when the filter has a valid value and the kind is still within its limit; records it. */
+function acceptGrepFilter(filter, filters) {
+  const { kind, value } = filter;
+  if (typeof value !== "string") return false;
+  if (kind === "exclude-dir") {
+    if (value === "." || value === ".." || !GREP_EXCLUDE_DIR_NAME.test(value)) return false;
+    filters.excludeDirs.push(value);
+  } else if (!isBoundedFilenameFilter(value)) return false;
+  filters.count[kind] = (filters.count[kind] ?? 0) + 1;
+  return filters.count[kind] <= GREP_FILTER_LIMIT;
+}
+
+// `grep -r` operand: a file or a directory; a directory goes through the all-files tree screen, which prunes exactly the --exclude-dir names.
+function isSafeRecursiveGrepOperand(raw, root, extraRoots, excludeDirs) {
+  if (typeof raw !== "string" || !raw || !isAllowedPassiveReadTarget(raw, {
+    rootDir: root, recursive: true, allFiles: true, excludeDirs, additionalRecursiveRoots: extraRoots,
+  })) return false;
+  try {
+    const observed = statSync(passiveCandidate(raw, root));
+    return observed.isFile() || observed.isDirectory();
+  } catch { return false; }
+}
+
 function isSafeExactGrepArgs(grepArgs, root, extraRoots = []) {
-  const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename", "-o", "--only-matching"]); // TR-B-F (T74): match-output spellings; the operand loop below is unchanged.
+  const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename", "-o", "--only-matching", // TR-B-F (T74): match-output spellings; the operand loop below is unchanged.
+    "-r", "--recursive", "-l", "--files-with-matches", "-w", "--word-regexp", "-s", "--no-messages"]); // C22B (PO decision 2026-11-09): -r only widens the operand rule below; -R, -f, -P and -z stay refused.
   // C22B: a cluster of boolean flags admitted above on their own (`-in`) is read as those flags; a cluster holding -A/-B/-C/-m or any other letter stays refused.
   const args = expandBooleanShortClusters(grepArgs, flags);
   let index = 0;
   let maxCountSeen = false;
+  let recursive = false;
+  const filters = { excludeDirs: [], count: {} };
   const contextSeen = new Set();
-  while (flags.has(args[index]) || args[index] === "-m" || args[index] === "--max-count" || GREP_CONTEXT_FLAG.test(args[index] ?? "")) {
-    if (flags.has(args[index])) { index += 1; continue; }
+  while (flags.has(args[index]) || args[index] === "-m" || args[index] === "--max-count" || GREP_CONTEXT_FLAG.test(args[index] ?? "")
+    || parseGrepFilter(args, index) !== null) {
+    const filter = parseGrepFilter(args, index);
+    if (filter !== null) {
+      if (!acceptGrepFilter(filter, filters)) return false;
+      index += filter.used;
+      continue;
+    }
+    if (flags.has(args[index])) { recursive ||= args[index] === "-r" || args[index] === "--recursive"; index += 1; continue; }
     // C21 (AC-108): -A, -B and -C only print neighbouring lines of an operand the checks below already admit. One bounded value (1..3 digits) each, in the
     // separate (`-C 5`) or the attached (`-C5`) spelling; a repeated letter, a cluster holding a context flag (`-nC5`) and the long spellings stay refused. A cluster of plain boolean flags (`-in`) is admitted (C22B).
     const context = GREP_CONTEXT_FLAG.exec(args[index] ?? "");
@@ -950,9 +998,17 @@ function isSafeExactGrepArgs(grepArgs, root, extraRoots = []) {
   if (endedOptions) index += 1;
   const pattern = args[index++];
   if (typeof pattern !== "string" || !pattern || (!endedOptions && pattern.startsWith("-"))) return false;
-  const paths = args.slice(index);
+  // C22B: the filters may also follow the operands (`grep -rn x . --exclude-dir=.git`), as GNU grep reads them; every other dash-led word is still refused below.
+  const paths = [];
+  while (index < args.length) {
+    const filter = endedOptions ? null : parseGrepFilter(args, index);
+    if (filter === null) { paths.push(args[index]); index += 1; continue; }
+    if (!acceptGrepFilter(filter, filters)) return false;
+    index += filter.used;
+  }
+  // With -r, and only with -r, an operand may be a directory (screened by its own all-files rule); otherwise the exact-file rule is unchanged.
   return paths.length > 0 && paths.every((path) => !path.startsWith("-")
-    && isSafeExactPassiveFile(path, root, extraRoots));
+    && (recursive ? isSafeRecursiveGrepOperand(path, root, extraRoots, filters.excludeDirs) : isSafeExactPassiveFile(path, root, extraRoots)));
 }
 
 // Directory enumeration may expose immediate child names only. Checking the

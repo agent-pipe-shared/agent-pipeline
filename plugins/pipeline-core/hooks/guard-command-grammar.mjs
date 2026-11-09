@@ -67,7 +67,8 @@ export function expandBooleanShortClusters(args, booleans) {
   return expanded;
 }
 
-function isBoundedFilenameFilter(value) {
+// Exported for lib/guard/shell-grammar.mjs: `grep --include=`/`--exclude=` take the same bounded filename shape as rg's `-g` (C22B, AC-108).
+export function isBoundedFilenameFilter(value) {
   // Test-module suffixes are filename data too: the observed `*.test.mjs`
   // read has the same traversal boundary as `*.mjs`. Keep the extension
   // bound and optional literal test marker, rather than admitting arbitrary

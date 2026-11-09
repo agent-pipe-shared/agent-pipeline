@@ -83,6 +83,52 @@ export function clusterSpellingHint(command, flag, root) {
   return `a combined short-flag cluster is not admitted here; give each flag on its own: ${split.join(" ")}`;
 }
 
+// C22B (PO decision 2026-11-09): a recursive grep is admitted behind its own all-files tree screen. When the screen refuses the tree, no single flag is
+// at fault, so this names ONE spelling of the same search that the grammar itself admits: the command with the missing `--exclude-dir=.git`, else the
+// `rg` form (rg skips hidden entries by its own rule). A spelling is printed only after `isReadOnlyDiagnosticCommand` admitted exactly that string, so
+// it is never a guess; the rg form is built only from flags rg reads the same way, and a command with a filter, `--`, -R, a pipeline or a redirect gets none.
+const SHELL_SAFE_WORD = /^[A-Za-z0-9_@%+=:,./-]+$/u;
+const shellWord = (word) => (SHELL_SAFE_WORD.test(word) ? word : quote(word));
+const RG_SAME_MEANING_LETTERS = new Set(["n", "i", "l", "w", "F", "v", "c", "H", "o"]);
+
+function rgSpellingOf(argv) {
+  const letters = [];
+  let at = 0;
+  for (; at < argv.length && argv[at].startsWith("-"); at += 1) {
+    if (argv[at] === "--recursive") continue;
+    if (!/^-[A-Za-z]+$/u.test(argv[at])) return null;
+    for (const letter of argv[at].slice(1)) {
+      if (letter === "r" || letter === "E") continue; // recursion is rg's default; its patterns are regular expressions already
+      if (!RG_SAME_MEANING_LETTERS.has(letter)) return null;
+      if (!letters.includes(letter)) letters.push(letter);
+    }
+  }
+  const rest = argv.slice(at);
+  if (rest.length < 2 || rest.some((word) => word.startsWith("-"))) return null;
+  if (!letters.some((letter) => "nlc".includes(letter))) letters.unshift("n");
+  return ["rg", `-${letters.join("")}`, ...rest];
+}
+
+/** @returns {string|null} one command, admitted by the grammar as written, that searches the same tree; null whenever none can be proven. */
+export function recursiveGrepHint(command, root) {
+  if (typeof command !== "string" || command.trim() === "") return null;
+  let parsed;
+  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
+  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
+  const { executable, argv } = parsed.segments[0];
+  if (String(executable).split("/").pop() !== "grep" || argv.includes("--")) return null;
+  if (!argv.some((word) => word === "--recursive" || /^-[A-Za-z]*r[A-Za-z]*$/u.test(word))) return null;
+  if (isReadOnlyDiagnosticCommand(command, root)) return null;
+  const admitted = (words) => isReadOnlyDiagnosticCommand(words.map(shellWord).join(" "), root);
+  if (!argv.includes("--exclude-dir=.git") && argv.filter((word) => word.startsWith("--exclude-dir=")).length < 8) {
+    const words = ["grep", ...argv, "--exclude-dir=.git"];
+    if (admitted(words)) return words.map(shellWord).join(" ");
+  }
+  const rg = rgSpellingOf(argv);
+  return rg !== null && admitted(rg) ? rg.map(shellWord).join(" ") : null;
+}
+
 const NAMES_ONLY_LS_FLAGS = new Set(["-1", "-a", "-A"]);
 
 /**

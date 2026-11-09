@@ -63,7 +63,9 @@ test("C21 grep context flags -A -B -C take a 1..3 digit number (separate or atta
       "grep -C 1000 needle scan.txt", "grep -C -1 needle scan.txt", "grep -C x needle scan.txt", "grep -C needle scan.txt", "grep -C", "grep -C 5 -C 6 needle scan.txt",
       "grep -C5 -C5 needle scan.txt", "grep -A 2 -A 3 needle scan.txt", "grep -C 05x needle scan.txt", "grep -nC5 needle scan.txt", "grep -C 5 needle .aws/credentials",
       "grep -C 5 needle scan.txt > output.txt", "grep -C 5 needle $(touch scan.txt)", "grep -C 5 -f scan.txt scan.txt",
-      "grep -C 5 --include '*.txt' needle scan.txt", "grep --context 5 needle scan.txt", "grep --context=5 needle scan.txt", "grep -C 5 --pre cat needle scan.txt",
+      // QG-04, restated in place (PO decision of 2026-11-09, recursive grep with --include/--exclude/--exclude-dir filters): `--include '*.txt'` is an admitted
+      // filter now; the unadmitted long option this row stood for (a value-taking option the grammar does not know) is `--exclude-from`, which stays refused.
+      "grep -C 5 --exclude-from scan.txt needle scan.txt", "grep --context 5 needle scan.txt", "grep --context=5 needle scan.txt", "grep -C 5 --pre cat needle scan.txt",
       "grep -C 5 needle", "grep -C 5 needle scan.txt | tee out.txt",
     ]) assert.equal(admitted(command), false, command);
   } finally { rmSync(base, { recursive: true, force: true }); }

@@ -308,6 +308,54 @@ function safeRecursiveTree(start, protectedRoots, realpath, stat) {
   return true;
 }
 
+// C22B (AC-108, PO decision 2026-11-09): the tree screen of a recursive `grep -r`. The rg inventory above follows rg's hidden and ignore rules, so it
+// passes build/deploy.key under an ignored directory, .cache/deploy.key and .git/config, which grep -r reads. This screen uses no rg and no ignore
+// semantics: it visits EVERY entry under the operand (the same bound as the fallback above: 10000 entries, refused beyond) and refuses on any secret
+// name or protected root. A `.git` directory or file anywhere in the tree (or an operand inside one) refuses, unless the caller names `.git` in
+// `excludeDirs`. `excludeDirs` holds plain directory names only; a directory with such a name is pruned at any depth, which is exactly what
+// `grep --exclude-dir=<name>` does, and nothing else is relaxed. A symbolic link met during the walk is not descended (grep -r does not follow it):
+// its name and its resolved target are screened, a link that leads out of the operand's tree is refused, a dangling link is ignored.
+const ALL_FILES_ENTRY_LIMIT = 10000;
+const isGitMetadataName = (name) => name.toLowerCase() === ".git";
+
+function safeAllFilesTree(start, protectedRoots, realpath, excludeDirs) {
+  // Exact spelling on every platform: grep's own --exclude-dir compares case-sensitively, so a case-folded prune could skip a directory grep still reads.
+  const excluded = new Set((Array.isArray(excludeDirs) ? excludeDirs : [])
+    .filter((name) => typeof name === "string" && name !== "" && name !== "." && name !== ".." && !/[\0\\/*?[\]{}]/u.test(name)));
+  let startPhysical;
+  try { startPhysical = realpath(start); }
+  catch { return false; }
+  if ([resolve(start), startPhysical].some((identity) => identity.split(sep).some(isGitMetadataName))) return false;
+  const pending = [{ path: start, physical: startPhysical }];
+  let entries = 1;
+  while (pending.length) {
+    const { path, physical } = pending.pop();
+    let children;
+    try { children = readdirSync(path, { withFileTypes: true }); }
+    catch { return false; }
+    for (const child of children) {
+      if (++entries > ALL_FILES_ENTRY_LIMIT) return false;
+      const name = child.name;
+      if (child.isDirectory() && excluded.has(name)) continue;
+      if (isGitMetadataName(name) && !excluded.has(name)) return false;
+      if (SECRET_BASENAME.test(name)) return false;
+      const childPath = resolve(path, name);
+      const childPhysical = resolve(physical, name);
+      if (protectedRoots.some((root) => within(root, childPath) || within(root, childPhysical))) return false;
+      if (child.isSymbolicLink()) {
+        let target;
+        try { target = realpath(childPath); }
+        catch { continue; }
+        if (!within(startPhysical, target) || SECRET_BASENAME.test(basename(target))
+          || protectedRoots.some((root) => within(root, target))) return false;
+        continue;
+      }
+      if (child.isDirectory()) pending.push({ path: childPath, physical: childPhysical });
+    }
+  }
+  return true;
+}
+
 // PO decision D210 (AC-147 catalog half, AC-209): a recursive search INSIDE one directory the host declared (the sealed private
 // record of lib/host-skill-catalog.mjs, written only by the host readback and verified here against the current filesystem) is
 // the one thing a valid declaration adds over D96/D108. The directory must contain the operand under BOTH identities, the
@@ -330,6 +378,7 @@ function insideDeclaredDirectory(raw, rootDir, homeDir, lexical, physical, looku
 export function isAllowedPassiveReadTarget(raw, {
   rootDir, homeDir = homedir(), credentialRoots = [], recursive = false, directoryListing = false,
   additionalRecursiveRoots = [], declaredDirectories = declaredSkillDirectories,
+  allFiles = false, excludeDirs = [],
   realpath = realpathSync.native ?? realpathSync, stat = statSync,
   repoKeyDirectory = resolveRepoScopedDirectory,
   machinePlaneRead = readMachinePlane,
@@ -475,7 +524,10 @@ export function isAllowedPassiveReadTarget(raw, {
     try { observed = stat(candidate); }
     catch { return false; }
     if (directoryListing && inAdditional && !observed.isFile() && !observed.isDirectory()) return false;
-    if (observed.isDirectory() && !safeRecursiveTree(candidate, protectedRoots, realpath, stat)) return false;
+    // C22B: `allFiles` asks for the all-files screen of a recursive grep; every other caller keeps the rg inventory screen unchanged.
+    if (observed.isDirectory() && !(allFiles === true
+      ? safeAllFilesTree(candidate, protectedRoots, realpath, excludeDirs)
+      : safeRecursiveTree(candidate, protectedRoots, realpath, stat))) return false;
   }
   return true;
 }

@@ -139,7 +139,9 @@ export const ADMITTED_GRAMMAR_SHAPES = [
     // C21 (AC-108): the listing and context forms a worker tries first; the paths are judged by the same scope as every other read.
     spelling: "listing and context forms of those commands: \"rg --files <dir>...\"; a context flag \"-A N\" / \"-B N\" / \"-C N\" (grep: N of 1..3 digits, separate or attached "
       + "as -C5; rg: N up to 500, separate); \"ls\" with -l -a -R -1 -h (or combined, e.g. -la) over contained paths; listing a directory the project has yet to create is admitted; "
-      + "rg and grep also take a combined cluster of flags that are each admitted on their own and take no value (e.g. -in); a flag with a value, such as -A or -m, stays separate",
+      + "rg and grep also take a combined cluster of flags that are each admitted on their own and take no value (e.g. -in); a flag with a value, such as -A or -m, stays separate; "
+      + "\"grep -rn <pattern> <dir>\" (also -rl, -ril, --include=GLOB, --exclude=GLOB) reads every file under the directory, hidden and ignored ones too, so it is admitted only when the tree holds no secret-named file and no .git "
+      + "(add --exclude-dir=.git, at most 8 --exclude-dir=NAME) -- otherwise use \"rg -n <pattern> <dir>\"; -R is not admitted",
     example: "grep -n -C 5 needle probe.txt",
   },
   {

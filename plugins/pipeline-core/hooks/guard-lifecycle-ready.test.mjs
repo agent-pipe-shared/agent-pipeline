@@ -2259,13 +2259,23 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write 
     mkdirSync(join(path, "plugins/pipeline-core/hooks"), { recursive: true });
     writeFileSync(join(path, "backlog/items/passive-probe.txt"), "pattern fixture\n");
     writeFileSync(join(path, "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"), "// pattern fixture\n");
-    // SEC-11: grep is an exact-file read lane; recursive -rl is unsupported.
+    // SEC-11: grep is an exact-file read lane; the dereferencing recursive -Rl is unsupported. QG-04, restated in place (PO decision of 2026-11-09, recursive grep
+    // behind its own all-files tree screen): these three used `-rl`, which is now admitted for a clean tree (below, same shapes, same chain and redirect rules);
+    // `-R` stays refused, so what each case proves (the chain, the redirect and the head sink do not turn an unsupported grep into an admitted one) is unchanged.
+    for (const command of [
+      'grep -Rl "pattern" backlog/items/ 2>/dev/null',
+      'git rev-parse HEAD && grep -Rl "pattern" backlog/items/ | head -n 5',
+      'grep -Rl "pattern" backlog/items/ | head -n 5 && git status',
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+    }
     for (const command of [
       'grep -rl "pattern" backlog/items/ 2>/dev/null',
       'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | head -n 5',
       'grep -rl "pattern" backlog/items/ | head -n 5 && git status',
     ]) {
-      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
       assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
     }
     for (const command of [
@@ -2339,6 +2349,7 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write 
       "git status || git log",
       "git status && printf $'format %s\\n' && git log",
       // Trailing pipe where sink is neither grep nor head fails closed
+      // (QG-04: this one proves the `| cat` sink stays refused; the recursive source is admitted now, the sink is what is refused, so it is unchanged.)
       'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | cat',
       // Disclosed exclusion: a git global -c flag is never a subcommand match, so the
       // segment fails the read-only classifier and the chain fails closed by construction.

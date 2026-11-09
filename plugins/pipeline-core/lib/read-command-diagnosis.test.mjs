@@ -4,8 +4,11 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint } from "./read-command-diagnosis.mjs";
+import * as diagnosis from "./read-command-diagnosis.mjs";
 import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -213,12 +216,14 @@ const CLUSTER_ROWS = [
   ["grep -nA 2 needle README.md", "grep -n -A 2 needle README.md", false, true],
   ["grep -ne needle README.md", "grep -n -e needle README.md", false, false],
   ["grep -nf README.md README.md", "grep -n -f README.md README.md", false, false],
-  // grep: members that are not admitted on their own (recursion, files-with-matches, perl regex, no-messages, devices)
-  ["grep -rn needle README.md", "grep -r -n needle README.md", false, false],
+  // grep: members that are not admitted on their own (follow-recursion, perl regex, devices). QG-04, restated in place (PO decision of 2026-11-09, recursive
+  // grep behind its own screen; RCD22-RCD24): -r, -l and -s are now admitted flags, so the rows that pinned them as refused say admitted, in the cluster and
+  // spelled out alike; the rule this table pins (a cluster is never admitted where its spelled-out form is refused) is unchanged and still asserted below.
+  ["grep -rn needle README.md", "grep -r -n needle README.md", true, true],
   ["grep -nR needle README.md", "grep -n -R needle README.md", false, false],
-  ["grep -nl needle README.md", "grep -n -l needle README.md", false, false],
+  ["grep -nl needle README.md", "grep -n -l needle README.md", true, true],
   ["grep -nP needle README.md", "grep -n -P needle README.md", false, false],
-  ["grep -ns needle README.md", "grep -n -s needle README.md", false, false],
+  ["grep -ns needle README.md", "grep -n -s needle README.md", true, true],
   ["grep -nz needle README.md", "grep -n -z needle README.md", false, false],
   // grep: a cluster never widens the target
   ["grep -in needle ../outside.txt", "grep -i -n needle ../outside.txt", false, false],
@@ -253,7 +258,9 @@ test("RCD20: C22B - a refused cluster that holds a value-taking flag still print
 test("RCD21: C22B - every runner route reaches the same cluster grammar: Claude, Codex and Antigravity guard runs and the PowerShell tool agree with the Bash verdict", async () => {
   const guard = await import("../hooks/guard-lifecycle-ready.mjs");
   for (const runner of ["claude", "codex", "antigravity"]) {
-    for (const [command, exitCode] of [["rg -ln needle README.md", 0], ["grep -in needle README.md", 0], ["rg -nA 5 needle README.md", 2], ["grep -rn needle README.md", 2]]) {
+    // QG-04, restated in place (PO decision of 2026-11-09, recursive grep behind its own screen): this row pinned `grep -rn` as refused. It now uses -R,
+    // which stays refused (it follows links), so the claim of this case - every runner reaches the one grammar and agrees on a refusal - is unchanged.
+    for (const [command, exitCode] of [["rg -ln needle README.md", 0], ["grep -in needle README.md", 0], ["rg -nA 5 needle README.md", 2], ["grep -nR needle README.md", 2]]) {
       const result = await guard.evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, {
         projectDir: root, runner,
         inspectProjectOnboardingV3Fn() { throw new Error("fixture: no onboarding observation"); },
@@ -291,6 +298,146 @@ test("RCD18: the PowerShell tool admits the node and git version probes and a re
     assert.equal(result.exitCode, 2, command);
     assert.match(String(result.stderr), /GUARD-/u, command);
   }
+});
+
+// C22B (AC-108, PO decision 2026-11-09): recursive grep is admitted for the shapes agents type, behind its own screen (passive-read-policy.mjs, option allFiles).
+function repoFixture(t, files, links = {}) {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "grep-r-grammar-")));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const project = join(base, "repo");
+  mkdirSync(project);
+  for (const [path, content] of Object.entries(files)) {
+    mkdirSync(dirname(join(project, path)), { recursive: true });
+    writeFileSync(join(project, path), content);
+  }
+  for (const [path, target] of Object.entries(links)) symlinkSync(target, join(project, path));
+  return project;
+}
+const PLAIN_FILES = { "src/a.mjs": "needle\n", "src/b.md": "needle\n", "sub/dir/c.txt": "needle\n", "README.md": "needle\n" };
+const rgAvailable = spawnSync("rg", ["--version"], { encoding: "utf8" }).status === 0;
+
+test("RCD22: C22B - recursive grep: the admitted shapes, and the spellings that stay refused", (t) => {
+  const plain = repoFixture(t, PLAIN_FILES);
+  const withGit = repoFixture(t, { ...PLAIN_FILES, ".git/config": "x\n" });
+  const worktree = repoFixture(t, { ...PLAIN_FILES, ".git": "gitdir: ../w/.git/worktrees/w\n" });
+  const withDotenv = repoFixture(t, { ...PLAIN_FILES, ".env": "NEEDLE=fake\n", ".git/config": "x\n" });
+  const withKey = repoFixture(t, { ...PLAIN_FILES, "build/deploy.key": "fake\n", ".ignore": "build/\n" });
+  const admitted = [
+    "grep -rn needle src", "grep -rl needle src", "grep -rE needle src", "grep -ril needle src", "grep -rln needle src", "grep -rnw needle src",
+    "grep --recursive needle src", "grep -r needle sub/dir", "grep -rn needle src sub", "grep -rn needle README.md", "grep -r -n needle src",
+    "grep -rn --include='*.mjs' needle src", "grep -rn --include '*.mjs' needle src", "grep -rn --exclude='*.md' needle src",
+    "grep -rn --exclude-dir=sub needle src", "grep -rn needle src --exclude-dir=sub", "grep -rn needle src --include='*.mjs' --exclude='*.md'",
+    "grep -rn needle src | head -n 20", "grep -rn needle src | head -20", "grep -rn needle src | grep -v mjs",
+    "grep -rn needle src | head -n 5 && git status", "grep -rl needle src 2>/dev/null",
+    "grep -l needle README.md", "grep -ws needle README.md", "grep --files-with-matches needle README.md", "grep --word-regexp --no-messages needle README.md",
+  ];
+  for (const command of admitted) assert.equal(isReadOnlyDiagnosticCommand(command, plain), true, command);
+  // the root of a repository: .git must be excluded by name, repeated at most 8 times, and --include/--exclude relax nothing
+  assert.equal(isReadOnlyDiagnosticCommand("grep -rn needle .", plain), true, "no .git, nothing sensitive");
+  assert.equal(isReadOnlyDiagnosticCommand("grep -rn needle .", withGit), false, ".git directory");
+  assert.equal(isReadOnlyDiagnosticCommand("grep -rn needle .", worktree), false, ".git file");
+  for (const command of [
+    "grep -rn needle . --exclude-dir=.git", "grep -rn needle . --exclude-dir=.git --exclude-dir=node_modules", "grep -rn --exclude-dir=.git needle .",
+    "grep -rn --exclude-dir=.git --include='*.mjs' needle .", "grep -rn needle . --exclude-dir=.git | head -n 20",
+  ]) {
+    assert.equal(isReadOnlyDiagnosticCommand(command, withGit), true, command);
+    assert.equal(isReadOnlyDiagnosticCommand(command, worktree), true, `worktree: ${command}`);
+    assert.equal(isReadOnlyDiagnosticCommand(command, withDotenv), false, `a secret name is never relaxed: ${command}`);
+  }
+  assert.equal(isReadOnlyDiagnosticCommand("grep -rn --include='*.md' needle .", withKey), false, "--include does not relax the screen");
+  assert.equal(isReadOnlyDiagnosticCommand("grep -rn --exclude='*.key' needle .", withKey), false, "--exclude does not relax the screen");
+  assert.equal(isReadOnlyDiagnosticCommand("grep -rn --exclude-dir=.git needle .", withKey), false, "an unrelated exclusion does not relax it");
+  assert.equal(isReadOnlyDiagnosticCommand("grep -rn --exclude-dir=build needle .", withKey), true, "the named directory is pruned");
+  const eight = Array.from({ length: 8 }, (_, index) => `--exclude-dir=d${index}`).join(" ");
+  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle src ${eight}`, plain), true, "8 exclusions");
+  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle src ${eight} --exclude-dir=d8`, plain), false, "9 exclusions");
+  const refused = [
+    "grep -Rn needle src", "grep -R needle src", "grep --dereference-recursive needle src", "grep -rf README.md src", "grep -r -f README.md needle src",
+    "grep -rP needle src", "grep -rz needle src", "grep -r needle", "grep -rn", "grep -r --include='*.mjs' needle",
+    "grep -n needle src", "grep -l needle src", "grep -s needle src", "grep needle src",
+    "grep -rn --include=src/*.mjs needle src", "grep -rn --include='../*.mjs' needle src", "grep -rn --include='*.mjs/..' needle src", "grep -rn --include= needle src",
+    "grep -rn --exclude-dir=src/lib needle src", "grep -rn --exclude-dir='*' needle src", "grep -rn --exclude-dir=.. needle src", "grep -rn --exclude-dir= needle src",
+    "grep -rn --exclude-dir=. needle src", "grep -rn --exclude-dir .git needle src", "grep -rn --exclude-dir='sub/dir' needle src", "grep -rn --exclude-dir=-x needle src",
+    "grep -rn --include-dir=src needle src", "grep -rn --exclude-from=README.md needle src", "grep -rn needle src -P", "grep -rn needle src --include",
+    "grep -rn needle ~/.ssh", "grep -rn needle /etc", "grep -rn needle ../outside",
+    "grep -n needle README.md | grep -r x", "grep -n needle README.md | grep -l x", "grep -n needle README.md | grep -s x", "grep -n needle README.md | grep --include='*.md' x",
+    "grep -rn needle src | head -n 20 extra", "grep -rn needle src | cat", "grep -rn needle src > out.txt",
+  ];
+  for (const command of refused) assert.equal(isReadOnlyDiagnosticCommand(command, plain), false, command);
+  // D96 (an ordinary directory outside the project is readable): the same rule gives an outside tree to grep -r that rg already has, and the all-files
+  // screen refuses it on the same grounds as inside (a .git, a secret name). A link out of the tree is refused (see passive-read-policy.test.mjs).
+  const outsideClean = repoFixture(t, PLAIN_FILES);
+  const outsideGit = repoFixture(t, { ...PLAIN_FILES, ".git/config": "x\n" });
+  const outsideKey = repoFixture(t, { ...PLAIN_FILES, ".cache/deploy.key": "fake\n" });
+  assert.equal(isReadOnlyDiagnosticCommand(`rg -n needle ${outsideClean}`, plain), true, "baseline: rg reads an ordinary outside directory");
+  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle ${outsideClean}`, plain), true, "a clean outside tree");
+  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle ${outsideGit}`, plain), false, "an outside tree holding .git");
+  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle ${outsideGit} --exclude-dir=.git`, plain), true, "excluded by name");
+  assert.equal(isReadOnlyDiagnosticCommand(`rg -n needle ${outsideKey}`, plain), true, "baseline: the rg screen skips hidden entries and passes this tree");
+  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle ${outsideKey}`, plain), false, "the hidden key is what grep -r reads and rg does not");
+});
+
+test("RCD23: C22B - the refusal of a recursive grep over a tree the screen rejects prints one command the grammar really admits, or nothing", (t) => {
+  assert.equal(typeof diagnosis.recursiveGrepHint, "function", "the hint function exists");
+  const withGit = repoFixture(t, { ...PLAIN_FILES, ".git/config": "x\n" });
+  const withDotenv = repoFixture(t, { ...PLAIN_FILES, ".env": "NEEDLE=fake\n", ".git/config": "x\n" });
+  const hint = (command, project) => diagnosis.recursiveGrepHint(command, project);
+  assert.equal(hint("grep -rn needle .", withGit), "grep -rn needle . --exclude-dir=.git");
+  assert.equal(hint("grep -rln needle .", withGit), "grep -rln needle . --exclude-dir=.git");
+  assert.equal(hint("grep -ri --include='*.mjs' needle .", withGit), "grep -ri '--include=*.mjs' needle . --exclude-dir=.git");
+  assert.equal(hint("grep -rn 'two words' .", withGit), "grep -rn 'two words' . --exclude-dir=.git");
+  // a secret-named file under a hidden directory cannot be excluded by name: the rg form (rg skips hidden entries by its own rule, and the rg screen
+  // admits that tree) is the other admitted spelling. A secret name at the top is refused by BOTH screens, so there is no spelling to print.
+  const withHiddenKey = repoFixture(t, { ...PLAIN_FILES, ".cache/deploy.key": "fake\n" });
+  assert.equal(hint("grep -rn needle .", withHiddenKey), rgAvailable ? "rg -n needle ." : null);
+  assert.equal(hint("grep -ril needle .", withHiddenKey), rgAvailable ? "rg -il needle ." : null);
+  assert.equal(hint("grep -rn needle .", withDotenv), null, "a .env at the top is refused by the rg screen too");
+  for (const [command, project] of [["grep -rn needle .", withGit], ["grep -rln needle .", withGit], ["grep -rn needle .", withHiddenKey]]) {
+    const printed = hint(command, project);
+    if (printed !== null) assert.equal(isReadOnlyDiagnosticCommand(printed, project), true, `a printed hint is admitted: ${printed}`);
+    assert.equal(isReadOnlyDiagnosticCommand(command, project), false, "the diagnosed command stays refused");
+  }
+  assert.equal(firstUnadmittedFlag("grep -rn needle .", withGit), null, "no single flag is the fault; the hint above carries the diagnosis");
+  for (const [command, project, why] of [
+    ["grep -rn needle src", withGit, "an admitted command"],
+    ["grep -n needle .", withGit, "not a recursive grep"],
+    ["grep -Rn needle .", withGit, "-R is refused for its own reason, no suggestion built on it"],
+    ["grep -rn needle . | head -n 3", withGit, "pipelines are not diagnosed"],
+    ["grep -rn needle . > out.txt", withGit, "redirects are not diagnosed"],
+    ["grep -rn needle ~/.ssh", withGit, "a credential operand has no admitted spelling"],
+    ["grep -rn needle . --exclude-dir=.git", withDotenv, "already excluded, and the rg form is not built from a filter"],
+    ["grep -rn -- needle .", withGit, "no suggestion after --"],
+    ["rg -n needle .", withGit, "not grep"],
+    ["", withGit, "empty"],
+    [undefined, withGit, "missing"],
+  ]) assert.equal(hint(command, project), null, `${why}: ${command}`);
+});
+
+test("RCD24: C22B - Claude, Codex and Antigravity run the same recursive-grep rule, the refusal prints the admitted spelling, and the PowerShell tool is not widened", async (t) => {
+  const guard = await import("../hooks/guard-lifecycle-ready.mjs");
+  // A governed, READY fixture: the guard enforces the closed grammar there (an ungoverned directory is not enforced at all).
+  const project = repoFixture(t, {
+    ...PLAIN_FILES, ".git/config": "x\n", "pipeline.user.yaml": "schema: pipeline.user.v3\n",
+    ".agent-pipeline/onboarding-consent.json": JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-09-29T00:00:00.000Z" }),
+  });
+  const ready = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  const run = (tool, command, runner = "claude") => guard.evaluateLifecycleReadyGuard({ tool_name: tool, tool_input: { command } }, {
+    projectDir: project, runner, requireProjectOnboardingReadyFn() { return ready; },
+  });
+  for (const runner of ["claude", "codex", "antigravity"]) {
+    for (const [command, exitCode] of [
+      ["grep -rn needle src", 0], ["grep -rln needle src | head -n 5", 0], ["grep -rn needle . --exclude-dir=.git", 0],
+      ["grep -rn needle .", 2], ["grep -Rn needle src", 2], ["grep -rn needle src --include=src/x", 2],
+    ]) assert.equal((await run("Bash", command, runner)).exitCode, exitCode, `${runner}: ${command}`);
+  }
+  const refused = await run("Bash", "grep -rn needle .");
+  assert.match(String(refused.stderr), /GUARD-READ-COMMAND-UNSUPPORTED/u);
+  assert.match(String(refused.stderr), /Rejected element: .*grep -rn needle \. --exclude-dir=\.git/u);
+  assert.equal((await run("PowerShell", "grep -rn needle src")).exitCode, 2, "the PowerShell tool has no grep route; the rule widens nothing there");
+  assert.equal((await run("PowerShell", "rg -n needle src")).exitCode, 0);
+  const grammar = (await import("./guard/grammar-denials.mjs")).ADMITTED_GRAMMAR_SHAPES.map((shape) => shape.spelling).join("\n");
+  assert.match(grammar, /grep -r/u, "the printed grammar list names recursive grep");
+  assert.match(grammar, /--exclude-dir/u);
 });
 
 test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {
