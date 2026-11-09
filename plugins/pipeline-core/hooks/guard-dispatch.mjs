@@ -121,7 +121,7 @@ export function promptTemplateShapeWarning({ subagentType, prompt } = {}) {
   const missing = (goldfish ? GOLDFISH_SHAPE_MARKERS : CRITIC_SHAPE_MARKERS).filter((marker) => !prompt.includes(marker));
   if (missing.length === 0) return "";
   const template = goldfish ? "templates/prompts/goldfish-task.md" : "templates/prompts/critic-review.md";
-  return `WARNING (guard-dispatch): GUARD-DISPATCH-PROMPT-NOT-TEMPLATE-SHAPED: the ${subagentType} prompt lacks ${missing.length} template marker(s) (${missing.join("; ")}); build it by filling ${template}, not freehand. Admitted anyway.\n`;
+  return `WARNING (guard-dispatch): GUARD-DISPATCH-PROMPT-NOT-TEMPLATE-SHAPED: the ${subagentType} prompt lacks ${missing.length} template marker(s) (${missing.join("; ")}); build it by filling ${template}, not freehand. This warning does not stop this dispatch by itself; later checks still can.\n`;
 }
 
 // W7 B: per-session memory of refused dispatches, under <git common dir>/agent-pipeline/refused-dispatch-retry/<sha(session)>/<sha(type NUL prompt)>.json.

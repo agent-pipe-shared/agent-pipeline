@@ -1164,6 +1164,7 @@ manualCheck("GD69 a pipeline-core critic dispatch without the review-template he
   const line = shapeWarningLine(stderr);
   assert.equal(code, ALLOW, `the shape warning must never refuse -- ${stderr.trim().slice(0, 300)}`);
   assert.ok(line.startsWith("WARNING (guard-dispatch):") && line.includes("templates/prompts/critic-review.md"), `got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.ok(line.includes("does not stop this dispatch by itself; later checks still can") && !line.includes("Admitted anyway"), line);
 });
 manualCheck("GD70 a non-pipeline agent type with a free prompt emits no shape warning (W7 A-iv)", () => {
   for (const builtIn of ["Explore", "general-purpose"]) {
