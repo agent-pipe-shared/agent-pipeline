@@ -1,0 +1,12 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 4626c248990cccdad2245d61ae730872272a5f99..6c729cea9c1da1c506a8cdd9beebe2b98af1e720 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -552,6 +552,7 @@
+         "verify-phase:harness/scripts/verify.mjs:guard-push-external-ledger-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-push-gitleaks-prefix-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-push-promotion-tests",
++        "verify-phase:harness/scripts/verify.mjs:guard-push-read-search-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-push-release-tag-ancestry-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-push-scratch-advisory-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
