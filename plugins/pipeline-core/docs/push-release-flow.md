@@ -760,6 +760,12 @@ whatever ref
 `<sha>` lives on) is already correctly published. It does not itself need a
 `push`-kind proof, because it structurally isn't one.
 
+**Pin the build a rollout names.** Every source update during one approved
+change is a new build, so a team that must reproduce a run needs one fixed
+build. A rollout names the exact plugin version, including its build suffix,
+and that version is installed unchanged for the whole change. A build taken
+mid-change is a development candidate and is never the release evidence.
+
 ## Machine-readable runbook of this flow
 
 The layers below are also available as a generated, machine-readable runbook,

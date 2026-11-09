@@ -333,6 +333,28 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("Do not change the tracked or untracked tree between handing over a tree-bound");
   put("signature command and its return.");
   put();
+  put("While a gate waits for a human, say once what is awaited. Do not re-check an unchanged");
+  put("gate, and answer an automatic continuation in one line until the human has acted.");
+  put();
+
+  put("## 9. Small habits that each cost a retry");
+  put();
+  put("<!-- hand-maintained: drawn from the loops chapters of the 2026-11 greenfield runs on all");
+  put("     three runners; these are working rules, not values a guard exports. -->");
+  put();
+  put("- Give a native file-read tool an absolute path. A relative path fails in child sessions.");
+  put("- Separate a revision from a path with `--`: `git diff <rev> -- <path>`.");
+  put("- Write a commit message to a file and use `git commit -F <file>`. `-m` is refused where a");
+  put("  trailer is required.");
+  put("- Never commit the output of a close or another Pipeline writer by hand. Run the command");
+  put("  that the tool printed; it owns that commit.");
+  put("- On a run longer than a few minutes, say briefly what is running and what comes next,");
+  put("  so that nobody has to ask whether the work is still alive.");
+  put("- Answer a question about what a consent or approval covers from its stored text, never");
+  put("  from memory.");
+  put("- Hand a printed command over unchanged. Where you must wrap a long path yourself, break");
+  put("  only at a token boundary, never inside a path.");
+  put();
   return `${lines.join("\n")}\n`;
 }
 

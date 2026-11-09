@@ -239,3 +239,24 @@ signature, hand over exactly that one line, then continue after the PO reports b
 Do not change the tracked or untracked tree between handing over a tree-bound
 signature command and its return.
 
+While a gate waits for a human, say once what is awaited. Do not re-check an unchanged
+gate, and answer an automatic continuation in one line until the human has acted.
+
+## 9. Small habits that each cost a retry
+
+<!-- hand-maintained: drawn from the loops chapters of the 2026-11 greenfield runs on all
+     three runners; these are working rules, not values a guard exports. -->
+
+- Give a native file-read tool an absolute path. A relative path fails in child sessions.
+- Separate a revision from a path with `--`: `git diff <rev> -- <path>`.
+- Write a commit message to a file and use `git commit -F <file>`. `-m` is refused where a
+  trailer is required.
+- Never commit the output of a close or another Pipeline writer by hand. Run the command
+  that the tool printed; it owns that commit.
+- On a run longer than a few minutes, say briefly what is running and what comes next,
+  so that nobody has to ask whether the work is still alive.
+- Answer a question about what a consent or approval covers from its stored text, never
+  from memory.
+- Hand a printed command over unchanged. Where you must wrap a long path yourself, break
+  only at a token boundary, never inside a path.
+

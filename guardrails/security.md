@@ -55,6 +55,7 @@ Rule IDs: `SEC-xx`.
 - A sandboxed session still needs every SEC-xx rule in this file enforced inside it: secrets stay out of artifacts, staging denies still apply, dependency verification still happens, security-scan still runs where declared. A sandbox narrows the blast radius of a mistake; it does not make the mistake acceptable, and it does not make any guard rule optional.
 - **Why:** Defense-in-depth means layers that each hold independently. Treating a sandbox as "the guards are handled elsewhere" reintroduces exactly the single point of failure the layered approach exists to avoid.
 - **Verification:** No standalone check — this is a framing/discipline note. If a future sandbox mechanism is adopted for this pipeline, its calibration entry MUST name which guards remain active inside it; "none, the sandbox is enough" is not a valid answer.
+- **The reverse also holds: a guard is not a sandbox.** The shell guard judges the command handed to the tool. It does not read what a project's own script does once that script runs, so a script can reach a path the guard would refuse as a direct read. Real separation of what a process can reach comes only from the runner's sandbox or the operating system. Do not describe a guard refusal as containment.
 
 ## SEC-08 — The agent never handles deploy-target credentials (Release/Deploy phase)
 

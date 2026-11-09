@@ -269,6 +269,11 @@ ask the PO **one** question with context, early, before any further attempt:
 which credential or remote this repository should push with. Then retry once
 with what the PO named.
 
+Resolve this before the first push is prepared, not after it fails, and ask at
+most once per repository. Record the answer (the credential's name or the
+remote, never its content) in the calibrated handover so that a later session
+reads it there instead of asking again.
+
 ### The two-step shape (superseded as a human step, still supported)
 
 ```
