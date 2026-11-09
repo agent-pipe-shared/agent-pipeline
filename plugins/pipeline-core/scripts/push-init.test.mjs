@@ -546,6 +546,7 @@ test("drivePushInit: signature preparation keeps the existing signature-required
     assert.equal(result.outcome, "signature-required", JSON.stringify(result));
     assert.ok(result.signatureCommand.lines.length > 0);
     assert.equal(Object.hasOwn(result, "approvePushLines"), false);
+    assert.match(result.humanGate, /end the turn/u, "CGF-07/22: the wait for a human is named as a stop, not as something to poll");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

@@ -2,7 +2,9 @@
 
 Load this when a session reaches, explains, or is about to discuss the push
 gate. Everything here is about the moment a **human** has to act; the session's
-own job is to state it clearly and then wait.
+own job is to state it clearly and then wait. Waiting means ending the turn:
+never re-run the driver, poll the proof or repeat the request, and answer an
+automatic continuation with one line. A new commit voids the prepared approval.
 
 > **Changed under [ADR-0061](../../../../../docs/adr/0061-uniform-human-approval-ceremony.md).**
 > In `signature` mode the human's part is now **one command, the word
