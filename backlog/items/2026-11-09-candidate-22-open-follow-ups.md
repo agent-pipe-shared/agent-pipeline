@@ -39,6 +39,14 @@ The chain is in `specs/sprint-alfred-epic/evidence/held-patches/c22b-chain/`. On
 - **LOOP-A1:** a round-trip test exists and found no defect. It runs on Linux. Execution of the printed command under cmd.exe and PowerShell is not proven, and some kinds are covered only through the library leg.
 - **Preflight and compact wording:** the cloud-folder key warning is gone and the false registry alarm after a compact is fixed.
 
+## Candidate 23 scope (PO direction of 2026-11-09)
+
+There is no interim candidate. The findings of the live greenfield runs on 22b and the three runner reports all go into candidate 23. Toil that occurs only minimally is not built: a one-turn refusal the agent recovered from itself.
+
+- **Design reviewer identity on Codex:** stays recorded as `unknown`, visibly. The design reference tells the agent to omit the field.
+- **Second readiness round NOT READY:** stays as it is. The agent corrects the sources and discloses the unreviewed change at the approval.
+- **`--help` in a ready session:** the guard admits it and the script decides. Most scripts print their usage, but a few really run (`rotate-handover-sections.mjs`, `repair-map.mjs`, `check-backlog-done-predicate.mjs`). Those get a real help branch in 23.
+
 ## Built only partly
 
 - **CGF-03:** the critical profile shows a named notice and the existing exception route. A real Codex CLI session prints the conditional form because the CLI takes no receipt flag. Whether every report producer avoids a stronger word was not checked.
