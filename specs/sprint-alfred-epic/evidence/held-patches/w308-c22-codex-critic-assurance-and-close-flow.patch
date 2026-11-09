@@ -1,0 +1,564 @@
+diff --git a/plugins/pipeline-core/lib/critic-route-assurance.mjs b/plugins/pipeline-core/lib/critic-route-assurance.mjs
+new file mode 100644
+index 000000000..ee34d36b2
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-route-assurance.mjs
+@@ -0,0 +1,75 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C22 (CGF-03, CGF-20, AC-108): the assurance a Critic route will really deliver, stated BEFORE the dispatch. The Codex greenfield run learned that its
++ * Critic was caller-authored (receipt: freshContext false, historyInherited true, `caller-authored-fallback`) only at the close, which then asked for a
++ * PO acknowledgement nobody had planned for. This module reads the planned route and states, in the receipt's own vocabulary and never a stronger word,
++ * what the finalized receipt will say and whether the close will need its own acknowledgement. Pure: no I/O, no state, never throws.
++ *
++ * It is a notice, not a gate. A route below the critical profile is not refused here: the one exception route that already exists for it is the PO
++ * acknowledgement of exactly this packet at the close (`pipeline-state.mjs approve-critic-acknowledgement`, critic-acknowledgement.mjs), so the rule
++ * never deadlocks, and the close gate (close-coordinator.mjs `assertCriticIndependenceForClose`) stays the one enforcing check.
++ */
++const RECEIPT_SOURCE = Object.freeze({ independence: "source-issued-origin", freshContext: true, historyInherited: false });
++const RECEIPT_FALLBACK = Object.freeze({ independence: "caller-authored-fallback", freshContext: false, historyInherited: true });
++const CRITICAL_TRIGGERS = Object.freeze(["T1", "T2"]);
++const PACKET_ID = /^[a-f0-9]{32}$/u;
++
++export const CRITIC_ROUTE_ASSURANCE_SCHEMA = "pipeline.critic-route-assurance.v1";
++
++/** The runner of the calling session from its own markers; `unknown` when none is present (the assurance then promises nothing). */
++export function criticRunnerFromEnv(env) {
++  const source = env !== null && typeof env === "object" ? env : {};
++  if (source.CODEX_SESSION_ID !== undefined || source.CODEX_THREAD_ID !== undefined) return "codex";
++  if (source.ANTIGRAVITY_AGENT !== undefined) return "antigravity";
++  if (source.CLAUDECODE !== undefined || source.CLAUDE_CODE_SESSION_ID !== undefined) return "claude";
++  return "unknown";
++}
++
++// What the finalized receipt will carry, from the planned route. Null where no route is decided yet: nothing stronger than the floor is promised.
++function expectedReceipt(runner, launchRoute) {
++  if (runner === "claude" || runner === "antigravity") return RECEIPT_SOURCE;
++  if (runner !== "codex" || launchRoute === null || typeof launchRoute !== "object" || typeof launchRoute.agentType !== "string") return null;
++  return launchRoute.sandboxed === true ? RECEIPT_SOURCE : RECEIPT_FALLBACK;
++}
++
++/**
++ * @param {{ runner?: string, trigger?: string, rigor?: number|null, packetId?: string, launchRoute?: object|null }} input `launchRoute` is the output of
++ *   decideCodexCriticLaunchRoute (Codex only); `rigor` is the feature package's rigor when readable, else null.
++ */
++export function describeCriticRouteAssurance(input) {
++  const { runner = "unknown", trigger = "T1", rigor = null, packetId = null, launchRoute = null } = input !== null && typeof input === "object" ? input : {};
++  const expected = expectedReceipt(runner, launchRoute);
++  const critical = CRITICAL_TRIGGERS.includes(trigger) || !["T1", "T2", "T3"].includes(trigger);
++  // The close rule (close-coordinator.mjs): a caller-authored round satisfies the close only at rigor 0 and low risk; the critical profile is the high-risk duty.
++  const whenFallback = critical || (Number.isInteger(rigor) && rigor >= 1) ? true : rigor === 0 ? false : "unknown";
++  const required = expected === null ? (whenFallback === false ? false : "conditional") : expected === RECEIPT_FALLBACK ? whenFallback : false;
++  const packet = typeof packetId === "string" && PACKET_ID.test(packetId) ? packetId : "<packet-id>";
++  const command = `node \${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-state.mjs approve-critic-acknowledgement --by <name> --critic-packet ${packet}`;
++  const status = !critical ? "not-critical" : expected === null ? "conditional" : expected === RECEIPT_SOURCE ? "meets" : "below-required";
++  const exception = status === "below-required" || status === "conditional"
++    ? Object.freeze({ route: "po-acknowledgement", command, note: "a deliberate, recorded exception for exactly this packet and its candidate; never inferred, never generic" }) : null;
++  const unknownRoute = expected === null
++    ? (runner === "codex" ? "the Codex launch route is decided at launch from this machine's sandbox receipt: a sandboxed role gives a source-issued round, the default route gives the caller-authored fallback"
++      : "no Critic route is known for this runner")
++    : null;
++  const words = (value) => `${value.independence} (freshContext ${value.freshContext}, historyInherited ${value.historyInherited})`;
++  const notice = [
++    expected === null ? `No Critic assurance is promised yet: ${unknownRoute}; the floor is ${words(RECEIPT_FALLBACK)}.`
++      : `The planned Critic route will be recorded as ${words(expected)}${expected === RECEIPT_FALLBACK ? ", protected by instruction only" : ""}.`,
++    required === true ? `The close will need the PO acknowledgement of this round (${critical ? "critical profile" : "rigor 1 or more"}): ${command}.`
++      : required === "conditional" || required === "unknown" ? `If the round is recorded as the fallback, the close will need the PO acknowledgement of this round: ${command}.`
++        : "The close needs no separate acknowledgement unless the round is finalized as the fallback.",
++    status === "below-required" ? "This is below the critical profile; the acknowledgement above is the deliberate exception." : "",
++  ].filter(Boolean).join(" ");
++  return Object.freeze({
++    schema: CRITIC_ROUTE_ASSURANCE_SCHEMA,
++    runner: typeof runner === "string" ? runner : "unknown",
++    plannedRoute: Object.freeze({ agentType: typeof launchRoute?.agentType === "string" ? launchRoute.agentType : null, sandboxed: typeof launchRoute?.sandboxed === "boolean" ? launchRoute.sandboxed : null }),
++    expected,
++    floor: RECEIPT_FALLBACK,
++    profile: Object.freeze({ name: critical ? "critical" : "standard", status }),
++    closeAcknowledgement: Object.freeze({ required, whenFallback, command }),
++    exception,
++    notice,
++  });
++}
+diff --git a/plugins/pipeline-core/lib/critic-route-assurance.test.mjs b/plugins/pipeline-core/lib/critic-route-assurance.test.mjs
+new file mode 100644
+index 000000000..0548b4994
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-route-assurance.test.mjs
+@@ -0,0 +1,89 @@
++// SPDX-License-Identifier: SUL-1.0
++// C22 (CGF-03, CGF-20, AC-108): criterion-bound cases for the assurance a Critic route will really deliver, stated BEFORE the dispatch. Written before the module existed.
++// Source: Codex greenfield report CGF-03 ("independence and test-first assurance must not be upgraded in wording: the receipt says freshContext:false,
++// historyInherited:true, caller-authored-fallback"; critical profile blocks or takes a deliberate exception up front) and CGF-20 ("a caller-authored Critic
++// needs its own acknowledgement only late in close": avoidable late discovery).
++import assert from "node:assert/strict";
++import test from "node:test";
++import { CRITIC_ROUTE_ASSURANCE_SCHEMA, criticRunnerFromEnv, describeCriticRouteAssurance } from "./critic-route-assurance.mjs";
++
++const PACKET = "a".repeat(32);
++const DEFAULT_ROUTE = { agentType: "default", sandboxed: false, protection: "instruction-only", reason: "no-receipt" };
++const SANDBOXED = { agentType: "critic-high-risk", sandboxed: true };
++const describe = (input) => describeCriticRouteAssurance({ packetId: PACKET, trigger: "T1", rigor: null, launchRoute: null, ...input });
++
++test("a native Claude or Antigravity Critic is stated with the receipt vocabulary of a source-issued round, with the fallback as its floor", () => {
++  for (const runner of ["claude", "antigravity"]) {
++    const result = describe({ runner });
++    assert.equal(result.schema, CRITIC_ROUTE_ASSURANCE_SCHEMA);
++    assert.deepEqual(result.expected, { independence: "source-issued-origin", freshContext: true, historyInherited: false });
++    assert.equal(result.floor.independence, "caller-authored-fallback", "a round whose stop issues no Source return is finalized as the fallback");
++    assert.equal(result.profile.status, "meets");
++    assert.equal(result.closeAcknowledgement.required, false);
++  }
++});
++
++test("a Codex route that resolves to default is stated as caller-authored, history inherited, and below the critical profile, with its close acknowledgement named now", () => {
++  const result = describe({ runner: "codex", launchRoute: DEFAULT_ROUTE });
++  assert.deepEqual(result.expected, { independence: "caller-authored-fallback", freshContext: false, historyInherited: true });
++  assert.equal(result.plannedRoute.agentType, "default");
++  assert.equal(result.profile.name, "critical");
++  assert.equal(result.profile.status, "below-required");
++  assert.equal(result.closeAcknowledgement.required, true, "CGF-20: the late discovery is gone, the preflight says it before the dispatch");
++  assert.ok(result.closeAcknowledgement.command.includes(`approve-critic-acknowledgement --by <name> --critic-packet ${PACKET}`), result.closeAcknowledgement.command);
++  assert.equal(result.exception.route, "po-acknowledgement", "the existing exception route, never a refusal without a way out");
++  assert.match(result.notice, /caller-authored-fallback/u);
++  assert.match(result.notice, /instruction only/u);
++});
++
++test("a sandboxed Codex Critic meets the critical profile; an undecided Codex launch states the floor and both outcomes instead of the stronger one", () => {
++  const sandboxed = describe({ runner: "codex", launchRoute: SANDBOXED });
++  assert.equal(sandboxed.expected.independence, "source-issued-origin");
++  assert.equal(sandboxed.profile.status, "meets");
++  const undecided = describe({ runner: "codex" });
++  assert.equal(undecided.expected, null, "no launch route is known yet, so no assurance is promised");
++  assert.equal(undecided.floor.independence, "caller-authored-fallback");
++  assert.equal(undecided.profile.status, "conditional");
++  assert.equal(undecided.closeAcknowledgement.required, "conditional");
++  assert.match(undecided.notice, /decided at launch/u);
++  assert.ok(undecided.exception !== null);
++});
++
++test("the close acknowledgement follows the close rule: required for a caller-authored round at rigor 1 or more or in the critical profile, not at rigor 0 and low risk", () => {
++  assert.equal(describe({ runner: "codex", launchRoute: DEFAULT_ROUTE, trigger: "T3", rigor: 0 }).closeAcknowledgement.required, false);
++  assert.equal(describe({ runner: "codex", launchRoute: DEFAULT_ROUTE, trigger: "T3", rigor: 1 }).closeAcknowledgement.required, true);
++  assert.equal(describe({ runner: "codex", launchRoute: DEFAULT_ROUTE, trigger: "T3", rigor: null }).closeAcknowledgement.required, "unknown");
++  const standard = describe({ runner: "codex", launchRoute: DEFAULT_ROUTE, trigger: "T3", rigor: 1 });
++  assert.equal(standard.profile.name, "standard");
++  assert.equal(standard.profile.status, "not-critical");
++  assert.equal(standard.exception, null);
++});
++
++test("wording is never upgraded: only a source-issued, fresh-context expectation may be called independent; an unknown runner promises nothing", () => {
++  assert.equal(criticRunnerFromEnv({ CODEX_THREAD_ID: "x" }), "codex");
++  assert.equal(criticRunnerFromEnv({ CODEX_SESSION_ID: "x" }), "codex");
++  assert.equal(criticRunnerFromEnv({ ANTIGRAVITY_AGENT: "1" }), "antigravity");
++  assert.equal(criticRunnerFromEnv({ CLAUDE_CODE_SESSION_ID: "x" }), "claude");
++  assert.equal(criticRunnerFromEnv({}), "unknown");
++  const unknown = describe({ runner: "unknown" });
++  assert.equal(unknown.expected, null);
++  for (const input of [{ runner: "unknown" }, { runner: "codex" }, { runner: "codex", launchRoute: DEFAULT_ROUTE }]) {
++    const result = describe(input);
++    assert.equal(/independent/iu.test(JSON.stringify(result)), false, `no stronger word for ${JSON.stringify(input)}`);
++    assert.notEqual(result.expected?.independence, "source-issued-origin");
++  }
++  for (const input of [{ runner: "claude" }, { runner: "codex", launchRoute: SANDBOXED }]) {
++    const result = describe(input);
++    assert.deepEqual([result.expected.freshContext, result.expected.historyInherited], [true, false]);
++  }
++});
++
++test("an unreadable or unexpected input never throws and never raises the assurance", () => {
++  for (const input of [{ runner: 7 }, { runner: "codex", launchRoute: "default" }, { runner: "codex", launchRoute: { agentType: 3 } }, { runner: "claude", trigger: undefined }, { runner: "claude", packetId: "not a packet" }]) {
++    const result = describeCriticRouteAssurance(input);
++    assert.equal(result.schema, CRITIC_ROUTE_ASSURANCE_SCHEMA);
++    assert.equal(result.floor.independence, "caller-authored-fallback");
++  }
++  assert.equal(describeCriticRouteAssurance({ runner: "codex", launchRoute: "default" }).expected, null);
++  assert.equal(describeCriticRouteAssurance(undefined).expected, null);
++});
+diff --git a/plugins/pipeline-core/lib/generated-artefact-schema.mjs b/plugins/pipeline-core/lib/generated-artefact-schema.mjs
+new file mode 100644
+index 000000000..ba221cd90
+--- /dev/null
++++ b/plugins/pipeline-core/lib/generated-artefact-schema.mjs
+@@ -0,0 +1,55 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C22 (CGF-06, AC-108): classify the Pipeline's OWN generated metadata by a verifiable schema and keep its digest fields apart from credential fields.
++ *
++ * Measured on this repository: the secret scanner reads bare digests under key-shaped field names (`idempotencyKey`, `scopeKey`, `reuseKeySha256`, `courseKey`) of
++ * generated JSON as credentials, and every earlier answer was a path-wide ignore. This reader says, without a value ever leaving it, which fields of one file are
++ * digests whose NAME looks like a credential, and which fields really look like credentials. A class is claimed only for a JSON object with a Pipeline schema id
++ * (`pipeline.<name>.v<N>`); anything else is `unclassified` and is never excused. Pure: no I/O, no ignore list, no blanket rule, never throws. A narrow, field-scoped
++ * scanner exception for a classified file is only provable when `scannerSafe` is true (every credential-shaped name holds a bare lower-case hex digest).
++ */
++const SCHEMA_ID = /^pipeline\.[a-z0-9]+(?:[.-][a-z0-9]+)*\.v\d+$/u;
++const DIGEST = /^[0-9a-f]{32,64}$/u;
++// The name family of the scanner's generic rule (gitleaks generic-api-key): a field named like this makes it read the value as a secret.
++const CREDENTIAL_NAME = /(?:access|auth|api|credential|creds|key|passw(?:or)?d|secret|token)/iu;
++const MAX_BYTES = 4 * 1024 * 1024;
++const MAX_DEPTH = 64;
++const MIN_CREDENTIAL_LENGTH = 8;
++
++const unclassified = (reason) => Object.freeze({ class: "unclassified", schema: null, digestFields: [], keyShapedDigestFields: [], credentialFields: [], scannerSafe: false, reason });
++
++/** @param {string|Uint8Array|undefined} input the file's bytes or text */
++export function classifyGeneratedArtefact(input) {
++  try {
++    const bytes = typeof input === "string" ? Buffer.byteLength(input, "utf8") : input instanceof Uint8Array ? input.byteLength : -1;
++    if (bytes < 0) return unclassified("input is neither text nor bytes");
++    if (bytes > MAX_BYTES) return unclassified("input is larger than the bound");
++    const text = (typeof input === "string" ? input : Buffer.from(input).toString("utf8")).replace(/^﻿/u, "");
++    let value;
++    try { value = JSON.parse(text); } catch { return unclassified("not JSON"); }
++    if (value === null || typeof value !== "object" || Array.isArray(value)) return unclassified("not a JSON object");
++    if (typeof value.schema !== "string" || !SCHEMA_ID.test(value.schema)) return unclassified("no Pipeline schema id (pipeline.<name>.v<N>)");
++    const digestFields = [];
++    const keyShapedDigestFields = [];
++    const credentialFields = [];
++    let tooDeep = false;
++    const walk = (node, path, depth) => {
++      if (depth > MAX_DEPTH) { tooDeep = true; return; }
++      if (Array.isArray(node)) { node.forEach((item, index) => walk(item, `${path}[${index}]`, depth + 1)); return; }
++      if (node === null || typeof node !== "object") return;
++      for (const [name, child] of Object.entries(node)) {
++        const here = path === "" ? name : `${path}.${name}`;
++        if (typeof child === "string") {
++          const keyShaped = CREDENTIAL_NAME.test(name);
++          if (DIGEST.test(child)) { digestFields.push({ path: here, keyShaped }); if (keyShaped) keyShapedDigestFields.push(here); }
++          else if (keyShaped && child.length >= MIN_CREDENTIAL_LENGTH) credentialFields.push(here);
++        } else walk(child, here, depth + 1);
++      }
++    };
++    walk(value, "", 0);
++    if (tooDeep) return unclassified("nesting is deeper than the bound");
++    return Object.freeze({ class: "pipeline-generated", schema: value.schema, digestFields, keyShapedDigestFields, credentialFields, scannerSafe: credentialFields.length === 0, reason: null });
++  } catch {
++    return unclassified("unreadable input");
++  }
++}
+diff --git a/plugins/pipeline-core/lib/generated-artefact-schema.test.mjs b/plugins/pipeline-core/lib/generated-artefact-schema.test.mjs
+new file mode 100644
+index 000000000..41ecb0aa2
+--- /dev/null
++++ b/plugins/pipeline-core/lib/generated-artefact-schema.test.mjs
+@@ -0,0 +1,61 @@
++// SPDX-License-Identifier: SUL-1.0
++// C22 (CGF-06, AC-108): criterion-bound cases for classifying the Pipeline's OWN generated metadata by a verifiable schema, with digest fields kept apart from credential fields.
++// Source: Codex greenfield report CGF-06 ("generated metadata repeatedly blocks scanners and classifiers; classify own generated artefacts by verifiable schema, separate digest from
++// credential fields; no blanket ignore, no history rewrite"). Measured on the repository: the secret scanner reads bare digests under key-shaped field names (idempotencyKey,
++// scopeKey, reuseKeySha256, courseKey) of generated JSON as credentials. Written before the module existed.
++import assert from "node:assert/strict";
++import test from "node:test";
++import { classifyGeneratedArtefact } from "./generated-artefact-schema.mjs";
++
++const HEX32 = "3f7fdf423cbf3011f758aeb70977dffc";
++const HEX64 = "a".repeat(64);
++const event = (extra = {}) => JSON.stringify({ schema: "pipeline.human-guard-event.v1", id: "evt-1", idempotencyKey: HEX32, scopeKey: HEX64, intentSha256: HEX64, ...extra });
++
++test("a generated artefact with a Pipeline schema is classified, and its key-shaped digest fields are named apart from credential fields", () => {
++  const result = classifyGeneratedArtefact(event());
++  assert.equal(result.class, "pipeline-generated");
++  assert.equal(result.schema, "pipeline.human-guard-event.v1");
++  assert.deepEqual(result.digestFields.map((field) => field.path).sort(), ["idempotencyKey", "intentSha256", "scopeKey"]);
++  assert.deepEqual(result.keyShapedDigestFields.sort(), ["idempotencyKey", "scopeKey"], "digest values whose NAME the scanner reads as a credential keyword");
++  assert.deepEqual(result.credentialFields, []);
++  assert.equal(result.scannerSafe, true, "every credential-shaped name holds a bare digest, so a field-scoped exception would be provable");
++});
++
++test("a credential-shaped field that does not hold a bare digest keeps the artefact out of the digest class: nothing is excused", () => {
++  const result = classifyGeneratedArtefact(event({ token: "not-a-digest-but-a-long-looking-value", nested: { password: HEX64.toUpperCase() } }));
++  assert.equal(result.class, "pipeline-generated");
++  assert.deepEqual(result.credentialFields.sort(), ["nested.password", "token"], "upper-case hex is not a Pipeline digest");
++  assert.equal(result.scannerSafe, false);
++});
++
++test("without a verifiable Pipeline schema the file is unclassified, never guessed from its name or its digests", () => {
++  for (const text of [JSON.stringify({ idempotencyKey: HEX32 }), JSON.stringify({ schema: "vendor.thing.v1", idempotencyKey: HEX32 }), JSON.stringify({ schema: "pipeline.x", idempotencyKey: HEX32 }),
++    "not json at all", "[1,2]", "null", JSON.stringify({ schema: 7 })]) {
++    const result = classifyGeneratedArtefact(text);
++    assert.equal(result.class, "unclassified", text);
++    assert.equal(result.scannerSafe, false);
++    assert.equal(typeof result.reason, "string");
++  }
++});
++
++test("a byte-order mark, CRLF line ends and indented text classify the same as compact text (Windows files)", () => {
++  const pretty = JSON.stringify(JSON.parse(event()), null, 2).replace(/\n/gu, "\r\n");
++  const compact = classifyGeneratedArtefact(event());
++  assert.deepEqual(classifyGeneratedArtefact(`﻿${pretty}`), compact);
++  assert.deepEqual(classifyGeneratedArtefact(Buffer.from(pretty, "utf8")), compact);
++});
++
++test("arrays and nested objects are walked with their path; the result never carries a value", () => {
++  const text = JSON.stringify({ schema: "pipeline.critic-lineage.v1", rounds: [{ packetId: HEX32, courseKey: HEX64 }] });
++  const result = classifyGeneratedArtefact(text);
++  assert.deepEqual(result.keyShapedDigestFields, ["rounds[0].courseKey"]);
++  assert.equal(JSON.stringify(result).includes(HEX64), false, "a classifier output is safe to print");
++  assert.equal(JSON.stringify(result).includes(HEX32), false);
++});
++
++test("an oversized or hostile input is refused as unclassified instead of throwing", () => {
++  assert.equal(classifyGeneratedArtefact("x".repeat(5 * 1024 * 1024)).class, "unclassified");
++  assert.equal(classifyGeneratedArtefact(undefined).class, "unclassified");
++  let deep = { schema: "pipeline.deep.v1" }; for (let index = 0; index < 200; index += 1) deep = { schema: "pipeline.deep.v1", inner: deep };
++  assert.equal(classifyGeneratedArtefact(JSON.stringify(deep)).class, "unclassified", "depth is bounded");
++});
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index dd0371632..d62422819 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -42,6 +42,7 @@ import { buildRootProjectCalibrationIdentity } from "../lib/project-calibration-
+ import { readState, run } from "./pipeline-state.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../lib/architecture-map-scaffold.mjs";
+ import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
++import { readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ import { NEUTRAL_MANIFEST } from "../lib/project-authority.mjs";
+ import * as po from "../lib/po-gate-authority.mjs";
+@@ -258,8 +259,9 @@ const WALKS = Object.freeze([
+   Object.freeze({ identity: RUNNER_IDENTITIES.find((entry) => entry.runner === "claude"), criticReturn: "stop-hook", catalogue: true }),
+ ]);
+ 
+-test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 600_000 }, async () => {
+-  for (const { identity, criticReturn, catalogue } of WALKS) {
++// C22 (CGF-04): the walk body is one function so the same fixture, Critic course and close prerequisites serve the manual coordinator walks (below) and the one-shot close walk.
++async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false }) {
++  {
+     const log = [];
+     const fx = consumerFixture(log, identity);
+     walkEnv = runnerEnv(identity.runner, fx.root);
+@@ -403,11 +405,22 @@ test("G20-35: the close path from implementation to release preflight is walked
+       const coordinator = (verb, extra) => json(step(log, `${identity.runner}: close-coordinator ${verb}`, process.execPath,
+         [script("close-coordinator.mjs"), verb, "--root", fx.root, "--lifecycle", lifecycle, ...extra], { cwd: fx.root }));
+       const runAction = (label, action) => json(step(log, `${identity.runner}: ${label}`, action.executable, action.argv, { cwd: fx.root }));
+-      const started = coordinator("plan-start", ["--actor", "PO", "--close-intent", "durable-stop"]);
+-      const startedApplied = runAction("apply-start", started.nextAction);
+-      assert.equal(startedApplied.status, "applied");
++      // C22 (CGF-04): the one-shot walk lets finish-feature.mjs start the close itself, so the hand-driven start and checkpoint are the manual walks' only.
++      const started = oneShot ? null : coordinator("plan-start", ["--actor", "PO", "--close-intent", "durable-stop"]);
++      const startedApplied = oneShot ? null : runAction("apply-start", started.nextAction);
++      if (!oneShot) assert.equal(startedApplied.status, "applied");
+       const transition = (phase, extra = []) => runAction(`apply ${phase}`, coordinator("plan-transition", ["--actor", "PO", "--phase", phase, ...extra]).nextAction);
+-      transition("checkpointed");
++      if (!oneShot) transition("checkpointed");
++      // C22 (CGF-04): the real one-shot CLI, one call per stop. Its result is typed JSON on stdout (exit 0 for a result, 2 for a stop); every assertion below reads stored state or a typed code.
++      const oneShotCli = (extra = []) => {
++        const out = spawnSync(process.execPath, [script("finish-feature.mjs"), "--one-shot", "--root", fx.root, "--by", "Fixture PO", "--architecture-impact", "architecture-conforms", "--critic-packet-id", packetId, ...extra],
++          { cwd: fx.root, env: walkEnv, encoding: "utf8", shell: false, windowsHide: true, timeout: 300_000, maxBuffer: 1 << 26 });
++        log.push({ label: `${identity.runner}: finish-feature --one-shot ${extra.join(" ")}`.trim(), status: out.status });
++        let result;
++        try { result = json(out); } catch { assert.fail(`${identity.runner}: finish-feature printed no JSON (exit ${out.status})\n${out.stdout}\n${out.stderr}`); }
++        return { status: out.status, result, code: result.status === "stopped" ? result.stop.code : result.status };
++      };
++      const porcelain = () => git(log, fx.root, ["status", "--porcelain=v1", "--untracked-files=all"]);
+       // The Result is bound to the Continuity state and the queue head says close (the work package's own output); the close request names the
+       // exported Critic receipt as its close evidence, which the skill names as the usual choice.
+       const STATE = "project/pipeline-state.json"; // the project authority tier (the baseline twin project/pipeline.json selects it)
+@@ -415,6 +428,15 @@ test("G20-35: the close path from implementation to release preflight is walked
+       const fileSha = (rel) => createHash("sha256").update(readFileSync(join(fx.root, rel))).digest("hex");
+       const resultPath = `specs/${FEATURE_ID}/result.md`;
+       const stateWriter = (label, verb, extra = []) => step(log, `${identity.runner}: ${label}`, process.execPath, [script("pipeline-state.mjs"), verb, ...extra], { cwd: fx.root });
++      if (oneShot) {
++        // C22 (CGF-04), first stop of the real CLI: a Continuity feature with no bound Result stops BEFORE any evidence is written, with the bootstrap chain as its repair.
++        const treeBefore = porcelain();
++        const unbound = oneShotCli();
++        assert.equal(unbound.status, 2, JSON.stringify(unbound.result).slice(0, 600));
++        assert.equal(unbound.code, "ONESHOT-RESULT-NOT-BOUND", JSON.stringify(unbound.result).slice(0, 600));
++        assert.match(unbound.result.stop.repair, /continuity-result-bootstrap-plan/u);
++        assert.equal(porcelain(), treeBefore, `${identity.runner}: a stop that wrote nothing leaves the tree as it was`);
++      }
+       const bootstrap = json(stateWriter("continuity-result-bootstrap-plan", "continuity-result-bootstrap-plan"));
+       const bootstrapApplied = step(log, `${identity.runner}: continuity-result-bootstrap-apply (the action the plan returned)`, bootstrap.applyAction.executable, bootstrap.applyAction.argv, { cwd: fx.root });
+       // Measured (w265 finding 2): a REGISTERED package lags the Result the bootstrap just bound. G20-38 (PO decision 2026-11-07), restated
+@@ -441,6 +463,53 @@ test("G20-35: the close path from implementation to release preflight is walked
+       const reconciled = step(log, `${identity.runner}: feature-package-reconcile (agent-run, result-only)`, completion.reconcileCommand.executable, completion.reconcileCommand.argv, { cwd: fx.root });
+       assert.deepEqual(JSON.parse(reconciled.stdout).approval, { basis: "agent-result-only-reconcile-no-po-proof", poProof: false });
+       commit(log, fx.root, "chore: bind the Result and reconcile the feature package");
++      if (oneShot) {
++        // C22 (CGF-04): the whole close through the real one-shot CLI, one call per stop. The question for the human comes once and writes nothing; the answer is recorded for exactly the HEAD it was
++        // given at; every commit the close asks for is made from the paths it names (so the close's own evidence commits are part of the walk); a resume never asks again and never lands in
++        // FCA-PACKAGE or in a second commit request for the same outputs. The final gates (freeze, Verify, scan) are read from the typed codes the CLI ends on.
++        const stateOf = () => JSON.parse(readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8"));
++        const treeBefore = porcelain();
++        const asked = oneShotCli();
++        assert.equal(asked.status, 2, JSON.stringify(asked.result).slice(0, 600));
++        assert.equal(asked.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(asked.result).slice(0, 600));
++        assert.equal(porcelain(), treeBefore, `${identity.runner}: the acceptance question wrote nothing`);
++        assert.equal(readAcceptanceRecord(fx.root, FEATURE_ID), null);
++        assert.deepEqual(stateOf().closedFeatures ?? [], [], "the close has not started");
++        const candidateAsked = git(log, fx.root, ["rev-parse", "HEAD"]);
++        const answer = "Fixture PO: accepted for this candidate";
++        const seen = [asked.code];
++        let args = ["--human-acceptance", answer];
++        let last = null;
++        for (let turn = 0; turn < 6; turn += 1) {
++          last = oneShotCli(args);
++          seen.push(last.code);
++          if (turn === 0) {
++            const record = readAcceptanceRecord(fx.root, FEATURE_ID);
++            assert.equal(record?.answer, answer, `${identity.runner}: the literal answer is recorded: ${JSON.stringify(last.result).slice(0, 800)}`);
++            assert.equal(record.candidate, candidateAsked, "the acceptance binds the HEAD it was given at");
++            assert.equal(last.code, "commit-required", JSON.stringify(last.result).slice(0, 800));
++            assert.ok(last.result.commit.paths.includes(record.path), `the close commit carries the acceptance record ${record.path}: ${last.result.commit.paths}`);
++            assert.equal(stateOf().closedFeatures.at(-1).id, FEATURE_ID, "the State close happened once, before the commit");
++          }
++          if (last.code !== "commit-required") break;
++          commitPaths(last.result.commit.message, last.result.commit.paths);
++          if (turn === 0) {
++            // CGF-04: the evidence a human step needs (a signature needs a clean tree) lands as its OWN commit between the close commit and the resume, so HEAD moves past the commit the close named.
++            const note = `specs/${FEATURE_ID}/evidence/post-close-note.md`;
++            writeFileSync(join(fx.root, note), "# Evidence committed between the close commit and the resume\n");
++            commitPaths("docs: evidence committed between the close commit and the resume", [note]);
++          }
++          args =["--resume-lifecycle-id", last.result.resumeLifecycleId];
++        }
++        assert.ok(!seen.includes("FCA-PACKAGE"), `${identity.runner}: the close never becomes unresolvable through its own evidence commits: ${seen}`);
++        assert.equal(seen.filter((code) => code === "ONESHOT-ACCEPTANCE-REQUIRED").length, 1, `the human is asked once: ${seen}`);
++        assert.equal(seen.filter((code) => code === "ONESHOT-COMMIT-PENDING").length, 0, `no close output is left uncommitted after its commit: ${seen}`);
++        assert.deepEqual(seen, ["ONESHOT-ACCEPTANCE-REQUIRED", "commit-required", "closed-local"], `${identity.runner}: the whole close is one question, one commit request and the end at closed-local: ${JSON.stringify(last.result).slice(0, 800)}`);
++        for (const stage of ["verify-candidate-frozen", "security-scan", "final-verify-green", "cleanup-complete", "closed-local"]) assert.ok(last.result.stages.includes(stage), `${identity.runner}: the resumed close ran ${stage}: ${last.result.stages}`);
++        assert.match(last.result.pushEvidence?.command ?? "", /--mode release --critic-packet-id/u, "the push boundary names the Critic-bound Verify, which the close never writes itself");
++        assert.equal(stateOf().closedFeatures.filter((entry) => entry.id === FEATURE_ID).length, 1, "the feature is closed exactly once");
++        return;
++      }
+       const bound = JSON.parse(readFileSync(statePath, "utf8"));
+       // review -> close through the sanctioned Result-close verb (plan, then the action it returns); no hand edit of the Continuity state
+       const closePlan = json(stateWriter("continuity-result-close-plan", "continuity-result-close-plan", ["--feature-id", FEATURE_ID,
+@@ -509,7 +578,7 @@ test("G20-35: the close path from implementation to release preflight is walked
+       assert.equal(prepared.phase, "feature-close-prepared");
+       // Without a record the acknowledgement walk ends here: the identical close command above was admitted only after it. The rest of the close
+       // (identical on every route) is walked by the three issuing identities.
+-      if (criticReturn === "none") continue;
++      if (criticReturn === "none") return;
+       assert.ok(prepared.nextAction.argv.includes("--continuity-close-request"), `the returned close-feature action keeps the Continuity flag: ${JSON.stringify(prepared.nextAction.argv.slice(1))}`);
+       // The State writer prints a plain sentence, not JSON.
+       const closed = step(log, `${identity.runner}: close-feature (State writer action returned by the coordinator)`, prepared.nextAction.executable, prepared.nextAction.argv, { cwd: fx.root });
+@@ -587,7 +656,7 @@ test("G20-35: the close path from implementation to release preflight is walked
+           { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
+         assert.equal(refusedChat.status, 2, refusedChat.stdout);
+         assert.match(refusedChat.stderr, /state-push-source-requester[\s\S]*--proof-request/u);
+-        continue;
++        return;
+       }
+       step(log, `${identity.runner}: approve-push (the line push-prepare printed)`, process.execPath,
+         [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"], { cwd: fx.root });
+@@ -656,4 +725,12 @@ test("G20-35: the close path from implementation to release preflight is walked
+       rmSync(fx.parent, { recursive: true, force: true, maxRetries: 3 });
+     }
+   }
++}
++
++test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 600_000 }, async () => {
++  for (const walk of WALKS) await walkTheClosePath(walk);
++});
++
++test("C22 CGF-04: the one-shot close CLI walks the whole close on the real fixture: its stops, the acceptance question, the commits the close asks for, and the resume", { timeout: 600_000 }, async () => {
++  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true });
+ });
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 29f97f9fd..aa9031584 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -39,6 +39,7 @@ import {
+ } from "../lib/requirement-traceability.mjs";
+ import { criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+ import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
++import { criticRunnerFromEnv, describeCriticRouteAssurance } from "../lib/critic-route-assurance.mjs";
+ 
+ export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
+ export const EVIDENCE_SWEEP_SCHEMA = "pipeline.critic-dispatch-preflight-evidence-sweep.v1";
+@@ -633,6 +634,13 @@ function reviewAdmissionTaskIds({ root, baseCommit, candidateCommit, given = nul
+   return { matching, considered, appliedRows };
+ }
+ 
++/** The feature package's rigor at the candidate (the close rule reads the same field), or null when there is no readable package. Read-only. */
++function featureRigor(root, candidateCommit, specPath) {
++  const match = /^specs\/([^/]+)\//u.exec(specPath ?? "");
++  if (match === null) return null;
++  try { const value = JSON.parse(candidateText(root, candidateCommit, `specs/${match[1]}/lifecycle.json`))?.feature?.rigor; return Number.isInteger(value) && value >= 0 ? value : null; } catch { return null; }
++}
++
+ /** MP-07 prompt lines for a Critic route that resolves to an Opus model; null for any other route. T1 and T2 select the high-risk Critic duty (as admit does). */
+ function opusCriticPromptLines({ root, result, env, registry, trigger }) {
+   const runner = env.CODEX_SESSION_ID !== undefined || env.CODEX_THREAD_ID !== undefined ? "codex" : "claude";
+@@ -706,6 +714,8 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
+     event: fillPlaceholder("event", "null, or an object with eventOutPath and featureId"),
+   };
+   const promptLines = opusCriticPromptLines({ root, result, env: deps.env ?? process.env, registry: deps.registry, trigger });
++  // C22 (CGF-03, CGF-20): what the planned route will really deliver and whether the close will need its own acknowledgement, stated now (printed only, like the fields above).
++  const routeAssurance = describeCriticRouteAssurance({ runner: criticRunnerFromEnv(deps.env ?? process.env), trigger, rigor: featureRigor(root, result.candidate.commit, reviewer.specPath), packetId: request.packetId, launchRoute: deps.criticLaunchRoute ?? null });
+   // G20-72: a range above the one named bound is split per module; `admit` rebuilds the identical object and binds its digest.
+   const split = buildCriticSplit({ root, result });
+   if (split !== null && split.entries.length > SPLIT_MAX_ENTRIES) {
+@@ -721,7 +731,8 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
+     ...(split === null ? [] : [`SPLIT: this range has ${split.changedFileCount} changed files, above the bound of ${split.maxChangedFiles} one Critic can read, so it is split (split.entries, ${split.entries.length} entries, plan ${split.plan.status}; bound exclusions and the delivery records named in the review protocol §2.2 are in no entry). Dispatch one Critic per split entry from the template, each with its entry's reviewerInput, its entry's batchScopeLine as the Batch scope (MP-07) line${promptLines === null ? "" : " (in place of criticDispatchPromptLines[0]; keep the rationale line)"} and the instruction to begin trajectory_evidence with its scopeMarker; run each entry's Critic once (a second run for an entry makes finalize refuse the round). When every child has returned, merge them without copying any verdict: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-split-merge.mjs --root <repo> --packet <packetId> --out <merged verdict file>; only for a child without a Source return, save split as a JSON file under scratch/ and pass --split <split file> and --child <entryId>=<verdict file> (one per entry) instead of --packet; admit binds the split, finalize takes the merged verdict as verdictPath and labels it source-issued only when every child returned through the Critic stop.`]),
+   ].join(" ");
+   return { ...result, admitRequest: request, admitCommand: ["node", ADMIT_SCRIPT, "admit", "--root", input.root, "--request", ADMIT_REQUEST_FILE], nextStep,
+-    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(split === null ? {} : { split }) };
++    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(split === null ? {} : { split }),
++    routeAssurance };
+ }
+ 
+ /**
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index c0bcbe94b..a0ae98d97 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -697,7 +697,8 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
+   assert.equal(printedRun.stderr, "");
+   // G20-72 (same criterion, same strictness): a range above the split bound also prints the additive `split`; it is stripped like the other additive fields, and this fixture's
+   // one-file range is below the bound so the printed line is compared byte for byte without it.
+-  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, split: _printedSplit, ...printedRest } = JSON.parse(printedRun.stdout);
++  // C22 (CGF-03, QG-04 restated in place): the printed-only `routeAssurance` is one more additive field next to the admit fields; every other key still equals the library result.
++  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, split: _printedSplit, routeAssurance: _printedAssurance, ...printedRest } = JSON.parse(printedRun.stdout);
+   assert.equal(_printedSplit, undefined, "a one-file range carries no split");
+   assert.equal(JSON.stringify(printedRest) + "\n", JSON.stringify(expected) + "\n");
+   assert.equal(printedAdmitRequest.schema, "pipeline.session-critic-finalization-request.v3");
+@@ -2071,7 +2072,8 @@ test("G20-69 the printed packet-ready result carries the complete admit request,
+     assert.equal(Object.hasOwn(covered, "admitRequest"), false, "the coverage entry point stays as it was");
+     assert.equal(Object.hasOwn(preflightCriticDispatch(input(fx)), "admitRequest"), false, "the library result is digest-bound by the session finalizer");
+     const printed = g2069Printed(fx);
+-    const { admitRequest, admitCommand, nextStep, criticDispatchPromptLines: _lines, ...rest } = printed;
++    // C22 (CGF-03, QG-04 restated in place): the printed-only `routeAssurance` joins the admit fields; the other keys are still exactly the coverage result.
++    const { admitRequest, admitCommand, nextStep, criticDispatchPromptLines: _lines, routeAssurance: _assurance, ...rest } = printed;
+     assert.deepEqual(rest, covered, "the admit fields are the only difference");
+     assert.deepEqual(Object.keys(admitRequest), G2069_KEYS);
+     assert.equal(admitRequest.schema, "pipeline.session-critic-finalization-request.v3", "a review that is no feature package is a generic batch request");
+@@ -2139,6 +2141,28 @@ test("G20-71 an Opus Critic route carries the MP-07 prompt lines the dispatch po
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++// C22 (CGF-03, CGF-20, AC-108): the PRINTED result states the assurance the planned Critic route will really deliver and whether the close will need its own acknowledgement, before
++// the dispatch. Additive and printed-only (the library result the finalizer binds by digest stays byte-identical); criterion-bound cases written before the implementation existed.
++test("C22 CGF-03/CGF-20 the printed result states the route assurance and the close acknowledgement before dispatch; the library entry points carry no such field", () => {
++  const fx = fixture();
++  try {
++    n33bRequiredRecord(fx.root, "C22-RA-ONE", fx.candidate);
++    assert.equal(Object.hasOwn(preflightModule.preflightCriticDispatchWithCoverage(input(fx)), "routeAssurance"), false, "digest-bound results stay as they were");
++    assert.equal(Object.hasOwn(preflightCriticDispatch(input(fx)), "routeAssurance"), false);
++    const defaultRoute = { agentType: "default", sandboxed: false, protection: "instruction-only", reason: "no-receipt" };
++    const codexDefault = g2069Printed(fx, {}, { env: { CODEX_THREAD_ID: "thread-c22" }, criticLaunchRoute: defaultRoute }).routeAssurance;
++    assert.equal(codexDefault.expected.independence, "caller-authored-fallback");
++    assert.equal(codexDefault.expected.freshContext, false);
++    assert.equal(codexDefault.expected.historyInherited, true);
++    assert.equal(codexDefault.profile.status, "below-required", "the matched record carries no Critic row, so the strictest trigger T1 is the critical profile");
++    assert.equal(codexDefault.closeAcknowledgement.required, true);
++    const printed = g2069Printed(fx, {}, { env: { CODEX_THREAD_ID: "thread-c22" }, criticLaunchRoute: defaultRoute });
++    assert.ok(printed.routeAssurance.closeAcknowledgement.command.includes(`--critic-packet ${printed.admitRequest.packetId}`));
++    assert.equal(g2069Printed(fx, {}, { env: { CLAUDE_CODE_SESSION_ID: "session-c22" } }).routeAssurance.expected.independence, "source-issued-origin");
++    assert.equal(g2069Printed(fx, {}, { env: { CODEX_THREAD_ID: "thread-c22" } }).routeAssurance.profile.status, "conditional", "no launch route is known: the floor and both outcomes are stated");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ test("G20-69 the request trigger is the applied Critic row of the matched dispatch record where admit has that trigger, else the strictest default", () => {
+   const fx = fixture();
+   try {
+@@ -2230,7 +2254,8 @@ test("G20-72 above SPLIT_MAX_CHANGED_FILES the printed result carries one split
+     }
+     assert.match(printed.nextStep, /one Critic per split entry/u);
+     assert.match(printed.nextStep, /critic-split-merge\.mjs --root <repo> --packet <packetId>/u);
+-    const { admitRequest: _a, admitCommand: _c, nextStep: _n, criticDispatchPromptLines: _l, taskIdResolution: _t, split: _s, ...rest } = printed;
++    // C22 (CGF-03, QG-04 restated in place): `routeAssurance` is printed-only like the other admit fields and is set aside before the library comparison.
++    const { admitRequest: _a, admitCommand: _c, nextStep: _n, criticDispatchPromptLines: _l, taskIdResolution: _t, split: _s, routeAssurance: _r, ...rest } = printed;
+     assert.deepEqual(rest, preflightModule.preflightCriticDispatchWithCoverage(g2072Input(fx)), "the admit fields and the split are the only additions");
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
