@@ -321,6 +321,29 @@ function isValidCatPipelineSourceArgs(argv, root, extraRoots = []) {
  * function and CAT_PIPELINE_DISPLAY_FLAGS for the flag-allowlist and path-restriction
  * rationale (deliberately narrower than the existing single-command `cat` rule).
  */
+// CGF-10 (PO tile 2026-11-09): `nl` numbers the lines of one contained file. Only the all-lines body style is admitted, no other option.
+function isNumberedFileReadArgs(args, root, extraRoots) {
+  const flags = args[0] === "-ba" ? 1 : args[0] === "-b" && args[1] === "a" ? 2 : 0;
+  const operands = args.slice(flags);
+  return operands.length === 1 && !operands[0].startsWith("-") && isSafeExactPassiveFile(operands[0], root, extraRoots);
+}
+
+const READER_ONLY_PIPELINE_NAMES = new Set(["cat", "head", "tail", "wc", "stat", "file", "ls", "rg", "grep", "nl"]);
+
+/**
+ * CGF-10 (PO tile 2026-11-09): only plain readers joined by pipes, every operand an admitted passive target. Refused forms of this shape are a
+ * spelling question and offer no signed override. A credential or outside-root operand is not harmless and keeps its existing refusal.
+ */
+export function isReaderOnlyPipeline(parsed, root) {
+  return parsed?.parseStatus === "accepted" && parsed.redirects.length === 0 && parsed.segments.length >= 2
+    && parsed.operators.every((entry) => entry.operator === "|")
+    && parsed.segments.every((segment) => READER_ONLY_PIPELINE_NAMES.has(basename(segment.executable).toLowerCase().replace(/\.exe$/u, ""))
+      && segment.argv.every((arg) => {
+        const candidate = rawReadCandidatePath(arg, root);
+        return (candidate === null || isRealpathedWithinBoundary(candidate, root)) && isApprovedSingleCommandReadArg(arg, root, []);
+      }));
+}
+
 export function isBoundedCatPipeline(parsed, root, extraRoots = []) {
   if (!parsed || parsed.parseStatus !== "accepted"
     || parsed.segments.length !== 2
@@ -330,14 +353,18 @@ export function isBoundedCatPipeline(parsed, root, extraRoots = []) {
   const windows = parsed.dialect === "windows-readonly-pipeline";
   const expectedCat = windows ? "cat.exe" : "cat";
   const sourceName = basename(parsed.segments[0].executable).toLowerCase();
-  if (sourceName !== expectedCat) return false;
-  if (!isValidCatPipelineSourceArgs(parsed.segments[0].argv, root, extraRoots)) return false;
+  const numbered = sourceName === (windows ? "nl.exe" : "nl");
+  if (sourceName !== expectedCat && !numbered) return false;
+  if (!(numbered ? isNumberedFileReadArgs(parsed.segments[0].argv, root, extraRoots)
+    : isValidCatPipelineSourceArgs(parsed.segments[0].argv, root, extraRoots))) return false;
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
   const expectedGrep = windows ? "grep.exe" : "grep";
   if (sinkName === expectedGrep) {
     return parsed.redirects.length === 0 && isValidPipelineGrepArgs(parsed.segments[1].argv);
   }
-  if (sinkName !== (windows ? "head.exe" : "head")) return false;
+  // CGF-10: a numbered excerpt is usually the end of a file, so `nl` also takes the `tail` sink.
+  const numberedTail = numbered && sinkName === (windows ? "tail.exe" : "tail");
+  if (sinkName !== (windows ? "head.exe" : "head") && !numberedTail) return false;
   if (parsed.redirects.length === 1) {
     const redirect = parsed.redirects[0];
     if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
@@ -1262,6 +1289,7 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
     // marker.
     return args.every((arg) => isApprovedSingleCommandReadArg(arg, root, extraRoots));
   }
+  if (executable === "nl") return isNumberedFileReadArgs(args, root, extraRoots);
   if (executable === "sed") {
     // Only numeric print programs. sed's `e` command executes shell text, and
     // `w`/`i`/`a` can write or produce effects even without -i.
@@ -1496,7 +1524,7 @@ export function isRejectedReadFamilyCommand(command, root) {
     || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
   const { executable, argv } = parsed.segments[0];
   const name = basename(executable).toLowerCase();
-  if (["cat", "rg", "grep", "head", "tail", "wc", "stat", "file", "ls"].includes(name)
+  if (["cat", "rg", "grep", "head", "tail", "wc", "stat", "file", "ls", "nl"].includes(name)
     || isSystemDiagnosticName(name)) return true;
   if (name === "git" && argv[0] === "diff"
     && argv.some((arg) => arg === "--output" || arg.startsWith("--output=")

@@ -1342,7 +1342,7 @@ check("outer Codex routing admits the exact bounded diagnostic pipeline while no
   ]) {
     const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
     assert.equal(output.permissionDecision, "deny", command);
-    assert.match(output.permissionDecisionReason, /GUARD-(?:REDIRECT|OPERATOR|LIFECYCLE)/u, command);
+    assert.match(output.permissionDecisionReason, /GUARD-(?:REDIRECT|OPERATOR|LIFECYCLE|READ-COMMAND)/u, command);
   }
 });
 

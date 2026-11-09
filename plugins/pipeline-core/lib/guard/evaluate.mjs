@@ -17,7 +17,7 @@ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, 
 import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
 import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint } from "../read-command-diagnosis.mjs";
 import { isProjectWritePath } from "./path-containment.mjs";
-import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
 import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
 import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
 import { evaluateBootstrapReceiptGate, recordBootstrapPreflightReceipt } from "./bootstrap-receipt.mjs";
@@ -617,6 +617,10 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       // (a `|`-joined pipeline) always is.
       const readScope = isOutsideRootBoundedDiagnosticRead(parsed, root)
         || isOutsideRootSingleCommandRead(parsed, root);
+      // CGF-10 (PO tile 2026-11-09): a pipeline of readers that is not an admitted shape is a spelling question, so no signed override is offered.
+      if (!readScope && isReaderOnlyPipeline(parsed, root)) {
+        return withLifts(lifts, blocked(READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejectedGrammarElement("GUARD-OPERATOR-UNAPPROVED", (input.tool_input.command ?? input.tool_input.CommandLine), parsed)));
+      }
       const code = readScope
         ? READ_SCOPE_DENIAL_CODE
         : parsed.redirects.length > 0 ? "GUARD-REDIRECT-UNAPPROVED" : "GUARD-OPERATOR-UNAPPROVED";

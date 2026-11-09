@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { evaluateLifecycleReadyGuard } from "./evaluate.mjs";
+import { isReadOnlyDiagnosticCommand } from "./shell-grammar.mjs";
 
 function seededRequests(toolName, toolInput) {
   const dir = mkdtempSync(join(tmpdir(), "ac160-seed-"));
@@ -33,6 +34,8 @@ test("NRS01 refusals with no override route seed no request", () => {
     ["Bash", { command: "cat /etc/hostname" }, "GUARD-READ-SCOPE-OUTSIDE-ROOT"],
     ["Bash", { command: "cat .aws/credentials" }, "GUARD-READ-CREDENTIAL-TARGET"],
     ["Bash", { command: "rg -A3 x a.txt" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
+    ["Bash", { command: "cat a.txt | wc -l" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
+    ["Bash", { command: "nl -ba a.txt | wc -l" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
     ["Bash", { command: "rm -rf scratch" }, "GUARD-LIFECYCLE-NOT-READY"],
     ["Bash", { command: "node -e \"process.exit(0)\"" }, "GUARD-LIFECYCLE-NOT-READY"],
   ]) {
@@ -41,6 +44,22 @@ test("NRS01 refusals with no override route seed no request", () => {
     assert.ok(result.stderr.includes(code), `${toolInput.command}: ${result.stderr}`);
     assert.equal(seeded, 0, `${code} (${toolInput.command}) must seed no request`);
   }
+});
+
+test("NRS03 CGF-10: a numbered excerpt of one contained file is an admitted read, anything wider is not", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cgf10-nl-"));
+  try {
+    writeFileSync(join(dir, "a.txt"), "x\n");
+    writeFileSync(join(dir, "b.txt"), "y\n");
+    mkdirSync(join(dir, ".aws"), { recursive: true });
+    writeFileSync(join(dir, ".aws", "credentials"), "synthetic fixture\n");
+    for (const command of ["nl a.txt", "nl -ba a.txt", "nl -b a a.txt", "nl -ba a.txt | tail -n 110", "nl -ba a.txt | head -n 5"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, dir), true, command);
+    }
+    for (const command of ["nl -s x a.txt", "nl -ba a.txt b.txt", "nl -ba .aws/credentials", "nl -ba ../outside.txt", "nl -ba missing.txt", "nl -ba a.txt | tail -n 501", "nl -ba a.txt | tee b.txt"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, dir), false, command);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("NRS02 refusals that offer a human override seed exactly one request", () => {
