@@ -52,6 +52,30 @@ test("CGF-08 the orientation carries a verdict label: report-only, observation d
   assert.match(none.verdict.scope, /no scope recorded/u);
 });
 
+// CGF-08 (AC-108): the orientation reads the ONE architecture projection from stored observations only. It never runs the boundary check and
+// carries no wall clock (AC-245 byte-compares two bootstrap envelopes), so without a stored blocking result the gate is typed
+// "no-blocking-result"; the recorded fitness observation stays beside it, report-only, with its own observation date.
+test("CGF-08 the orientation carries the architecture projection: no stored blocking result is typed, the recorded fitness observation stays report-only and open with its date", () => {
+  const root = fixtureRoot("projection-");
+  const bare = observeArchitectureAdoptionOrientation({ rootDir: root });
+  assert.equal(bare.architectureProjection.schema, "pipeline.architecture-projection.v1");
+  assert.deepEqual([bare.architectureProjection.gate.verdict, bare.architectureProjection.gate.candidate, bare.architectureProjection.gate.observedAt], ["no-blocking-result", null, null]);
+  assert.equal(bare.architectureProjection.reportOnly, null, "nothing stored: nothing claimed");
+  const recorded = { observedAt: "2026-11-08T08:00:00.000Z", candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, fitnessProjection: { outcomes: [{ classId: 2, propertyId: "p2", outcome: "pass" }, { classId: 3, propertyId: "p3", outcome: "finding" }] } };
+  const calls = [];
+  const deps = { readFitnessObservation: (rootDir) => { calls.push(rootDir); return recorded; }, resolveAdoptionState: () => ({ state: "approved-scoped", scope: "src/**", decisionRef: "ADR-1", coverageClass: "measured", confidence: "measured" }) };
+  const seen = observeArchitectureAdoptionOrientation({ rootDir: root, deps });
+  assert.equal(calls.length, 1);
+  assert.deepEqual([seen.architectureProjection.reportOnly.effect, seen.architectureProjection.reportOnly.verdict, seen.architectureProjection.reportOnly.observedAt], ["report-only", "observed-open", "2026-11-08T08:00:00.000Z"]);
+  assert.deepEqual(seen.architectureProjection.reportOnly.reportOnlyOpen.map((entry) => entry.classId), [3]);
+  assert.equal(seen.architectureProjection.gate.verdict, "no-blocking-result", "the fitness observation never turns into a gate verdict");
+  // byte-stable: nothing in it comes from a clock or the boundary check
+  assert.deepEqual(observeArchitectureAdoptionOrientation({ rootDir: root, deps }), observeArchitectureAdoptionOrientation({ rootDir: root, deps }));
+  // an unreadable store leaves the observation typed absent, never a thrown bootstrap
+  const unreadable = observeArchitectureAdoptionOrientation({ rootDir: root, deps: { readFitnessObservation: () => { throw new Error("state unreadable"); } } });
+  assert.equal(unreadable.architectureProjection.reportOnly, null);
+});
+
 test("brownfield without a physical map has an actionable adoption-required readback", () => {
   const root = fixtureRoot("brownfield-");
   writeFileSync(join(root, "package.json"), "{}\n", "utf8");

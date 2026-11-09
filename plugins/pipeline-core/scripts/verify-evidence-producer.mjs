@@ -72,7 +72,8 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
-import { readRigorVerifyObservation } from "../lib/rigor-lifecycle.mjs";
+import { readRecordedFitnessObservation, readRigorVerifyObservation } from "../lib/rigor-lifecycle.mjs";
+import { architectureVerdictLabel, currentArchitectureProjection, fitnessObservationVerdictLabel } from "../lib/architecture-verdict-label.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { describeWindowsAuthorityRefusal } from "../lib/windows-authority-readiness.mjs";
 import { porcelainPaths } from "../lib/pipeline-owned-files.mjs";
@@ -143,6 +144,37 @@ export function summarizeVerifyFailures(run) {
     } catch { /* Missing/malformed diagnostics never change the failed result. */ }
     return result;
   });
+}
+
+/**
+ * CGF-08: the one architecture projection Verify prints (the same reader the bootstrap orientation uses). The blocking verdict is the one the
+ * `baseline-architecture` suite recorded in its own retained log (the check runs in a child process and is never re-run here); it counts
+ * only when the log hash-matches this run's receipt. A verdict observed at another candidate (a resumed baseline) is relabelled superseded.
+ * No such result (no architecture map, the suite not selected, an unreadable log) leaves the gate part typed "no-blocking-result". The stored
+ * fitness observation stays beside it as report-only. Never throws: the projection is printed beside the evidence, it is not part of it.
+ */
+export function architectureProjectionForRun(root, run, commit) {
+  let boundaryVerdict = null;
+  try {
+    const step = run.steps.find((entry) => entry?.name === "baseline-architecture");
+    const artifact = verifySuiteArtifactName("baseline-architecture");
+    const logPath = join(run.runDir, "logs", `${artifact}.log`);
+    const stat = step === undefined ? null : lstatSync(logPath);
+    if (stat?.isFile() && !stat.isSymbolicLink() && stat.size <= 4194304) {
+      const bytes = readFileSync(logPath);
+      const receipt = JSON.parse(readFileSync(join(run.runDir, "receipts", `${artifact}.json`), "utf8"));
+      if (receipt.receiptSha256 === step.receiptSha256 && receipt.log?.fileSha256 === createHash("sha256").update(bytes).digest("hex")) {
+        const verdict = JSON.parse(bytes.toString("utf8").split("\n").find((line) => line.startsWith("{")))?.verdict;
+        if (verdict !== undefined) boundaryVerdict = architectureVerdictLabel({ ...verdict, currency: verdict.candidate === null || verdict.candidate === commit ? verdict.currency : "superseded" });
+      }
+    }
+  } catch { boundaryVerdict = null; }
+  let fitnessLabel = null;
+  try {
+    const recorded = readRecordedFitnessObservation(root);
+    if (recorded) fitnessLabel = fitnessObservationVerdictLabel(recorded);
+  } catch { fitnessLabel = null; }
+  return currentArchitectureProjection({ boundaryVerdict, fitnessLabel });
 }
 
 function git(root, args, timeout = 10_000) {
@@ -603,6 +635,8 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     }
   }
 
+  // CGF-08: printed beside the evidence (the return value and the CLI output), never inside it: the evidence shape stays closed.
+  const architectureProjection = architectureProjectionForRun(root, run, started.commit);
   const evidence = {
     schema: VERIFY_EVIDENCE_SCHEMA,
     project,
@@ -648,17 +682,17 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
       fail(error?.code ?? "VEP-CRITIC-LIFECYCLE", error?.message ?? "Critic/Verify lifecycle receipt could not be persisted.");
     }
   }
-  if (eventPlan === null) return { status: "passed", evidence, outPath: target, ...(criticLifecycle === null ? {} : { criticLifecycle }) };
+  if (eventPlan === null) return { status: "passed", evidence, outPath: target, architectureProjection, ...(criticLifecycle === null ? {} : { criticLifecycle }) };
   // The event follows source persistence and a physical source readback.
   let observed;
   try { observed = JSON.parse(readFileSync(target, "utf8")); } catch { fail("VEP-SOURCE-READBACK", "Verify evidence could not be read back after persistence."); }
   if (JSON.stringify(observed) !== JSON.stringify(evidence)) fail("VEP-SOURCE-READBACK", "Verify evidence readback did not match the terminal source.");
   try {
     const eventWrite = writeGovernanceVerificationAction({ rootDir: root, eventOutPath: eventPlan.eventOutPath, event: actionEvent });
-    return { status: "passed", evidence, outPath: target, actionEvent, eventOutPath: eventWrite.outPath, ...(criticLifecycle === null ? {} : { criticLifecycle }) };
+    return { status: "passed", evidence, outPath: target, architectureProjection, actionEvent, eventOutPath: eventWrite.outPath, ...(criticLifecycle === null ? {} : { criticLifecycle }) };
   } catch {
     return {
-      status: "source-complete/event-unavailable", sourceStatus: "passed", evidence, outPath: target,
+      status: "source-complete/event-unavailable", sourceStatus: "passed", evidence, outPath: target, architectureProjection,
       actionEvent, eventRetry: buildGovernanceVerificationRetry({ eventOutPath: eventPlan.eventOutPath, event: actionEvent }), ...(criticLifecycle === null ? {} : { criticLifecycle }),
     };
   }
@@ -689,9 +723,11 @@ if (isDirectInvocation(import.meta.url)) {
   } else try {
     const args = parseArgs(argv);
     const result = args.prepare ? prepareConsumerVerify(args) : await produceVerifyEvidence(args);
+    // CGF-08: the architecture projection (when this run produced one) is printed beside the evidence fields, from the same reader as the bootstrap.
+    const projection = result.architectureProjection === undefined ? {} : { architectureProjection: result.architectureProjection };
     const output = result.actionEvent === undefined
-      ? { status: result.status, outPath: result.outPath, ...result.evidence }
-      : { status: result.status, sourceStatus: result.sourceStatus, outPath: result.outPath, eventOutPath: result.eventOutPath, ...result.evidence, actionEvent: result.actionEvent, eventRetry: result.eventRetry };
+      ? { status: result.status, outPath: result.outPath, ...result.evidence, ...projection }
+      : { status: result.status, sourceStatus: result.sourceStatus, outPath: result.outPath, eventOutPath: result.eventOutPath, ...result.evidence, ...projection, actionEvent: result.actionEvent, eventRetry: result.eventRetry };
     process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
     if (result.status === "dirty") process.exitCode = 1;
     if (["failed", "source-complete/event-unavailable"].includes(result.status)) process.exitCode = 2;

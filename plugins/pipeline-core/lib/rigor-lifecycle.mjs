@@ -372,3 +372,21 @@ export function readRigorVerifyObservation(rootDir) {
     return result;
   }
 }
+
+/**
+ * CGF-08: the newest stored rigor observation (any feature) that carries a fitness projection, for the one architecture projection.
+ * Read-only, stored data only (no evaluation, no clock); the history is validated like every other read. Returns the row body, or null
+ * when there is no readable state, no history, no such row, or the history is invalid -- never a thrown error, never a manufactured row.
+ */
+export function readRecordedFitnessObservation(rootDir) {
+  try {
+    const source = resolveAuthorityArtifactPath("state", { rootDir });
+    if (!source.exists || source.authorityStatus !== "ready") return null;
+    const state = parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(physicalBytes(rootDir, source.relPath, 4194304)));
+    if (state.schema !== "pipeline.state.v0" || state.rigorHistory === undefined) return null;
+    const rows = validateRigorHistory(state.rigorHistory);
+    return rows.findLast(row => row.body.fitnessProjection !== null && row.body.fitnessProjection !== undefined)?.body ?? null;
+  } catch {
+    return null;
+  }
+}

@@ -7,6 +7,8 @@ import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readF
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PROPERTY_CLASSES } from "./architecture-fitness.mjs";
+import { collectRigorJournalEntry } from "../lib/rigor-lifecycle.mjs";
 import test from "node:test";
 
 import { VerifyEvidenceError, VERIFY_EVIDENCE_SCHEMA, produceVerifyEvidence } from "./verify-evidence-producer.mjs";
@@ -240,6 +242,56 @@ test("G20-36 the normal Verify reports a module that imports across a forbidden 
     const measurement = JSON.parse(log.split("\n").find((line) => line.startsWith("{")));
     assert.equal(measurement.measurement.budgets.source, "default");
     assert.deepEqual(measurement.measurement.modules.find((entry) => entry.id === "app").measuredDependencies, ["lib"]);
+  });
+});
+
+// CGF-08 (AC-108): Verify prints the same architecture projection the bootstrap does. The blocking baseline-architecture result alone decides
+// the gate part; a project without an architecture map has no blocking result and the projection says so. The stored report-only fitness
+// observation stays beside it and is never read as a gate verdict. The evidence file itself is unchanged (no new key).
+test("CGF-08 Verify prints the architecture projection: the blocking baseline-architecture verdict decides, a project without a map has no blocking result", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const unmapped = await produceVerifyEvidence({ rootDir: root });
+    assert.equal(unmapped.architectureProjection.schema, "pipeline.architecture-projection.v1");
+    assert.deepEqual([unmapped.architectureProjection.gate.verdict, unmapped.architectureProjection.gate.candidate], ["no-blocking-result", null]);
+    assert.equal(unmapped.architectureProjection.reportOnly, null);
+    commitArchitecture(root, ["lib"]);
+    const passed = await produceVerifyEvidence({ rootDir: root });
+    const { gate } = passed.architectureProjection;
+    assert.deepEqual([gate.verdict, gate.effect, gate.candidate, gate.currency, gate.source], ["pass", "blocking", passed.evidence.commit, "current", "architecture-boundary-check"]);
+    assert.equal(passed.architectureProjection.reportOnly, null, "nothing recorded: nothing claimed");
+    assert.equal(Object.hasOwn(passed.evidence, "architectureProjection"), false, "the closed evidence shape gains no key");
+    const onDisk = JSON.parse(readFileSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH), "utf8"));
+    assert.deepEqual(onDisk, passed.evidence);
+    // a resumed (reused) baseline keeps its log, so the gate part is still the blocking verdict of this candidate
+    const again = await produceVerifyEvidence({ rootDir: root });
+    assert.ok(again.evidence.steps.some((step) => step.name === "baseline-architecture" && step.reused === true));
+    assert.deepEqual([again.architectureProjection.gate.verdict, again.architectureProjection.gate.candidate], ["pass", passed.evidence.commit]);
+  });
+});
+
+test("CGF-08 Verify keeps the stored open fitness observation beside a blocking PASS: report-only, dated, never the gate verdict", async () => {
+  const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
+  const fitnessCandidate = { commit: git(repoRoot, ["rev-parse", "HEAD"]), tree: git(repoRoot, ["rev-parse", "HEAD^{tree}"]) };
+  const available = (value) => ({ value, status: "available", sourceContract: "fixture" });
+  const entry = collectRigorJournalEntry({ rootDir: repoRoot, state: { activeFeature: { id: "fixture-feature", planPath: "specs/fixture/plan.md" }, rigorHistory: [] },
+    boundary: "pre-close", selectedProfile: "epic", observedAt: "2026-11-08T08:00:00.000Z" }, {
+    currentCandidate: () => fitnessCandidate, inferInputs: () => ({ actualPaths: available([]) }),
+    planningSurface: () => ({ planPath: "specs/fixture/plan.md", paths: [] }), protectedBaseline: () => ({ status: "unavailable" }), interruptionReport: () => ({ ok: false }),
+    evaluateFitness: () => ({ schema: "pipeline.fitness-evidence.v1", outcomes: PROPERTY_CLASSES.map((row) => ({ classId: row.classId, propertyId: row.propertyId,
+      outcome: row.classId === 7 ? "finding" : "pass", details: `Fixture detail ${row.classId}` })) }),
+  });
+  assert.equal(entry.body.fitnessProjection.outcomes.some((row) => row.outcome !== "pass"), true, "the fixture observation is open");
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    commitArchitecture(root, ["lib"]);
+    writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0", rigorHistory: [entry] })}\n`);
+    git(root, ["add", "."]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "record the pre-close fitness observation"]);
+    const passed = await produceVerifyEvidence({ rootDir: root });
+    const { gate, reportOnly } = passed.architectureProjection;
+    assert.deepEqual([gate.verdict, gate.effect], ["pass", "blocking"]);
+    assert.deepEqual([reportOnly.effect, reportOnly.verdict, reportOnly.observedAt, reportOnly.candidate], ["report-only", "observed-open", "2026-11-08T08:00:00.000Z", fitnessCandidate.commit]);
+    assert.deepEqual(reportOnly.reportOnlyOpen.map((open) => open.classId), [7]);
   });
 });
 

@@ -508,6 +508,21 @@ test("normal bootstrap surfaces brownfield architecture adoption as a read-only 
   });
 });
 
+// CGF-08 (AC-108): the bootstrap orientation prints the one architecture projection from stored observations only (no boundary run, no clock),
+// so two bootstrap envelopes stay byte-identical (AC-245); without a stored blocking result the gate is typed and claims nothing.
+test("CGF-08 the normal bootstrap orientation carries the architecture projection: typed no-blocking-result, stored observations only, byte-stable", () => {
+  const cwd = ROOT_CURRENT;
+  const run = () => preflight({
+    env: {}, pluginList: pluginList(), read: () => manifest, cwd,
+    requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }; },
+  });
+  const first = run();
+  const projection = first.architectureOrientation.architectureProjection;
+  assert.equal(projection?.schema, "pipeline.architecture-projection.v1");
+  assert.deepEqual([projection.gate.verdict, projection.gate.effect, projection.gate.observedAt, projection.reportOnly], ["no-blocking-result", "blocking", null, null]);
+  assert.equal(JSON.stringify(first.architectureOrientation), JSON.stringify(run().architectureOrientation));
+});
+
 test("a durable deferral with a missing physical map retains its decision and offers a read-only map-first proposal", () => {
   const cwd = ROOT_CURRENT;
   const result = preflight({

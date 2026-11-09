@@ -55,3 +55,52 @@ test("AVL05 a recorded pre-close observation is labelled from its own candidate,
   const bare = labels.fitnessObservationVerdictLabel({ fitnessProjection: {} });
   assert.deepEqual([bare.candidate, bare.observedAt, bare.reportOnlyOpen], [null, null, []]);
 });
+
+// CGF-08 (AC-108, PO decision): ONE current projection. The blocking check alone decides the gate verdict; the stored fitness observation
+// stays beside it, labelled report-only and open with its observation date, and neither hides a PASS nor changes the gate.
+const blocking = (verdict, extra = {}) => labels.architectureVerdictLabel({ ...base, source: "architecture-boundary-check", verdict, effect: "blocking", ...extra });
+const fitness = (verdict, open = []) => labels.architectureVerdictLabel({ source: "recorded-fitness-observation", verdict, candidate: COMMIT, observedAt: "2026-11-08T08:00:00.000Z",
+  scope: "fitness property classes, latest recorded observation of the feature", effect: "report-only", currency: "unobserved", reportOnlyOpen: open });
+const OPEN = [{ classId: 3, open: 1, detail: "p3: finding" }];
+
+test("AVL06 the blocking check alone decides the gate: a PASS stays a PASS beside an open report-only fitness observation, which stays visible with its date", () => {
+  const projection = labels.currentArchitectureProjection({ boundaryVerdict: blocking("pass"), fitnessLabel: fitness("observed-open", OPEN) });
+  assert.equal(projection.schema, labels.ARCHITECTURE_PROJECTION_SCHEMA);
+  assert.equal(projection.schema, "pipeline.architecture-projection.v1");
+  assert.deepEqual([projection.gate.verdict, projection.gate.effect, projection.gate.candidate, projection.gate.observedAt], ["pass", "blocking", COMMIT, "2026-11-09T10:00:00.000Z"]);
+  assert.deepEqual([projection.reportOnly.verdict, projection.reportOnly.effect, projection.reportOnly.observedAt], ["observed-open", "report-only", "2026-11-08T08:00:00.000Z"]);
+  assert.deepEqual(projection.reportOnly.reportOnlyOpen, OPEN);
+  assert.ok(projection.summary.some((line) => line.includes("observed-open") && line.includes("2026-11-08T08:00:00.000Z") && line.includes("report-only")), projection.summary.join("\n"));
+  assert.ok(projection.summary.some((line) => line.includes("pass") && line.includes("blocking")), projection.summary.join("\n"));
+  assert.equal(Object.isFrozen(projection), true);
+});
+
+test("AVL07 the report-only observation neither upgrades nor downgrades the gate, whichever way it reads", () => {
+  for (const fitnessLabel of [null, fitness("observed-pass"), fitness("observed-open", OPEN), fitness("no-outcomes-recorded")]) {
+    const pass = labels.currentArchitectureProjection({ boundaryVerdict: blocking("pass"), fitnessLabel });
+    const findings = labels.currentArchitectureProjection({ boundaryVerdict: blocking("findings"), fitnessLabel });
+    assert.equal(pass.gate.verdict, "pass", `${fitnessLabel?.verdict}`);
+    assert.equal(findings.gate.verdict, "findings", `${fitnessLabel?.verdict}`);
+    assert.deepEqual(pass.gate, labels.currentArchitectureProjection({ boundaryVerdict: blocking("pass") }).gate);
+  }
+});
+
+test("AVL08 with no blocking result the projection says so, typed, and claims nothing; the fitness observation is still shown", () => {
+  const none = labels.currentArchitectureProjection({ fitnessLabel: fitness("observed-open", OPEN) });
+  assert.deepEqual([none.gate.verdict, none.gate.effect, none.gate.currency, none.gate.candidate, none.gate.observedAt], ["no-blocking-result", "blocking", "unobserved", null, null]);
+  assert.equal(none.reportOnly.verdict, "observed-open");
+  const nothing = labels.currentArchitectureProjection();
+  assert.equal(nothing.gate.verdict, "no-blocking-result");
+  assert.equal(nothing.reportOnly, null);
+  assert.deepEqual(labels.currentArchitectureProjection({ boundaryVerdict: null, fitnessLabel: null }), nothing);
+});
+
+test("AVL09 the boundary verdict must be blocking and the fitness label report-only; a swapped or malformed label is refused, never reinterpreted", () => {
+  assert.throws(() => labels.currentArchitectureProjection({ boundaryVerdict: fitness("observed-pass") }), /AVL-INVALID: boundaryVerdict/u);
+  assert.throws(() => labels.currentArchitectureProjection({ fitnessLabel: blocking("pass") }), /AVL-INVALID: fitnessLabel/u);
+  assert.throws(() => labels.currentArchitectureProjection({ boundaryVerdict: { verdict: "pass", effect: "blocking" } }), /AVL-INVALID/u);
+  // the open report-only classes the blocking check itself lists (size budgets) stay visible beside the PASS
+  const sized = labels.currentArchitectureProjection({ boundaryVerdict: blocking("pass", { reportOnlyOpen: [{ classId: "size-budget", open: 2, detail: "2 over-budget entries, advisory" }] }) });
+  assert.equal(sized.gate.verdict, "pass");
+  assert.deepEqual(sized.gate.reportOnlyOpen.map((entry) => entry.classId), ["size-budget"]);
+});

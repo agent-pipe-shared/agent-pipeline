@@ -13,7 +13,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { resolveAdoptionState } from "../scripts/architecture-adoption.mjs";
-import { architectureVerdictLabel } from "./architecture-verdict-label.mjs";
+import { architectureVerdictLabel, currentArchitectureProjection, fitnessObservationVerdictLabel } from "./architecture-verdict-label.mjs";
+import { readRecordedFitnessObservation } from "./rigor-lifecycle.mjs";
 
 export const ARCHITECTURE_ADOPTION_ORIENTATION_SCHEMA = "pipeline.architecture-adoption-orientation.v1";
 
@@ -79,6 +80,14 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
       : physicalMapStatus === "missing"
         ? "A durable architecture adoption decision exists, but the physical map index is missing. Preserve that decision; materialize the map before implementation, where map and fitness evidence are verified."
         : "A durable architecture adoption decision was read back. Respect its scope; the present map and fitness evidence are verified only at the implementation boundary.";
+  // CGF-08: the one architecture projection, from STORED observations only (AC-245 byte-compares two bootstrap envelopes: no boundary run, no
+  // clock here). No blocking result is stored anywhere the bootstrap may read, so the gate part is typed "no-blocking-result"; the latest
+  // recorded fitness observation (any feature) stays beside it as report-only with its own observation date. An unreadable store is typed absent.
+  let fitnessLabel = null;
+  try {
+    const recorded = (deps.readFitnessObservation ?? readRecordedFitnessObservation)(root);
+    if (recorded) fitnessLabel = architectureVerdictLabel({ ...fitnessObservationVerdictLabel(recorded), scope: "fitness property classes, latest recorded observation in the repository" });
+  } catch { fitnessLabel = null; }
   return {
     schema: ARCHITECTURE_ADOPTION_ORIENTATION_SCHEMA,
     status,
@@ -105,5 +114,6 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
         : typeof adoption?.scope === "string" ? adoption.scope : "") || "repository (no scope recorded)",
       effect: "report-only", currency: "current",
     }),
+    architectureProjection: currentArchitectureProjection({ boundaryVerdict: null, fitnessLabel }),
   };
 }

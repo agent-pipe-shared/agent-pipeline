@@ -8,10 +8,12 @@
  * hashed or closed-shape records; a new key there would invalidate rows that already exist, so those surfaces carry the label as
  * text in their free `evidence` string (see close-quality-readback.mjs) or are labelled by a function over the record.
  *
- * What this does NOT provide: one current architecture projection read by preflight, plan and Verify. That needs an authority
- * decision (which verdict wins when the boundary check and the recorded fitness observation disagree) and is reported, not built.
+ * The one current projection (`currentArchitectureProjection`, below) is read by the preflight orientation and the Verify output. PO
+ * decision (CGF-08): the blocking check alone decides the gate verdict of a candidate; the recorded fitness observation stays beside it
+ * as a report-only label and never changes the gate.
  */
 export const ARCHITECTURE_VERDICT_LABEL_SCHEMA = "pipeline.architecture-verdict-label.v1";
+export const ARCHITECTURE_PROJECTION_SCHEMA = "pipeline.architecture-projection.v1";
 export const VERDICT_EFFECTS = Object.freeze(["blocking", "report-only"]);
 export const VERDICT_CURRENCIES = Object.freeze(["current", "superseded", "unobserved"]);
 
@@ -76,5 +78,32 @@ export function fitnessObservationVerdictLabel(body) {
     candidate: commit !== null && OID.test(commit) ? commit : null, observedAt: canonicalIso(body?.observedAt) ? body.observedAt : null,
     scope: "fitness property classes, latest recorded observation of the feature", effect: "report-only", currency: "unobserved",
     reportOnlyOpen: open.map((row) => ({ classId: row.classId, open: 1, detail: `${row.propertyId}: ${row.outcome}` })),
+  });
+}
+
+/**
+ * The one current architecture projection (CGF-08, PO decision). `boundaryVerdict` is the label of the blocking boundary check, or
+ * null/absent when none was observed; `fitnessLabel` is the label of the stored fitness observation, or null/absent. The gate part is
+ * the blocking label verbatim (a typed "no-blocking-result", candidate and date null, when there is none: nothing is claimed). The
+ * report-only part is the fitness label verbatim, with its observation date and open classes: never hidden by a PASS, and it never
+ * upgrades or downgrades the gate. A label of the wrong effect is refused, not reinterpreted. Pure: no store, no clock.
+ */
+export function currentArchitectureProjection({ boundaryVerdict = null, fitnessLabel = null } = {}) {
+  const asLabel = (value, effect, field) => {
+    try {
+      if (value === null || typeof value !== "object" || value.effect !== effect) throw invalid(field);
+      return architectureVerdictLabel(value);
+    } catch { throw invalid(field); }
+  };
+  const gate = boundaryVerdict === null ? architectureVerdictLabel({
+    source: "architecture-boundary-check", verdict: "no-blocking-result", scope: "no stored blocking result for this candidate", effect: "blocking", currency: "unobserved",
+  }) : asLabel(boundaryVerdict, "blocking", "boundaryVerdict");
+  const reportOnly = fitnessLabel === null ? null : asLabel(fitnessLabel, "report-only", "fitnessLabel");
+  return Object.freeze({
+    schema: ARCHITECTURE_PROJECTION_SCHEMA, decidedBy: boundaryVerdict === null ? "none" : "blocking-check", gate, reportOnly,
+    summary: Object.freeze([
+      `gate: ${describeVerdictLabel(gate)}`,
+      reportOnly === null ? "report-only: no recorded observation" : `report-only: ${describeVerdictLabel(reportOnly)}`,
+    ]),
   });
 }
