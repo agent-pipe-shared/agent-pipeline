@@ -308,9 +308,11 @@ test("export merges a multi-segment Codex session in first-record-timestamp orde
 
     // Data-minimising: counts, digests and timestamps only.
     assert.deepEqual(Object.keys(result).sort(), [
-      "childSessions", "completeness", "eventsComplete", "firstTimestamp", "incompleteReasons", "lastTimestamp", "metadataComplete", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
+      "childSessions", "completeness", "effort", "eventsComplete", "firstTimestamp", "incompleteReasons", "lastTimestamp", "metadataComplete", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
       "segments", "sessionId", "status", "turns", "unparsedLineCount", "usage",
     ]);
+    // Justification (CGF-14, restated in place, nothing weakened): the key set is still pinned; `effort` is the one new key, the per-answer
+    // effort record taken from the same records as `turns` and `usage`.
     // Justification (C20 G20-31, restated in place, nothing weakened): the key set is still pinned; the two new keys are the
     // split of `completeness` into metadataComplete and eventsComplete.
     // Justification (AC-175 part B): the key set stays pinned on purpose; `turns` is the new turn-boundary marker block.
@@ -1292,5 +1294,103 @@ test("G20-31 the CLI passes the page and window flags and refuses every other sh
       ["read", ...base, "--session-id", "s5", "--cursor", "x"],
       ["export", ...base, "--session-id", "s5", "--page-size", "2"],
     ]) assert.deepEqual(JSON.parse(runMain(argv, env)), invalid, argv.join(" "));
+  });
+});
+
+// CGF-14 (AC-108): effort from events. Per PO answer: the interval from the PO message to the end of the answer, the models seen,
+// and the tokens with cache, each only where the runner's own records carry them; anything else is typed "unobserved", never estimated.
+const claudePrompt = (timestamp, content = "a question") => ({ type: "user", timestamp, message: { role: "user", content } });
+const effortToolResult = (timestamp) => ({ type: "user", timestamp, message: { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "x" }] } });
+const claudeReply = (timestamp, id, usage, model) => ({ type: "assistant", timestamp, message: { id, role: "assistant", ...(model ? { model } : {}), ...(usage ? { usage } : {}) } });
+
+test("CGF-14 Claude: one answer per human prompt, usage once per message id with cache, models seen, tool results and sidechains are not prompts", () => {
+  const records = [
+    claudePrompt(stamp("10:00:00")),
+    claudeReply(stamp("10:00:05"), "m1", { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 1, cache_read_input_tokens: 1 }, "claude-sonnet-5-5"),
+    effortToolResult(stamp("10:00:06")),
+    { ...claudePrompt(stamp("10:00:07")), isSidechain: true },
+    claudeReply(stamp("10:00:08"), "m1", { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 100, cache_read_input_tokens: 200 }, "claude-sonnet-5-5"),
+    claudeReply(stamp("10:00:30"), "m2", { input_tokens: 20, output_tokens: 6, cache_read_input_tokens: 300 }, "claude-opus-4-7"),
+    claudePrompt(stamp("10:05:00")),
+    claudeReply(stamp("10:05:20"), "m3", null, "claude-sonnet-5-5"),
+  ];
+  const effort = recovery.extractRunnerEffort("claude", records);
+  assert.equal(effort.schema, "pipeline.runner-effort-record.v1");
+  assert.equal(effort.answers.length, 2);
+  const [first, second] = effort.answers;
+  assert.deepEqual({ promptAt: first.promptAt, endAt: first.answerEndAt, intervalMs: first.intervalMs, startKind: first.startKind }, { promptAt: stamp("10:00:00"), endAt: stamp("10:00:30"), intervalMs: 30000, startKind: "po-prompt" });
+  assert.deepEqual(first.models, ["claude-opus-4-7", "claude-sonnet-5-5"]);
+  assert.deepEqual(first.usage, { status: "available", source: "claude-assistant-message-usage", observations: 2, counters: { input_tokens: 30, output_tokens: 11, cache_creation_input_tokens: 100, cache_read_input_tokens: 500 } });
+  assert.equal(second.intervalMs, 20000);
+  assert.deepEqual(second.usage, { status: "unobserved", reason: "no-per-answer-usage-recorded" }, "a reply without a usage block is unobserved, not zero");
+  assert.ok(effort.unobserved.includes("phase"), "no transcript carries the pipeline phase");
+});
+
+test("CGF-14 Codex: the answer ends at task_complete, tokens come from last_token_usage only, a bare total stays unobserved, the model comes from turn_context", () => {
+  const counters = (n) => ({ input_tokens: n, cached_input_tokens: n + 1, output_tokens: n + 2, reasoning_output_tokens: n + 3, total_tokens: n + 4 });
+  const event = (timestamp, payload) => ({ timestamp, type: "event_msg", payload });
+  const records = [
+    event(stamp("10:00:00"), { type: "user_message", message: "q1" }),
+    event(stamp("10:00:01"), { type: "task_started" }),
+    { timestamp: stamp("10:00:02"), type: "turn_context", payload: { model: "gpt-5-codex" } },
+    event(stamp("10:00:10"), { type: "token_count", info: { total_token_usage: counters(500), last_token_usage: counters(10) } }),
+    event(stamp("10:00:20"), { type: "task_complete" }),
+    event(stamp("10:00:21"), { type: "token_count", info: { total_token_usage: counters(900), last_token_usage: counters(5) } }),
+    event(stamp("10:10:00"), { type: "user_message", message: "q2" }),
+    event(stamp("10:10:01"), { type: "task_started" }),
+    event(stamp("10:10:10"), { type: "token_count", info: { total_token_usage: counters(2000) } }),
+    event(stamp("10:10:30"), { type: "task_complete" }),
+  ];
+  const effort = recovery.extractRunnerEffort("codex", records);
+  assert.equal(effort.answers.length, 2);
+  const [first, second] = effort.answers;
+  assert.equal(first.intervalMs, 20000, "task_complete ends the answer, a late usage row is not work");
+  assert.deepEqual(first.models, ["gpt-5-codex"]);
+  assert.deepEqual(first.usage, { status: "available", source: "codex-token-count-last", observations: 2, counters: { input_tokens: 15, cached_input_tokens: 17, output_tokens: 19, reasoning_output_tokens: 21, total_tokens: 23 } });
+  assert.equal(second.intervalMs, 30000);
+  assert.deepEqual(second.usage, { status: "unobserved", reason: "no-per-answer-usage-recorded" }, "a cumulative total is never diffed into a per-answer figure");
+  assert.deepEqual(second.models, []);
+});
+
+test("CGF-14 Antigravity and absent timestamps: no PO prompt is recorded, so the start is the turn start; a missing timestamp is null, never a guess", () => {
+  const records = [
+    { type: "turn.started", timestamp: stamp("11:00:00") },
+    { type: "turn.completed", timestamp: stamp("11:00:02"), usage: { input_tokens: 10, cached_input_tokens: 2, output_tokens: 3 } },
+    { type: "turn.started" },
+    { type: "turn.completed", usage: { input_tokens: 5, output_tokens: 1 } },
+  ];
+  const effort = recovery.extractRunnerEffort("antigravity", records);
+  assert.equal(effort.answers.length, 2);
+  assert.deepEqual({ promptAt: effort.answers[0].promptAt, startKind: effort.answers[0].startKind, intervalMs: effort.answers[0].intervalMs }, { promptAt: null, startKind: "turn-started", intervalMs: 2000 });
+  assert.deepEqual(effort.answers[0].usage.counters, { input_tokens: 10, cached_input_tokens: 2, output_tokens: 3 });
+  assert.equal(effort.answers[1].intervalMs, null);
+  assert.deepEqual(effort.answers[0].models, []);
+  assert.ok(effort.unobserved.includes("model") && effort.unobserved.includes("phase") && effort.unobserved.includes("po-prompt-time"));
+  assert.deepEqual(recovery.extractRunnerEffort("unknown-runner", records).answers, []);
+  assert.deepEqual(recovery.extractRunnerEffort("claude", "not-records").answers, []);
+});
+
+test("CGF-14 children: each child interval is its own first-to-last timestamp, with its usage, null where the transcript has none", () => {
+  const usage = { status: "available", source: "x", observations: 1, counters: { input_tokens: 1 } };
+  const children = [
+    { childId: "a", agentType: "goldfish", transcript: { firstTimestamp: stamp("10:00:10"), lastTimestamp: stamp("10:03:10") }, usage },
+    { childId: "b", agentType: null, transcript: { firstTimestamp: null, lastTimestamp: null }, usage: { status: "unavailable", reason: "transcript-carries-no-usage" } },
+  ];
+  const effort = recovery.extractRunnerEffort("claude", [], children);
+  assert.deepEqual(effort.childIntervals, [
+    { childId: "a", agentType: "goldfish", firstTimestamp: stamp("10:00:10"), lastTimestamp: stamp("10:03:10"), intervalMs: 180000, usage },
+    { childId: "b", agentType: null, firstTimestamp: null, lastTimestamp: null, intervalMs: null, usage: { status: "unavailable", reason: "transcript-carries-no-usage" } },
+  ]);
+  assert.deepEqual(recovery.extractRunnerEffort("claude", [], "child-storage-unavailable").childIntervals, []);
+});
+
+test("CGF-14 the export carries the effort record beside the turns, from the same records", () => {
+  withExportFixture(({ fixture, project, codexHome }) => {
+    const agy = agyFixture(fixture, project, AGY_LINES);
+    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "antigravity", excludeSession: AGY_CONVERSATION, sessionId: AGY_CONVERSATION, env: {}, homedirFn: () => agy.home, credentialScreen: NO_MACHINE_PLANE, antigravityArtifactHost: agy.host });
+    assert.equal(result.effort.schema, "pipeline.runner-effort-record.v1");
+    assert.deepEqual(result.effort.answers.map((answer) => answer.intervalMs), [2000, 9000]);
+    assert.equal(JSON.stringify(result.effort).includes(SECRET), false);
+    assert.ok(codexHome);
   });
 });

@@ -634,6 +634,103 @@ function recordTimestampMs(record) {
 
 const isoOrNull = (ms) => (ms === null ? null : new Date(ms).toISOString());
 
+// CGF-14 (AC-108): the effort of each PO answer, from events the runner really records. An answer runs from the PO message to
+// the record before the next one. Every figure is observed or typed "unobserved": no role heuristic, no estimate, no diff of a
+// cumulative total. The store is this export; nothing new is written anywhere.
+//   claude       PO message = a user row that is not a tool_result, sidechain or meta row; model and usage per assistant message.id.
+//   codex        PO message = event_msg user_message; model from turn_context; tokens from token_count last_token_usage only.
+//   antigravity  no PO message is recorded: the answer starts at turn.started (startKind says so); usage from turn.completed.
+// No transcript carries the pipeline phase or a task class, so those are listed as unobserved.
+export const RUNNER_EFFORT_SCHEMA = "pipeline.runner-effort-record.v1";
+const unobservedUsage = () => ({ status: "unobserved", reason: "no-per-answer-usage-recorded" });
+const EFFORT_UNOBSERVED = { claude: ["phase", "task-class"], codex: ["phase", "task-class"], antigravity: ["phase", "task-class", "model", "po-prompt-time"] };
+
+function isClaudePrompt(row) {
+  if (row?.type !== "user" || row.isSidechain === true || row.isMeta === true || !isObject(row.message) || row.message.role !== "user") return false;
+  const content = row.message.content;
+  if (typeof content === "string") return content.trim() !== "";
+  return Array.isArray(content) && content.length > 0 && !content.some((block) => block?.type === "tool_result");
+}
+
+function isEffortStart(runner, row) {
+  if (runner === CLAUDE_RUNNER) return isClaudePrompt(row);
+  if (runner === CODEX_RUNNER) return row?.type === "event_msg" && row.payload?.type === "user_message";
+  return row?.type === "turn.started";
+}
+
+function effortModels(runner, slice) {
+  const models = new Set();
+  for (const row of slice) {
+    if (runner === CLAUDE_RUNNER && row?.type === "assistant" && isObject(row.message) && typeof row.message.model === "string"
+      && row.message.model !== "" && row.message.model !== "<synthetic>") models.add(row.message.model);
+    if (runner === CODEX_RUNNER && row?.type === "turn_context" && typeof row.payload?.model === "string" && row.payload.model !== "") models.add(row.payload.model);
+  }
+  return [...models].sort();
+}
+
+function effortUsage(runner, slice) {
+  let usage;
+  if (runner === CLAUDE_RUNNER) usage = claudeUsage(slice);
+  else if (runner === ANTIGRAVITY_RUNNER) usage = antigravityUsage(slice);
+  else {
+    const observations = [];
+    for (const row of slice) {
+      const last = row?.type === "event_msg" && row.payload?.type === "token_count" ? row.payload.info?.last_token_usage : null;
+      if (isObject(last) && CODEX_USAGE_KEYS.every((key) => isCounter(last[key]))) observations.push(Object.fromEntries(CODEX_USAGE_KEYS.map((key) => [key, last[key]])));
+    }
+    usage = summedUsage("codex-token-count-last", observations);
+  }
+  return usage.status === "available" ? usage : unobservedUsage();
+}
+
+function effortEndMs(runner, slice) {
+  let end = null, marker = null;
+  for (const row of slice) {
+    const ms = recordTimestampMs(row);
+    if (ms === null) continue;
+    const ends = runner === CLAUDE_RUNNER ? row?.type === "assistant"
+      : runner === CODEX_RUNNER ? row?.type === "event_msg" && CODEX_TURN_END_MARKERS.has(row.payload?.type)
+        : row?.type === "turn.completed";
+    if (ends && (marker === null || ms > marker)) marker = ms;
+    if (end === null || ms > end) end = ms;
+  }
+  return marker ?? end;
+}
+
+/** The effort record of one session: one entry per PO answer, plus the interval of each recorded child. Pure. */
+export function extractRunnerEffort(runner, records, children = []) {
+  const known = [CLAUDE_RUNNER, CODEX_RUNNER, ANTIGRAVITY_RUNNER].includes(runner);
+  const starts = known && Array.isArray(records) ? records.flatMap((row, index) => (isEffortStart(runner, row) ? [index] : [])) : [];
+  const answers = starts.slice(0, MAX_TURN_MARKERS).map((from, ordinal) => {
+    const slice = records.slice(from, starts[ordinal + 1] ?? records.length);
+    const startMs = recordTimestampMs(records[from]);
+    const endMs = effortEndMs(runner, slice);
+    return {
+      ordinal,
+      startKind: runner === ANTIGRAVITY_RUNNER ? "turn-started" : "po-prompt",
+      promptAt: runner === ANTIGRAVITY_RUNNER ? null : isoOrNull(startMs),
+      startAt: isoOrNull(startMs),
+      answerEndAt: isoOrNull(endMs),
+      intervalMs: startMs !== null && endMs !== null && endMs >= startMs ? endMs - startMs : null,
+      models: effortModels(runner, slice),
+      usage: effortUsage(runner, slice),
+    };
+  });
+  const childIntervals = Array.isArray(children) ? children.map((child) => {
+    const first = Date.parse(child?.transcript?.firstTimestamp ?? ""), last = Date.parse(child?.transcript?.lastTimestamp ?? "");
+    const observed = Number.isFinite(first) && Number.isFinite(last) && last >= first;
+    return {
+      childId: child.childId, agentType: child.agentType ?? null,
+      firstTimestamp: child.transcript?.firstTimestamp ?? null, lastTimestamp: child.transcript?.lastTimestamp ?? null,
+      intervalMs: observed ? last - first : null, usage: child.usage,
+    };
+  }) : [];
+  return {
+    schema: RUNNER_EFFORT_SCHEMA, answers, answersTruncated: starts.length > MAX_TURN_MARKERS, childIntervals,
+    unobserved: EFFORT_UNOBSERVED[runner] ?? ["phase", "task-class", "model", "po-prompt-time"],
+  };
+}
+
 function claudeCandidateMetadata(filePath, projectIdentity) {
   const metadataBytes = readTranscriptMetadataBytes(filePath);
   if (metadataBytes === null) return null;
@@ -1143,6 +1240,7 @@ function describeExport({ runner, sessionId, snapshots, options, found }) {
     // A list when the runner records its children (empty when none), otherwise a typed reason; never a guess.
     childSessions: children.value,
     turns: turnView.turns,
+    effort: extractRunnerEffort(runner, mergedRecords, children.value),
     segmentCount: parsed.length,
     segmentOrder: EXPORT_SEGMENT_ORDER,
     recordCount: parsed.reduce((total, segment) => total + segment.records.length, 0),
