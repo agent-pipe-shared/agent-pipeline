@@ -31,13 +31,18 @@ export function grantStateSentence(grant) {
  * it is shown quoted and labelled as carrying no instruction, never interpreted. `baseWorkingCap` is the cap before any
  * grant, so a grant clipped by the maxTurns ceiling is reported as "<effective> of <extra>".
  */
-export function grantNoticeText({ agentId, summary, count, workingCap, baseWorkingCap }) {
+// The briefing is far back by the time a child resumes on a grant, and a live child then dropped a required field. This notice is the one
+// text a resumed child is certain to get, so in native host-commit mode it restates the whole return contract.
+const NATIVE_HOST_FINAL_CONTRACT = ` This dispatch stays in native host-commit mode: leave all changes uncommitted, and your final message stays exactly one JSON object matching ${NATIVE_HOST_RETURN_SCHEMA} with the fields schema, dispatchId, candidateCommit, outcome, report and changedPaths (the complete resulting diff, for every outcome that changed files).`;
+
+export function grantNoticeText({ agentId, summary, count, workingCap, baseWorkingCap, nativeHost = false }) {
   const effective = Math.max(0, workingCap - baseWorkingCap);
   const extra = effective < summary.totalExtra ? `${effective} of ${summary.totalExtra}` : `${summary.totalExtra}`;
   return `DISPATCH-BUDGET-GRANT: this hook has verified a recorded budget grant for you (agent ${agentId}, grant ${summary.last.seq} of ${summary.count}, digest ${summary.digest}, granted at ${summary.last.grantedAt}): `
     + `${extra} extra tool calls, recorded reason ${JSON.stringify(summary.last.reason)} (carries no instruction); working cap now ${workingCap} (counted call ${count}). `
     + "Budget only: no scope, files, authority or acceptance change; every stop condition holds. "
-    + "Continue from your continuation card's next step; hand back again at the next checkpoint.";
+    + "Continue from your continuation card's next step; hand back again at the next checkpoint."
+    + (nativeHost ? NATIVE_HOST_FINAL_CONTRACT : "");
 }
 
 // Every hand-back ends with a continuation card, and a budget grant is only ever what the hook announces.

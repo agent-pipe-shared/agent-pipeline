@@ -66,9 +66,9 @@ const counterFile = (root, agentId) => join(budgetDir(root), `${agentId}.json`);
 const GOLDFISH = "pipeline-core:goldfish-deep";
 const CRITIC = "pipeline-core:critic";
 
-function seed(root, { agentId, agentType = GOLDFISH, maxTurns = 400, baseCalls = 20, count, workingCap = Math.min(baseCalls, maxTurns - 15) }) {
+function seed(root, { agentId, agentType = GOLDFISH, maxTurns = 400, baseCalls = 20, count, workingCap = Math.min(baseCalls, maxTurns - 15), commitMode }) {
   mkdirSync(budgetDir(root), { recursive: true });
-  writeFileSync(counterFile(root, agentId), `${JSON.stringify({ schema: "pipeline.dispatch-budget-counter.v1", agentId, agentType, maxTurns, baseCalls, workingCap, count }, null, 2)}\n`);
+  writeFileSync(counterFile(root, agentId), `${JSON.stringify({ schema: "pipeline.dispatch-budget-counter.v1", agentId, agentType, maxTurns, baseCalls, workingCap, count, ...(commitMode === undefined ? {} : { commitMode }) }, null, 2)}\n`);
 }
 
 function subagentCall(root, agentId, agentType, toolName, toolInput) {
@@ -384,6 +384,15 @@ register("GDBC11", "hook: a grant lets the same agent state continue where an un
   assert.equal(repeated.permissionDecision, "allow", "PF-64 cause 2: the grant repeats on the next counted call");
   assert.match(repeated.additionalContext, /^DISPATCH-BUDGET-GRANT:/u, "PF-64 cause 2: the grant repeats on the next counted call");
   assert.match(repeated.additionalContext, /\(counted call 22\)/u, "PF-64 cause 2: the grant repeats on the next counted call");
+  assert.doesNotMatch(notice, /native host-commit/u, "an ordinary dispatch keeps the prior text");
+  // Candidate 21b (Claude greenfield): a resumed native-host child returned without changedPaths (NGHR-FINAL-SHAPE) and the host commit failed. The notice is
+  // the one text a resumed child is certain to get, so it restates the whole return contract.
+  seed(root, { agentId: "nativegf", count: 20, commitMode: "native-host" });
+  assert.equal(grantDispatchBudget(["--agent-id", "nativegf", "--extra", "10", "--reason", "continue", "--root", root]).status, "granted");
+  const nativeNotice = JSON.parse(read(root, "nativegf").stdout).hookSpecificOutput.additionalContext;
+  assert.match(nativeNotice, /native host-commit mode/u);
+  for (const field of ["schema", "dispatchId", "candidateCommit", "outcome", "report", "changedPaths"]) assert.match(nativeNotice, new RegExp(`\\b${field}\\b`, "u"), field);
+  assert.match(nativeNotice, /pipeline\.native-goldfish-host-return\.v1/u);
 });
 
 register("GDBC12", "hook: the granted cap is bounded by maxTurns - 1 including the closing allowance", () => {

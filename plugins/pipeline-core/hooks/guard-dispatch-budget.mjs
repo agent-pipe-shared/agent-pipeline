@@ -744,7 +744,7 @@ function readGrantedCalls(counterFilePath, agentId, dependencies) {
  * marker is absent/unreadable; repeats never move firstCount. A legacy marker holding only this digest (no count) stays
  * silent. Persists under the counter lock the caller holds; the text comes from lib/dispatch-budget-notice.mjs.
  */
-function grantNoticeContext({ counterFilePath, agentId, grant, count, workingCap, baseWorkingCap, dependencies }) {
+function grantNoticeContext({ counterFilePath, agentId, grant, count, workingCap, baseWorkingCap, nativeHost = false, dependencies }) {
   const summary = grant.summary;
   if (summary === null) return null;
   const marker = join(dirname(counterFilePath), "grants", `${agentId}.announced`);
@@ -765,7 +765,7 @@ function grantNoticeContext({ counterFilePath, agentId, grant, count, workingCap
   if (write) {
     try { (dependencies.writeFileSyncFn ?? writeFileSync)(marker, `${summary.digest} ${count}\n`, { mode: 0o600 }); } catch { /* announcing again is the safe direction */ }
   }
-  return grantNoticeText({ agentId, summary, count, workingCap, baseWorkingCap });
+  return grantNoticeText({ agentId, summary, count, workingCap, baseWorkingCap, nativeHost });
 }
 
 const COMMIT_FLOW_PRODUCER_SCRIPT = "goldfish-commit-command-flow.mjs";
@@ -1475,7 +1475,7 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
     }
     // D75 B / PF-64 cause 2: the hook itself announces a verified recorded grant on the first three counted calls after it
     // (another hook's denial can drop one announcement, so it is not once-only).
-    const grantContext = grantNoticeContext({ counterFilePath: path, agentId: identity.agentId, grant, count: budget.nextCount, workingCap: budget.workingCap, baseWorkingCap: workingCap, dependencies });
+    const grantContext = grantNoticeContext({ counterFilePath: path, agentId: identity.agentId, grant, count: budget.nextCount, workingCap: budget.workingCap, baseWorkingCap: workingCap, nativeHost: isNativeHostMode(identity.agentType, counter.commitMode), dependencies });
     // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
     const contract = (dependencies.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType, budgetContractOptions(rootDir, dependencies));
     const checkpoint = contract.applicable
