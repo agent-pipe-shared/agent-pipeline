@@ -33,6 +33,7 @@ import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../l
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { RESIDUAL_REASON_CLASS, residualAcceptanceSubject, residualReasonClassRefusal } from "../lib/critic-verify-lifecycle.mjs";
 import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
+import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
 import { SIGNED_QUALITY_PACKAGE_SCHEMA, describeSignedQualityPackageIntent, physicalQualityPackageFile } from "../lib/signed-quality-package.mjs";
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { describeHumanGuardOverrideSelection, describeHumanGuardOverrideSignatureRequest } from "../lib/human-guard-override.mjs";
@@ -1141,7 +1142,12 @@ export function parseHumanArgs(argv, dependencies = {}) {
   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
   if (command.endsWith("-critical") && !CRITICAL_COMMAND_KINDS.includes(values.kind)) return { error: USAGE };
   // D190: the residual acceptance subject is computed from the consumed Critic packet and from nothing else.
-  if (values.criticPacket !== undefined && !(command.endsWith("-critical") && values.kind === RESIDUAL_ACCEPTANCE_KIND)) return { error: `${USAGE}\n--critic-packet is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} with prepare-critical or authorize-critical.` };
+  if (values.criticPacket !== undefined && !(command.endsWith("-critical") && [RESIDUAL_ACCEPTANCE_KIND, CRITIC_ACKNOWLEDGEMENT_KIND].includes(values.kind))) return { error: `${USAGE}\n--critic-packet is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} or ${CRITIC_ACKNOWLEDGEMENT_KIND} with prepare-critical or authorize-critical.` };
+  // C21B: the acknowledgement names its packet the same way; without it the request would bind HEAD, which has moved past the reviewed commit by the time of the close.
+  if (values.criticPacket !== undefined && values.kind === CRITIC_ACKNOWLEDGEMENT_KIND) {
+    if (values.subject !== undefined) return { error: `${USAGE}\n${CRITIC_ACKNOWLEDGEMENT_KIND} with --critic-packet takes no --subject: the subject is computed from the consumed Critic packet.` };
+    if (!/^[a-f0-9]{32}$/u.test(values.criticPacket)) return { error: `${USAGE}\n${CRITIC_ACKNOWLEDGEMENT_KIND} requires --critic-packet <32 lowercase hexadecimal characters>.` };
+  }
   // D227: the optional reason class of a residual acceptance of a MAJOR finding; it rides in the signed subject.
   if (values.reasonClass !== undefined && !(command.endsWith("-critical") && values.kind === RESIDUAL_ACCEPTANCE_KIND)) return { error: `${USAGE}\n--reason-class is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} with prepare-critical or authorize-critical.` };
   if (values.kind === RESIDUAL_ACCEPTANCE_KIND && (command === "prepare-critical" || command === "authorize-critical")) {
@@ -1881,6 +1887,32 @@ function resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, depen
   return { subject, candidate: reviewed };
 }
 
+/** C21B: the acknowledgement counterpart of the resolver above: the subject and the candidate come from the consumed receipt, never from HEAD. */
+function resolveCriticAcknowledgementSubject({ args, gitCommonDir, dependencies }) {
+  const controlRoot = join(gitCommonDir, "agent-pipeline", "critic-packets");
+  const packetId = args.criticPacket;
+  let receipt;
+  try { receipt = (dependencies.readConsumedCandidateReceiptFn ?? readConsumedCandidateReceipt)({ controlRoot, packetId }).receipt; }
+  catch (error) { fail(`critical approval request is invalid: the consumed Critic packet could not be read (${typeof error?.code === "string" ? error.code : "CRITIC-PACKET-UNREADABLE"})`); }
+  const reviewed = { commit: receipt?.candidate?.commit, tree: receipt?.candidate?.tree };
+  if (typeof reviewed.commit !== "string" || typeof reviewed.tree !== "string") fail("critical approval request is invalid: the consumed Critic packet could not be read (CRITIC-PACKET-UNREADABLE)");
+  if (receipt.independence !== "caller-authored-fallback") fail("critical approval request is invalid (CRITIC-ACK-NOT-CALLER-AUTHORED): this Critic verdict is not caller-authored, so it needs no acknowledgement");
+  const subject = criticAcknowledgementSubject({ packetId, receipt });
+  const computed = criticalActionSubjectSha256({ kind: CRITIC_ACKNOWLEDGEMENT_KIND, candidate: reviewed, subject });
+  if (text(args.subjectSha256) && args.subjectSha256 !== computed) fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the consumed Critic packet (expected ${computed})`);
+  args.subjectSha256 = computed;
+  return { subject, candidate: reviewed };
+}
+
+function criticAcknowledgementConfirmationLines(kind, subject) {
+  if (kind !== CRITIC_ACKNOWLEDGEMENT_KIND || subject === null || typeof subject !== "object" || Array.isArray(subject)) return [];
+  return [
+    `critic packet: ${subject.packetId}`,
+    `critic receipt sha256: ${subject.criticReceiptSha256}`,
+    "this acknowledges that the calling agent, not a Critic subagent's stop, supplied this verdict; the close record keeps that label.",
+  ];
+}
+
 function residualAcceptanceConfirmationLines(kind, subject) {
   if (kind !== RESIDUAL_ACCEPTANCE_KIND || subject === null || typeof subject !== "object") return [];
   return [
@@ -1909,6 +1941,10 @@ function criticalApprovalRequest({ args, repository, featureId, gitCommonDir, de
   let subjectPreimage;
   if (args.kind === RESIDUAL_ACCEPTANCE_KIND) {
     const resolved = resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, dependencies });
+    subjectPreimage = resolved.subject;
+    candidate = resolved.candidate;
+  } else if (args.kind === CRITIC_ACKNOWLEDGEMENT_KIND && text(args.criticPacket)) {
+    const resolved = resolveCriticAcknowledgementSubject({ args, gitCommonDir, dependencies });
     subjectPreimage = resolved.subject;
     candidate = resolved.candidate;
   } else {
@@ -2078,11 +2114,11 @@ export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy",
  * It renders; it never executes, signs or reads a key.
  */
 export function authorizeCriticalActionCommand({
-  kind, repoRoot, directory = null, featureId, plan, spec, subjectSha256, expiresAt,
+  kind, repoRoot, directory = null, featureId, plan, spec, subjectSha256, expiresAt, criticPacket = null,
   launcher = fileURLToPath(import.meta.url),
 } = {}) {
   return renderAuthorizeCriticalCommand("authorizeCriticalActionCommand", {
-    kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, launcher,
+    kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, criticPacket, launcher,
   });
 }
 
@@ -2112,7 +2148,7 @@ export function prepareAuthorizeCriticalLine({ kind, candidate, subject, ...rest
 }
 
 function renderAuthorizeCriticalCommand(name, {
-  kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, launcher,
+  kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, criticPacket = null, launcher,
 }) {
   if (!AUTHORIZE_CRITICAL_COMMAND_KINDS.includes(kind)) {
     throw new TypeError(`${name} requires a known kind (${AUTHORIZE_CRITICAL_COMMAND_KINDS.join(", ")})`);
@@ -2133,6 +2169,7 @@ function renderAuthorizeCriticalCommand(name, {
     "--plan", plan,
     "--spec", spec,
     "--kind", kind,
+    ...(criticPacket === null ? [] : ["--critic-packet", criticPacket]),
     "--subject-sha256", subjectSha256,
     "--expires-at", expiresAt,
   );
@@ -2621,6 +2658,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
       ...releasePreflightConfirmationLines(request.action.kind, subjectPreimage),
       ...interruptionPromotionConfirmationLines(request.action.kind, subjectPreimage),
       ...residualAcceptanceConfirmationLines(request.action.kind, subjectPreimage),
+      ...criticAcknowledgementConfirmationLines(request.action.kind, subjectPreimage),
       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
     ], dependencies, humanFacingLanguage);
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });

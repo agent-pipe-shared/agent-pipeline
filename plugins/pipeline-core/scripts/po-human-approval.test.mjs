@@ -6316,6 +6316,30 @@ test("authorize-critical --kind accept-residual-critic-findings refuses a non-mi
   }
 });
 
+test("C21B authorize-critical --kind acknowledge-caller-authored-critic --critic-packet binds the candidate the Critic reviewed, never the checkout's HEAD", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const kind = "acknowledge-caller-authored-critic";
+    const receipt = { ...RESIDUAL_ROUTE_RECEIPT, independence: "caller-authored-fallback" };
+    const head = { commit: "9".repeat(40), tree: "8".repeat(40) };
+    const deps = (extra = {}) => ({ observeCandidate: () => ({ ...head }), readConsumedCandidateReceiptFn: () => ({ packet: { packetId: RESIDUAL_ROUTE_PACKET }, receipt }), ...extra });
+    const argv = (command, more = []) => [command, "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC, "--kind", kind, "--critic-packet", RESIDUAL_ROUTE_PACKET, "--expires-at", futureExpiry(), ...more];
+    const subject = { packetId: RESIDUAL_ROUTE_PACKET, criticReceiptSha256: residualRouteSha256(residualRouteCanonicalJson(receipt)), independence: "caller-authored-fallback" };
+    const expected = criticalActionSubjectSha256({ kind, candidate: CANDIDATE, subject });
+    const prompts = [];
+    const result = runHumanApproval(argv("authorize-critical"), deps({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }));
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.candidate, CANDIDATE, "the reviewed candidate, not HEAD");
+    assert.equal(result.action.subjectSha256, expected);
+    assert.ok(prompts[0].includes(RESIDUAL_ROUTE_PACKET), "must show the packet");
+    assert.throws(() => runHumanApproval(argv("prepare-critical", ["--subject-sha256", "e".repeat(64)]), deps()), /--subject-sha256 does not match the digest computed from the consumed Critic packet/u);
+    assert.throws(() => runHumanApproval(argv("prepare-critical"), deps({ readConsumedCandidateReceiptFn: () => ({ packet: {}, receipt: { ...receipt, independence: "source-issued-origin" } }) })), /CRITIC-ACK-NOT-CALLER-AUTHORED/u);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 test("accept-residual-critic-findings takes --critic-packet and never --subject or a typed --subject-sha256 mismatch; --critic-packet is refused for every other kind", () => {
   const dirs = criticalDirs();
   try {

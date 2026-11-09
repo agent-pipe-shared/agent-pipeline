@@ -3466,6 +3466,34 @@ c11Case("C21B approve-critic-acknowledgement without proof flags prints the sign
   } finally { console.log = originalLog; fx.cleanup(); }
 });
 
+c11Case("C21B the acknowledgement signing command names the packet and a proof for the REVIEWED candidate is accepted although HEAD has moved on", () => {
+  const fx = c11Fixture({ findings: c11Minor });
+  const printed = []; const originalLog = console.log; console.log = (line) => { printed.push(String(line)); };
+  try {
+    const receipt = { ...fx.made.receipt, independence: "caller-authored-fallback" };
+    const deps = { ...fx.deps, readConsumedCandidateReceiptFn: () => ({ packet: fx.made.packet, receipt }),
+      gitHead: () => ({ ok: true, commit: "8".repeat(40) }), gitCandidate: () => ({ ok: true, commit: "8".repeat(40), tree: "7".repeat(40) }) };
+    const verb = ["approve-critic-acknowledgement", "--by", "PO", "--critic-packet", receipt.packetId];
+    const bound = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
+    bound.continuity = { authority: { spec: { path: "specs/sprint-nova-epic/spec.md" } } };
+    writeFileSync(fx.statePathFile, JSON.stringify(bound, null, 2));
+    assert.equal(capturedStderr(() => run(verb, deps)).result, 2);
+    const signing = JSON.parse(printed.at(-1)).signatureCommand;
+    assert.ok(signing.argv.includes("--critic-packet") && signing.argv[signing.argv.indexOf("--critic-packet") + 1] === receipt.packetId, "the printed signing command must name the packet, or it binds the current HEAD");
+    assert.deepEqual(signing.candidate, { commit: receipt.candidate.commit, tree: receipt.candidate.tree });
+    const external = mktempProjectDir();
+    const request = createCriticalActionApprovalRequest({ candidate: signing.candidate, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action: { kind: "acknowledge-caller-authored-critic", subjectSha256: signing.subjectSha256, expiresAt: "2026-08-08T18:50:00.000Z" } });
+    const keys = generateKeyPairSync("ed25519");
+    const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
+    const paths = { request: join(external, "request.json"), authority: join(external, "authority.json"), proof: join(external, "proof.json") };
+    writeFileSync(paths.request, JSON.stringify(request));
+    writeFileSync(paths.authority, JSON.stringify({ keyReference: "test-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") }));
+    writeFileSync(paths.proof, JSON.stringify({ schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "test-key", publicKey, signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64") }));
+    const acknowledged = capturedStderr(() => run([...verb, "--proof-request", paths.request, "--proof-authority", paths.authority, "--proof", paths.proof], deps));
+    assert.equal(acknowledged.result, 0, acknowledged.lines.join(" "));
+  } finally { console.log = originalLog; fx.cleanup(); }
+});
+
 c11Case("C11-a chat mode records an attended residual acceptance and the lifecycle then qualifies the failed all-minor receipt", () => {
   const fx = c11Fixture({ chat: true, findings: c11Minor });
   try {

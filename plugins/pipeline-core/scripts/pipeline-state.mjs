@@ -9931,7 +9931,7 @@ function runApproveCriticAcknowledgement({ dir, rest, base, now, deps }) {
       const root = realpathSync(resolve(dir));
       const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
       const expiresAt = new Date((Date.parse(approvedAt) || Date.now()) + 3_600_000).toISOString();
-      const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId: base.activeFeature?.id, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt });
+      const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId: base.activeFeature?.id, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt, criticPacket: packetId });
       console.log(JSON.stringify({ schema: "pipeline.critic-acknowledgement-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
         signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
         acknowledgeCommand: { executable: process.execPath, argv: [fileURLToPath(import.meta.url), "approve-critic-acknowledgement", "--by", "<po-name>", "--critic-packet", packetId, "--proof-request", "<proof-request>", "--proof-authority", "<proof-authority>", "--proof", "<proof>"],
