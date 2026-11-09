@@ -147,14 +147,23 @@ function testFirstCondition(block) {
   return null;
 }
 
-/** Validate one plain-JSON final result; prose, fences and duplicate keys fail closed. */
+// One Markdown fence around the WHOLE message carries the same one object and nothing else (the briefing itself shows the contract in such a
+// fence, and a live Goldfish copied it, which cost a hand-written recovery). The inner text still goes through the strict parser, so a second
+// block, prose or a different language tag still fails: JSON has no raw newline inside a string, so no fence line can hide inside the object.
+const WHOLE_MESSAGE_JSON_FENCE = /^\s*```(?:json)?[ \t]*\r?\n([\s\S]*)\r?\n```\s*$/u;
+function withoutWholeMessageFence(text) {
+  const match = WHOLE_MESSAGE_JSON_FENCE.exec(text);
+  return match === null ? text : match[1];
+}
+
+/** Validate one JSON final result (plain, or in one fence around the whole message); prose, any other fencing and duplicate keys fail closed. */
 // D31: `allowCheckpoint` is opt-in. Only the SubagentStop route passes it, because a budget stop settles there without
 // a commit; every other route (foreground PostToolUse, Codex) keeps admitting a success only.
 export function validateNativeGoldfishFinal(text, { binding, allowCheckpoint = false } = {}) {
   if (typeof text !== "string" || text.length === 0 || Buffer.byteLength(text, "utf8") > 2 * 1024 * 1024
     || !binding || !ID.test(binding.dispatchId ?? "") || !OID.test(binding.candidateCommit ?? "")) return fail("NGHR-FINAL-INPUT");
   let value;
-  try { value = parseStrictJson(text); } catch { return fail("NGHR-FINAL-JSON"); }
+  try { value = parseStrictJson(withoutWholeMessageFence(text)); } catch { return fail("NGHR-FINAL-JSON"); }
   const shapeCondition = finalShapeCondition(value, binding, allowCheckpoint);
   if (shapeCondition !== null) return { ...fail("NGHR-FINAL-SHAPE"), detail: shapeCondition };
   try { validateDurableDispatchReportText(value.report); } catch { return fail("NGHR-FINAL-REPORT-UNSAFE"); }

@@ -58,6 +58,24 @@ const cases = [
     ]) assert.equal(validateNativeGoldfishFinal(JSON.stringify({ ...final, ...change }), { binding }).ok, false);
     assert.equal(validateNativeGoldfishFinal(`\`${finalText}\``, { binding }).code, "NGHR-FINAL-JSON");
     assert.equal(validateNativeGoldfishFinal(`{"schema":"${final.schema}","schema":"forged"}`, { binding }).code, "NGHR-FINAL-JSON");
+    // Candidate 21b (Claude greenfield): one fence around the whole message is the same return; prose, a second block or a broken fence still fail closed.
+    const plain = validateNativeGoldfishFinal(finalText, { binding });
+    for (const wrapped of [`\`\`\`json\n${finalText}\n\`\`\``, `\`\`\`\n${finalText}\n\`\`\`\n`, `\n\`\`\`json\r\n${finalText}\r\n\`\`\`  \n`]) {
+      const admitted = validateNativeGoldfishFinal(wrapped, { binding });
+      assert.equal(admitted.ok, true, admitted.code);
+      assert.equal(admitted.final.resultSha256, plain.final.resultSha256, "the fence changes nothing about the bound result");
+      assert.equal(admitted.final.reportSha256, plain.final.reportSha256);
+    }
+    for (const refused of [
+      `Here is the result:\n\`\`\`json\n${finalText}\n\`\`\``,
+      `\`\`\`json\n${finalText}\n\`\`\`\nDone.`,
+      `\`\`\`json\n${finalText}\n\`\`\`\n\`\`\`json\n${finalText}\n\`\`\``,
+      `\`\`\`json\n${finalText}`,
+      `\`\`\`json ${finalText} \`\`\``,
+      `\`\`\`js\n${finalText}\n\`\`\``,
+    ]) assert.equal(validateNativeGoldfishFinal(refused, { binding }).code, "NGHR-FINAL-JSON", refused.slice(0, 40));
+    const fencedOther = validateNativeGoldfishFinal(`\`\`\`json\n${JSON.stringify({ ...final, dispatchId: "OTHER" })}\n\`\`\``, { binding });
+    assert.equal(fencedOther.ok, false, "the binding is checked on the unwrapped object exactly as on a plain one");
   }],
   ["NGHR04 Claude Task/Agent return requires exact tool/session correlation, successful completion and stable resolved model", () => {
     const input = { hook_event_name: "PostToolUse", tool_name: "Task", tool_use_id: "tool-use-1",
