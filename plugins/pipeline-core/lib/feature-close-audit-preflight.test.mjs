@@ -12,11 +12,13 @@ import { planVerifySelection } from "./verify-selection.mjs";
 
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 const pack = { schema: "pipeline.organization-policy-pack.v1", packId: "security-baseline", revision: "a".repeat(64), compatibility: { minimumCoreVersion: "0.4.0", maximumCoreVersion: "0.5.0" }, governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true }] };
-function fixture(t) {
+function fixture(t, { tracked = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "feature close audit-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = args => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.invalid", GIT_COMMITTER_NAME: "Fixture", GIT_COMMITTER_EMAIL: "fixture@example.invalid" } }).trim();
-  git(["init", "-q"]); git(["commit", "--allow-empty", "-qm", "candidate"]);
+  git(["init", "-q"]);
+  if (tracked) { mkdirSync(join(root, "specs/feature-fixture/evidence/critic/r1"), { recursive: true }); writeFileSync(join(root, "specs/feature-fixture/evidence/critic/r1/report.md"), "report\n"); git(["add", "specs"]); }
+  git(["commit", "--allow-empty", "-qm", "candidate"]);
   const candidate = { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
   const featureId = "feature-fixture", base = `specs/${featureId}`;
   mkdirSync(join(root, base), { recursive: true });
@@ -47,6 +49,17 @@ test("read-only plan binds candidate, Result and policy; identical bundle retry 
   assert.deepEqual(readFileSync(join(f.root, plan.outputPath, "manifest.json")), before);
   writeFileSync(join(f.root, plan.outputPath, "README.md"), "tampered");
   assert.equal((await planFeatureCloseAudit(f.options)).code, "FCA-OUTPUT-COLLISION");
+});
+
+test("C21E the plan carries the feature's tracked evidence from the candidate tree, and an older bundle without an index is still reused", async t => {
+  const f = fixture(t, { tracked: true }), plan = await planFeatureCloseAudit(f.options);
+  assert.equal(plan.status, "build-required", JSON.stringify(plan));
+  assert.deepEqual(plan.bundlePlan.evidenceIndex.entries.map(entry => `${entry.group}:${entry.path}`), ["critic-reviews:specs/feature-fixture/evidence/critic/r1/report.md"]);
+  mkdirSync(join(f.root, "audit-bundles/feature-fixture"), { recursive: true });
+  await buildAuditBundle({ repositoryRoot: f.root, outputPath: plan.outputPath, plan: plan.bundlePlan });
+  assert.equal((await planFeatureCloseAudit(f.options)).status, "reuse-verified");
+  const plain = fixture(t), older = await planFeatureCloseAudit(plain.options);
+  assert.equal(Object.hasOwn(older.bundlePlan, "evidenceIndex"), false, "a feature with no tracked evidence keeps the old shape");
 });
 
 test("missing policy is actionable, no fabricated defaults or extra signature", async t => {

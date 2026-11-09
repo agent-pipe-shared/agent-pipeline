@@ -182,6 +182,9 @@ and `reason`). The shipped gitleaks configuration already exempts the bare hex d
 writes into `audit-bundles/<feature>/<commit>/` and the State file (bare hex values of 32 to 64 characters);
 a real key in those files is still found.
 
+The record for an auditor is that bundle: its README lists the signed proofs and the feature's tracked evidence
+with Git blobs, and it is pushed with the close. Never hand-write an index or evidence summary under `scratch/`.
+
 A value that is public by design (for example an IndexNow key) is reviewed through the same route
 (`gitleaks-repair-ignore.mjs --prepare-gate`, then `--approve-new`) when the project publishes it as the
 tracked file `public/<key>.txt` containing exactly that key (hex, 32 to 64 characters): put the key alone in

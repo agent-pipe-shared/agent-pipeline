@@ -34,7 +34,7 @@ This directory is a candidate-bound audit bundle. It contains the copied artifac
 ## Artifacts
 
 ${artifactLines}
-${evidenceSection(manifest)}${proofsSection(manifest)}
+${evidenceSection(manifest)}${proofsSection(manifest)}${evidenceIndexSection(manifest)}
 ## Offline verification
 
 Prerequisites: Node.js and a copy of the repository containing \`plugins/pipeline-core/scripts/audit-bundle.mjs\`; no network, provider, key, or deployment access is required.
@@ -73,7 +73,34 @@ function sanitizeExportEvidence(exportEvidence) {
 }
 // Q3: the optional top-level keys a plan or manifest may carry, each validated when present. The absent case keeps the
 // exact key list it always had, so old bundles and plans stay byte-identical and verifiable.
-const OPTIONAL_KEYS = ["exportMetadata", "evidence", "proofs"];
+const OPTIONAL_KEYS = ["exportMetadata", "evidence", "proofs", "evidenceIndex"];
+// C21E: the index an auditor needs lived in private storage or in a hand-written scratch file, so it never reached the push. The bundle now lists the feature's
+// tracked evidence from the candidate's own Git tree: path and Git blob only, nothing that the same commit does not already publish.
+const EVIDENCE_INDEX_SCHEMA = "pipeline.audit-bundle-evidence-index.v1"; const EVIDENCE_INDEX_MAX = 2048;
+const INDEX_PATH = /^[A-Za-z0-9._@+-]+(?:\/[A-Za-z0-9._@+-]+)*$/u; const INDEX_LINE = /^[0-9]{6} blob ([a-f0-9]{40}|[a-f0-9]{64})\t(.+)$/u;
+const INDEX_GROUPS = ["critic-reviews", "dispatch-records", "verify-records", "other"];
+const indexGroup = (path) => (/(?:^|\/)(?:critic|design-review)/u.test(path) ? "critic-reviews" : /dispatch/u.test(path) ? "dispatch-records" : /verify/u.test(path) ? "verify-records" : "other");
+/** The index of one `git ls-tree -r` output, or null when it lists nothing. A path Git had to quote is counted as omitted, never guessed. */
+export function evidenceIndexFromLsTree(text) {
+  const entries = []; let omitted = 0;
+  for (const line of String(text ?? "").split("\n").filter((value) => value !== "")) {
+    const match = INDEX_LINE.exec(line);
+    if (match === null || !INDEX_PATH.test(match[2]) || entries.length >= EVIDENCE_INDEX_MAX) { omitted += 1; continue; }
+    entries.push({ path: match[2], blob: match[1], group: indexGroup(match[2]) });
+  }
+  return entries.length === 0 && omitted === 0 ? null : { schema: EVIDENCE_INDEX_SCHEMA, source: "git-ls-tree", entries, omitted };
+}
+function evidenceIndexShape(value) {
+  return exact(value, ["schema", "source", "entries", "omitted"]) && value.schema === EVIDENCE_INDEX_SCHEMA && value.source === "git-ls-tree" && Number.isSafeInteger(value.omitted) && value.omitted >= 0
+    && Array.isArray(value.entries) && value.entries.length <= EVIDENCE_INDEX_MAX && value.entries.every((entry) => exact(entry, ["path", "blob", "group"]) && INDEX_PATH.test(entry.path) && OID.test(entry.blob) && INDEX_GROUPS.includes(entry.group));
+}
+function evidenceIndexSection(manifest) {
+  if (!Object.hasOwn(manifest, "evidenceIndex")) return "";
+  const { entries, omitted } = manifest.evidenceIndex;
+  const groups = INDEX_GROUPS.map((group) => [group, entries.filter((entry) => entry.group === group)]).filter(([, listed]) => listed.length > 0)
+    .map(([group, listed]) => `### ${group}\n\n${listed.map((entry) => `- \`${entry.path}\` (Git blob: \`${entry.blob}\`)`).join("\n")}\n`).join("\n");
+  return `\n## Evidence index\n\nThe feature's tracked evidence at this candidate, listed from the candidate's own Git tree. The files stay in the repository; each is bound by its Git blob, so \`git cat-file -p <blob>\` in a clone shows the exact bytes.${omitted > 0 ? ` ${omitted} tracked path(s) could not be listed and were omitted.` : ""}\n\n${groups}`;
+}
 // P3 (C20D-P3-ONE-SHOT-CLOSE): the signed approval proof envelopes that authorized the feature live in the private approval store, outside the
 // repository. The bundle copies the PUBLIC proof objects (schema, signed digest, key reference, public key, signature; never a private key) into
 // proofs/ and binds each by file digest and by the signed intent digest; the offline verifier re-checks the bytes, the intent and the Ed25519 signature.
@@ -143,7 +170,7 @@ function evidenceShape(value) {
       && (entry.bundlePath === null || /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath)) && (entry.status === "gap" ? entry.code !== null && entry.bundlePath === null : entry.bundlePath !== null));
 }
 function planShape(plan) { return exact(plan, ["schema", "status", "bundleId", "candidate", "effectivePolicy", "effectivePolicySha256", "artifacts", ...optionalKeys(plan)])
-  && plan.schema === "pipeline.audit-bundle-plan.v1" && plan.status === "preview" && BUNDLE_ID.test(plan.bundleId) && exact(plan.candidate, ["commit", "tree"]) && OID.test(plan.candidate.commit) && OID.test(plan.candidate.tree) && SHA.test(plan.effectivePolicySha256) && canonicalSha256(plan.effectivePolicy) === plan.effectivePolicySha256 && Array.isArray(plan.artifacts) && plan.artifacts.length > 0 && plan.artifacts.every((entry) => exact(entry, ["sourcePath", "bundlePath", "sha256"]) && typeof entry.sourcePath === "string" && /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath) && SHA.test(entry.sha256)) && (!hasExportMetadata(plan) || exportMetadataShape(plan.exportMetadata)) && (!Object.hasOwn(plan, "evidence") || evidenceShape(plan.evidence)) && (!Object.hasOwn(plan, "proofs") || proofsPlanShape(plan.proofs)); }
+  && plan.schema === "pipeline.audit-bundle-plan.v1" && plan.status === "preview" && BUNDLE_ID.test(plan.bundleId) && exact(plan.candidate, ["commit", "tree"]) && OID.test(plan.candidate.commit) && OID.test(plan.candidate.tree) && SHA.test(plan.effectivePolicySha256) && canonicalSha256(plan.effectivePolicy) === plan.effectivePolicySha256 && Array.isArray(plan.artifacts) && plan.artifacts.length > 0 && plan.artifacts.every((entry) => exact(entry, ["sourcePath", "bundlePath", "sha256"]) && typeof entry.sourcePath === "string" && /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath) && SHA.test(entry.sha256)) && (!hasExportMetadata(plan) || exportMetadataShape(plan.exportMetadata)) && (!Object.hasOwn(plan, "evidence") || evidenceShape(plan.evidence)) && (!Object.hasOwn(plan, "proofs") || proofsPlanShape(plan.proofs)) && (!Object.hasOwn(plan, "evidenceIndex") || evidenceIndexShape(plan.evidenceIndex)); }
 
 function readEvidenceFile(root, path) {
   let source; try { source = rootPath(root, path, "AB-EVIDENCE-PATH"); } catch { return null; }
@@ -208,8 +235,9 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
  * candidate exactly, so a bundle is never labelled with the parent of the commit it was asked to audit (Q3).
  * `evidence` (optional) carries the approval trace, detached proofs, release Verify record and security scan; see `collectEvidence`.
  */
-export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVersion, packs, exportEvidence, candidate, evidence, proofs } = {}) {
+export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVersion, packs, exportEvidence, candidate, evidence, proofs, evidenceIndex } = {}) {
   const root = resolve(repositoryRoot ?? ""); if (!BUNDLE_ID.test(bundleId ?? "")) fail("AB-BUNDLE-ID");
+  if (evidenceIndex !== undefined && !evidenceIndexShape(evidenceIndex)) fail("AB-EVIDENCE-INDEX", "The evidence index is not a list of tracked paths and Git blobs.");
   const packageCheck = validateFeaturePackage(root, manifestPath); if (!packageCheck.ok || !packageCheck.receipt?.candidate) fail("AB-PACKAGE");
   if (candidate !== undefined && !(exact(candidate, ["commit", "tree"]) && OID.test(candidate.commit) && OID.test(candidate.tree) && candidate.commit === packageCheck.receipt.candidate.commit && candidate.tree === packageCheck.receipt.candidate.tree)) fail("AB-CANDIDATE-MISMATCH", "The audited candidate is not the feature package candidate.");
   const policy = resolveEffectiveOrganizationPolicy({ coreVersion, packs });
@@ -219,7 +247,7 @@ export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVe
   const carried = evidence === undefined ? null : collectEvidence(root, packageCheck.receipt.candidate, evidence, artifacts.length);
   if (carried !== null) artifacts.push(...carried.artifacts);
   const carriedProofs = proofs === undefined ? undefined : Object.freeze(planProofs(proofs));
-  return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}), ...(carried !== null ? { evidence: carried.evidence } : {}), ...(carriedProofs !== undefined ? { proofs: carriedProofs } : {}) });
+  return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}), ...(carried !== null ? { evidence: carried.evidence } : {}), ...(carriedProofs !== undefined ? { proofs: carriedProofs } : {}), ...(evidenceIndex !== undefined ? { evidenceIndex } : {}) });
 }
 
 export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}) {
@@ -227,7 +255,7 @@ export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}
   try { await lstat(output); fail("AB-OUTPUT-EXISTS"); } catch (error) { if (error?.code !== "ENOENT") throw error; }
   await mkdir(output, { recursive: false }); await mkdir(join(output, "artifacts"));
   for (const artifact of plan.artifacts) { const source = rootPath(root, artifact.sourcePath, "AB-SOURCE"); const bytes = await readFile(source); if (digest(bytes) !== artifact.sha256) fail("AB-SOURCE-DIGEST"); await copyFile(source, join(output, artifact.bundlePath)); }
-  const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}), ...(Object.hasOwn(plan, "evidence") ? { evidence: plan.evidence } : {}), ...(Object.hasOwn(plan, "proofs") ? { proofs: proofsManifest(plan.proofs) } : {}) };
+  const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}), ...(Object.hasOwn(plan, "evidence") ? { evidence: plan.evidence } : {}), ...(Object.hasOwn(plan, "proofs") ? { proofs: proofsManifest(plan.proofs) } : {}), ...(Object.hasOwn(plan, "evidenceIndex") ? { evidenceIndex: plan.evidenceIndex } : {}) };
   if (Object.hasOwn(plan, "proofs")) { await mkdir(join(output, "proofs")); for (const entry of plan.proofs) await writeFile(join(output, entry.bundlePath), proofBytes(entry.proof), { flag: "wx", mode: 0o644 }); }
   const readmeBytes = Buffer.from(auditorReadme(baseManifest), "utf8");
   const manifest = { ...baseManifest, readmeSha256: digest(readmeBytes) };
@@ -244,6 +272,7 @@ export function verifyAuditBundleSync({ bundleRoot } = {}) {
   for (const artifact of manifest.artifacts ?? []) { if (!exact(artifact, ["path", "sourcePath", "sha256"]) || typeof artifact.sourcePath !== "string" || !/^artifacts\/[0-9]{3}-[a-z-]+$/u.test(artifact.path) || !SHA.test(artifact.sha256)) { findings.push("AB-ARTIFACT"); continue; } try { if (digest(readFileSync(join(root, artifact.path))) !== artifact.sha256) findings.push(`AB-DIGEST ${artifact.path}`); } catch { findings.push(`AB-MISSING ${artifact.path}`); } }
   if (hasEvidence && evidenceShape(manifest.evidence)) findings.push(...evidenceFindings(root, manifest));
   if (Object.hasOwn(manifest, "proofs")) { if (proofsManifestShape(manifest.proofs)) findings.push(...proofFindings(root, manifest.proofs)); else findings.push("AB-PROOFS"); }
+  if (Object.hasOwn(manifest, "evidenceIndex") && !evidenceIndexShape(manifest.evidenceIndex)) findings.push("AB-EVIDENCE-INDEX");
   findings.push(...followUpFindings(root, manifest));
   return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: findings.length ? "invalid" : "verified", candidate: manifest.candidate ?? null, findings: Object.freeze(findings) });
 }

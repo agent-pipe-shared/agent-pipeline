@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { buildAuditBundle, planAuditBundle, planAuditBundleSignature, signAuditBundle, verifyAuditBundle, verifyAuditBundleSignature } from "./audit-bundle.mjs";
+import { buildAuditBundle, evidenceIndexFromLsTree, planAuditBundle,planAuditBundleSignature, signAuditBundle, verifyAuditBundle, verifyAuditBundleSignature } from "./audit-bundle.mjs";
 import { canonicalSha256 } from "./governance-event.mjs";
 import { planVerifySelection } from "./verify-selection.mjs";
 
@@ -258,6 +258,31 @@ test("P3 collection reads the plan approval proof from State and the store envel
     assert.deepEqual(collectAuditProofs({ common, candidate: CANDIDATE, state: { planApproval: { designApproval: { mode: "chat" } } } }).proofs.map((entry) => entry.kind), ["push"], "a chat-mode approval keeps no proof");
     assert.deepEqual(collectAuditProofs({}), { proofs: [], gaps: [] });
   } finally { rmSync(common, { recursive: true, force: true }); }
+});
+test("C21E the PO acknowledgement of a caller-authored Critic is found by its packet, not by the close candidate", async () => {
+  const { collectAuditProofs } = await import("./audit-proof-collection.mjs");
+  const { criticalApprovalStoreRoot, CRITICAL_APPROVAL_STORE_SCHEMA } = await import("./critical-action-authorization.mjs");
+  const common = mkdtempSync(join(tmpdir(), "audit-proofs-ack-")); const kind = "acknowledge-caller-authored-critic";
+  try {
+    const directory = join(criticalApprovalStoreRoot(common), "approvals", kind); mkdirSync(directory, { recursive: true });
+    const put = (name, packetId, intent) => writeFileSync(join(directory, name), JSON.stringify({ schema: CRITICAL_APPROVAL_STORE_SCHEMA, kind, approval: { forCommit: "e".repeat(40), packetId, criticalProof: { proof: signedProof(intent) } } }));
+    put("a.json", "packet-one", "5".repeat(64)); put("b.json", "packet-two", "6".repeat(64));
+    assert.deepEqual(collectAuditProofs({ common, candidate: CANDIDATE }).proofs, [], "without a packet nothing of this kind is collected");
+    assert.deepEqual(collectAuditProofs({ common, candidate: CANDIDATE, criticPacketId: "packet-one" }).proofs.map((entry) => `${entry.kind}:${entry.proof.intentSha256}`), [`${kind}:${"5".repeat(64)}`]);
+  } finally { rmSync(common, { recursive: true, force: true }); }
+});
+test("C21E the bundle lists the tracked evidence with Git blobs in manifest and README, verifies offline, and refuses a malformed index", async () => {
+  const blob = "c".repeat(40); assert.equal(evidenceIndexFromLsTree(""), null);
+  const index = evidenceIndexFromLsTree([`100644 blob ${blob}\tspecs/x/evidence/critic/r1/report.md`, `100644 blob ${blob}\tspecs/x/evidence/verify-candidate.json`, `100644 blob ${blob}\tspecs/x/result.md`, `100644 blob ${blob}\t"specs/x/quoted\\303\\244.md"`].join("\n"));
+  assert.deepEqual(index.entries.map((entry) => entry.group), ["critic-reviews", "verify-records", "other"]); assert.equal(index.omitted, 1);
+  const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, evidenceIndex: index });
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }); const bundle = join(input.root, "bundle"); const manifestPath = join(bundle, "manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")); assert.deepEqual(manifest.evidenceIndex, index);
+  const readme = readFileSync(join(bundle, "README.md"), "utf8"); assert.match(readme, /## Evidence index/u); assert.match(readme, /specs\/x\/evidence\/critic\/r1\/report\.md/u); assert.match(readme, /1 tracked path\(s\) could not be listed/u);
+  assert.equal((await verifyAuditBundle({ bundleRoot: bundle })).status, "verified");
+  manifest.evidenceIndex.entries[0].blob = "not-a-blob"; writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
+  assert.ok((await verifyAuditBundle({ bundleRoot: bundle })).findings.includes("AB-EVIDENCE-INDEX"));
+  assert.throws(() => planWith(input, { candidate: CANDIDATE, evidenceIndex: { ...index, source: "by-hand" } }), (error) => error.code === "AB-EVIDENCE-INDEX");
 });
 // C20E-AP (AC-108): the push and release approvals come AFTER the close commit (the push approval signs the commit that carries the bundle), so their
 // public proofs reach the bundle in a follow-up: new files under proofs/ plus ONE follow-up list; manifest.json and README.md stay byte for byte.

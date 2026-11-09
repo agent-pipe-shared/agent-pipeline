@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { planAuditBundle, verifyAuditBundle } from "./audit-bundle.mjs";
+import { evidenceIndexFromLsTree, planAuditBundle, verifyAuditBundle } from "./audit-bundle.mjs";
 import { validateFeaturePackage } from "./feature-package-topology.mjs";
 import { canonicalSha256, canonicalizeJson } from "./governance-event.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "./verify-selection.mjs";
@@ -70,7 +70,9 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
       return blocked("FCA-QUALIFICATION", `Produce passing candidate-bound Verify evidence (--mode candidate, full) and bind it into the package. Diagnostic or stale evidence is not qualification. Examined: ${seen}.`);
     }
     let bundlePlan;
-    try { bundlePlan = planAuditBundle({ repositoryRoot: root, manifestPath, bundleId: featureId, coreVersion, packs, candidate, ...(evidence !== undefined ? { evidence } : {}), ...(proofs !== undefined ? { proofs } : {}) }); }
+    // C21E: the auditor's index is generated here, from the candidate's own tree, so it travels in the bundle and in the push.
+    const evidenceIndex = evidenceIndexFromLsTree(git(["ls-tree", "-r", candidate.commit, "--", `specs/${featureId}`]));
+    try { bundlePlan = planAuditBundle({ repositoryRoot: root, manifestPath, bundleId: featureId, coreVersion, packs, candidate, ...(evidence !== undefined ? { evidence } : {}), ...(proofs !== undefined ? { proofs } : {}), ...(evidenceIndex !== null ? { evidenceIndex } : {}) }); }
     catch (error) { return blocked(error.code ?? "FCA-POLICY-INVALID", "Validate the package and applicable organization policy using their existing preparation workflows."); }
     const destination = outputPath ?? `audit-bundles/${featureId}/${candidate.commit}`;
     const target = safePath(root, destination);
@@ -88,7 +90,7 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
       safePath(root, `${destination}/README.md`);
       const verification = await verifyAuditBundle({ bundleRoot: target });
       const expectedArtifacts = bundlePlan.artifacts.map(a => ({ path: a.bundlePath, sourcePath: a.sourcePath, sha256: a.sha256 }));
-      if (verification.status !== "verified" || !prior.readmeSha256 || prior.bundleId !== featureId || !same(prior.candidate, candidate) || prior.effectivePolicySha256 !== bundlePlan.effectivePolicySha256 || !same(prior.artifacts, expectedArtifacts) || !same(prior.evidence ?? null, bundlePlan.evidence ?? null) || !same(prior.proofs ?? null, bundlePlan.proofs?.map(p => ({ kind: p.kind, path: p.bundlePath, sha256: p.sha256, intentSha256: p.intentSha256 })) ?? null)) return blocked("FCA-OUTPUT-COLLISION", "Existing snapshot is incomplete, changed or differently bound. Preserve it; inspect and use a distinct explicit output if recovery requires it.");
+      if (verification.status !== "verified" || !prior.readmeSha256 || prior.bundleId !== featureId || !same(prior.candidate, candidate) || prior.effectivePolicySha256 !== bundlePlan.effectivePolicySha256 || !same(prior.artifacts, expectedArtifacts) || !same(prior.evidence ?? null, bundlePlan.evidence ?? null) || !same(prior.proofs ?? null, bundlePlan.proofs?.map(p => ({ kind: p.kind, path: p.bundlePath, sha256: p.sha256, intentSha256: p.intentSha256 })) ?? null) || (Object.hasOwn(prior, "evidenceIndex") && !same(prior.evidenceIndex, bundlePlan.evidenceIndex ?? null))) return blocked("FCA-OUTPUT-COLLISION", "Existing snapshot is incomplete, changed or differently bound. Preserve it; inspect and use a distinct explicit output if recovery requires it.");
       status = "reuse-verified";
       existingManifestSha256 = hash(bytes);
     }

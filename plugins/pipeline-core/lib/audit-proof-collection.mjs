@@ -22,11 +22,12 @@ import { CRITICAL_APPROVAL_STORE_SCHEMA, criticalApprovalStoreRoot, readLastPriv
 import { canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
 
 const STORE_KINDS = Object.freeze(["push", "feature-package-reconcile"]);
+const CRITIC_ACKNOWLEDGEMENT_KIND = "acknowledge-caller-authored-critic"; // spelled here: importing lib/critic-acknowledgement.mjs closes an import cycle through the State writer
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const readJson = (path) => { try { return JSON.parse(readFileSync(path, "utf8")); } catch { return null; } };
 
 /** @returns {{ proofs: Array<{kind: string, proof: object}>, gaps: Array<{kind: string, code: string}> }} */
-export function collectAuditProofs({ common, candidate, state } = {}) {
+export function collectAuditProofs({ common, candidate, state, criticPacketId = null } = {}) {
   const proofs = []; const gaps = []; const seen = new Set();
   const take = (kind, proof, source) => {
     if (!isCarriableProof(proof)) { gaps.push({ kind, code: `PROOF-NOT-CARRIABLE:${source}` }); return; }
@@ -36,12 +37,14 @@ export function collectAuditProofs({ common, candidate, state } = {}) {
   const design = state?.planApproval?.designApproval;
   if (object(design) && design.mode === "signature") take("plan-approval", design.proof, "state:planApproval");
   if (typeof common === "string" && common !== "" && object(candidate)) {
-    for (const kind of STORE_KINDS) {
+    // C21E: the PO acknowledgement of a caller-authored Critic signs the REVIEWED candidate, which the close candidate has moved past, so it is found by its packet.
+    const belongs = (kind, approval) => (kind === CRITIC_ACKNOWLEDGEMENT_KIND ? approval.packetId === criticPacketId : approval.forCommit === candidate.commit);
+    for (const kind of criticPacketId === null ? STORE_KINDS : [...STORE_KINDS, CRITIC_ACKNOWLEDGEMENT_KIND]) {
       const directory = join(criticalApprovalStoreRoot(common), "approvals", kind); let names = [];
       try { names = readdirSync(directory).filter((name) => name.endsWith(".json") && !name.startsWith(".")).sort().slice(0, 256); } catch { names = []; }
       for (const name of names) {
         const envelope = readJson(join(directory, name));
-        if (!object(envelope) || envelope.schema !== CRITICAL_APPROVAL_STORE_SCHEMA || envelope.kind !== kind || !object(envelope.approval) || envelope.approval.forCommit !== candidate.commit) continue;
+        if (!object(envelope) || envelope.schema !== CRITICAL_APPROVAL_STORE_SCHEMA || envelope.kind !== kind || !object(envelope.approval) || !belongs(kind, envelope.approval)) continue;
         if (object(envelope.approval.criticalProof?.proof)) take(kind, envelope.approval.criticalProof.proof, `store:${kind}/${name}`);
       }
     }

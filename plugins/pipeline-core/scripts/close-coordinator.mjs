@@ -751,7 +751,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
       // P3: the signed approval proofs that authorized this candidate travel in the bundle's proofs/ directory (public proof objects only).
       const collectedProofs = collectAuditProofs({ common, candidate: options.candidate, state: snapshot.state });
       if (collectedProofs.proofs.length > 0) options.proofs = collectedProofs.proofs;
-      const auditPlan = await planFeatureCloseAudit(options);
+      let auditPlan = await planFeatureCloseAudit(options);
       if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
       if (auditPlan.result.sha256 !== observed.authority.implementationResultSha256) fail("CLOSE-AUDIT-RESULT", "audit Result differs from active feature authority");
       const packageValue = readJsonFile(root, options.manifestPath, "audit package").value;
@@ -761,6 +761,16 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
         if (artifact?.path !== path || artifact?.sha256 !== digest) fail("CLOSE-AUDIT-AUTHORITY", "audit package must bind the exact approved PRD and Spec");
       }
       const lifecycle = auditLifecycleReadback({ root, common, request, auditPlan });
+      // C21E: the signed PO acknowledgement of a caller-authored Critic is part of what authorized this close, so it travels with the other proofs.
+      const acknowledgement = lifecycle.criticIndependence.acknowledgement;
+      if (acknowledgement?.mode === "signature") {
+        const withAcknowledgement = collectAuditProofs({ common, candidate: options.candidate, state: snapshot.state, criticPacketId: acknowledgement.packetId });
+        if (withAcknowledgement.proofs.length > (options.proofs?.length ?? 0)) {
+          options.proofs = withAcknowledgement.proofs;
+          auditPlan = await planFeatureCloseAudit(options);
+          if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
+        }
+      }
       audit = {
         options,
         planSha256: auditPlan.planSha256,
