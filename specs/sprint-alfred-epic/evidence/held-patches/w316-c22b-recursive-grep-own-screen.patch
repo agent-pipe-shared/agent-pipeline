@@ -1,0 +1,738 @@
+diff --git a/plugins/pipeline-core/hooks/guard-command-grammar.mjs b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+index f03bab344..9cdc44067 100644
+--- a/plugins/pipeline-core/hooks/guard-command-grammar.mjs
++++ b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+@@ -67,7 +67,8 @@ export function expandBooleanShortClusters(args, booleans) {
+   return expanded;
+ }
+ 
+-function isBoundedFilenameFilter(value) {
++// Exported for lib/guard/shell-grammar.mjs: `grep --include=`/`--exclude=` take the same bounded filename shape as rg's `-g` (C22B, AC-108).
++export function isBoundedFilenameFilter(value) {
+   // Test-module suffixes are filename data too: the observed `*.test.mjs`
+   // read has the same traversal boundary as `*.mjs`. Keep the extension
+   // bound and optional literal test marker, rather than admitting arbitrary
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 4f7d7f101..29a143ded 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -2259,13 +2259,23 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write
+     mkdirSync(join(path, "plugins/pipeline-core/hooks"), { recursive: true });
+     writeFileSync(join(path, "backlog/items/passive-probe.txt"), "pattern fixture\n");
+     writeFileSync(join(path, "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"), "// pattern fixture\n");
+-    // SEC-11: grep is an exact-file read lane; recursive -rl is unsupported.
++    // SEC-11: grep is an exact-file read lane; the dereferencing recursive -Rl is unsupported. QG-04, restated in place (PO decision of 2026-11-09, recursive grep
++    // behind its own all-files tree screen): these three used `-rl`, which is now admitted for a clean tree (below, same shapes, same chain and redirect rules);
++    // `-R` stays refused, so what each case proves (the chain, the redirect and the head sink do not turn an unsupported grep into an admitted one) is unchanged.
++    for (const command of [
++      'grep -Rl "pattern" backlog/items/ 2>/dev/null',
++      'git rev-parse HEAD && grep -Rl "pattern" backlog/items/ | head -n 5',
++      'grep -Rl "pattern" backlog/items/ | head -n 5 && git status',
++    ]) {
++      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
++      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
++    }
+     for (const command of [
+       'grep -rl "pattern" backlog/items/ 2>/dev/null',
+       'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | head -n 5',
+       'grep -rl "pattern" backlog/items/ | head -n 5 && git status',
+     ]) {
+-      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
++      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+       assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+     }
+     for (const command of [
+@@ -2339,6 +2349,7 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write
+       "git status || git log",
+       "git status && printf $'format %s\\n' && git log",
+       // Trailing pipe where sink is neither grep nor head fails closed
++      // (QG-04: this one proves the `| cat` sink stays refused; the recursive source is admitted now, the sink is what is refused, so it is unchanged.)
+       'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | cat',
+       // Disclosed exclusion: a git global -c flag is never a subcommand match, so the
+       // segment fails the read-only classifier and the chain fails closed by construction.
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 51295dfe2..f035bd013 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -15,7 +15,7 @@ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { observeGovernanceScope } from "../governance-scope.mjs";
+ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
+ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+-import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint } from "../read-command-diagnosis.mjs";
++import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, recursiveGrepHint } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+ import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+ import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
+@@ -530,12 +530,15 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       let flag = null;
+       let glob = null;
+       let listing = null;
++      let recursiveSearch = null;
+       if (!outsideRoot) {
+         const readCommand = input.tool_input.command ?? input.tool_input.CommandLine;
+         // F9: a rejected rg glob value is named first, with the forms that are admitted (the value, not the -g flag, is the fault).
+         try { glob = firstUnadmittedGlobValue(readCommand, root); } catch { glob = null; }
+         if (glob === null) {
+           try { flag = firstUnadmittedFlag(readCommand, root); } catch { flag = null; }
++          // C22B: a recursive grep that the tree screen refuses has no single faulty flag; name one spelling of the same search the grammar admits.
++          if (flag === null) { try { recursiveSearch = recursiveGrepHint(readCommand, root); } catch { recursiveSearch = null; } }
+           // Q2: a rejected `ls` flag on a protected directory says which listing spellings are admitted.
+           if (flag !== null) {
+             try { listing = clusterSpellingHint(readCommand, flag, root) ?? lsListingHint(readCommand, flag, root); } catch { listing = null; }
+@@ -543,7 +546,9 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+         }
+       }
+       const spelling = flag === null ? null : (flagSpellingHint(flag) ?? listing);
+-      const rejected = glob !== null ? `the glob value "${glob}" (${GLOB_FORM_HINT})` : flag === null ? null : `the flag "${flag}"${spelling === null ? "" : ` (${spelling})`}`;
++      const rejected = glob !== null ? `the glob value "${glob}" (${GLOB_FORM_HINT})`
++        : flag === null ? (recursiveSearch === null ? null : `the tree this recursive search reads (an admitted spelling of the same search: \`${recursiveSearch}\`)`)
++          : `the flag "${flag}"${spelling === null ? "" : ` (${spelling})`}`;
+       return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejected));
+     }
+   }
+diff --git a/plugins/pipeline-core/lib/guard/grammar-denials.mjs b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+index 340acd42f..21499b287 100644
+--- a/plugins/pipeline-core/lib/guard/grammar-denials.mjs
++++ b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+@@ -139,7 +139,9 @@ export const ADMITTED_GRAMMAR_SHAPES = [
+     // C21 (AC-108): the listing and context forms a worker tries first; the paths are judged by the same scope as every other read.
+     spelling: "listing and context forms of those commands: \"rg --files <dir>...\"; a context flag \"-A N\" / \"-B N\" / \"-C N\" (grep: N of 1..3 digits, separate or attached "
+       + "as -C5; rg: N up to 500, separate); \"ls\" with -l -a -R -1 -h (or combined, e.g. -la) over contained paths; listing a directory the project has yet to create is admitted; "
+-      + "rg and grep also take a combined cluster of flags that are each admitted on their own and take no value (e.g. -in); a flag with a value, such as -A or -m, stays separate",
++      + "rg and grep also take a combined cluster of flags that are each admitted on their own and take no value (e.g. -in); a flag with a value, such as -A or -m, stays separate; "
++      + "\"grep -rn <pattern> <dir>\" (also -rl, -ril, --include=GLOB, --exclude=GLOB) reads every file under the directory, hidden and ignored ones too, so it is admitted only when the tree holds no secret-named file and no .git "
++      + "(add --exclude-dir=.git, at most 8 --exclude-dir=NAME) -- otherwise use \"rg -n <pattern> <dir>\"; -R is not admitted",
+     example: "grep -n -C 5 needle probe.txt",
+   },
+   {
+diff --git a/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs b/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs
+index c9f8f1aad..5aeb6cc22 100644
+--- a/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs
++++ b/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs
+@@ -63,7 +63,9 @@ test("C21 grep context flags -A -B -C take a 1..3 digit number (separate or atta
+       "grep -C 1000 needle scan.txt", "grep -C -1 needle scan.txt", "grep -C x needle scan.txt", "grep -C needle scan.txt", "grep -C", "grep -C 5 -C 6 needle scan.txt",
+       "grep -C5 -C5 needle scan.txt", "grep -A 2 -A 3 needle scan.txt", "grep -C 05x needle scan.txt", "grep -nC5 needle scan.txt", "grep -C 5 needle .aws/credentials",
+       "grep -C 5 needle scan.txt > output.txt", "grep -C 5 needle $(touch scan.txt)", "grep -C 5 -f scan.txt scan.txt",
+-      "grep -C 5 --include '*.txt' needle scan.txt", "grep --context 5 needle scan.txt", "grep --context=5 needle scan.txt", "grep -C 5 --pre cat needle scan.txt",
++      // QG-04, restated in place (PO decision of 2026-11-09, recursive grep with --include/--exclude/--exclude-dir filters): `--include '*.txt'` is an admitted
++      // filter now; the unadmitted long option this row stood for (a value-taking option the grammar does not know) is `--exclude-from`, which stays refused.
++      "grep -C 5 --exclude-from scan.txt needle scan.txt", "grep --context 5 needle scan.txt", "grep --context=5 needle scan.txt", "grep -C 5 --pre cat needle scan.txt",
+       "grep -C 5 needle", "grep -C 5 needle scan.txt | tee out.txt",
+     ]) assert.equal(admitted(command), false, command);
+   } finally { rmSync(base, { recursive: true, force: true }); }
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index c3c3bc324..b71054379 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -9,7 +9,7 @@ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
+ // Expose the policy-owned binding; shell decisions continue through the same policy function.
+ export { PASSIVE_READ_CREDENTIAL_ROOTS };
+-import { expandBooleanShortClusters, gitShowObjectOperand, isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
++import { expandBooleanShortClusters, gitShowObjectOperand, isBoundedFilenameFilter, isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM } from "./constants.mjs";
+ import { MAX_AND_CHAIN_SEGMENTS } from "./grammar-denials.mjs";
+ import { commandPath, isProjectWritePath, isRealpathedWithinBoundary, pathInside, rawReadCandidatePath } from "./path-containment.mjs";
+@@ -922,15 +922,63 @@ export function isSafeExactPassiveFile(raw, root, extraRoots = []) {
+ 
+ const GREP_CONTEXT_FLAG = /^-([ABC])([0-9]{1,3})?$/u;
+ 
++// C22B (AC-108, PO decision 2026-11-09): the narrowing filters of a recursive grep. `--include`/`--exclude` take the bounded filename shape rg's `-g` has;
++// `--exclude-dir` takes one plain directory name (no slash, no glob). Each kind may appear at most 8 times. Only `--exclude-dir` changes what the tree
++// screen visits (it prunes exactly that name); `--include` and `--exclude` only narrow what grep prints and relax nothing.
++const GREP_FILTER_LIMIT = 8;
++const GREP_EXCLUDE_DIR_NAME = /^[A-Za-z0-9._][A-Za-z0-9._-]{0,63}$/u;
++
++/** @returns {{kind: string, value: string|undefined, used: number}|null} the filter spelled at `at` (`--include=G`, `--include G`, `--exclude=G`, `--exclude-dir=N`), else null. Pure. */
++function parseGrepFilter(list, at) {
++  const token = list[at];
++  if (typeof token !== "string") return null;
++  const attached = /^--(include|exclude|exclude-dir)=(.*)$/su.exec(token);
++  if (attached !== null) return { kind: attached[1], value: attached[2], used: 1 };
++  return token === "--include" ? { kind: "include", value: list[at + 1], used: 2 } : null;
++}
++
++/** True when the filter has a valid value and the kind is still within its limit; records it. */
++function acceptGrepFilter(filter, filters) {
++  const { kind, value } = filter;
++  if (typeof value !== "string") return false;
++  if (kind === "exclude-dir") {
++    if (value === "." || value === ".." || !GREP_EXCLUDE_DIR_NAME.test(value)) return false;
++    filters.excludeDirs.push(value);
++  } else if (!isBoundedFilenameFilter(value)) return false;
++  filters.count[kind] = (filters.count[kind] ?? 0) + 1;
++  return filters.count[kind] <= GREP_FILTER_LIMIT;
++}
++
++// `grep -r` operand: a file or a directory; a directory goes through the all-files tree screen, which prunes exactly the --exclude-dir names.
++function isSafeRecursiveGrepOperand(raw, root, extraRoots, excludeDirs) {
++  if (typeof raw !== "string" || !raw || !isAllowedPassiveReadTarget(raw, {
++    rootDir: root, recursive: true, allFiles: true, excludeDirs, additionalRecursiveRoots: extraRoots,
++  })) return false;
++  try {
++    const observed = statSync(passiveCandidate(raw, root));
++    return observed.isFile() || observed.isDirectory();
++  } catch { return false; }
++}
++
+ function isSafeExactGrepArgs(grepArgs, root, extraRoots = []) {
+-  const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename", "-o", "--only-matching"]); // TR-B-F (T74): match-output spellings; the operand loop below is unchanged.
++  const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename", "-o", "--only-matching", // TR-B-F (T74): match-output spellings; the operand loop below is unchanged.
++    "-r", "--recursive", "-l", "--files-with-matches", "-w", "--word-regexp", "-s", "--no-messages"]); // C22B (PO decision 2026-11-09): -r only widens the operand rule below; -R, -f, -P and -z stay refused.
+   // C22B: a cluster of boolean flags admitted above on their own (`-in`) is read as those flags; a cluster holding -A/-B/-C/-m or any other letter stays refused.
+   const args = expandBooleanShortClusters(grepArgs, flags);
+   let index = 0;
+   let maxCountSeen = false;
++  let recursive = false;
++  const filters = { excludeDirs: [], count: {} };
+   const contextSeen = new Set();
+-  while (flags.has(args[index]) || args[index] === "-m" || args[index] === "--max-count" || GREP_CONTEXT_FLAG.test(args[index] ?? "")) {
+-    if (flags.has(args[index])) { index += 1; continue; }
++  while (flags.has(args[index]) || args[index] === "-m" || args[index] === "--max-count" || GREP_CONTEXT_FLAG.test(args[index] ?? "")
++    || parseGrepFilter(args, index) !== null) {
++    const filter = parseGrepFilter(args, index);
++    if (filter !== null) {
++      if (!acceptGrepFilter(filter, filters)) return false;
++      index += filter.used;
++      continue;
++    }
++    if (flags.has(args[index])) { recursive ||= args[index] === "-r" || args[index] === "--recursive"; index += 1; continue; }
+     // C21 (AC-108): -A, -B and -C only print neighbouring lines of an operand the checks below already admit. One bounded value (1..3 digits) each, in the
+     // separate (`-C 5`) or the attached (`-C5`) spelling; a repeated letter, a cluster holding a context flag (`-nC5`) and the long spellings stay refused. A cluster of plain boolean flags (`-in`) is admitted (C22B).
+     const context = GREP_CONTEXT_FLAG.exec(args[index] ?? "");
+@@ -950,9 +998,17 @@ function isSafeExactGrepArgs(grepArgs, root, extraRoots = []) {
+   if (endedOptions) index += 1;
+   const pattern = args[index++];
+   if (typeof pattern !== "string" || !pattern || (!endedOptions && pattern.startsWith("-"))) return false;
+-  const paths = args.slice(index);
++  // C22B: the filters may also follow the operands (`grep -rn x . --exclude-dir=.git`), as GNU grep reads them; every other dash-led word is still refused below.
++  const paths = [];
++  while (index < args.length) {
++    const filter = endedOptions ? null : parseGrepFilter(args, index);
++    if (filter === null) { paths.push(args[index]); index += 1; continue; }
++    if (!acceptGrepFilter(filter, filters)) return false;
++    index += filter.used;
++  }
++  // With -r, and only with -r, an operand may be a directory (screened by its own all-files rule); otherwise the exact-file rule is unchanged.
+   return paths.length > 0 && paths.every((path) => !path.startsWith("-")
+-    && isSafeExactPassiveFile(path, root, extraRoots));
++    && (recursive ? isSafeRecursiveGrepOperand(path, root, extraRoots, filters.excludeDirs) : isSafeExactPassiveFile(path, root, extraRoots)));
+ }
+ 
+ // Directory enumeration may expose immediate child names only. Checking the
+diff --git a/plugins/pipeline-core/lib/passive-read-policy.mjs b/plugins/pipeline-core/lib/passive-read-policy.mjs
+index c4e4572a0..194537b32 100644
+--- a/plugins/pipeline-core/lib/passive-read-policy.mjs
++++ b/plugins/pipeline-core/lib/passive-read-policy.mjs
+@@ -308,6 +308,55 @@ function safeRecursiveTree(start, protectedRoots, realpath, stat) {
+   return true;
+ }
+ 
++// C22B (AC-108, PO decision 2026-11-09): the tree screen of a recursive `grep -r`. The rg inventory above follows rg's hidden and ignore rules, so it
++// passes build/deploy.key under an ignored directory, .cache/deploy.key and .git/config, which grep -r reads. This screen uses no rg and no ignore
++// semantics: it visits EVERY entry under the operand (the same bound as the fallback above: 10000 entries, refused beyond) and refuses on any secret
++// name or protected root. A `.git` directory or file anywhere in the tree (or an operand inside one) refuses, unless the caller names `.git` in
++// `excludeDirs`. `excludeDirs` holds plain directory names only; a directory with such a name is pruned at any depth, which is exactly what
++// `grep --exclude-dir=<name>` does, and nothing else is relaxed. A symbolic link met during the walk is not descended (grep -r does not follow it):
++// its name and its resolved target are screened, a link that leads out of the operand's tree is refused, a dangling link is ignored.
++const ALL_FILES_ENTRY_LIMIT = 10000;
++const foldEntryName = (name) => (process.platform === "win32" ? name.toLowerCase() : name);
++const isGitMetadataName = (name) => name.toLowerCase() === ".git";
++
++function safeAllFilesTree(start, protectedRoots, realpath, excludeDirs) {
++  const excluded = new Set((Array.isArray(excludeDirs) ? excludeDirs : [])
++    .filter((name) => typeof name === "string" && name !== "" && name !== "." && name !== ".." && !/[\0\\/*?[\]{}]/u.test(name))
++    .map(foldEntryName));
++  let startPhysical;
++  try { startPhysical = realpath(start); }
++  catch { return false; }
++  if ([resolve(start), startPhysical].some((identity) => identity.split(sep).some(isGitMetadataName))) return false;
++  const pending = [{ path: start, physical: startPhysical }];
++  let entries = 1;
++  while (pending.length) {
++    const { path, physical } = pending.pop();
++    let children;
++    try { children = readdirSync(path, { withFileTypes: true }); }
++    catch { return false; }
++    for (const child of children) {
++      if (++entries > ALL_FILES_ENTRY_LIMIT) return false;
++      const name = child.name;
++      if (child.isDirectory() && excluded.has(foldEntryName(name))) continue;
++      if (isGitMetadataName(name) && !excluded.has(foldEntryName(name))) return false;
++      if (SECRET_BASENAME.test(name)) return false;
++      const childPath = resolve(path, name);
++      const childPhysical = resolve(physical, name);
++      if (protectedRoots.some((root) => within(root, childPath) || within(root, childPhysical))) return false;
++      if (child.isSymbolicLink()) {
++        let target;
++        try { target = realpath(childPath); }
++        catch { continue; }
++        if (!within(startPhysical, target) || SECRET_BASENAME.test(basename(target))
++          || protectedRoots.some((root) => within(root, target))) return false;
++        continue;
++      }
++      if (child.isDirectory()) pending.push({ path: childPath, physical: childPhysical });
++    }
++  }
++  return true;
++}
++
+ // PO decision D210 (AC-147 catalog half, AC-209): a recursive search INSIDE one directory the host declared (the sealed private
+ // record of lib/host-skill-catalog.mjs, written only by the host readback and verified here against the current filesystem) is
+ // the one thing a valid declaration adds over D96/D108. The directory must contain the operand under BOTH identities, the
+@@ -330,6 +379,7 @@ function insideDeclaredDirectory(raw, rootDir, homeDir, lexical, physical, looku
+ export function isAllowedPassiveReadTarget(raw, {
+   rootDir, homeDir = homedir(), credentialRoots = [], recursive = false, directoryListing = false,
+   additionalRecursiveRoots = [], declaredDirectories = declaredSkillDirectories,
++  allFiles = false, excludeDirs = [],
+   realpath = realpathSync.native ?? realpathSync, stat = statSync,
+   repoKeyDirectory = resolveRepoScopedDirectory,
+   machinePlaneRead = readMachinePlane,
+@@ -475,7 +525,10 @@ export function isAllowedPassiveReadTarget(raw, {
+     try { observed = stat(candidate); }
+     catch { return false; }
+     if (directoryListing && inAdditional && !observed.isFile() && !observed.isDirectory()) return false;
+-    if (observed.isDirectory() && !safeRecursiveTree(candidate, protectedRoots, realpath, stat)) return false;
++    // C22B: `allFiles` asks for the all-files screen of a recursive grep; every other caller keeps the rg inventory screen unchanged.
++    if (observed.isDirectory() && !(allFiles === true
++      ? safeAllFilesTree(candidate, protectedRoots, realpath, excludeDirs)
++      : safeRecursiveTree(candidate, protectedRoots, realpath, stat))) return false;
+   }
+   return true;
+ }
+diff --git a/plugins/pipeline-core/lib/passive-read-policy.test.mjs b/plugins/pipeline-core/lib/passive-read-policy.test.mjs
+index 986d9c472..248fe0f4a 100644
+--- a/plugins/pipeline-core/lib/passive-read-policy.test.mjs
++++ b/plugins/pipeline-core/lib/passive-read-policy.test.mjs
+@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { dirname, join } from "node:path";
+ import test from "node:test";
+ import * as policyModule from "./passive-read-policy.mjs";
+ import { isAllowedPassiveReadTarget } from "./passive-read-policy.mjs";
+@@ -450,3 +450,171 @@ test("D109 native Windows spellings are classified by the same rules (string-lev
+   assert.equal(refuses("C:\\Users", { ...options, recursive: true }), true);
+   assert.equal(refuses("C:\\Users", { ...options, directoryListing: true }), false);
+ });
++
++// C22B (AC-108, PO decision 2026-11-09): a recursive grep gets its own tree screen (option `allFiles`), because the rg inventory above follows rg's
++// hidden and ignore rules and grep -r does not: the measured gap was build/deploy.key under an ignored directory, .cache/deploy.key and .git/config,
++// which the rg screen passes and grep -r reads. The screen walks every entry under the operand, prunes only the directories named in `excludeDirs`,
++// does not descend a symbolic link (grep -r does not follow one met during the walk) and refuses beyond 10000 entries.
++function grepTreeFixture(t, { files = {}, links = {}, outside = {} } = {}) {
++  const fixture = realpathSync(mkdtempSync(join(tmpdir(), "grep-tree-screen-")));
++  t.after(() => rmSync(fixture, { recursive: true, force: true }));
++  const root = join(fixture, "repo"), home = join(fixture, "home"), away = join(fixture, "away");
++  for (const directory of [root, home, away]) mkdirSync(directory);
++  const put = (base, table) => {
++    for (const [path, content] of Object.entries(table)) {
++      mkdirSync(dirname(join(base, path)), { recursive: true });
++      writeFileSync(join(base, path), content);
++    }
++  };
++  put(root, files);
++  put(away, outside);
++  for (const [path, target] of Object.entries(links)) {
++    mkdirSync(dirname(join(root, path)), { recursive: true });
++    symlinkSync(typeof target === "function" ? target({ root, home, away }) : target, join(root, path));
++  }
++  const screen = (operand = ".", extra = {}) => isAllowedPassiveReadTarget(operand, {
++    rootDir: root, homeDir: home, recursive: true, allFiles: true,
++    machinePlaneRead: () => ({ status: "absent" }), repoKeyDirectory: () => ({ status: "absent" }), ...extra,
++  });
++  return { fixture, root, home, away, screen };
++}
++
++test("C22B grep screen: a secret name is refused wherever it sits, including under hidden and ignored directories that the rg inventory skips", (t) => {
++  const plain = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", "src/deep/b.txt": "NEEDLE", "docs/c.md": "NEEDLE" } });
++  assert.equal(plain.screen("."), true, "an ordinary tree is admitted");
++  assert.equal(plain.screen("src"), true, "a subdirectory is admitted");
++  for (const [name, files] of Object.entries({
++    "dotenv at the top": { "src/a.txt": "NEEDLE", ".env": "NEEDLE=fake" },
++    "dotenv variant": { "src/a.txt": "NEEDLE", "config/.env.local": "NEEDLE=fake" },
++    "key under an ignored directory": { "src/a.txt": "NEEDLE", "build/deploy.key": "NEEDLE fake", ".ignore": "build/\n", ".gitignore": "build/\n" },
++    "key under a hidden directory": { "src/a.txt": "NEEDLE", ".cache/deploy.key": "NEEDLE fake" },
++    "pem deep in a tree": { "src/a.txt": "NEEDLE", "a/b/c/d/server.pem": "NEEDLE fake" },
++    "credentials file in a hidden directory": { "src/a.txt": "NEEDLE", ".aws-local/credentials": "NEEDLE fake" },
++  })) {
++    const tree = grepTreeFixture(t, { files });
++    assert.equal(tree.screen("."), false, name);
++  }
++});
++
++test("C22B grep screen: a .git directory or a .git file refuses the operand unless the command excludes it by name; the operand itself may not sit inside .git", (t) => {
++  const directory = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".git/config": "url = https://NEEDLE:fake@example.invalid/x\n", ".git/HEAD": "ref: refs/heads/main\n", ".git/refs/heads/main": "0000\n" } });
++  assert.equal(directory.screen("."), false, ".git directory");
++  assert.equal(directory.screen(".", { excludeDirs: [".git"] }), true, "excluded by name");
++  assert.equal(directory.screen(".", { excludeDirs: ["node_modules"] }), false, "another excluded name does not help");
++  assert.equal(directory.screen(".git"), false, "the operand is the .git directory");
++  assert.equal(directory.screen(".git", { excludeDirs: [".git"] }), false, "excluding the name does not exempt an operand that is already inside it");
++  assert.equal(directory.screen(".git/refs"), false, "an operand inside .git");
++  const worktree = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".git": "gitdir: ../elsewhere/.git/worktrees/w\n" } });
++  assert.equal(worktree.screen("."), false, ".git file (a worktree)");
++  assert.equal(worktree.screen(".", { excludeDirs: [".git"] }), true, "excluded by name");
++  const nested = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", "vendor/lib/.git/config": "x\n" } });
++  assert.equal(nested.screen("."), false, "a nested .git directory");
++  assert.equal(nested.screen(".", { excludeDirs: [".git"] }), true, "excluded at any depth by name");
++  const shouting = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".GIT/config": "x\n" } });
++  assert.equal(shouting.screen(".", { excludeDirs: [".git"] }), false, "the name is compared case-insensitively for refusal and exactly for exclusion");
++});
++
++test("C22B grep screen: excludeDirs prunes exactly the directories it names, at any depth, and relaxes nothing else", (t) => {
++  const tree = grepTreeFixture(t, { files: {
++    "src/a.txt": "NEEDLE", ".git/config": "x\n", "node_modules/pkg/deploy.key": "fake\n", "src/node_modules/pkg/x.pem": "fake\n", "node_modules_extra/y.key": "fake\n",
++  } });
++  assert.equal(tree.screen(".", { excludeDirs: [".git", "node_modules"] }), false, "a similar name is not the named directory: node_modules_extra holds a key");
++  const only = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".git/config": "x\n", "node_modules/pkg/deploy.key": "fake\n", "src/node_modules/pkg/x.pem": "fake\n" } });
++  assert.equal(only.screen(".", { excludeDirs: [".git"] }), false, "a key under node_modules is not pruned by .git");
++  assert.equal(only.screen(".", { excludeDirs: [".git", "node_modules"] }), true, "both named directories pruned at every depth");
++  const topKey = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".env": "NEEDLE=fake", ".git/config": "x\n" } });
++  assert.equal(topKey.screen(".", { excludeDirs: [".git", "node_modules"] }), false, "a secret name is never relaxed by an exclusion");
++  for (const bad of [[".git/hooks"], ["*"], [""], [".."], [".git\\hooks"], "node_modules", null]) {
++    assert.equal(only.screen(".", { excludeDirs: bad }), false, `a name that is not a plain directory name prunes nothing: ${JSON.stringify(bad)}`);
++  }
++});
++
++test("C22B grep screen: a symbolic link is not descended, but its name and its resolved target are screened; a link out of the tree is refused; a dangling link is ignored", (t) => {
++  const inside = grepTreeFixture(t, {
++    files: { "src/a.txt": "NEEDLE", "docs/b.md": "NEEDLE" },
++    links: { "alias.txt": "src/a.txt", "docs/up": "..", "loop": ".", "dangling": "does-not-exist", "dangling-out": ({ away }) => join(away, "missing") },
++  });
++  assert.equal(inside.screen("."), true, "links to in-tree targets, a cycle and dangling links are admitted without a walk through them");
++  const secretName = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE" }, links: { "deploy.key": "src/a.txt" } });
++  assert.equal(secretName.screen("."), false, "the link NAME is screened");
++  const toSecret = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE" }, outside: { "id_rsa": "fake\n" }, links: { "notes.txt": ({ away }) => join(away, "id_rsa") } });
++  assert.equal(toSecret.screen("."), false, "the resolved target is screened");
++  const toRoot = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE" }, links: { "mine": ({ home }) => home } });
++  mkdirSync(join(toRoot.home, ".ssh"));
++  assert.equal(toRoot.screen(".", { credentialRoots: [join(toRoot.home, ".ssh")] }), false, "a link out of the tree to a directory holding a protected root");
++  const leaves = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE" }, outside: { "plain.txt": "harmless\n" }, links: { "out.txt": ({ away }) => join(away, "plain.txt"), "outdir": ({ away }) => away } });
++  assert.equal(leaves.screen("."), false, "a link that leads out of the tree is refused, although grep -r would not read through it (conservative on purpose)");
++  const viaOperand = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", "other/.env": "NEEDLE=fake" }, links: { "view": "src", "bad": "other" } });
++  assert.equal(viaOperand.screen("view"), true, "grep -r follows a link given on the command line, so the operand is walked through its target");
++  assert.equal(viaOperand.screen("bad"), false, "and the target's content is judged");
++});
++
++test("C22B grep screen: more than 10000 entries are refused, exactly 10000 are admitted", (t) => {
++  const tree = grepTreeFixture(t, { files: { "a.txt": "x" } });
++  mkdirSync(join(tree.root, "many"));
++  for (let index = 0; index < 9998; index += 1) writeFileSync(join(tree.root, "many", `f${index}.txt`), "");
++  // root + many/ + a.txt + 9998 files = 10001 entries
++  assert.equal(tree.screen("many"), true, "9998 files + the directory = 9999 entries");
++  assert.equal(tree.screen("."), false, "10001 entries");
++  writeFileSync(join(tree.root, "many", "one-more.txt"), "");
++  assert.equal(tree.screen("many"), true, "exactly 10000 entries (9999 files + the directory) are admitted");
++  writeFileSync(join(tree.root, "many", "two-more.txt"), "");
++  assert.equal(tree.screen("many"), false, "10001 entries are refused");
++});
++
++test("C22B grep screen: the rg route is unchanged and the option is off by default", (t) => {
++  const hidden = grepTreeFixture(t, { files: { "src/a.txt": "NEEDLE", ".cache/deploy.key": "NEEDLE fake", ".git/config": "x\n" } });
++  assert.equal(hidden.screen(".", { allFiles: true }), false);
++  const rg = spawnSync("rg", ["--version"], { encoding: "utf8" });
++  if (rg.status === 0) {
++    assert.equal(hidden.screen(".", { allFiles: false }), true, "the rg inventory skips hidden directories: byte for byte the previous verdict");
++    assert.equal(hidden.screen(".", { allFiles: undefined }), true, "the option is off unless asked for");
++  }
++  assert.equal(hidden.screen("src/a.txt", { allFiles: true }), true, "a single file is judged like any exact file");
++  assert.equal(hidden.screen(".cache/deploy.key", { allFiles: true }), false, "a secret file operand stays refused");
++});
++
++// The measurement that backs the screen: run the REAL grep -r over each fixture and compare what it opened with what the screen approved.
++// `grep -rc` prints one line per file it reads, matching or not. Read oracle (independent of the screen): a file is sensitive when its name
++// is a secret name or when it sits inside a .git directory. A `.git` FILE (worktree pointer) holds only a gitdir line and is not sensitive;
++// the screen refuses it unless the command excludes the name, as the briefing for this change states.
++const SENSITIVE_NAME = /^(?:\.env(?:\..*)?|id_rsa|credentials|.*\.(?:key|pem|p12|pfx))$/u;
++function sensitiveRead(relative) {
++  const parts = relative.split("/");
++  return parts.slice(0, -1).includes(".git") || SENSITIVE_NAME.test(parts[parts.length - 1]);
++}
++function gnuGrep() {
++  const probe = spawnSync("grep", ["--version"], { encoding: "utf8" });
++  return probe.status === 0 && /GNU grep/u.test(probe.stdout) ? "grep" : null;
++}
++
++test("C22B grep screen: what the real grep -r opens is inside what the screen approved (the screen admits only trees in which nothing sensitive is read)", (t) => {
++  if (gnuGrep() === null) { t.skip("GNU grep is not available on this host"); return; }
++  const fixtures = [
++    { name: "plain", files: { "src/a.txt": "NEEDLE", "docs/b.md": "NEEDLE" }, admit: true },
++    { name: "dotenv at the top", files: { "src/a.txt": "NEEDLE", ".env": "NEEDLE=fake" }, admit: false },
++    { name: "dotenv ignored by name", files: { "src/a.txt": "NEEDLE", ".env": "NEEDLE=fake", ".ignore": ".env\n" }, admit: false },
++    { name: "key under an ignored directory", files: { "src/a.txt": "NEEDLE", "build/deploy.key": "NEEDLE fake", ".ignore": "build/\n", ".gitignore": "build/\n" }, admit: false },
++    { name: "key under a hidden directory", files: { "src/a.txt": "NEEDLE", ".cache/deploy.key": "NEEDLE fake" }, admit: false },
++    { name: ".git directory", files: { "src/a.txt": "NEEDLE", ".git/config": "url = https://NEEDLE:fake@example.invalid/x\n" }, admit: false },
++    { name: ".git directory, excluded by name", files: { "src/a.txt": "NEEDLE", ".git/config": "url = https://NEEDLE:fake@example.invalid/x\n" }, excludeDirs: [".git"], admit: true },
++    { name: ".git file, excluded by name", files: { "src/a.txt": "NEEDLE", ".git": "gitdir: ../w/.git/worktrees/w\n" }, excludeDirs: [".git"], admit: true },
++    { name: "node_modules pruned and key kept out of reach", files: { "src/a.txt": "NEEDLE", "node_modules/p/deploy.key": "NEEDLE fake" }, excludeDirs: ["node_modules"], admit: true },
++    { name: "link to a secret outside the tree", files: { "src/a.txt": "NEEDLE" }, outside: { "id_rsa": "NEEDLE fake\n" }, links: { "notes.txt": ({ away }) => join(away, "id_rsa") }, admit: false, linkNotRead: "notes.txt" },
++    { name: "link out of the tree to a directory", files: { "src/a.txt": "NEEDLE" }, outside: { "plain.txt": "NEEDLE\n" }, links: { "outdir": ({ away }) => away }, admit: false, linkNotRead: "outdir" },
++    { name: "link inside the tree", files: { "src/a.txt": "NEEDLE" }, links: { "alias.txt": "src/a.txt", "loop": "." }, admit: true, linkNotRead: "alias.txt" },
++  ];
++  for (const fixture of fixtures) {
++    const tree = grepTreeFixture(t, fixture);
++    const args = ["-rc", "NEEDLE", ".", ...(fixture.excludeDirs ?? []).map((name) => `--exclude-dir=${name}`)];
++    const real = spawnSync("grep", args, { cwd: tree.root, encoding: "utf8", env: { ...process.env, LC_ALL: "C" } });
++    const opened = real.stdout.split("\n").filter(Boolean).map((line) => line.slice(0, line.lastIndexOf(":")).replace(/^\.\//u, ""));
++    assert.ok(opened.length > 0, `${fixture.name}: grep opened something`);
++    const sensitive = opened.filter(sensitiveRead);
++    const admitted = tree.screen(".", { excludeDirs: fixture.excludeDirs });
++    assert.equal(admitted, fixture.admit, `${fixture.name}: screen verdict`);
++    if (admitted) assert.deepEqual(sensitive, [], `${fixture.name}: the screen approved a tree in which grep -r opened a sensitive file`);
++    else if (fixture.linkNotRead === undefined) assert.ok(sensitive.length > 0, `${fixture.name}: a refusal in this table must be a read that really happens (${opened.join(", ")})`);
++    if (fixture.linkNotRead !== undefined) assert.equal(opened.includes(fixture.linkNotRead), false, `${fixture.name}: grep -r does not read a link met during the walk`);
++  }
++});
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+index a20b08d37..3ff3423ae 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+@@ -83,6 +83,52 @@ export function clusterSpellingHint(command, flag, root) {
+   return `a combined short-flag cluster is not admitted here; give each flag on its own: ${split.join(" ")}`;
+ }
+ 
++// C22B (PO decision 2026-11-09): a recursive grep is admitted behind its own all-files tree screen. When the screen refuses the tree, no single flag is
++// at fault, so this names ONE spelling of the same search that the grammar itself admits: the command with the missing `--exclude-dir=.git`, else the
++// `rg` form (rg skips hidden entries by its own rule). A spelling is printed only after `isReadOnlyDiagnosticCommand` admitted exactly that string, so
++// it is never a guess; the rg form is built only from flags rg reads the same way, and a command with a filter, `--`, -R, a pipeline or a redirect gets none.
++const SHELL_SAFE_WORD = /^[A-Za-z0-9_@%+=:,./-]+$/u;
++const shellWord = (word) => (SHELL_SAFE_WORD.test(word) ? word : quote(word));
++const RG_SAME_MEANING_LETTERS = new Set(["n", "i", "l", "w", "F", "v", "c", "H", "o"]);
++
++function rgSpellingOf(argv) {
++  const letters = [];
++  let at = 0;
++  for (; at < argv.length && argv[at].startsWith("-"); at += 1) {
++    if (argv[at] === "--recursive") continue;
++    if (!/^-[A-Za-z]+$/u.test(argv[at])) return null;
++    for (const letter of argv[at].slice(1)) {
++      if (letter === "r" || letter === "E") continue; // recursion is rg's default; its patterns are regular expressions already
++      if (!RG_SAME_MEANING_LETTERS.has(letter)) return null;
++      if (!letters.includes(letter)) letters.push(letter);
++    }
++  }
++  const rest = argv.slice(at);
++  if (rest.length < 2 || rest.some((word) => word.startsWith("-"))) return null;
++  if (!letters.some((letter) => "nlc".includes(letter))) letters.unshift("n");
++  return ["rg", `-${letters.join("")}`, ...rest];
++}
++
++/** @returns {string|null} one command, admitted by the grammar as written, that searches the same tree; null whenever none can be proven. */
++export function recursiveGrepHint(command, root) {
++  if (typeof command !== "string" || command.trim() === "") return null;
++  let parsed;
++  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
++  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
++    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
++  const { executable, argv } = parsed.segments[0];
++  if (String(executable).split("/").pop() !== "grep" || argv.includes("--")) return null;
++  if (!argv.some((word) => word === "--recursive" || /^-[A-Za-z]*r[A-Za-z]*$/u.test(word))) return null;
++  if (isReadOnlyDiagnosticCommand(command, root)) return null;
++  const admitted = (words) => isReadOnlyDiagnosticCommand(words.map(shellWord).join(" "), root);
++  if (!argv.includes("--exclude-dir=.git") && argv.filter((word) => word.startsWith("--exclude-dir=")).length < 8) {
++    const words = ["grep", ...argv, "--exclude-dir=.git"];
++    if (admitted(words)) return words.map(shellWord).join(" ");
++  }
++  const rg = rgSpellingOf(argv);
++  return rg !== null && admitted(rg) ? rg.map(shellWord).join(" ") : null;
++}
++
+ const NAMES_ONLY_LS_FLAGS = new Set(["-1", "-a", "-A"]);
+ 
+ /**
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+index 563bb1445..2448e4453 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+@@ -4,8 +4,11 @@ import { dirname, join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+ 
+-import { readFileSync } from "node:fs";
++import { spawnSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
+ import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint } from "./read-command-diagnosis.mjs";
++import * as diagnosis from "./read-command-diagnosis.mjs";
+ import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
+ 
+ const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+@@ -213,12 +216,14 @@ const CLUSTER_ROWS = [
+   ["grep -nA 2 needle README.md", "grep -n -A 2 needle README.md", false, true],
+   ["grep -ne needle README.md", "grep -n -e needle README.md", false, false],
+   ["grep -nf README.md README.md", "grep -n -f README.md README.md", false, false],
+-  // grep: members that are not admitted on their own (recursion, files-with-matches, perl regex, no-messages, devices)
+-  ["grep -rn needle README.md", "grep -r -n needle README.md", false, false],
++  // grep: members that are not admitted on their own (follow-recursion, perl regex, devices). QG-04, restated in place (PO decision of 2026-11-09, recursive
++  // grep behind its own screen; RCD22-RCD24): -r, -l and -s are now admitted flags, so the rows that pinned them as refused say admitted, in the cluster and
++  // spelled out alike; the rule this table pins (a cluster is never admitted where its spelled-out form is refused) is unchanged and still asserted below.
++  ["grep -rn needle README.md", "grep -r -n needle README.md", true, true],
+   ["grep -nR needle README.md", "grep -n -R needle README.md", false, false],
+-  ["grep -nl needle README.md", "grep -n -l needle README.md", false, false],
++  ["grep -nl needle README.md", "grep -n -l needle README.md", true, true],
+   ["grep -nP needle README.md", "grep -n -P needle README.md", false, false],
+-  ["grep -ns needle README.md", "grep -n -s needle README.md", false, false],
++  ["grep -ns needle README.md", "grep -n -s needle README.md", true, true],
+   ["grep -nz needle README.md", "grep -n -z needle README.md", false, false],
+   // grep: a cluster never widens the target
+   ["grep -in needle ../outside.txt", "grep -i -n needle ../outside.txt", false, false],
+@@ -253,7 +258,9 @@ test("RCD20: C22B - a refused cluster that holds a value-taking flag still print
+ test("RCD21: C22B - every runner route reaches the same cluster grammar: Claude, Codex and Antigravity guard runs and the PowerShell tool agree with the Bash verdict", async () => {
+   const guard = await import("../hooks/guard-lifecycle-ready.mjs");
+   for (const runner of ["claude", "codex", "antigravity"]) {
+-    for (const [command, exitCode] of [["rg -ln needle README.md", 0], ["grep -in needle README.md", 0], ["rg -nA 5 needle README.md", 2], ["grep -rn needle README.md", 2]]) {
++    // QG-04, restated in place (PO decision of 2026-11-09, recursive grep behind its own screen): this row pinned `grep -rn` as refused. It now uses -R,
++    // which stays refused (it follows links), so the claim of this case - every runner reaches the one grammar and agrees on a refusal - is unchanged.
++    for (const [command, exitCode] of [["rg -ln needle README.md", 0], ["grep -in needle README.md", 0], ["rg -nA 5 needle README.md", 2], ["grep -nR needle README.md", 2]]) {
+       const result = await guard.evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, {
+         projectDir: root, runner,
+         inspectProjectOnboardingV3Fn() { throw new Error("fixture: no onboarding observation"); },
+@@ -293,6 +300,146 @@ test("RCD18: the PowerShell tool admits the node and git version probes and a re
+   }
+ });
+ 
++// C22B (AC-108, PO decision 2026-11-09): recursive grep is admitted for the shapes agents type, behind its own screen (passive-read-policy.mjs, option allFiles).
++function repoFixture(t, files, links = {}) {
++  const base = realpathSync(mkdtempSync(join(tmpdir(), "grep-r-grammar-")));
++  t.after(() => rmSync(base, { recursive: true, force: true }));
++  const project = join(base, "repo");
++  mkdirSync(project);
++  for (const [path, content] of Object.entries(files)) {
++    mkdirSync(dirname(join(project, path)), { recursive: true });
++    writeFileSync(join(project, path), content);
++  }
++  for (const [path, target] of Object.entries(links)) symlinkSync(target, join(project, path));
++  return project;
++}
++const PLAIN_FILES = { "src/a.mjs": "needle\n", "src/b.md": "needle\n", "sub/dir/c.txt": "needle\n", "README.md": "needle\n" };
++const rgAvailable = spawnSync("rg", ["--version"], { encoding: "utf8" }).status === 0;
++
++test("RCD22: C22B - recursive grep: the admitted shapes, and the spellings that stay refused", (t) => {
++  const plain = repoFixture(t, PLAIN_FILES);
++  const withGit = repoFixture(t, { ...PLAIN_FILES, ".git/config": "x\n" });
++  const worktree = repoFixture(t, { ...PLAIN_FILES, ".git": "gitdir: ../w/.git/worktrees/w\n" });
++  const withDotenv = repoFixture(t, { ...PLAIN_FILES, ".env": "NEEDLE=fake\n", ".git/config": "x\n" });
++  const withKey = repoFixture(t, { ...PLAIN_FILES, "build/deploy.key": "fake\n", ".ignore": "build/\n" });
++  const admitted = [
++    "grep -rn needle src", "grep -rl needle src", "grep -rE needle src", "grep -ril needle src", "grep -rln needle src", "grep -rnw needle src",
++    "grep --recursive needle src", "grep -r needle sub/dir", "grep -rn needle src sub", "grep -rn needle README.md", "grep -r -n needle src",
++    "grep -rn --include='*.mjs' needle src", "grep -rn --include '*.mjs' needle src", "grep -rn --exclude='*.md' needle src",
++    "grep -rn --exclude-dir=sub needle src", "grep -rn needle src --exclude-dir=sub", "grep -rn needle src --include='*.mjs' --exclude='*.md'",
++    "grep -rn needle src | head -n 20", "grep -rn needle src | head -20", "grep -rn needle src | grep -v mjs",
++    "grep -rn needle src | head -n 5 && git status", "grep -rl needle src 2>/dev/null",
++    "grep -l needle README.md", "grep -ws needle README.md", "grep --files-with-matches needle README.md", "grep --word-regexp --no-messages needle README.md",
++  ];
++  for (const command of admitted) assert.equal(isReadOnlyDiagnosticCommand(command, plain), true, command);
++  // the root of a repository: .git must be excluded by name, repeated at most 8 times, and --include/--exclude relax nothing
++  assert.equal(isReadOnlyDiagnosticCommand("grep -rn needle .", plain), true, "no .git, nothing sensitive");
++  assert.equal(isReadOnlyDiagnosticCommand("grep -rn needle .", withGit), false, ".git directory");
++  assert.equal(isReadOnlyDiagnosticCommand("grep -rn needle .", worktree), false, ".git file");
++  for (const command of [
++    "grep -rn needle . --exclude-dir=.git", "grep -rn needle . --exclude-dir=.git --exclude-dir=node_modules", "grep -rn --exclude-dir=.git needle .",
++    "grep -rn --exclude-dir=.git --include='*.mjs' needle .", "grep -rn needle . --exclude-dir=.git | head -n 20",
++  ]) {
++    assert.equal(isReadOnlyDiagnosticCommand(command, withGit), true, command);
++    assert.equal(isReadOnlyDiagnosticCommand(command, worktree), true, `worktree: ${command}`);
++    assert.equal(isReadOnlyDiagnosticCommand(command, withDotenv), false, `a secret name is never relaxed: ${command}`);
++  }
++  assert.equal(isReadOnlyDiagnosticCommand("grep -rn --include='*.md' needle .", withKey), false, "--include does not relax the screen");
++  assert.equal(isReadOnlyDiagnosticCommand("grep -rn --exclude='*.key' needle .", withKey), false, "--exclude does not relax the screen");
++  assert.equal(isReadOnlyDiagnosticCommand("grep -rn --exclude-dir=.git needle .", withKey), false, "an unrelated exclusion does not relax it");
++  assert.equal(isReadOnlyDiagnosticCommand("grep -rn --exclude-dir=build needle .", withKey), true, "the named directory is pruned");
++  const eight = Array.from({ length: 8 }, (_, index) => `--exclude-dir=d${index}`).join(" ");
++  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle src ${eight}`, plain), true, "8 exclusions");
++  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle src ${eight} --exclude-dir=d8`, plain), false, "9 exclusions");
++  const refused = [
++    "grep -Rn needle src", "grep -R needle src", "grep --dereference-recursive needle src", "grep -rf README.md src", "grep -r -f README.md needle src",
++    "grep -rP needle src", "grep -rz needle src", "grep -r needle", "grep -rn", "grep -r --include='*.mjs' needle",
++    "grep -n needle src", "grep -l needle src", "grep -s needle src", "grep needle src",
++    "grep -rn --include=src/*.mjs needle src", "grep -rn --include='../*.mjs' needle src", "grep -rn --include='*.mjs/..' needle src", "grep -rn --include= needle src",
++    "grep -rn --exclude-dir=src/lib needle src", "grep -rn --exclude-dir='*' needle src", "grep -rn --exclude-dir=.. needle src", "grep -rn --exclude-dir= needle src",
++    "grep -rn --exclude-dir=. needle src", "grep -rn --exclude-dir .git needle src", "grep -rn --exclude-dir='sub/dir' needle src", "grep -rn --exclude-dir=-x needle src",
++    "grep -rn --include-dir=src needle src", "grep -rn --exclude-from=README.md needle src", "grep -rn needle src -P", "grep -rn needle src --include",
++    "grep -rn needle ~/.ssh", "grep -rn needle /etc", "grep -rn needle ../outside",
++    "grep -n needle README.md | grep -r x", "grep -n needle README.md | grep -l x", "grep -n needle README.md | grep -s x", "grep -n needle README.md | grep --include='*.md' x",
++    "grep -rn needle src | head -n 20 extra", "grep -rn needle src | cat", "grep -rn needle src > out.txt",
++  ];
++  for (const command of refused) assert.equal(isReadOnlyDiagnosticCommand(command, plain), false, command);
++  // D96 (an ordinary directory outside the project is readable): the same rule gives an outside tree to grep -r that rg already has, and the all-files
++  // screen refuses it on the same grounds as inside (a .git, a secret name). A link out of the tree is refused (see passive-read-policy.test.mjs).
++  const outsideClean = repoFixture(t, PLAIN_FILES);
++  const outsideGit = repoFixture(t, { ...PLAIN_FILES, ".git/config": "x\n" });
++  const outsideKey = repoFixture(t, { ...PLAIN_FILES, ".cache/deploy.key": "fake\n" });
++  assert.equal(isReadOnlyDiagnosticCommand(`rg -n needle ${outsideClean}`, plain), true, "baseline: rg reads an ordinary outside directory");
++  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle ${outsideClean}`, plain), true, "a clean outside tree");
++  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle ${outsideGit}`, plain), false, "an outside tree holding .git");
++  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle ${outsideGit} --exclude-dir=.git`, plain), true, "excluded by name");
++  assert.equal(isReadOnlyDiagnosticCommand(`rg -n needle ${outsideKey}`, plain), true, "baseline: the rg screen skips hidden entries and passes this tree");
++  assert.equal(isReadOnlyDiagnosticCommand(`grep -rn needle ${outsideKey}`, plain), false, "the hidden key is what grep -r reads and rg does not");
++});
++
++test("RCD23: C22B - the refusal of a recursive grep over a tree the screen rejects prints one command the grammar really admits, or nothing", (t) => {
++  assert.equal(typeof diagnosis.recursiveGrepHint, "function", "the hint function exists");
++  const withGit = repoFixture(t, { ...PLAIN_FILES, ".git/config": "x\n" });
++  const withDotenv = repoFixture(t, { ...PLAIN_FILES, ".env": "NEEDLE=fake\n", ".git/config": "x\n" });
++  const hint = (command, project) => diagnosis.recursiveGrepHint(command, project);
++  assert.equal(hint("grep -rn needle .", withGit), "grep -rn needle . --exclude-dir=.git");
++  assert.equal(hint("grep -rln needle .", withGit), "grep -rln needle . --exclude-dir=.git");
++  assert.equal(hint("grep -ri --include='*.mjs' needle .", withGit), "grep -ri '--include=*.mjs' needle . --exclude-dir=.git");
++  assert.equal(hint("grep -rn 'two words' .", withGit), "grep -rn 'two words' . --exclude-dir=.git");
++  // a secret-named file under a hidden directory cannot be excluded by name: the rg form (rg skips hidden entries by its own rule, and the rg screen
++  // admits that tree) is the other admitted spelling. A secret name at the top is refused by BOTH screens, so there is no spelling to print.
++  const withHiddenKey = repoFixture(t, { ...PLAIN_FILES, ".cache/deploy.key": "fake\n" });
++  assert.equal(hint("grep -rn needle .", withHiddenKey), rgAvailable ? "rg -n needle ." : null);
++  assert.equal(hint("grep -ril needle .", withHiddenKey), rgAvailable ? "rg -il needle ." : null);
++  assert.equal(hint("grep -rn needle .", withDotenv), null, "a .env at the top is refused by the rg screen too");
++  for (const [command, project] of [["grep -rn needle .", withGit], ["grep -rln needle .", withGit], ["grep -rn needle .", withHiddenKey]]) {
++    const printed = hint(command, project);
++    if (printed !== null) assert.equal(isReadOnlyDiagnosticCommand(printed, project), true, `a printed hint is admitted: ${printed}`);
++    assert.equal(isReadOnlyDiagnosticCommand(command, project), false, "the diagnosed command stays refused");
++  }
++  assert.equal(firstUnadmittedFlag("grep -rn needle .", withGit), null, "no single flag is the fault; the hint above carries the diagnosis");
++  for (const [command, project, why] of [
++    ["grep -rn needle src", withGit, "an admitted command"],
++    ["grep -n needle .", withGit, "not a recursive grep"],
++    ["grep -Rn needle .", withGit, "-R is refused for its own reason, no suggestion built on it"],
++    ["grep -rn needle . | head -n 3", withGit, "pipelines are not diagnosed"],
++    ["grep -rn needle . > out.txt", withGit, "redirects are not diagnosed"],
++    ["grep -rn needle ~/.ssh", withGit, "a credential operand has no admitted spelling"],
++    ["grep -rn needle . --exclude-dir=.git", withDotenv, "already excluded, and the rg form is not built from a filter"],
++    ["grep -rn -- needle .", withGit, "no suggestion after --"],
++    ["rg -n needle .", withGit, "not grep"],
++    ["", withGit, "empty"],
++    [undefined, withGit, "missing"],
++  ]) assert.equal(hint(command, project), null, `${why}: ${command}`);
++});
++
++test("RCD24: C22B - Claude, Codex and Antigravity run the same recursive-grep rule, the refusal prints the admitted spelling, and the PowerShell tool is not widened", async (t) => {
++  const guard = await import("../hooks/guard-lifecycle-ready.mjs");
++  // A governed, READY fixture: the guard enforces the closed grammar there (an ungoverned directory is not enforced at all).
++  const project = repoFixture(t, {
++    ...PLAIN_FILES, ".git/config": "x\n", "pipeline.user.yaml": "schema: pipeline.user.v3\n",
++    ".agent-pipeline/onboarding-consent.json": JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-09-29T00:00:00.000Z" }),
++  });
++  const ready = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
++  const run = (tool, command, runner = "claude") => guard.evaluateLifecycleReadyGuard({ tool_name: tool, tool_input: { command } }, {
++    projectDir: project, runner, requireProjectOnboardingReadyFn() { return ready; },
++  });
++  for (const runner of ["claude", "codex", "antigravity"]) {
++    for (const [command, exitCode] of [
++      ["grep -rn needle src", 0], ["grep -rln needle src | head -n 5", 0], ["grep -rn needle . --exclude-dir=.git", 0],
++      ["grep -rn needle .", 2], ["grep -Rn needle src", 2], ["grep -rn needle src --include=src/x", 2],
++    ]) assert.equal((await run("Bash", command, runner)).exitCode, exitCode, `${runner}: ${command}`);
++  }
++  const refused = await run("Bash", "grep -rn needle .");
++  assert.match(String(refused.stderr), /GUARD-READ-COMMAND-UNSUPPORTED/u);
++  assert.match(String(refused.stderr), /Rejected element: .*grep -rn needle \. --exclude-dir=\.git/u);
++  assert.equal((await run("PowerShell", "grep -rn needle src")).exitCode, 2, "the PowerShell tool has no grep route; the rule widens nothing there");
++  assert.equal((await run("PowerShell", "rg -n needle src")).exitCode, 0);
++  const grammar = (await import("./guard/grammar-denials.mjs")).ADMITTED_GRAMMAR_SHAPES.map((shape) => shape.spelling).join("\n");
++  assert.match(grammar, /grep -r/u, "the printed grammar list names recursive grep");
++  assert.match(grammar, /--exclude-dir/u);
++});
++
+ test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {
+   const command = "rg --hidden needle README.md";
+   assert.equal(firstUnadmittedFlag(command, root), "--hidden");
