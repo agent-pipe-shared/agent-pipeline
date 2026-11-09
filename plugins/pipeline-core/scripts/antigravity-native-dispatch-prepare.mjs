@@ -1,13 +1,35 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
+import { spawnSync } from "node:child_process";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
 
-export function prepareFromRequest(value, root = value?.root) {
+const UNTRACKED_LISTED = 5;
+
+/**
+ * LOOP-A4. `Workspace: "branch"` cuts the child's worktree from the committed HEAD, so the parent's untracked files are not in it, and a
+ * greenfield run lost a PO turn to them. Untracked and not ignored files, named before `prepared` with the step that resolves it. Information
+ * only: the guard's own check ignores untracked files on purpose, so this never refuses. [] when git cannot say. `-z` keeps a path with a space,
+ * a newline or a non-ASCII byte whole on every platform.
+ */
+function untrackedBeforeBranch(root, nativeSubagents, exceptRelativePath) {
+  if (!nativeSubagents.some((entry) => entry?.Workspace === "branch")) return null;
+  const listed = spawnSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", shell: false, timeout: 4_000, maxBuffer: 1024 * 1024 });
+  if (listed.error || listed.status !== 0) return null;
+  const files = String(listed.stdout).split("\0").filter((file) => file !== "" && file !== exceptRelativePath).sort();
+  if (files.length === 0) return null;
+  return {
+    count: files.length,
+    files: files.slice(0, UNTRACKED_LISTED),
+    step: `the branch worktree is cut from the committed HEAD and will not contain these ${files.length} untracked file(s)${files.length > UNTRACKED_LISTED ? ` (${UNTRACKED_LISTED} named)` : ""}. If the host refuses Workspace: "branch" or the child needs one of them: commit them (the ordinary commit route), add scratch-only paths to .gitignore, or move them out of the repository, then prepare again. Nothing was refused here.`,
+  };
+}
+
+export function prepareFromRequest(value, root = value?.root, { requestPath = null } = {}) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return { status: "rejected", code: "AGY-NATIVE-REQUEST-SHAPE", modelCalls: 0, launcherCalls: 0 };
   }
@@ -31,7 +53,11 @@ export function prepareFromRequest(value, root = value?.root) {
   } else {
     return { status: "rejected", code: hasBatch && hasFlat ? "AGY-NATIVE-SHAPE-MIXED" : "AGY-NATIVE-REQUEST-SHAPE", modelCalls: 0, launcherCalls: 0 };
   }
-  return prepareAntigravityNativeDispatch({ root, packets: value.packets, nativeSubagents, callShape });
+  const prepared = prepareAntigravityNativeDispatch({ root, packets: value.packets, nativeSubagents, callShape });
+  if (prepared.status !== "prepared" || !Array.isArray(nativeSubagents)) return prepared;
+  const exceptRelativePath = requestPath === null ? null : relative(root, requestPath).split(sep).join("/");
+  const untracked = untrackedBeforeBranch(root, nativeSubagents, exceptRelativePath);
+  return untracked === null ? prepared : { ...prepared, untrackedBeforeBranch: untracked };
 }
 
 function requestFromArgv(argv) {
@@ -47,7 +73,7 @@ function requestFromArgv(argv) {
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 2 || stat.size > 1024 * 1024 || realpathSync(lexical) !== lexical) return null;
     path = lexical;
   } catch { return null; }
-  try { return { root, value: JSON.parse(readFileSync(path, "utf8")) }; }
+  try { return { root, requestPath: path, value: JSON.parse(readFileSync(path, "utf8")) }; }
   catch { return null; }
 }
 
@@ -57,7 +83,7 @@ if (isDirectInvocation(import.meta.url)) {
     process.stdout.write(`${JSON.stringify({ status: "rejected", code: "AGY-NATIVE-REQUEST-JSON", modelCalls: 0, launcherCalls: 0 })}\n`);
     process.exit(2);
   }
-  const result = prepareFromRequest(selected.value, selected.root);
+  const result = prepareFromRequest(selected.value, selected.root, { requestPath: selected.requestPath });
   process.stdout.write(`${JSON.stringify(result)}\n`);
   process.exit(result.status === "prepared" ? 0 : 2);
 }
