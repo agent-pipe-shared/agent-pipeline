@@ -143,6 +143,28 @@ export function readScannerExceptions(projectDir, now = new Date()) {
 }
 
 /**
+ * Candidate 22 (CGR-10): what a scanner entry's `ruleSet` (written by security-scan.mjs for a scanner that was invoked) says really ran, on one line:
+ * the config or rule file with where it came from, a digest prefix, the rule ids when they are known, and a short description. Null without a rule set.
+ * Never contains " -- " (the separator of the status lines).
+ */
+export function ruleSetSummary(ruleSet) {
+  if (ruleSet === null || typeof ruleSet !== "object") return null;
+  const ids = Array.isArray(ruleSet.ruleIds) && ruleSet.ruleIds.length > 0
+    ? `: ${ruleSet.ruleIds.join(", ")}${Number.isInteger(ruleSet.ruleCount) && ruleSet.ruleCount > ruleSet.ruleIds.length ? ` (+${ruleSet.ruleCount - ruleSet.ruleIds.length} more)` : ""}`
+    : "";
+  const digest = typeof ruleSet.sha256 === "string" && ruleSet.sha256 !== "" ? `, sha256 ${ruleSet.sha256.slice(0, 12)}` : "";
+  const note = typeof ruleSet.description === "string" && ruleSet.description !== "" ? ` - ${ruleSet.description}` : "";
+  return `${ruleSet.ref ?? "no config resolved"} (${ruleSet.source ?? "unknown"}${digest})${ids}${note}`.replace(/ -- /gu, " - ");
+}
+
+/** One line per scanner entry for the scan output: the rule set of a scanner that ran, else the plain statement that no rules ran. */
+export function formatRuleSetLine(entry) {
+  const ran = entry?.status === "PASS" || entry?.status === "FINDINGS";
+  const summary = ran ? ruleSetSummary(entry.ruleSet) : null;
+  return `${entry?.tool ?? "unknown"}: ${ran ? (summary ?? "ran, rule set not recorded") : "no rules ran (scanner did not execute)"}`;
+}
+
+/**
  * One {element, state, reason} per security element. `scanners` is the scan evidence's scanner list (or null when there is none);
  * `enabled` maps an element to false when the calibration does not configure it. An element without an entry is "not applicable"
  * when not configured and "not executed" when configured -- no evidence never reads like a passed scan.
@@ -158,7 +180,11 @@ export function securityCloseElements({ scanners = null, enabled = {}, critical 
   };
   return SECURITY_ELEMENTS.map((element) => {
     const entry = list.find((s) => s?.tool === element);
-    if (entry) return excepted({ element, state: securityScannerState(entry, { critical }), reason: entry.reason ?? null });
+    if (entry) {
+      const state = securityScannerState(entry, { critical });
+      const rules = state === "passed" || state === "failed" ? ruleSetSummary(entry.ruleSet) : null;
+      return excepted({ element, state, reason: entry.reason ?? null, ...(rules === null ? {} : { rules }) });
+    }
     if (enabled?.[element] === false) return { element, state: "not applicable", reason: "not configured for this project" };
     return excepted({ element, state: "not executed", reason: "no scan evidence for this scanner" });
   });
@@ -177,9 +203,11 @@ export const unexcusedNotExecuted = (elements) => elements.filter((e) => e.state
 // One line per exception: never contains a newline, and the " -- " that separates the reason from the label stays unique.
 const oneLine = (value) => String(value).replace(/\s+/gu, " ").replace(/ -- /gu, " - ").trim();
 export function formatSecurityCloseStatus(elements) {
-  return elements.map(({ element, state, reason, exception }) => {
+  return elements.map(({ element, state, reason, exception, rules }) => {
     const applied = exception ? ` [named exception: ${oneLine(exception.reason)}; expires ${exception.expires}; confirmed by ${oneLine(exception.confirmedBy)}]` : "";
-    return `${element}: ${state}${applied}${reason ? ` -- ${reason}` : ""}`;
+    // Candidate 22 (CGR-10): a scanner that ran shows which rules or rule set really ran.
+    const ran = rules ? ` [rules: ${oneLine(rules)}]` : "";
+    return `${element}: ${state}${applied}${ran}${reason ? ` -- ${reason}` : ""}`;
   });
 }
 
