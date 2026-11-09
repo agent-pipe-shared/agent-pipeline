@@ -566,7 +566,7 @@ import {
   readHumanApprovalMode,
 } from "../lib/critical-human-proof-policy.mjs";
 import { chatAttributionRecord, isAttendedTerminal, requireAttendedChatGateConfirmation, runRegisteredAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
-import { authorizeCriticalActionCommand, criticalPushScratchArtifactPaths, prepareAuthorizeCriticalLine, resolvePoKeyDirectory } from "./po-human-approval.mjs";
+import { authorizeCriticalActionCommand, criticalScratchArtifactPaths, prepareAuthorizeCriticalLine, resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
@@ -4824,14 +4824,15 @@ function externalPublicJson(dir, value) {
   } catch { return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-FILE" }; }
 }
 
-// A signed push is the one critical-proof route whose human command deliberately
-// mirrors its *public* request/proof/authority into this repository's scratch/
-// directory.  The agent must not need the PO's private external key directory
-// merely to consume that proof.  This reader admits only that exact four-name
-// mirror, rejects symlinks and hard links, and pins its authority to this
-// repository's private key-directory pointer before cryptographic verification.
-// It is therefore not a general
-// in-repository-proof escape hatch, and non-push kinds remain external-only.
+// A signed push, and since C21C the acknowledgement of a caller-authored Critic, are the
+// critical-proof routes whose consumption reads the *public* request/proof/authority the
+// human command mirrored into this repository's scratch/ directory.  The agent must not
+// need the PO's private external key directory merely to consume that proof, and the PO
+// reports nothing back.  This reader admits only that exact four-name mirror of the one
+// kind, rejects symlinks and hard links, and pins its authority to this repository's
+// private key-directory pointer before cryptographic verification.  It is therefore not
+// a general in-repository-proof escape hatch, and every other kind remains external-only.
+const LOCAL_MIRROR_PROOF_KINDS = new Set(["push", CRITIC_ACKNOWLEDGEMENT_KIND]);
 function localPushScratchJson(dir, value, expectedPath) {
   if (typeof value !== "string" || !isAbsolute(value) || resolve(value) !== resolve(expectedPath)) {
     return { ok: false, code: "CRITICAL-PROOF-SCRATCH-PATH" };
@@ -4859,10 +4860,10 @@ function repoScopedPushKeyAnchor(dir, gitCommonDir) {
   } catch { return null; }
 }
 
-function localPushScratchArtifacts(dir, flags) {
+function localMirrorScratchArtifacts(dir, flags, kind) {
   const common = defaultGitCommonDir(dir);
   if (!common.ok) return null;
-  const expected = criticalPushScratchArtifactPaths(dir, common.path);
+  const expected = criticalScratchArtifactPaths(dir, common.path, kind);
   if (flags["proof-request"] !== expected.request
     || flags["proof-authority"] !== expected.authority
     || flags.proof !== expected.proof) return null;
@@ -4924,7 +4925,7 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   if (!policy.requiredKinds.has(kind) && !ALWAYS_REQUIRED_KINDS.has(kind)) {
     return required ? { ok: false, code: "CRITICAL-PROOF-POLICY-KIND-REQUIRED" } : { ok: true, proof: null };
   }
-  const local = kind === "push" ? localPushScratchArtifacts(dir, flags) : null;
+  const local = LOCAL_MIRROR_PROOF_KINDS.has(kind) ? localMirrorScratchArtifacts(dir, flags, kind) : null;
   if (local !== null && !local.ok) return local;
   const request = local?.request ?? externalPublicJson(dir, flags["proof-request"]);
   const authority = local?.authority ?? externalPublicJson(dir, flags["proof-authority"]);
@@ -9932,10 +9933,15 @@ function runApproveCriticAcknowledgement({ dir, rest, base, now, deps }) {
       const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
       const expiresAt = new Date((Date.parse(approvedAt) || Date.now()) + 3_600_000).toISOString();
       const rendered = authorizeCriticalActionCommand({ kind, repoRoot: root, featureId: base.activeFeature?.id, plan: base.activeFeature?.planPath, spec: base.continuity?.authority?.spec?.path, subjectSha256, expiresAt, criticPacket: packetId });
+      // C21C: the signing step mirrors its public artifacts to these exact scratch names, so the agent waits for the proof itself and the PO reports nothing back.
+      const mirrorCommon = defaultGitCommonDir(dir);
+      const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, kind) : null;
+      const waiting = mirror === null ? null : awaitSignatureFields({ root, proofPath: `scratch/${basename(mirror.proof)}`, subjectSha256 });
       console.log(JSON.stringify({ schema: "pipeline.critic-acknowledgement-signing.v1", status: "signature-required", code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED",
         signatureCommand: { ...rendered, kind, subjectSha256, subject, candidate, expiresAt, requiresPoApproval: true, executionBoundary: "attended-external-terminal", executed: false },
-        acknowledgeCommand: { executable: process.execPath, argv: [fileURLToPath(import.meta.url), "approve-critic-acknowledgement", "--by", "<po-name>", "--critic-packet", packetId, "--proof-request", "<proof-request>", "--proof-authority", "<proof-authority>", "--proof", "<proof>"],
-          note: "run after the PO signed: --by is the PO's own name; the three proof paths are printed by the signing step" } }));
+        ...(waiting === null ? {} : { ...waiting, afterSigning: `${waiting.afterSigning.replace("then read the next step from the same inspect readback", "then run acknowledgeCommand unchanged and the identical close command again")}` }),
+        acknowledgeCommand: { executable: process.execPath, argv: [fileURLToPath(import.meta.url), "approve-critic-acknowledgement", "--by", flags.by, "--critic-packet", packetId, "--proof-request", mirror?.request ?? "<proof-request>", "--proof-authority", mirror?.authority ?? "<proof-authority>", "--proof", mirror?.proof ?? "<proof>"],
+          note: mirror === null ? "run after the PO signed; the three proof paths are printed by the signing step" : "run unchanged once the proof is there; the three paths are the repository mirror the signing step writes" } }));
     } catch { /* the refusal below still names the missing flags */ }
     return refuse("CRITICAL-PROOF-FLAGS-PROOF-REQUIRED");
   }

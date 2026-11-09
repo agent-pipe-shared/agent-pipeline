@@ -6333,6 +6333,11 @@ test("C21B authorize-critical --kind acknowledge-caller-authored-critic --critic
     assert.deepEqual(result.candidate, CANDIDATE, "the reviewed candidate, not HEAD");
     assert.equal(result.action.subjectSha256, expected);
     assert.ok(prompts[0].includes(RESIDUAL_ROUTE_PACKET), "must show the packet");
+    // C21C: the agent consumes exactly these mirrored files, so the PO reports no path back.
+    for (const role of ["request", "proof", "authority"]) {
+      assert.match(result.paths[role], new RegExp(`scratch[\\\\/]critical-${kind}-${role}-[a-f0-9]+\\.json$`, "u"));
+      assert.ok(existsSync(result.paths[role]), `the signing step must write the ${role} mirror`);
+    }
     assert.throws(() => runHumanApproval(argv("prepare-critical", ["--subject-sha256", "e".repeat(64)]), deps()), /--subject-sha256 does not match the digest computed from the consumed Critic packet/u);
     assert.throws(() => runHumanApproval(argv("prepare-critical"), deps({ readConsumedCandidateReceiptFn: () => ({ packet: {}, receipt: { ...receipt, independence: "source-issued-origin" } }) })), /CRITIC-ACK-NOT-CALLER-AUTHORED/u);
   } finally {

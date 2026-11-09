@@ -3411,6 +3411,7 @@ function c11Findings(list) {
 // N22: the acceptance lives in a private record under the git common directory (never in the tracked state
 // file); the shared loader turns it into the lifecycle deps.
 import * as c11Readiness from "../lib/critic-verify-readiness.mjs";
+import { criticalScratchArtifactPaths } from "./po-human-approval.mjs";
 function c11PrivatePath(fx) {
   return join(fx.common, "agent-pipeline", "critic-residual-acceptance", `${fx.made.receiptSha256}.json`);
 }
@@ -3466,6 +3467,64 @@ c11Case("C21B approve-critic-acknowledgement without proof flags prints the sign
     const copied = capturedStderr(() => run([...verb, "--proof-request", inside, "--proof-authority", inside, "--proof", inside], deps));
     assert.match(copied.lines.join(" "), /CRITICAL-PROOF-EXTERNAL-PATH\)\. The three proof paths must be absolute/u);
   } finally { console.log = originalLog; fx.cleanup(); }
+});
+
+c11Case("C21C the acknowledgement signing output carries the agent's own wait and exact follow-up, and the mirrored proof is consumed with no path reported by the PO", () => {
+  const fx = c11Fixture({ findings: c11Minor });
+  const keyDir = mktempProjectDir();
+  const printed = []; const originalLog = console.log; console.log = (line) => { printed.push(String(line)); };
+  const envName = "PIPELINE_PO_APPROVAL_DIRECTORY";
+  const priorEnv = process.env[envName]; process.env[envName] = keyDir;
+  try {
+    const receipt = { ...fx.made.receipt, independence: "caller-authored-fallback" };
+    const deps = { ...fx.deps, readConsumedCandidateReceiptFn: () => ({ packet: fx.made.packet, receipt }) };
+    const verb = ["approve-critic-acknowledgement", "--by", "PO", "--critic-packet", receipt.packetId];
+    const bound = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
+    bound.continuity = { authority: { spec: { path: "specs/sprint-nova-epic/spec.md" } } };
+    writeFileSync(fx.statePathFile, JSON.stringify(bound, null, 2));
+    assert.equal(capturedStderr(() => run(verb, deps)).result, 2);
+    const out = JSON.parse(printed.at(-1));
+    assert.equal(out.reportBackRequired, false, "the PO reports nothing back on this route either");
+    assert.match(out.proofPath, /^scratch\/critical-acknowledge-caller-authored-critic-proof-[a-f0-9]+\.json$/u);
+    assert.deepEqual(out.waitAction.argv.slice(-2), ["--subject", out.signatureCommand.subjectSha256], "an older signature's mirror must not end the wait");
+    assert.match(out.afterSigning, /acknowledgeCommand/u);
+    const follow = out.acknowledgeCommand.argv;
+    assert.ok(follow.every((part) => !part.includes("<")), "the follow-up holds no placeholder");
+    assert.equal(follow[follow.indexOf("--by") + 1], "PO");
+    const signing = out.signatureCommand;
+    const request = createCriticalActionApprovalRequest({ candidate: signing.candidate, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action: { kind: "acknowledge-caller-authored-critic", subjectSha256: signing.subjectSha256, expiresAt: signing.expiresAt } });
+    const keys = generateKeyPairSync("ed25519");
+    const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
+    const authority = { keyReference: "test-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+    writeFileSync(join(keyDir, "trust-policy.json"), JSON.stringify(authority));
+    mkdirSync(join(fx.root, "scratch"), { recursive: true });
+    const at = (flag) => follow[follow.indexOf(flag) + 1];
+    writeFileSync(at("--proof-request"), JSON.stringify(request));
+    writeFileSync(at("--proof"), JSON.stringify({ schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "test-key", publicKey, signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64") }));
+    writeFileSync(at("--proof-authority"), JSON.stringify({ keyReference: "other-key", publicKeySha256: "a".repeat(64) }));
+    const foreign = capturedStderr(() => run(follow.slice(1), deps));
+    assert.equal(foreign.result, 2, foreign.lines.join(" "));
+    assert.match(foreign.lines.join(" "), /CRITICAL-PROOF-LOCAL-ANCHOR-MISMATCH/u, "a mirrored authority is pinned to the key directory before the signature is checked");
+    writeFileSync(at("--proof-authority"), JSON.stringify(authority));
+    const acknowledged = capturedStderr(() => run(follow.slice(1), deps));
+    assert.equal(acknowledged.result, 0, acknowledged.lines.join(" "));
+    assert.match(printed.at(-1), /Caller-authored Critic acknowledged by "PO"/u);
+  } finally {
+    console.log = originalLog;
+    if (priorEnv === undefined) delete process.env[envName]; else process.env[envName] = priorEnv;
+    rmSync(keyDir, { recursive: true, force: true }); fx.cleanup();
+  }
+});
+
+c11Case("C21C the repository mirror stays closed for the residual acceptance", () => {
+  const fx = c11Fixture({ findings: c11Minor });
+  try {
+    const common = spawnSync("git", ["-C", fx.root, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8" }).stdout.trim();
+    const mirror = criticalScratchArtifactPaths(fx.root, common, C11_KIND);
+    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, "--proof-request", mirror.request, "--proof-authority", mirror.authority, "--proof", mirror.proof], fx.deps));
+    assert.equal(outcome.result, 2, outcome.lines.join(" "));
+    assert.match(outcome.lines.join(" "), /CRITICAL-PROOF-EXTERNAL-PATH/u);
+  } finally { fx.cleanup(); }
 });
 
 c11Case("C21B the acknowledgement signing command names the packet and a proof for the REVIEWED candidate is accepted although HEAD has moved on", () => {
