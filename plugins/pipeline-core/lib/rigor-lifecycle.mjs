@@ -218,7 +218,11 @@ export function collectRigorJournalEntry({ rootDir, state, boundary, selectedPro
   try {
     const protectedSurface = (deps.protectedBaseline ?? resolveProtectedBaseline)({ rootDir: root });
     if (protectedSurface.status === "ready" && protectedSurface.dynamic?.status === "available") {
-      inputs.protectedIdentity = envelope(protectedSurface.identity, "available", "pipeline.protected-baseline.v1");
+      // CGR-16: the shipped baseline spells its revision as a decimal string ("1", schema type string); the accepted input needs the
+      // integer, otherwise a resolvable identity was always read as unknown. Anything but a plain positive decimal stays unknown.
+      const revision = protectedSurface.identity?.baselineRevision;
+      inputs.protectedIdentity = envelope(typeof revision === "string" && /^[1-9][0-9]{0,14}$/u.test(revision)
+        ? { ...protectedSurface.identity, baselineRevision: Number(revision) } : protectedSurface.identity, "available", "pipeline.protected-baseline.v1");
       bindings.protected = protectedSurface.identity;
       if (inputs.actualPaths.status === "available") inputs.protectedTouches = envelope(inputs.actualPaths.value.some(path =>
         protectedSurface.entries.some(entry => new RegExp(entry.pathPattern, "u").test(path))), "available", "pipeline.protected-baseline.v1");

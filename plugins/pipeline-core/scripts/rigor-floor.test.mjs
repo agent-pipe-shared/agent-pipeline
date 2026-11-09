@@ -20,6 +20,9 @@ import {
   DEFAULT_DERIVATION_REVISION
 } from "./rigor-floor.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import * as rigorModule from "./rigor-floor.mjs";
+import { collectRigorJournalEntry } from "../lib/rigor-lifecycle.mjs";
+import os from "node:os";
 
 const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../../");
 const POLICY_PATH = path.join(REPO_ROOT, "policies", "rigor-derivation.v1.json");
@@ -492,5 +495,109 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
     assert.equal(partialResult.minProfile, "feature");
     const valPartial = validateAgainstSchema(partialResult, schema);
     assert.equal(valPartial.valid, true, "Partial input derivation must satisfy schema");
+  });
+});
+
+// CGR-16 (candidate 22, w306): a greenfield floor read four of five "triggers" from ignorance. The floor itself stays fail-safe
+// (an unavailable input still escalates, and the derivation bytes are unchanged); what changes is that the readout names an
+// unknown input apart from a real trigger, and that the inputs the project state CAN answer are answered.
+describe("CGR-16: unknown inputs are named apart from real triggers, and answerable inputs are supplied", () => {
+  const HEX = "a".repeat(64);
+  const emptyRepo = () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "w306-rigor-"));
+    const git = (...args) => execFileSync("git", ["-C", dir, ...args], { stdio: "pipe" });
+    git("init", "-q");
+    git("config", "user.email", "t@example.invalid");
+    git("config", "user.name", "t");
+    fs.writeFileSync(path.join(dir, "seed.txt"), "seed\n");
+    git("add", "-A");
+    git("commit", "-q", "-m", "seed");
+    return dir;
+  };
+
+  test("rigorReadout separates unknown inputs from real triggers and leaves the derivation untouched", () => {
+    const derived = deriveMinimumRigor({
+      actualPaths: ["package.json"],
+      reversibility: { value: "high", status: "available", sourceContract: "t" },
+    }, policy);
+    const before = JSON.stringify(derived);
+    const readout = rigorModule.rigorReadout(derived);
+    assert.deepEqual(readout.triggers, ["CONTRACT_OR_SCHEMA_DELTA"]);
+    assert.ok(readout.unknownInputs.includes("protectedIdentity"));
+    assert.ok(readout.unknownInputs.includes("diffStats"));
+    assert.ok(readout.unknownInputs.every(name => !name.startsWith("UNAVAILABLE_OR_UNKNOWN_INPUT")), "names, not trigger codes");
+    assert.equal(readout.unknownInputs.length + readout.triggers.length, derived.escalationTriggers.length);
+    assert.equal(JSON.stringify(derived), before, "the hashed derivation is not changed by the readout");
+    assert.deepEqual(rigorModule.rigorReadout(null), { unknownInputs: [], triggers: [] });
+  });
+
+  test("the command readout prints unknown inputs on their own line in text; the JSON form stays the schema-bound derivation", () => {
+    const dir = emptyRepo();
+    try {
+      const inputs = path.join(dir, "inputs.json");
+      fs.writeFileSync(inputs, JSON.stringify({ actualPaths: { value: ["package.json"], status: "available", sourceContract: "t" } }));
+      const script = new URL("./rigor-floor.mjs", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/u, "$1");
+      const run = format => execFileSync(process.execPath, [script, "--root", dir, "--inputs", inputs, "--format", format], { encoding: "utf8" });
+      const parsed = JSON.parse(run("json"));
+      assert.equal(parsed.readout, undefined, "the schema forbids extra keys");
+      assert.deepEqual(rigorModule.rigorReadout(parsed).triggers, ["CONTRACT_OR_SCHEMA_DELTA"]);
+      assert.deepEqual(parsed.escalationTriggers, rigorModule.deriveMinimumRigor(JSON.parse(fs.readFileSync(inputs, "utf8")), loadPolicy(dir)).escalationTriggers);
+      const text = run("text").split(/\r?\n/u);
+      assert.ok(text.some(line => /^triggers:\s+CONTRACT_OR_SCHEMA_DELTA$/u.test(line)), text.join("\n"));
+      assert.ok(text.some(line => /^unknown inputs \(not triggers\):\s.*protectedIdentity/u.test(line)), text.join("\n"));
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("a new greenfield file set gets a measured line count instead of an unknown one (LF, CRLF, unterminated line)", () => {
+    const dir = emptyRepo();
+    try {
+      fs.mkdirSync(path.join(dir, "src"));
+      fs.writeFileSync(path.join(dir, "src", "a.js"), "one\ntwo\nthree\n");
+      fs.writeFileSync(path.join(dir, "src", "b.js"), "one\r\ntwo\r\n");
+      fs.writeFileSync(path.join(dir, "src", "c.js"), "no newline at the end");
+      fs.writeFileSync(path.join(dir, "src", "empty.js"), "");
+      const inputs = inferInputsFromRepo(dir);
+      assert.equal(inputs.diffStats.status, "available");
+      assert.deepEqual(inputs.diffStats.value, { files: 4, lines: 3 + 2 + 1 });
+      // A tracked edit is added to the untracked lines, not replaced by them.
+      fs.writeFileSync(path.join(dir, "seed.txt"), "seed\nmore\n");
+      const mixed = inferInputsFromRepo(dir);
+      assert.deepEqual(mixed.diffStats.value, { files: 5, lines: 6 + 1 });
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("an untracked file whose lines cannot be counted keeps the line count unknown", () => {
+    const dir = emptyRepo();
+    try {
+      fs.writeFileSync(path.join(dir, "blob.bin"), Buffer.from([1, 2, 0, 3]));
+      assert.equal(inferInputsFromRepo(dir).diffStats.status, "unknown", "a binary file");
+      fs.rmSync(path.join(dir, "blob.bin"));
+      fs.writeFileSync(path.join(dir, "big.txt"), "x\n".repeat(600 * 1024));
+      assert.equal(inferInputsFromRepo(dir).diffStats.status, "unknown", "a file above the read bound");
+      fs.rmSync(path.join(dir, "big.txt"));
+      fs.writeFileSync(path.join(dir, "ok.txt"), "x\n");
+      let linked = true;
+      try { fs.symlinkSync("ok.txt", path.join(dir, "link.txt")); } catch { linked = false; }
+      if (linked) assert.equal(inferInputsFromRepo(dir).diffStats.status, "unknown", "a symbolic link is never followed");
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("the protected baseline identity the resolver returns is supplied as an accepted input", () => {
+    // The shipped baseline file spells baselineRevision as the string "1" (schema type string); the input envelope needs an integer.
+    const resolved = revision => ({ status: "ready", dynamic: { status: "available", entries: [] }, entries: [],
+      identity: { baselineRevision: revision, baselineDigest: HEX, mergedDigest: "b".repeat(64) } });
+    const collect = revision => collectRigorJournalEntry({
+      rootDir: REPO_ROOT, state: { activeFeature: { id: "w306-feature", planPath: "specs/w306/plan.md" }, rigorHistory: [] },
+      boundary: "plan-submission", selectedProfile: "feature", observedAt: "2026-11-09T00:00:00.000Z",
+    }, {
+      currentCandidate: () => ({ commit: "1".repeat(40), tree: "2".repeat(40) }),
+      inferInputs: () => ({ actualPaths: { value: [], status: "available", sourceContract: "t" } }),
+      planningSurface: () => null, interruptionReport: () => ({ ok: false }), protectedBaseline: () => resolved(revision),
+    }).body.inputs.protectedIdentity;
+    const fromString = collect("1");
+    assert.equal(fromString.status, "available");
+    assert.equal(fromString.value.baselineRevision, 1);
+    assert.equal(collect(1).status, "available");
+    for (const bad of ["", "0", "01", "1.5", "x", -1, null]) assert.equal(collect(bad).status, "unknown", String(bad));
   });
 });

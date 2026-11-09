@@ -500,6 +500,46 @@ export function deriveMinimumRigor(inputs, policy = null) {
   return result;
 }
 
+const UNTRACKED_MAX_FILES = 256;
+const UNTRACKED_MAX_FILE_BYTES = 1024 * 1024;
+
+/**
+ * Total line count of untracked files, or null when any of them cannot be counted exactly. A line is a newline byte, plus one
+ * for a final unterminated line, so LF and CRLF files count alike. Never follows a link, never reads outside `root`, bounded.
+ */
+function countUntrackedLines(root, names) {
+  if (names.length === 0) return 0;
+  if (names.length > UNTRACKED_MAX_FILES) return null;
+  let total = 0;
+  for (const name of names) {
+    const parts = name.split("/");
+    if (path.isAbsolute(name) || parts.some((part) => part === "" || part === "." || part === "..")) return null;
+    try {
+      const file = path.join(root, ...parts);
+      const info = fs.lstatSync(file);
+      if (!info.isFile() || info.size > UNTRACKED_MAX_FILE_BYTES) return null;
+      const bytes = fs.readFileSync(file);
+      if (bytes.includes(0)) return null;
+      for (const byte of bytes) if (byte === 10) total += 1;
+      if (bytes.length > 0 && bytes[bytes.length - 1] !== 10) total += 1;
+    } catch { return null; }
+  }
+  return total;
+}
+
+/**
+ * CGR-16: the readout of a derivation. An escalation caused by an input nobody could observe is a precaution, not a finding about
+ * the change, so the two are listed apart. Pure projection; the derivation (and therefore its digest) is not touched.
+ */
+export function rigorReadout(result) {
+  const prefix = "UNAVAILABLE_OR_UNKNOWN_INPUT:";
+  const all = Array.isArray(result?.escalationTriggers) ? result.escalationTriggers : [];
+  return {
+    unknownInputs: all.filter((code) => code.startsWith(prefix)).map((code) => code.slice(prefix.length)),
+    triggers: all.filter((code) => !code.startsWith(prefix)),
+  };
+}
+
 /**
  * Infer inputs from working tree if no inputs file is supplied.
  *
@@ -541,15 +581,19 @@ export function inferInputsFromRepo(root, { execFileSyncFn = execFileSync, conti
   } catch { /* unknown, not empty */ }
 
   let diffStats = null;
-  if (actualPaths !== null && untrackedPaths.length === 0) {
+  if (actualPaths !== null) {
     try {
+      // CGR-16: a greenfield change is mostly untracked files, which `git diff` never counts. Their lines are counted from the
+      // files themselves; a file that cannot be counted exactly (binary, large, a link, unreadable) leaves the count unknown.
+      const untrackedLines = countUntrackedLines(root, untrackedPaths);
+      if (untrackedLines === null) throw new Error("untracked line count unavailable");
       const output = git(["diff", "--shortstat", "HEAD"]);
       if (!Buffer.isBuffer(output)) throw new Error("invalid Git stat output");
       const stat = new TextDecoder("utf-8", { fatal: true }).decode(output).trim();
       const insertions = /(?:^|,\s*)(\d+) insertions?\(\+\)/u.exec(stat);
       const deletions = /(?:^|,\s*)(\d+) deletions?\(-\)/u.exec(stat);
       if (stat && !insertions && !deletions) throw new Error("unrecognized Git stat output");
-      diffStats = { files: actualPaths.length, lines: Number(insertions?.[1] ?? 0) + Number(deletions?.[1] ?? 0) };
+      diffStats = { files: actualPaths.length, lines: Number(insertions?.[1] ?? 0) + Number(deletions?.[1] ?? 0) + untrackedLines };
     } catch { /* unknown line count */ }
   }
 
@@ -676,7 +720,10 @@ export function main() {
 
   const result = deriveMinimumRigor(rawInputs, policy);
 
+  const readout = rigorReadout(result);
   if (options.format === "json") {
+    // The JSON form is the schema-bound derivation (schemas/pipeline.rigor-derivation.v1.json forbids extra keys); a consumer
+    // that wants the split calls rigorReadout(result).
     console.log(JSON.stringify(result, null, 2));
   } else {
     console.log("Minimum Rigor Floor Derivation");
@@ -685,7 +732,9 @@ export function main() {
     console.log("derivationRevision:      " + result.derivationRevision);
     console.log("inputDigest:             " + result.inputDigest);
     console.log("requiredEvidenceClasses: " + result.requiredEvidenceClasses.join(", "));
-    console.log("escalationTriggers:      " + (result.escalationTriggers.length > 0 ? result.escalationTriggers.join(", ") : "none"));
+    console.log("triggers:                " + (readout.triggers.length > 0 ? readout.triggers.join(", ") : "none"));
+    console.log("unknown inputs (not triggers): " + (readout.unknownInputs.length > 0 ? readout.unknownInputs.join(", ") : "none")
+      + (readout.unknownInputs.length > 0 ? " (each raises the floor as a precaution until it is observed)" : ""));
     if (result.disagreementLog) {
       console.log("");
       console.log("DISAGREEMENT LOG:");
