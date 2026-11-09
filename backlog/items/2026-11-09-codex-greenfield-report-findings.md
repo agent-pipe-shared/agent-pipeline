@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-11-09
-source: forensic analysis written by the Codex greenfield run on build 0.7.0+codex.20261109080736.4b9add3, secured on PO request 2026-11-09; the report itself stays in that private consumer repository
+source: "forensic analysis written by the Codex greenfield run on build 0.7.0+codex.20261109080736.4b9add3, secured on PO request 2026-11-09; the report itself stays in that private consumer repository"
 sprint: alfred
 done_when: manual
 ---

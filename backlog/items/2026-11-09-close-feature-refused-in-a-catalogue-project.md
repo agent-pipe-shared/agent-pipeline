@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-11-09
-source: live Claude greenfield close on native Windows, build 0.7.0+claude.20261109080736.4b9add3, reported by the PO on 2026-11-09
+source: "live Claude greenfield close on native Windows, build 0.7.0+claude.20261109080736.4b9add3, reported by the PO on 2026-11-09"
 sprint: alfred
 done_when: manual
 ---
