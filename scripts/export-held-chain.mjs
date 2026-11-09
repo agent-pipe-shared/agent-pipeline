@@ -23,7 +23,8 @@ const git = (...args) => execFileSync("git", ["-C", resolve(clone), ...args], { 
 const shas = git("rev-list", "--reverse", `${base}..HEAD`).split("\n").filter(Boolean);
 if (shas.length === 0) { console.error(`no commits in ${base}..HEAD`); process.exit(1); }
 mkdirSync(outDir, { recursive: true });
-const width = String(shas.length).length;
+// At least two digits: a chain that grows past nine patches keeps its file names, so a re-export leaves no second, stale copy of each patch.
+const width = Math.max(2, String(shas.length).length);
 const steps = [];
 shas.forEach((sha, index) => {
   const number = String(index + 1).padStart(width, "0");
