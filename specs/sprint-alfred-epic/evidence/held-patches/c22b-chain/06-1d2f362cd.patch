@@ -1,0 +1,381 @@
+diff --git a/plugins/pipeline-core/lib/audit-bundle.mjs b/plugins/pipeline-core/lib/audit-bundle.mjs
+index f0d49a675691cf8e894f60e3b04de6fc185dcb86..3ec4262a3e4552ecf892e482d78685cd6224e3b4 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.mjs
+@@ -23,7 +23,16 @@ function evidenceSection(manifest) {
+   const reportText = reports.length === 0 ? "" : `\n## Critic round reports\n\nOne entry per Critic round of the feature. \`REPORT-NOT-EXPORTED\` means the round's report was never exported into the repository's tracked evidence (it lived outside the tracked tree), and \`UNREADABLE\` that the named file was missing or empty at the close: the report is NOT part of this bundle.\n\n${reports.map(line).join("\n")}\n`;
+   return `${approvalText}${reportText}`;
+ }
+-function auditorReadme(manifest) {
++// C22B (CGR-13): printed prose only, from a build input that is NOT a manifest field (the manifest and its keys are hashed by the verifier and the bindings).
++// The README digest is recorded in the manifest at build time, so the extra text is bound like the rest of the README.
++function commitSplitSection(split) {
++  if (split === undefined || split === null || typeof split !== "object") return "";
++  if (split.status === "counted" && Number.isSafeInteger(split.product) && Number.isSafeInteger(split.evidence) && Number.isSafeInteger(split.total)) {
++    return `\n## Commits of the feature range\n\nThe feature range holds ${split.product} product commit(s) and ${split.evidence} evidence commit(s) (${split.total} in total). A commit is an evidence commit when every path it touches is an administration or documentation path, a path under the feature's evidence directory or under audit-bundles, or a root evidence record; any other path (source, tests, configuration, an ADR, the spec text) makes it a product commit. The range starts at the first commit that touched the feature's directory (\`${split.rangeSource}\`). The commits themselves are unchanged; this count is printed here only and is not part of the manifest.\n`;
++  }
++  return "\n## Commits of the feature range\n\nThe commits of the feature range could not be counted at the time this bundle was built; no count is stated.\n";
++}
++function auditorReadme(manifest, commitSplit) {
+   const artifactLines = manifest.artifacts.map((artifact) => `- \`${artifact.path}\` (source: \`${artifact.sourcePath}\`, SHA-256: \`${artifact.sha256}\`)`).join("\n");
+   return `# Audit bundle: ${manifest.bundleId}
+ 
+@@ -38,7 +47,7 @@ This directory is a candidate-bound audit bundle. It contains the copied artifac
+ ## Artifacts
+ 
+ ${artifactLines}
+-${evidenceSection(manifest)}${proofsSection(manifest)}${evidenceIndexSection(manifest)}
++${evidenceSection(manifest)}${proofsSection(manifest)}${evidenceIndexSection(manifest)}${commitSplitSection(commitSplit)}
+ ## Offline verification
+ 
+ Prerequisites: Node.js and a copy of the repository containing \`plugins/pipeline-core/scripts/audit-bundle.mjs\`; no network, provider, key, or deployment access is required.
+@@ -52,6 +61,8 @@ The command exits 0 only for \`verified\` and nonzero for \`invalid\` or a comma
+ ## Assurance limits
+ 
+ This bundle is not a claim that requirements are satisfied, that a review or PO approval occurred, that deployment or a push happened, or that the candidate is suitable for release. The unsigned manifest and its hashes are not independently trusted: an actor who can replace both an artifact and the manifest can preserve internal consistency. A separate optional signature, when present and independently verified through its provider, adds cryptographic binding only; signatures are not implied by this bundle. Supporting reports and state files are evidence supplied by the producer, not intrinsically tamper-proof proof.
++
++The bundle states no independence of its own for any Critic round. Whether a round ran in a fresh context, without inherited history, is what the \`receipt.json\` exported beside that round's report records (\`freshContext\`, \`historyInherited\`, \`independence\`): a round recorded as \`caller-authored-fallback\` (freshContext false, historyInherited true) was authored by the calling agent and is not an independent review, and the report next to it must be read that way.
+ `;
+ }
+ function rootPath(root, path, code) { if (typeof path !== "string" || path.length === 0 || isAbsolute(path) || path.includes("\\")) fail(code); const target = resolve(root, path); const check = relative(root, target); if (check === "" || check === ".." || check.startsWith(`..${sep}`) || isAbsolute(check)) fail(code); return target; }
+@@ -268,14 +279,15 @@ export function planAuditBundle({ repositoryRoot, manifestPath, bundleId, coreVe
+   return Object.freeze({ schema: "pipeline.audit-bundle-plan.v1", status: "preview", bundleId, candidate: Object.freeze({ ...packageCheck.receipt.candidate }), effectivePolicy: policy, effectivePolicySha256: canonicalSha256(policy), artifacts: Object.freeze(artifacts.map((entry) => Object.freeze(entry))), ...(exportMetadata !== undefined ? { exportMetadata } : {}), ...(carried !== null ? { evidence: carried.evidence } : {}), ...(carriedProofs !== undefined ? { proofs: carriedProofs } : {}), ...(evidenceIndex !== undefined ? { evidenceIndex } : {}) });
+ }
+ 
+-export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}) {
++/** `commitSplit` (optional, C22B) is printed in the README only, never in the manifest: see commitSplitSection. */
++export async function buildAuditBundle({ repositoryRoot, outputPath, plan, commitSplit } = {}) {
+   const root = resolve(repositoryRoot ?? ""); if (!planShape(plan)) fail("AB-PLAN"); const output = rootPath(root, outputPath, "AB-OUTPUT");
+   try { await lstat(output); fail("AB-OUTPUT-EXISTS"); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+   await mkdir(output, { recursive: false }); await mkdir(join(output, "artifacts"));
+   for (const artifact of plan.artifacts) { const source = rootPath(root, artifact.sourcePath, "AB-SOURCE"); const bytes = await readFile(source); if (digest(bytes) !== artifact.sha256) fail("AB-SOURCE-DIGEST"); await copyFile(source, join(output, artifact.bundlePath)); }
+   const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}), ...(Object.hasOwn(plan, "evidence") ? { evidence: plan.evidence } : {}), ...(Object.hasOwn(plan, "proofs") ? { proofs: proofsManifest(plan.proofs) } : {}), ...(Object.hasOwn(plan, "evidenceIndex") ? { evidenceIndex: plan.evidenceIndex } : {}) };
+   if (Object.hasOwn(plan, "proofs")) { await mkdir(join(output, "proofs")); for (const entry of plan.proofs) await writeFile(join(output, entry.bundlePath), proofBytes(entry.proof), { flag: "wx", mode: 0o644 }); }
+-  const readmeBytes = Buffer.from(auditorReadme(baseManifest), "utf8");
++  const readmeBytes = Buffer.from(auditorReadme(baseManifest, commitSplit), "utf8");
+   const manifest = { ...baseManifest, readmeSha256: digest(readmeBytes) };
+   const bytes = `${canonicalizeJson(manifest)}\n`; await writeFile(join(output, "manifest.json"), bytes, { encoding: "utf8", flag: "wx", mode: 0o644 }); await writeFile(join(output, "README.md"), readmeBytes, { flag: "wx", mode: 0o644 });
+   return Object.freeze({ schema: "pipeline.audit-bundle-build-receipt.v1", status: "built", bundleId: plan.bundleId, outputPath, manifestSha256: digest(bytes), candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256 });
+diff --git a/plugins/pipeline-core/lib/audit-bundle.test.mjs b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+index c18152bedcf0c7cb58ad42ac304ceffb361419c9..c0d6e43a9828b700d28214c35975cf5e08f1d206 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.test.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+@@ -187,6 +187,28 @@ test("Q3 a missing item is a typed gap, never silently skipped", () => {
+   assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["approval-trace:gap:NOT-REFERENCED", "approval-proofs:gap:NOT-REFERENCED", "verify-record:gap:NOT-REFERENCED", "security-scan:gap:NOT-REFERENCED"]);
+   assert.equal(plan.artifacts.length, 5); assert.equal(plan.evidence.traceStatus, null);
+ });
++// C22B (CGR-13, CGF-03, AC-108): the README counts the product commits and the evidence commits of the feature range apart, from a build input that is NOT a manifest field
++// (the manifest and its keys are hashed by the verifier and the bindings), and says where the independence of a Critic round is recorded instead of restating it.
++test("C22B CGR-13 the README states product and evidence commits separately without touching the manifest, and the bundle still verifies offline", async () => {
++  const input = fixture(); const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] });
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan, commitSplit: { schema: "pipeline.close-commit-split.v1", status: "counted", base: null, rangeSource: "first-commit-touching-feature-directory", product: 3, evidence: 5, total: 8 } });
++  const readme = readFileSync(join(input.root, "bundle", "README.md"), "utf8");
++  assert.match(readme, /## Commits of the feature range/u); assert.match(readme, /3 product commit\(s\)/u); assert.match(readme, /5 evidence commit\(s\)/u);
++  const manifest = JSON.parse(readFileSync(join(input.root, "bundle", "manifest.json"), "utf8"));
++  assert.deepEqual(Object.keys(manifest).sort(), ["artifacts", "bundleId", "candidate", "effectivePolicySha256", "readmeSha256", "schema"], "no manifest field was added");
++  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle-unavailable", plan, commitSplit: { schema: "pipeline.close-commit-split.v1", status: "unavailable", reason: "git log failed" } });
++  const absent = readFileSync(join(input.root, "bundle-unavailable", "README.md"), "utf8");
++  assert.match(absent, /could not be counted/u); assert.doesNotMatch(absent, /product commit\(s\)/u, "no count is invented");
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle-plain", plan });
++  assert.doesNotMatch(readFileSync(join(input.root, "bundle-plain", "README.md"), "utf8"), /Commits of the feature range/u, "a caller that passes no split gets the README it always got, apart from the assurance sentence");
++});
++test("C22B CGF-03 the README does not restate the assurance of a Critic round: it points at the receipt of each round", async () => {
++  const input = fixture(); const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] });
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
++  const readme = readFileSync(join(input.root, "bundle", "README.md"), "utf8");
++  assert.match(readme, /freshContext/u); assert.match(readme, /caller-authored-fallback/u); assert.match(readme, /receipt\.json/u); assert.match(readme, /states no independence of its own/u);
++});
+ // C22 (CGR-12, AC-108): every Critic round report of the feature travels in the bundle; a round whose report was never exported (it lived only in a scratch directory) is a typed gap the README names.
+ test("C22 CGR-12 the bundle carries every Critic round report, names a round without a readable report, and verifies offline", async () => {
+   const input = fixture(); const [one, two, three] = ["a", "b", "c"].map((letter) => letter.repeat(32));
+diff --git a/plugins/pipeline-core/lib/close-acceptance-record.mjs b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+index e1e252abe1961e033772c37a1dcecd39183bd490..2b8ee974f5d39227cf2e13fbc8973681008970ef 100644
+--- a/plugins/pipeline-core/lib/close-acceptance-record.mjs
++++ b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+@@ -98,13 +98,28 @@ export function writeAcceptanceRecord({ root, featureId, record, now = () => new
+   return written;
+ }
+ 
+-/** The generated closed-state lines of the handover (technical close, product acceptance and push as three different facts), or null when the feature has no readable package. */
+-export function closedHandoverLines(root, featureId) {
++/**
++ * The technical-close line, read from the recorded close entry of Pipeline State (C22B, CGF-12) instead of stating "done" from memory. This text is committed in
++ * the close commit, before the freeze, the final Verify and the cleanup, so it names only what the entry records: when, by whom, the close lifecycle and the
++ * phase the State close recorded. An entry that carries none of them is named as such.
++ */
++function technicalCloseLine(entry) {
++  const recorded = typeof entry?.closedAt === "string" && entry.closedAt !== "" ? entry.closedAt : null;
++  const lifecycle = typeof entry?.coordinatorClose?.lifecycleId === "string" ? entry.coordinatorClose.lifecycleId : null;
++  const phase = typeof entry?.coordinatorClose?.phase === "string" ? entry.coordinatorClose.phase : null;
++  const by = typeof entry?.closedBy === "string" && entry.closedBy !== "" ? entry.closedBy : null;
++  const tail = "The freeze, the final Verify and the cleanup follow this text in the close and are not claimed here; it says nothing about product acceptance or push.";
++  if (recorded === null || lifecycle === null) return `**Technical close:** recorded in Pipeline State, but the entry's close time or close lifecycle is not readable here. ${tail}`;
++  return `**Technical close:** recorded in Pipeline State at \`${recorded}\`${by === null ? "" : ` by \`${by}\``}, close lifecycle \`${lifecycle}\`${phase === null ? "" : `, recorded phase \`${phase}\``}. ${tail}`;
++}
++
++/** The generated closed-state lines of the handover (technical close, product acceptance and push as three different facts), or null when the feature has no readable package. `entry` is the feature's closedFeatures entry. */
++export function closedHandoverLines(root, featureId, entry = null) {
+   if (!FEATURE.test(featureId ?? "")) return null;
+   let candidate = null; try { const value = JSON.parse(readFileSync(resolve(root, `specs/${featureId}/lifecycle.json`), "utf8"))?.candidate?.commit; candidate = typeof value === "string" ? value : null; } catch { candidate = null; }
+   const record = readAcceptanceRecord(root, featureId);
+   return [`Feature \`${featureId}\` is closed locally; its verified candidate is ${candidate === null ? "not readable from its package" : `\`${candidate}\``}, and the close commit that carries this text is the one the close then freezes as the candidate.`,
+-    "**Technical close:** done. The feature close is recorded in Pipeline State; it says nothing about product acceptance or push.",
++    technicalCloseLine(entry),
+     record === null ? "**Product acceptance:** not recorded in this feature's acceptance record; the human has not answered the acceptance question through the close."
+       : `**Product acceptance:** recorded in \`${record.path}\` for candidate \`${record.candidate}\` (an attribution record of the human's answer, not a signature); open checks: ${record.openChecks.join("; ")}.`,
+     "**Push:** not done by the close. Publication and push are separate human-gated steps."];
+diff --git a/plugins/pipeline-core/lib/close-commit-split.mjs b/plugins/pipeline-core/lib/close-commit-split.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a284faecca2cb4059b11ed1936bf8d1f52231050
+--- /dev/null
++++ b/plugins/pipeline-core/lib/close-commit-split.mjs
+@@ -0,0 +1,73 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C22B (CGR-13, AC-108): the commits of a feature's range counted as product commits and evidence commits, apart. The commits stay exactly as they are
++ * (PO decision): this only reads them. A commit is an EVIDENCE commit when every path it touches is
++ *   - an administration or documentation path of the one shared set (lib/administration-documentation-paths.mjs), or
++ *   - a path under specs/<feature>/evidence/ or audit-bundles/, or a root evidence record (evidence/ or backlog/evidence/).
++ * Any other path (source, tests, configuration, an ADR, the spec text of the feature) makes it a PRODUCT commit. A commit that touches no path (an empty
++ * commit, a merge without its own changes) counts as evidence: it changes nothing a reviewer reads.
++ *
++ * The shared set is asked through its public function and the three evidence prefixes are added here, because that function vetoes the tracked Critic export
++ * and the Critic addenda (they are Critic-carry-forward evidence there), and for this count they are evidence.
++ *
++ * The feature range: from the first commit that touched specs/<feature>/ (the feature's own directory) to HEAD. The close has no recorded base commit of its
++ * own, so the range names that source; a range that cannot be read is typed `unavailable` and never blocks a close.
++ *
++ * The result is a printed fact for the close result and the audit bundle README. It is NOT a manifest field: the manifest and its keys are hashed.
++ */
++import { spawnSync } from "node:child_process";
++import { administrationDocumentationClassOf } from "./administration-documentation-paths.mjs";
++
++export const CLOSE_COMMIT_SPLIT_SCHEMA = "pipeline.close-commit-split.v1";
++export const RANGE_SOURCE = "first-commit-touching-feature-directory";
++const FEATURE = /^[a-z][a-z0-9-]{2,63}$/u;
++const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
++
++const unavailable = (reason) => Object.freeze({ schema: CLOSE_COMMIT_SPLIT_SCHEMA, status: "unavailable", reason: String(reason).slice(0, 200) });
++
++/** True when `path` is an evidence path for the count (see the header). */
++export function isEvidencePath(path, featureId) {
++  if (typeof path !== "string" || path === "") return false;
++  return administrationDocumentationClassOf(path, { featureIds: [featureId] }) !== null
++    || path.startsWith(`specs/${featureId}/evidence/`) || path.startsWith("audit-bundles/")
++    || path.startsWith("evidence/") || path.startsWith("backlog/evidence/");
++}
++
++/** "evidence" or "product" for the paths one commit touches. */
++export function classifyCommitPaths(paths, featureId) {
++  return paths.every((path) => isEvidencePath(path, featureId)) ? "evidence" : "product";
++}
++
++/** Parses `git log --format=%x00%H --name-only` output into [{ commit, paths }]. */
++export function parseCommitPaths(output) {
++  return String(output).split("\0").filter((chunk) => chunk.trim() !== "").map((chunk) => {
++    const [commit, ...rest] = chunk.split("\n");
++    return { commit: commit.trim(), paths: rest.map((line) => line.trim()).filter((line) => line !== "") };
++  }).filter((entry) => OID.test(entry.commit));
++}
++
++/**
++ * @param {{ rootDir: string, featureId: string, head?: string, runGit?: (args: string[]) => { status: number, stdout: string } }} input
++ *   `runGit` runs git in the root and defaults to a real process; a close passes its own injectable runner.
++ */
++export function featureRangeCommitSplit({ rootDir, featureId, head = "HEAD", runGit = null } = {}) {
++  if (!FEATURE.test(featureId ?? "")) return unavailable("the feature id is not valid");
++  const git = runGit ?? ((args) => spawnSync("git", ["-C", rootDir, ...args], { encoding: "utf8", timeout: 15000 }));
++  const text = (result) => (result?.status === 0 ? String(result.stdout ?? "") : null);
++  const feature = text(git(["log", "--first-parent", "--reverse", "--format=%H", head, "--", `specs/${featureId}`]));
++  const first = feature === null ? undefined : feature.split("\n").find((line) => OID.test(line.trim()))?.trim();
++  if (first === undefined) return unavailable(feature === null ? "git log could not read the history" : `no commit touches specs/${featureId}`);
++  const parent = text(git(["rev-parse", "--verify", "--quiet", `${first}^`]))?.trim() ?? "";
++  const base = OID.test(parent) ? parent : null;
++  const listing = text(git(["-c", "core.quotepath=off", "log", "--first-parent", "-m", "--no-renames", "--name-only", "--format=%x00%H", base === null ? head : `${base}..${head}`]));
++  if (listing === null) return unavailable("git log could not read the range");
++  const counts = { product: 0, evidence: 0 };
++  for (const { paths } of parseCommitPaths(listing)) counts[classifyCommitPaths(paths, featureId)] += 1;
++  return Object.freeze({ schema: CLOSE_COMMIT_SPLIT_SCHEMA, status: "counted", rangeSource: RANGE_SOURCE, base, product: counts.product, evidence: counts.evidence, total: counts.product + counts.evidence });
++}
++
++/** One sentence for a printed text; never states a count the split does not hold. */
++export function describeCommitSplit(split) {
++  if (split?.status !== "counted") return "The commits of the feature range could not be counted.";
++  return `The feature range holds ${split.product} product commit(s) and ${split.evidence} evidence commit(s) (${split.total} in total, counted by the touched paths; the commits themselves are unchanged).`;
++}
+diff --git a/plugins/pipeline-core/lib/feature-close-audit-executor.mjs b/plugins/pipeline-core/lib/feature-close-audit-executor.mjs
+index 980973dff591d257014550863d318b943f1e0640..087f27c102531b17141edd62d2ad028c24139da9 100644
+--- a/plugins/pipeline-core/lib/feature-close-audit-executor.mjs
++++ b/plugins/pipeline-core/lib/feature-close-audit-executor.mjs
+@@ -4,6 +4,7 @@ import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readF
+ import { dirname, join, relative, resolve } from "node:path";
+ import { spawnSync } from "node:child_process";
+ import { buildAuditBundle } from "./audit-bundle.mjs";
++import { featureRangeCommitSplit } from "./close-commit-split.mjs";
+ import { canonicalizeJson } from "./governance-event.mjs";
+ import { planFeatureCloseAudit } from "./feature-close-audit-preflight.mjs";
+ import { publicationClosePaths, syncPublicationCloseDirectory } from "../scripts/publication-close-journal.mjs";
+@@ -44,7 +45,10 @@ export async function executeFeatureCloseAudit({ options, lifecycleId, expectedP
+         if (!existsSync(cursor)) mkdirSync(cursor, { mode: 0o700 });
+         if (!lstatSync(cursor).isDirectory() || lstatSync(cursor).isSymbolicLink()) throw new Error("FCA-UNSAFE-OUTPUT-PARENT");
+       }
+-      await buildAuditBundle({ repositoryRoot: root, outputPath: plan.outputPath, plan: plan.bundlePlan });
++      // C22B (CGR-13): the README states the product and evidence commits of the feature range apart. It is a read of the history at the candidate, printed in the README only
++      // (never in the plan, the manifest or the receipt), and a range that cannot be read is typed unavailable and never stops the build.
++      let commitSplit; try { commitSplit = featureRangeCommitSplit({ rootDir: root, featureId: options.featureId, head: plan.candidate.commit }); } catch { commitSplit = undefined; }
++      await buildAuditBundle({ repositoryRoot: root, outputPath: plan.outputPath, plan: plan.bundlePlan, ...(commitSplit === undefined ? {} : { commitSplit }) });
+     }
+     fault("after-build");
+     const current = await planFeatureCloseAudit(options);
+diff --git a/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs b/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
+index 3205c7c8ce114bb75a09e77c8894a51c2ad8becd..58f0cda27fc1a68527b2f27a21f75c7ede3b27fd 100644
+--- a/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
+@@ -905,6 +905,8 @@ test("(k) a course closed by a PO residual acceptance of its last round: the add
+     assert.match(first.body.message, /TASK-EARLY require a Critic and carry no matching Critic evidence/u);
+     assert.doesNotMatch(first.body.message, /TASK-ONE require|TASK-TWO require/u);
+     assert.match(first.body.message, /--critic-addendum <request\.json> once for EACH uncovered record/u);
++    // C22B (LOOP-A3, AC-108): the hand route is named as the exception it is, because the close writes every addendum that exactly one consumed receipt covers.
++    assert.match(first.body.message, /the close writes the addendum itself for every record that exactly one consumed Critic receipt covers/u);
+     w9CommitPaths(root, first.body.criticAddenda.commitPaths, "chore(evidence): bind the Critic course to the delivery records");
+     const before = w9Status(root);
+     const second = session.planPrepared();
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 6d1e58a6e6a740d05e172c1b7eacfe9f6e836a59..4ad882a4d7e3a77bdace03f7122e93f97199f482 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -618,7 +618,7 @@ function assertCourseCriticEvidence(root, feature, { audited, deriveAddenda = fa
+       const reasons = coverage.readFindings.filter((finding) => ids.some((id) => finding.includes(id))).slice(0, 3)
+         .map((finding) => (finding.length > 300 ? `${finding.slice(0, 300)}...` : finding));
+       const why = reasons.length > 0 ? ` (${reasons.join("; ")})` : "";
+-      return (`feature close preparation is blocked: ${ids.join(", ")} require a Critic and carry no matching Critic evidence${why}; repair: if a passed, consumed Critic receipt already covers the record (its own task id, or a feature-wide Critic course whose reviewed range contains the record's commit), write the byte-bound addendum with node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json> once for EACH uncovered record (one addendum file per record; the request file is the pipeline.critic-disposition-addendum.v1 object; see the close-feature skill), then plan the transition again; a failed receipt never binds without a PO residual acceptance of its minor findings (the PO's own attended step: node <plugin-root>/scripts/pipeline-state.mjs approve-residual-acceptance --by <name> --critic-packet <packet-id>), and a course closed by a residual acceptance covers the records of all its registered rounds when the addendum names the course's last round (its criticPacketId and reviewCandidateCommit are that round's); otherwise run the Critic dispatch for each of them, then write the addendum the same way; follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate; no round cap since D190/D199; a further correction-diff Critic round is always allowed`);
++      return (`feature close preparation is blocked: ${ids.join(", ")} require a Critic and carry no matching Critic evidence${why}; repair: if a passed, consumed Critic receipt already covers the record (its own task id, or a feature-wide Critic course whose reviewed range contains the record's commit), write the byte-bound addendum with node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <repo-root> --critic-addendum <request.json> once for EACH uncovered record (one addendum file per record; the request file is the pipeline.critic-disposition-addendum.v1 object; see the close-feature skill), then plan the transition again; a failed receipt never binds without a PO residual acceptance of its minor findings (the PO's own attended step: node <plugin-root>/scripts/pipeline-state.mjs approve-residual-acceptance --by <name> --critic-packet <packet-id>), and a course closed by a residual acceptance covers the records of all its registered rounds when the addendum names the course's last round (its criticPacketId and reviewCandidateCommit are that round's); otherwise run the Critic dispatch for each of them, then write the addendum the same way; follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate; no round cap since D190/D199; a further correction-diff Critic round is always allowed; the hand-written route above is the exception, not the default: the close writes the addendum itself for every record that exactly one consumed Critic receipt covers (it tries that when the transition is planned, so the ids named here are ones it could not derive: no consumed receipt covers them, several do, or a read failed), so write one by hand only for a record the close left in this list`);
+     };
+     // D223 (slice 2): only plan-transition derives; apply-transition re-runs this check and must stay a pure check.
+     const derived = deriveAddenda ? deriveCriticAddenda(root, coverage.requiredTaskIds) : { written: [], commitPaths: [] };
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index aedacd14efc3d15515aedba828287d98da30f7b7..40f04ab5e66e1d875abe7e39a6a98bd992173b1f 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -18,6 +18,7 @@ import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../li
+ import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+ import { acceptanceQuestion, acceptanceTarget, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
+ import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
++import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
+ import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
+ 
+ const HERE = new URL(".", import.meta.url);
+@@ -529,7 +530,15 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     phase = "closed-local";
+   }
+   if (phase === "closed-local" || phase === "delivered" || phase === "release-eligible" || phase === "promoted") {
+-    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, ...pushEvidenceStep(closedFeatureId), message: "The feature is closed locally. Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init." });
++    // C22B (CGR-13, CGF-12): the commits of the feature range counted by kind (the commits themselves stay as they are), and the three statuses read from what exists: the coordinator's phase, the acceptance
++    // record and the fact that this close never pushes. Neither can block the close: a count that cannot be read is typed unavailable.
++    let commits; try { commits = featureRangeCommitSplit({ rootDir: root, featureId: closedFeatureId, runGit: (args) => runner("git", args) }); } catch { commits = { schema: CLOSE_COMMIT_SPLIT_SCHEMA, status: "unavailable", reason: "the range could not be read" }; }
++    let acceptance = null; try { acceptance = readAcceptanceRecord(root, closedFeatureId); } catch { acceptance = null; }
++    const closeStatus = { technicalClose: { status: phase, source: "close coordinator phase" },
++      productAcceptance: acceptance === null ? { status: "not-recorded", source: "the feature's acceptance record" } : { status: "recorded", candidate: acceptance.candidate, openChecks: acceptance.openChecks, source: acceptance.path },
++      push: { status: "not-done-by-the-close", source: "the close never pushes; publication and push are separate human-gated steps" } };
++    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, commits, ...pushEvidenceStep(closedFeatureId),
++      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. ${describeCommitSplit(commits)} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
+   }
+   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
+ }
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 55c8e86e3670e6796f39a0e3e8cfddcbe9746f12..bdbbca011f9311a87596537eb6d3ad2978605c1b 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -842,3 +842,78 @@ test("G20-66: every close stage that writes protected files arms the commit of e
+     assert.equal(stale.admitted, false); assert.match(stale.stale.rerun, /finish-feature\.mjs/);
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
++
++// ---- C22B (AC-108): the close reports product and evidence commits of the feature range apart, and its status comes from receipts ----
++// CGR-13 (PO decision: the commits stay as they are): a commit is an evidence commit when every path it touches is an administration/documentation path of the
++// shared path set, a path under specs/<feature>/evidence/ or audit-bundles/, or a root evidence record; any other path (source, an ADR, the spec text) makes it a product commit.
++function commitFile(f, path, text, message) { mkdirSync(dirname(join(f.root, path)), { recursive: true }); writeFileSync(join(f.root, path), text); f.git("add", "-A"); f.git("commit", "-q", "-m", message); }
++function closedLocalFixture() {
++  const f = oneShotFixture({ closed: true, startPhase: "cleanup-complete" });
++  f.resumed = { ...f.input, criticPacketId: null, resumeLifecycleId: "lc-1" };
++  return f;
++}
++test("C22B CGR-13: closed-local counts the product commits and the evidence commits of the feature range separately, by the touched paths", () => {
++  const f = closedLocalFixture();
++  try {
++    // the baseline commit (state file and the feature's result.md) is the first commit that touches specs/feature-abc: an evidence commit
++    commitFile(f, "src/app.mjs", "export const a = 1;\n", "feat: product");
++    commitFile(f, "specs/feature-abc/evidence/run.json", "{}\n", "chore: evidence record");
++    commitFile(f, "docs/guide.md", "# guide\n", "docs: a guide");
++    commitFile(f, "docs/adr/0002-choice.md", "# decision\n", "docs: an ADR is a decision, so content");
++    commitFile(f, `specs/feature-abc/evidence/critic/${"b".repeat(32)}/report.md`, "# report\n", "chore: critic export");
++    commitFile(f, "audit-bundles/feature-abc/x/README.md", "# bundle\n", "chore: bundle");
++    mkdirSync(join(f.root, "specs/feature-abc/evidence"), { recursive: true }); writeFileSync(join(f.root, "specs/feature-abc/evidence/mixed.json"), "{}\n"); commitFile(f, "src/b.mjs", "export const b = 2;\n", "feat: product plus evidence in one commit");
++    const done = oneShotClose(f.resumed, { runCommand: f.runner });
++    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
++    assert.equal(done.commits.schema, "pipeline.close-commit-split.v1");
++    assert.deepEqual([done.commits.product, done.commits.evidence, done.commits.total], [3, 5, 8], JSON.stringify(done.commits));
++    assert.equal(typeof done.commits.rangeSource, "string", "the range names where its base came from");
++    assert.match(done.message, /3 product commit\(s\) and 5 evidence commit\(s\)/u);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C22B CGR-13: a range that cannot be read is typed unavailable and never blocks the close", () => {
++  const f = closedLocalFixture();
++  try {
++    const runner = (executable, argv) => (executable === "git" && argv[0] === "log" ? { status: 128, stdout: "", stderr: "fatal" } : f.runner(executable, argv));
++    const done = oneShotClose(f.resumed, { runCommand: runner });
++    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
++    assert.equal(done.commits.status, "unavailable"); assert.equal(typeof done.commits.reason, "string");
++    assert.equal(done.commits.product, undefined, "no count is invented");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C22B CGF-12: the closed-local status separates product acceptance, technical close and push and reads the acceptance from its record", () => {
++  const f = closedLocalFixture();
++  try {
++    const none = oneShotClose(f.resumed, { runCommand: f.runner });
++    assert.equal(none.status, "closed-local", JSON.stringify(none).slice(0, 400));
++    assert.deepEqual(Object.keys(none.closeStatus).sort(), ["productAcceptance", "push", "technicalClose"]);
++    assert.equal(none.closeStatus.technicalClose.status, "closed-local");
++    assert.equal(none.closeStatus.productAcceptance.status, "not-recorded");
++    assert.equal(none.closeStatus.push.status, "not-done-by-the-close");
++    const head = f.git("rev-parse", "HEAD").trim();
++    writeFileSync(join(f.root, "specs/feature-abc/acceptance.md"), applyAcceptanceSection(null, renderAcceptanceSection({ candidate: head, answer: "accepted", openChecks: ["device check"] })));
++    const recorded = oneShotClose(f.resumed, { runCommand: f.runner });
++    assert.equal(recorded.closeStatus.productAcceptance.status, "recorded"); assert.equal(recorded.closeStatus.productAcceptance.candidate, head);
++    assert.deepEqual(recorded.closeStatus.productAcceptance.openChecks, ["device check"]);
++    assert.match(recorded.message, /Technical close: closed-local\. Product acceptance: recorded\. Push: not done by the close\./u);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C22B CGF-12: the handover's technical-close line is read from the recorded close entry, never stated as done from memory", () => {
++  const dir = realpathSync(mkdtempSync(join(tmpdir(), "closed-handover-receipt-")));
++  try {
++    mkdirSync(join(dir, "docs")); mkdirSync(join(dir, "specs/feature-abc"), { recursive: true });
++    writeFileSync(join(dir, "docs/state.md"), "# State\n\n## Current state\n\nFeature `feature-abc` is active in implementation.\n");
++    writeFileSync(join(dir, "specs/feature-abc/lifecycle.json"), `${JSON.stringify({ candidate: { commit: "c".repeat(40), tree: "d".repeat(40) }, artifacts: [] })}\n`);
++    const entry = { id: "feature-abc", closedBy: "PO", closedAt: "2026-11-09T09:00:00.000Z", coordinatorClose: { lifecycleId: "lc-1", phase: "feature-close-prepared" } };
++    syncPublicCurrentState(dir, { schema: "pipeline.state.v0", closedFeatures: [entry] }, "docs/state.md", "2026-11-09T10:00:00.000Z");
++    const line = readFileSync(join(dir, "docs/state.md"), "utf8").split("\n").find((text) => text.startsWith("**Technical close:**"));
++    assert.ok(line.includes("2026-11-09T09:00:00.000Z") && line.includes("lc-1") && line.includes("feature-close-prepared"), line);
++    assert.doesNotMatch(line, /\bdone\b/u, "the close continues to freeze, final Verify and cleanup after this text is committed, so it is not claimed as done");
++    const bare = { id: "feature-abc", closedBy: "PO" };
++    syncPublicCurrentState(dir, { schema: "pipeline.state.v0", closedFeatures: [bare] }, "docs/state.md", "2026-11-09T10:00:00.000Z");
++    assert.match(readFileSync(join(dir, "docs/state.md"), "utf8"), /^\*\*Technical close:\*\* .*not readable/mu, "an entry without a readable close time is named, not papered over");
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 981729f79df049f292c9af6c2eb2cffa01365c68..d4830f79a5972f5caf706ac8475e76c64970a19f 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11662,7 +11662,7 @@ export function syncPublicCurrentState(dir, state, handoverPath, nowIso) {
+   // C22 (CGF-12, CGF-29): with no active feature and a closed one, the section states the closed-local state, the candidate and, as three different facts, the technical close, the product acceptance and the push
+   // (generated lines between their own markers, from the feature's package and acceptance record). The stale "is active in <phase>" sentence of that feature goes; a new active feature removes the block.
+   const closedId = !active && /^[a-z][a-z0-9-]{2,63}$/u.test(state?.closedFeatures?.at?.(-1)?.id ?? "") ? state.closedFeatures.at(-1).id : null;
+-  const closedLines = closedId === null ? null : closedHandoverLines(dir, closedId);
++  const closedLines = closedId === null ? null : closedHandoverLines(dir, closedId, state.closedFeatures.at(-1));
+   const cr = markdown.includes("\r\n") ? "\r" : "";
+   const sectionLines = lines.slice(start + 1, end); const blockFrom = sectionLines.findIndex(line => line.trim() === CLOSED_BLOCK_BEGIN);
+   const blockTo = blockFrom < 0 ? -1 : sectionLines.findIndex((line, index) => index > blockFrom && line.trim() === CLOSED_BLOCK_END);

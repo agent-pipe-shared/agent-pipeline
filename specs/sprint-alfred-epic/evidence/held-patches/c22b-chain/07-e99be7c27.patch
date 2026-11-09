@@ -1,0 +1,53 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 1e3aa880c29616915018fc5cb1f89f21e5e2dd5f..3320bc00a11f854aad33ab8f036210ed5c88fd9a 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -576,6 +576,15 @@ It is imported by kernel modules and executes in their process, so a corrupted
+ copy could report a missing model as usable; it is protected through both anchors
+ like the modules above.
+ 
++The Candidate 22 closure repair additionally protects
++`lib/push-threat-model-materialize.mjs`, `lib/close-acceptance-record.mjs`,
++`scripts/repository-freshness.mjs`, `lib/generated-artefact-schema.mjs`,
++`lib/architecture-verdict-label.mjs`, `lib/critic-route-assurance.mjs`, and
++`scripts/repository-mode-promote.mjs`. Each is imported by a kernel module and
++executes in its process; the last one holds the byte rule by which the generated
++pre-commit hook admits the one `repositoryMode` promotion. They are protected
++through both anchors like the modules above.
++
+ The approved design-flow closure additionally protects, in kernel-array order,
+ `lib/design-approval-binding.mjs`, `lib/design-consistency-check.mjs`,
+ `lib/design-review-receipt.mjs`, `lib/design-review-receipt-write-guard.mjs`
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+index ba7c2433139ef448f70e72424019f8b3ebe41d6a..301ff1636724cd86f98681bd290a5b7c0cc25499 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+@@ -308,6 +308,9 @@ const DYNAMIC_IMPORT_EDGES = {
+     // calibration-verify-commit-transition library whether the transition is ready (a second call site of that edge).
+     "node:fs",
+     "../lib/calibration-verify-commit-transition.mjs",
++    // Candidate 22 (CGR-19): the staged repositoryMode promotion is compared with the writer's own byte rule (one edge) and reads the tree (one builtin load).
++    "./repository-mode-promote.mjs",
++    "node:fs",
+   ],
+   "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs": [
+     "../lib/commit-message-policy.mjs",
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index f79aabc588f3bce0f419ef6f69cbbb6afd049e7e..0bfaf5ebfcb581c74cf042d4baea665535ea9b74 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -509,6 +509,14 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/runbook-link.mjs",
+   // Candidate 19 (D4a): the push threat model decision is imported by pipeline-state.mjs and push-prepare.mjs (kernel above) and by the close coordinator.
+   "plugins/pipeline-core/lib/push-threat-model-gate.mjs",
++  // Candidate 22 closure repair (GMWKC01): modules that kernel files import since the candidate 22 chain and its follow-up build.
++  "plugins/pipeline-core/lib/push-threat-model-materialize.mjs",
++  "plugins/pipeline-core/lib/close-acceptance-record.mjs",
++  "plugins/pipeline-core/scripts/repository-freshness.mjs",
++  "plugins/pipeline-core/lib/generated-artefact-schema.mjs",
++  "plugins/pipeline-core/lib/architecture-verdict-label.mjs",
++  "plugins/pipeline-core/lib/critic-route-assurance.mjs",
++  "plugins/pipeline-core/scripts/repository-mode-promote.mjs",
+   // Candidate 19c closure repair (found by the kernel closure suite on the whole chain): the shared seal reader that continuity-state,
+   // onboarding-continuity, plan-spec-state-v2, po-gate-authority-read and critical-action-authorization-read import; the carry-forward
+   // reader (and the decision and gitleaks adapter it imports) that push-prepare and the pre-push hook load; the EPERM retry that the three

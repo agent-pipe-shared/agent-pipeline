@@ -1,0 +1,154 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index a43c21f7d85848101802ce1547920479c827940f..a59ad10b9f258d36f4edeafbae02bff72667bf55 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -1274,7 +1274,8 @@
+         "caseIds": [
+           "NGHS06",
+           "NGHS07",
+-          "NGHS08"
++          "NGHS08",
++          "NGHS09"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/plugins/pipeline-core/hooks/post-compact-reground.mjs b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+index 5b54aadb07766e80238e508e82dc61fb5c49d9b9..c6fa138357cdcd8566d7bba4383fedfea43faffb 100644
+--- a/plugins/pipeline-core/hooks/post-compact-reground.mjs
++++ b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+@@ -36,7 +36,7 @@ import { isAbsolute, resolve } from "node:path";
+ import { liveSlices } from "../lib/fanout-ledger.mjs";
+ import { resolveFanoutConfig } from "../lib/fanout-governor.mjs";
+ import { loadSliceQueue, readyAndLive } from "../lib/slice-queue.mjs";
+-import { resolveGovernedItemQueue, inspectNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
++import { resolveGovernedItemQueue, inspectNativeGoldfishItemDelivery, itemDeliveryUnobservedLine } from "../lib/native-goldfish-host-state.mjs";
+ 
+ const FANOUT_MAX_RECORD_BYTES = 1024 * 1024;
+ const FANOUT_SLICE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+@@ -348,7 +348,7 @@ export function decideOutput(input, state, { rootDir = null, env = process.env }
+       const ownership=inspectNativeGoldfishItemDelivery({root:rootDir});
+       message+=ownership.status==='observed'
+         ? `\nItem delivery: ${ownership.items.slice(0,10).map(item=>`${item.itemId} owner ${item.dispatchId} ${item.phase} pending ${item.pendingSha256}${item.checkpoint?` declared ${item.checkpoint.declaredPhase}; remaining ${item.checkpoint.remainingClauses.join(",")||"none declared"}; context ${item.checkpoint.contextPaths.join(",")||"none declared"}`:""}`).join('; ')||'no active owners'}${ownership.items.length>10?' (additional owners retained)':''}. Resume these owners; terminal returns do not authorize a replacement.`
+-        : `\nItem delivery: ${ownership.code}; ownership readback required before productive admission.`;
++        : `\n${itemDeliveryUnobservedLine(ownership.code)}`;
+     }
+   }
+   const measurement = measureBootstrapPayload(message, { mode: "compact" });
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state-regression.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state-regression.test.mjs
+index 4691e12be6ffcf148e9532ce67b23a66c84c6cb2..4495d22df651b0206b553d9de9f0ac820a1d2d43 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state-regression.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state-regression.test.mjs
+@@ -5,7 +5,7 @@ import { tmpdir, devNull } from "node:os";
+ import { join } from "node:path";
+ import { spawnSync } from "node:child_process";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+-import { bindNativeCodexStart, prepareNativeGoldfishHostState,
++import { bindNativeCodexStart, itemDeliveryUnobservedLine, prepareNativeGoldfishHostState,
+   readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
+ import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
+ 
+@@ -111,6 +111,12 @@ const cases = [
+     assert.equal(readNativeCodexPending({ commonDir, input: { hook_event_name: "SubagentStop",
+       session_id: "session-ambiguous-worker", agent_id: "child-ambiguous" } }).code, "NGHS-CODEX-PENDING-MISSING");
+   }) },
++  { id: "NGHS09", name: "an absent registry reads as nothing blocked, every other readback failure keeps asking for the ownership readback", run: () => {
++    const absent = itemDeliveryUnobservedLine("SQ-ITEM-REGISTRY-UNAVAILABLE");
++    assert.match(absent, /next governed dispatch creates it; nothing is blocked/u);
++    assert.doesNotMatch(absent, /readback required|SQ-ITEM-REGISTRY-UNAVAILABLE/u);
++    assert.equal(itemDeliveryUnobservedLine("SDC-AUTHORITY-UNAVAILABLE"), "Item delivery: SDC-AUTHORITY-UNAVAILABLE; ownership readback required before productive admission.");
++  } },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 1ca73d5f233e89c970e78685b1268edffad57a4d..288687e406d4849ec8c68bcc24de1bddd1bc130e 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -1296,6 +1296,13 @@ export function completeNativeGoldfishAuthority({repository:given,terminalHandle
+   });
+ }
+ 
++/** The re-grounding line for a readback that observed no owners. The first governed dispatch creates the registry (D44), and a plugin update or a repair moves it aside, so its absence blocks nothing. */
++export function itemDeliveryUnobservedLine(code){
++  return code==='SQ-ITEM-REGISTRY-UNAVAILABLE'
++    ?'Item delivery: no session-authority registry exists yet, so no owner is recorded. The next governed dispatch creates it; nothing is blocked.'
++    :`Item delivery: ${code}; ownership readback required before productive admission.`;
++}
++
+ /** Bounded readback; producer references come from the actual authority owner. */
+ export function inspectNativeGoldfishItemDelivery({root}={}) {
+   try {
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+index f066e945f3dc48d20089bae2aafab9fb9159c0b2..1359d9709ee60bb4cf68e4e0d8be3dadd50d767f 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+@@ -401,16 +401,6 @@ async function locateKeyDirectory(rootDir, signingDeps) {
+   return { directory: null, legacy: false, invalid: null };
+ }
+ 
+-const CLOUD_SYNC_SEGMENTS = Object.freeze([[/^onedrive/iu, "OneDrive"], [/^dropbox/iu, "Dropbox"], [/^icloud ?drive$/iu, "iCloud"], [/^mobile documents$/iu, "iCloud"], [/^google ?drive$/iu, "Google Drive"], [/^cloudstorage$/iu, "a macOS cloud provider"]]);
+-
+-/** The sync provider whose folder holds `directory`, by path segment, or null. Exported for its test. */
+-export function cloudSyncProvider(directory) {
+-  for (const segment of String(directory).split(/[\\/]/u)) {
+-    for (const [pattern, provider] of CLOUD_SYNC_SEGMENTS) if (pattern.test(segment)) return provider;
+-  }
+-  return null;
+-}
+-
+ /** One signing-readiness observation per report, shared by the three signing findings. */
+ function observeSigning(context) {
+   context.signing ??= (async () => {
+@@ -427,12 +417,8 @@ function observeSigning(context) {
+       byId.set("po-key-directory", located.invalid ?? approval.keyDirectoryUnsetFinding());
+       byId.delete("trust-anchor-match");
+     }
+-    // Claude greenfield report: the private key sat in a cloud-synced folder and nothing said so. This report never gates and never reaches
+-    // sign-intent, so a warning here cannot stop a signature. Only the provider is named, the path stays unprinted.
+-    const provider = located.directory === null ? null : cloudSyncProvider(located.directory);
+-    if (provider !== null && byId.get("po-key-directory")?.status === "ok") {
+-      byId.set("po-key-directory", { findingId: "po-key-directory", status: "attended", cause: `key-directory-cloud-synced: the PO key directory lies in a folder synchronised by ${provider}, so the private key leaves this machine`, repair: attendedPrerequisite("po-key-directory-local", "move the key directory to a local folder outside any synchronised location, point the PO key directory at it in your own terminal, then re-run the readiness report.") });
+-    }
++    // PO decision 2026-11-09: a key directory in a synchronised folder is fine; the requirement is only that it lies outside the repository
++    // (enforced by po-human-approval.mjs), so this report no longer warns about the folder.
+     return byId;
+   })();
+   return context.signing;
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+index e9b6c4f94f880b721932073dcb2642677d5e0c9e..76a6bc564c53e6de1f30bbce7b40066a5ad01318 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+@@ -782,16 +782,9 @@ check("R7-6n: an invalid legacy per-repository store is a failure, never absent"
+     rmSync(base, { recursive: true, force: true, maxRetries: 3 });
+   }
+ });
+-check("CGR-04: a synchronised folder is named by its provider, an ordinary folder by nobody", async () => {
+-  const { cloudSyncProvider } = await import("./toolchain-preflight.mjs");
+-  assert.equal(cloudSyncProvider(join("C:", "Users", "someone", "OneDrive - Contoso", "keys")), "OneDrive");
+-  assert.equal(cloudSyncProvider("/home/someone/Dropbox/keys"), "Dropbox");
+-  assert.equal(cloudSyncProvider("/Users/someone/Library/Mobile Documents/keys"), "iCloud");
+-  assert.equal(cloudSyncProvider("/home/someone/Google Drive/keys"), "Google Drive");
+-  assert.equal(cloudSyncProvider("/home/someone/.config/po-keys"), null);
+-  assert.equal(cloudSyncProvider("/home/someone/my-onedrive-notes/keys"), null, "only a segment that starts with the provider counts");
+-});
+-check("CGR-04: a key directory in a synchronised folder is reported without its path and without a sign-intent effect; the same directory elsewhere stays as it was", async () => {
++// QG-04, restated 2026-11-09 by PO decision: a key directory in a synchronised folder is fine, only "outside the repository" is required. The former
++// provider-name case and the `attended` expectation pinned the withdrawn warning.
++check("CGR-04: a key directory in a synchronised folder reads the same as anywhere else outside the repository", async () => {
+   const base = mkdtempSync(join(tmpdir(), "cgr04-"));
+   const savedEnv = process.env[R76J_ENV];
+   try {
+@@ -806,11 +799,9 @@ check("CGR-04: a key directory in a synchronised folder is reported without its
+     const report = await r76tReport(fixture);
+     const finding = report.findings.find((entry) => entry.findingId === "po-key-directory");
+     if (plainFinding.status === "ok") {
+-      assert.equal(finding.status, "attended", JSON.stringify(finding));
+-      assert.match(String(finding.cause), /^key-directory-cloud-synced/u);
+-      assert.match(String(finding.cause), /OneDrive/u);
++      assert.equal(finding.status, "ok", JSON.stringify(finding));
++      assert.doesNotMatch(JSON.stringify(finding), /cloud-synced/u);
+       assert.doesNotMatch(JSON.stringify(finding), /Contoso/u, "the machine path stays unprinted");
+-      assert.equal(finding.repair?.prerequisite, "po-key-directory-local");
+     } else {
+       assert.fail(`the fixture must be ok outside the synchronised folder, got ${plainFinding.status}: ${String(plainFinding.cause).slice(0, 120)}`);
+     }

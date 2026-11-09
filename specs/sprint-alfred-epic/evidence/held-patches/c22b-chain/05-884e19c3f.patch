@@ -1,0 +1,559 @@
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+index 0e8782fb8de1555df56b96b681eb8dee91c1639d..c7728ab54771711ca94d568df154b9d0a9e31e14 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs
+@@ -662,6 +662,53 @@ function sanctionedLateVerifyRecoveryPaths(projectRoot, paths) {
+   return establishedImplementationState(state) ? new Set(VERIFY_CALIBRATION_PATHS) : new Set();
+ }
+ 
++/** Raw bytes of a blob (no decoding, so CRLF, a BOM and any byte sequence stay exact), or null when git cannot read it. */
++function gitBlob(projectRoot, revSpec) {
++  const result = spawnSync("git", ["cat-file", "blob", revSpec], { cwd: projectRoot, timeout: 15000, maxBuffer: 1048577 });
++  return result.status === 0 && Buffer.isBuffer(result.stdout) ? result.stdout : null;
++}
++
++/** The git file mode of a path in HEAD or in the index (stage 0), or null. */
++function gitEntryMode(projectRoot, path, staged) {
++  const result = git(staged ? ["ls-files", "--stage", "--", path] : ["ls-tree", "HEAD", "--", path], projectRoot);
++  const lines = result.status === 0 ? (result.stdout ?? "").split("\\n").filter(Boolean) : [];
++  if (lines.length !== 1) return null;
++  const parts = lines[0].split(" ");
++  if (staged ? parts[2]?.charAt(0) !== "0" : parts[1] !== "blob") return null;
++  return parts[0] === "100644" || parts[0] === "100755" ? parts[0] : null;
++}
++
++/**
++ * C22B (AC-108 closest criterion), CGR-19 (PO decision): the ONE calibration change admitted without a signature is repositoryMode local-only ->
++ * remote-tracked as written by plugins/pipeline-core/scripts/repository-mode-promote.mjs. This is a stateless byte comparison of the staged
++ * content against HEAD (no journal, no capability, no store): every staged path is a calibration twin, every existing twin is staged (so the pair
++ * cannot drift, PA-CALIBRATION-DRIFT), a remote is configured, and each staged twin equals the writer's own byte rule applied to its HEAD content
++ * with an unchanged file mode. Anything else -- another field, whitespace, the reverse direction, host-managed, one twin, no remote -- returns an
++ * empty set and the ordinary GS-10/GS-11 refusal stands. Fail closed: an unreadable input or an unloadable rule module admits nothing.
++ */
++async function repositoryModePromotionPaths(projectRoot, paths) {
++  if (paths.length === 0 || !paths.every((path) => VERIFY_CALIBRATION_PATHS.includes(path))) return new Set();
++  let promoteBytes;
++  try {
++    ({ promoteRepositoryModeBytes: promoteBytes } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "repository-mode-promote.mjs")).href));
++  } catch { return new Set(); }
++  if (typeof promoteBytes !== "function") return new Set();
++  const fs = await import("node:fs");
++  const existing = VERIFY_CALIBRATION_PATHS.filter((path) => fs.existsSync(resolve(projectRoot, path)) || git(["cat-file", "-e", "HEAD:" + path], projectRoot).status === 0);
++  if (existing.length !== paths.length || !existing.every((path) => paths.includes(path))) return new Set();
++  const remotes = git(["remote"], projectRoot);
++  if (remotes.status !== 0 || (remotes.stdout ?? "").trim() === "") return new Set();
++  for (const path of paths) {
++    const headBytes = gitBlob(projectRoot, "HEAD:" + path);
++    const stagedBytes = gitBlob(projectRoot, ":" + path);
++    const headMode = gitEntryMode(projectRoot, path, false);
++    if (headBytes === null || stagedBytes === null || headMode === null || headMode !== gitEntryMode(projectRoot, path, true)) return new Set();
++    const promoted = promoteBytes(headBytes);
++    if (!promoted || promoted.ok !== true || !Buffer.isBuffer(promoted.bytes) || !promoted.bytes.equals(stagedBytes)) return new Set();
++  }
++  return new Set(paths);
++}
++
+ /**
+  * HANDOVER-SIZE COMPANION CHECK (NVA-B-HANDOVERPATH, 2026-09-01, backlog/items/
+  * 2026-09-01-the-handover-size-guard-only-sees-one-of-two-write-paths.md; buffer/encoding fix
+@@ -1087,6 +1134,11 @@ async function main() {
+     } catch { /* ordinary GS-10/GS-11 refusal remains */ }
+   }
+ 
++  // C22B CGR-19: the one-token repositoryMode promotion (local-only -> remote-tracked), compared statelessly against HEAD. Nothing else is admitted here.
++  try {
++    for (const path of await repositoryModePromotionPaths(projectRoot, paths)) sanctionedVerifyPaths.add(path);
++  } catch { /* ordinary GS-10/GS-11 refusal remains */ }
++
+   // A quality package is not a per-file exemption. The verifier only returns
+   // true after rechecking the detached proof, unchanged committed trust policy,
+   // base HEAD, and every staged path/blob of one whole package.
+diff --git a/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs b/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+index b08722b8602c30aefc99de288077c7d6de06f960..d0e8813afeb2e52626d796df688f4bfee6cc3b08 100644
+--- a/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
++++ b/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+@@ -682,6 +682,82 @@ test("installed hook: refuses the verify rewrite when the lifecycle state is not
+   assert.notEqual(code, 0);
+ });
+ 
++// AC-108 (closest accepted criterion), CGR-19 (C22B, PO decision): one narrow command moves repositoryMode from local-only to remote-tracked and the
++// commit boundary admits exactly that one-token change in every existing calibration twin, with a remote configured, and nothing else. The cases
++// below are written from that decision, never from the hook code: the positive goes through the REAL writer; every negative stays on today's refusal.
++const MODE_TWIN_PATHS = ["project/pipeline.json", ".claude/pipeline.json"];
++const modeTwin = ({ mode = "local-only", extra = {}, eol = "\n", indent = 2 } = {}) => {
++  const text = JSON.stringify({ project: "fixture", repositoryMode: mode, verify: "node --test t.mjs", handover: "docs/state.md", ...extra }, null, indent);
++  return eol === "\n" ? `${text}\n` : `${text.replace(/\n/gu, eol)}${eol}`;
++};
++const writeModeTwins = (dir, content, paths = MODE_TWIN_PATHS) => {
++  for (const path of paths) { mkdirSync(join(dir, path, ".."), { recursive: true }); writeFileSync(join(dir, path), content); }
++};
++/** A repository whose two twins are committed with `headContent`, a hook installed, and (optionally) a remote configured. */
++function seedModeRepo(prefix, { headContent = modeTwin(), remote = true } = {}) {
++  const { dir, git } = freshRepo(prefix);
++  writeModeTwins(dir, headContent);
++  assert.equal(git("add", ...MODE_TWIN_PATHS).status, 0);
++  assert.equal(git("commit", "-q", "-m", "seed calibration twins").status, 0);
++  if (remote) assert.equal(git("remote", "add", "origin", "https://example.invalid/project.git").status, 0);
++  installHook(dir);
++  return { dir, git, head: git("rev-parse", "HEAD").stdout.trim() };
++}
++const promoteWithTheCommand = (dir) => spawnSync(process.execPath, [join(PLUGIN_SCRIPTS_DIR, "repository-mode-promote.mjs"), "--root", dir, "--to", "remote-tracked"], { cwd: dir, encoding: "utf8", timeout: 60000 });
++/** Restore both twins from HEAD (index and working tree), apply `mutate`, stage `paths`, commit; the commit must be refused with today's GS text. */
++function assertModeCommitRefused({ dir, git, head }, label, mutate, paths = MODE_TWIN_PATHS) {
++  assert.equal(git("checkout", "-q", "HEAD", "--", ...MODE_TWIN_PATHS).status, 0);
++  git("reset", "-q", "--", ".");
++  mutate();
++  assert.equal(git("add", "--", ...paths).status, 0);
++  const { code, stderr } = commit(dir, `attempt: ${label}`);
++  assert.notEqual(code, 0, `${label}: must be refused`);
++  assert.match(stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/u, label);
++  assert.match(stderr, /GS-10 project\/pipeline\.json/u, `${label}: today's refusal text names the twin`);
++  assert.equal(git("rev-parse", "HEAD").stdout.trim(), head, `${label}: no new commit`);
++}
++
++test("installed hook: the real promotion command's output (CRLF twins, remote configured) commits with no signature, byte-for-byte the one-token change", { timeout: commitTestTimeout(1) }, () => {
++  const before = modeTwin({ eol: "\r\n", indent: 4 });
++  const seeded = seedModeRepo("e2e-repository-mode-promotion", { headContent: before });
++  const { dir, git } = seeded;
++  const run = promoteWithTheCommand(dir);
++  assert.equal(run.status, 0, run.stderr || run.stdout);
++  assert.equal(JSON.parse(run.stdout).status, "promoted");
++  assert.equal(git("add", ...MODE_TWIN_PATHS).status, 0);
++  const { code, stderr } = commit(dir, "chore(calibration): promote repositoryMode to remote-tracked");
++  assert.equal(code, 0, stderr);
++  assert.notEqual(git("rev-parse", "HEAD").stdout.trim(), seeded.head, "a new commit exists");
++  for (const path of MODE_TWIN_PATHS) {
++    assert.equal(git("show", `HEAD:${path}`).stdout, before.replace('"repositoryMode": "local-only"', '"repositoryMode": "remote-tracked"'), `${path}: only the value token differs (CRLF and indent kept)`);
++  }
++});
++
++test("installed hook: anything wider than the one-token promotion stays refused with today's text (other field, one twin, whitespace, extra file)", { timeout: commitTestTimeout(4) }, () => {
++  const seeded = seedModeRepo("e2e-repository-mode-wider");
++  const { dir } = seeded;
++  const promoted = modeTwin({ mode: "remote-tracked" });
++  assertModeCommitRefused(seeded, "another field changed alongside the mode", () => writeModeTwins(dir, modeTwin({ mode: "remote-tracked", extra: { verify: "node --test other.mjs" } })));
++  assertModeCommitRefused(seeded, "only one of the two twins staged", () => writeModeTwins(dir, promoted), [MODE_TWIN_PATHS[0]]);
++  assertModeCommitRefused(seeded, "a whitespace change on top", () => writeModeTwins(dir, `${promoted}\n`));
++  assertModeCommitRefused(seeded, "an unrelated file staged with the twins", () => { writeModeTwins(dir, promoted); writeFileSync(join(dir, "extra.txt"), "extra\n"); }, [...MODE_TWIN_PATHS, "extra.txt"]);
++});
++
++test("installed hook: the one-token promotion without a configured remote stays refused", { timeout: commitTestTimeout(1) }, () => {
++  const seeded = seedModeRepo("e2e-repository-mode-no-remote", { remote: false });
++  assertModeCommitRefused(seeded, "no remote configured", () => writeModeTwins(seeded.dir, modeTwin({ mode: "remote-tracked" })));
++});
++
++test("installed hook: the reverse direction (remote-tracked to local-only) stays refused", { timeout: commitTestTimeout(1) }, () => {
++  const seeded = seedModeRepo("e2e-repository-mode-reverse", { headContent: modeTwin({ mode: "remote-tracked" }) });
++  assertModeCommitRefused(seeded, "reverse direction", () => writeModeTwins(seeded.dir, modeTwin({ mode: "local-only" })));
++});
++
++test("installed hook: host-managed to remote-tracked stays refused (that direction stays on the signed guard-override route)", { timeout: commitTestTimeout(1) }, () => {
++  const seeded = seedModeRepo("e2e-repository-mode-host-managed", { headContent: modeTwin({ mode: "host-managed" }) });
++  assertModeCommitRefused(seeded, "host-managed to remote-tracked", () => writeModeTwins(seeded.dir, modeTwin({ mode: "remote-tracked" })));
++});
++
+ test("installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED", { timeout: commitTestTimeout(1) }, () => {
+   // Documents the deliberate residual scope of the PO's chosen candidate: the first-appearance
+   // exemption is drawn on git history, not on the write mechanism, so a spawned-process bypass
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 6c061657b505b28bec9ecfdf90bf7bc55040f8c7..94a6669c5cb6cedeb677a546d1362c94da1ca0f3 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -357,8 +357,9 @@ export function checkPushThreatModel(dir, deps = {}) {
+ /**
+  * Candidate 22 (CGR-19): `repositoryMode` is written once at onboarding and nothing read it, so a project that says `local-only` was pushed.
+  * Compares the calibrated mode with the real push target (a remote this repository has) and names ONE notice on a mismatch, null otherwise.
+- * Advice only: it writes nothing and refuses nothing, so the report's `ready` does not move. There is no verb that writes the field; the notice names
+- * the route that exists (the calibration is gate-strength protected, so a PO-approved override) and that the fix is a commit, hence before the candidate.
++ * Advice only: it writes nothing and refuses nothing, so the report's `ready` does not move. The notice names the one narrow command that writes the
++ * field (scripts/repository-mode-promote.mjs, admitted at the commit boundary without a signature) and that the fix is a commit, hence before the
++ * candidate; every other calibration change stays on the signed guard-override route.
+  */
+ export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
+   let declared;
+@@ -372,8 +373,9 @@ export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
+     id: "repository-mode",
+     code: "PUSH-REPOSITORY-MODE-MISMATCH",
+     message: `the calibration (${file}) declares repositoryMode "local-only" (written once at onboarding), but this push targets the configured remote "${remote}" (${destination}). `
+-      + `Correct the calibration: set "repositoryMode" to "remote-tracked" in ${file}${mirror}. There is no sanctioned writer (no verb) for this field and the file is gate-strength protected, `
+-      + "so the change goes through a PO-approved guard override (plan it with node <plugin-root>/scripts/guard-human-override.mjs plan); it is a commit, so make it before the candidate is fixed and run push-prepare again. "
++      + `Correct the calibration: set "repositoryMode" to "remote-tracked" in ${file}${mirror} with the one narrow command node <plugin-root>/scripts/repository-mode-promote.mjs --root <project-root> --to remote-tracked `
++      + "(it changes only that one value, needs a configured remote and prints the paths to commit; the pre-commit hook admits exactly that change without a signature). "
++      + "It is a commit, so make it before the candidate is fixed and run push-prepare again. Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
+       + "Nothing was written now and nothing is refused; if \"local-only\" is the truth, the push target is what is wrong.",
+   };
+ }
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index 52bb4164b0dc1335724db33c25cb29c0bfd60104..4de4b53dd4eb5466d298e52f3cec7bcf6e1050f6 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -1905,8 +1905,11 @@ test("CGR-19: a calibrated local-only mode against a configured push remote is n
+     assert.match(notice.message, /refs\/heads\/main/u);
+     assert.match(notice.message, /"remote-tracked"/u, "names the value the calibration is corrected to");
+     assert.match(notice.message, /project\/pipeline\.json/u, "names the file that holds it");
+-    assert.match(notice.message, /override/u, "names the sanctioned route: the calibration is gate-strength protected, no direct edit");
+-    assert.match(notice.message, /no verb|no sanctioned writer/u, "says there is no dedicated verb for this field");
++    // QG-04, restated in place (C22B, CGR-19 PO decision): these two pins said "there is no verb, go through a guard override". There IS now one
++    // narrow command, so the notice must name it exactly and keep the signed override only for every other change. Same subject, same strength.
++    assert.match(notice.message, /node <plugin-root>\/scripts\/repository-mode-promote\.mjs --root <project-root> --to remote-tracked/u, "names the one narrow command, exactly");
++    assert.match(notice.message, /override/u, "still names the signed guard-override route for every other change to the calibration");
++    assert.doesNotMatch(notice.message, /no verb|no sanctioned writer/u, "no longer claims there is no writer for this field");
+     assert.deepEqual(readFileSync(calibrationPath), bytesBefore, "the calibration (CRLF included) is untouched");
+     assert.equal(tree(), treeBefore, "nothing was written into the tree by the report");
+ 
+diff --git a/plugins/pipeline-core/scripts/repository-mode-promote.mjs b/plugins/pipeline-core/scripts/repository-mode-promote.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..738d97f33f1b07f701a6931033d780e4a0ea6275
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/repository-mode-promote.mjs
+@@ -0,0 +1,171 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * repository-mode-promote.mjs -- the one narrow, agent-executable command that moves the calibrated `repositoryMode` from `local-only` to
++ * `remote-tracked` (AC-108 closest criterion; CGR-19, PO decision). Every other direction, value or field stays on the signed guard-override route.
++ *
++ * Usage: node <plugin-root>/scripts/repository-mode-promote.mjs --root <project-root> --to remote-tracked
++ *
++ * What it does: writes BOTH calibration twins (`project/pipeline.json`, `.claude/pipeline.json`, each when present) by replacing the single value
++ * token `"repositoryMode": "local-only"` -> `"remote-tracked"` at the byte level, so CRLF, a BOM, the indent and the key order stay exactly as they
++ * were. Exactly one token per file is required and the re-parsed result must equal the old value with only that field changed. The twins are compared
++ * after normalising that token, so a half-applied state resumes and a rerun reports `unchanged`. It refuses `host-managed`, an absent or invalid
++ * current value, any other target and a project without a configured remote, each with a typed RMP-* code that names the route that remains.
++ * Writes are atomic (temporary file in the same directory, then rename) and happen only after the preimage bytes were checked again.
++ *
++ * The same byte rule (`promoteRepositoryModeBytes`) is what the pre-commit hook compares the staged twins against, so the commit boundary admits
++ * exactly this change and nothing else (scripts/pre-commit-hook-install.mjs).
++ *
++ * Output: ONE JSON line. Exit 0 promoted or unchanged, 1 refused, 2 usage.
++ */
++import { spawnSync } from "node:child_process";
++import { randomBytes } from "node:crypto";
++import { closeSync, constants, fsyncSync, lstatSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeSync } from "node:fs";
++import { dirname, join, basename } from "node:path";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++
++export const TWIN_PATHS = Object.freeze(["project/pipeline.json", ".claude/pipeline.json"]);
++const SCHEMA = "pipeline.repository-mode-promotion.v1";
++const MAX_BYTES = 1_048_576;
++const SIGNED_ROUTE = "any other change to the calibration stays on the signed route: plan it with node <plugin-root>/scripts/guard-human-override.mjs plan";
++// The ONE token this command may change. Whitespace between the key and its value is kept exactly as found (captured, not rewritten).
++const TOKEN = /("repositoryMode"[ \t\r\n]*:[ \t\r\n]*)"local-only"/gu;
++const strictUtf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
++
++const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
++function parseObject(bytes) {
++  try {
++    const text = strictUtf8.decode(bytes);
++    const value = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
++    return plain(value) ? value : null;
++  } catch { return null; }
++}
++
++/**
++ * The one rule. `bytes` -> `{ ok: true, bytes }` when the document is valid UTF-8 JSON whose top-level `repositoryMode` is `local-only` and exactly one
++ * literal `"repositoryMode": "local-only"` token exists; the result differs from the input in those value bytes only and re-parses to the old value with
++ * only that field changed. Otherwise `{ ok: false, code, mode? }` (`mode` is the current top-level value when the document is valid).
++ */
++export function promoteRepositoryModeBytes(bytes) {
++  const old = parseObject(bytes);
++  if (old === null) return { ok: false, code: "RMP-CALIBRATION-INVALID" };
++  const mode = old.repositoryMode;
++  if (mode === "host-managed") return { ok: false, code: "RMP-HOST-MANAGED", mode };
++  if (mode === "remote-tracked") return { ok: false, code: "RMP-NOT-LOCAL-ONLY", mode };
++  if (mode !== "local-only") return { ok: false, code: "RMP-MODE-INVALID", mode: mode === undefined ? null : mode };
++  // latin1 maps every byte to one character and back, so the replacement cannot touch any byte outside the token.
++  const text = Buffer.from(bytes).toString("latin1");
++  if ([...text.matchAll(TOKEN)].length !== 1) return { ok: false, code: "RMP-TOKEN-NOT-ONE", mode };
++  const next = Buffer.from(text.replace(TOKEN, '$1"remote-tracked"'), "latin1");
++  const reparsed = parseObject(next);
++  if (reparsed === null || JSON.stringify(reparsed) !== JSON.stringify({ ...old, repositoryMode: "remote-tracked" })) return { ok: false, code: "RMP-TOKEN-NOT-ONE", mode };
++  return { ok: true, bytes: next };
++}
++
++const MESSAGES = {
++  "RMP-TARGET-UNSUPPORTED": "only --to remote-tracked is offered by this command (local-only -> remote-tracked); no other target or direction is",
++  "RMP-NO-CALIBRATION": "neither project/pipeline.json nor .claude/pipeline.json exists under the root, so there is no calibration to change",
++  "RMP-CALIBRATION-UNSAFE": "a calibration twin is not a regular, non-linked file of a readable size",
++  "RMP-CALIBRATION-INVALID": "a calibration twin is not valid UTF-8 JSON holding an object",
++  "RMP-HOST-MANAGED": "the calibrated repositoryMode is host-managed; this command never changes it",
++  "RMP-MODE-INVALID": "the calibrated repositoryMode is absent or not one of local-only, remote-tracked, host-managed",
++  "RMP-TOKEN-NOT-ONE": "the file does not hold exactly one literal \"repositoryMode\": \"local-only\" token, so a single-token replace is not possible",
++  "RMP-TWIN-DRIFT": "project/pipeline.json and .claude/pipeline.json differ by more than the repositoryMode value (after normalising that token)",
++  "RMP-NO-REMOTE": "no remote is configured in this repository, and remote-tracked needs one",
++  "RMP-PREIMAGE-CHANGED": "a calibration twin changed while the command was running; nothing was written",
++  "RMP-WRITE-FAILED": "a calibration twin could not be written",
++};
++const ROUTES = {
++  "RMP-NO-CALIBRATION": "run the onboarding that creates project/pipeline.json first; this command only edits an existing calibration",
++  "RMP-NO-REMOTE": "add the remote first (git remote add <name> <url>), then run this command again",
++  "RMP-PREIMAGE-CHANGED": "run the command again once no other write is running",
++  "RMP-WRITE-FAILED": "run the command again: a half-applied state resumes (the twins are compared after normalising the token)",
++};
++const refuse = (code, extra = {}) => ({ schema: SCHEMA, status: "refused", code, message: extra.message ?? MESSAGES[code], route: ROUTES[code] ?? SIGNED_ROUTE, ...extra.fields });
++
++function readTwin(root, rel) {
++  const abs = join(root, ...rel.split("/"));
++  let info;
++  try { info = lstatSync(abs); } catch (error) { if (error?.code === "ENOENT" || error?.code === "ENOTDIR") return { rel, abs, absent: true }; return { rel, abs, unsafe: true }; }
++  if (!info.isFile() || info.isSymbolicLink() || info.size < 1 || info.size > MAX_BYTES) return { rel, abs, unsafe: true };
++  try { return { rel, abs, bytes: readFileSync(abs), mode: info.mode & 0o777 }; } catch { return { rel, abs, unsafe: true }; }
++}
++
++function hasRemote(root) {
++  const result = spawnSync("git", ["-C", root, "remote"], { encoding: "utf8", timeout: 15_000, windowsHide: true });
++  return result.status === 0 && typeof result.stdout === "string" && result.stdout.trim() !== "";
++}
++
++function writeAtomic(twin, bytes) {
++  const tmp = join(dirname(twin.abs), `.${basename(twin.abs)}.rmp-${process.pid}-${randomBytes(4).toString("hex")}.tmp`);
++  const fd = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, twin.mode);
++  try { writeSync(fd, bytes); fsyncSync(fd); } catch (error) { try { closeSync(fd); } catch { /* keep the original error */ } try { unlinkSync(tmp); } catch { /* best effort */ } throw error; }
++  closeSync(fd);
++  try { renameSync(tmp, twin.abs); } catch (error) { try { unlinkSync(tmp); } catch { /* best effort */ } throw error; }
++}
++
++function pathsToCommit(root, present) {
++  const diff = spawnSync("git", ["-C", root, "diff", "--name-only", "-z", "HEAD", "--", ...present], { encoding: "utf8", timeout: 15_000, windowsHide: true });
++  if (diff.status !== 0 || typeof diff.stdout !== "string") return [...present];
++  return diff.stdout.split("\0").filter(Boolean).sort();
++}
++
++/** `deps.beforeWrite` is a test seam that runs after the first read and before the preimage re-check. */
++export function promoteRepositoryMode({ root, to } = {}, deps = {}) {
++  if (to !== "remote-tracked") return refuse("RMP-TARGET-UNSUPPORTED");
++  const twins = TWIN_PATHS.map((rel) => readTwin(root, rel));
++  if (twins.some((twin) => twin.unsafe)) return refuse("RMP-CALIBRATION-UNSAFE");
++  const present = twins.filter((twin) => !twin.absent);
++  if (present.length === 0) return refuse("RMP-NO-CALIBRATION");
++  const plan = [];
++  for (const twin of present) {
++    const result = promoteRepositoryModeBytes(twin.bytes);
++    if (result.ok) plan.push({ twin, after: result.bytes, change: true });
++    else if (result.code === "RMP-NOT-LOCAL-ONLY") plan.push({ twin, after: twin.bytes, change: false });
++    else return refuse(result.code, { fields: { file: twin.rel } });
++  }
++  if (plan.some((entry) => !entry.after.equals(plan[0].after))) return refuse("RMP-TWIN-DRIFT");
++  const changing = plan.filter((entry) => entry.change);
++  if (changing.length === 0) return { schema: SCHEMA, status: "unchanged", repositoryMode: "remote-tracked", written: [], paths: pathsToCommit(root, present.map((twin) => twin.rel)) };
++  if (!hasRemote(root)) return refuse("RMP-NO-REMOTE");
++  deps.beforeWrite?.();
++  for (const entry of changing) {
++    const current = readTwin(root, entry.twin.rel);
++    if (current.unsafe || current.absent || !current.bytes.equals(entry.twin.bytes)) return refuse("RMP-PREIMAGE-CHANGED", { fields: { file: entry.twin.rel } });
++  }
++  const written = [];
++  for (const entry of changing) {
++    try { writeAtomic(entry.twin, entry.after); written.push(entry.twin.rel); } catch (error) { return refuse("RMP-WRITE-FAILED", { fields: { file: entry.twin.rel, written, detail: String(error?.code ?? error?.name ?? "Error") } }); }
++  }
++  for (const entry of plan) {
++    const current = readTwin(root, entry.twin.rel);
++    if (current.unsafe || current.absent || !current.bytes.equals(entry.after)) return refuse("RMP-WRITE-FAILED", { fields: { file: entry.twin.rel, written, detail: "readback-mismatch" } });
++  }
++  return { schema: SCHEMA, status: "promoted", repositoryMode: "remote-tracked", written, paths: pathsToCommit(root, present.map((twin) => twin.rel)),
++    next: "stage exactly these paths with git add -- <paths> and commit them as their own commit; the pre-commit hook admits this one-token change without a signature" };
++}
++
++function parseArgs(argv) {
++  const seen = {};
++  for (let i = 0; i < argv.length; i += 2) {
++    const flag = argv[i];
++    if ((flag !== "--root" && flag !== "--to") || Object.hasOwn(seen, flag) || i + 1 >= argv.length || argv[i + 1] === "") return null;
++    seen[flag] = argv[i + 1];
++  }
++  if (seen["--root"] === undefined || seen["--to"] === undefined) return null;
++  try { if (!statSync(seen["--root"]).isDirectory()) return null; } catch { return null; }
++  return { root: seen["--root"], to: seen["--to"] };
++}
++
++function main(argv) {
++  const args = parseArgs(argv);
++  if (args === null) {
++    process.stdout.write(`${JSON.stringify({ schema: SCHEMA, status: "usage", code: "RMP-USAGE", message: "usage: node repository-mode-promote.mjs --root <project-root> --to remote-tracked (each flag once, root an existing directory)" })}\n`);
++    return 2;
++  }
++  const result = promoteRepositoryMode(args);
++  process.stdout.write(`${JSON.stringify(result)}\n`);
++  return result.status === "refused" ? 1 : 0;
++}
++
++if (isDirectInvocation(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+diff --git a/plugins/pipeline-core/scripts/repository-mode-promote.test.mjs b/plugins/pipeline-core/scripts/repository-mode-promote.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..efcc7966a963da69ba49fbbeb6886c5bf4de637c
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/repository-mode-promote.test.mjs
+@@ -0,0 +1,173 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * repository-mode-promote.test.mjs -- AC-108 (closest accepted criterion), CGR-19 (C22B, PO decision): one narrow, agent-executable command moves
++ * `repositoryMode` from `local-only` to `remote-tracked`, only with a configured remote, writing both calibration twins by a surgical single-token
++ * replace. Every other direction and every other target stays on the signed guard-override route and is refused with a typed RMP-* code.
++ * Written from that decision, not from the writer's code. The commit-boundary half is in pre-commit-hook-install.test.mjs.
++ *
++ * Run: node --test plugins/pipeline-core/scripts/repository-mode-promote.test.mjs
++ */
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++
++import { promoteRepositoryMode, promoteRepositoryModeBytes } from "./repository-mode-promote.mjs";
++
++const SCRIPT = fileURLToPath(new URL("./repository-mode-promote.mjs", import.meta.url));
++const TWINS = ["project/pipeline.json", ".claude/pipeline.json"];
++const BOM = "﻿";
++const roots = [];
++process.on("exit", () => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
++
++const ABSENT = Symbol("absent");
++const twin = ({ mode = "local-only", extra = {}, eol = "\n", indent = 2, bom = false } = {}) => {
++  const value = mode === ABSENT ?{ project: "p", verify: "node --test t.mjs" } : { project: "p", repositoryMode: mode, verify: "node --test t.mjs", ...extra };
++  const text = JSON.stringify(value, null, indent);
++  return `${bom ? BOM : ""}${eol === "\n" ? `${text}\n` : `${text.replace(/\n/gu, eol)}${eol}`}`;
++};
++const flip = (text) => text.replace('"repositoryMode": "local-only"', '"repositoryMode": "remote-tracked"');
++
++function makeRoot({ remote = true, files = {} } = {}) {
++  const root = mkdtempSync(join(tmpdir(), "rmp-"));
++  roots.push(root);
++  assert.equal(spawnSync("git", ["-C", root, "init", "-q", "-b", "main"], { encoding: "utf8" }).status, 0);
++  if (remote) assert.equal(spawnSync("git", ["-C", root, "remote", "add", "origin", "https://example.invalid/project.git"], { encoding: "utf8" }).status, 0);
++  for (const [path, content] of Object.entries(files)) { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), content); }
++  return root;
++}
++const read = (root, path) => readFileSync(join(root, path));
++const run = (...args) => {
++  const result = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8", timeout: 60000 });
++  return { status: result.status, stdout: result.stdout, stderr: result.stderr, json: (() => { try { return JSON.parse(result.stdout); } catch { return null; } })() };
++};
++const snapshot = (root) => Object.fromEntries(TWINS.map((path) => { try { return [path, read(root, path).toString("latin1")]; } catch { return [path, null]; } }));
++
++test("RMP-1: both twins change by the one value token only; CRLF, BOM, indent and key order are kept byte for byte; one JSON result names the paths to commit", () => {
++  const before = twin({ eol: "\r\n", indent: 4, bom: true });
++  const root = makeRoot({ files: { [TWINS[0]]: before, [TWINS[1]]: before } });
++  const result = run("--root", root, "--to", "remote-tracked");
++  assert.equal(result.status, 0, result.stderr || result.stdout);
++  assert.equal(result.stdout.trim().split(/\r?\n/u).length, 1, "exactly one JSON line");
++  assert.equal(result.json.status, "promoted");
++  assert.deepEqual([...result.json.paths].sort(), [...TWINS].sort());
++  for (const path of TWINS) {
++    assert.deepEqual(read(root, path), Buffer.from(flip(before), "utf8"), `${path}: byte-identical except the value token`);
++    assert.deepEqual(JSON.parse(read(root, path).toString("utf8").slice(1)), { ...JSON.parse(before.slice(1)), repositoryMode: "remote-tracked" }, `${path}: the re-parsed result is the old value with only that field changed`);
++  }
++  assert.deepEqual(readdirSync(join(root, "project")), ["pipeline.json"], "no temporary file is left behind");
++  assert.deepEqual(readdirSync(join(root, ".claude")), ["pipeline.json"]);
++});
++
++test("RMP-2: a rerun reports unchanged with exit 0 and writes nothing", () => {
++  const before = twin();
++  const root = makeRoot({ files: { [TWINS[0]]: before, [TWINS[1]]: before } });
++  assert.equal(run("--root", root, "--to", "remote-tracked").status, 0);
++  const once = snapshot(root);
++  const again = run("--root", root, "--to", "remote-tracked");
++  assert.equal(again.status, 0);
++  assert.equal(again.json.status, "unchanged");
++  assert.deepEqual(snapshot(root), once);
++});
++
++test("RMP-3: a half-applied state (one twin already remote-tracked) resumes: only the other twin is written, then both agree", () => {
++  const before = twin({ eol: "\r\n" });
++  const root = makeRoot({ files: { [TWINS[0]]: before, [TWINS[1]]: flip(before) } });
++  const result = run("--root", root, "--to", "remote-tracked");
++  assert.equal(result.status, 0, result.stderr || result.stdout);
++  assert.equal(result.json.status, "promoted");
++  assert.deepEqual(result.json.written, [TWINS[0]], "only the twin that still said local-only was written");
++  assert.deepEqual(read(root, TWINS[0]), read(root, TWINS[1]));
++});
++
++test("RMP-4: a project with only one existing twin is promoted (the other is simply absent)", () => {
++  for (const only of TWINS) {
++    const before = twin();
++    const root = makeRoot({ files: { [only]: before } });
++    const result = run("--root", root, "--to", "remote-tracked");
++    assert.equal(result.status, 0, result.stderr || result.stdout);
++    assert.deepEqual(result.json.paths, [only]);
++    assert.equal(read(root, only).toString("utf8"), flip(before));
++  }
++});
++
++const REFUSALS = [
++  { name: "host-managed current value", code: "RMP-HOST-MANAGED", route: /guard-human-override/u, build: () => ({ files: { [TWINS[0]]: twin({ mode: "host-managed" }), [TWINS[1]]: twin({ mode: "host-managed" }) } }) },
++  { name: "one twin host-managed", code: "RMP-HOST-MANAGED", route: /guard-human-override/u, build: () => ({ files: { [TWINS[0]]: twin(), [TWINS[1]]: twin({ mode: "host-managed" }) } }) },
++  { name: "absent current value", code: "RMP-MODE-INVALID", route: /guard-human-override/u, build: () => ({ files: { [TWINS[0]]: twin({ mode: ABSENT }) } }) },
++  { name: "invalid current value", code: "RMP-MODE-INVALID", route: /guard-human-override/u, build: () => ({ files: { [TWINS[0]]: twin({ mode: "somewhere" }) } }) },
++  { name: "current value of another type", code: "RMP-MODE-INVALID", route: /guard-human-override/u, build: () => ({ files: { [TWINS[0]]: twin({ mode: 7 }) } }) },
++  { name: "calibration that does not parse", code: "RMP-CALIBRATION-INVALID", route: /guard-human-override/u, build: () => ({ files: { [TWINS[0]]: "{ not json" } }) },
++  { name: "no calibration at all", code: "RMP-NO-CALIBRATION", route: /pipeline\.json/u, build: () => ({ files: {} }) },
++  { name: "no configured remote", code: "RMP-NO-REMOTE", route: /git remote add/u, build: () => ({ remote: false, files: { [TWINS[0]]: twin(), [TWINS[1]]: twin() } }) },
++  { name: "twins that differ in more than the mode", code: "RMP-TWIN-DRIFT", route: /guard-human-override/u, build: () => ({ files: { [TWINS[0]]: twin(), [TWINS[1]]: twin({ extra: { verify: "node --test other.mjs" } }) } }) },
++  { name: "twins that differ only in line endings", code: "RMP-TWIN-DRIFT", route: /guard-human-override/u, build: () => ({ files: { [TWINS[0]]: twin(), [TWINS[1]]: twin({ eol: "\r\n" }) } }) },
++  { name: "the token twice (duplicate key)", code: "RMP-TOKEN-NOT-ONE", route: /guard-human-override/u, build: () => ({ files: { [TWINS[0]]: `{ "repositoryMode": "local-only", "repositoryMode": "local-only" }\n` } }) },
++  { name: "the key spelled with an escape (no literal token to replace)", code: "RMP-TOKEN-NOT-ONE", route: /guard-human-override/u, build: () => ({ files: { [TWINS[0]]: `{ "repository\\u004dode": "local-only" }\n` } }) },
++];
++for (const { name, code, route, build } of REFUSALS) {
++  test(`RMP-5: refused with ${code}, exit 1, names the remaining route, nothing written: ${name}`, () => {
++    const spec = build();
++    const root = makeRoot(spec);
++    const before = snapshot(root);
++    const result = run("--root", root, "--to", "remote-tracked");
++    assert.equal(result.status, 1, result.stderr || result.stdout);
++    assert.equal(result.json.status, "refused");
++    assert.equal(result.json.code, code);
++    assert.match(result.json.route, route);
++    assert.deepEqual(snapshot(root), before, "the calibration is untouched");
++  });
++}
++
++test("RMP-6: every other target is refused with RMP-TARGET-UNSUPPORTED and the signed route, whatever the current value", () => {
++  for (const to of ["local-only", "host-managed", "Remote-Tracked", "", "x"]) {
++    const root = makeRoot({ files: { [TWINS[0]]: twin(), [TWINS[1]]: twin() } });
++    const before = snapshot(root);
++    const result = run("--root", root, "--to", to);
++    assert.equal(result.status, to === "" ? 2 : 1, `--to ${JSON.stringify(to)}: ${result.stderr || result.stdout}`);
++    if (to !== "") { assert.equal(result.json.code, "RMP-TARGET-UNSUPPORTED"); assert.match(result.json.route, /guard-human-override/u); }
++    assert.deepEqual(snapshot(root), before);
++  }
++  const reverse = makeRoot({ files: { [TWINS[0]]: twin({ mode: "remote-tracked" }), [TWINS[1]]: twin({ mode: "remote-tracked" }) } });
++  assert.equal(run("--root", reverse, "--to", "local-only").json.code, "RMP-TARGET-UNSUPPORTED", "the reverse direction is not offered");
++});
++
++test("RMP-7: usage errors exit 2 with a JSON result and write nothing", () => {
++  const root = makeRoot({ files: { [TWINS[0]]: twin(), [TWINS[1]]: twin() } });
++  const before = snapshot(root);
++  for (const args of [[], ["--root", root], ["--to", "remote-tracked"], ["--root", root, "--to", "remote-tracked", "--force"], ["--root", root, "--to", "remote-tracked", "extra"], ["--root", root, "--root", root, "--to", "remote-tracked"], ["--root", join(root, "missing"), "--to", "remote-tracked"]]) {
++    const result = run(...args);
++    assert.equal(result.status, 2, `${JSON.stringify(args)}: ${result.stderr || result.stdout}`);
++    assert.equal(result.json.code, "RMP-USAGE");
++  }
++  assert.deepEqual(snapshot(root), before);
++});
++
++test("RMP-8: a twin that changes between the first read and the write is refused with RMP-PREIMAGE-CHANGED and no twin is written", () => {
++  const before = twin();
++  const root = makeRoot({ files: { [TWINS[0]]: before, [TWINS[1]]: before } });
++  const changed = `${before}\n`;
++  const result = promoteRepositoryMode({ root, to: "remote-tracked" }, { beforeWrite: () => writeFileSync(join(root, TWINS[1]), changed) });
++  assert.equal(result.status, "refused");
++  assert.equal(result.code, "RMP-PREIMAGE-CHANGED");
++  assert.equal(read(root, TWINS[0]).toString("utf8"), before, "the first twin was not written");
++  assert.equal(read(root, TWINS[1]).toString("utf8"), changed, "the concurrent edit is left as it is");
++});
++
++test("RMP-9: promoteRepositoryModeBytes is the one rule: exactly one top-level token, parse-checked, byte-surgical", () => {
++  const good = Buffer.from(twin({ eol: "\r\n", bom: true }), "utf8");
++  const promoted = promoteRepositoryModeBytes(good);
++  assert.equal(promoted.ok, true);
++  assert.deepEqual(promoted.bytes, Buffer.from(flip(good.toString("utf8")), "utf8"));
++  const nestedOnly = Buffer.from(`{ "project": "p", "nested": { "repositoryMode": "local-only" } }\n`);
++  assert.equal(promoteRepositoryModeBytes(nestedOnly).ok, false, "a nested key is not the calibrated mode");
++  const nestedToo = Buffer.from(`{ "repositoryMode": "local-only", "nested": { "repositoryMode": "local-only" } }\n`);
++  assert.equal(promoteRepositoryModeBytes(nestedToo).code, "RMP-TOKEN-NOT-ONE");
++  assert.equal(promoteRepositoryModeBytes(Buffer.from(twin({ mode: "remote-tracked" }))).ok, false, "only local-only is a source value");
++  const invalidUtf8 = Buffer.concat([Buffer.from('{ "repositoryMode": "local-only", "note": "'), Buffer.from([0xff, 0xfe]), Buffer.from('" }\n')]);
++  assert.equal(promoteRepositoryModeBytes(invalidUtf8).ok, false, "bytes that are not valid UTF-8 JSON are never rewritten");
++});

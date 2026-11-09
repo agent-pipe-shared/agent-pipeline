@@ -1,0 +1,57 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 597ba874107400fbc4583d0930394088c098e292..69c36ea5d79e1377d4627ab4680139c4ca25e8e6 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -487,6 +487,7 @@
+         "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
+         "verify-phase:harness/scripts/verify.mjs:generate-runbook-tests",
+         "verify-phase:harness/scripts/verify.mjs:generate-vendored-canon-tests",
++        "verify-phase:harness/scripts/verify.mjs:generated-artefact-schema-tests",
+         "verify-phase:harness/scripts/verify.mjs:git-cmd-push-classifier-tests",
+         "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
+         "verify-phase:harness/scripts/verify.mjs:git-hook-runtime-snapshot-fast-verify-tests",
+@@ -1045,6 +1046,7 @@
+         "verify-phase:harness/scripts/verify.mjs:remote-provisional-receipt-tests",
+         "verify-phase:harness/scripts/verify.mjs:report-interruptions-tests",
+         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
++        "verify-phase:harness/scripts/verify.mjs:repository-mode-promote-tests",
+         "verify-phase:harness/scripts/verify.mjs:repository-path-identity-tests",
+         "verify-phase:harness/scripts/verify.mjs:required-evidence-not-ignored-tests",
+         "verify-phase:harness/scripts/verify.mjs:requirement-traceability-tests",
+@@ -2724,6 +2726,7 @@
+         "verify-phase:harness/scripts/verify.mjs:commit-msg-hook-signed-integration-tests",
+         "verify-phase:harness/scripts/verify.mjs:critical-action-approval-request-tests",
+         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
++        "verify-phase:harness/scripts/verify.mjs:critical-action-signature-round-trip-tests",
+         "verify-phase:harness/scripts/verify.mjs:critical-human-proof-gate-tests",
+         "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
+         "verify-phase:harness/scripts/verify.mjs:design-approval-binding-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index a59ad10b9f258d36f4edeafbae02bff72667bf55..5f8b74131d733e4665774daf0ebedec7c0c1b77f 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -1761,6 +1761,24 @@
+       "invariantPinned": "Open minor Critic findings are kept in one managed handover block, an accepted entry is never reopened, and the close line counts only what the block lists",
+       "nonOverlapNote": "Text and file functions of the handover block; the one-shot close wiring is covered in the finish-feature suite"
+     },
++    {
++      "name": "generated-artefact-schema-tests",
++      "file": "plugins/pipeline-core/lib/generated-artefact-schema.test.mjs",
++      "invariantPinned": "A scanner match is treated as a generated digest field only for the exact artefact schema and field shape, anything else stays a normal finding",
++      "nonOverlapNote": "Pure schema check; the discounted count in a scan is covered in the gitleaks adapter suite"
++    },
++    {
++      "name": "critical-action-signature-round-trip-tests",
++      "file": "plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs",
++      "invariantPinned": "The signature command handed to the human produces a proof that the matching verifier accepts for the critical action kinds it covers, and a changed digest is refused",
++      "nonOverlapNote": "End-to-end sign and verify round trip on this platform; request and authorization logic stays in the critical action authorization suites"
++    },
++    {
++      "name": "repository-mode-promote-tests",
++      "file": "plugins/pipeline-core/scripts/repository-mode-promote.test.mjs",
++      "invariantPinned": "Only local-only moves to remote-tracked, only with a configured remote, by one token in both calibration twins, and every other direction is refused with its remaining route",
++      "nonOverlapNote": "The writer command only; the commit-boundary admission of the same change is covered in the pre-commit hook suite"
++    },
+     {
+       "name": "critic-route-assurance-tests",
+       "file": "plugins/pipeline-core/lib/critic-route-assurance.test.mjs",
