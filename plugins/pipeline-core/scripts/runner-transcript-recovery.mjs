@@ -74,13 +74,16 @@ function regularJsonlFiles(sessionsDirectory, maxCandidates = MAX_CANDIDATES, st
     const directory = queue.pop();
     let entries;
     try { entries = readdirSync(directory, { withFileTypes: true }); } catch { continue; }
+    // readdir order is the filesystem's. Names are dated (year/month/day/rollout-<time>), so newest-first makes the bound drop the oldest sessions, not arbitrary ones.
+    entries.sort((left, right) => (left.name < right.name ? 1 : left.name > right.name ? -1 : 0));
+    const subdirectories = [];
     for (const entry of entries) {
       if (files.length >= maxCandidates) { state.boundReached = true; break; }
       // Never follow a session-storage symlink: it could point at arbitrary host data.
       if (entry.isSymbolicLink()) continue;
       const candidate = join(directory, entry.name);
       if (entry.isDirectory()) {
-        queue.push(candidate);
+        subdirectories.push(candidate);
       } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
         try {
           const real = realpathSync(candidate);
@@ -88,6 +91,7 @@ function regularJsonlFiles(sessionsDirectory, maxCandidates = MAX_CANDIDATES, st
         } catch { /* An unreadable candidate is not evidence. */ }
       }
     }
+    queue.push(...subdirectories.reverse());
   }
   if (queue.length > 0 && files.length >= maxCandidates) state.boundReached = true;
   return files;

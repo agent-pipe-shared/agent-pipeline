@@ -1221,6 +1221,19 @@ test("G20-31 turn markers carry an end time and per-turn counters where the tran
   });
 });
 
+test("C21F: when the candidate bound cuts a dated Codex store, the newest days and files are the ones kept", () => {
+  withExportFixture(({ project, codexHome }) => {
+    for (const [day, name] of [["2026/10/01", "rollout-a.jsonl"], ["2026/11/08", "rollout-b.jsonl"], ["2026/11/09", "rollout-c.jsonl"], ["2026/11/09", "rollout-d.jsonl"]]) {
+      const directory = join(codexHome, "sessions", ...day.split("/"));
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(join(directory, name), `${JSON.stringify({ timestamp: stamp("05:00:00"), type: "session_meta", payload: { id: name, cwd: project } })}\n`);
+    }
+    const listed = recovery.listRunnerTranscripts({ rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, limits: { maxCandidates: 3 } });
+    assert.equal(listed.page.candidateBoundReached, true);
+    assert.deepEqual(listed.sessions.map((session) => session.sessionId).sort(), ["rollout-b.jsonl", "rollout-c.jsonl", "rollout-d.jsonl"]);
+  });
+});
+
 test("C21F: a Codex custom_tool_call counts as a tool call beside function_call; its output does not", () => {
   withExportFixture(({ project, codexHome }) => {
     codexSegment(codexHome, "custom.jsonl", { cwd: project, sessionId: "custom", metaTimestamp: stamp("05:00:00"), records: [

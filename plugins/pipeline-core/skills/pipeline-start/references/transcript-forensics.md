@@ -32,6 +32,9 @@ from memory is not evidence; a quoted line from the transcript is.
 
 - `exec_command` entries — the equivalent of `tool_use` for Codex: the exact
   shell invocation, its `cwd`, and its exit status.
+- `response_item` payloads of type `function_call` and `custom_tool_call` — the
+  two call forms. A code-mode `exec` is one `custom_tool_call` that can run
+  several tools; count nested tools separately from top-level calls.
 - `sandbox_permissions` — the sandbox mode/approval policy in force for a
   given command; compare across the session to catch an unexplained
   escalation (e.g. read-only -> workspace-write) that was never surfaced to
@@ -76,6 +79,17 @@ general impression:
    hit an approval gate? A high count in a segment that should have been
    routine implementation is itself a finding, independent of whether any
    single instance was individually correct.
+
+## Counting rules
+
+- Count a refusal only from a call paired with its result. An error code in a
+  document the session merely loaded is not a refusal, so plain string
+  matching over the file overcounts.
+- Sum tokens from per-response usage records only, never together with the
+  cumulative turn or thread counters or a second record form of the same
+  response. Cached input is not a price and not a count of words read.
+- A session span is not working time: it contains idle and parallel periods.
+- A missing raw transcript means "not established", never zero.
 
 ## Report shape — one section per claim, independently traceable
 
