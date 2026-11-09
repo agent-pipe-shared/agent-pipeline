@@ -751,7 +751,9 @@ function missingOperandIsTheOnlyFault(name, executable, argv, root) {
   });
   // An option's value (head -n 5) is no path: also try with every word that directly follows an option left as written.
   const afterOption = missing.filter((index) => !(index > 0 && /^-[^-]/u.test(argv[index - 1]) && (endOfOptions === -1 || index - 1 < endOfOptions)));
-  for (const set of [missing, afterOption]) {
+  // C21E: the value of a long option (rg ... --max-columns 300) is no path either; it was replaced by the stand-in, the grammar refused that, and a missing path kept the flag-or-spelling text.
+  const afterAnyOption = missing.filter((index) => !(index > 0 && /^--?[^-]/u.test(argv[index - 1]) && (endOfOptions === -1 || index - 1 < endOfOptions)));
+  for (const set of [missing, afterOption, afterAnyOption]) {
     if (set.length === 0) continue;
     const choices = set.map((index) => existingInRootStandIns(argv[index], root));
     for (let pick = 0; pick < 2; pick += 1) {

@@ -149,6 +149,9 @@ test("P5b a missing in-root path in any admitted read shape is GUARD-READ-TARGET
     "grep -n -i apply docs/missing.md",
     "head -n 5 docs/missing.md",
     "tail -n 5 docs/missing.md",
+    // C21E: the value of a long option is no path, so a missing file next to it stays the only fault.
+    "rg -n apply docs/missing.md --max-columns 300 --max-count 8",
+    "rg -n apply docs/2026-09-21-a.md docs/missing.md --max-columns 300",
   ]) {
     // QG-04 restated (G20-67, 2026-11-08): when the missing in-root path is the command's ONLY fault the read is an existence probe and
     // is admitted (the shell reports the missing file); before, it was refused with GUARD-READ-TARGET-MISSING. The second loop keeps
@@ -156,7 +159,7 @@ test("P5b a missing in-root path in any admitted read shape is GUARD-READ-TARGET
     const r = run(bash(command), path);
     assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
   }
-  for (const command of ["rg --pre=sh apply docs/missing.md", "rg --pre=sh apply docs/2026-09-21-a.md", "cat vault/id_rsa docs/missing.md"]) {
+  for (const command of ["rg --pre=sh apply docs/missing.md", "rg --pre=sh apply docs/2026-09-21-a.md", "cat vault/id_rsa docs/missing.md", "rg --pre sh apply docs/missing.md", "rg -n apply docs/missing.md --max-columns 99999"]) {
     const r = run(bash(command), path);
     assert.equal(r.exitCode, 2, command);
     assert.doesNotMatch(r.text, /GUARD-READ-TARGET-MISSING/u, `${command}: the missing path is not the only fault\n${r.text}`);
