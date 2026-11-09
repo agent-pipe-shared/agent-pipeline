@@ -1,0 +1,97 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.codex-greenfield-report-findings
+type: defect
+owner: pipeline
+status: open
+created: 2026-11-09
+source: forensic analysis written by the Codex greenfield run on build 0.7.0+codex.20261109080736.4b9add3, secured on PO request 2026-11-09; the report itself stays in that private consumer repository
+sprint: alfred
+done_when: manual
+---
+
+# Findings of the Codex greenfield forensic report (build 20261109080736.4b9add3)
+
+## Description
+
+The Codex greenfield run delivered, pushed and then analysed itself. Its report judges the state as fit for a limited pilot once the P0 findings are fixed, not for a mandatory rollout to critical banking teams. This item keeps every finding so none lives only in a private repository or in chat. The run changed builds several times, so each finding is checked against current code before anything is built for it.
+
+Status words: `built-c21f` is implemented in the held candidate 21f and not yet applied. `earlier-fix` is addressed by an earlier candidate, with the live proof named if still missing. `open` needs work. `po-decision` needs a Product Owner tile. `no-action` is method or product observation with nothing to change.
+
+## Priority findings
+
+| ID | Finding | Proposal in the report | Status |
+|---|---|---|---|
+| CGF-01 | P0. Forensics cannot be fully reconstructed: the prior-session scan stops at 2000 candidates, the active main session and child raw text are not exportable. | Project-bound read-only export of all own segments and children with cursor, completeness manifest, hashes and privacy consent. Missing raw data reads "incomplete", never 0. | open |
+| CGF-02 | P0. The official tool counter miscounts the real Codex format: `custom_tool_call` was not counted. | Adapter for both call forms, anonymised real rollout fixtures, structured nested calls, turn end on real task-end markers. | built-c21f for the count; nested calls, fixture and turn end open |
+| CGF-03 | P0. Independence and test-first assurance must not be upgraded in wording: the receipt says `freshContext:false`, `historyInherited:true`, `caller-authored-fallback`; test-first is self-attested. | Check native role and provenance before dispatch. Critical profile blocks or takes a deliberate exception up front. UI and reports show the receipt's assurance. | po-decision taken (second Codex role `critic-high-risk`), Slice A; pre-dispatch check open |
+| CGF-04 | P0. Close must not become unresolvable through its own evidence commits (dirty tree at signing, then `FCA-PACKAGE`, then a refused completed-to-verifying move). | Transaction plan Freeze, Verify, Audit, Signature, Close; idempotent conservative candidate rebind; integration test over the whole CLI flow. | earlier-fix (21c requalify, 21e addenda before Verify, dirty-path note); live close and whole-flow test missing |
+| CGF-05 | P0. Provenance of security verdicts: green with OSV not applicable and licences skipped; v2 is report-only. | Show "PASS with not applicable/skipped". Critical profile fixes mandatory checks and exceptions and enforces execution. | display exists (`Security close status`, `reportStatus`); mandatory scanners po-decision |
+| CGF-06 | P1. Generated metadata repeatedly blocks scanners and classifiers: `CCI-MIXED` after a historic document move, gitleaks hits on generated review digests. | Classify own generated artefacts by verifiable schema, separate digest from credential fields, judge renamed documents consistently. No blanket ignore, no history rewrite. | open |
+| CGF-07 | P1. Lifecycle recovery must be a normal agent step: `SDC-REQUESTER-UNAVAILABLE` and `WT-ORPHAN-ARCHIVE-OWN-SESSION` kept the same active session from re-entering. | Tell own active from foreign orphaned descriptors, check offered recovery for executability beforehand, durable waiting state with event wakeup after an unchanged hard block, no status polling. | open |
+| CGF-08 | P1. Architecture projection and blocking fitness diverge: stored projection `observed-open` while the narrow check is green; after close orientation says `adoption-required`. | Label every architecture verdict with candidate, observation date, scope, blocking or report-only; one current projection for preflight, plan and Verify; losing active feature references at close is not losing accepted architecture. | open |
+| CGF-09 | P1. Approved architecture bytes need a governed change route: the coordinator edited the signed map for a regression test, later reverted. | Show the approved digest and the permitted route before a map or policy edit; typed "new decision or exact exception" route at the edit. | open |
+| CGF-10 | P1. Harmless reads need a robust simple interface: search filters and a numbered file excerpt were refused, one with a signed override offer. | Separate unknown syntax from dangerous action; no signature for a file excerpt. | po-decision; `nl -ba file \| tail`, `rg x dir/*.ext` and several `rg --files -g` measured |
+| CGF-11 | P1. Limit extra PO work to real decisions: the PO moved a file by hand and installed official fixes; signing failed once on workflow-made dirty state. | Reuse actor and intake answers, agent does all preparation, only tested copy commands, check key directory, trust, clean tree and candidate binding before the signing prompt, automate recovery. | open; printed signing lines tested in built-c21f |
+| CGF-12 | P1. Documentation and CLI drift: documented `push-prepare --close` got only usage; `docs/state.md` keeps active rows after close. | Test documented commands as a CLI contract, project status from receipts, separate product acceptance, technical close and push in the final report. | built-c21f for `--close`; contract test and projection open |
+| CGF-13 | P2. Reader rounds out of proportion for small consumer documents. | At most two rounds, one bundled finding set, explicit end; no full course for evidence-only commits. | open |
+| CGF-14 | P2. Effort recorded by role heuristic rather than events. | Store PO-to-answer and child intervals, tokens per answer with cache, model, phase and a/b/c class; fixed delivery cutoff before analysis. | open |
+
+## Loops and PO interventions
+
+| ID | Event | Classification in the report | Status |
+|---|---|---|---|
+| CGF-15 | Onboarding first in the sandbox (`EPERM`), identical host call then worked. | Agent error at the execution boundary. Route correctly from the first call. | open, check whether the action's boundary is printed clearly enough |
+| CGF-16 | Mandatory restart before product work, an extra human terminal step. | Expected runtime boundary; a technically secured handoff could shorten it. | open |
+| CGF-17 | After foundation delivery a stale agent and authority assignment; PO moved a file by hand. | Pipeline recovery problem. | earlier-fix (`heal`, `move-aside`); check that no PO hand step remains |
+| CGF-18 | Historic document rename blocked the first Critic input; a suggested branch rename was refused. | Classifier fault plus wrong repair suggestion. | open, with CGF-06 |
+| CGF-19 | Project-bound push description clear only after another review. | Documentation gap and agent error while materialising; a correct local template would have saved the last round. | open |
+| CGF-20 | Caller-authored Critic needs its own acknowledgement only late in close. | Avoidable late discovery. | with CGF-03 |
+| CGF-21 | Push-init lacked the canonical Verify file; an earlier green run was not the canonical push evidence. | Expected precondition, path and flow friction. | open |
+| CGF-22 | Automatic continuations re-checked a missing push signature and repeated the same request. | Avoidable orchestration work at a real human gate. | partly earlier-fix (bounded proof wait); Codex goal continuation open |
+
+## Operating-model comparison and audit
+
+| ID | Finding | Status |
+|---|---|---|
+| CGF-23 | Reports need candidate, gate effect, scope and current or superseded label; open report-only classes beside the blocking PASS. | with CGF-08 |
+| CGF-24 | Read isolation is only declared: observe read permission and provenance at runner or tool level and report it separately from declared scope. | open |
+| CGF-25 | Audit package is not portable: evidence spreads over `specs/.../evidence/`, ignored `evidence/`, `scratch/` and private stores. Close should produce a redacted transportable export (index, candidate and tree, mandate and changes, binding approvals, provenance, test and scanner scope including skips, review chain, acceptance status, publish readback), with missing files machine-checked. | open; 21e2 adds the evidence index and acknowledgement proof |
+| CGF-26 | Dispatch records count only host launch and return; separate worker usage receipts and per-turn events are needed. | open |
+| CGF-27 | Test-first order is self-attested; the first correction carried no test-first block. Do not report it as observed order. | open |
+| CGF-28 | `chat-gate-ceremonies/*.terminal-observed.json` records entry lifecycles, yet its name reads like chat approvals. | open |
+| CGF-29 | Generate the handover as a compact current projection and keep history apart (`docs/state.md` stayed at an intermediate state). | with CGF-12 |
+| CGF-30 | Close should not read "adoption-required" merely because active feature references were cleared. | with CGF-08 |
+
+## Method notes for transcript forensics
+
+| ID | Note | Status |
+|---|---|---|
+| CGF-31 | Naive string matching counts error codes quoted in loaded documentation as refusals; only call and result pairs count. | open, add to `references/transcript-forensics.md` if missing |
+| CGF-32 | Summing tokens: only per-response usage, never both record forms or cumulative counters. | open, same reference |
+| CGF-33 | A child's prior-session selector was refused with `MODEL-ROLE-SESSION-IDENTITY-CONFLICT`; the parent had to capture the source. | open |
+| CGF-34 | A Git-ignored `evidence/` and absent backlog make a close's backlog comparison unprovable in a consumer without a backlog (empty digest in tracked close). Report says do not backfill. | no-action |
+| CGF-35 | Number of source updates during one approved change is itself a release and reproducibility risk from a bank's view; rollout needs a pinned build. | open, release criterion |
+| CGF-36 | Runner, hook and trust setup should be provisioned centrally rather than repaired per team. | open |
+
+## Straight-run system tests proposed by the report
+
+A pinned build should pass these without a private manual file operation and without a source update:
+
+1. New consumer repository, bundled intake, every answered value reused, successful re-entry, no lost material input.
+2. Complete design package and required design signature, then autonomous implementation with disjoint dispatches and a built-in integration owner.
+3. Critic role attested beforehand, one continued review chain with bounded deltas, honest test and provenance assurance, no late surprise signature.
+4. Own generated evidence handled correctly by scanners and classifiers; freeze, Verify, signature and close stay idempotent despite own audit commits.
+5. Session transfer and real push with remote readback without endless loops; human gates rest until the event; harmless reads stay possible.
+6. An auditor can reconstruct all main and child events, the three effort pots, active time, skipped checks and the approval scope, redacted and complete; the parser knows the real Codex format.
+
+## Product comparison (no Pipeline change)
+
+The report's A/B comparison credits the Pipeline variant with read-back confirmation, partial-corruption recovery, validated image import, a persistent chore ledger and locking on unreliable storage. It rejects a numeric cost ratio as unproven and notes that real Android acceptance is pending for both variants.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** accepted
+- **Rationale:** the PO asked on 2026-11-09 for every finding to be secured and worked through.
+- **Assignment (if accepted):** candidate 21f and later; the tables carry per-finding status.
+- **Date:** 2026-11-09
