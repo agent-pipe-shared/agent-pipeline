@@ -500,6 +500,8 @@ test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed re
     assert.match(stopped.stderr, /ONESHOT-NO-ACTIVE-FEATURE/u); assert.match(stopped.stderr, /^repair: /mu);
     const usage = spawnSync(process.execPath, [script, "--one-shot", "--root", f.root, "--bogus", "x"], { encoding: "utf8" });
     assert.equal(usage.status, 2); assert.match(usage.stderr, /FINISH-USAGE/u);
+    const help = spawnSync(process.execPath, [script, "--help"], { encoding: "utf8" }); // measured: a run asked --help and was never told of the one-shot entry
+    assert.equal(help.status === 0, false); assert.match(help.stderr, /finish-feature\.mjs --one-shot --by/u);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

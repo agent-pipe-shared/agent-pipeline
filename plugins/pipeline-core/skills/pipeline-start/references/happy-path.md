@@ -111,7 +111,7 @@ Owner: `skills/close-feature/SKILL.md`. **The normal entry on every runner is on
 
 `finish-feature.mjs --one-shot --by <name> --architecture-impact <impact> [--root <root>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>]`
 
-It collects the close evidence itself, in this order: candidate Verify bound to the Critic packet, its registration, the package moves to `verifying` and `completed`, the audit request, the Continuity Result bootstrap where the feature needs one, and the coordinator phases. It stops before Verify when the Critic acknowledgement is missing, prints the one commit the close needs, and every stop names its code and the rerun command. A rerun after a commit qualifies the new HEAD again.
+It collects the close evidence itself, in this order: candidate Verify bound to the Critic packet, its registration, the package moves to `verifying` and `completed`, the audit request, the Continuity Result bootstrap where the feature needs one, and the coordinator phases. It stops before Verify when the Critic acknowledgement is missing, prints the one commit the close needs, and every stop names its code and the rerun command. The Critic addenda of the dispatch records are its job as well: do not build them ahead (a `CRITIC-COVERAGE-PENDING` notice asks for nothing yet); the close writes them and stops once with `CLOSE-CRITIC-ADDENDA-WRITTEN` and the commit. A rerun after a commit qualifies the new HEAD again.
 
 The single steps below are what it runs; use them for a recovery or when a stop names one. The coordinator returns the exact argv for each step; run it as returned, do not rebuild it from prose.
 

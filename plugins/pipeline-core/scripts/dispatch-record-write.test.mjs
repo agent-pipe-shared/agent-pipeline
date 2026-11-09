@@ -821,6 +821,8 @@ check("N33B an attested request writes the record and its result carries a typed
     assert.ok(advisory.line.includes("NVA-ATT-1") && advisory.line.includes(N33B_COMMAND) && !advisory.line.includes("\n"), advisory.line);
     assert.match(advisory.nextStep, /passed, consumed Critic receipt/u);
     assert.match(advisory.nextStep, /CLOSE-CRITIC-EVIDENCE-MISSING/u);
+    assert.match(advisory.nextStep, /Do not build the addenda by hand now/u); // measured: two runs followed this text and scripted the addenda the close writes itself
+    assert.match(advisory.nextStep, /CLOSE-CRITIC-ADDENDA-WRITTEN/u);
     // The feature close names the same command: one spelling, no second version that could drift.
     assert.ok(readFileSync(join(import.meta.dirname, "close-coordinator.mjs"), "utf8").includes(N33B_COMMAND), "close-coordinator.mjs must spell the same command");
   } finally { rmSync(root, { recursive: true, force: true }); }

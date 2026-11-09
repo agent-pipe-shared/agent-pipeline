@@ -84,7 +84,11 @@ passing evidence for exactly HEAD) and again with `--next-state completed`.
 The planner also refuses `CLOSE-CRITIC-EVIDENCE-MISSING` for a delivery-course
 dispatch record that requires a Critic and carries no bound evidence (an
 orchestrator-attested record included). A record is immutable, so the evidence
-is a separate addendum. Write one request file under `scratch/`, `evidence/` or
+is a separate addendum. **Do not build these ahead of the close:** the planner
+writes the addendum of every record exactly one consumed receipt covers, stops
+once with `CLOSE-CRITIC-ADDENDA-WRITTEN` and names the one evidence-only commit;
+commit those paths and run the close again. Only for a record that stays refused
+afterwards, write one request file under `scratch/`, `evidence/` or
 `specs/` holding the `pipeline.critic-disposition-addendum.v1` object
 (`recordPath`, `recordSha256`, `taskId`, `candidateCommit`,
 `reviewCandidateCommit`, `criticPacketId`, `criticReceiptSha256`, and a
