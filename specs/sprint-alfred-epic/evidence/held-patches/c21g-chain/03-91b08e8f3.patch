@@ -1,0 +1,13 @@
+diff --git a/harness/scripts/verify.mjs b/harness/scripts/verify.mjs
+index c39052e7883afe9a6ace1d577caeb40a291e3fb4..f166eb9a73c5f8e6ba4267c9c7384517f3834fd9 100644
+--- a/harness/scripts/verify.mjs
++++ b/harness/scripts/verify.mjs
+@@ -909,7 +909,7 @@ const TEST_SUITES = [
+   { name: "check-state-phase-consistency-tests", file: join(pluginScriptsDir, "check-state-phase-consistency.test.mjs") },
+   { name: "check-private-identifiers-tests", file: join(pluginScriptsDir, "check-private-identifiers.test.mjs") },
+   { name: "pre-commit-hook-install-tests", file: join(pluginScriptsDir, "pre-commit-hook-install.test.mjs") },
+-  { name: "commit-msg-hook-install-tests", file: join(pluginScriptsDir, "commit-msg-hook-install.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CMI001", "CMI002", "CMI003", "CMI004", "CMI005", "CMI006", "CMI007", "CMI008", "CMI009", "CMI010", "CMI011", "CMI012", "CMI013", "CMI014", "CMI015", "CMI016", "CMI017", "CMI018", "CMI019", "CMI020", "CMI021", "CMI022", "CMI023"], maxBytes: 65_536 } },
++  { name: "commit-msg-hook-install-tests", file: join(pluginScriptsDir, "commit-msg-hook-install.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["CMI001", "CMI002", "CMI003", "CMI004", "CMI005", "CMI006", "CMI007", "CMI008", "CMI009", "CMI010", "CMI011", "CMI012", "CMI013", "CMI014", "CMI015", "CMI016", "CMI017", "CMI018", "CMI019", "CMI020", "CMI021", "CMI022", "CMI023", "CMI024"], maxBytes: 65_536 } },
+   { name: "manual-check-logic-tests", file: join(repoRoot, "harness", "scripts", "manual-check-logic.test.mjs") },
+   { name: "pre-commit-hook-install-trust-anchor-bootstrap-tests", file: join(pluginScriptsDir, "pre-commit-hook-install.trust-anchor-bootstrap.test.mjs") },
+   { name: "project-onboarding-v3-unborn-head-tests", file: join(pluginScriptsDir, "project-onboarding-v3-unborn-head.test.mjs") },

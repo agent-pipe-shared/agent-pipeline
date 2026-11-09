@@ -1,0 +1,32 @@
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index a62c814c81857662fc8454489eef5fe57c9115d1..b25b6edd5f9389f846cc8163e5c81fa13b4237b0 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -760,6 +760,12 @@ whatever ref
+ `<sha>` lives on) is already correctly published. It does not itself need a
+ `push`-kind proof, because it structurally isn't one.
+ 
++**Pin the build a rollout names.** Every source update during one approved
++change is a new build, so a team that must reproduce a run needs one fixed
++build. A rollout names the exact plugin version, including its build suffix,
++and that version is installed unchanged for the whole change. A build taken
++mid-change is a development candidate and is never the release evidence.
++
+ ## Machine-readable runbook of this flow
+ 
+ The layers below are also available as a generated, machine-readable runbook,
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md b/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
+index f4da9783e44756de2ff2bf464a7b075647b2b276..b21b5fcc7effc9ca860e1e5299f6110eaaaed540 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
+@@ -90,6 +90,10 @@ general impression:
+   response. Cached input is not a price and not a count of words read.
+ - A session span is not working time: it contains idle and parallel periods.
+ - A missing raw transcript means "not established", never zero.
++- A `chat-gate-ceremonies/*.terminal-observed.json` record is one entry
++  lifecycle reaching its terminal phase (`reserved`, `running`,
++  `terminal-observed`). It is not a chat approval, so never count these files
++  as approvals by the human.
+ 
+ ## Report shape — one section per claim, independently traceable
+ 

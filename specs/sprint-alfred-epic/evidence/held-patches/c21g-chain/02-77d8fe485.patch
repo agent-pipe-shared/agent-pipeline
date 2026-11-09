@@ -1,0 +1,112 @@
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+index 409d97daf30bf75ec2f2c840696a3b1eae597bdf..1df1c4717d7db8352d31c9a53d035e57ef1a8693 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+@@ -438,7 +438,7 @@ export function completedFeaturePackageEditDenial(relPath, projectDir) {
+  *   multi-line message text `guard-devplan.mjs` has always emitted to stderr for a
+  *   BLOCKED/WARN outcome; absent for a plain "allow".
+  */
+-export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = false }) {
++export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = false, stagedCommit = false }) {
+   if (typeof filePath !== "string" || filePath === "") return { verdict: "allow" };
+ 
+   // ---- resolve absolute file_path against the project root (C1 fix) ----------------
+@@ -460,7 +460,9 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate =
+   // ---- scratch/: UNCONDITIONAL allow, before any gate evaluation ---------------------
+   if (!forceLifecycleGate && (normalizedPath.startsWith("scratch/") || isCriticScratchNotesPath(normalizedPath))) return { verdict: "allow" };
+   if (!forceLifecycleGate && isDispatchRecordCoordinationPath(normalizedPath)) return { verdict: "allow" };
+-  const packageEditDenial = completedFeaturePackageEditDenial(relPath, projectDir);
++  // C21F guards the edit, in the Edit|Write and shell lanes. At the commit boundary the file already reads verifying or completed only when its writer
++  // put it there, so the refusal could hit nothing but the writer's own output (a hand rewind reads an earlier state and never matched).
++  const packageEditDenial = stagedCommit ? null : completedFeaturePackageEditDenial(relPath, projectDir);
+   if (packageEditDenial !== null) return { verdict: "block", reason: packageEditDenial };
+ 
+   // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
+@@ -802,7 +804,7 @@ export function evaluateStagedDevPlanPaths({
+     if (GENERATED_CODEX_PROJECTION_PATHS.has(path)) continue;
+ 
+     let result;
+-    try { result = devPlanGateVerdictFn({ filePath: path, projectDir }); }
++    try { result = devPlanGateVerdictFn({ filePath: path, projectDir, stagedCommit: true }); }
+     catch { return unavailable("PIPELINE-STAGED-POLICY-FAILED", "the lifecycle policy could not evaluate a staged path"); }
+     if (result === null || typeof result !== "object" || !["allow", "block", "warn"].includes(result.verdict)) {
+       return unavailable("PIPELINE-STAGED-POLICY-INVALID", "the lifecycle policy returned an invalid result");
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
+index 3d8bbfa3eb9bcc59588970121ab23d1438884797..21d2f61985d8710755557dd2a63589ac74acce3c 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.test.mjs
+@@ -42,6 +42,10 @@ test("C21F: a feature package at verifying or completed refuses a hand edit and
+     writeFileSync(manifest, JSON.stringify({ state: "completed" }));
+     assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/spec.md", root), null);
+     assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/nested/lifecycle.json", root), null);
++    // The commit boundary: the writer's own output at completed is committable, the edit lanes keep the refusal.
++    assert.equal(devPlanGateVerdict({ filePath: "specs/feature-abc/lifecycle.json", projectDir: root, stagedCommit: true }).verdict, "allow");
++    assert.deepEqual(evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: ["specs/feature-abc/lifecycle.json"] }), { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings: [] });
++    assert.equal(devPlanGateVerdict({ filePath: "specs/feature-abc/lifecycle.json", projectDir: root }).verdict, "block");
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
+@@ -99,7 +103,7 @@ test("staged lifecycle policy adds no independent approval gate after the existi
+       devPlanGateVerdictFn(input) { seen.push(input); return { verdict: "allow" }; },
+     });
+     assert.deepEqual(result, { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings: [] });
+-    assert.deepEqual(seen, [{ filePath: "src/game.js", projectDir: root }]);
++    assert.deepEqual(seen, [{ filePath: "src/game.js", projectDir: root, stagedCommit: true }]);
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 0e24227348d5b68b71a9a6bd612e766184f3c6d2..dd0371632e5e852fbff003e0e40de3eed540ef71 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -46,6 +46,7 @@ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ import { NEUTRAL_MANIFEST } from "../lib/project-authority.mjs";
+ import * as po from "../lib/po-gate-authority.mjs";
+ import { nativeContractFixtureParent } from "../lib/test-item-approved-course-fixture.mjs";
++import { evaluateStagedDevPlanPaths } from "../lib/guard-devplan-policy.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+ import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
+ import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
+@@ -521,6 +522,11 @@ test("G20-35: the close path from implementation to release preflight is walked
+       writeJson(join(fx.root, "evidence", "tracked.json"), { schema: "pipeline.close-tracked-effects.v1", resultSha256: fileSha(resultPath), backlogSha256: emptySha,
+         handoverSha256: emptySha, historySha256: emptySha, telemetrySha256: emptySha, retrospectiveSha256: emptySha, pipelineStateSha256: fileSha(STATE) });
+       transition("tracked-close-finalized", ["--evidence", "evidence/tracked.json"]);
++      // The commit hook's staged policy over the close's real output: the package the writers moved to its final state stays committable.
++      git(log, fx.root, ["add", "."]);
++      const stagedClose = git(log, fx.root, ["diff", "--cached", "--name-only", "--no-renames"]).split("\n").filter(Boolean);
++      const stagedVerdict = evaluateStagedDevPlanPaths({ projectDir: fx.root, stagedPaths: stagedClose });
++      assert.equal(stagedVerdict.ok, true, `${identity.runner}: ${JSON.stringify(stagedVerdict.findings).slice(0, 800)}`);
+       const closeCommit = commit(log, fx.root, "chore: final tracked close");
+       transition("candidate-frozen");
+       const frozenTree = git(log, fx.root, ["rev-parse", `${closeCommit}^{tree}`]);
+diff --git a/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs b/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs
+index 2a5151760fc8a42d195dde3aeed987d818c99ed1..785f59c848666b12ea68f69c274dae909d53dc48 100644
+--- a/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs
++++ b/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs
+@@ -238,6 +238,17 @@ test("install, managed upgrade and removal preserve ownership checks", () => {
+   assert.equal(planRemoval({ rootDir: dir }).status, "nothing-to-remove");
+ });
+ 
++test("commit hook: the feature package a writer moved to completed is committable (C21F guards the edit, not the writer's commit)", () => {
++  const { dir, git } = freshRepo("staged-completed-package");
++  install(dir);
++  mkdirSync(join(dir, "specs", "feature-abc"), { recursive: true });
++  writeFileSync(join(dir, "specs", "feature-abc", "lifecycle.json"), `${JSON.stringify({ state: "completed" })}\n`);
++  assert.equal(git("add", "specs/feature-abc/lifecycle.json").status, 0);
++  const committed = git("commit", "-m", "chore(pipeline): record the feature close\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
++  assert.equal(committed.status, 0, committed.stderr);
++  assert.doesNotMatch(committed.stderr, /GUARD-FEATURE-PACKAGE-HAND-EDIT/);
++});
++
+ test("commit hook blocks unapproved staged implementation paths but still permits documentation", () => {
+   const { dir, git } = freshRepo("staged-lifecycle");
+   install(dir);
+@@ -429,7 +440,7 @@ test("--install CLI: a typed refusal thrown by the install path is reported as i
+   }
+ });
+ 
+-if (completionCases.length !== 23) throw new Error("case completion count drift: expected 23, got " + completionCases.length);
++if (completionCases.length !== 24) throw new Error("case completion count drift: expected 24, got " + completionCases.length);
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openCompletionDescriptor(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
