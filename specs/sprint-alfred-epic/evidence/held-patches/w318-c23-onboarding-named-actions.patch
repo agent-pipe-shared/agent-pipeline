@@ -1,0 +1,324 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 91853a512..123d14791 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -30,6 +30,7 @@ import {
+ // NVA-INTAKEARGV-1: the guidance renderer comes from the lib module that now owns the shape
+ // table; the table and argv emitter keep arriving through the CLI seam below, unchanged.
+ import { mutatingApplyCommandHint } from "../lib/onboarding-argv-shapes.mjs";
++import { renderProjectOnboardingAction } from "../lib/project-onboarding-v3.mjs";
+ import {
+   EVIDENCE_HOST_PATH_DENIAL_CODE,
+   checkDispatchRecordCollision,
+@@ -13322,6 +13323,115 @@ test("C21 Glob <directory>/**/* and a <directory>/**/* pattern are admitted unde
+   }
+ });
+ 
++// C23 (AC-108): the onboarding asks for the commit author at bootstrap-binding-required and its own guidance says to run
++// `git config user.name` / `user.email` there; the guard refused that very command (GUARD-LIFECYCLE-NOT-READY).
++function c23Guard(path, status, command, toolName = "Bash", extra = {}) {
++  return evaluateLifecycleReadyGuard({ tool_name: toolName, tool_input: { command } }, {
++    projectDir: path, runner: "claude", requireProjectOnboardingReadyFn() { deny(status); }, ...extra,
++  });
++}
++
++test("C23 bootstrap-binding-required admits exactly the two local author-identity writes the onboarding asks for", () => {
++  const path = root();
++  try {
++    markGovernedFixture(path);
++    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
++    const admitted = [
++      "git config user.name Ada", 'git config user.name "Ada Lovelace"', "git config user.name 'Ada Lovelace'",
++      "git config user.email ada@example.invalid", 'git config user.email "ada@example.invalid"', "git config user.email 'ada@example.invalid'",
++    ];
++    for (const command of admitted) {
++      const result = c23Guard(path, "bootstrap-binding-required", command);
++      assert.equal(result.exitCode, 0, `${command}\n${result.stderr}`);
++    }
++    const refused = [
++      "git config --global user.name x", "git config --system user.name x", "git config --local user.name x", "git config core.hooksPath x",
++      "git config user.name x ; git push", "git config --file f user.name x", "git config credential.helper x",
++      // (`git config --get user.name` is a read-only diagnostic that every status already admits before this change; it is not a write and is not part of this admission.)
++      "git config user.signingkey x", "git config user.name",
++      "git config user.name x y", "git config user.name --global", "git config user.name -x", "git config user.name ''",
++      'git config user.name "$(id)"', "git config user.name `id`", "git config user.name $HOME", "git config user.name x && git push",
++      "git config user.name x > out.txt", "git config user.email x | cat", "git config --unset user.name", "git config user.nam x", "git config USER.NAME x",
++      "git -c core.hooksPath=x config user.name x", "git config user.name x user.email y",
++    ];
++    for (const command of refused) {
++      const result = c23Guard(path, "bootstrap-binding-required", command);
++      assert.equal(result.exitCode, 2, command);
++    }
++    // Every other not-ready status keeps refusing exactly as before.
++    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.filter((value) => value !== "bootstrap-binding-required")) {
++      for (const command of admitted) {
++        const result = c23Guard(path, status, command);
++        assert.equal(result.exitCode, 2, `${status}/${command}`);
++        assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${status}/${command}`);
++      }
++    }
++  } finally { rmSync(path, { recursive: true, force: true }); }
++});
++
++test("C23 the author commands the start skill spells out are the ones bootstrap-binding-required admits (every entry path)", () => {
++  const skill = readFileSync(new URL("../skills/pipeline-start/SKILL.md", import.meta.url), "utf8");
++  const spelled = [...skill.matchAll(/git config (user\.(?:name|email)) "<(name|email)>"/gu)];
++  assert.deepEqual(spelled.map((match) => match[1]), ["user.name", "user.email"], "the skill names both forms");
++  const path = root();
++  try {
++    markGovernedFixture(path);
++    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
++    for (const [, key, placeholder] of spelled) {
++      const value = placeholder === "name" ? "Ada Lovelace" : "ada@example.invalid";
++      // Bash only: a PowerShell call never reaches the readiness gate (evaluate.mjs returns powerShellScopeVerdict() first), so it is not
++      // refused by readiness in the first place and this slice leaves that pre-existing asymmetry as it is.
++      const result = c23Guard(path, "bootstrap-binding-required", `git config ${key} "${value}"`);
++      assert.equal(result.exitCode, 0, `${key}\n${result.stderr}`);
++    }
++  } finally { rmSync(path, { recursive: true, force: true }); }
++});
++
++test("C23 runtime-initialization-required names the one exact command the onboarding returns as its nextAction; no other status and no unobserved action does", () => {
++  const path = root();
++  try {
++    markGovernedFixture(path);
++    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
++    const physical = realpathSync(path);
++    const script = join(HGO_PLUGIN_ROOT, "scripts", "project-onboarding-v3.mjs");
++    const action = {
++      kind: "command", executable: "node", argv: [script, "plan-runtime", "--root", physical, "--runner", "claude", "--intent", "session"],
++      mutation: false, requiresConfirmation: false,
++      expected: { schema: "pipeline.project-onboarding.v4", statuses: ["runtime-initialization-required"] },
++    };
++    const observe = (status, nextAction = action) => () => ({ schema: "pipeline.project-onboarding.v4", status, root: physical, intent: "session", runner: "claude", nextAction });
++    const named = c23Guard(path, "runtime-initialization-required", "touch scratch-note.txt", "Bash", { inspectProjectOnboardingV3Fn: observe("runtime-initialization-required") });
++    assert.equal(named.exitCode, 2);
++    assert.match(named.stderr, /GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is runtime-initialization-required\./u);
++    const line = `Next onboarding action (run exactly this): ${renderProjectOnboardingAction(action)}`;
++    assert.ok(named.stderr.split("\n").includes(line), `the refusal prints the observed action on one line\n${named.stderr}`);
++    // The same refusal through a Write names it too (the status, not the tool, decides).
++    const viaWrite = evaluateLifecycleReadyGuard({ tool_name: "Write", tool_input: { file_path: "src/a.mjs", content: "x\n" } }, {
++      projectDir: path, runner: "claude", requireProjectOnboardingReadyFn() { deny("runtime-initialization-required"); },
++      inspectProjectOnboardingV3Fn: observe("runtime-initialization-required"),
++    });
++    assert.equal(viaWrite.exitCode, 2);
++    assert.ok(viaWrite.stderr.split("\n").includes(line));
++    // Another status prints no such line, even when an observation carries an action.
++    const other = c23Guard(path, "partial", "touch scratch-note.txt", "Bash", { inspectProjectOnboardingV3Fn: observe("partial"), sleepSyncFn() {} });
++    assert.equal(other.exitCode, 2);
++    assert.doesNotMatch(other.stderr, /Next onboarding action/u);
++    // A disagreeing, malformed or unavailable observation prints nothing and the refusal itself stands unchanged.
++    for (const inspectProjectOnboardingV3Fn of [
++      observe("ready"), observe("runtime-initialization-required", null), observe("runtime-initialization-required", { ...action, kind: "advisory" }),
++      observe("runtime-initialization-required", { ...action, argv: [script, 42] }), () => { throw new Error("unavailable"); },
++    ]) {
++      const refusal = c23Guard(path, "runtime-initialization-required", "touch scratch-note.txt", "Bash", { inspectProjectOnboardingV3Fn });
++      assert.equal(refusal.exitCode, 2);
++      assert.match(refusal.stderr, /readiness is runtime-initialization-required\./u);
++      assert.doesNotMatch(refusal.stderr, /Next onboarding action/u);
++    }
++    // The printed command is itself admitted by the guard as the observed nextAction (it is the one thing the agent may run).
++    const run = c23Guard(path, "runtime-initialization-required", renderProjectOnboardingAction(action), "Bash", { inspectProjectOnboardingV3Fn: observe("runtime-initialization-required") });
++    assert.equal(run.exitCode, 0, run.stderr);
++  } finally { rmSync(path, { recursive: true, force: true }); }
++});
++
+ test("C21 a shell listing or rg --files of a project directory that does not exist yet is an existence probe; credentials, hidden and outside paths keep refusing", () => {
+   const path = qp4Fixture();
+   try {
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 41d9a068d..0c58cb51a 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -8,7 +8,8 @@ import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep, win
+ import { inspectSourceOwnedContinuityVerificationGuardContext, inspectSourceOwnedApprovedControllerCourse } from "../session-requester-bridge.mjs";
+ import { readOwnedVerificationPhysicalFile, recheckOwnedVerificationPhysicalRefs, readOwnedVerificationRegistration } from "../owned-continuity-verification.mjs";
+ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/owning-verification-controller.mjs";
+-import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
++import { inspectProjectOnboardingV3, renderProjectOnboardingAction } from "../project-onboarding-v3.mjs";
++import { AUTHOR_IDENTITY_FIELD_MAX_BYTES } from "../project-onboarding-v3-author-identity.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+ import { RUNNER_CAPABILITIES_SCRIPT, CHECK_PRIVATE_IDENTIFIERS_SCRIPT, CHECK_PO_GATE_AUTHORITY_SCRIPT, ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, BIND_ADR_PROPOSALS_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+@@ -1107,6 +1108,53 @@ export function isExactObservedOnboardingNextAction(command, root, dependencies
+     && (observedOnlyPlanner || sanctionedLifecycleScriptArgs(script, args, root, dependencies));
+ }
+ 
++/**
++ * C23 (AC-108): `bootstrap-binding-required` is the status where the onboarding asks the PO for the commit author, and the skill and the
++ * ask's own guidance then say to run `git config user.name "<name>"` / `git config user.email "<email>"`. This is exactly that shape and
++ * nothing wider: `git config <user.name|user.email> <one value>` in the repository's own local config. No flag, no other key, no read, no
++ * second value, and a value the shell would expand (`$`, a backtick, `\`, a glob character, a leading `~`) is refused. The value bound is
++ * the one the onboarding itself applies to the answer (AUTHOR_IDENTITY_FIELD_MAX_BYTES). The caller gates this on the status.
++ */
++export function isAuthorIdentityConfigCommand(command, root) {
++  const words = simpleWords(command, root);
++  if (!words || words.length !== 4 || words[0] !== "git" || words[1] !== "config") return false;
++  if (words[2] !== "user.name" && words[2] !== "user.email") return false;
++  const value = words[3];
++  return value.trim().length > 0 && value.length <= AUTHOR_IDENTITY_FIELD_MAX_BYTES
++    && !value.startsWith("-") && !value.startsWith("~") && !/[\r\n\0$`\\*?[]/u.test(value);
++}
++
++/**
++ * C23 (AC-108): at `runtime-initialization-required` the refusal told the agent to re-run the inspection and name no action. The action is
++ * the onboarding's own `nextAction` (the same object the producer returns, rendered by the same renderer), re-observed here exactly as
++ * observedOnboardingCommandMatch() does, never composed in text. Returns the rendered one-line command, or null when the observation is
++ * unavailable, disagrees on status/root/intent, or carries no well-formed command action: then the refusal stands without it.
++ */
++export function observedRuntimeInitializationCommand(root, dependencies = {}) {
++  let observed;
++  try {
++    observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
++      rootDir: root,
++      intent: "session",
++      runner: dependencies.runner,
++    });
++  } catch {
++    return null;
++  }
++  const action = observed?.nextAction;
++  if (observed?.schema !== "pipeline.project-onboarding.v4"
++    || observed?.status !== "runtime-initialization-required"
++    || observed?.root !== root
++    || observed?.intent !== "session"
++    || action?.kind !== "command"
++    || action.mutation !== false) return null;
++  try {
++    return renderProjectOnboardingAction(action);
++  } catch {
++    return null;
++  }
++}
++
+ /**
+  * NVA-B8-IPA: a newly installed local Codex plugin has no receipt until its
+  * own preflight publishes the one host writer that creates it. The guard used
+diff --git a/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs b/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
+index 54793b91f..77bc61e14 100644
+--- a/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
++++ b/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
+@@ -13,7 +13,8 @@ import { blocked, externalRestartOnly } from "./denial-route.mjs";
+ import { isBootstrapBindingScratchWrite, isIntakeLifecycleScratchMkdir, isIntakeLifecycleScratchWrite, isPartialLifecycleIncidentReportWrite, isPartialLifecycleScratchDirCreate, isRestartResumeHintCapture, isRestartResumeHintInputWrite, isRestartResumeHintInspect, restartResumeHintNearMissWrite, isHalfMovedRepairCommand, w04IsNonAuthorityRecordWrite } from "./write-scope.mjs";
+ import { architectureAdoptionAuthorityVerdict, architectureFitnessAuthorityVerdict, fitnessModelQualificationObservation, minimumRigorObservation } from "./entry-gates.mjs";
+ import { rootIdentityMismatch } from "./sanctioned-args-onboarding.mjs";
+-import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand, scriptHelpRefusalHint } from "./command-catalogue.mjs";
++import { LIFECYCLE_NEXT_ACTION_LINE_PREFIX } from "../human-guard-override.mjs";
++import { isAuthorIdentityConfigCommand, observedRuntimeInitializationCommand, isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand, scriptHelpRefusalHint } from "./command-catalogue.mjs";
+ import { isSanctionedGovernanceScopeDiagnosticInvocation } from "./sanctioned-args-scripts.mjs";
+ import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice } from "./rebase-lane.mjs";
+ 
+@@ -221,6 +222,16 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
+       && !restartResumeHintNearMissWrite(input, root)
+       && isBootstrapBindingScratchWrite(input, root, dependencies);
+     if (bootstrapBindingScratchWrite) return verdict(0);
++    // C23 (AC-108): the onboarding asks for the commit author at exactly this status and its guidance says to apply it with
++    // `git config user.name|user.email <value>` (local config); refusing that very command left the agent no way to follow it.
++    // Admitted by shape only (isAuthorIdentityConfigCommand), Bash only, this one status only; every other status keeps refusing.
++    const bootstrapBindingAuthorIdentity = error instanceof ProjectOnboardingReadyError
++      && error.code === "PORG-NOT-READY"
++      && error.intent === "session"
++      && error.lifecycleStatus === "bootstrap-binding-required"
++      && toolName === "Bash"
++      && isAuthorIdentityConfigCommand((input.tool_input.command ?? input.tool_input.CommandLine), root);
++    if (bootstrapBindingAuthorIdentity) return verdict(0);
+     // ALFRED-W0-4 (backlog 2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes):
+     // an invalid OBSERVATION says nothing about the lifecycle, so it must not strand a session
+     // that only wants to record a defect, a decision or a scratch note. Never keyed on a typed
+@@ -345,6 +356,15 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
+         + `the same project root as this guard's own root (${rootMismatch.root}) -- the `
+         + "refusal is a root-identity mismatch, not an unadmitted command shape."
+       : null;
++    // C23 (AC-108): at runtime-initialization-required the refusal named no action. Print the onboarding's own observed nextAction
++    // (observedRuntimeInitializationCommand), on one line; nothing is printed when it cannot be observed.
++    const runtimeInitializationCommand = error instanceof ProjectOnboardingReadyError
++      && error.code === "PORG-NOT-READY"
++      && error.intent === "session"
++      && error.lifecycleStatus === "runtime-initialization-required"
++      ? observedRuntimeInitializationCommand(root, dependencies)
++      : null;
++    const nextActionLine = runtimeInitializationCommand === null ? null : `${LIFECYCLE_NEXT_ACTION_LINE_PREFIX}${runtimeInitializationCommand}`;
+     return toolName === "Bash"
+       && (isSanctionedLifecycleCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)
+         || isSanctionedGhReadOnlyDiagnostic((input.tool_input.command ?? input.tool_input.CommandLine), root))
+@@ -360,8 +380,9 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
+         "",
+         null,
+         null,
+-        restartResumeHintNearMissHint ?? rootIdentityMismatchHint
++        [restartResumeHintNearMissHint ?? rootIdentityMismatchHint
+           ?? (toolName === "Bash" ? scriptHelpRefusalHint((input.tool_input.command ?? input.tool_input.CommandLine), root) : null),
++        nextActionLine].filter((line) => line !== null && line !== undefined).join("\n") || null,
+         invalidObservation,
+         true,
+         sessionCapabilityFailurePhase,
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index 54c8a5b06..a9f01a2d9 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -1510,6 +1510,19 @@ function lifecycleCoDenialSummary(denials, lifecycleDenial) {
+   return `Additional active guard denials: ${summaries.join(", ")}${additional > 0 ? `; ${additional} more` : ""}.`;
+ }
+ 
++// C23 (AC-108): the ONE dynamic line the transport below carries. At runtime-initialization-required the guard prints the onboarding's own
++// observed nextAction (lib/guard/lifecycle-gate.mjs); Codex and Antigravity print this transported guidance instead of the guard's text, so
++// without it they would still say "technical repair is required" and name no action. It is admitted only for that status, only once, only
++// within the byte bound, and only in the exact shape the producer renders for it (`node <...>/project-onboarding-v3.mjs plan-runtime --root
++// <root>` with its optional --runner/--intent, every word plain or single-quoted as shellWord() renders it): it is a line to read, never
++// telemetry and never an admission (the guard's own exact-observed-action check is what admits running it).
++export const LIFECYCLE_NEXT_ACTION_LINE_PREFIX = "Next onboarding action (run exactly this): ";
++const LIFECYCLE_NEXT_ACTION_WORD = "(?:[A-Za-z0-9_@%+=:,./-]+|'[^'\\r\\n]*')";
++const LIFECYCLE_NEXT_ACTION_LINE = new RegExp(
++  `^${LIFECYCLE_NEXT_ACTION_LINE_PREFIX.replace(/[()]/gu, "\\$&")}node (?:[A-Za-z0-9_@%+=:,./-]*project-onboarding-v3\\.mjs|'[^'\\r\\n]*project-onboarding-v3\\.mjs') plan-runtime --root ${LIFECYCLE_NEXT_ACTION_WORD}(?: --runner (?:claude|codex|antigravity))?(?: --intent session)?$`,
++  "u",
++);
++
+ // Transport only existing fixed guidance. Unknown text, dynamic paths and
+ // command/action payloads never become recovery telemetry or new admission.
+ function lifecycleRecoveryGuidance(denial) {
+@@ -1523,8 +1536,11 @@ function lifecycleRecoveryGuidance(denial) {
+   if (status === "intake-required" || status === "intake-design-questions-required") allowed.add("A scratch write stays admitted during intake: creating the repository's own scratch directory (mkdir or mkdir -p, including a nested path inside it) and any Edit/Write/NotebookEdit write whose resolved path is inside it.");
+   const guidance = [];
+   let bytes = 0;
++  const nextActionAdmitted = (line) => status === "runtime-initialization-required"
++    && Buffer.byteLength(line, "utf8") <= 2048 && LIFECYCLE_NEXT_ACTION_LINE.test(line)
++    && !guidance.some((kept) => kept.startsWith(LIFECYCLE_NEXT_ACTION_LINE_PREFIX));
+   for (const line of lines) {
+-    if (!allowed.has(line) || guidance.includes(line)) continue;
++    if (!(allowed.has(line) || nextActionAdmitted(line)) || guidance.includes(line)) continue;
+     const size = Buffer.byteLength(line, "utf8");
+     if (guidance.length === 4 || bytes + size > 2048) break;
+     guidance.push(line); bytes += size;
+diff --git a/plugins/pipeline-core/lib/human-guard-override.test.mjs b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+index 669e5469b..a176b1ea2 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.test.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+@@ -245,6 +245,28 @@ test("lifecycle co-denial diagnostics remain bounded", () => {
+   assert.ok(Buffer.byteLength(boundedGuidance.join("\n"), "utf8") <= 2048);
+ });
+ 
++// C23 (AC-108): Codex and Antigravity print the transported recovery guidance instead of the guard's own text, so the one
++// exact next-action line of runtime-initialization-required has to survive that transport (and nothing like it may).
++test("C23 the runtime-initialization-required next-action line is transported, only for that status and only in its exact shape", () => {
++  const header = status => `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is ${status}.`;
++  const inspection = "Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.";
++  const prefix = "Next onboarding action (run exactly this): ";
++  const command = `${prefix}node plugin/scripts/project-onboarding-v3.mjs plan-runtime --root work/project --runner codex --intent session`;
++  const recover = reason => humanGuardOverrideInternals.lifecycleNotReadyRecovery([{ guard: "guard-lifecycle-ready.mjs", reason }]);
++  const sent = recover([header("runtime-initialization-required"), inspection, command].join("\n"));
++  assert.deepEqual(sent.recoveryGuidance, [inspection, command]);
++  assert.match(sent.nextAction.reason, /Technical repair is required before retrying/u, "the fixed reason text is unchanged");
++  // Another status, a second line, a control character or a line over the byte bound is dropped.
++  assert.deepEqual(recover([header("partial"), inspection, command].join("\n")).recoveryGuidance, [inspection]);
++  assert.deepEqual(recover([header("projection-drift"), inspection, command].join("\n")).recoveryGuidance, [inspection]);
++  assert.deepEqual(recover([header("runtime-initialization-required"), inspection, command, command.replace("codex", "claude")].join("\n")).recoveryGuidance, [inspection, command]);
++  assert.deepEqual(recover([header("runtime-initialization-required"), `${command}\u0007`].join("\n")).recoveryGuidance, []);
++  assert.deepEqual(recover([header("runtime-initialization-required"), `${command} ${"x".repeat(2100)}`].join("\n")).recoveryGuidance, []);
++  assert.deepEqual(recover([header("runtime-initialization-required"), `${prefix}rm -rf /`].join("\n")).recoveryGuidance, []);
++  assert.deepEqual(recover([header("runtime-initialization-required"), `${prefix}node a.mjs plan-runtime ; touch x`].join("\n")).recoveryGuidance, []);
++  assert.deepEqual(recover([header("runtime-initialization-required"), `${prefix}node a.mjs`, "node arbitrary-command.mjs"].join("\n")).recoveryGuidance, []);
++});
++
+ /**
+  * Tamper one of pluginIdentity()'s six hashed files by changing its bytes. `.codex-plugin/
+  * plugin.json` is the one file `pluginIdentity()` runs through `JSON.parse()`, so a raw `//`
