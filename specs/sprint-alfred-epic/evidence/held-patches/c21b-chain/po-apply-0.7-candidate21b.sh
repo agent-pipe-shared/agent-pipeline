@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 21b: 16 held patches exported from the build clone chain cf73ce22d..9c94fa928
+# PO apply script for candidate 21b: 17 held patches exported from the build clone chain cf73ce22d..b4cb894a8
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -30,6 +30,7 @@ step 13-740753e7e 'test(critic): pin the rename direction the correction derivat
 step 14-9f2367dcd 'test(critic): walk a released round through the takeover to the corrected candidate'
 step 15-6441c3dfd 'fix(pipeline): name the cause of a refused proof on approve-push and the residual acceptance'
 step 16-9c94fa928 'test(pipeline): pin the proof refusal cause on approve-push'
+step 17-b4cb894a8 'fix(guard-push): name the spellings that read a commit when a marker refuses one'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

@@ -1,0 +1,45 @@
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index edc25214a679d088d8b8a2c7df67da30870246c3..ac9f1e090a66804fe2e16c9c86d70b8f4d268d7b 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -1939,6 +1939,9 @@ if (!pushBinding.ok) {
+       ? ["Why: a command that names git together with a ( ) { $ backtick or a nested shell -c is refused as a possible hidden push, even when it only reads or commits."]
+       : []),
+     "Instead: commit with `git commit -F scratch/commit-msg/<slice>.txt -- <paths>` (message in a file, paths after the double dash), and for a search use rg -n <pattern> <file> rather than git grep.",
++    // Critics read a fixed commit, so rg and a plain rev-parse suffix do not help them; these spellings pass this guard.
++    ...(/\^\{(?:tree|commit)\}/u.test(cmd) ? ["For a commit's id and tree use `git log -1 --format=%H%x20%T <commit>`, which needs no braces."] : []),
++    ...(/\sgrep\s/u.test(cmd) ? ["To search inside a commit, where rg cannot look, use `git grep -n -F <literal> <commit> -- <path>`, one literal per call, with no ( ) { $ or backslash."] : []),
+   ]);
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs b/plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs
+index ad9d5d1ba3395e1c5ecc2cc5e083de920fa8570d..fcb2ae0fc80d85e6004ed67fbc804e52ddebed6c 100644
+--- a/plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs
++++ b/plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs
+@@ -123,6 +123,26 @@ test("AC-194 flag combination: several flags together and the -e/--regexp patter
+   assertAllowed("git grep -n needle -- README.md probe.json");
+ });
+ 
++test("a refused commit-tree read names the spelling that passes, and that spelling is admitted", () => {
++  const { code, stderr } = runGuard(`git rev-parse ${head}^{tree}`);
++  assert.equal(code, 2);
++  assert.match(stderr, /git log -1 --format=%H%x20%T <commit>/u);
++  assertAllowed(`git log -1 --format=%H%x20%T ${head}`);
++});
++
++test("a refused search inside a commit names the spelling that passes, and that spelling is admitted", () => {
++  const { code, stderr } = runGuard(`git grep -n -E "alpha\\|beta" ${head} -- README.md`);
++  assert.equal(code, 2);
++  assert.match(stderr, /git grep -n -F <literal> <commit> -- <path>/u);
++  assertAllowed(`git grep -n -F fixture ${head} -- README.md`);
++});
++
++test("a refusal unrelated to reading a commit carries neither spelling", () => {
++  const { code, stderr } = runGuard("git status $( )");
++  assert.equal(code, 2);
++  assert.doesNotMatch(stderr, /--format=%H%x20%T|git grep -n -F/u);
++});
++
+ test("AC-194 no regression: the read-only classification does not open a hidden push", () => {
+   // A push buried in the pattern's command substitution, a BRE backslash alternation (Ruling 81 option B),
+   // a nested shell, and a plain push all stay refused.
