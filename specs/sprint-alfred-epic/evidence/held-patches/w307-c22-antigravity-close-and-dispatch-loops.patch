@@ -1,0 +1,261 @@
+diff --git a/plugins/pipeline-core/lib/close-cleanup-receipt.mjs b/plugins/pipeline-core/lib/close-cleanup-receipt.mjs
+index 3455cb906..da095ac9b 100644
+--- a/plugins/pipeline-core/lib/close-cleanup-receipt.mjs
++++ b/plugins/pipeline-core/lib/close-cleanup-receipt.mjs
+@@ -49,6 +49,16 @@ export function buildCleanupReceipt({ descriptors, ownSessionId, candidateOid, c
+       || seen.has(descriptor.sessionId)) refuse("descriptor entry is invalid");
+     seen.add(descriptor.sessionId);
+   }
++  // LOOP-A2. An Antigravity close whose hook record is missing cannot name its own conversation, but the close was admitted by that
++  // runner's hook, so the one Antigravity descriptor of the listing that answers `unavailable` (all a still-running session can say of
++  // itself) is its own. The inference is labelled in what the digest binds. Several are never guessed between: they are named instead.
++  const antigravity = ownSessionId === null && ownSession?.runner === "antigravity"
++    ? descriptors.filter((descriptor) => descriptor.sessionId.startsWith("antigravity-")).map((descriptor) => descriptor.sessionId).sort()
++    : [];
++  if (antigravity.length === 1 && descriptors.find((descriptor) => descriptor.sessionId === antigravity[0]).status === "unavailable") {
++    ownSessionId = antigravity[0];
++    ownSession = { ...ownSession, derivation: "inferred-single-antigravity-descriptor", reason: "no hook record for this close; the only antigravity session descriptor, answering unavailable as a running session does for itself, is taken as the closing conversation (inferred, not observed)" };
++  }
+   const own = ownSessionId === null ? null : descriptors.find((descriptor) => descriptor.sessionId === ownSessionId) ?? null;
+   const others = descriptors
+     .filter((descriptor) => descriptor.sessionId !== ownSessionId)
+@@ -70,10 +80,17 @@ export function buildCleanupReceipt({ descriptors, ownSessionId, candidateOid, c
+   // A typed result for the case the old text got wrong: the own session could not be derived, so the closing session's own
+   // descriptor (if it has one) is among the "others". That is not "other sessions remain"; the person has to know which it is.
+   const ownSessionCode = ownSessionId === null && others.length > 0 && ownSession !== null ? "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED" : null;
++  const named = ownSessionCode !== null && antigravity.length > 0;
+   return {
+     observation,
+     observationSha256,
+     ownSessionCode,
++    // The own-session record that was really used, so a caller prints the inferred derivation and not the one it passed in.
++    ownSession,
++    ...(!named ? {} : {
++      ownSessionCandidates: antigravity,
++      ownSessionHint: `${antigravity.length} active antigravity session descriptor(s) exist (${antigravity.join(", ")}) and the closing conversation could not be told among them, so none is excluded. Run write-cleanup-receipt directly as a shell command (not inside another script): the Antigravity hook records the conversation of a command that names close-coordinator.mjs or finish-feature.mjs, and the receipt then excludes exactly that one. Otherwise check them with session-cleanup.mjs status, end or clear every one that is not this conversation, and write the receipt again.`,
++    }),
+     receipt: {
+       schema: CLEANUP_RECEIPT_SCHEMA,
+       status: others.length === 0 ? "complete" : "uncertain",
+diff --git a/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs b/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs
+index fb36e45f1..c8718110b 100644
+--- a/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs
++++ b/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs
+@@ -1,13 +1,35 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ 
++import { spawnSync } from "node:child_process";
+ import { lstatSync, readFileSync, realpathSync } from "node:fs";
+ import { isAbsolute, relative, resolve, sep } from "node:path";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
+ 
+-export function prepareFromRequest(value, root = value?.root) {
++const UNTRACKED_LISTED = 5;
++
++/**
++ * LOOP-A4. `Workspace: "branch"` cuts the child's worktree from the committed HEAD, so the parent's untracked files are not in it, and a
++ * greenfield run lost a PO turn to them. Untracked and not ignored files, named before `prepared` with the step that resolves it. Information
++ * only: the guard's own check ignores untracked files on purpose, so this never refuses. [] when git cannot say. `-z` keeps a path with a space,
++ * a newline or a non-ASCII byte whole on every platform.
++ */
++function untrackedBeforeBranch(root, nativeSubagents, exceptRelativePath) {
++  if (!nativeSubagents.some((entry) => entry?.Workspace === "branch")) return null;
++  const listed = spawnSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", shell: false, timeout: 4_000, maxBuffer: 1024 * 1024 });
++  if (listed.error || listed.status !== 0) return null;
++  const files = String(listed.stdout).split("\0").filter((file) => file !== "" && file !== exceptRelativePath).sort();
++  if (files.length === 0) return null;
++  return {
++    count: files.length,
++    files: files.slice(0, UNTRACKED_LISTED),
++    step: `the branch worktree is cut from the committed HEAD and will not contain these ${files.length} untracked file(s)${files.length > UNTRACKED_LISTED ? ` (${UNTRACKED_LISTED} named)` : ""}. If the host refuses Workspace: "branch" or the child needs one of them: commit them (the ordinary commit route), add scratch-only paths to .gitignore, or move them out of the repository, then prepare again. Nothing was refused here.`,
++  };
++}
++
++export function prepareFromRequest(value, root = value?.root, { requestPath = null } = {}) {
+   if (value === null || typeof value !== "object" || Array.isArray(value)) {
+     return { status: "rejected", code: "AGY-NATIVE-REQUEST-SHAPE", modelCalls: 0, launcherCalls: 0 };
+   }
+@@ -31,7 +53,11 @@ export function prepareFromRequest(value, root = value?.root) {
+   } else {
+     return { status: "rejected", code: hasBatch && hasFlat ? "AGY-NATIVE-SHAPE-MIXED" : "AGY-NATIVE-REQUEST-SHAPE", modelCalls: 0, launcherCalls: 0 };
+   }
+-  return prepareAntigravityNativeDispatch({ root, packets: value.packets, nativeSubagents, callShape });
++  const prepared = prepareAntigravityNativeDispatch({ root, packets: value.packets, nativeSubagents, callShape });
++  if (prepared.status !== "prepared" || !Array.isArray(nativeSubagents)) return prepared;
++  const exceptRelativePath = requestPath === null ? null : relative(root, requestPath).split(sep).join("/");
++  const untracked = untrackedBeforeBranch(root, nativeSubagents, exceptRelativePath);
++  return untracked === null ? prepared : { ...prepared, untrackedBeforeBranch: untracked };
+ }
+ 
+ function requestFromArgv(argv) {
+@@ -47,7 +73,7 @@ function requestFromArgv(argv) {
+     if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 2 || stat.size > 1024 * 1024 || realpathSync(lexical) !== lexical) return null;
+     path = lexical;
+   } catch { return null; }
+-  try { return { root, value: JSON.parse(readFileSync(path, "utf8")) }; }
++  try { return { root, requestPath: path, value: JSON.parse(readFileSync(path, "utf8")) }; }
+   catch { return null; }
+ }
+ 
+@@ -57,7 +83,7 @@ if (isDirectInvocation(import.meta.url)) {
+     process.stdout.write(`${JSON.stringify({ status: "rejected", code: "AGY-NATIVE-REQUEST-JSON", modelCalls: 0, launcherCalls: 0 })}\n`);
+     process.exit(2);
+   }
+-  const result = prepareFromRequest(selected.value, selected.root);
++  const result = prepareFromRequest(selected.value, selected.root, { requestPath: selected.requestPath });
+   process.stdout.write(`${JSON.stringify(result)}\n`);
+   process.exit(result.status === "prepared" ? 0 : 2);
+ }
+diff --git a/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.test.mjs b/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.test.mjs
+new file mode 100644
+index 000000000..c9a95b819
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.test.mjs
+@@ -0,0 +1,92 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++//
++// LOOP-A4 (Antigravity greenfield 2026-11-09): `Workspace: "branch"` cuts the child's worktree from the COMMITTED HEAD, so untracked files of the
++// parent are not in it, and a run lost a PO turn to them. The prepare step names them before it reports `prepared` and says the step that
++// resolves it. It never refuses on them (the guard's own check deliberately ignores untracked files) and says nothing for a call that does not
++// ask for a branch workspace.
++
++import assert from "node:assert/strict";
++import { execFileSync, spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { dirname, join } from "node:path";
++import { test } from "node:test";
++import { fileURLToPath } from "node:url";
++
++import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
++import { prepareFromRequest } from "./antigravity-native-dispatch-prepare.mjs";
++
++const hash = (value) => createHash("sha256").update(value).digest("hex");
++const git = (root, ...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
++const prepareScript = join(dirname(fileURLToPath(import.meta.url)), "antigravity-native-dispatch-prepare.mjs");
++
++function withRepository(run) {
++  const parent = process.env.PIPELINE_TEST_TMPDIR ?? join(process.cwd(), "scratch");
++  mkdirSync(parent, { recursive: true });
++  const root = mkdtempSync(join(parent, "agy-prepare-untracked-"));
++  try {
++    writeFileSync(join(root, "input-a.txt"), "a\n");
++    writeFileSync(join(root, ".gitignore"), "ignored-dir/\n");
++    git(root, "init", "-q");
++    git(root, "config", "user.name", "Fixture");
++    git(root, "config", "user.email", "fixture@example.invalid");
++    git(root, "add", "input-a.txt", ".gitignore");
++    git(root, "commit", "-q", "-m", "fixture");
++    run(root);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++}
++
++function flatRequest(root, extra = {}) {
++  const native = { TypeName: "consult-advisor", Role: "Advisor", Prompt: "Inspect input-a.txt. Model: gemini-3.7; Ruleset-SHA: local.", Model: "pro", ...extra };
++  const packet = {
++    schema: ROLE_DISPATCH_REQUEST_SCHEMA,
++    dispatchId: "agy-native-0",
++    transport: "antigravity",
++    role: `pipeline-core:${native.TypeName}`,
++    prompt: native.Prompt,
++    candidate: { commit: git(root, "rev-parse", "HEAD"), tree: git(root, "rev-parse", "HEAD^{tree}") },
++    requiredPaths: ["input-a.txt"],
++    requiredPathSha256: { "input-a.txt": hash("a\n") },
++    resultDestination: { kind: "return" },
++  };
++  return { packets: [packet], ...native };
++}
++
++test("A4: a branch workspace with untracked files is prepared, names the files and the step, and does not refuse", () => withRepository((root) => {
++  mkdirSync(join(root, "scratch"));
++  writeFileSync(join(root, "scratch", "notes.txt"), "n\n");
++  writeFileSync(join(root, "scratch", "a name with spaces.txt"), "n\n");
++  const result = prepareFromRequest(flatRequest(root, { Workspace: "branch" }), root);
++  assert.equal(result.status, "prepared", JSON.stringify(result));
++  assert.equal(result.untrackedBeforeBranch.count, 2);
++  assert.deepEqual(result.untrackedBeforeBranch.files, ["scratch/a name with spaces.txt", "scratch/notes.txt"]);
++  assert.match(result.untrackedBeforeBranch.step, /commit them/u);
++  assert.match(result.untrackedBeforeBranch.step, /\.gitignore/u);
++  assert.match(result.untrackedBeforeBranch.step, /Workspace: "branch"/u);
++}));
++
++test("A4: a clean tree, an ignored file and a call without a branch workspace carry no notice", () => withRepository((root) => {
++  assert.equal(Object.hasOwn(prepareFromRequest(flatRequest(root, { Workspace: "branch" }), root), "untrackedBeforeBranch"), false, "a clean tree says nothing");
++  mkdirSync(join(root, "ignored-dir"));
++  writeFileSync(join(root, "ignored-dir", "x.txt"), "x\n");
++  assert.equal(Object.hasOwn(prepareFromRequest(flatRequest(root, { Workspace: "branch" }), root), "untrackedBeforeBranch"), false, "an ignored file is not untracked");
++  writeFileSync(join(root, "loose.txt"), "x\n");
++  for (const extra of [{}, { Workspace: "inherit" }, { Workspace: "share" }]) {
++    const result = prepareFromRequest(flatRequest(root, extra), root);
++    assert.equal(result.status, "prepared", JSON.stringify(result));
++    assert.equal(Object.hasOwn(result, "untrackedBeforeBranch"), false, JSON.stringify(extra));
++  }
++}));
++
++test("A4: a long list is bounded and the CLI never counts its own request file", () => withRepository((root) => {
++  for (let index = 0; index < 8; index += 1) writeFileSync(join(root, `loose-${index}.txt`), "x\n");
++  writeFileSync(join(root, "agy-request.json"), `${JSON.stringify(flatRequest(root, { Workspace: "branch" }))}\n`);
++  const run = spawnSync(process.execPath, [prepareScript, "prepare", "--root", root, "--request", "agy-request.json"], { cwd: root, encoding: "utf8", shell: false });
++  assert.equal(run.status, 0, run.stderr);
++  const output = JSON.parse(run.stdout);
++  assert.equal(output.status, "prepared");
++  assert.equal(output.untrackedBeforeBranch.count, 8, "the request file the agent itself wrote is not one of the files to resolve");
++  assert.equal(output.untrackedBeforeBranch.files.length, 5);
++  assert.ok(!output.untrackedBeforeBranch.files.includes("agy-request.json"));
++}));
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 7044476b0..3104d8997 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -855,6 +855,47 @@ test("17 cleanup receipt: an own session that could not be derived is a typed re
+   assert.equal(legacy.ownSessionCode, null);
+ });
+ 
++// LOOP-A2 (Antigravity greenfield 2026-11-09): a close stopped at CLOSE-CLEANUP-OWN-SESSION-UNDERIVED although the only descriptor was its own.
++// The hook record is the observation; when it is missing, exactly ONE antigravity descriptor in the listing of a close that the Antigravity
++// hook admitted can only be the closing conversation's own. It is labelled inferred in what the digest binds. Several are never guessed between.
++test("C22 A2 cleanup receipt: one Antigravity descriptor is the closing session, several are named and never guessed", () => {
++  const oid = h("c", 40); const tree = h("d", 40);
++  const agy = { runner: "antigravity", derivation: "unavailable", reason: "the antigravity hook recorded no current conversation for this close" };
++  const own = { sessionId: "antigravity-1a41c1ed-bb39-40db-b45a-866595bab590", descriptorSha256: h("1"), status: "unavailable" };
++  const other = { sessionId: "antigravity-99999999-aaaa-bbbb-cccc-dddddddddddd", descriptorSha256: h("2"), status: "unavailable" };
++  const build = (descriptors, ownSession = agy, ownSessionId = null) => buildCleanupReceipt({ descriptors, ownSessionId, candidateOid: oid, candidateTree: tree, ownSession });
++
++  const inferred = build([own]);
++  assert.equal(inferred.receipt.status, "complete");
++  assert.equal(inferred.ownSessionCode, null);
++  assert.equal(inferred.observation.ownSessionDerived, true);
++  assert.equal(inferred.observation.ownSessionDerivation, "inferred-single-antigravity-descriptor");
++  assert.equal(inferred.observation.excludedOwnSession.sessionId, own.sessionId, "the exclusion is named, never silent");
++  assert.deepEqual(inferred.observation.otherActiveDescriptors, []);
++  assert.equal(inferred.ownSession.derivation, "inferred-single-antigravity-descriptor", "the caller prints the derivation that was really used");
++  const observed = build([own], { runner: "antigravity", derivation: "observed", reason: "x" }, own.sessionId);
++  assert.notEqual(inferred.observationSha256, observed.observationSha256, "an inferred own session is not digest-equal to an observed one");
++
++  const several = build([own, other]);
++  assert.equal(several.receipt.status, "uncertain");
++  assert.equal(several.ownSessionCode, "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED");
++  assert.equal(several.observation.ownSessionDerived, false);
++  assert.deepEqual(several.ownSessionCandidates, [own.sessionId, other.sessionId].sort());
++  for (const id of several.ownSessionCandidates) assert.ok(several.ownSessionHint.includes(id), several.ownSessionHint);
++  assert.match(several.ownSessionHint, /session-cleanup\.mjs status/u);
++  assert.match(several.ownSessionHint, /directly as a shell command/u, "the hint names the exact way the hook records the closing conversation");
++
++  const foreignRunner = build([own, { sessionId: "codex-33333333", descriptorSha256: h("3"), status: "unavailable" }]);
++  assert.equal(foreignRunner.receipt.status, "uncertain", "a non-Antigravity descriptor still counts as another session");
++  assert.equal(foreignRunner.observation.excludedOwnSession.sessionId, own.sessionId);
++  assert.equal(foreignRunner.ownSessionCode, null, "the own session is inferred, so what remains is the ordinary 'others remain' result");
++
++  assert.equal(build([own], { ...agy, runner: "codex" }).ownSessionCode, "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED", "only an Antigravity close infers");
++  assert.equal(build([{ ...own, status: "live" }]).ownSessionCode, "CLOSE-CLEANUP-OWN-SESSION-UNDERIVED", "a descriptor that answers as live is not the still-running closing session");
++  assert.equal(build([{ ...own, status: "not-live" }]).receipt.status, "uncertain");
++  assert.equal(build([own], agy, own.sessionId).observation.ownSessionDerivation, "unavailable", "a derived own session leaves the observation as the caller reported it");
++});
++
+ test("process: drive names the missing input, plans without writing, applies one step, writes the cleanup receipt itself and stops at a human gate", () => {
+   const f = processFixture("drive", { stopAfterFreeze: true });
+   const drive = (extra, status = 0) => f.invoke(["drive", "--root", f.root, "--lifecycle", f.lifecycle, "--actor", "PO", ...extra], status);
