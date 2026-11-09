@@ -2830,6 +2830,30 @@ test("G20-72 admit binds the split; the Critic stop hook issues one Source retur
   } finally { cleanup(fx); }
 });
 
+test("C21B the merge reads the children from their Source returns, so no verdict is copied by hand, and finalize takes the result as source-issued", () => {
+  const fx = g2072Fixture();
+  try {
+    const admitted = g2072Admit(fx);
+    const none = spawnSync(process.execPath, [MERGE_SCRIPT, "--root", fx.root, "--packet", admitted.packetId], { encoding: "utf8" });
+    assert.equal(none.status, 1, none.stdout);
+    assert.equal(JSON.parse(none.stderr).code, "CSM-PACKET-NO-RECORDS", none.stderr);
+    assert.match(JSON.parse(none.stderr).message, /repair:.*--split/u);
+    const kids = ["api", "core", "shared"].map((id) => [id, g2072Child(id)]);
+    assert.match(g2072Hook(fx, criticReturn(kids[0][1])).stderr, new RegExp(`critic-split-merge\\.mjs --packet ${admitted.packetId}`, "u"));
+    const early = spawnSync(process.execPath, [MERGE_SCRIPT, "--root", fx.root, "--packet", admitted.packetId], { encoding: "utf8" });
+    assert.equal(JSON.parse(early.stderr).code, "CSM-CHILD-MISSING", early.stderr);
+    for (const [, value] of kids.slice(1)) g2072Hook(fx, criticReturn(value));
+    const mixed = spawnSync(process.execPath, [MERGE_SCRIPT, "--root", fx.root, "--packet", admitted.packetId, "--split", "scratch/x.json"], { encoding: "utf8" });
+    assert.equal(JSON.parse(mixed.stderr).code, "CSM-USAGE", mixed.stderr);
+    const run = spawnSync(process.execPath, [MERGE_SCRIPT, "--root", fx.root, "--packet", admitted.packetId, "--out", "evidence/critic-verdict.json"], { encoding: "utf8" });
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(JSON.parse(run.stdout).verdictPath, "evidence/critic-verdict.json");
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", admitted.requestPath]);
+    assert.equal(result.exitCode, 0, JSON.stringify(result.output));
+    assert.equal(result.output.independence, "source-issued-origin");
+  } finally { cleanup(fx); }
+});
+
 test("G20-72 a child verdict that names no split entry issues nothing; a packet without a split keeps the single source-return.json", async () => {
   const fx = g2072Fixture();
   try {

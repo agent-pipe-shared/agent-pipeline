@@ -2229,7 +2229,7 @@ test("G20-72 above SPLIT_MAX_CHANGED_FILES the printed result carries one split 
         .findings.some(({ code }) => code.startsWith("DISPATCH-RECRITIC")), false);
     }
     assert.match(printed.nextStep, /one Critic per split entry/u);
-    assert.match(printed.nextStep, /critic-split-merge\.mjs/u);
+    assert.match(printed.nextStep, /critic-split-merge\.mjs --root <repo> --packet <packetId>/u);
     const { admitRequest: _a, admitCommand: _c, nextStep: _n, criticDispatchPromptLines: _l, taskIdResolution: _t, split: _s, ...rest } = printed;
     assert.deepEqual(rest, preflightModule.preflightCriticDispatchWithCoverage(g2072Input(fx)), "the admit fields and the split are the only additions");
   } finally { rmSync(fx.root, { recursive: true, force: true }); }

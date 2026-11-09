@@ -3,7 +3,11 @@
 /**
  * G20-72 (candidate 20e, AC-108): merge the verdicts of the module Critics of one split review round into the one verdict the session finalizer takes.
  *
- * Usage: node critic-split-merge.mjs --root <repo> --split <split file> --child <entryId>=<verdict file> [--child ...] [--out <merged verdict file>]
+ * Usage: node critic-split-merge.mjs --root <repo> --packet <packetId> [--out <merged verdict file>]
+ *    or: node critic-split-merge.mjs --root <repo> --split <split file> --child <entryId>=<verdict file> [--child ...] [--out <merged verdict file>]
+ *
+ * `--packet` reads the admitted split and every child's verdict from the packet's Source return records, so no verdict is copied by hand (candidate 21b). The second form is for a
+ * child that has no Source return.
  *
  * The split is the object `critic-dispatch-preflight.mjs` printed (the file may also be the whole printed result, which holds it under `split`); each child file is the JSON a
  * module Critic returned, verbatim. Pure JSON in, JSON out: stdout `{ schema, status: "merged", verdictSha256, verdict, verdictPath }`; a refusal prints one line
@@ -12,16 +16,32 @@
  * All files are repository-relative regular files (no symlink, at most 1 MiB).
  */
 import { closeSync, lstatSync, openSync, readFileSync, realpathSync, writeSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { mergeSplitVerdicts } from "../lib/critic-split.mjs";
+import { readAdmittedSplit, readCriticSplitSourceReturns } from "../lib/critic-source-return.mjs";
 
 export const CRITIC_SPLIT_MERGE_RESULT_SCHEMA = "pipeline.critic-split-merge-result.v1";
 const MAX_BYTES = 1024 * 1024;
-const USAGE = "node critic-split-merge.mjs --root <repo> --split <split file> --child <entryId>=<verdict file> (one per entry) [--out <merged verdict file>]";
+const USAGE = "node critic-split-merge.mjs --root <repo> --packet <packetId> [--out <merged verdict file>], or --root <repo> --split <split file> --child <entryId>=<verdict file> (one per entry) [--out <merged verdict file>]";
 
-class MergeUsageError extends Error { constructor(message) { super(message); this.code = "CSM-USAGE"; } }
+class MergeUsageError extends Error { constructor(message, code = "CSM-USAGE") { super(message); this.code = code; } }
+
+/** The admitted split and the children of a packet, read from its Source return records. The finalizer repeats this derivation; nothing here grants anything. */
+function childrenFromPacket(root, packetId) {
+  const common = spawnSync("git", ["-C", root, "rev-parse", "--git-common-dir"], { encoding: "utf8" });
+  if (common.status !== 0) throw new MergeUsageError(`the Git directory of the repository could not be read; repair: ${USAGE}`);
+  const packetsRoot = join(resolve(root, common.stdout.trim()), "agent-pipeline", "critic-packets");
+  let records = [];
+  try { records = readCriticSplitSourceReturns({ controlRoot: packetsRoot, packetId }); } catch { records = []; }
+  if (records.length === 0) throw new MergeUsageError(`packet ${JSON.stringify(String(packetId).slice(0, 40))} holds no Critic Source return; repair: let the module Critics return through their stop, or pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-NO-RECORDS");
+  const digests = new Set(records.map((record) => record?.splitSha256));
+  const split = digests.size === 1 ? readAdmittedSplit(join(packetsRoot, packetId), [...digests][0]) : undefined;
+  if (split === undefined) throw new MergeUsageError(`the Source returns of packet ${packetId} do not bind one admitted split; repair: pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-SPLIT");
+  return { split, children: records.map((record) => ({ entryId: record.entryId, verdict: record.verdict })) };
+}
 
 function repoFile(root, path, label) {
   if (typeof path !== "string" || path === "" || isAbsolute(path)) throw new MergeUsageError(`${label} must be a repository-relative path; repair: ${USAGE}`);
@@ -44,21 +64,25 @@ export function runCriticSplitMergeCli(argv) {
     const flags = { child: [] };
     for (let index = 0; index < argv.length; index += 2) {
       const flag = argv[index], value = argv[index + 1];
-      if (!["--root", "--split", "--child", "--out"].includes(flag) || typeof value !== "string") throw new MergeUsageError(`unknown or valueless argument ${JSON.stringify(String(flag).slice(0, 40))}; repair: ${USAGE}`);
+      if (!["--root", "--packet", "--split", "--child", "--out"].includes(flag) || typeof value !== "string") throw new MergeUsageError(`unknown or valueless argument ${JSON.stringify(String(flag).slice(0, 40))}; repair: ${USAGE}`);
       if (flag === "--child") flags.child.push(value);
       else if (Object.hasOwn(flags, flag.slice(2))) throw new MergeUsageError(`${flag} was given twice; repair: ${USAGE}`);
       else flags[flag.slice(2)] = value;
     }
-    if (flags.root === undefined || flags.split === undefined) throw new MergeUsageError(`--root and --split are required; repair: ${USAGE}`);
+    if (flags.packet !== undefined && (flags.split !== undefined || flags.child.length > 0)) throw new MergeUsageError(`--packet takes no --split or --child; repair: ${USAGE}`);
+    if (flags.root === undefined || (flags.split === undefined && flags.packet === undefined)) throw new MergeUsageError(`--root and either --packet or --split are required; repair: ${USAGE}`);
     const root = realpathSync(resolve(flags.root));
-    const given = readJsonFile(root, flags.split, "--split");
-    const split = given !== null && typeof given === "object" && !Array.isArray(given) && typeof given.split === "object" && given.split !== null ? given.split : given;
-    const children = flags.child.map((spec) => {
-      const at = spec.indexOf("=");
-      if (at <= 0) throw new MergeUsageError(`--child takes <entryId>=<verdict file>; repair: ${USAGE}`);
-      return { entryId: spec.slice(0, at), verdict: readJsonFile(root, spec.slice(at + 1), `--child ${spec.slice(0, at)}`) };
-    });
-    const merged = mergeSplitVerdicts(split, children);
+    const input = flags.packet !== undefined ? childrenFromPacket(root, flags.packet) : (() => {
+      const given = readJsonFile(root, flags.split, "--split");
+      const split = given !== null && typeof given === "object" && !Array.isArray(given) && typeof given.split === "object" && given.split !== null ? given.split : given;
+      const children = flags.child.map((spec) => {
+        const at = spec.indexOf("=");
+        if (at <= 0) throw new MergeUsageError(`--child takes <entryId>=<verdict file>; repair: ${USAGE}`);
+        return { entryId: spec.slice(0, at), verdict: readJsonFile(root, spec.slice(at + 1), `--child ${spec.slice(0, at)}`) };
+      });
+      return { split, children };
+    })();
+    const merged = mergeSplitVerdicts(input.split, input.children);
     if (!merged.ok) return { exitCode: 1, stdout: "", stderr: `${JSON.stringify({ schema: CRITIC_SPLIT_MERGE_RESULT_SCHEMA, status: "rejected", code: merged.code, message: merged.message })}\n` };
     if (flags.out !== undefined) {
       const out = repoFile(root, flags.out, "--out");
