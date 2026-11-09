@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "4832cdb41e0b04625fd8403c7cc21f23ffc12352",
-    "tree": "09df76ca014c9ef8d70f09a3aa83113446c747f1"
+    "commit": "7371ff708ae366a2b0644143a61679aa2eb6c59b",
+    "tree": "785188fe44394fb0c35d4c970e23c2b2e43848f2"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -238,6 +238,7 @@
         "verify-phase:harness/scripts/verify.mjs:antigravity-alpha-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-execution-host-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-prepare-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-pretool-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-native-read-credential-roots-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
@@ -685,6 +686,7 @@
         "verify-phase:harness/scripts/verify.mjs:onboarding-init-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-inspect-prefilter-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
+        "verify-phase:harness/scripts/verify.mjs:open-minors-tests",
         "verify-phase:harness/scripts/verify.mjs:orchestrator-commit-record-tests",
         "verify-phase:harness/scripts/verify.mjs:organization-architecture-source-store-tests",
         "verify-phase:harness/scripts/verify.mjs:organization-architecture-source-tests",
@@ -2048,11 +2050,13 @@
         "duty:pipeline.user.yaml:read",
         "duty:pipeline.user.yaml:readiness",
         "duty:pipeline.user.yaml:test_author",
+        "verify-phase:harness/scripts/verify.mjs:codex-critic-launch-route-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-critic-selected-host-fallback-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-design-readiness-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-design-readiness-host-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-readiness-app-server-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-lane-fallback-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-route-assurance-tests",
         "verify-phase:harness/scripts/verify.mjs:design-readiness-course-e2e-tests",
         "verify-phase:harness/scripts/verify.mjs:design-readiness-host-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:design-readiness-runner-host-store-tests",
@@ -3443,7 +3447,8 @@
         "verify-phase:harness/scripts/verify.mjs:architecture-prospective-companion-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-prospective-materialization-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-push-currency-tests",
-        "verify-phase:harness/scripts/verify.mjs:architecture-remedy-tests"
+        "verify-phase:harness/scripts/verify.mjs:architecture-remedy-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-verdict-label-tests"
       ],
       "runners": [
         "runner-neutral"
