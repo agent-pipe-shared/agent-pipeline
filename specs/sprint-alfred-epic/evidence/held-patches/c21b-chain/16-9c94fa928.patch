@@ -1,0 +1,13 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 78fc11d80f9cbfa99b002c37551d941df616617d..6052dae684adcb606004fef119f8477dfac46f3a 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -139,6 +139,8 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
+   const afterMaterialize = approvePushAttempt(root, deps);
+   assert.ok(!afterMaterialize.lines.some((line) => line.includes("CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE")),
+     "AC-6: after materializing, the artifact resolves -- the refusal is no longer the artifact-unavailable one");
++  assert.ok(afterMaterialize.lines.some((line) => /CRITICAL-PROOF-EXTERNAL-PATH\); external proof was not consumed\. The three proof paths must be absolute/u.test(line)),
++    `a refused proof path names its cause: ${afterMaterialize.lines.join(" ")}`);
+ 
+   // End-to-end: a real signed approval, over the artifact exactly as materialized.
+   const external = mktempProjectDir();
