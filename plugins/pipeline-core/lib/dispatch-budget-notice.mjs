@@ -4,7 +4,7 @@
  * values and returns text; the hook (`hooks/guard-dispatch-budget.mjs`) does every read and write and decides who is a
  * Critic or in native host-commit mode. Runner-neutral wording: no runner-specific verb, no OS path syntax.
  */
-import { CLOSING_ALLOWANCE } from "./dispatch-budget-core.mjs";
+import { CLOSING_ALLOWANCE, MAX_GRANT_EXTRA_PER_CALL } from "./dispatch-budget-core.mjs";
 
 export const NATIVE_HOST_RETURN_SCHEMA = "pipeline.native-goldfish-host-return.v1";
 export const NATIVE_HOST_RETURN_INSTRUCTION = `return your final message as exactly one JSON object matching ${NATIVE_HOST_RETURN_SCHEMA} with outcome: "checkpoint" (changedPaths listing the files changed so far; if no file changed so far, the plain-text stop report is the only legal form) and a report carrying the condensed report plus a continuation card (done / remaining / next step) in its report field`;
@@ -54,19 +54,23 @@ export function allowContextStdout(additionalContext) {
 /**
  * G20-73: the exact grant line the dispatcher runs, built by the hook from values it already holds (plugin root, project
  * root, agent id, remaining grant headroom), so no dispatcher has to look up the script, its flags or the headroom. Paths
- * use forward slashes (accepted by node on every platform). Returns null when no grant headroom remains.
+ * use forward slashes (accepted by node on every platform). Returns null when no grant headroom remains. The line never
+ * asks for more than one grant may add: it is copied verbatim, so a value the grant script refuses would be a dead instruction.
  */
 export function grantCommandLine({ scriptPath, rootDir, agentId, headroom }) {
   if (!Number.isSafeInteger(headroom) || headroom < 1 || typeof scriptPath !== "string" || scriptPath === "") return null;
   const slash = (value) => String(value).replace(/\\/gu, "/");
   const root = typeof rootDir === "string" && rootDir !== "" ? ` --root "${slash(rootDir)}"` : "";
-  return `node "${slash(scriptPath)}" --agent-id ${agentId} --extra ${headroom} --reason "finish the remaining scope of the continuation card"${root}`;
+  return `node "${slash(scriptPath)}" --agent-id ${agentId} --extra ${Math.min(headroom, MAX_GRANT_EXTRA_PER_CALL)} --reason "finish the remaining scope of the continuation card"${root}`;
 }
 
 function grantCommandSentence(grantCommand) {
   if (!grantCommand) return "";
+  const scope = grantCommand.headroom > MAX_GRANT_EXTRA_PER_CALL
+    ? `it grants ${MAX_GRANT_EXTRA_PER_CALL} calls, the most one grant may add; ${grantCommand.headroom} calls of headroom remain and a grant is repeatable`
+    : `it grants the whole remaining headroom of ${grantCommand.headroom} call${grantCommand.headroom === 1 ? "" : "s"}`;
   return grantCommand.line
-    ? `Copy this exact line into your hand-back, so the dispatcher grants without any lookup (it grants the whole remaining headroom of ${grantCommand.headroom} call${grantCommand.headroom === 1 ? "" : "s"}): GRANT-COMMAND: ${grantCommand.line} `
+    ? `Copy this exact line into your hand-back, so the dispatcher grants without any lookup (${scope}): GRANT-COMMAND: ${grantCommand.line} `
     : "No grant headroom remains for this dispatch (working cap plus closing allowance already reach maxTurns). Say so in your hand-back with the words NO-GRANT-HEADROOM, so the dispatcher dispatches the remainder as a new task instead of trying a grant. ";
 }
 

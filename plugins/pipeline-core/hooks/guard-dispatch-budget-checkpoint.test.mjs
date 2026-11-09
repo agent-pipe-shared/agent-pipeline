@@ -505,6 +505,14 @@ register("GDBC15", "grant script: refuses malformed arguments, an unknown agent 
   assert.match(none, /NO-GRANT-HEADROOM/u);
   assert.doesNotMatch(none, /GRANT-COMMAND/u);
   assert.equal(checkpointNoticeText({ critic: true, nativeHost: false, count: 40, workingCap: 50, remaining: 10 }).includes("GRANT-COMMAND"), false, "without the field the text is the prior one");
+  // Candidate 21b (Claude greenfield): a headroom of 314 printed `--extra 314`, which the grant script refuses (at most 40 per grant). The line the
+  // notice orders copied verbatim must be one the script accepts, and the text must say the rest needs another grant.
+  const large = grantCommandLine({ scriptPath: "/p/s.mjs", rootDir: "/r", agentId: "a", headroom: 314 });
+  assert.match(large, /--extra 40 --reason/u);
+  assert.match(grantCommandLine({ scriptPath: "/p/s.mjs", rootDir: "/r", agentId: "a", headroom: 40 }), /--extra 40 --reason/u);
+  const capped = checkpointNoticeText({ critic: false, nativeHost: false, count: 70, workingCap: 80, remaining: 10, grantCommand: { headroom: 314, line: large } });
+  assert.match(capped, /it grants 40 calls, the most one grant may add; 314 calls of headroom remain and a grant is repeatable/u);
+  assert.doesNotMatch(capped, /whole remaining headroom/u);
 });
 
 function readdirSafe(dir) {
