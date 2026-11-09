@@ -1,0 +1,161 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 12807efcd72b21cf83a0969a69cc9acc76baa739..3e233f48f96f2e55461a2aa25c17c6b4593b6af2 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -1,5 +1,5 @@
+ // SPDX-License-Identifier: SUL-1.0
+-import { readCriticReviewUnit, assertFeatureCriticReviewUnitOwnership } from "./critic-generic-batch.mjs";
++import { readCriticReviewUnit, assertFeatureCriticReviewUnitOwnership, GenericCriticBatchError } from "./critic-generic-batch.mjs";
+ import { readDispatchBudgetLaunchObservation } from "./dispatch-budget-launch-observation.mjs";
+ /** Derive Critic course counters from a validated history, never request prose. */
+ import { validateCriticReviewHistory, validateCriticReviewLineage } from "./critic-review-lineage.mjs";
+@@ -915,7 +915,7 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
+  const delta=history.length&&!preparing?(typeof input.deltaRequestPath==='string'?requestRead(input,resolved,history,source,evidence):fail('CCA-DELTA-REQUIRED')):null;
+  return {resolved,history,source,evidence,criterion,delta,budgets};
+ }
+-function emptyProjection(input,error){return {schema:'pipeline.critic-course-admission.v2',courseIdentity:null,source:null,parent:null,acceptance:null,deltaRequestSha256:null,deterministicEvidenceSha256:null,budgets:null,decision:{status:error?.status??'refused',mode:null,code:error?.code??'CCA-RUNTIME-READBACK',affectedInvariantIds:[]}};}
++function emptyProjection(input,error){return {schema:'pipeline.critic-course-admission.v2',courseIdentity:null,source:null,parent:null,acceptance:null,deltaRequestSha256:null,deterministicEvidenceSha256:null,budgets:null,decision:{status:error?.status??'refused',mode:null,code:error?.code??'CCA-RUNTIME-READBACK',...(error instanceof GenericCriticBatchError&&error.detail?{reason:error.detail}:{}),affectedInvariantIds:[]}};}
+ export function readCriticCourseAdmission(input){try{const c=runtimeCompose(input);return deriveCriticCourseAdmissionV2({source:{courseIdentity:c.resolved.courseIdentity,source:c.source},acceptedCriterion:c.criterion,consumedHistory:c.history,deltaRequest:c.delta,deterministicEvidence:c.evidence,budgets:c.budgets});}catch(error){return emptyProjection(input,error);}}
+ // D223 slice 3: the registration commit of a round, derived (read-only) by the rule the admission itself applies. A candidate commit is
+ // registered by evidence-only commits that follow it (transport() requires exactly that), so the commits after the candidate on the way to
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index bfb68d22366941d9648b9ea5f8d68d9752199c12..32608a5071273d64d47e291d57d11a70fa5c6bdb 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -37,7 +37,7 @@ const exact = (v, keys) => v !== null && typeof v === "object" && !Array.isArray
+   && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k));
+ const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+ export class GenericCriticBatchError extends Error {
+-  constructor(code, detail) { super(detail ?? "Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; }
++  constructor(code, detail) { super(detail ?? "Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; this.detail = detail ?? null; }
+ }
+ function fail(code, detail) { throw new GenericCriticBatchError(code, detail); }
+ function shape(v, keys) { if (!exact(v, keys)) fail("CGB-SHAPE"); }
+@@ -745,13 +745,13 @@ export function readCriticReviewUnit(input) {
+   });
+ }
+ // PF-94: the repair text of a refused feature-course ownership names both takeover verbs.
+-const TAKEOVER_DETAIL = "Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted. The batch may belong to an earlier course key of this feature; the takeover verbs retire it when it is fully consumed and the feature has no registered lineage.";
++const TAKEOVER_DETAIL = "Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed or fully released and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted. The batch may belong to an earlier course key of this feature; the takeover verbs retire it when it is fully consumed or fully released and the feature has no registered lineage.";
+ const TAKEOVER_REPAIR = {
+   "CGB-TAKEOVER-NONE": "No batch owns these work ids; there is nothing to take over.",
+   "CGB-TAKEOVER-PARTIAL": "Only part of the work ids (or a differently scoped batch) is owned; a takeover never splits a batch. Repair the batch scope first.",
+   "CGB-TAKEOVER-COURSE": "The owner is this very feature course (same course key) and it has no unregistered round to retire; its registered lineage cannot be reset. Continue the course in delta mode from the last registered round.",
+   "CGB-TAKEOVER-HISTORY": "The feature course already has registered history; continue it in delta mode instead of taking over.",
+-  "CGB-TAKEOVER-OPEN": "The old batch has no reserved packet or a packet that is not consumed; finish or release it first. To release an expired or abandoned packet: node ${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs release --root <root> --request <file> with a request of schema pipeline.session-critic-release-request.v1 carrying packetId and reason.",
++  "CGB-TAKEOVER-OPEN": "The old batch holds a packet that is not consumed, or no packet at all without a released one. Finish that packet, or release it and inspect again: a batch of an earlier course whose packets were all released can be retired. To release an expired or abandoned packet: node ${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs release --root <root> --request <file> with a request of schema pipeline.session-critic-release-request.v1 carrying packetId and reason.",
+ };
+ function featureOwnership(c, courseKey, work) {
+   const hits = work.map(id => indexPath(c, "logical", id)).filter(p => existsSync(p)).map(p => stableJson(p));
+@@ -780,7 +780,7 @@ function packetConsumed(c, packetId) {
+ function takeoverState(c, courseKey, work, courseHistoryRegistered, registeredRounds = null) {
+   const hits = work.map(id => ({ id, p: indexPath(c, "logical", id) })).filter(h => existsSync(h.p)).map(h => ({ id: h.id, value: stableJson(h.p) }));
+   const facts = { courseKey, logicalWorkIds: work, ownedWorkIds: hits.map(h => h.id), batchRef: null, registrationSchema: null, originKind: null,
+-    originTargets: null, originEntries: [], packetIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true,
++    originTargets: null, originEntries: [], packetIds: [], releasedPacketIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true,
+     registeredRounds, scope: "batch", tailOrdinals: [] };
+   const done = refusalCode => ({ facts, refusalCode });
+   if (!hits.length) return done("CGB-TAKEOVER-NONE");
+@@ -794,6 +794,8 @@ function takeoverState(c, courseKey, work, courseHistoryRegistered, registeredRo
+   const rows = reservations(r.dir);
+   facts.packetIds = rows.map(x => x.packetId);
+   facts.allPacketsConsumed = rows.length > 0 && rows.every(x => packetConsumed(c, x.packetId));
++  // A packet release renames its reservation to released-<packetId>-<name>; those packets reviewed nothing the course keeps.
++  facts.releasedPacketIds = [...new Set(readdirSync(r.dir).map(name => /^released-([a-f0-9]{32})-.+-admission\.json$/u.exec(name)?.[1]).filter(Boolean))].sort();
+   if (facts.originKind === "feature-course" && facts.originTargets[0].courseKey === courseKey) {
+     // Same course key: only the rounds above the registered lineage (the unregistrable tail) may be retired; without the count, nothing is.
+     if (registeredRounds === null) return done("CGB-TAKEOVER-COURSE");
+@@ -804,6 +806,8 @@ function takeoverState(c, courseKey, work, courseHistoryRegistered, registeredRo
+     return done(null);
+   }
+   if (facts.courseHistoryRegistered) return done("CGB-TAKEOVER-HISTORY");
++  // The course key follows the first candidate, so a corrected candidate after a released round is a new course: the old batch has no live packet and nothing to lose.
++  if (facts.originKind === "feature-course" && rows.length === 0 && facts.releasedPacketIds.length > 0) return done(null);
+   if (!facts.allPacketsConsumed) return done("CGB-TAKEOVER-OPEN");
+   return done(null);
+ }
+@@ -939,7 +943,7 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
+       const deliveryIndex=indexPath(c,"origins",targetForPacket(packet));
+       if(existsSync(deliveryIndex)){
+         const entry=stableJson(deliveryIndex);
+-        if(!owned || !eq(entry.batchRef,owned.batchRef))fail("CGB-CONFLICT",`Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The delivery target of this packet is already indexed under another batch (batch ${entry.batchRef?.batchId}, origin kind ${entry.identity?.kind}). If that batch is fully consumed and belongs to an earlier course of this feature, retire it with the session-critic-finalizer inspect-course-takeover and supersede-course-takeover verbs; nothing is deleted.`);
++        if(!owned || !eq(entry.batchRef,owned.batchRef))fail("CGB-CONFLICT",`Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The delivery target of this packet is already indexed under another batch (batch ${entry.batchRef?.batchId}, origin kind ${entry.identity?.kind}). If that batch is fully consumed or fully released and belongs to an earlier course of this feature, retire it with the session-critic-finalizer inspect-course-takeover and supersede-course-takeover verbs; nothing is deleted.`);
+       }
+       if (!owned) {
+         if (projection.budgets.reviewRound !== 1) fail("CGB-REGISTRATION-REQUIRED");
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index 964dc949ef6b13c37b30078e64ac80e0fa48ac9c..021dc7299b6d5541da635757d5d93c3a4dac42ab 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -16,8 +16,9 @@ import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
+ import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
+ import {readdirSync,readlinkSync,fsyncSync,renameSync} from "node:fs";
+ import * as CGB from "./critic-generic-batch.mjs";
++import {releaseCriticPacket} from "./critic-packet-release.mjs";
+ 
+-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035", "CGB036", "CGB037", "CGB038"]);
++const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035", "CGB036", "CGB037", "CGB038", "CGB039"]);
+ const completionCases = [];
+ function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
+ function unit(overrides = {}) {
+@@ -725,4 +726,22 @@ test("W7 round takeover (2) a consumed tail round is retired alone: lower rounds
+     assert.equal(existsSync(join(batchDir,"full-admission.json")),true);
+   }finally{rmSync(fx.root,{recursive:true,force:true});}
+ });
++test("a takeover retires an earlier-key feature course whose packets were all released, and a live packet still refuses",()=>{
++  const fx=fixture({feature:true});try{
++    const c=reservedCourse(fx),other="9".repeat(64),packetId="e".repeat(32);
++    const input={...c.base,courseKey:other,courseHistoryRegistered:false};
++    const open=CGB.inspectFeatureCourseTakeover(input);
++    assert.equal(open.refusalCode,"CGB-TAKEOVER-OPEN");
++    assert.ok(/not consumed/u.test(open.repair)&&!open.repair.includes("no reserved packet"),open.repair);
++    assert.equal(releaseCriticPacket({controlRoot:c.controlRoot,packetId,reason:"round lost"}).reservationsFreed,1);
++    const released=CGB.inspectFeatureCourseTakeover(input);
++    assert.equal(released.refusalCode,null,JSON.stringify(released));
++    assert.deepEqual(released.packetIds,[]);
++    assert.deepEqual(released.releasedPacketIds,[packetId]);
++    assert.equal(released.scope,"batch");
++    assert.equal(CGB.inspectFeatureCourseTakeover({...input,courseHistoryRegistered:true}).refusalCode,"CGB-TAKEOVER-HISTORY");
++    assert.equal(CGB.supersedeFeatureCourseTakeover({...input,digestSha256:released.digestSha256,reason:"released round"}).status,"superseded");
++    assert.deepEqual(assertFeatureCriticReviewUnitOwnership({repoRoot:fx.root,courseKey:other,logicalWorkIds:["AC-1","AC-2"]}),{claimed:false,batchRef:null});
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
+ registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 9bc294c237cc757c3569f5de08b704ab34b794bf..4e3ec27a40d46b5ff6261212fe8074486aa1bc4d 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -458,6 +458,8 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+       const parentDetail = admission?.decision?.code === "CCA-PARENT"
+         ? criticCourseParentDetail({ repoRoot: realRoot, featureId, candidateCommit, givenBase: baseCommit ?? baseTree }) : null;
+       if (parentDetail !== null) repair = criticCourseParentRepair({ detail: parentDetail, candidate: candidateCommit, specPath: spec });
++      // A generic-batch refusal carries its own repair text; without this the caller sees only the bare code.
++      if (repair === null && admission?.decision?.code?.startsWith("CGB-") && typeof admission.decision.reason === "string") repair = admission.decision.reason;
+       return Object.freeze({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+         status: admission?.decision?.status ?? "unavailable", code: admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE",
+         ...(parentDetail === null ? {} : { detail: parentDetail }),
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index ae5f66ffafb591073321e6b584a5109e92e878c8..14afb55a4e8e69b92e42cca8e3f4884a509f8e04 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -1063,6 +1063,7 @@ test("a new feature ID cannot reset logical work after an actual feature packet
+     const denied=preflightCriticDispatch(renamed);
+     assert.equal(denied.status,"refused",JSON.stringify(denied));
+     assert.equal(denied.code,"CGB-CONFLICT");
++    assert.match(denied.repair,/inspect-course-takeover.*supersede-course-takeover/u,JSON.stringify(denied));
+     assert.equal(denied.dispatch.packetCreated,false);
+     const mixed=prepareIndexedFeature(fx.root,"mixed-renamed-scope",["scope-one","new-scope"],"feature-mixed-task");
+     assert.equal(preflightCriticDispatch(mixed).code,"CGB-CONFLICT");
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index 0c1c3add6a17ce02fae343e8b5f06d0410ac04f3..ed0cb250097ccd827dee22da9f0fdd730cf07881 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -216,7 +216,7 @@ supersede adds `"digestSha256"` and `"reason"` and uses the `...-supersede-reque
+ | `CGB-CONFLICT` | An earlier batch owns the work ids; it may belong to an earlier course key: use the takeover verbs. |
+ | `CGB-TAKEOVER-COURSE` | The owner is the SAME course key: do not take over; register its lineage with `--add-review-lineage`, or continue in delta mode. |
+ | `CGB-TAKEOVER-HISTORY` | The feature already has registered history: continue in delta mode. |
+-| `CGB-TAKEOVER-OPEN` | The old batch has no reserved packet or an unconsumed one: finish or release it first. |
++| `CGB-TAKEOVER-OPEN` | The old batch holds an unconsumed packet: finish it, or release it and inspect again (a batch of an earlier course whose packets were all released can be retired). |
+ | `FPR-LINEAGE-TRANSPORT` | The lineage does not resolve; with `CCA-TRANSPORT-SOURCE-DRIFT` (a non-evidence-only commit follows the round) it can no longer be registered: use the takeover verbs, rerun round 1. |
+ | `CCA-DELTA-REQUIRED` | A retained review exists: register a delta request, rerun preflight with its path. |
+ | `CCA-REQUESTED-MODE` | First review is full, every later one delta: rerun preflight with the required mode. |

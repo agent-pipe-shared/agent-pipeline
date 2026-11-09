@@ -1,0 +1,14 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 7696da5f264b87302ff35f2fa72c65757e941d9a..c2ab4d5c20414ca0e6fab19a9bf57815b0001854 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -794,7 +794,8 @@
+           "CGB035",
+           "CGB036",
+           "CGB037",
+-          "CGB038"
++          "CGB038",
++          "CGB039"
+         ],
+         "maxBytes": 65536
+       }
