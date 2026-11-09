@@ -16,8 +16,9 @@ import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
 import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
 import {readdirSync,readlinkSync,fsyncSync,renameSync} from "node:fs";
 import * as CGB from "./critic-generic-batch.mjs";
+import {releaseCriticPacket} from "./critic-packet-release.mjs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035", "CGB036", "CGB037", "CGB038"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035", "CGB036", "CGB037", "CGB038", "CGB039"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -723,6 +724,24 @@ test("W7 round takeover (2) a consumed tail round is retired alone: lower rounds
     const replay=CGB.supersedeFeatureCourseTakeover({...one,digestSha256:round.digestSha256,reason:"round 2 can no longer be registered"});
     assert.equal(replay.replay,true);
     assert.equal(existsSync(join(batchDir,"full-admission.json")),true);
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("a takeover retires an earlier-key feature course whose packets were all released, and a live packet still refuses",()=>{
+  const fx=fixture({feature:true});try{
+    const c=reservedCourse(fx),other="9".repeat(64),packetId="e".repeat(32);
+    const input={...c.base,courseKey:other,courseHistoryRegistered:false};
+    const open=CGB.inspectFeatureCourseTakeover(input);
+    assert.equal(open.refusalCode,"CGB-TAKEOVER-OPEN");
+    assert.ok(/not consumed/u.test(open.repair)&&!open.repair.includes("no reserved packet"),open.repair);
+    assert.equal(releaseCriticPacket({controlRoot:c.controlRoot,packetId,reason:"round lost"}).reservationsFreed,1);
+    const released=CGB.inspectFeatureCourseTakeover(input);
+    assert.equal(released.refusalCode,null,JSON.stringify(released));
+    assert.deepEqual(released.packetIds,[]);
+    assert.deepEqual(released.releasedPacketIds,[packetId]);
+    assert.equal(released.scope,"batch");
+    assert.equal(CGB.inspectFeatureCourseTakeover({...input,courseHistoryRegistered:true}).refusalCode,"CGB-TAKEOVER-HISTORY");
+    assert.equal(CGB.supersedeFeatureCourseTakeover({...input,digestSha256:released.digestSha256,reason:"released round"}).status,"superseded");
+    assert.deepEqual(assertFeatureCriticReviewUnitOwnership({repoRoot:fx.root,courseKey:other,logicalWorkIds:["AC-1","AC-2"]}),{claimed:false,batchRef:null});
   }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});

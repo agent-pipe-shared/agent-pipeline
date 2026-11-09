@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: SUL-1.0
-import { readCriticReviewUnit, assertFeatureCriticReviewUnitOwnership } from "./critic-generic-batch.mjs";
+import { readCriticReviewUnit, assertFeatureCriticReviewUnitOwnership, GenericCriticBatchError } from "./critic-generic-batch.mjs";
 import { readDispatchBudgetLaunchObservation } from "./dispatch-budget-launch-observation.mjs";
 /** Derive Critic course counters from a validated history, never request prose. */
 import { validateCriticReviewHistory, validateCriticReviewLineage } from "./critic-review-lineage.mjs";
@@ -915,7 +915,7 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
  const delta=history.length&&!preparing?(typeof input.deltaRequestPath==='string'?requestRead(input,resolved,history,source,evidence):fail('CCA-DELTA-REQUIRED')):null;
  return {resolved,history,source,evidence,criterion,delta,budgets};
 }
-function emptyProjection(input,error){return {schema:'pipeline.critic-course-admission.v2',courseIdentity:null,source:null,parent:null,acceptance:null,deltaRequestSha256:null,deterministicEvidenceSha256:null,budgets:null,decision:{status:error?.status??'refused',mode:null,code:error?.code??'CCA-RUNTIME-READBACK',affectedInvariantIds:[]}};}
+function emptyProjection(input,error){return {schema:'pipeline.critic-course-admission.v2',courseIdentity:null,source:null,parent:null,acceptance:null,deltaRequestSha256:null,deterministicEvidenceSha256:null,budgets:null,decision:{status:error?.status??'refused',mode:null,code:error?.code??'CCA-RUNTIME-READBACK',...(error instanceof GenericCriticBatchError&&error.detail?{reason:error.detail}:{}),affectedInvariantIds:[]}};}
 export function readCriticCourseAdmission(input){try{const c=runtimeCompose(input);return deriveCriticCourseAdmissionV2({source:{courseIdentity:c.resolved.courseIdentity,source:c.source},acceptedCriterion:c.criterion,consumedHistory:c.history,deltaRequest:c.delta,deterministicEvidence:c.evidence,budgets:c.budgets});}catch(error){return emptyProjection(input,error);}}
 // D223 slice 3: the registration commit of a round, derived (read-only) by the rule the admission itself applies. A candidate commit is
 // registered by evidence-only commits that follow it (transport() requires exactly that), so the commits after the candidate on the way to

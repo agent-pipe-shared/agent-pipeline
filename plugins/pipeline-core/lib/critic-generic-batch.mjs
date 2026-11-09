@@ -37,7 +37,7 @@ const exact = (v, keys) => v !== null && typeof v === "object" && !Array.isArray
   && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k));
 const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 export class GenericCriticBatchError extends Error {
-  constructor(code, detail) { super(detail ?? "Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; }
+  constructor(code, detail) { super(detail ?? "Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; this.detail = detail ?? null; }
 }
 function fail(code, detail) { throw new GenericCriticBatchError(code, detail); }
 function shape(v, keys) { if (!exact(v, keys)) fail("CGB-SHAPE"); }
@@ -745,13 +745,13 @@ export function readCriticReviewUnit(input) {
   });
 }
 // PF-94: the repair text of a refused feature-course ownership names both takeover verbs.
-const TAKEOVER_DETAIL = "Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted. The batch may belong to an earlier course key of this feature; the takeover verbs retire it when it is fully consumed and the feature has no registered lineage.";
+const TAKEOVER_DETAIL = "Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed or fully released and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted. The batch may belong to an earlier course key of this feature; the takeover verbs retire it when it is fully consumed or fully released and the feature has no registered lineage.";
 const TAKEOVER_REPAIR = {
   "CGB-TAKEOVER-NONE": "No batch owns these work ids; there is nothing to take over.",
   "CGB-TAKEOVER-PARTIAL": "Only part of the work ids (or a differently scoped batch) is owned; a takeover never splits a batch. Repair the batch scope first.",
   "CGB-TAKEOVER-COURSE": "The owner is this very feature course (same course key) and it has no unregistered round to retire; its registered lineage cannot be reset. Continue the course in delta mode from the last registered round.",
   "CGB-TAKEOVER-HISTORY": "The feature course already has registered history; continue it in delta mode instead of taking over.",
-  "CGB-TAKEOVER-OPEN": "The old batch has no reserved packet or a packet that is not consumed; finish or release it first. To release an expired or abandoned packet: node ${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs release --root <root> --request <file> with a request of schema pipeline.session-critic-release-request.v1 carrying packetId and reason.",
+  "CGB-TAKEOVER-OPEN": "The old batch holds a packet that is not consumed, or no packet at all without a released one. Finish that packet, or release it and inspect again: a batch of an earlier course whose packets were all released can be retired. To release an expired or abandoned packet: node ${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs release --root <root> --request <file> with a request of schema pipeline.session-critic-release-request.v1 carrying packetId and reason.",
 };
 function featureOwnership(c, courseKey, work) {
   const hits = work.map(id => indexPath(c, "logical", id)).filter(p => existsSync(p)).map(p => stableJson(p));
@@ -780,7 +780,7 @@ function packetConsumed(c, packetId) {
 function takeoverState(c, courseKey, work, courseHistoryRegistered, registeredRounds = null) {
   const hits = work.map(id => ({ id, p: indexPath(c, "logical", id) })).filter(h => existsSync(h.p)).map(h => ({ id: h.id, value: stableJson(h.p) }));
   const facts = { courseKey, logicalWorkIds: work, ownedWorkIds: hits.map(h => h.id), batchRef: null, registrationSchema: null, originKind: null,
-    originTargets: null, originEntries: [], packetIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true,
+    originTargets: null, originEntries: [], packetIds: [], releasedPacketIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true,
     registeredRounds, scope: "batch", tailOrdinals: [] };
   const done = refusalCode => ({ facts, refusalCode });
   if (!hits.length) return done("CGB-TAKEOVER-NONE");
@@ -794,6 +794,8 @@ function takeoverState(c, courseKey, work, courseHistoryRegistered, registeredRo
   const rows = reservations(r.dir);
   facts.packetIds = rows.map(x => x.packetId);
   facts.allPacketsConsumed = rows.length > 0 && rows.every(x => packetConsumed(c, x.packetId));
+  // A packet release renames its reservation to released-<packetId>-<name>; those packets reviewed nothing the course keeps.
+  facts.releasedPacketIds = [...new Set(readdirSync(r.dir).map(name => /^released-([a-f0-9]{32})-.+-admission\.json$/u.exec(name)?.[1]).filter(Boolean))].sort();
   if (facts.originKind === "feature-course" && facts.originTargets[0].courseKey === courseKey) {
     // Same course key: only the rounds above the registered lineage (the unregistrable tail) may be retired; without the count, nothing is.
     if (registeredRounds === null) return done("CGB-TAKEOVER-COURSE");
@@ -804,6 +806,8 @@ function takeoverState(c, courseKey, work, courseHistoryRegistered, registeredRo
     return done(null);
   }
   if (facts.courseHistoryRegistered) return done("CGB-TAKEOVER-HISTORY");
+  // The course key follows the first candidate, so a corrected candidate after a released round is a new course: the old batch has no live packet and nothing to lose.
+  if (facts.originKind === "feature-course" && rows.length === 0 && facts.releasedPacketIds.length > 0) return done(null);
   if (!facts.allPacketsConsumed) return done("CGB-TAKEOVER-OPEN");
   return done(null);
 }
@@ -939,7 +943,7 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
       const deliveryIndex=indexPath(c,"origins",targetForPacket(packet));
       if(existsSync(deliveryIndex)){
         const entry=stableJson(deliveryIndex);
-        if(!owned || !eq(entry.batchRef,owned.batchRef))fail("CGB-CONFLICT",`Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The delivery target of this packet is already indexed under another batch (batch ${entry.batchRef?.batchId}, origin kind ${entry.identity?.kind}). If that batch is fully consumed and belongs to an earlier course of this feature, retire it with the session-critic-finalizer inspect-course-takeover and supersede-course-takeover verbs; nothing is deleted.`);
+        if(!owned || !eq(entry.batchRef,owned.batchRef))fail("CGB-CONFLICT",`Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The delivery target of this packet is already indexed under another batch (batch ${entry.batchRef?.batchId}, origin kind ${entry.identity?.kind}). If that batch is fully consumed or fully released and belongs to an earlier course of this feature, retire it with the session-critic-finalizer inspect-course-takeover and supersede-course-takeover verbs; nothing is deleted.`);
       }
       if (!owned) {
         if (projection.budgets.reviewRound !== 1) fail("CGB-REGISTRATION-REQUIRED");

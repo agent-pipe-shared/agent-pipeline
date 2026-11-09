@@ -1063,6 +1063,7 @@ test("a new feature ID cannot reset logical work after an actual feature packet 
     const denied=preflightCriticDispatch(renamed);
     assert.equal(denied.status,"refused",JSON.stringify(denied));
     assert.equal(denied.code,"CGB-CONFLICT");
+    assert.match(denied.repair,/inspect-course-takeover.*supersede-course-takeover/u,JSON.stringify(denied));
     assert.equal(denied.dispatch.packetCreated,false);
     const mixed=prepareIndexedFeature(fx.root,"mixed-renamed-scope",["scope-one","new-scope"],"feature-mixed-task");
     assert.equal(preflightCriticDispatch(mixed).code,"CGB-CONFLICT");

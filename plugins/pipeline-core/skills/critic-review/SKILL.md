@@ -216,7 +216,7 @@ supersede adds `"digestSha256"` and `"reason"` and uses the `...-supersede-reque
 | `CGB-CONFLICT` | An earlier batch owns the work ids; it may belong to an earlier course key: use the takeover verbs. |
 | `CGB-TAKEOVER-COURSE` | The owner is the SAME course key: do not take over; register its lineage with `--add-review-lineage`, or continue in delta mode. |
 | `CGB-TAKEOVER-HISTORY` | The feature already has registered history: continue in delta mode. |
-| `CGB-TAKEOVER-OPEN` | The old batch has no reserved packet or an unconsumed one: finish or release it first. |
+| `CGB-TAKEOVER-OPEN` | The old batch holds an unconsumed packet: finish it, or release it and inspect again (a batch of an earlier course whose packets were all released can be retired). |
 | `FPR-LINEAGE-TRANSPORT` | The lineage does not resolve; with `CCA-TRANSPORT-SOURCE-DRIFT` (a non-evidence-only commit follows the round) it can no longer be registered: use the takeover verbs, rerun round 1. |
 | `CCA-DELTA-REQUIRED` | A retained review exists: register a delta request, rerun preflight with its path. |
 | `CCA-REQUESTED-MODE` | First review is full, every later one delta: rerun preflight with the required mode. |

@@ -458,6 +458,8 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       const parentDetail = admission?.decision?.code === "CCA-PARENT"
         ? criticCourseParentDetail({ repoRoot: realRoot, featureId, candidateCommit, givenBase: baseCommit ?? baseTree }) : null;
       if (parentDetail !== null) repair = criticCourseParentRepair({ detail: parentDetail, candidate: candidateCommit, specPath: spec });
+      // A generic-batch refusal carries its own repair text; without this the caller sees only the bare code.
+      if (repair === null && admission?.decision?.code?.startsWith("CGB-") && typeof admission.decision.reason === "string") repair = admission.decision.reason;
       return Object.freeze({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
         status: admission?.decision?.status ?? "unavailable", code: admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE",
         ...(parentDetail === null ? {} : { detail: parentDetail }),
