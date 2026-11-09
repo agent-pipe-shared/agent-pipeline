@@ -16,7 +16,7 @@ step() {
 }
 step 01-287105e71 'docs(runbooks): add the critic path and the one-shot close entry to the runner happy path'
 step 02-7e5fed8d3 'fix(close): stop the coverage notice from sending runners to hand-build addenda the close writes itself, and name the one-shot entry in the usage'
-step 03-8b622836e 'scratch/commit-msg/c21d-p3-windows-owner-route.txt'
+step 03-8b622836e 'fix(windows): admit the owner-route and controller records and find a killed owner-route call'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
