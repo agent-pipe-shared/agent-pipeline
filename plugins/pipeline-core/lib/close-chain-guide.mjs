@@ -24,12 +24,12 @@ export const CLOSE_STEP_REQUIREMENTS = Object.freeze({
     requires: ["architectureImpact"], needsAuthorized: false,
     flags: ["--architecture-impact <typed impact>", "--continuity-close-request <path> (when the feature has one)", "--audit-request <path> --critic-verify-lifecycle <id> (required at rigor >= 1)"],
     evidenceSchema: "pipeline.feature-close-audit-request.v1", humanGate: false,
-    producer: "the Critic/Verify lifecycle records and the audit request file; the plan prints the next action",
+    producer: "the Critic/Verify lifecycle records and the audit request file (its evidence.criticReports names every Critic round, so the audit bundle carries each exported report and names a missing one); the one-shot close first asks the human once whether the feature package is accepted and records the answer in the feature's acceptance record (an attribution record, not a signature); the plan prints the next action",
   },
   "tracked-close-finalized": {
     requires: ["evidence"], needsAuthorized: false, flags: ["--evidence <path>"],
     evidenceSchema: "pipeline.close-tracked-effects.v1", humanGate: false,
-    producer: "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close",
+    producer: "the tracked close effects (result, backlog, handover, history, telemetry, retrospective, pipeline state) digested after the feature close; the one-shot close hashes the calibrated handover (first brought to the closed state by update-public-handover) and telemetry/costs.md when they exist, and keeps the marked empty digest for what has no defined file",
   },
   "candidate-frozen": {
     requires: [], needsAuthorized: false, flags: [], evidenceSchema: null, humanGate: false,
