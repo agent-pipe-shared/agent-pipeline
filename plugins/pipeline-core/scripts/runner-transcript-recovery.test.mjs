@@ -1221,6 +1221,19 @@ test("G20-31 turn markers carry an end time and per-turn counters where the tran
   });
 });
 
+test("C21F: a Codex custom_tool_call counts as a tool call beside function_call; its output does not", () => {
+  withExportFixture(({ project, codexHome }) => {
+    codexSegment(codexHome, "custom.jsonl", { cwd: project, sessionId: "custom", metaTimestamp: stamp("05:00:00"), records: [
+      { timestamp: stamp("05:00:01"), type: "event_msg", payload: { type: "task_started" } },
+      { timestamp: stamp("05:00:02"), type: "response_item", payload: { type: "custom_tool_call", name: "exec", call_id: "c1", input: "text(1)" } },
+      { timestamp: stamp("05:00:03"), type: "response_item", payload: { type: "custom_tool_call_output", call_id: "c1", output: "1" } },
+      { timestamp: stamp("05:00:04"), type: "response_item", payload: { type: "function_call", name: "shell", call_id: "c2" } },
+    ] });
+    const result = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome }, sessionId: "custom" });
+    assert.equal(result.turns.markers[0].toolCallCount, 2);
+  });
+});
+
 test("G20-31 the CLI passes the page and window flags and refuses every other shape", () => {
   withFiveSessions(({ project, args }) => {
     const env = { CODEX_HOME: args.env.CODEX_HOME, CODEX_SESSION_ID: "current-session", CODEX_THREAD_ID: "current-session" };

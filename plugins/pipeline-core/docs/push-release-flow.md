@@ -785,7 +785,7 @@ refusal. The field is additive: every other result field is unchanged.
 | 4 | `pipeline-state.mjs approve-push` | Agent |
 | 5a | `git push` (non-main, proof valid) | Agent, subject to the harness classifier |
 | 5b | `git push` to `main`/protected (GG-03) | Agent — the verified approval *is* the confirmation; no `OVERRIDE GG-03`. Still subject to the harness classifier. |
-| 5c | `push-prepare.mjs --close` — the last step after a signed push: folds a LEGACY tracked push-approval record into one local commit once the remote is proven to hold the signed commit (D161); a record written by the current `approve-push` is private (D206) and leaves nothing to fold | Agent |
+| 5c | `push-prepare.mjs --close` (alone, no other flag) — the last step after a signed push: folds a LEGACY tracked push-approval record into one local commit once the remote is proven to hold the signed commit (D161); a record written by the current `approve-push` is private (D206) and leaves nothing to fold | Agent |
 | 6 | GitHub repository ruleset on the target ref | Repo admin (PO); agent can read it, not change it without an explicit decision |
 | 7 | `gh release create` (tag + release) | Agent |
 

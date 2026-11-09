@@ -96,6 +96,8 @@ function readCandidateState(dir, commit, readSource) {
 }
 
 export function parseArgs(argv) {
+  // A Codex run copied `--close` from the flow document, added the push flags, and got only the usage line back.
+  if (argv.includes("--close")) return { error: "push-prepare.mjs --close takes no other flag: run it alone, after the signed push." };
   const values = {};
   let checkpoint = false;
   for (let index = 0; index < argv.length; index += 2) {

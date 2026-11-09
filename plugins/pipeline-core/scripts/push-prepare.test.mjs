@@ -93,6 +93,12 @@ test("checkWorkingTreeClean: accepts the WSL EPERM-after-status-zero shape, but 
   }
 });
 
+test("C21F parseArgs: --close beside the push flags says to run it alone, in any position", () => {
+  for (const argv of [["--close", "--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main", "--close"]]) {
+    assert.match(parseArgs(argv).error, /--close takes no other flag/u);
+  }
+});
+
 test("parseArgs: refuses a missing --by", () => {
   const parsed = parseArgs(["--remote", "origin", "--destination", "refs/heads/main"]);
   assert.ok(parsed.error);

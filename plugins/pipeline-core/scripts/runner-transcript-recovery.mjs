@@ -748,7 +748,8 @@ function describeTurns(runner, records) {
     const ms = recordTimestampMs(row);
     if (ms !== null && (counters[turn].endMs === null || ms > counters[turn].endMs)) counters[turn].endMs = ms;
     const blocks = isObject(row?.message) && Array.isArray(row.message.content) ? row.message.content : [];
-    if ((row?.type === "response_item" && row.payload?.type === "function_call")
+    // Codex writes its code-mode `exec` calls as custom_tool_call: one record, however many tools the script inside it calls.
+    if ((row?.type === "response_item" && (row.payload?.type === "function_call" || row.payload?.type === "custom_tool_call"))
       || (runner === CLAUDE_RUNNER && row?.type === "assistant")) {
       counters[turn].toolCallCount += runner === CLAUDE_RUNNER ? blocks.filter((block) => block?.type === "tool_use").length : 1;
     }
@@ -933,7 +934,7 @@ function codexChildSessions({ found, sessionId, records, turnView, projectIdenti
     let lastRecord = output.index;
     records.forEach((row, index) => {
       const payload = row?.type === "response_item" && isObject(row.payload) ? row.payload : null;
-      if (payload !== null && (payload.type === "function_call" || payload.type === "function_call_output")
+      if (payload !== null && ["function_call", "function_call_output", "custom_tool_call", "custom_tool_call_output"].includes(payload.type)
         && index > lastRecord && JSON.stringify(payload).includes(childId)) lastRecord = index;
     });
     return { start: turnView.turnAt[startRecord], end: turnView.turnAt[lastRecord] };
