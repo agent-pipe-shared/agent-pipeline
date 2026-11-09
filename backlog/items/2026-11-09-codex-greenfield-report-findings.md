@@ -89,6 +89,19 @@ A pinned build should pass these without a private manual file operation and wit
 
 The report's A/B comparison credits the Pipeline variant with read-back confirmation, partial-corruption recovery, validated image import, a persistent chore ledger and locking on unreliable storage. It rejects a numeric cost ratio as unproven and notes that real Android acceptance is pending for both variants.
 
+## Scope decided by the PO on 2026-11-09
+
+Every finding was weighed against current code before this split.
+
+- **Candidate 21f:** all open P0, P1 and P2 findings, CGF-01 to CGF-14, with their dependents CGF-20, CGF-22, CGF-23 and CGF-29. Quick wins on top: CGF-19, CGF-21, CGF-28 (explain the name, no rename across roughly 90 uses), CGF-33 and CGF-35 (a pinned build as a release rule, documentation only).
+- **CGF-01:** 21f keeps the repaired count and the "incomplete" label. The raw export of active and child sessions moves to 0.7.1 together with the audit package CGF-25.
+- **CGF-05:** in the critical profile a `skipped` scanner blocks the close unless a named exception was recorded beforehand. `not applicable` stays allowed with a reason. Other profiles are unchanged.
+- **CGF-09:** an edit of an approved architecture file gets a notice naming the permitted route, and the existing drift check keeps blocking later. No hard refusal and no reopen route.
+- **CGF-10:** the read grammar admits `nl`, and a pipeline of readers only no longer offers a signed override. Pipelines with a writing part stay as they are. Shell-glob operands stay refused because `-g` covers them.
+- **Version 0.7.1:** CGF-16, CGF-24, CGF-25, CGF-26, CGF-36 and the automated straight-run tests 1, 2, 3 and 5. Straight-run test 4 belongs to CGF-04.
+- **Nothing further:** CGF-15 (agent error, the boundary rule is documented), CGF-17 and CGF-18 (earlier fixes, recheck in the next greenfield), CGF-27 (the record already says `self-attested; ... the order of events was not observed`), CGF-34.
+- **Left as they are:** a test-only correction after a passed Critic round keeps its bounded delta round, and the push guard exception for `git rev-parse <commit>^{tree}` is not widened.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted
