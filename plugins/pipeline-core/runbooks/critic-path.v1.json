@@ -1,0 +1,400 @@
+{
+  "schema": "pipeline.runbook.v1",
+  "pathId": "critic",
+  "generatedFrom": [
+    "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+    "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+    "plugins/pipeline-core/scripts/register-feature-package.mjs"
+  ],
+  "notGenerated": [
+    "the request files of the finalizer (finalize --help prints their closed keys)"
+  ],
+  "steps": [
+    {
+      "id": "diagnostic-evidence",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/critic-diagnostic-evidence.mjs --root <root> --spec <spec-path> --log specs/<feature>/evidence/<name>.log --out specs/<feature>/evidence/<name>.json --candidate <ref> -- <command> <args>",
+      "needs": [
+        "the candidate is committed",
+        "one diagnostic per check the Critic should read as evidence"
+      ],
+      "evidenceSchema": null,
+      "producer": "the captured log and its evidence record under specs/<feature>/evidence/",
+      "humanGate": false,
+      "next": [
+        "register-diagnostic"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "critic-diagnostic-evidence.mjs",
+        "verb": "--log",
+        "argv": [
+          "--root",
+          "<root>",
+          "--spec",
+          "<spec-path>",
+          "--log",
+          "specs/<feature>/evidence/<name>.log",
+          "--out",
+          "specs/<feature>/evidence/<name>.json",
+          "--candidate",
+          "<ref>",
+          "--",
+          "<command>",
+          "<args>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "register-diagnostic",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
+      "needs": [
+        "the diagnostic evidence, not committed yet (registration reads the working tree)"
+      ],
+      "evidenceSchema": null,
+      "producer": "the diagnostic entry in the feature manifest",
+      "humanGate": false,
+      "next": [
+        "dispatch-preflight"
+      ],
+      "commit": "commit artifact, log and manifest in one evidence-only commit",
+      "catalogue": {
+        "script": "register-feature-package.mjs",
+        "verb": "--add-diagnostic-evidence",
+        "argv": [
+          "--root",
+          "<root>",
+          "--add-diagnostic-evidence",
+          "<path>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "dispatch-preflight",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/critic-dispatch-preflight.mjs --root <root> --base <ref> --candidate <ref> --spec <spec-path> --guardrail <path> --evidence <path>",
+      "needs": [
+        "a fixed base and candidate",
+        "immediately before every Critic spawn"
+      ],
+      "evidenceSchema": "pipeline.critic-dispatch-preflight.v1",
+      "producer": "status packet-ready and the packet, or the next missing input; after an evidence-only commit add --registration-commit <that commit>, a later round adds --task-id, a delta round --delta-request and --correction-input-bindings",
+      "humanGate": false,
+      "next": [
+        "admit"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "critic-dispatch-preflight.mjs",
+        "verb": "--candidate",
+        "argv": [
+          "--root",
+          "<root>",
+          "--base",
+          "<ref>",
+          "--candidate",
+          "<ref>",
+          "--spec",
+          "<spec-path>",
+          "--guardrail",
+          "<path>",
+          "--evidence",
+          "<path>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "admit",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/session-critic-finalizer.mjs admit --root <root> --request scratch/session-critic-finalization-request.json",
+      "needs": [
+        "a packet-ready preflight"
+      ],
+      "evidenceSchema": null,
+      "producer": "the admission record for this packet",
+      "humanGate": false,
+      "next": [
+        "dispatch-critic"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "session-critic-finalizer.mjs",
+        "verb": "admit",
+        "argv": [
+          "admit",
+          "--root",
+          "<root>",
+          "--request",
+          "scratch/session-critic-finalization-request.json"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "dispatch-critic",
+      "who": "agent",
+      "command": "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template",
+      "needs": [
+        "the admission record"
+      ],
+      "evidenceSchema": null,
+      "producer": "the Critic's return; a split review returns one per child",
+      "humanGate": false,
+      "next": [
+        "finalize",
+        "split-merge"
+      ],
+      "commit": null,
+      "catalogue": null
+    },
+    {
+      "id": "split-merge",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/critic-split-merge.mjs --root <root> --packet <packetId>",
+      "needs": [
+        "a split review: every child returned"
+      ],
+      "evidenceSchema": null,
+      "producer": "the merged verdict of the parent packet",
+      "humanGate": false,
+      "next": [
+        "finalize"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "critic-split-merge.mjs",
+        "verb": "--packet",
+        "argv": [
+          "--root",
+          "<root>",
+          "--packet",
+          "<packetId>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "finalize",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/session-critic-finalizer.mjs finalize --root <root> --request scratch/session-critic-finalization-request.json",
+      "needs": [
+        "the Critic's return or the merged verdict"
+      ],
+      "evidenceSchema": null,
+      "producer": "the consumed receipt of this packet",
+      "humanGate": false,
+      "next": [
+        "export"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "session-critic-finalizer.mjs",
+        "verb": "finalize",
+        "argv": [
+          "finalize",
+          "--root",
+          "<root>",
+          "--request",
+          "scratch/session-critic-finalization-request.json"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "export",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/session-critic-finalizer.mjs export --root <root> --request scratch/session-critic-export-request.json",
+      "needs": [
+        "the consumed receipt"
+      ],
+      "evidenceSchema": null,
+      "producer": "the exported review record",
+      "humanGate": false,
+      "next": [
+        "add-review-lineage"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "session-critic-finalizer.mjs",
+        "verb": "export",
+        "argv": [
+          "export",
+          "--root",
+          "<root>",
+          "--request",
+          "scratch/session-critic-export-request.json"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "add-review-lineage",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>",
+      "needs": [
+        "the finalized packet"
+      ],
+      "evidenceSchema": null,
+      "producer": "the review lineage entry; on PASS continue with the close runbook, on findings fix them and take the delta round",
+      "humanGate": false,
+      "next": [
+        "correction-input-bindings"
+      ],
+      "commit": "commit the manifest change",
+      "catalogue": {
+        "script": "register-feature-package.mjs",
+        "verb": "--add-review-lineage",
+        "argv": [
+          "--root",
+          "<root>",
+          "--add-review-lineage",
+          "--packet",
+          "<packetId>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "correction-input-bindings",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/critic-correction-input-bindings.mjs derive --root <root> --base <commit> --head <commit> --out scratch/<file>",
+      "needs": [
+        "findings were fixed and committed"
+      ],
+      "evidenceSchema": null,
+      "producer": "the binding file --correction-input-bindings names in the delta preflight",
+      "humanGate": false,
+      "next": [
+        "add-delta-request"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "critic-correction-input-bindings.mjs",
+        "verb": "derive",
+        "argv": [
+          "derive",
+          "--root",
+          "<root>",
+          "--base",
+          "<commit>",
+          "--head",
+          "<commit>",
+          "--out",
+          "scratch/<file>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "add-delta-request",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/register-feature-package.mjs --root <root> --add-delta-request <input.json>",
+      "needs": [
+        "the correction commits and the first round's taskId"
+      ],
+      "evidenceSchema": null,
+      "producer": "the delta request of the next round",
+      "humanGate": false,
+      "next": [
+        "dispatch-preflight"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "register-feature-package.mjs",
+        "verb": "--add-delta-request",
+        "argv": [
+          "--root",
+          "<root>",
+          "--add-delta-request",
+          "<input.json>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "register-batch",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/session-critic-finalizer.mjs register-batch --root <root> --request scratch/<request.json>",
+      "needs": [
+        "recovery or batch work: several units reviewed in one round"
+      ],
+      "evidenceSchema": null,
+      "producer": "the batch registration",
+      "humanGate": false,
+      "next": [
+        "dispatch-preflight"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "session-critic-finalizer.mjs",
+        "verb": "register-batch",
+        "argv": [
+          "register-batch",
+          "--root",
+          "<root>",
+          "--request",
+          "scratch/<request.json>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "inspect-course-takeover",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/session-critic-finalizer.mjs inspect-course-takeover --root <root> --request scratch/<request.json>",
+      "needs": [
+        "recovery: a stale or conflicting round blocks the next one (read-only)"
+      ],
+      "evidenceSchema": null,
+      "producer": "what would be superseded, with its digests",
+      "humanGate": false,
+      "next": [
+        "supersede-course-takeover"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "session-critic-finalizer.mjs",
+        "verb": "inspect-course-takeover",
+        "argv": [
+          "inspect-course-takeover",
+          "--root",
+          "<root>",
+          "--request",
+          "scratch/<request.json>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "supersede-course-takeover",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/session-critic-finalizer.mjs supersede-course-takeover --root <root> --request scratch/<request.json>",
+      "needs": [
+        "the inspected takeover"
+      ],
+      "evidenceSchema": null,
+      "producer": "the old round marked superseded; nothing is deleted",
+      "humanGate": false,
+      "next": [
+        "dispatch-preflight"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "session-critic-finalizer.mjs",
+        "verb": "supersede-course-takeover",
+        "argv": [
+          "supersede-course-takeover",
+          "--root",
+          "<root>",
+          "--request",
+          "scratch/<request.json>"
+        ],
+        "closed": false
+      }
+    }
+  ]
+}

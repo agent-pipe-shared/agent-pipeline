@@ -113,7 +113,7 @@
       "producer": "evidence/dispatch-record-<TASK_ID>.json with a terminal outcome",
       "humanGate": false,
       "next": [
-        "verify"
+        "architecture-fitness"
       ],
       "commit": "commit the work with the AI-Assisted and Dispatch trailers; the record must cover the committed paths",
       "catalogue": {
@@ -129,6 +129,57 @@
       }
     },
     {
+      "id": "architecture-fitness",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/architecture-fitness.mjs --root <root> --check",
+      "needs": [
+        "the work is committed",
+        "a project with an architecture fitness model"
+      ],
+      "evidenceSchema": null,
+      "producer": "the fitness verdict of the changed modules; a violation is fixed before the Critic reads the candidate",
+      "humanGate": false,
+      "next": [
+        "architecture-boundary-check"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "architecture-fitness.mjs",
+        "verb": "--check",
+        "argv": [
+          "--root",
+          "<root>",
+          "--check"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "architecture-boundary-check",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/architecture-boundary-check.mjs --root <root> --json",
+      "needs": [
+        "a project with declared module boundaries"
+      ],
+      "evidenceSchema": null,
+      "producer": "read-only boundary findings as JSON",
+      "humanGate": false,
+      "next": [
+        "verify"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "architecture-boundary-check.mjs",
+        "verb": "--json",
+        "argv": [
+          "--root",
+          "<root>",
+          "--json"
+        ],
+        "closed": false
+      }
+    },
+    {
       "id": "verify",
       "who": "agent",
       "command": "<the project's verify command from its calibration>",
@@ -136,7 +187,7 @@
         "the work is committed"
       ],
       "evidenceSchema": null,
-      "producer": "the Verify evidence file for the candidate commit",
+      "producer": "the Verify evidence file for the candidate commit; continue with the critic runbook",
       "humanGate": false,
       "next": [],
       "commit": null,

@@ -65,7 +65,7 @@ test("the CLI prints the table, one runner's column, and refuses anything else",
   assert.equal(main(["--runner", "antigravity"], one.out), 0);
   const column = JSON.parse(one.lines.join(""));
   assert.equal(column.runner, "antigravity");
-  assert.equal(column.rows.find((row) => row.topic === "Close entry").value, "`finish-feature.mjs` single entry");
+  assert.equal(column.rows.find((row) => row.topic === "Close entry").value, "`finish-feature.mjs --one-shot`");
   const bad = capture();
   assert.equal(main(["--runner", "gemini"], bad.out), 2);
   assert.equal(JSON.parse(bad.lines.join("")).ok, false);

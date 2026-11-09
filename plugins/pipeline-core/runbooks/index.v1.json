@@ -5,7 +5,7 @@
       "pathId": "close",
       "path": "plugins/pipeline-core/runbooks/close-path.v1.json",
       "schema": "pipeline.runbook.v1",
-      "sha256": "258204a0e66d5d2d930b9364ab86adccdbd77cdeb1e0452185e29cbf6e43a4c4"
+      "sha256": "32b7800bdfe0144ad62e0a1b92202da137778b1cd606a8519ea64c850461f407"
     },
     {
       "pathId": "start",
@@ -17,13 +17,19 @@
       "pathId": "plan",
       "path": "plugins/pipeline-core/runbooks/plan-path.v1.json",
       "schema": "pipeline.runbook.v1",
-      "sha256": "8148350e36652cc228b648ba397c36e44e1203be784fb71f02fcb0d0b9dfee4e"
+      "sha256": "3f2bbdadd60dc4a46212844348e4b159594fde1a6da01154f6c6cbd423f8f908"
     },
     {
       "pathId": "implement",
       "path": "plugins/pipeline-core/runbooks/implement-path.v1.json",
       "schema": "pipeline.runbook.v1",
-      "sha256": "456ef95efbb5726c48497147d5f6ba9265a2aa73556c718513a697ffac2e52bb"
+      "sha256": "715e012035787d2fcea63710a35c3fe3bda66df28373bef992e6f1d19da748bc"
+    },
+    {
+      "pathId": "critic",
+      "path": "plugins/pipeline-core/runbooks/critic-path.v1.json",
+      "schema": "pipeline.runbook.v1",
+      "sha256": "8c0a5b92f0cba9ee593def124e40bfbbe41ffd8aa772a4656b7a6c1a01c30bb9"
     },
     {
       "pathId": "push",

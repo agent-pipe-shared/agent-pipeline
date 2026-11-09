@@ -63,7 +63,24 @@ function planSteps() {
       id: "record-decisions", command: "call the architecture-decision skill once for each decision the design lists under decisions to record, and write the ADR at the path the design names",
       needs: ["the design package names its decisions to record (title, trigger, ADR path) in the module adrReferences"],
       producer: "one ADR file per named path under docs/adr/; report-only: the readiness review asks about missing ones and the close readback lists which named paths exist, neither blocks",
-      commit: "commit the ADRs with the design", next: ["submit-plan"],
+      commit: "commit the ADRs with the design", next: ["create-adr", "design-review-receipt", "submit-plan"],
+    }),
+    scriptStep({
+      id: "create-adr", script: "create-adr.mjs", verb: "--slug", argv: ["--root", "<root>", "--slug", "<slug>", "--title", "<title>"],
+      needs: ["a decision that must be accepted with this design (a proposal, never an accepted record)"],
+      producer: "docs/adr/draft-<slug>.md and .json with status proposed; --refresh recomputes the digest after an edit of the Markdown", next: ["bind-adr-proposals"],
+    }),
+    scriptStep({
+      id: "bind-adr-proposals", script: "bind-adr-proposals.mjs", verb: "--carrier",
+      argv: ["--root", "<root>", "--feature", "<feature-id>", "--carrier", "<design.md>", "--selection", "<po-selection.json>", "--draft", "<slug>"],
+      needs: ["the proposals from create-adr", "the PO's selection file"],
+      producer: "the prospective selection and manifest beside the carrier, the decision bindings block in the carrier, and every companion path the review receipt must carry", next: ["design-review-receipt"],
+    }),
+    scriptStep({
+      id: "design-review-receipt", script: "design-review-receipt.mjs", verb: "create",
+      argv: ["create", "--repo", "<root>", "--feature", "<feature-id>", "--report", "<review-report-path>", "--prd", "<prd-path>", "--spec", "<spec-path>", "--out", "<review-receipt-path>"],
+      needs: ["the read-only readiness review of the design (pipeline-core:readiness-reviewer, not the Critic)"],
+      producer: "the tracked design review receipt present-plan and prepare-seal name; never written by hand", commit: "commit the receipt with the design", next: ["submit-plan"],
     }),
     scriptStep({
       id: "submit-plan", script: STATE, verb: "submit-plan", closed: true, argv: ["submit-plan", "--by", "<name>", "--profile", "<epic|feature|mini>"],
@@ -92,7 +109,17 @@ function planSteps() {
     scriptStep({
       id: "approve-plan", script: STATE, verb: "approve-plan", argv: ["approve-plan", "--design-workflow-approval-request", "<design-approval-request-path>"],
       needs: ["the plan is presented", "the PO's proof (signature mode) or the attended chat confirmation (chat mode: --by <po-name> instead)"],
-      producer: "plan approval recorded in pipeline state, lifecycle approved; for a draft package the same approval seals the PRD and the Spec (the one signature is the seal); continue with the implement runbook", next: [],
+      producer: "plan approval recorded in pipeline state, lifecycle approved; for a draft package the same approval seals the PRD and the Spec (the one signature is the seal)", next: ["register-feature-package"],
+    }),
+    scriptStep({
+      id: "register-feature-package", script: "register-feature-package.mjs", verb: "--root", argv: ["--root", "<root>"],
+      needs: ["the approved plan"], producer: "the feature package manifest; its commitPaths are committed before any item binding is generated",
+      commit: "commit the printed commitPaths in one commit", next: ["materialize-architecture"],
+    }),
+    scriptStep({
+      id: "materialize-architecture", script: STATE, verb: "materialize-architecture", argv: ["materialize-architecture"],
+      needs: ["greenfield only: the approved PRD carries the architecture design block"],
+      producer: "the architecture map, fitness model and baseline, and the accepted ADR records the signed package pre-bound; continue with the implement runbook", next: [],
     }),
     scriptStep({
       id: "reopen-design", script: STATE, verb: "reopen-design", closed: true, argv: ["reopen-design", "--by", "<name>"],
@@ -132,17 +159,80 @@ function implementSteps() {
     scriptStep({
       id: "dispatch-record-write", script: "dispatch-record-write.mjs", verb: "--request", argv: ["--repo-root", "<root>", "--request", "<request.json>"],
       needs: ["the Goldfish report"], producer: "evidence/dispatch-record-<TASK_ID>.json with a terminal outcome",
-      commit: "commit the work with the AI-Assisted and Dispatch trailers; the record must cover the committed paths", next: ["verify"],
+      commit: "commit the work with the AI-Assisted and Dispatch trailers; the record must cover the committed paths", next: ["architecture-fitness"],
+    }),
+    scriptStep({
+      id: "architecture-fitness", script: "architecture-fitness.mjs", verb: "--check", argv: ["--root", "<root>", "--check"],
+      needs: ["the work is committed", "a project with an architecture fitness model"], producer: "the fitness verdict of the changed modules; a violation is fixed before the Critic reads the candidate", next: ["architecture-boundary-check"],
+    }),
+    scriptStep({
+      id: "architecture-boundary-check", script: "architecture-boundary-check.mjs", verb: "--json", argv: ["--root", "<root>", "--json"],
+      needs: ["a project with declared module boundaries"], producer: "read-only boundary findings as JSON", next: ["verify"],
     }),
     otherStep({
       id: "verify", command: "<the project's verify command from its calibration>",
-      needs: ["the work is committed"], producer: "the Verify evidence file for the candidate commit", next: [],
+      needs: ["the work is committed"], producer: "the Verify evidence file for the candidate commit; continue with the critic runbook", next: [],
     }),
     scriptStep({
       id: "materialize-push-threat-model", script: STATE, verb: "materialize-push-threat-model", closed: true, argv: ["materialize-push-threat-model"],
       needs: ["the push gate needs a push threat model and project/push-threat-model.md is absent (inspect offers this step then)"],
       producer: "the governed template file project/push-threat-model.md", commit: "commit project/push-threat-model.md with the Close commit", next: [],
     }),
+  ];
+}
+
+const FINALIZER = "session-critic-finalizer.mjs";
+const REGISTER = "register-feature-package.mjs";
+const finalizerStep = (id, verb, request, rest) => scriptStep({ id, script: FINALIZER, verb, argv: [verb, "--root", "<root>", "--request", request], ...rest });
+
+/** C21C: the Critic path, in the order real runs walked it; collecting the evidence comes first, the recovery branches last. */
+function criticSteps() {
+  const finalization = "scratch/session-critic-finalization-request.json";
+  return [
+    scriptStep({
+      id: "diagnostic-evidence", script: "critic-diagnostic-evidence.mjs", verb: "--log",
+      argv: ["--root", "<root>", "--spec", "<spec-path>", "--log", "specs/<feature>/evidence/<name>.log", "--out", "specs/<feature>/evidence/<name>.json", "--candidate", "<ref>", "--", "<command>", "<args>"],
+      needs: ["the candidate is committed", "one diagnostic per check the Critic should read as evidence"],
+      producer: "the captured log and its evidence record under specs/<feature>/evidence/", next: ["register-diagnostic"],
+    }),
+    scriptStep({
+      id: "register-diagnostic", script: REGISTER, verb: "--add-diagnostic-evidence", argv: ["--root", "<root>", "--add-diagnostic-evidence", "<path>"],
+      needs: ["the diagnostic evidence, not committed yet (registration reads the working tree)"], producer: "the diagnostic entry in the feature manifest",
+      commit: "commit artifact, log and manifest in one evidence-only commit", next: ["dispatch-preflight"],
+    }),
+    scriptStep({
+      id: "dispatch-preflight", script: "critic-dispatch-preflight.mjs", verb: "--candidate",
+      argv: ["--root", "<root>", "--base", "<ref>", "--candidate", "<ref>", "--spec", "<spec-path>", "--guardrail", "<path>", "--evidence", "<path>"],
+      needs: ["a fixed base and candidate", "immediately before every Critic spawn"], evidenceSchema: "pipeline.critic-dispatch-preflight.v1",
+      producer: "status packet-ready and the packet, or the next missing input; after an evidence-only commit add --registration-commit <that commit>, a later round adds --task-id, a delta round --delta-request and --correction-input-bindings", next: ["admit"],
+    }),
+    finalizerStep("admit", "admit", finalization, { needs: ["a packet-ready preflight"], producer: "the admission record for this packet", next: ["dispatch-critic"] }),
+    otherStep({
+      id: "dispatch-critic", command: "dispatch one fresh read-only Critic with its pipeline-core agent type, built from the critic-review template",
+      needs: ["the admission record"], producer: "the Critic's return; a split review returns one per child", next: ["finalize", "split-merge"],
+    }),
+    scriptStep({
+      id: "split-merge", script: "critic-split-merge.mjs", verb: "--packet", argv: ["--root", "<root>", "--packet", "<packetId>"],
+      needs: ["a split review: every child returned"], producer: "the merged verdict of the parent packet", next: ["finalize"],
+    }),
+    finalizerStep("finalize", "finalize", finalization, { needs: ["the Critic's return or the merged verdict"], producer: "the consumed receipt of this packet", next: ["export"] }),
+    finalizerStep("export", "export", "scratch/session-critic-export-request.json", { needs: ["the consumed receipt"], producer: "the exported review record", next: ["add-review-lineage"] }),
+    scriptStep({
+      id: "add-review-lineage", script: REGISTER, verb: "--add-review-lineage", argv: ["--root", "<root>", "--add-review-lineage", "--packet", "<packetId>"],
+      needs: ["the finalized packet"], producer: "the review lineage entry; on PASS continue with the close runbook, on findings fix them and take the delta round", commit: "commit the manifest change", next: ["correction-input-bindings"],
+    }),
+    scriptStep({
+      id: "correction-input-bindings", script: "critic-correction-input-bindings.mjs", verb: "derive",
+      argv: ["derive", "--root", "<root>", "--base", "<commit>", "--head", "<commit>", "--out", "scratch/<file>"],
+      needs: ["findings were fixed and committed"], producer: "the binding file --correction-input-bindings names in the delta preflight", next: ["add-delta-request"],
+    }),
+    scriptStep({
+      id: "add-delta-request", script: REGISTER, verb: "--add-delta-request", argv: ["--root", "<root>", "--add-delta-request", "<input.json>"],
+      needs: ["the correction commits and the first round's taskId"], producer: "the delta request of the next round", next: ["dispatch-preflight"],
+    }),
+    finalizerStep("register-batch", "register-batch", "scratch/<request.json>", { needs: ["recovery or batch work: several units reviewed in one round"], producer: "the batch registration", next: ["dispatch-preflight"] }),
+    finalizerStep("inspect-course-takeover", "inspect-course-takeover", "scratch/<request.json>", { needs: ["recovery: a stale or conflicting round blocks the next one (read-only)"], producer: "what would be superseded, with its digests", next: ["supersede-course-takeover"] }),
+    finalizerStep("supersede-course-takeover", "supersede-course-takeover", "scratch/<request.json>", { needs: ["the inspected takeover"], producer: "the old round marked superseded; nothing is deleted", next: ["dispatch-preflight"] }),
   ];
 }
 
@@ -213,6 +303,8 @@ export function lifecycleRunbooks({ pushFlowText }) {
       ["which branch applies now (inspect prints the structural nextAction for the current state)"]),
     implement: doc("implement", ["plugins/pipeline-core/scripts/pipeline-state.mjs", "plugins/pipeline-core/scripts/dispatch-briefing.mjs", "plugins/pipeline-core/scripts/dispatch-record-write.mjs"], implementSteps(),
       ["the briefing package content and the project's verify command (project calibration)"]),
+    critic: doc("critic", ["plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs", "plugins/pipeline-core/scripts/session-critic-finalizer.mjs", "plugins/pipeline-core/scripts/register-feature-package.mjs"], criticSteps(),
+      ["the request files of the finalizer (finalize --help prints their closed keys)"]),
     push: doc("push", [PUSH_FLOW_DOC], pushSteps(pushFlowText),
       ["the filled-in authorize-critical command (push-init prints it with the computed subject digest)"]),
   };

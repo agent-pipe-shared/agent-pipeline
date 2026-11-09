@@ -77,10 +77,108 @@
       "producer": "one ADR file per named path under docs/adr/; report-only: the readiness review asks about missing ones and the close readback lists which named paths exist, neither blocks",
       "humanGate": false,
       "next": [
+        "create-adr",
+        "design-review-receipt",
         "submit-plan"
       ],
       "commit": "commit the ADRs with the design",
       "catalogue": null
+    },
+    {
+      "id": "create-adr",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/create-adr.mjs --root <root> --slug <slug> --title <title>",
+      "needs": [
+        "a decision that must be accepted with this design (a proposal, never an accepted record)"
+      ],
+      "evidenceSchema": null,
+      "producer": "docs/adr/draft-<slug>.md and .json with status proposed; --refresh recomputes the digest after an edit of the Markdown",
+      "humanGate": false,
+      "next": [
+        "bind-adr-proposals"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "create-adr.mjs",
+        "verb": "--slug",
+        "argv": [
+          "--root",
+          "<root>",
+          "--slug",
+          "<slug>",
+          "--title",
+          "<title>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "bind-adr-proposals",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/bind-adr-proposals.mjs --root <root> --feature <feature-id> --carrier <design.md> --selection <po-selection.json> --draft <slug>",
+      "needs": [
+        "the proposals from create-adr",
+        "the PO's selection file"
+      ],
+      "evidenceSchema": null,
+      "producer": "the prospective selection and manifest beside the carrier, the decision bindings block in the carrier, and every companion path the review receipt must carry",
+      "humanGate": false,
+      "next": [
+        "design-review-receipt"
+      ],
+      "commit": null,
+      "catalogue": {
+        "script": "bind-adr-proposals.mjs",
+        "verb": "--carrier",
+        "argv": [
+          "--root",
+          "<root>",
+          "--feature",
+          "<feature-id>",
+          "--carrier",
+          "<design.md>",
+          "--selection",
+          "<po-selection.json>",
+          "--draft",
+          "<slug>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "design-review-receipt",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/design-review-receipt.mjs create --repo <root> --feature <feature-id> --report <review-report-path> --prd <prd-path> --spec <spec-path> --out <review-receipt-path>",
+      "needs": [
+        "the read-only readiness review of the design (pipeline-core:readiness-reviewer, not the Critic)"
+      ],
+      "evidenceSchema": null,
+      "producer": "the tracked design review receipt present-plan and prepare-seal name; never written by hand",
+      "humanGate": false,
+      "next": [
+        "submit-plan"
+      ],
+      "commit": "commit the receipt with the design",
+      "catalogue": {
+        "script": "design-review-receipt.mjs",
+        "verb": "create",
+        "argv": [
+          "create",
+          "--repo",
+          "<root>",
+          "--feature",
+          "<feature-id>",
+          "--report",
+          "<review-report-path>",
+          "--prd",
+          "<prd-path>",
+          "--spec",
+          "<spec-path>",
+          "--out",
+          "<review-receipt-path>"
+        ],
+        "closed": false
+      }
     },
     {
       "id": "submit-plan",
@@ -201,9 +299,11 @@
         "the PO's proof (signature mode) or the attended chat confirmation (chat mode: --by <po-name> instead)"
       ],
       "evidenceSchema": null,
-      "producer": "plan approval recorded in pipeline state, lifecycle approved; for a draft package the same approval seals the PRD and the Spec (the one signature is the seal); continue with the implement runbook",
+      "producer": "plan approval recorded in pipeline state, lifecycle approved; for a draft package the same approval seals the PRD and the Spec (the one signature is the seal)",
       "humanGate": false,
-      "next": [],
+      "next": [
+        "register-feature-package"
+      ],
       "commit": null,
       "catalogue": {
         "script": "pipeline-state.mjs",
@@ -212,6 +312,51 @@
           "approve-plan",
           "--design-workflow-approval-request",
           "<design-approval-request-path>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "register-feature-package",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/register-feature-package.mjs --root <root>",
+      "needs": [
+        "the approved plan"
+      ],
+      "evidenceSchema": null,
+      "producer": "the feature package manifest; its commitPaths are committed before any item binding is generated",
+      "humanGate": false,
+      "next": [
+        "materialize-architecture"
+      ],
+      "commit": "commit the printed commitPaths in one commit",
+      "catalogue": {
+        "script": "register-feature-package.mjs",
+        "verb": "--root",
+        "argv": [
+          "--root",
+          "<root>"
+        ],
+        "closed": false
+      }
+    },
+    {
+      "id": "materialize-architecture",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/pipeline-state.mjs materialize-architecture",
+      "needs": [
+        "greenfield only: the approved PRD carries the architecture design block"
+      ],
+      "evidenceSchema": null,
+      "producer": "the architecture map, fitness model and baseline, and the accepted ADR records the signed package pre-bound; continue with the implement runbook",
+      "humanGate": false,
+      "next": [],
+      "commit": null,
+      "catalogue": {
+        "script": "pipeline-state.mjs",
+        "verb": "materialize-architecture",
+        "argv": [
+          "materialize-architecture"
         ],
         "closed": false
       }

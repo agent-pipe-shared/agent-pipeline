@@ -9,7 +9,7 @@ Conventions. `PLUGIN` is the absolute `pluginRoot` printed by the ready prefligh
 (there is no `--dir` flag). "PO" means a step only the human can run. Scratch files live under `scratch/`.
 
 Runbooks. Each path below also exists as a generated machine-readable runbook (`runbooks/<path>-path.v1.json` in the plugin, listed by
-`runbooks/index.v1.json`): the start, plan, implement, close and push paths, each step with its preconditions, exact command, evidence and next step.
+`runbooks/index.v1.json`): the start, plan, implement, critic, close and push paths, each step with its preconditions, exact command, evidence and next step.
 The first call of a standard command returns a typed `runbook` field `{ path, digest, step }` naming the runbook of its path and its own step (once per
 session and path, and always on a refusal); follow that runbook when this guide and the command's own output differ, because it is regenerated from the
 command tables.
@@ -27,6 +27,8 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
    read-only `pipeline-core:readiness-reviewer`, not the Critic. Owner: `references/design-course.md`. Never write a receipt by hand.
    Before the design is promoted, call the `architecture-decision` skill once for each of the design's decisions to record (title, trigger and ADR path in the module
    `adrReferences`); the readiness review asks about a missing one and the close readback lists which named paths exist. Neither blocks.
+   A decision the PO must accept with this design is a proposal first: `create-adr.mjs --root <root> --slug <slug> --title <title>` writes it (`--refresh` after an edit of the Markdown), then
+   `bind-adr-proposals.mjs --root <root> --feature <id> --carrier <design.md> --selection <po-selection.json> --draft <slug>` binds it into the carrier and prints every companion path the review receipt must carry. Run both before the receipt.
 3. `pipeline-state.mjs submit-plan --by <name> --profile <epic|feature|mini>` (agent). A blocked planning fitness names its blocking classes; a class 9
    (profile drift) block is a repository state and names the adoption renewal.
    **PRD release scope (every profile but `mini`, EL-19): the design package is an unsealed DRAFT** (`inspect` -> `sealSituation.situation` is `draft`); onboarding
@@ -84,9 +86,12 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
    On Claude the host commit of a background Goldfish lands at its SubagentStop. Its hand-back message can arrive before that commit, its completion
    task-notification arrives after it: act on that notification, read `git log -1` and dispatch the next ready slice in the same turn. While ready
    slices remain, never end a turn with a status report or to wait for the pipeline to commit; a turn that ends there waits for the PO.
+5. After the last slice and before the project's Verify, where the project has an architecture model: `architecture-fitness.mjs --root <root> --check` and `architecture-boundary-check.mjs --root <root> --json` (both read-only). A violation is fixed before the Critic reads the candidate.
 
 ## 3. Critic
 
+0. Collect the evidence the Critic reads, once per check, while the candidate is fixed: `critic-diagnostic-evidence.mjs --root <root> --spec <spec> --log specs/<feature>/evidence/<name>.log --out specs/<feature>/evidence/<name>.json [--candidate <ref>] -- <command> <args>`,
+   then `register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>` BEFORE committing (registration reads the working tree), then one evidence-only commit of artifact, log and manifest. The preflight in step 1 then takes `--registration-commit <that commit>`.
 1. `critic-dispatch-preflight.mjs` immediately before every Critic spawn, against the fixed base and candidate (`--base <ref> --candidate <ref>`, not `--range`;
    `--task-id` on every later round). Dispatch only on `pipeline.critic-dispatch-preflight.v1` = `packet-ready`. The script has no `--help`; its argument refusal
    (`CDP-ARGUMENT`) names the complete flag set, each with a value: `--root --base --candidate --spec --guardrail --evidence --prior-critic --sweep-evidence --task-id
@@ -95,12 +100,20 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
 2. `session-critic-finalizer.mjs admit --root "$PWD" --request scratch/session-critic-finalization-request.json`, then dispatch one fresh read-only Critic
    (Antigravity: no external process; refs-only packets per `references/antigravity-native-dispatch.md`).
 3. `session-critic-finalizer.mjs finalize --root "$PWD" --request scratch/session-critic-finalization-request.json`, then `... export --root "$PWD" --request scratch/session-critic-export-request.json`.
-   `finalize --help` prints the closed request keys.
+   `finalize --help` prints the closed request keys. A split review: `critic-split-merge.mjs --root <root> --packet <packetId>` once every child returned, before `finalize`.
 4. Findings: `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` or `--add-delta-request <input.json>`; every later round reuses the first `taskId`.
+   After fixing findings: `critic-correction-input-bindings.mjs derive --root <root> --base <commit> --head <commit> --out scratch/<file>` gives the file a delta preflight names with `--correction-input-bindings`.
+5. Recovery only: a stale or conflicting round is read with `session-critic-finalizer.mjs inspect-course-takeover` and retired with `supersede-course-takeover`; nothing is deleted. Several units reviewed in one round: `register-batch`. All three take `--root` and `--request`.
 
 ## 4. Close
 
-Owner: `skills/close-feature/SKILL.md`. The coordinator returns the exact argv for each step; run it as returned, do not rebuild it from prose.
+Owner: `skills/close-feature/SKILL.md`. **The normal entry on every runner is one command, after the Critic passed and its packet is consumed, on a clean tree:**
+
+`finish-feature.mjs --one-shot --by <name> --architecture-impact <impact> [--root <root>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>]`
+
+It collects the close evidence itself, in this order: candidate Verify bound to the Critic packet, its registration, the package moves to `verifying` and `completed`, the audit request, the Continuity Result bootstrap where the feature needs one, and the coordinator phases. It stops before Verify when the Critic acknowledgement is missing, prints the one commit the close needs, and every stop names its code and the rerun command. A rerun after a commit qualifies the new HEAD again.
+
+The single steps below are what it runs; use them for a recovery or when a stop names one. The coordinator returns the exact argv for each step; run it as returned, do not rebuild it from prose.
 
 1. Package side: `verify-evidence-producer.mjs --mode candidate --out specs/<feature>/evidence/<name>.json`, then `register-feature-package.mjs --root <root> --add-verify-evidence <path>`,
    then `pipeline-state.mjs feature-package-plan` / `feature-package-apply` with `--next-state verifying`, and again with `--next-state completed` (one step at a time).
@@ -110,7 +123,7 @@ Owner: `skills/close-feature/SKILL.md`. The coordinator returns the exact argv f
    `apply-transition` with the same arguments plus `--plan-sha256 <sha256 of the plan> --activate`; `close-coordinator.mjs next <phase>` prints what a phase needs. The cleanup receipt: `close-coordinator.mjs write-cleanup-receipt --root <repository-root> --lifecycle <id>` (before `closed-local`).
    To step through these without composing each pair by hand, `close-coordinator.mjs drive --root <root> --lifecycle <id> --actor <name>` names the phase, the missing input and the remaining chain; with `--apply` it applies exactly one step and writes the cleanup receipt itself. It stops before every human-gate phase.
 3. `pipeline-state.mjs close-feature --by "<name>" --architecture-impact "<value>" --coordinator-lifecycle "<id>" --coordinator-sha256 "<sha>"` plus
-   `--continuity-close-request` when the returned argv carries it. **Antigravity** has one entry instead: `finish-feature.mjs --root <root> --by <actor> --architecture-impact <value> --audit-request <json> --critic-verify-lifecycle <id>`.
+   `--continuity-close-request` when the returned argv carries it.
 4. Telemetry row (Claude only): `usage-ledger.mjs`; on Codex and Antigravity skip it and say so in the close report.
 
 ## 5. Push
@@ -139,7 +152,7 @@ Owner: `docs/push-release-flow.md`, section "Releasing a consumer project". A co
 | Tool budget | per-agent counter; a grant raises it | nothing counts it (the briefing says so) | nothing counts it (the briefing says so) |
 | Dispatch record model | host-observed | declared, labelled unobserved | see `references/antigravity-native-dispatch.md` |
 | Own session descriptor at close | derived for Claude | derived for the closing runner | derived for the closing runner |
-| Close entry | coordinator route | coordinator route | `finish-feature.mjs` single entry |
+| Close entry | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` | `finish-feature.mjs --one-shot` |
 | Telemetry row at close | `usage-ledger.mjs` | not available | not available |
 | Push second gate | host classifier (settings entry) | runner prompt, not measured | runner prompt, not measured |
 | Signing preparation | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's | the agent runs every preparation step; only the sign-off is the PO's |

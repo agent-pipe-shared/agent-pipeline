@@ -105,7 +105,7 @@ test("without --check the generator writes both files under --root", () => {
 // ---------------------------------------------------------------------------------------------------------------------
 const SCRIPTS_DIR = dirname(SCRIPT);
 const REPO_ROOT = resolve(PLUGIN_ROOT, "..", "..");
-const PATH_IDS = ["close", "start", "plan", "implement", "push"];
+const PATH_IDS = ["close", "start", "plan", "implement", "critic", "push"];
 const NEW_PATH_IDS = PATH_IDS.filter((id) => id !== "close");
 const STEP_KEYS = ["id", "who", "command", "needs", "evidenceSchema", "producer", "humanGate", "next"];
 const sha256Hex = (text) => createHash("sha256").update(text).digest("hex");
@@ -117,7 +117,28 @@ const PLACEHOLDERS = {
 };
 const sample = (argv) => argv.map((a) => PLACEHOLDERS[a] ?? a);
 
-test("the index lists the five lifecycle paths, each file with its own sha256", () => {
+test("C21C: the critic path collects its evidence first and loops back, the close path opens with the one-shot entry, and the implement path checks the architecture", () => {
+  const critic = docOf("critic").steps.map((s) => s.id);
+  assert.deepEqual(critic.slice(0, 4), ["diagnostic-evidence", "register-diagnostic", "dispatch-preflight", "admit"]);
+  for (const id of ["finalize", "export", "add-review-lineage", "correction-input-bindings", "add-delta-request", "split-merge", "inspect-course-takeover", "supersede-course-takeover"]) assert.ok(critic.includes(id), id);
+  assert.deepEqual(docOf("critic").steps.find((s) => s.id === "add-delta-request").next, ["dispatch-preflight"]);
+  const close = docOf("close").steps;
+  assert.equal(close[0].id, "one-shot"); assert.match(close[0].command, /finish-feature\.mjs --one-shot/u); assert.equal(close[0].humanGate, false);
+  const impl = docOf("implement").steps.map((s) => s.id);
+  assert.ok(impl.indexOf("architecture-fitness") < impl.indexOf("verify"));
+  assert.match(docOf("implement").steps.find((s) => s.id === "verify").producer, /critic runbook/u);
+  const plan = docOf("plan").steps.map((s) => s.id);
+  assert.ok(plan.indexOf("design-review-receipt") < plan.indexOf("submit-plan"));
+  assert.ok(plan.indexOf("approve-plan") < plan.indexOf("register-feature-package") && plan.indexOf("register-feature-package") < plan.indexOf("materialize-architecture"));
+});
+
+test("C21C: the happy-path guide names the evidence commands and one close entry for every runner", () => {
+  const guide = readFileSync(join(PLUGIN_ROOT, "skills/pipeline-start/references/happy-path.md"), "utf8");
+  for (const needle of ["critic-diagnostic-evidence.mjs", "--add-diagnostic-evidence", "critic-split-merge.mjs", "finish-feature.mjs --one-shot", "create-adr.mjs", "bind-adr-proposals.mjs", "architecture-fitness.mjs"]) assert.ok(guide.includes(needle), needle);
+  assert.equal(guide.includes("--audit-request <json>"), false, "the old Antigravity-only close line is gone");
+});
+
+test("the index lists the lifecycle paths, each file with its own sha256", () => {
   const files = buildRunbookFiles();
   const idx = JSON.parse(files["plugins/pipeline-core/runbooks/index.v1.json"]);
   assert.deepEqual(idx.paths.map((p) => p.pathId).sort(), [...PATH_IDS].sort());

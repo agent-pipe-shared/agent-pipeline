@@ -40,9 +40,9 @@
     },
     {
       "topic": "Close entry",
-      "claude": "coordinator route",
-      "codex": "coordinator route",
-      "antigravity": "`finish-feature.mjs` single entry",
+      "claude": "`finish-feature.mjs --one-shot`",
+      "codex": "`finish-feature.mjs --one-shot`",
+      "antigravity": "`finish-feature.mjs --one-shot`",
       "owner": "skills/close-feature/SKILL.md; references/antigravity-feature-close.md"
     },
     {

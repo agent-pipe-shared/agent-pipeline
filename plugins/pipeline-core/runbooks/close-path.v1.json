@@ -11,6 +11,21 @@
   ],
   "steps": [
     {
+      "id": "one-shot",
+      "who": "agent",
+      "command": "node <plugin-root>/scripts/finish-feature.mjs --one-shot --by <name> --architecture-impact <impact> [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>]",
+      "needs": [
+        "the Critic review passed and its packet is consumed",
+        "a clean tree"
+      ],
+      "evidenceSchema": "pipeline.one-shot-close.v1",
+      "producer": "collects the close evidence itself (candidate Verify bound to the Critic packet, its registration, the package moves, the audit and close requests), closes, and prints the one commit; a stop names its code and the rerun command; a rerun after a commit qualifies the new HEAD again",
+      "humanGate": false,
+      "next": [
+        "checkpointed"
+      ]
+    },
+    {
       "id": "checkpointed",
       "who": "agent",
       "command": "close-coordinator.mjs plan-transition --root <root> --lifecycle <id> --actor <name> --phase checkpointed",

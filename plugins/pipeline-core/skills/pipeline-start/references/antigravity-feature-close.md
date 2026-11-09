@@ -6,6 +6,14 @@ handover, Compact or runtime transfer. The installed
 It wraps the existing coordinator and State writer; it does not grant a PO
 approval, release, push or publication authority.
 
+The normal entry is the same one every runner uses, and it collects the
+audit request and the Verify lifecycle itself:
+`node "${PIPELINE_PLUGIN_ROOT}/scripts/finish-feature.mjs" --one-shot --root <physical-repository-root> --by <actor> --architecture-impact <value>`,
+adding `--critic-packet-id <32-hex>` when it asks for the packet and
+`--resume-lifecycle-id <id>` on a rerun; every stop names its code and the
+rerun command. The explicit form below is for a close that already holds
+those inputs.
+
 Before invocation, read back the active feature and its approved Result,
 the exact Critic/Verify lifecycle receipt ID, the architecture-impact
 disposition, and the repository-relative feature-close audit request. If the

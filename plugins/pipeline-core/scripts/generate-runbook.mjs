@@ -29,7 +29,7 @@ const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PREFIX = "plugins/pipeline-core/";
 const CLOSE_PATH_FILE = `${PREFIX}runbooks/close-path.v1.json`;
 const INDEX_FILE = `${PREFIX}runbooks/index.v1.json`;
-export const RUNBOOK_FILES = Object.freeze([CLOSE_PATH_FILE, ...["start", "plan", "implement", "push"].map((id) => `${PREFIX}runbooks/${id}-path.v1.json`), INDEX_FILE]);
+export const RUNBOOK_FILES = Object.freeze([CLOSE_PATH_FILE, ...["start", "plan", "implement", "critic", "push"].map((id) => `${PREFIX}runbooks/${id}-path.v1.json`), INDEX_FILE]);
 
 const canonical = (value) => `${JSON.stringify(value, null, 2)}\n`;
 
@@ -39,6 +39,14 @@ function closeSteps() {
   const whoByPhase = new Map(describeCloseActions("checkpointed").actions.map((a) => [a.id, a.who]));
   // Actions that do not depend on dynamic state: checkpointed and the Continuity Result steps (the chain phases follow below).
   const lead = active.filter((a) => a.id === "checkpointed" || !(a.id in CLOSE_STEP_REQUIREMENTS));
+  // C21C: the runner-neutral entry. Everything below is what it runs; the single steps stay for a recovery or a project that drives them by hand.
+  steps.push({
+    id: "one-shot", who: "agent",
+    command: "node <plugin-root>/scripts/finish-feature.mjs --one-shot --by <name> --architecture-impact <impact> [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>]",
+    needs: ["the Critic review passed and its packet is consumed", "a clean tree"], evidenceSchema: "pipeline.one-shot-close.v1",
+    producer: "collects the close evidence itself (candidate Verify bound to the Critic packet, its registration, the package moves, the audit and close requests), closes, and prints the one commit; a stop names its code and the rerun command; a rerun after a commit qualifies the new HEAD again",
+    humanGate: false, next: [lead[0].id],
+  });
   lead.forEach((a, i) => {
     steps.push({
       id: a.id, who: a.who, command: a.command, needs: [], evidenceSchema: null, producer: a.source, humanGate: a.who === "po-only",
@@ -66,7 +74,7 @@ function closeSteps() {
   return steps;
 }
 
-const NEW_PATH_IDS = Object.freeze(["start", "plan", "implement", "push"]);
+const NEW_PATH_IDS = Object.freeze(["start", "plan", "implement", "critic", "push"]);
 const pathFileOf = (pathId) => `${PREFIX}runbooks/${pathId}-path.v1.json`;
 const readPushFlow = () => readFileSync(resolve(PLUGIN_ROOT, "..", "..", PUSH_FLOW_DOC), "utf8");
 
