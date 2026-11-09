@@ -1017,8 +1017,9 @@ test("W9 SLICE 3 NEGATIVE (2): a range the derivation refuses stays CDP-CORRECTI
   const fx = walkCourse({ label: "w9s3-refused", rounds: [{ kind: "full", verdict: FAIL_MAJOR }], slices: ["TASK-ONE"], derived: true });
   try {
     const [round] = fx.observed.rounds;
-    git(fx.root, ["mv", "src/TASK-ONE.mjs", "docs/HISTORY.md"]);
-    const crossing = commitPaths(fx.root, ["src", "docs/HISTORY.md"], "move a source file onto the block history file");
+    // A move from a source file into the project-state record is split and admitted (critic-correction-input-bindings.mjs); this reverse direction stays refused.
+    git(fx.root, ["mv", "docs/state.md", "src/moved-state.mjs"]);
+    const crossing = commitPaths(fx.root, ["src"], "move the handover file onto a source path");
     const refused = cli("critic-dispatch-preflight.mjs", ["--root", fx.root, "--base", round.candidate, "--candidate", crossing, "--spec", SPEC_PATH, "--evidence", `specs/${FEATURE}/evidence/diagnostic-r1.json`]);
     assert.equal(refused.status, 1);
     assert.equal(refused.body.code, "CDP-CORRECTION-INPUT-REFUSED", refused.text);
