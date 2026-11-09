@@ -662,6 +662,53 @@ function sanctionedLateVerifyRecoveryPaths(projectRoot, paths) {
   return establishedImplementationState(state) ? new Set(VERIFY_CALIBRATION_PATHS) : new Set();
 }
 
+/** Raw bytes of a blob (no decoding, so CRLF, a BOM and any byte sequence stay exact), or null when git cannot read it. */
+function gitBlob(projectRoot, revSpec) {
+  const result = spawnSync("git", ["cat-file", "blob", revSpec], { cwd: projectRoot, timeout: 15000, maxBuffer: 1048577 });
+  return result.status === 0 && Buffer.isBuffer(result.stdout) ? result.stdout : null;
+}
+
+/** The git file mode of a path in HEAD or in the index (stage 0), or null. */
+function gitEntryMode(projectRoot, path, staged) {
+  const result = git(staged ? ["ls-files", "--stage", "--", path] : ["ls-tree", "HEAD", "--", path], projectRoot);
+  const lines = result.status === 0 ? (result.stdout ?? "").split("\\n").filter(Boolean) : [];
+  if (lines.length !== 1) return null;
+  const parts = lines[0].split(" ");
+  if (staged ? parts[2]?.charAt(0) !== "0" : parts[1] !== "blob") return null;
+  return parts[0] === "100644" || parts[0] === "100755" ? parts[0] : null;
+}
+
+/**
+ * C22B (AC-108 closest criterion), CGR-19 (PO decision): the ONE calibration change admitted without a signature is repositoryMode local-only ->
+ * remote-tracked as written by plugins/pipeline-core/scripts/repository-mode-promote.mjs. This is a stateless byte comparison of the staged
+ * content against HEAD (no journal, no capability, no store): every staged path is a calibration twin, every existing twin is staged (so the pair
+ * cannot drift, PA-CALIBRATION-DRIFT), a remote is configured, and each staged twin equals the writer's own byte rule applied to its HEAD content
+ * with an unchanged file mode. Anything else -- another field, whitespace, the reverse direction, host-managed, one twin, no remote -- returns an
+ * empty set and the ordinary GS-10/GS-11 refusal stands. Fail closed: an unreadable input or an unloadable rule module admits nothing.
+ */
+async function repositoryModePromotionPaths(projectRoot, paths) {
+  if (paths.length === 0 || !paths.every((path) => VERIFY_CALIBRATION_PATHS.includes(path))) return new Set();
+  let promoteBytes;
+  try {
+    ({ promoteRepositoryModeBytes: promoteBytes } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "repository-mode-promote.mjs")).href));
+  } catch { return new Set(); }
+  if (typeof promoteBytes !== "function") return new Set();
+  const fs = await import("node:fs");
+  const existing = VERIFY_CALIBRATION_PATHS.filter((path) => fs.existsSync(resolve(projectRoot, path)) || git(["cat-file", "-e", "HEAD:" + path], projectRoot).status === 0);
+  if (existing.length !== paths.length || !existing.every((path) => paths.includes(path))) return new Set();
+  const remotes = git(["remote"], projectRoot);
+  if (remotes.status !== 0 || (remotes.stdout ?? "").trim() === "") return new Set();
+  for (const path of paths) {
+    const headBytes = gitBlob(projectRoot, "HEAD:" + path);
+    const stagedBytes = gitBlob(projectRoot, ":" + path);
+    const headMode = gitEntryMode(projectRoot, path, false);
+    if (headBytes === null || stagedBytes === null || headMode === null || headMode !== gitEntryMode(projectRoot, path, true)) return new Set();
+    const promoted = promoteBytes(headBytes);
+    if (!promoted || promoted.ok !== true || !Buffer.isBuffer(promoted.bytes) || !promoted.bytes.equals(stagedBytes)) return new Set();
+  }
+  return new Set(paths);
+}
+
 /**
  * HANDOVER-SIZE COMPANION CHECK (NVA-B-HANDOVERPATH, 2026-09-01, backlog/items/
  * 2026-09-01-the-handover-size-guard-only-sees-one-of-two-write-paths.md; buffer/encoding fix
@@ -1086,6 +1133,11 @@ async function main() {
       }
     } catch { /* ordinary GS-10/GS-11 refusal remains */ }
   }
+
+  // C22B CGR-19: the one-token repositoryMode promotion (local-only -> remote-tracked), compared statelessly against HEAD. Nothing else is admitted here.
+  try {
+    for (const path of await repositoryModePromotionPaths(projectRoot, paths)) sanctionedVerifyPaths.add(path);
+  } catch { /* ordinary GS-10/GS-11 refusal remains */ }
 
   // A quality package is not a per-file exemption. The verifier only returns
   // true after rechecking the detached proof, unchanged committed trust policy,

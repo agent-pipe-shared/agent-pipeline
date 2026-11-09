@@ -357,8 +357,9 @@ export function checkPushThreatModel(dir, deps = {}) {
 /**
  * Candidate 22 (CGR-19): `repositoryMode` is written once at onboarding and nothing read it, so a project that says `local-only` was pushed.
  * Compares the calibrated mode with the real push target (a remote this repository has) and names ONE notice on a mismatch, null otherwise.
- * Advice only: it writes nothing and refuses nothing, so the report's `ready` does not move. There is no verb that writes the field; the notice names
- * the route that exists (the calibration is gate-strength protected, so a PO-approved override) and that the fix is a commit, hence before the candidate.
+ * Advice only: it writes nothing and refuses nothing, so the report's `ready` does not move. The notice names the one narrow command that writes the
+ * field (scripts/repository-mode-promote.mjs, admitted at the commit boundary without a signature) and that the fix is a commit, hence before the
+ * candidate; every other calibration change stays on the signed guard-override route.
  */
 export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
   let declared;
@@ -372,8 +373,9 @@ export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
     id: "repository-mode",
     code: "PUSH-REPOSITORY-MODE-MISMATCH",
     message: `the calibration (${file}) declares repositoryMode "local-only" (written once at onboarding), but this push targets the configured remote "${remote}" (${destination}). `
-      + `Correct the calibration: set "repositoryMode" to "remote-tracked" in ${file}${mirror}. There is no sanctioned writer (no verb) for this field and the file is gate-strength protected, `
-      + "so the change goes through a PO-approved guard override (plan it with node <plugin-root>/scripts/guard-human-override.mjs plan); it is a commit, so make it before the candidate is fixed and run push-prepare again. "
+      + `Correct the calibration: set "repositoryMode" to "remote-tracked" in ${file}${mirror} with the one narrow command node <plugin-root>/scripts/repository-mode-promote.mjs --root <project-root> --to remote-tracked `
+      + "(it changes only that one value, needs a configured remote and prints the paths to commit; the pre-commit hook admits exactly that change without a signature). "
+      + "It is a commit, so make it before the candidate is fixed and run push-prepare again. Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
       + "Nothing was written now and nothing is refused; if \"local-only\" is the truth, the push target is what is wrong.",
   };
 }

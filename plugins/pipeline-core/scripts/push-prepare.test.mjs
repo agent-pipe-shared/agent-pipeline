@@ -1905,8 +1905,11 @@ test("CGR-19: a calibrated local-only mode against a configured push remote is n
     assert.match(notice.message, /refs\/heads\/main/u);
     assert.match(notice.message, /"remote-tracked"/u, "names the value the calibration is corrected to");
     assert.match(notice.message, /project\/pipeline\.json/u, "names the file that holds it");
-    assert.match(notice.message, /override/u, "names the sanctioned route: the calibration is gate-strength protected, no direct edit");
-    assert.match(notice.message, /no verb|no sanctioned writer/u, "says there is no dedicated verb for this field");
+    // QG-04, restated in place (C22B, CGR-19 PO decision): these two pins said "there is no verb, go through a guard override". There IS now one
+    // narrow command, so the notice must name it exactly and keep the signed override only for every other change. Same subject, same strength.
+    assert.match(notice.message, /node <plugin-root>\/scripts\/repository-mode-promote\.mjs --root <project-root> --to remote-tracked/u, "names the one narrow command, exactly");
+    assert.match(notice.message, /override/u, "still names the signed guard-override route for every other change to the calibration");
+    assert.doesNotMatch(notice.message, /no verb|no sanctioned writer/u, "no longer claims there is no writer for this field");
     assert.deepEqual(readFileSync(calibrationPath), bytesBefore, "the calibration (CRLF included) is untouched");
     assert.equal(tree(), treeBefore, "nothing was written into the tree by the report");
 

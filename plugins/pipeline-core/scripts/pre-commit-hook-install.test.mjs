@@ -682,6 +682,82 @@ test("installed hook: refuses the verify rewrite when the lifecycle state is not
   assert.notEqual(code, 0);
 });
 
+// AC-108 (closest accepted criterion), CGR-19 (C22B, PO decision): one narrow command moves repositoryMode from local-only to remote-tracked and the
+// commit boundary admits exactly that one-token change in every existing calibration twin, with a remote configured, and nothing else. The cases
+// below are written from that decision, never from the hook code: the positive goes through the REAL writer; every negative stays on today's refusal.
+const MODE_TWIN_PATHS = ["project/pipeline.json", ".claude/pipeline.json"];
+const modeTwin = ({ mode = "local-only", extra = {}, eol = "\n", indent = 2 } = {}) => {
+  const text = JSON.stringify({ project: "fixture", repositoryMode: mode, verify: "node --test t.mjs", handover: "docs/state.md", ...extra }, null, indent);
+  return eol === "\n" ? `${text}\n` : `${text.replace(/\n/gu, eol)}${eol}`;
+};
+const writeModeTwins = (dir, content, paths = MODE_TWIN_PATHS) => {
+  for (const path of paths) { mkdirSync(join(dir, path, ".."), { recursive: true }); writeFileSync(join(dir, path), content); }
+};
+/** A repository whose two twins are committed with `headContent`, a hook installed, and (optionally) a remote configured. */
+function seedModeRepo(prefix, { headContent = modeTwin(), remote = true } = {}) {
+  const { dir, git } = freshRepo(prefix);
+  writeModeTwins(dir, headContent);
+  assert.equal(git("add", ...MODE_TWIN_PATHS).status, 0);
+  assert.equal(git("commit", "-q", "-m", "seed calibration twins").status, 0);
+  if (remote) assert.equal(git("remote", "add", "origin", "https://example.invalid/project.git").status, 0);
+  installHook(dir);
+  return { dir, git, head: git("rev-parse", "HEAD").stdout.trim() };
+}
+const promoteWithTheCommand = (dir) => spawnSync(process.execPath, [join(PLUGIN_SCRIPTS_DIR, "repository-mode-promote.mjs"), "--root", dir, "--to", "remote-tracked"], { cwd: dir, encoding: "utf8", timeout: 60000 });
+/** Restore both twins from HEAD (index and working tree), apply `mutate`, stage `paths`, commit; the commit must be refused with today's GS text. */
+function assertModeCommitRefused({ dir, git, head }, label, mutate, paths = MODE_TWIN_PATHS) {
+  assert.equal(git("checkout", "-q", "HEAD", "--", ...MODE_TWIN_PATHS).status, 0);
+  git("reset", "-q", "--", ".");
+  mutate();
+  assert.equal(git("add", "--", ...paths).status, 0);
+  const { code, stderr } = commit(dir, `attempt: ${label}`);
+  assert.notEqual(code, 0, `${label}: must be refused`);
+  assert.match(stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/u, label);
+  assert.match(stderr, /GS-10 project\/pipeline\.json/u, `${label}: today's refusal text names the twin`);
+  assert.equal(git("rev-parse", "HEAD").stdout.trim(), head, `${label}: no new commit`);
+}
+
+test("installed hook: the real promotion command's output (CRLF twins, remote configured) commits with no signature, byte-for-byte the one-token change", { timeout: commitTestTimeout(1) }, () => {
+  const before = modeTwin({ eol: "\r\n", indent: 4 });
+  const seeded = seedModeRepo("e2e-repository-mode-promotion", { headContent: before });
+  const { dir, git } = seeded;
+  const run = promoteWithTheCommand(dir);
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+  assert.equal(JSON.parse(run.stdout).status, "promoted");
+  assert.equal(git("add", ...MODE_TWIN_PATHS).status, 0);
+  const { code, stderr } = commit(dir, "chore(calibration): promote repositoryMode to remote-tracked");
+  assert.equal(code, 0, stderr);
+  assert.notEqual(git("rev-parse", "HEAD").stdout.trim(), seeded.head, "a new commit exists");
+  for (const path of MODE_TWIN_PATHS) {
+    assert.equal(git("show", `HEAD:${path}`).stdout, before.replace('"repositoryMode": "local-only"', '"repositoryMode": "remote-tracked"'), `${path}: only the value token differs (CRLF and indent kept)`);
+  }
+});
+
+test("installed hook: anything wider than the one-token promotion stays refused with today's text (other field, one twin, whitespace, extra file)", { timeout: commitTestTimeout(4) }, () => {
+  const seeded = seedModeRepo("e2e-repository-mode-wider");
+  const { dir } = seeded;
+  const promoted = modeTwin({ mode: "remote-tracked" });
+  assertModeCommitRefused(seeded, "another field changed alongside the mode", () => writeModeTwins(dir, modeTwin({ mode: "remote-tracked", extra: { verify: "node --test other.mjs" } })));
+  assertModeCommitRefused(seeded, "only one of the two twins staged", () => writeModeTwins(dir, promoted), [MODE_TWIN_PATHS[0]]);
+  assertModeCommitRefused(seeded, "a whitespace change on top", () => writeModeTwins(dir, `${promoted}\n`));
+  assertModeCommitRefused(seeded, "an unrelated file staged with the twins", () => { writeModeTwins(dir, promoted); writeFileSync(join(dir, "extra.txt"), "extra\n"); }, [...MODE_TWIN_PATHS, "extra.txt"]);
+});
+
+test("installed hook: the one-token promotion without a configured remote stays refused", { timeout: commitTestTimeout(1) }, () => {
+  const seeded = seedModeRepo("e2e-repository-mode-no-remote", { remote: false });
+  assertModeCommitRefused(seeded, "no remote configured", () => writeModeTwins(seeded.dir, modeTwin({ mode: "remote-tracked" })));
+});
+
+test("installed hook: the reverse direction (remote-tracked to local-only) stays refused", { timeout: commitTestTimeout(1) }, () => {
+  const seeded = seedModeRepo("e2e-repository-mode-reverse", { headContent: modeTwin({ mode: "remote-tracked" }) });
+  assertModeCommitRefused(seeded, "reverse direction", () => writeModeTwins(seeded.dir, modeTwin({ mode: "local-only" })));
+});
+
+test("installed hook: host-managed to remote-tracked stays refused (that direction stays on the signed guard-override route)", { timeout: commitTestTimeout(1) }, () => {
+  const seeded = seedModeRepo("e2e-repository-mode-host-managed", { headContent: modeTwin({ mode: "host-managed" }) });
+  assertModeCommitRefused(seeded, "host-managed to remote-tracked", () => writeModeTwins(seeded.dir, modeTwin({ mode: "remote-tracked" })));
+});
+
 test("installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED", { timeout: commitTestTimeout(1) }, () => {
   // Documents the deliberate residual scope of the PO's chosen candidate: the first-appearance
   // exemption is drawn on git history, not on the write mechanism, so a spawned-process bypass
