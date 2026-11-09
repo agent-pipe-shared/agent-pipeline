@@ -1,0 +1,62 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 6c519909f3d0cc5bc38ca4ce3bf230bc1eb58fae..e6b8d180aefff46ceae202160d6cbac86a89c1f4 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -9832,7 +9832,7 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+     flags, now: approvedAt, required: true,
+   });
+   if (!verified.ok) {
+-    console.error(`Error: approve-residual-acceptance refused (${verified.code}).`);
++    console.error(`Error: approve-residual-acceptance refused (${verified.code}).${criticalProofRefusalHint(verified.code)}`);
+     return 2;
+   }
+   const priorConsumption = base.criticalProofConsumption;
+@@ -9889,15 +9889,15 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+ // bridge for a runner that issues no Source return record; the close gate names this command as its one runnable repair. Recorded through the same
+ // human-approval route as `feature-package-reconcile` (signature or chat per `gates.human_approval`), into the private approval store, never inferred.
+ /** C21B: the cause and the next step behind the two proof refusals that otherwise leave an agent reading plugin source. Empty for every other code. */
+-function criticalProofRefusalHint(code) {
++function criticalProofRefusalHint(code, renewal = "") {
+   if (code === "CRITICAL-PROOF-EXTERNAL-PATH") return " The three proof paths must be absolute, must exist and must lie outside this repository: pass the requestPath, authorityPath and proofPath the signing step printed, never a copy under scratch/ or anywhere else in the project.";
+-  if (code === "CRITICAL-ACTION-REQUEST-MISMATCH") return " The signed request is not the one this action expects: sign the printed signatureCommand unchanged, because any edited value, --expires-at included, makes a different request. When its window has passed, run this command again without the proof flags to get a fresh one.";
++  if (code === "CRITICAL-ACTION-REQUEST-MISMATCH") return ` The signed request is not the one this action expects: sign the printed signatureCommand unchanged, because any edited value, --expires-at included, makes a different request.${renewal}`;
+   return "";
+ }
+ 
+ function runApproveCriticAcknowledgement({ dir, rest, base, now, deps }) {
+   const kind = CRITIC_ACKNOWLEDGEMENT_KIND;
+-  const refuse = (code) => { console.error(`Error: approve-critic-acknowledgement refused (${code}).${criticalProofRefusalHint(code)}`); return 2; };
++  const refuse = (code) => { console.error(`Error: approve-critic-acknowledgement refused (${code}).${criticalProofRefusalHint(code, " When its window has passed, run this command again without the proof flags to get a fresh one.")}`); return 2; };
+   const configured = criticalProofWaiverFor(dir, kind);
+   if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
+   const waived = configured.waived === true;
+@@ -13426,7 +13426,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         dir, state: base, kind: "push", candidate: observed,
+         subject: { sourceCommit: observed.commit, remote, destination, threatModel: threatModelBinding }, flags: parsed.value, now: approvedAt, required: true,
+       });
+-      if (!verified.ok) { console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.`); return 2; }
++      if (!verified.ok) { console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.${criticalProofRefusalHint(verified.code)}`); return 2; }
+       const priorConsumption = base.criticalProofConsumption;
+       if (priorConsumption !== undefined && (!Array.isArray(priorConsumption)
+         || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index e40a486e4d9b95972e113d6701f374bca4f7b0eb..78fc11d80f9cbfa99b002c37551d941df616617d 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -3494,6 +3494,16 @@ c11Case("C21B the acknowledgement signing command names the packet and a proof f
+   } finally { console.log = originalLog; fx.cleanup(); }
+ });
+ 
++c11Case("C21B approve-residual-acceptance names the cause of a proof path inside the repository", () => {
++  const fx = c11Fixture({ findings: c11Minor });
++  try {
++    const inside = join(fx.root, "scratch", "copy.json");
++    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, "--proof-request", inside, "--proof-authority", inside, "--proof", inside], fx.deps));
++    assert.equal(outcome.result, 2, outcome.lines.join(" "));
++    assert.match(outcome.lines.join(" "), /CRITICAL-PROOF-EXTERNAL-PATH\)\. The three proof paths must be absolute/u);
++  } finally { fx.cleanup(); }
++});
++
+ c11Case("C11-a chat mode records an attended residual acceptance and the lifecycle then qualifies the failed all-minor receipt", () => {
+   const fx = c11Fixture({ chat: true, findings: c11Minor });
+   try {
