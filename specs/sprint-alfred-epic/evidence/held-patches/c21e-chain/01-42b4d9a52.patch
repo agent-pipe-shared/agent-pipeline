@@ -1,0 +1,213 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index f614aa4d8bbaa9886848bed687a8a8e27b688124..6d9f512b6ab1a270e59b5f31e1d94f50d7bb8cae 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -54,6 +54,7 @@ import {
+   antigravityArtifactHostContext, antigravityArtifactLayoutIsValid, crossRepositoryDenialReason,
+   sweepAntigravityHostHandoffs, writeAntigravityHostHandoff,
+ } from "../lib/current-session-artifact-export.mjs";
++import { isAntigravityCloseCommand, recordAntigravityCloseSession } from "../lib/antigravity-close-session.mjs";
+ import { TRANSCRIPT_RECOVERY_SCRIPT } from "../lib/guard/constants.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedTranscriptRecoveryArgs } from "../lib/guard/sanctioned-args-scripts.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+@@ -395,6 +396,20 @@ function handOffAntigravityHostContext({ input, command, projectRoot, toolName }
+   }
+ }
+ 
++/**
++ * C21E. A close command's own process cannot learn its Antigravity conversation; this hook can. Runs only for a shell call about to be admitted and
++ * only for a close command, so the cleanup producer can exclude the closing session's own descriptor. A failure is a diagnostic, never a denial.
++ */
++export function recordAntigravityCloseConversation({ input, command, projectRoot, toolName }) {
++  if (toolName !== "Bash" || typeof input?.conversationId !== "string" || !isAntigravityCloseCommand(command)) return;
++  try {
++    const commonDir = resolveGitCommonDir(projectRoot);
++    if (commonDir !== null) recordAntigravityCloseSession({ commonDir, conversationId: input.conversationId });
++  } catch (error) {
++    diagnostic("antigravity-close-session-not-recorded", { name: error?.name, code: error?.code });
++  }
++}
++
+ /**
+  * AC-175D. The CLI consumes the handoff named by the export's `--session-id`, so an Antigravity export that names
+  * another conversation could be served that conversation's unconsumed handoff. This refuses it while the envelope still
+@@ -1257,6 +1272,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
+   const foreignExport = foreignAntigravityExportReason({ input, command, projectRoot, toolName });
+   if (foreignExport !== null) deny(foreignExport);
+   handOffAntigravityHostContext({ input, command, projectRoot, toolName });
++  recordAntigravityCloseConversation({ input, command, projectRoot, toolName });
+   allow();
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/antigravity-close-session.mjs b/plugins/pipeline-core/lib/antigravity-close-session.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..af497f37f125649bd5de5ff599bbf783dea50fe9
+--- /dev/null
++++ b/plugins/pipeline-core/lib/antigravity-close-session.mjs
+@@ -0,0 +1,44 @@
++// SPDX-License-Identifier: SUL-1.0
++//
++// C21E (Antigravity greenfield): which conversation is running this close?
++//
++// A command-line process on Antigravity carries no session id, but the pretool hook sees the conversation that issues each command. For a close
++// command the hook records that conversation here, and the cleanup producer (a child of the close) reads it to exclude the closing session's own
++// descriptor. This is an observation of one command by the hook, never a choice among descriptors. The file holds nothing but the id and its time,
++// grants nothing, and a missing, malformed or expired record means "not derived", exactly as before.
++import { lstatSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
++import { dirname, join } from "node:path";
++
++export const ANTIGRAVITY_CLOSE_SESSION_SCHEMA = "pipeline.antigravity-close-session.v1";
++// A close with a full Verify runs long; a record older than this belongs to an earlier close.
++export const ANTIGRAVITY_CLOSE_SESSION_TTL_MS = 2 * 60 * 60_000;
++const MAX_BYTES = 1024;
++const CLOCK_SKEW_MS = 5_000;
++const CLOSE_COMMAND = /(?:^|[\s"'/\\])(?:finish-feature|close-coordinator)\.mjs["']?(?:\s|$)/u;
++const recordPath = (commonDir) => join(commonDir, "agent-pipeline", "run", "antigravity-close-session.json");
++
++/** True for a shell command that starts a close or one of its steps. */
++export function isAntigravityCloseCommand(command) { return typeof command === "string" && CLOSE_COMMAND.test(command); }
++
++/** Called by the pretool hook for a command it is about to admit. Atomic; the caller treats a failure as a diagnostic, never a denial. */
++export function recordAntigravityCloseSession({ commonDir, conversationId, now = Date.now() } = {}) {
++  const path = recordPath(commonDir);
++  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
++  const temporary = `${path}.${process.pid}.tmp`;
++  writeFileSync(temporary, `${JSON.stringify({ schema: ANTIGRAVITY_CLOSE_SESSION_SCHEMA, conversationId, recordedAt: now })}\n`, { flag: "wx", mode: 0o600 });
++  try { renameSync(temporary, path); } catch (error) { try { unlinkSync(temporary); } catch { /* best effort */ } throw error; }
++}
++
++/** @returns {string|null} the conversation id of a current record, otherwise null. */
++export function readAntigravityCloseSession({ commonDir, now = Date.now() } = {}) {
++  if (typeof commonDir !== "string" || commonDir === "") return null;
++  try {
++    const path = recordPath(commonDir);
++    const stat = lstatSync(path);
++    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_BYTES) return null;
++    const record = JSON.parse(readFileSync(path, "utf8"));
++    if (record?.schema !== ANTIGRAVITY_CLOSE_SESSION_SCHEMA || typeof record.conversationId !== "string" || !Number.isFinite(record.recordedAt)) return null;
++    if (record.recordedAt > now + CLOCK_SKEW_MS || now - record.recordedAt > ANTIGRAVITY_CLOSE_SESSION_TTL_MS) return null;
++    return record.conversationId;
++  } catch { return null; }
++}
+diff --git a/plugins/pipeline-core/lib/own-session-descriptor.mjs b/plugins/pipeline-core/lib/own-session-descriptor.mjs
+index 978db4bf156e07e55a6bd896e9becb257f2da63d..26daeb64105f29b4d071c511af061b744f0149a2 100644
+--- a/plugins/pipeline-core/lib/own-session-descriptor.mjs
++++ b/plugins/pipeline-core/lib/own-session-descriptor.mjs
+@@ -7,12 +7,14 @@
+ // must tell the closing session's OWN descriptor from a foreign one. They used to hard-code runner `claude`, so on Codex the own
+ // descriptor was counted as foreign and the receipt could never become `complete`.
+ //
+-// This module derives the id for the runner that is actually invoking, and says honestly when it cannot: Antigravity creates no
+-// session descriptor and a CLI process has no Antigravity session id, so the result is `unavailable` with the reason, never a guess.
++// This module derives the id for the runner that is actually invoking, and says honestly when it cannot. An Antigravity hook names its
++// descriptor `antigravity-<conversation id>`, but a CLI process has no such id in its environment: the id comes from the record the pretool
++// hook wrote for the close command (lib/antigravity-close-session.mjs), and without that record the result is `unavailable` with the reason.
+ // It never selects "the newest" or "the one with an unknown owner" descriptor: such a guess could hide a live foreign session.
+ 
++import { readAntigravityCloseSession } from "./antigravity-close-session.mjs";
+ import { resolveModelRoleHostSessionIdentity } from "./model-role-host-identity.mjs";
+-import { claudeHookDescriptorSessionId, codexHookDescriptorSessionId } from "./claude-hook-session-owner.mjs";
++import { antigravityHookDescriptorSessionId, claudeHookDescriptorSessionId, codexHookDescriptorSessionId } from "./claude-hook-session-owner.mjs";
+ 
+ export const RUNNERS = Object.freeze(["claude", "codex", "antigravity"]);
+ 
+@@ -30,12 +32,14 @@ export function invokingRunnerFromEnv(env = process.env, explicit = undefined) {
+ /**
+  * @returns {{runner: string|null, descriptorSessionId: string|null, derivation: "observed"|"unavailable", reason: string}}
+  */
+-export function resolveOwnSessionDescriptor({ runner, env = process.env } = {}) {
++export function resolveOwnSessionDescriptor({ runner, env = process.env, commonDir = null, now = Date.now() } = {}) {
+   if (!RUNNERS.includes(runner)) {
+     return { runner: null, descriptorSessionId: null, derivation: "unavailable", reason: "the invoking runner is not one of claude, codex, antigravity" };
+   }
+   if (runner === "antigravity") {
+-    return { runner, descriptorSessionId: null, derivation: "unavailable", reason: "antigravity creates no session descriptor and a command-line process does not carry its session id" };
++    const descriptorSessionId = antigravityHookDescriptorSessionId(readAntigravityCloseSession({ commonDir, now }));
++    if (descriptorSessionId === null) return { runner, descriptorSessionId: null, derivation: "unavailable", reason: "the antigravity hook recorded no current conversation for this close and a command-line process does not carry its session id" };
++    return { runner, descriptorSessionId, derivation: "observed", reason: "antigravity conversation id recorded by the pretool hook for this close command" };
+   }
+   const identity = resolveModelRoleHostSessionIdentity({ runner, env });
+   if (!identity.ok) {
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index e91a38bc6ce85dfac665fbe83494c97ddea136ce..18e9fbe5da5a8a9b8e1c7798036f6c0218b55f33 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -985,7 +985,7 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
+   if (!OID.test(coordinator.candidateOid ?? "") || !OID.test(coordinator.candidateTree ?? "")) fail("CLOSE-CLEANUP-PHASE", "the lifecycle has no frozen candidate");
+   // 17: the closing session's own descriptor is derived for the runner that is actually closing (it used to be hard-coded to claude, so
+   // on Codex the own `codex-<id>` descriptor counted as foreign and the receipt could never be complete).
+-  const ownSession = resolveOwnSessionDescriptor({ runner: invokingRunnerFromEnv(env), env });
++  const ownSession = resolveOwnSessionDescriptor({ runner: invokingRunnerFromEnv(env), env, commonDir: common });
+   const ownSessionId = ownSession.descriptorSessionId;
+   const descriptors = listDescriptors(root).map((descriptor) => {
+     const observed = inspectOwner(root, descriptor.sessionId, { expectedDescriptorSha256: descriptor.descriptorSha256 });
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 2fe18acfa27c65274e583a0e39eebda07089921e..7044476b0d42757b91b3fe3a61b00740b7ce8d2a 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -769,13 +769,40 @@ test("17 cleanup receipt: each runner names how its own session was derived, and
+     const agy = receiptAs(fixture, { ANTIGRAVITY_AGENT: "1" });
+     assert.equal(agy.runner, "antigravity");
+     assert.equal(agy.ownSessionDerivation, "unavailable");
+-    assert.match(agy.ownSessionReason, /antigravity creates no session descriptor/u);
++    assert.match(agy.ownSessionReason, /antigravity hook recorded no current conversation/u);
+     // no descriptor exists in this fixture, so every runner is complete; what differs is that the observation says who derived what
+     for (const written of [claude, codex, codexBlind, agy]) assert.equal(written.status, "complete");
+     assert.equal(new Set([claude, codex, codexBlind, agy].map((written) => written.evidenceDigest)).size, 4, "the runner and the derivation are part of what the digest binds");
+   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+ });
+ 
++test("C21E Antigravity: the pretool hook records the conversation of a close command and the cleanup receipt derives the own session from it", async () => {
++  const { recordAntigravityCloseConversation: record } = await import("../hooks/antigravity-pretool-guard.mjs");
++  const { readAntigravityCloseSession: read, ANTIGRAVITY_CLOSE_SESSION_TTL_MS: ttl } = await import("../lib/antigravity-close-session.mjs");
++  const fixture = processFixture("receipt-agy-hook");
++  const commonDir = join(fixture.root, ".git");
++  const conversationId = "1a41c1ed-bb39-40db-b45a-866595bab590";
++  try {
++    const call = (command, overrides = {}) => record({ input: { conversationId }, command, projectRoot: fixture.root, toolName: "Bash", ...overrides });
++    call("git status --short");
++    call("node /plugin/scripts/finish-feature.mjs --one-shot", { toolName: "Read" });
++    assert.equal(read({ commonDir }), null, "only an admitted shell command that starts a close is recorded");
++    call("node /plugin/scripts/finish-feature.mjs --one-shot --root x --by PO");
++    assert.equal(read({ commonDir }), conversationId);
++    assert.equal(read({ commonDir, now: Date.now() + ttl + 1000 }), null, "a record of an earlier close proves nothing");
++    const agy = receiptAs(fixture, { ANTIGRAVITY_AGENT: "1" });
++    assert.equal(agy.ownSessionDerivation, "observed", JSON.stringify(agy));
++    assert.match(agy.ownSessionReason, /recorded by the pretool hook/u);
++    const own = resolveOwnSessionDescriptor({ runner: "antigravity", env: {}, commonDir });
++    assert.equal(own.descriptorSessionId, `antigravity-${conversationId}`);
++    const descriptorSha256 = "a".repeat(64);
++    const built = buildCleanupReceipt({ descriptors: [{ sessionId: own.descriptorSessionId, descriptorSha256, status: "unavailable" }], ownSessionId: own.descriptorSessionId, candidateOid: "b".repeat(40), candidateTree: "c".repeat(40), ownSession: own });
++    assert.equal(built.receipt.status, "complete", "the closing conversation's own descriptor no longer counts as another session");
++    const foreign = buildCleanupReceipt({ descriptors: [{ sessionId: own.descriptorSessionId, descriptorSha256, status: "unavailable" }, { sessionId: "antigravity-99999999-aaaa", descriptorSha256, status: "unavailable" }], ownSessionId: own.descriptorSessionId, candidateOid: "b".repeat(40), candidateTree: "c".repeat(40), ownSession: own });
++    assert.equal(foreign.receipt.status, "uncertain", "another conversation's descriptor still counts");
++  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
++});
++
+ test("17 the invoking runner: an explicit valid runner wins, otherwise the ambient markers, otherwise codex", () => {
+   assert.equal(invokingRunnerFromEnv({ CLAUDECODE: "1" }), "claude");
+   assert.equal(invokingRunnerFromEnv({ ANTIGRAVITY_AGENT: "1" }), "antigravity");
+@@ -801,7 +828,7 @@ test("17 the own descriptor id is derived per runner and is never guessed", () =
+   assert.match(odd.reason, /does not form a session descriptor id/u, "a valid session identity that cannot form a descriptor id is reported, not silently dropped");
+   const agy = resolveOwnSessionDescriptor({ runner: "antigravity", env: { CLAUDE_CODE_SESSION_ID: id, CODEX_THREAD_ID: id } });
+   assert.equal(agy.descriptorSessionId, null);
+-  assert.match(agy.reason, /antigravity creates no session descriptor/u);
++  assert.match(agy.reason, /antigravity hook recorded no current conversation/u);
+   assert.equal(resolveOwnSessionDescriptor({ runner: "other", env: { CLAUDE_CODE_SESSION_ID: id } }).descriptorSessionId, null);
+   assert.equal(resolveOwnSessionDescriptor({}).descriptorSessionId, null);
+ });
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 176af4035282a810778827ace5ec68e0ce5e9da9..2897b24ddca51cb180e6d77d5198778a765d0afa 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -197,8 +197,8 @@ so commit it BEFORE the freeze, or renew the freeze as above.
+ or `readback-confirmed` after a publication; candidate 16d). The command lists the active session descriptors and
+ EXCLUDES the closing session's own: that session is still running, so its descriptor can only ever report
+ `unavailable`, and it is derived from the runtime environment for the runner that is closing (`claude-<session id>` for
+-Claude, `codex-<session id>` for Codex; Antigravity creates no session descriptor, so nothing is derived there), never
+-typed. The command prints `runner`, `ownSessionDerivation` and the reason. The exclusion is
++Claude, `codex-<session id>` for Codex, `antigravity-<conversation id>` for Antigravity, from the record its pretool hook
++writes for the close command), never typed. The command prints `runner`, `ownSessionDerivation` and the reason. The exclusion is
+ named in the stored observation (`cleanup-observation.json`, beside the receipt) and the receipt's `evidenceDigest` is
+ the SHA-256 of that observation. Every OTHER active descriptor counts: `complete` only when none remains, otherwise
+ `uncertain`, and the output lists them. When the own session cannot be derived (the runner exposed no usable session
