@@ -340,3 +340,222 @@ test("C12 a refused repair leaves every byte and the directory unchanged; twin m
   const { SECURITY_GATE_BLOCK } = await import("../../scripts/security-gate-configure.mjs");
   assert.equal(SECURITY_GATE_BLOCK, BLOCK());
 });
+
+// ---- C13-C19 (Candidate 21h, CGF-05, AC-108; PO decision 2026-11-09): in a critical calibration a SKIPPED scanner blocks the close unless a
+// named, expiring exception was recorded beforehand. Written from the decision text, not from the code: `not applicable` keeps its reason,
+// every other calibration reads exactly as before, the exception only answers "did not run" (never findings), every applied exception is
+// shown and reads differently from `passed`, and the refusal names both ways out (install/configure, or the exact exception file and shape).
+const EXCEPTIONS_PATH = "project/security-scanner-exceptions.json";
+const EXCEPTIONS_SCHEMA = "pipeline.security-scanner-exceptions.v1";
+const FUTURE = "2999-01-01T00:00:00Z";
+const PAST = "2000-01-01T00:00:00Z";
+const exception = (over = {}) => ({ scanner: "license-check", reason: "no licence policy is declared for this internal tool", expires: FUTURE, confirmedBy: "chat-2026-11-09", ...over });
+const writeExceptions = (dir, entries, schema = EXCEPTIONS_SCHEMA) => writeJson(dir, EXCEPTIONS_PATH, { schema, exceptions: entries });
+// A clean capability scan (gitleaks passed) whose license-check control was skipped: license-check is a control, so the real scan records it
+// in the verdict document's `controls`, never in the envelope's `capabilities`.
+function licenseSkipped(dir) {
+  evidence(dir, { status: "PASS", classification: "success", outcome: "pass" });
+  const verdictPath = join(dir, "evidence/security-latest.v2.verdict.json");
+  const doc = JSON.parse(readFileSync(verdictPath, "utf8"));
+  doc.controls = [{ control: "license-check", tool: "license-check", capabilityId: null, controlRef: null, required: false, status: "SKIPPED", classification: "success", runOutcome: "not-applicable", controlResult: "not-applicable", reason: "no license policy configured" }];
+  writeFileSync(verdictPath, JSON.stringify(doc));
+}
+const gateFailures = (dir) => checkSecurityCompleteness({ projectDir: dir, commit: HEAD, tree: TREE });
+
+test("C13 critical + a skipped license-check is a typed block that names both ways out; standard stays admitted", () => {
+  const dir = project("critical");
+  licenseSkipped(dir);
+  const failures = gateFailures(dir);
+  assert.equal(failures.length, 1, failures.join("\n"));
+  assert.match(failures[0], /SEC-CLOSE-SCANNER-NOT-EXECUTED/u);
+  assert.match(failures[0], /license-check/u);
+  assert.match(failures[0], /Install license-check|configure license-check/u, "way 1: install or configure the scanner");
+  assert.match(failures[0], /node <plugin-root>\/scripts\/security-scan\.mjs/u);
+  assert.match(failures[0], /project\/security-scanner-exceptions\.json/u, "way 2: the exact exception file");
+  for (const word of ["pipeline.security-scanner-exceptions.v1", "scanner", "reason", "expires", "confirmedBy", "before the candidate"]) assert.ok(failures[0].includes(word), word);
+  const standard = project("standard");
+  licenseSkipped(standard);
+  assert.deepEqual(gateFailures(standard), []);
+});
+
+test("C13b the state reading: critical turns a skipped license-check into not executed; no package sources stays not applicable with its reason", () => {
+  const list = scanners(["license-check", "SKIPPED", "success"], ["osv-scanner", "SKIPPED", "success"]).map((s) => ({ ...s, reason: `${s.tool} reason` }));
+  const critical = Object.fromEntries(securityCloseElements({ scanners: list, critical: true }).map((e) => [e.element, e]));
+  assert.equal(critical["license-check"].state, "not executed");
+  assert.equal(critical["osv-scanner"].state, "not applicable");
+  assert.equal(critical["osv-scanner"].reason, "osv-scanner reason");
+  const standard = Object.fromEntries(securityCloseElements({ scanners: list }).map((e) => [e.element, e.state]));
+  assert.equal(standard["license-check"], "not applicable", "non-critical reads exactly as before");
+});
+
+test("C14 a valid named exception lets that one scanner pass the critical gate and is shown, never as passed", async () => {
+  const { readScannerExceptions } = await import("../security-close-status.mjs");
+  const dir = project("critical");
+  licenseSkipped(dir);
+  writeExceptions(dir, [exception()]);
+  assert.deepEqual(gateFailures(dir), []);
+  const read = readScannerExceptions(dir);
+  assert.equal(read.valid.length, 1);
+  const lines = formatSecurityCloseStatus(securityCloseElements({ scanners: scanners(["license-check", "SKIPPED", "success"]), critical: true, exceptions: read })).filter((l) => l.startsWith("license-check"));
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /license-check: not executed/u);
+  for (const text of ["named exception", "no licence policy is declared for this internal tool", FUTURE, "chat-2026-11-09"]) assert.ok(lines[0].includes(text), text);
+  assert.doesNotMatch(lines[0], /: (passed|ok)\b/iu);
+  // The exception covers only the scanner it names: a second skipped scanner is still refused.
+  const second = project("critical");
+  evidence(second, { status: "SKIPPED", classification: "binary_missing", outcome: "not-applicable" });
+  writeExceptions(second, [exception()]);
+  const refused = gateFailures(second);
+  assert.equal(refused.length, 1, refused.join("\n"));
+  assert.match(refused[0], /gitleaks/u);
+  writeExceptions(second, [exception({ scanner: "gitleaks" })]);
+  assert.deepEqual(gateFailures(second), [], "a capability scanner is covered by its own entry");
+});
+
+test("C14b a scanner the capability plan marks required is covered by its own exception too, and still blocks without one", () => {
+  const dir = project("critical");
+  evidence(dir, { status: "SKIPPED", classification: "binary_missing", outcome: "required-capability-missing", blocking: true, optional: false });
+  const blocked = gateFailures(dir);
+  assert.ok(blocked.some((f) => /SEC-CLOSE-SCANNER-NOT-EXECUTED/u.test(f)), blocked.join("\n"));
+  writeExceptions(dir, [exception({ scanner: "gitleaks" })]);
+  assert.deepEqual(gateFailures(dir), []);
+  const standard = project("standard");
+  evidence(standard, { status: "SKIPPED", classification: "binary_missing", outcome: "required-capability-missing", blocking: true, optional: false });
+  writeExceptions(standard, [exception({ scanner: "gitleaks" })]);
+  assert.equal(gateFailures(standard).length, 1, "outside the critical profile the exception file changes nothing");
+});
+
+test("C15 an expired, malformed or unknown entry is ignored for admission and named in the refusal", () => {
+  const cases = [
+    ["expired", exception({ expires: PAST }), /expired/u],
+    ["unknown scanner", exception({ scanner: "trivy" }), /unknown scanner/u],
+    ["reason too long", exception({ reason: "x".repeat(501) }), /500/u],
+    ["blank reason", exception({ reason: "   " }), /reason/u],
+    ["missing confirmedBy", exception({ confirmedBy: undefined }), /confirmedBy/u],
+    ["bad expires", exception({ expires: "tomorrow" }), /expires/u],
+  ];
+  for (const [label, entry, word] of cases) {
+    const dir = project("critical");
+    licenseSkipped(dir);
+    writeExceptions(dir, [entry]);
+    const failures = gateFailures(dir);
+    assert.equal(failures.length, 1, `${label}: ${failures.join("\n")}`);
+    assert.match(failures[0], /SEC-CLOSE-SCANNER-NOT-EXECUTED/u, label);
+    assert.match(failures[0], word, `${label}: the refusal names why the entry was ignored`);
+  }
+  const wrongSchema = project("critical");
+  licenseSkipped(wrongSchema);
+  writeExceptions(wrongSchema, [exception()], "pipeline.security-scanner-exceptions.v0");
+  assert.match(gateFailures(wrongSchema)[0], /schema/u);
+  const notJson = project("critical");
+  licenseSkipped(notJson);
+  put(notJson, EXCEPTIONS_PATH, "{ not json");
+  assert.match(gateFailures(notJson)[0], /JSON/u);
+  // One bad entry does not poison a good one.
+  const mixed = project("critical");
+  licenseSkipped(mixed);
+  writeExceptions(mixed, [exception({ expires: PAST }), exception()]);
+  assert.deepEqual(gateFailures(mixed), []);
+});
+
+test("C16 a scanner that ran and reported findings is never covered by an exception", () => {
+  const dir = project("critical");
+  evidence(dir, { status: "FINDINGS", classification: "findings", outcome: "findings", blocking: true, optional: false });
+  const without = gateFailures(dir);
+  assert.equal(without.length, 1, without.join("\n"));
+  writeExceptions(dir, [exception({ scanner: "gitleaks" })]);
+  assert.deepEqual(gateFailures(dir), without, "the exception changes nothing for a scanner that ran");
+  const elements = securityCloseElements({ scanners: scanners(["gitleaks", "FINDINGS", "findings"]), critical: true, exceptions: { valid: [exception({ scanner: "gitleaks" })], rejected: [] } });
+  const gitleaks = elements.find((e) => e.element === "gitleaks");
+  assert.equal(gitleaks.state, "failed");
+  assert.ok(!formatSecurityCloseStatus([gitleaks]).join("").includes("named exception"));
+});
+
+test("C17 the close.pre entry point: critical + skipped license-check exits 2; with a valid exception it exits 0, prints the exception and never GREEN", () => {
+  const closeLicense = (stakes, exceptionEntries) => {
+    const fixture = closeFixture({ gate: "blocking", stakes });
+    licenseSkipped(fixture.dir);
+    const envelopePath = join(fixture.dir, "evidence/security-latest.v2.json");
+    const envelope = JSON.parse(readFileSync(envelopePath, "utf8"));
+    envelope.input.commit = fixture.commit;
+    envelope.input.tree = fixture.tree;
+    writeFileSync(envelopePath, JSON.stringify(envelope));
+    // The scan lists every scanner the project enables; only license-check was skipped (osv-scanner found no package sources).
+    writeJson(fixture.dir, "evidence/security-latest.json", { scanners: [
+      { tool: "gitleaks", status: "PASS", classification: "success" }, { tool: "osv-scanner", status: "SKIPPED", classification: "success", reason: "no package sources in project" },
+      { tool: "semgrep", status: "PASS", classification: "success" }, { tool: "license-check", status: "SKIPPED", classification: "success", reason: "no license policy configured" },
+    ] });
+    if (exceptionEntries) writeExceptions(fixture.dir, exceptionEntries);
+    return runClose(fixture.dir);
+  };
+  const refused = closeLicense("critical", null);
+  assert.equal(refused.status, 2, refused.stdout + refused.stderr);
+  assert.match(refused.stderr, /SEC-CLOSE-SCANNER-NOT-EXECUTED/u);
+  assert.match(refused.stderr, /license-check/u);
+  const admitted = closeLicense("critical", [exception()]);
+  assert.equal(admitted.status, 0, admitted.stdout + admitted.stderr);
+  assert.match(admitted.stdout, /license-check: not executed/u);
+  for (const text of ["named exception", "no licence policy is declared for this internal tool", FUTURE, "chat-2026-11-09"]) assert.ok(admitted.stdout.includes(text), text);
+  assert.match(admitted.stdout, /NAMED EXCEPTION/u);
+  assert.doesNotMatch(admitted.stdout, /GREEN/u);
+  assert.doesNotMatch(admitted.stdout, /license-check: (passed|ok)\b/iu);
+  const standard = closeLicense("standard", null);
+  assert.equal(standard.status, 0, standard.stdout + standard.stderr);
+  assert.match(standard.stdout, /license-check: not applicable/u);
+});
+
+test("C18 the Verify security check and the scan summary apply the same reading and show each applied exception", async () => {
+  const { runSecurityCloseCheck } = await import("../../scripts/security-close-check.mjs");
+  const { deriveSummaryVerdict } = await import("../../scripts/security-scan.mjs");
+  const gateFile = "schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: blocking\n    type: automated\n";
+  const make = (stakes) => { const root = project(stakes); put(root, ".claude/pipeline.yaml", gateFile); return root; };
+  const run = (root) => {
+    const lines = [];
+    const log = console.log; const error = console.error;
+    console.log = (...a) => lines.push(a.join(" ")); console.error = (...a) => lines.push(a.join(" "));
+    try { return { code: runSecurityCloseCheck(root, { PATH: "", Path: "", HOME: root }), text: lines.join("\n") }; } finally { console.log = log; console.error = error; }
+  };
+  // No scanner binary on this PATH: gitleaks, osv-scanner and semgrep did not execute, and license-check has no policy (skipped).
+  const bare = run(make("critical"));
+  assert.equal(bare.code, 1);
+  assert.match(bare.text, /license-check/u, "the skipped license-check is refused in the Verify path too");
+  assert.match(bare.text, /project\/security-scanner-exceptions\.json/u);
+  const all = make("critical");
+  writeExceptions(all, ["gitleaks", "osv-scanner", "semgrep", "license-check"].map((scanner) => exception({ scanner })));
+  const admitted = run(all);
+  assert.equal(admitted.code, 0, admitted.text);
+  const partial = make("critical");
+  writeExceptions(partial, ["gitleaks", "osv-scanner", "semgrep"].map((scanner) => exception({ scanner })));
+  const stillRefused = run(partial);
+  assert.equal(stillRefused.code, 1);
+  assert.match(stillRefused.text, /license-check/u);
+  // The scan's own summary reads a skipped license-check as an incomplete scan in a critical project only.
+  const skippedEvidence = { exitCode: 0, scanners: [{ tool: "license-check", status: "SKIPPED", classification: "success", reportStatus: "not-configured" }] };
+  assert.equal(deriveSummaryVerdict(skippedEvidence), "NOT CONFIGURED");
+  assert.equal(deriveSummaryVerdict(skippedEvidence, { critical: true }), "INCOMPLETE");
+  // The real CLI prints the status lines with the exception applied.
+  const cli = make("critical");
+  writeExceptions(cli, [exception()]);
+  const res = spawnSync(process.execPath, [scanScript, "--root", cli, "--timeout-ms", "5000"], { encoding: "utf8", shell: false, env: { HOME: cli, USERPROFILE: cli, SystemRoot: process.env.SystemRoot ?? "", PATH: "", Path: "" } });
+  assert.match(res.stdout, /^ {2}license-check: not executed.*named exception.*chat-2026-11-09/mu, res.stdout + res.stderr);
+  const plain = make("standard");
+  const plainRes = spawnSync(process.execPath, [scanScript, "--root", plain, "--timeout-ms", "5000"], { encoding: "utf8", shell: false, env: { HOME: plain, USERPROFILE: plain, SystemRoot: process.env.SystemRoot ?? "", PATH: "", Path: "" } });
+  assert.match(plainRes.stdout, /^ {2}license-check: not applicable/mu, plainRes.stdout + plainRes.stderr);
+});
+
+test("C19 the close quality readback names an applied exception in its security evidence", async () => {
+  const { closeQualityReadback } = await import("../close-quality-readback.mjs");
+  const files = {
+    "evidence/security-latest.json": JSON.stringify({ scanners: [{ tool: "gitleaks", status: "PASS", classification: "success" }, { tool: "license-check", status: "SKIPPED", classification: "success" }] }),
+    "project/pipeline.json": JSON.stringify({ stakes: "critical" }),
+    [EXCEPTIONS_PATH]: JSON.stringify({ schema: EXCEPTIONS_SCHEMA, exceptions: [exception()] }),
+  };
+  const readers = { exists: (p) => p.startsWith("evidence/security-latest.v2"), readBytes: (p) => { if (!(p in files)) throw new Error("absent"); return Buffer.from(files[p]); }, listDir: () => [] };
+  const row = closeQualityReadback({ root: "<root>", featureId: "feature", readers }).find((r) => r.id === "security-scan");
+  assert.equal(row.status, "present");
+  assert.match(row.evidence, /license-check: not executed/u);
+  assert.ok(row.evidence.includes("named exception") && row.evidence.includes("chat-2026-11-09"), row.evidence);
+  const noException = closeQualityReadback({ root: "<root>", featureId: "feature", readers: { ...readers, readBytes: (p) => { if (p === EXCEPTIONS_PATH || !(p in files)) throw new Error("absent"); return Buffer.from(files[p]); } } }).find((r) => r.id === "security-scan");
+  assert.match(noException.evidence, /license-check: not executed/u);
+  assert.ok(!noException.evidence.includes("named exception"));
+});

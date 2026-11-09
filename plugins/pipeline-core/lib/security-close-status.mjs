@@ -44,12 +44,17 @@ export function deriveReportStatus({ tool, status, classification }) {
   return "tool-unavailable";
 }
 
-/** The four-state reading of one scanner entry {tool, status, classification, reason?}. */
-export function securityScannerState(entry) {
+/**
+ * The four-state reading of one scanner entry {tool, status, classification, reason?}. `critical` (Candidate 21h, CGF-05): in a critical
+ * calibration a skipped license-check ("not-configured") did not run, so it reads "not executed" like every other scanner that did not run;
+ * every other calibration keeps "not applicable". osv-scanner's "no package sources" result stays "not applicable" in both.
+ */
+export function securityScannerState(entry, { critical = false } = {}) {
   const label = entry?.reportStatus ?? deriveReportStatus(entry ?? {});
   if (label === "passed") return "passed";
   if (label === "findings") return "failed";
-  if (label === "not-configured" || label === "not-applicable") return "not applicable";
+  if (label === "not-configured") return critical ? "not executed" : "not applicable";
+  if (label === "not-applicable") return "not applicable";
   return "not executed"; // tool-unavailable, error, or an unrecognised status: the scanner did not complete a scan
 }
 
@@ -75,30 +80,94 @@ export function readCalibrationStakes(projectDir) {
   return null;
 }
 
+// The named exception for a scanner that did not run (Candidate 21h, CGF-05; PO decision 2026-11-09): one committed file, entries with the
+// scanner, a reason, an expiry and the label the human gave in chat. Same strength as the per-finding ignore (reason + expiry, listed in the
+// close evidence, confirmed in chat, no signature). It only ever answers "did not run": a scanner that reported findings reads "failed".
+export const SCANNER_EXCEPTIONS_PATH = "project/security-scanner-exceptions.json";
+export const SCANNER_EXCEPTIONS_SCHEMA = "pipeline.security-scanner-exceptions.v1";
+export const SCANNER_EXCEPTION_REASON_MAX = 500;
+const ISO_8601 = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/u;
+const nonBlank = (value) => typeof value === "string" && value.trim() !== "";
+
+/**
+ * Parses the exception file text (null = no file). Returns {valid, rejected}: `valid` are the entries that may admit a scanner,
+ * `rejected` are {ref, why} for every file-level or entry-level problem (expired, malformed, unknown scanner), which the refusal names.
+ */
+export function parseScannerExceptions(text, now = new Date()) {
+  if (text === null) return { valid: [], rejected: [] };
+  const rejectFile = (why) => ({ valid: [], rejected: [{ ref: SCANNER_EXCEPTIONS_PATH, why }] });
+  let doc;
+  try { doc = JSON.parse(text); } catch { return rejectFile("not valid JSON"); }
+  if (doc?.schema !== SCANNER_EXCEPTIONS_SCHEMA) return rejectFile(`schema must be ${SCANNER_EXCEPTIONS_SCHEMA}`);
+  if (!Array.isArray(doc.exceptions)) return rejectFile("exceptions must be an array");
+  const valid = [];
+  const rejected = [];
+  doc.exceptions.forEach((entry, index) => {
+    const ref = `entry ${index}${typeof entry?.scanner === "string" ? ` (${entry.scanner})` : ""}`;
+    const problem = (() => {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) return "not an object";
+      if (!SECURITY_ELEMENTS.includes(entry.scanner)) return `unknown scanner (one of ${SECURITY_ELEMENTS.join(", ")})`;
+      if (!nonBlank(entry.reason)) return "reason is missing or blank";
+      if (entry.reason.length > SCANNER_EXCEPTION_REASON_MAX) return `reason is longer than ${SCANNER_EXCEPTION_REASON_MAX} characters`;
+      if (!nonBlank(entry.confirmedBy)) return "confirmedBy is missing or blank";
+      if (typeof entry.expires !== "string" || !ISO_8601.test(entry.expires) || Number.isNaN(Date.parse(entry.expires))) return "expires is not an ISO-8601 date";
+      if (Date.parse(entry.expires) <= now.getTime()) return `expired (${entry.expires})`;
+      return null;
+    })();
+    if (problem) rejected.push({ ref, why: problem });
+    else valid.push({ scanner: entry.scanner, reason: entry.reason, expires: entry.expires, confirmedBy: entry.confirmedBy });
+  });
+  return { valid, rejected };
+}
+
+/** The exceptions of the project under `projectDir` (committed file; absent = none). Pure and offline. */
+export function readScannerExceptions(projectDir, now = new Date()) {
+  const path = join(projectDir, SCANNER_EXCEPTIONS_PATH);
+  if (!existsSync(path)) return { valid: [], rejected: [] };
+  let text;
+  try { text = readFileSync(path, "utf8"); } catch { return { valid: [], rejected: [{ ref: SCANNER_EXCEPTIONS_PATH, why: "could not be read" }] }; }
+  return parseScannerExceptions(text, now);
+}
+
 /**
  * One {element, state, reason} per security element. `scanners` is the scan evidence's scanner list (or null when there is none);
  * `enabled` maps an element to false when the calibration does not configure it. An element without an entry is "not applicable"
  * when not configured and "not executed" when configured -- no evidence never reads like a passed scan.
+ * `critical` applies the critical reading (securityScannerState); `exceptions` ({valid, rejected} of readScannerExceptions) is honoured only
+ * then: an element that did not execute and has a valid exception keeps the state "not executed" and carries the entry as `exception`, so it
+ * is printed with its reason, expiry and confirmer and can never read like "passed".
  */
-export function securityCloseElements({ scanners = null, enabled = {} } = {}) {
+export function securityCloseElements({ scanners = null, enabled = {}, critical = false, exceptions = null } = {}) {
   const list = Array.isArray(scanners) ? scanners : [];
+  const excepted = (base) => {
+    const entry = critical && base.state === "not executed" ? exceptions?.valid?.find((e) => e.scanner === base.element) : null;
+    return entry ? { ...base, exception: entry } : base;
+  };
   return SECURITY_ELEMENTS.map((element) => {
     const entry = list.find((s) => s?.tool === element);
-    if (entry) return { element, state: securityScannerState(entry), reason: entry.reason ?? null };
+    if (entry) return excepted({ element, state: securityScannerState(entry, { critical }), reason: entry.reason ?? null });
     if (enabled?.[element] === false) return { element, state: "not applicable", reason: "not configured for this project" };
-    return { element, state: "not executed", reason: "no scan evidence for this scanner" };
+    return excepted({ element, state: "not executed", reason: "no scan evidence for this scanner" });
   });
 }
 
 /** The elements of a scan that completed: it lists every scanner the project enables, so an element missing from it is not configured. */
-export function elementsOfCompletedScan(scanners) {
+export function elementsOfCompletedScan(scanners, options = {}) {
   const list = Array.isArray(scanners) ? scanners : [];
   const enabled = Object.fromEntries(SECURITY_ELEMENTS.filter((e) => !list.some((s) => s?.tool === e)).map((e) => [e, false]));
-  return securityCloseElements({ scanners: list, enabled });
+  return securityCloseElements({ ...options, scanners: list, enabled });
 }
 
+/** The elements that did not execute and no named exception covers: these are what a critical calibration refuses. */
+export const unexcusedNotExecuted = (elements) => elements.filter((e) => e.state === "not executed" && !e.exception);
+
+// One line per exception: never contains a newline, and the " -- " that separates the reason from the label stays unique.
+const oneLine = (value) => String(value).replace(/\s+/gu, " ").replace(/ -- /gu, " - ").trim();
 export function formatSecurityCloseStatus(elements) {
-  return elements.map(({ element, state, reason }) => `${element}: ${state}${reason ? ` -- ${reason}` : ""}`);
+  return elements.map(({ element, state, reason, exception }) => {
+    const applied = exception ? ` [named exception: ${oneLine(exception.reason)}; expires ${exception.expires}; confirmed by ${oneLine(exception.confirmedBy)}]` : "";
+    return `${element}: ${state}${applied}${reason ? ` -- ${reason}` : ""}`;
+  });
 }
 
 /**
@@ -116,7 +185,12 @@ export function securityGateNotConfiguredRefusal(root, where = "this check") {
 }
 
 /** The typed refusal of a critical calibration for a scanner that did not execute: names the scanner and the commands that repair it. */
-export function scannerNotExecutedRefusal(element, where = "the security evidence") {
+export function scannerNotExecutedRefusal(element, where = "the security evidence", { rejected = [] } = {}) {
+  const ignored = rejected.length > 0 ? ` Exception entries ignored: ${rejected.map((r) => `${r.ref}: ${r.why}`).join("; ")}.` : "";
   return `${SCANNER_NOT_EXECUTED_CODE}: ${element} did not execute (${where}) and this project is calibrated critical (stakes in the project calibration). `
-    + `Install ${element} (platform guidance: ${SECURITY_PREFLIGHT_COMMAND}), then run: ${SECURITY_RUN_COMMAND}`;
+    + `Install or configure ${element} (platform guidance: ${SECURITY_PREFLIGHT_COMMAND}), then run: ${SECURITY_RUN_COMMAND}. `
+    + `Or record a named exception for ${element} in ${SCANNER_EXCEPTIONS_PATH} (schema ${SCANNER_EXCEPTIONS_SCHEMA}): `
+    + `{"schema":"${SCANNER_EXCEPTIONS_SCHEMA}","exceptions":[{"scanner":"${element}","reason":"<non-blank, at most ${SCANNER_EXCEPTION_REASON_MAX} characters>",`
+    + `"expires":"<ISO-8601 date in the future>","confirmedBy":"<the label the human gave for this exception in chat>"}]} `
+    + `and commit it before the candidate is frozen; an exception never covers a scanner that reported findings.${ignored}`;
 }

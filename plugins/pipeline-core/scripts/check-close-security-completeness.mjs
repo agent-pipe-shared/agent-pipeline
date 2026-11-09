@@ -39,7 +39,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
-  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, securityCloseElements, securityGateNotConfiguredRefusal,
+  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions, securityCloseElements,
+  securityGateNotConfiguredRefusal, unexcusedNotExecuted,
 } from "../lib/security-close-status.mjs";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
@@ -75,7 +76,9 @@ export function checkCloseSecurityCompleteness(root) {
   let scanners = null;
   try { scanners = JSON.parse(readFileSync(join(root, "evidence", "security-latest.json"), "utf8")).scanners; } catch { /* no readable scan evidence: every configured element reads "not executed" */ }
   const enabled = Object.fromEntries(SECURITY_ELEMENTS.map((key) => [key, manifestResult.manifest?.security?.scanners?.[key]?.enabled ?? true]));
-  return { skipped: false, commit, failures, elements: securityCloseElements({ scanners, enabled }) };
+  // Candidate 21h: the critical reading and the named exceptions, so the printed lines match what the completeness check above decided.
+  const critical = isCriticalStakes(readCalibrationStakes(root));
+  return { skipped: false, commit, failures, elements: securityCloseElements({ scanners, enabled, critical, exceptions: critical ? readScannerExceptions(root) : null }) };
 }
 
 if (isDirectInvocation(import.meta.url)) {
@@ -94,7 +97,13 @@ if (isDirectInvocation(import.meta.url)) {
     for (const failure of result.failures) console.error(`CLOSE SECURITY COMPLETENESS FAILED: ${failure}`);
     process.exit(2);
   }
-  const notExecuted = result.elements.filter((e) => e.state === "not executed").map((e) => e.element);
+  const notExecuted = unexcusedNotExecuted(result.elements).map((e) => e.element);
+  const excepted = result.elements.filter((e) => e.exception).map((e) => e.element);
+  if (notExecuted.length === 0 && excepted.length > 0) {
+    // Never GREEN: the scanners named here did not run and are admitted only by a recorded, unexpired, human-confirmed exception.
+    console.log(`CLOSE SECURITY COMPLETENESS ADMITTED BY NAMED EXCEPTION: HEAD ${result.commit} is bound; not executed but excepted: ${excepted.join(", ")} (see the lines above for reason, expiry and confirmer).`);
+    process.exit(0);
+  }
   console.log(notExecuted.length === 0
     ? `CLOSE SECURITY COMPLETENESS GREEN: HEAD ${result.commit} is bound and complete.`
     : `CLOSE SECURITY COMPLETENESS ADMITTED, NOT COMPLETE: HEAD ${result.commit} is bound; not executed: ${notExecuted.join(", ")} (this calibration is not critical, so it does not block). Run: ${SECURITY_RUN_COMMAND}`);

@@ -17,7 +17,7 @@
 // handoverUpdatedMs()->number|null, headCommitMs()->number|null, readBytes(rel)->Buffer, promisedAdrPaths()->string[]|null. A reader that throws or is not supplied yields "unknown".
 
 import { createHash } from "node:crypto";
-import { elementsOfCompletedScan, formatSecurityCloseStatus } from "./security-close-status.mjs";
+import { SCANNER_EXCEPTIONS_PATH, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, parseScannerExceptions } from "./security-close-status.mjs";
 import { inspectSpecJourneys, JOURNEY_REPAIR } from "./spec-journey-coverage.mjs";
 
 export const HANDOVER_FRESHNESS_BOUND_MS = 24 * 60 * 60 * 1000;
@@ -52,7 +52,13 @@ function securityRow(readers) {
   const scan = call(readers.readBytes, SECURITY_SCAN_PATH);
   if (scan.ok) {
     try {
-      const states = formatSecurityCloseStatus(elementsOfCompletedScan(JSON.parse(Buffer.from(scan.value).toString("utf8")).scanners)).map((line) => line.split(" -- ")[0]);
+      // Candidate 21h: the same critical reading and named exceptions as the close gate, read through the injected reader (a reader that
+      // cannot supply the calibration or the exception file leaves the non-critical reading, which the readback never claims beyond).
+      const text = (rel) => { const read = call(readers.readBytes, rel); return read.ok ? Buffer.from(read.value).toString("utf8") : null; };
+      const stakesOf = (rel) => { try { const stakes = JSON.parse(text(rel))?.stakes; return typeof stakes === "string" ? stakes : null; } catch { return null; } };
+      const critical = isCriticalStakes(stakesOf("project/pipeline.json") ?? stakesOf(".claude/pipeline.json"));
+      const exceptions = critical ? parseScannerExceptions(text(SCANNER_EXCEPTIONS_PATH)) : null;
+      const states = formatSecurityCloseStatus(elementsOfCompletedScan(JSON.parse(Buffer.from(scan.value).toString("utf8")).scanners, { critical, exceptions })).map((line) => line.split(" -- ")[0]);
       return row(id, "present", `${SECURITY_ENVELOPE_PATH} (${states.join("; ")})`);
     } catch { /* unreadable scan result: fall through to the bare path */ }
   }

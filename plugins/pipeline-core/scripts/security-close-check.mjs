@@ -12,7 +12,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal, securityGateNotConfiguredRefusal } from "../lib/security-close-status.mjs";
+import {
+  elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, readScannerExceptions, scannerNotExecutedRefusal, securityGateNotConfiguredRefusal, unexcusedNotExecuted,
+} from "../lib/security-close-status.mjs";
 import { gateConfig, loadManifest } from "../lib/manifest.mjs";
 
 export const SECURITY_SCAN_SCRIPT = fileURLToPath(new URL("./security-scan.mjs", import.meta.url));
@@ -31,8 +33,11 @@ export function runSecurityCloseCheck(root, env = process.env) {
   if (!isCriticalStakes(readCalibrationStakes(root))) return 0;
   let scanners = null;
   try { scanners = JSON.parse(readFileSync(join(root, "evidence", "security-latest.json"), "utf8")).scanners; } catch { /* unreadable evidence: every configured element is not executed */ }
-  const notExecuted = elementsOfCompletedScan(scanners).filter((entry) => entry.state === "not executed");
-  for (const entry of notExecuted) console.error(scannerNotExecutedRefusal(entry.element, "this Verify run"));
+  // Candidate 21h: the critical reading (a skipped license-check did not run) and the named exceptions, the same as the close gate. The scan
+  // above already printed each applied exception in its "Security close status" lines.
+  const exceptions = readScannerExceptions(root);
+  const notExecuted = unexcusedNotExecuted(elementsOfCompletedScan(scanners, { critical: true, exceptions }));
+  for (const entry of notExecuted) console.error(scannerNotExecutedRefusal(entry.element, "this Verify run", { rejected: exceptions.rejected }));
   return notExecuted.length === 0 ? 0 : 1;
 }
 

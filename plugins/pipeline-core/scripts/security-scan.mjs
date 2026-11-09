@@ -111,7 +111,9 @@ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 // SHARED absent-key default both consumers use) -- see that function's own doc comment for
 // why "blocking" was chosen and why it moved rather than staying duplicated here.
 import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
-import { deriveReportStatus, elementsOfCompletedScan, formatSecurityCloseStatus } from "../lib/security-close-status.mjs";
+import {
+  deriveReportStatus, elementsOfCompletedScan, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions,
+} from "../lib/security-close-status.mjs";
 import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
 import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
 
@@ -1121,7 +1123,7 @@ export function formatScannerLine(s) {
  * not successful scans; only explicit not-applicable/not-configured skips can be excluded from
  * an otherwise complete scan. This projection never changes `evidence.exitCode`.
  */
-export function deriveSummaryVerdict(evidence) {
+export function deriveSummaryVerdict(evidence, { critical = false } = {}) {
   if (evidence?.exitCode === 2) return "BLOCKING";
   if (evidence?.exitCode === 1) return "WARNING";
 
@@ -1129,10 +1131,11 @@ export function deriveSummaryVerdict(evidence) {
   if (scanners.length === 0) return "NO SCANNERS ENABLED";
 
   const successful = scanners.filter((scanner) => scanner.status === "PASS" || scanner.status === "FINDINGS");
+  // Candidate 21h (CGF-05): in a critical calibration a skipped license-check ("not-configured") did not run, so it is not resolved.
   const unresolved = scanners.some((scanner) => {
     if (scanner.status === "PASS" || scanner.status === "FINDINGS") return false;
     if (scanner.status === "SKIPPED"
-      && (scanner.reportStatus === "not-applicable" || scanner.reportStatus === "not-configured")) return false;
+      && (scanner.reportStatus === "not-applicable" || (scanner.reportStatus === "not-configured" && !critical))) return false;
     return true;
   });
 
@@ -1146,15 +1149,16 @@ export function deriveSummaryVerdict(evidence) {
   return "CLEAN";
 }
 
-function printSummary(evidence) {
+function printSummary(evidence, critical = false, exceptions = null) {
   for (const s of evidence.scanners) {
     console.log(formatScannerLine(s));
   }
   // G20-25: the four-state close status (passed / failed / not executed / not applicable), so a scanner that did not run never
-  // reads like a passed scan next to a "policy exit 0".
+  // reads like a passed scan next to a "policy exit 0". Candidate 21h: a critical calibration reads a skipped license-check as not
+  // executed and shows every applied named exception on its line.
   console.log("Security close status:");
-  for (const line of formatSecurityCloseStatus(elementsOfCompletedScan(evidence.scanners))) console.log(`  ${line}`);
-  const verdict = deriveSummaryVerdict(evidence);
+  for (const line of formatSecurityCloseStatus(elementsOfCompletedScan(evidence.scanners, { critical, exceptions }))) console.log(`  ${line}`);
+  const verdict = deriveSummaryVerdict(evidence, { critical });
   const policyNote = evidence.exitCode === 0 && verdict !== "CLEAN" ? ` (policy exit ${evidence.exitCode})` : "";
   if (evidence.candidate?.destination === "local-only") {
     console.log("destination: local-only");
@@ -1233,7 +1237,8 @@ export async function main(argv = process.argv.slice(2)) {
     ...(opts.scanMode ? { scanMode: opts.scanMode } : {}),
     ...(outDir ? { evidenceOutDir: outDir } : {}),
   });
-  printSummary(evidence);
+  const critical = isCriticalStakes(readCalibrationStakes(rootDir));
+  printSummary(evidence, critical, critical ? readScannerExceptions(rootDir) : null);
   const evidenceBase = outDir ?? rootDir;
   console.log(`Evidence written: ${join(evidenceBase, "evidence", "security-latest.json")}`);
   if (evidenceV2) {

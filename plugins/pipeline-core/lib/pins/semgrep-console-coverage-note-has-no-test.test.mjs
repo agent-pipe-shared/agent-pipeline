@@ -137,7 +137,9 @@ test("P4: formatter contract on literal entries (suffix only for degraded + file
 
 test("P4: the CLI summary printer routes every scanner line through formatScannerLine", () => {
   const src = readFileSync(SCRIPT, "utf8");
-  const m = src.match(/function printSummary\(evidence\) \{[\s\S]*?\n\}/);
+  // QG-04 restatement (Candidate 21h, CGF-05): printSummary gained two optional parameters (the calibration's critical reading and the named
+  // scanner exceptions) so the close status lines honour them; the assertion on the scanner-line loop below is unchanged.
+  const m = src.match(/function printSummary\(evidence(?:, [^)]*)?\) \{[\s\S]*?\n\}/);
   assert.ok(m, "printSummary found");
   assert.match(m[0], /for \(const s of evidence\.scanners\) \{\s*console\.log\(formatScannerLine\(s\)\);\s*\}/);
 });

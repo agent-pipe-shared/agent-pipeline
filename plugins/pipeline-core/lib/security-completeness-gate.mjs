@@ -82,7 +82,7 @@ import { join } from "node:path";
 
 import { evaluateAllCapabilities, aggregateVerdict, validateSecurityEvidenceV2 } from "./security-evidence-evaluator.mjs";
 import { EVIDENCE_FRESHNESS_CODES, evidenceFreshnessFailureCodes, freshnessCodeSuffix } from "./evidence-freshness-codes.mjs";
-import { isCriticalStakes, readCalibrationStakes, scannerNotExecutedRefusal, securityScannerState } from "./security-close-status.mjs";
+import { isCriticalStakes, readCalibrationStakes, readScannerExceptions, scannerNotExecutedRefusal, securityScannerState } from "./security-close-status.mjs";
 
 const DEFAULT_ENVELOPE_PATH = "evidence/security-latest.v2.json";
 const DEFAULT_VERDICT_PATH = "evidence/security-latest.v2.verdict.json";
@@ -301,8 +301,18 @@ export function checkSecurityCompleteness({
     return [`${verdictPath}: verdict is not consistent with ${envelopePath}'s capability records (stale or mismatched pair)`];
   }
 
+  // Candidate 21h (CGF-05): in a critical calibration a named, unexpired exception (project/security-scanner-exceptions.json) answers a
+  // scanner that did NOT RUN -- here and in the plan-required verdict line above it, which is the same refusal for the same scanner. It never
+  // covers a scanner that ran (state "failed"), and every other calibration ignores the file.
+  const critical = isCriticalStakes(readCalibrationStakes(projectDir));
+  const exceptions = critical ? readScannerExceptions(projectDir) : null;
+  const didNotRunAndExcepted = (record) =>
+    critical && securityScannerState(record, { critical }) === "not executed" && exceptions.valid.some((e) => e.scanner === record.tool);
+  const capabilityRecords = envelope.capabilities.map((c) => ({ id: c?.capabilityId, tool: c?.tool?.name, status: c?.status, classification: c?.classification }));
   if (verdictBlock.blocking === true) {
     for (const offender of verdictBlock.offendingCapabilities) {
+      const record = capabilityRecords.find((c) => c.id === offender?.capabilityId);
+      if (record && didNotRunAndExcepted(record)) continue;
       failures.push(
         `${verdictPath}: required capability ${offender?.capabilityId} did not reach an accepted state (outcome=${offender?.outcome})`,
       );
@@ -310,11 +320,13 @@ export function checkSecurityCompleteness({
   }
   // G20-25: a critical calibration is hard -- a scanner that did not execute blocks even where the plan marks it optional. Any other
   // calibration keeps the verdict above as the whole decision (its status line still reads "not executed", see security-close-status.mjs).
-  if (isCriticalStakes(readCalibrationStakes(projectDir))) {
-    for (const c of envelope.capabilities) {
-      const element = c?.tool?.name;
-      if (securityScannerState({ tool: element, status: c?.status, classification: c?.classification }) === "not executed") {
-        failures.push(scannerNotExecutedRefusal(element, envelopePath));
+  // license-check is a control, not a capability: the scan records it in the verdict document's `controls`, never in the envelope.
+  if (critical) {
+    const controlRecords = (Array.isArray(verdictDoc.controls) ? verdictDoc.controls : [])
+      .map((c) => ({ tool: c?.tool ?? c?.control, status: c?.status, classification: c?.classification }));
+    for (const record of [...capabilityRecords, ...controlRecords]) {
+      if (securityScannerState(record, { critical }) === "not executed" && !didNotRunAndExcepted(record)) {
+        failures.push(scannerNotExecutedRefusal(record.tool, envelopePath, { rejected: exceptions.rejected }));
       }
     }
   }
