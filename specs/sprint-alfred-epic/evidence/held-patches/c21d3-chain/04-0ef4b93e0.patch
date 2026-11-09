@@ -1,0 +1,111 @@
+diff --git a/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs b/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs
+index 27bc2d1fad6a800d15494a108be1dc839d07aeae..056d9fd0c46539da9d3a60559b3bd4a2001a0084 100644
+--- a/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs
++++ b/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs
+@@ -27,6 +27,7 @@ import {
+   planOrphanDescriptorArchive,
+   planSessionCleanupRecovery,
+ } from "../session-cleanup-recovery.mjs";
++import { partialCleanupRecoveryResultCore } from "../project-onboarding-v3.mjs";
+ import { main as sessionCleanupMain } from "../../scripts/session-cleanup.mjs";
+ 
+ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
+@@ -174,6 +175,32 @@ test("AC-203 own session: the library entry points honour requesterSessionId at
+   assert.deepEqual(readFileSync(own.path), own.bytes);
+ }));
+ 
++// Candidate 21d (live Codex greenfield 2026-11-09): after a closed feature, the hook anchor of the session that closed it read as residue and its
++// re-entry after a plugin update stopped at `orphan-recovery-unavailable`. The PF-50 filter covered only `claude-`; every runner hook creates the same anchor.
++const CLOSED_FEATURE = { readOnboardingSessionCleanupBindingFn: ({ rootDir }) => ({ status: "closed-unbound", root: rootDir }) };
++for (const [runner, id, env] of [
++  ["codex", `codex-${OWN_UUID}`, { CODEX_THREAD_ID: OWN_UUID }],
++  ["antigravity", `antigravity-${OWN_UUID}`, {}],
++]) {
++  test(`C21D ${runner}: the hook anchor of the running session is no residue after a close, and onboarding stays open for it`, () => withFixture((root) => {
++    const anchor = hookDescriptor(root, id);
++    assert.equal(planSessionCleanupRecovery({ rootDir: root, deps: CLOSED_FEATURE }).status, "not-needed");
++    const onboarding = partialCleanupRecoveryResultCore({
++      root, runner, intent: "onboarding", repository: {},
++      deps: { planSessionCleanupRecovery: (input) => planSessionCleanupRecovery({ ...input, deps: CLOSED_FEATURE }) },
++    });
++    assert.equal(onboarding, null, "no partial result: nothing blocks the re-entry");
++    assert.equal(run(["plan-recovery", "--repo", root, "--runner", runner], env).status, "not-needed");
++    assert.deepEqual(readFileSync(anchor.path), anchor.bytes, "the anchor stays untouched");
++    assert.deepEqual(listActiveSessionDescriptors(root).map((descriptor) => descriptor.sessionId), [id], "an unfiltered listing still reports it");
++  }));
++}
++
++test("C21D: a descriptor that is not a runner hook anchor still counts after a close", () => withFixture((root) => {
++  hookDescriptor(root, `other-${OWN_UUID}`);
++  assert.notEqual(planSessionCleanupRecovery({ rootDir: root, deps: CLOSED_FEATURE }).status, "not-needed");
++}));
++
+ const NOT_OWN_ENVS = [
+   ["a different session id", { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: FOREIGN_UUID }],
+   ["no CLAUDE_CODE_SESSION_ID", { CLAUDECODE: "1" }],
+diff --git a/plugins/pipeline-core/lib/session-cleanup-recovery.mjs b/plugins/pipeline-core/lib/session-cleanup-recovery.mjs
+index ec3f0e6b83580f7f2255bac17e96c991f2208ce1..adea2b6350e0e0e2bc49dffb06897769210b19ff 100644
+--- a/plugins/pipeline-core/lib/session-cleanup-recovery.mjs
++++ b/plugins/pipeline-core/lib/session-cleanup-recovery.mjs
+@@ -986,8 +986,8 @@ export function planSessionCleanupRecovery({
+         ?? ((root, options = {}) => listActiveSessionDescriptors(root, {
+           ...options,
+           loadSessionDescriptorFn: loadOnce,
+-          // PF-50: a Claude hook identity anchor is not a cleanup session.
+-          excludeClaudeHookIdentity: true,
++          // PF-50: a runner hook identity anchor is not a cleanup session.
++          excludeHookIdentity: true,
+         })),
+     ),
+     inspectSessionRetirementFn: deps.inspectSessionRetirementFn
+diff --git a/plugins/pipeline-core/lib/worktree-lifecycle.mjs b/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+index 910fbca8c9413bc906f5f0cde0c84504d4fda1c4..440712f392c8d9c8890874df24034b06328eba5b 100644
+--- a/plugins/pipeline-core/lib/worktree-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+@@ -930,7 +930,7 @@ export function listActiveSessionDescriptors(startPath, options = {}) {
+     const loaded = loadListedSessionDescriptor(repo.primaryRoot, sessionId, options);
+     // Retired by its owner between the directory read and this load: absent, not an error.
+     if (loaded === null) return [];
+-    if (options.excludeClaudeHookIdentity === true && isClaudeHookIdentityDescriptor(repo, loaded)) return [];
++    if (options.excludeHookIdentity === true && isHookIdentityDescriptor(repo, loaded)) return [];
+     return [{
+       sessionId: loaded.sessionId,
+       descriptorSha256: loaded.descriptorSha256,
+@@ -939,14 +939,16 @@ export function listActiveSessionDescriptors(startPath, options = {}) {
+ }
+ 
+ /**
+- * PF-50: the identity anchor a Claude hook process creates for its own session (claude-hook-session-owner.mjs,
+- * id `claude-<session_id>`, no owner process by design) is not a cleanup session: it has no cleanup manifest,
++ * PF-50: the identity anchor a runner hook process creates for its own session (claude-hook-session-owner.mjs,
++ * id `<runner>-<session id>`, no owner process by design) is not a cleanup session: it has no cleanup manifest,
+  * holds no resource and grants nothing by itself. Cleanup recovery and session start skip it instead of planning
+  * a continuity bind for it that no hook-less process can ever perform. Any other descriptor is unaffected.
++ * The Codex and Antigravity hooks create the same anchor; a filter limited to `claude-` made the session that had
++ * just closed a feature on Codex a residue of its own close, and its re-entry after a plugin update was refused.
+  */
+-const CLAUDE_HOOK_IDENTITY_ID = /^claude-[A-Za-z0-9][A-Za-z0-9-]{7,71}$/u;
+-export function isClaudeHookIdentityDescriptor(repo, loaded) {
+-  return CLAUDE_HOOK_IDENTITY_ID.test(loaded?.sessionId ?? "") && loaded.descriptorSchema === SESSION_DESCRIPTOR_SCHEMA
++const HOOK_IDENTITY_ID = /^(?:claude|codex|antigravity)-[A-Za-z0-9][A-Za-z0-9-]{7,71}$/u;
++export function isHookIdentityDescriptor(repo, loaded) {
++  return HOOK_IDENTITY_ID.test(loaded?.sessionId ?? "") && loaded.descriptorSchema === SESSION_DESCRIPTOR_SCHEMA
+     && loaded.ownerRuntime === null && !existsSync(cleanupManifestPath(repo, loaded.sessionId));
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/session-cleanup.mjs b/plugins/pipeline-core/scripts/session-cleanup.mjs
+index 1fada2c7cfe4b16b1ba9b89324d97666a01165ed..5aba98d2b6cacf5927e8420f16d8634f237215cc 100644
+--- a/plugins/pipeline-core/scripts/session-cleanup.mjs
++++ b/plugins/pipeline-core/scripts/session-cleanup.mjs
+@@ -730,9 +730,9 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
+       ?? readOnboardingSessionCleanupBinding;
+     const bindCleanup = dependencies.bindOnboardingSessionCleanupFn
+       ?? bindOnboardingSessionCleanup;
+-    // PF-50: a Claude hook identity anchor (no owner process, no cleanup manifest) is not a cleanup session.
++    // PF-50: a runner hook identity anchor (no owner process, no cleanup manifest) is not a cleanup session.
+     const listDescriptors = dependencies.listActiveSessionDescriptorsFn
+-      ?? ((root) => listActiveSessionDescriptors(root, { excludeClaudeHookIdentity: true }));
++      ?? ((root) => listActiveSessionDescriptors(root, { excludeHookIdentity: true }));
+     const loadDescriptor = dependencies.loadSessionDescriptorFn
+       ?? loadSessionDescriptor;
+     const retireDescriptor = dependencies.retireSessionDescriptorFn
