@@ -197,8 +197,8 @@ so commit it BEFORE the freeze, or renew the freeze as above.
 or `readback-confirmed` after a publication; candidate 16d). The command lists the active session descriptors and
 EXCLUDES the closing session's own: that session is still running, so its descriptor can only ever report
 `unavailable`, and it is derived from the runtime environment for the runner that is closing (`claude-<session id>` for
-Claude, `codex-<session id>` for Codex; Antigravity creates no session descriptor, so nothing is derived there), never
-typed. The command prints `runner`, `ownSessionDerivation` and the reason. The exclusion is
+Claude, `codex-<session id>` for Codex, `antigravity-<conversation id>` for Antigravity, from the record its pretool hook
+writes for the close command), never typed. The command prints `runner`, `ownSessionDerivation` and the reason. The exclusion is
 named in the stored observation (`cleanup-observation.json`, beside the receipt) and the receipt's `evidenceDigest` is
 the SHA-256 of that observation. Every OTHER active descriptor counts: `complete` only when none remains, otherwise
 `uncertain`, and the output lists them. When the own session cannot be derived (the runner exposed no usable session

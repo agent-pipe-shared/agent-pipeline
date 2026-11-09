@@ -985,7 +985,7 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
   if (!OID.test(coordinator.candidateOid ?? "") || !OID.test(coordinator.candidateTree ?? "")) fail("CLOSE-CLEANUP-PHASE", "the lifecycle has no frozen candidate");
   // 17: the closing session's own descriptor is derived for the runner that is actually closing (it used to be hard-coded to claude, so
   // on Codex the own `codex-<id>` descriptor counted as foreign and the receipt could never be complete).
-  const ownSession = resolveOwnSessionDescriptor({ runner: invokingRunnerFromEnv(env), env });
+  const ownSession = resolveOwnSessionDescriptor({ runner: invokingRunnerFromEnv(env), env, commonDir: common });
   const ownSessionId = ownSession.descriptorSessionId;
   const descriptors = listDescriptors(root).map((descriptor) => {
     const observed = inspectOwner(root, descriptor.sessionId, { expectedDescriptorSha256: descriptor.descriptorSha256 });

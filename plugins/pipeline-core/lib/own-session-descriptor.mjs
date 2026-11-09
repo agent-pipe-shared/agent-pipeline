@@ -7,12 +7,14 @@
 // must tell the closing session's OWN descriptor from a foreign one. They used to hard-code runner `claude`, so on Codex the own
 // descriptor was counted as foreign and the receipt could never become `complete`.
 //
-// This module derives the id for the runner that is actually invoking, and says honestly when it cannot: Antigravity creates no
-// session descriptor and a CLI process has no Antigravity session id, so the result is `unavailable` with the reason, never a guess.
+// This module derives the id for the runner that is actually invoking, and says honestly when it cannot. An Antigravity hook names its
+// descriptor `antigravity-<conversation id>`, but a CLI process has no such id in its environment: the id comes from the record the pretool
+// hook wrote for the close command (lib/antigravity-close-session.mjs), and without that record the result is `unavailable` with the reason.
 // It never selects "the newest" or "the one with an unknown owner" descriptor: such a guess could hide a live foreign session.
 
+import { readAntigravityCloseSession } from "./antigravity-close-session.mjs";
 import { resolveModelRoleHostSessionIdentity } from "./model-role-host-identity.mjs";
-import { claudeHookDescriptorSessionId, codexHookDescriptorSessionId } from "./claude-hook-session-owner.mjs";
+import { antigravityHookDescriptorSessionId, claudeHookDescriptorSessionId, codexHookDescriptorSessionId } from "./claude-hook-session-owner.mjs";
 
 export const RUNNERS = Object.freeze(["claude", "codex", "antigravity"]);
 
@@ -30,12 +32,14 @@ export function invokingRunnerFromEnv(env = process.env, explicit = undefined) {
 /**
  * @returns {{runner: string|null, descriptorSessionId: string|null, derivation: "observed"|"unavailable", reason: string}}
  */
-export function resolveOwnSessionDescriptor({ runner, env = process.env } = {}) {
+export function resolveOwnSessionDescriptor({ runner, env = process.env, commonDir = null, now = Date.now() } = {}) {
   if (!RUNNERS.includes(runner)) {
     return { runner: null, descriptorSessionId: null, derivation: "unavailable", reason: "the invoking runner is not one of claude, codex, antigravity" };
   }
   if (runner === "antigravity") {
-    return { runner, descriptorSessionId: null, derivation: "unavailable", reason: "antigravity creates no session descriptor and a command-line process does not carry its session id" };
+    const descriptorSessionId = antigravityHookDescriptorSessionId(readAntigravityCloseSession({ commonDir, now }));
+    if (descriptorSessionId === null) return { runner, descriptorSessionId: null, derivation: "unavailable", reason: "the antigravity hook recorded no current conversation for this close and a command-line process does not carry its session id" };
+    return { runner, descriptorSessionId, derivation: "observed", reason: "antigravity conversation id recorded by the pretool hook for this close command" };
   }
   const identity = resolveModelRoleHostSessionIdentity({ runner, env });
   if (!identity.ok) {

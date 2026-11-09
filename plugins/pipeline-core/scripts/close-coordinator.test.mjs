@@ -769,10 +769,37 @@ test("17 cleanup receipt: each runner names how its own session was derived, and
     const agy = receiptAs(fixture, { ANTIGRAVITY_AGENT: "1" });
     assert.equal(agy.runner, "antigravity");
     assert.equal(agy.ownSessionDerivation, "unavailable");
-    assert.match(agy.ownSessionReason, /antigravity creates no session descriptor/u);
+    assert.match(agy.ownSessionReason, /antigravity hook recorded no current conversation/u);
     // no descriptor exists in this fixture, so every runner is complete; what differs is that the observation says who derived what
     for (const written of [claude, codex, codexBlind, agy]) assert.equal(written.status, "complete");
     assert.equal(new Set([claude, codex, codexBlind, agy].map((written) => written.evidenceDigest)).size, 4, "the runner and the derivation are part of what the digest binds");
+  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+});
+
+test("C21E Antigravity: the pretool hook records the conversation of a close command and the cleanup receipt derives the own session from it", async () => {
+  const { recordAntigravityCloseConversation: record } = await import("../hooks/antigravity-pretool-guard.mjs");
+  const { readAntigravityCloseSession: read, ANTIGRAVITY_CLOSE_SESSION_TTL_MS: ttl } = await import("../lib/antigravity-close-session.mjs");
+  const fixture = processFixture("receipt-agy-hook");
+  const commonDir = join(fixture.root, ".git");
+  const conversationId = "1a41c1ed-bb39-40db-b45a-866595bab590";
+  try {
+    const call = (command, overrides = {}) => record({ input: { conversationId }, command, projectRoot: fixture.root, toolName: "Bash", ...overrides });
+    call("git status --short");
+    call("node /plugin/scripts/finish-feature.mjs --one-shot", { toolName: "Read" });
+    assert.equal(read({ commonDir }), null, "only an admitted shell command that starts a close is recorded");
+    call("node /plugin/scripts/finish-feature.mjs --one-shot --root x --by PO");
+    assert.equal(read({ commonDir }), conversationId);
+    assert.equal(read({ commonDir, now: Date.now() + ttl + 1000 }), null, "a record of an earlier close proves nothing");
+    const agy = receiptAs(fixture, { ANTIGRAVITY_AGENT: "1" });
+    assert.equal(agy.ownSessionDerivation, "observed", JSON.stringify(agy));
+    assert.match(agy.ownSessionReason, /recorded by the pretool hook/u);
+    const own = resolveOwnSessionDescriptor({ runner: "antigravity", env: {}, commonDir });
+    assert.equal(own.descriptorSessionId, `antigravity-${conversationId}`);
+    const descriptorSha256 = "a".repeat(64);
+    const built = buildCleanupReceipt({ descriptors: [{ sessionId: own.descriptorSessionId, descriptorSha256, status: "unavailable" }], ownSessionId: own.descriptorSessionId, candidateOid: "b".repeat(40), candidateTree: "c".repeat(40), ownSession: own });
+    assert.equal(built.receipt.status, "complete", "the closing conversation's own descriptor no longer counts as another session");
+    const foreign = buildCleanupReceipt({ descriptors: [{ sessionId: own.descriptorSessionId, descriptorSha256, status: "unavailable" }, { sessionId: "antigravity-99999999-aaaa", descriptorSha256, status: "unavailable" }], ownSessionId: own.descriptorSessionId, candidateOid: "b".repeat(40), candidateTree: "c".repeat(40), ownSession: own });
+    assert.equal(foreign.receipt.status, "uncertain", "another conversation's descriptor still counts");
   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
 });
 
@@ -801,7 +828,7 @@ test("17 the own descriptor id is derived per runner and is never guessed", () =
   assert.match(odd.reason, /does not form a session descriptor id/u, "a valid session identity that cannot form a descriptor id is reported, not silently dropped");
   const agy = resolveOwnSessionDescriptor({ runner: "antigravity", env: { CLAUDE_CODE_SESSION_ID: id, CODEX_THREAD_ID: id } });
   assert.equal(agy.descriptorSessionId, null);
-  assert.match(agy.reason, /antigravity creates no session descriptor/u);
+  assert.match(agy.reason, /antigravity hook recorded no current conversation/u);
   assert.equal(resolveOwnSessionDescriptor({ runner: "other", env: { CLAUDE_CODE_SESSION_ID: id } }).descriptorSessionId, null);
   assert.equal(resolveOwnSessionDescriptor({}).descriptorSessionId, null);
 });

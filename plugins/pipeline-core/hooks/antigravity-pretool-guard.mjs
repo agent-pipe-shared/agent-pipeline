@@ -54,6 +54,7 @@ import {
   antigravityArtifactHostContext, antigravityArtifactLayoutIsValid, crossRepositoryDenialReason,
   sweepAntigravityHostHandoffs, writeAntigravityHostHandoff,
 } from "../lib/current-session-artifact-export.mjs";
+import { isAntigravityCloseCommand, recordAntigravityCloseSession } from "../lib/antigravity-close-session.mjs";
 import { TRANSCRIPT_RECOVERY_SCRIPT } from "../lib/guard/constants.mjs";
 import { resolveSanctionedScriptInvocation, sanctionedTranscriptRecoveryArgs } from "../lib/guard/sanctioned-args-scripts.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
@@ -392,6 +393,20 @@ function handOffAntigravityHostContext({ input, command, projectRoot, toolName }
     if (written.status !== "written") diagnostic("antigravity-host-handoff-not-written", { reason: written.reason });
   } catch (error) {
     diagnostic("antigravity-host-handoff-failed", { name: error?.name, code: error?.code });
+  }
+}
+
+/**
+ * C21E. A close command's own process cannot learn its Antigravity conversation; this hook can. Runs only for a shell call about to be admitted and
+ * only for a close command, so the cleanup producer can exclude the closing session's own descriptor. A failure is a diagnostic, never a denial.
+ */
+export function recordAntigravityCloseConversation({ input, command, projectRoot, toolName }) {
+  if (toolName !== "Bash" || typeof input?.conversationId !== "string" || !isAntigravityCloseCommand(command)) return;
+  try {
+    const commonDir = resolveGitCommonDir(projectRoot);
+    if (commonDir !== null) recordAntigravityCloseSession({ commonDir, conversationId: input.conversationId });
+  } catch (error) {
+    diagnostic("antigravity-close-session-not-recorded", { name: error?.name, code: error?.code });
   }
 }
 
@@ -1257,6 +1272,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
   const foreignExport = foreignAntigravityExportReason({ input, command, projectRoot, toolName });
   if (foreignExport !== null) deny(foreignExport);
   handOffAntigravityHostContext({ input, command, projectRoot, toolName });
+  recordAntigravityCloseConversation({ input, command, projectRoot, toolName });
   allow();
 }
 
