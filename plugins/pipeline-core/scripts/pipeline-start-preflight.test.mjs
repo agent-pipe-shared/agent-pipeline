@@ -316,6 +316,7 @@ test('D168-S7b a private-state root cause with its icacls repairPreview reaches 
 
 test('trusted Windows custody leaves bootstrap ready', () => {
   const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32',
+    pluginList: pluginList(), read: () => manifest,
     assessWindowsAuthorityReadinessFn: () => ({ schema: 'pipeline.windows-authority-readiness.v1', status: 'ready', causes: [] }),
   });
   assert.equal(result.status, 'ready');
