@@ -2465,6 +2465,7 @@
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-11-09",
+      "source": "live Claude greenfield close on native Windows, build 0.7.0+claude.20261109080736.4b9add3, reported by the PO on 2026-11-09",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -2621,6 +2622,7 @@
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-11-09",
+      "source": "forensic analysis written by the Codex greenfield run on build 0.7.0+codex.20261109080736.4b9add3, secured on PO request 2026-11-09; the report itself stays in that private consumer repository",
       "deferred": false,
       "sprint": "alfred"
     },
