@@ -438,7 +438,7 @@ export function completedFeaturePackageEditDenial(relPath, projectDir) {
  *   multi-line message text `guard-devplan.mjs` has always emitted to stderr for a
  *   BLOCKED/WARN outcome; absent for a plain "allow".
  */
-export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = false }) {
+export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = false, stagedCommit = false }) {
   if (typeof filePath !== "string" || filePath === "") return { verdict: "allow" };
 
   // ---- resolve absolute file_path against the project root (C1 fix) ----------------
@@ -460,7 +460,9 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = 
   // ---- scratch/: UNCONDITIONAL allow, before any gate evaluation ---------------------
   if (!forceLifecycleGate && (normalizedPath.startsWith("scratch/") || isCriticScratchNotesPath(normalizedPath))) return { verdict: "allow" };
   if (!forceLifecycleGate && isDispatchRecordCoordinationPath(normalizedPath)) return { verdict: "allow" };
-  const packageEditDenial = completedFeaturePackageEditDenial(relPath, projectDir);
+  // C21F guards the edit, in the Edit|Write and shell lanes. At the commit boundary the file already reads verifying or completed only when its writer
+  // put it there, so the refusal could hit nothing but the writer's own output (a hand rewind reads an earlier state and never matched).
+  const packageEditDenial = stagedCommit ? null : completedFeaturePackageEditDenial(relPath, projectDir);
   if (packageEditDenial !== null) return { verdict: "block", reason: packageEditDenial };
 
   // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
@@ -802,7 +804,7 @@ export function evaluateStagedDevPlanPaths({
     if (GENERATED_CODEX_PROJECTION_PATHS.has(path)) continue;
 
     let result;
-    try { result = devPlanGateVerdictFn({ filePath: path, projectDir }); }
+    try { result = devPlanGateVerdictFn({ filePath: path, projectDir, stagedCommit: true }); }
     catch { return unavailable("PIPELINE-STAGED-POLICY-FAILED", "the lifecycle policy could not evaluate a staged path"); }
     if (result === null || typeof result !== "object" || !["allow", "block", "warn"].includes(result.verdict)) {
       return unavailable("PIPELINE-STAGED-POLICY-INVALID", "the lifecycle policy returned an invalid result");

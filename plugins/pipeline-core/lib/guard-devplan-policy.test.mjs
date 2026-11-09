@@ -42,6 +42,10 @@ test("C21F: a feature package at verifying or completed refuses a hand edit and 
     writeFileSync(manifest, JSON.stringify({ state: "completed" }));
     assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/spec.md", root), null);
     assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/nested/lifecycle.json", root), null);
+    // The commit boundary: the writer's own output at completed is committable, the edit lanes keep the refusal.
+    assert.equal(devPlanGateVerdict({ filePath: "specs/feature-abc/lifecycle.json", projectDir: root, stagedCommit: true }).verdict, "allow");
+    assert.deepEqual(evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: ["specs/feature-abc/lifecycle.json"] }), { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings: [] });
+    assert.equal(devPlanGateVerdict({ filePath: "specs/feature-abc/lifecycle.json", projectDir: root }).verdict, "block");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -99,7 +103,7 @@ test("staged lifecycle policy adds no independent approval gate after the existi
       devPlanGateVerdictFn(input) { seen.push(input); return { verdict: "allow" }; },
     });
     assert.deepEqual(result, { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings: [] });
-    assert.deepEqual(seen, [{ filePath: "src/game.js", projectDir: root }]);
+    assert.deepEqual(seen, [{ filePath: "src/game.js", projectDir: root, stagedCommit: true }]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

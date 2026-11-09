@@ -46,6 +46,7 @@ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { NEUTRAL_MANIFEST } from "../lib/project-authority.mjs";
 import * as po from "../lib/po-gate-authority.mjs";
 import { nativeContractFixtureParent } from "../lib/test-item-approved-course-fixture.mjs";
+import { evaluateStagedDevPlanPaths } from "../lib/guard-devplan-policy.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
 import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
@@ -521,6 +522,11 @@ test("G20-35: the close path from implementation to release preflight is walked 
       writeJson(join(fx.root, "evidence", "tracked.json"), { schema: "pipeline.close-tracked-effects.v1", resultSha256: fileSha(resultPath), backlogSha256: emptySha,
         handoverSha256: emptySha, historySha256: emptySha, telemetrySha256: emptySha, retrospectiveSha256: emptySha, pipelineStateSha256: fileSha(STATE) });
       transition("tracked-close-finalized", ["--evidence", "evidence/tracked.json"]);
+      // The commit hook's staged policy over the close's real output: the package the writers moved to its final state stays committable.
+      git(log, fx.root, ["add", "."]);
+      const stagedClose = git(log, fx.root, ["diff", "--cached", "--name-only", "--no-renames"]).split("\n").filter(Boolean);
+      const stagedVerdict = evaluateStagedDevPlanPaths({ projectDir: fx.root, stagedPaths: stagedClose });
+      assert.equal(stagedVerdict.ok, true, `${identity.runner}: ${JSON.stringify(stagedVerdict.findings).slice(0, 800)}`);
       const closeCommit = commit(log, fx.root, "chore: final tracked close");
       transition("candidate-frozen");
       const frozenTree = git(log, fx.root, ["rev-parse", `${closeCommit}^{tree}`]);

@@ -238,6 +238,17 @@ test("install, managed upgrade and removal preserve ownership checks", () => {
   assert.equal(planRemoval({ rootDir: dir }).status, "nothing-to-remove");
 });
 
+test("commit hook: the feature package a writer moved to completed is committable (C21F guards the edit, not the writer's commit)", () => {
+  const { dir, git } = freshRepo("staged-completed-package");
+  install(dir);
+  mkdirSync(join(dir, "specs", "feature-abc"), { recursive: true });
+  writeFileSync(join(dir, "specs", "feature-abc", "lifecycle.json"), `${JSON.stringify({ state: "completed" })}\n`);
+  assert.equal(git("add", "specs/feature-abc/lifecycle.json").status, 0);
+  const committed = git("commit", "-m", "chore(pipeline): record the feature close\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  assert.equal(committed.status, 0, committed.stderr);
+  assert.doesNotMatch(committed.stderr, /GUARD-FEATURE-PACKAGE-HAND-EDIT/);
+});
+
 test("commit hook blocks unapproved staged implementation paths but still permits documentation", () => {
   const { dir, git } = freshRepo("staged-lifecycle");
   install(dir);
@@ -429,7 +440,7 @@ test("--install CLI: a typed refusal thrown by the install path is reported as i
   }
 });
 
-if (completionCases.length !== 23) throw new Error("case completion count drift: expected 23, got " + completionCases.length);
+if (completionCases.length !== 24) throw new Error("case completion count drift: expected 24, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
