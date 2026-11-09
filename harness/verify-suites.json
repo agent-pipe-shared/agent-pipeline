@@ -1755,6 +1755,12 @@
       "nonOverlapNote": "Prepare-script notice only, distinct from the coordinator and pretool suites of the Antigravity native dispatch"
     },
     {
+      "name": "open-minors-tests",
+      "file": "plugins/pipeline-core/lib/open-minors.test.mjs",
+      "invariantPinned": "Open minor Critic findings are kept in one managed handover block, an accepted entry is never reopened, and the close line counts only what the block lists",
+      "nonOverlapNote": "Text and file functions of the handover block; the one-shot close wiring is covered in the finish-feature suite"
+    },
+    {
       "name": "codex-critic-selected-host-fallback-tests",
       "file": "plugins/pipeline-core/scripts/codex-critic-selected-host-fallback.test.mjs",
       "invariantPinned": "A selected-host Codex Critic pre-launch failure keeps its code and carries the typed lane fallback with its lane record, failure class and terminal code",

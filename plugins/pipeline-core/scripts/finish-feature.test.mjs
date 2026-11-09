@@ -768,6 +768,26 @@ test("C22 CGR-12: the audit request carries every Critic round report of the fea
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test("C22 CGR-22: the minors of the bound Critic round are listed in the handover inside the close commit, the result names them, and an unreadable packet never blocks", () => {
+  const verdict = { verdict: { findings: [{ severity: "minor", gap: "a small gap" }, { severity: "major", gap: "not a minor" }] } };
+  const withHandover = () => { const fixture = oneShotFixture(); mkdirSync(join(fixture.root, "docs"), { recursive: true }); writeFileSync(join(fixture.root, "docs/state.md"), "# State\n"); return fixture; };
+  const f = withHandover();
+  try {
+    const result = oneShotClose(f.input, { runCommand: f.runner, readConsumedCandidateResultFn: () => ({ result: verdict }) });
+    assert.equal(result.status, "commit-required");
+    const text = readFileSync(join(f.root, "docs/state.md"), "utf8");
+    assert.ok(text.includes(`CRF-${f.packetId}-1`) && text.includes("a small gap") && !text.includes("not a minor"), text);
+    assert.match(result.openMinors, /1 open, 0 accepted/u);
+    assert.ok(result.commit.paths.includes("docs/state.md"));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  const unreadable = withHandover();
+  try {
+    const result = oneShotClose(unreadable.input, { runCommand: unreadable.runner, readConsumedCandidateResultFn: () => { throw new Error("packet cleaned up"); } });
+    assert.equal(result.status, "commit-required");
+    assert.match(result.openMinors, /none recorded/u);
+  } finally { rmSync(unreadable.root, { recursive: true, force: true }); }
+});
+
 test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed repair on stderr with exit 2; a bad flag is a usage refusal", () => {
   const f = oneShotFixture({ closed: true });
   try {

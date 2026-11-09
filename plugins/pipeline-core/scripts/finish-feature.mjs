@@ -17,6 +17,8 @@ import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWrit
 import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
 import { acceptanceQuestion, acceptanceTarget, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
+import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
+import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
 
 const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
@@ -469,13 +471,26 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       const updated = runner(process.execPath, [STATE_WRITER, "update-public-handover"]);
       handover = { path: handoverPath, status: updated?.status === 0 ? "current" : "not-updated", ...(updated?.status === 0 ? {} : { reason: failedText(updated).slice(0, 300) }) };
     }
+    // C22 (CGR-22): the minors of the Critic round this close is bound to are what the close leaves open (a later round supersedes an earlier one: the lineage marks carried findings fixed on a pass).
+    // They go into the calibrated handover before its digest, so they travel in the one close commit. Never blocks: a packet that cannot be read adds nothing, and the line still reports what is listed.
+    let openMinors = null;
+    if (existsSync(resolve(root, handoverPath))) {
+      try {
+        const bound = criticPacketId ?? packetOfAuditRequest(`specs/${closedFeatureId}/evidence/audit-request.json`);
+        const readResult = deps.readConsumedCandidateResultFn ?? readConsumedCandidateResult;
+        const consumed = bound === null ? null : readResult({ controlRoot: join(common() ?? root, "agent-pipeline", "critic-packets"), packetId: bound });
+        const entries = consumed === null ? [] : minorsFromVerdictFindings({ featureId: closedFeatureId, packetId: bound, findings: consumed.result.verdict.findings });
+        if (entries.length > 0) recordOpenMinors({ root, handoverPath, entries });
+      } catch { /* the close line below reports only what the handover really lists */ }
+      openMinors = openMinorsCloseLine(summarizeOpenMinors({ root, handoverPath }), handoverPath);
+    }
     // C22 (CGR-05): hash what exists. Measured, the project-defined files are the calibrated handover and the telemetry ledger the close-feature skill names (telemetry/costs.md); a project has no defined
     // file for backlog, history or retrospective (the backlog is a directory), so those keep the marked empty digest (PO rule 2026-11-01). Only resultSha256 and pipelineStateSha256 are compared by the coordinator.
     const digestOf = (relative) => { try { return sha256Hex(readFileSync(resolve(root, relative))); } catch { return EMPTY_SHA256; } };
     writeRepoJson(root, trackedPath, { schema: "pipeline.close-tracked-effects.v1", resultSha256: sha256Hex(resultBytes), backlogSha256: EMPTY_SHA256, handoverSha256: digestOf(handoverPath), historySha256: EMPTY_SHA256, telemetrySha256: digestOf("telemetry/costs.md"), retrospectiveSha256: EMPTY_SHA256, pipelineStateSha256: sha256Hex(readFileSync(resolve(root, statePath))) });
     const tracked = step("tracked-close-finalized", () => transition("tracked-close-finalized", { evidence: trackedPath })); if (tracked.stop) return tracked.stop;
     const commit = commitFacts();
-    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId: closedFeatureId, lifecycleId: id, resumeLifecycleId: id, stages, commit, ...(handover === null ? {} : { handover }),
+    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId: closedFeatureId, lifecycleId: id, resumeLifecycleId: id, stages, commit, ...(handover === null ? {} : { handover }), ...(openMinors === null ? {} : { openMinors }),
       next: rerun(id), message: "Run the commit (the pre-commit hook admits exactly these bytes), then run the next command: it continues to closed-local. Nothing here signs or pushes." });
   }
   if (phase === "tracked-close-finalized") {
