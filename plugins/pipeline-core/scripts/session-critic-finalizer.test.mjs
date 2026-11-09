@@ -2039,6 +2039,60 @@ test("G20-41 (b) a send_message that the runner-written facts do not identify as
   } finally { for (const dir of [goldfishBrain, criticBrain, bareBrain]) rmSync(dir, { recursive: true, force: true }); cleanup(fx); }
 });
 
+test("C21B a Critic child's message without a verdict is sent back once while its packet waits, the same hook step stays refused, a later step passes, and the corrected message still issues", async () => {
+  const fx = fixture();
+  const brain = agyBrain();
+  const plain = "The review is finished; the findings are in the report above.";
+  const step = (stepIdx, message = plain) => ({ ...agySendMessage(fx, brain, { message }), stepIdx });
+  try {
+    const admitted = admitAntigravity(fx);
+    const target = join(admitted.controlRoot, admitted.packetId, SOURCE_RETURN_FILE);
+    const first = await agyIssue(step(9));
+    assert.deepEqual([first.status, first.refuse, first.packetId], ["no-verdict", true, admitted.packetId], JSON.stringify(first));
+    const secondFiring = await agyIssue(step(9));
+    assert.equal(secondFiring.refuse, true, "the hook fires twice for one call and both firings must agree");
+    const later = await agyIssue(step(11));
+    assert.equal(later.status, "no-verdict"); assert.notEqual(later.refuse, true, "a Critic that cannot state a verdict must get out");
+    assert.equal(existsSync(target), false);
+    const corrected = await agyIssue(step(13, criticReturn()));
+    assert.equal(corrected.status, "issued", JSON.stringify(corrected));
+  } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
+});
+
+test("C21B a message without a verdict is not refused when no packet waits for one, and a stepless payload is refused at most once", async () => {
+  const fx = fixture();
+  const brain = agyBrain();
+  try {
+    const none = await agyIssue(agySendMessage(fx, brain, { message: "no verdict here" }));
+    assert.equal(none.status, "no-verdict"); assert.notEqual(none.refuse, true);
+    admitAntigravity(fx);
+    const stepless = () => { const { stepIdx, ...rest } = agySendMessage(fx, brain, { message: "no verdict here" }); return rest; };
+    assert.equal((await agyIssue(stepless())).refuse, true);
+    assert.notEqual((await agyIssue(stepless())).refuse, true, "without a step index a repeat is never treated as the same call");
+  } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
+});
+
+test("C21B the Antigravity guard itself denies the verdict-less message, names the required shape, and admits the same message at a later step", () => {
+  const fx = fixture();
+  const brain = agyBrain();
+  const home = mkdtempSync(join(tmpdir(), "c21b-home-"));
+  const env = { ...process.env, HOME: home, USERPROFILE: home };
+  const guard = fileURLToPath(new URL("../hooks/antigravity-pretool-guard.mjs", import.meta.url));
+  const fire = (stepIdx) => spawnSync(process.execPath, [guard], { cwd: fx.root, env, encoding: "utf8", input: JSON.stringify({ ...agySendMessage(fx, brain, { message: "The review is finished." }), stepIdx }), timeout: 30000 });
+  const scope = new URL("../lib/governance-scope.mjs", import.meta.url).href;
+  // Only an enrolled repository reaches the guard's checks; the enrolment runs under the throwaway HOME so nothing lands outside the fixture.
+  const enrolment = spawnSync(process.execPath, ["--input-type=module", "-e", `const s=await import(${JSON.stringify(scope)});const plan=s.planGovernanceScopeDecision({rootDir:${JSON.stringify(fx.root)},decision:"enroll",by:"Synthetic fixture operator"});s.applyGovernanceScopeDecision(plan,{activate:true,planSha256:plan.planSha256});`], { cwd: fx.root, env, encoding: "utf8", timeout: 30000 });
+  assert.equal(enrolment.status, 0, enrolment.stderr);
+  try {
+    admitAntigravity(fx);
+    const refused = fire(21);
+    assert.equal(JSON.parse(refused.stdout).decision, "deny", refused.stdout + refused.stderr);
+    assert.match(refused.stdout, /CRITIC-VERDICT-JSON-REQUIRED/u);
+    for (const key of ["findings", "deliberately_not_flagged", "trajectory_verdict", "trajectory_evidence", "briefing_violations", "pass"]) assert.ok(refused.stdout.includes(key), key);
+    assert.doesNotMatch(fire(23).stdout, /CRITIC-VERDICT-JSON-REQUIRED/u);
+  } finally { rmSync(brain, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }); cleanup(fx); }
+});
+
 test("G20-41 (d) the Critic is named by the descriptor's type or its role, exactly (the plugin namespace is stripped); a name that merely contains the word is not the Critic", async () => {
   for (const [descriptor, expected] of [
     [{ typeName: "pipeline-core:critic", role: "reviewer" }, "issued"],

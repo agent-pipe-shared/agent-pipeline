@@ -95,14 +95,39 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
 /**
  * G20-41: the Antigravity producer. The caller (hooks/antigravity-pretool-guard.mjs) has already recognised the Critic child's final `send_message`
  * to its parent from runner-written facts; this takes only the message text and issues the record exactly like the stop path. Never throws.
- * @param {{ commonDir: string, runner: "antigravity", text: string, nowMs?: number }} request
+ * @param {{ commonDir: string, runner: "antigravity", text: string, nowMs?: number, child?: string, stepIdx?: number }} request
  */
-export function issueCriticSourceReturnFromMessage({ commonDir, runner, text, nowMs = Date.now() } = {}) {
+export function issueCriticSourceReturnFromMessage({ commonDir, runner, text, nowMs = Date.now(), child = null, stepIdx = null } = {}) {
   try {
     if (!MESSAGE_RUNNERS.has(runner)) return { status: "not-applicable" };
     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
-    return issueForVerdict({ commonDir, runner, verdict: extractCriticVerdict(text), nowMs });
+    const verdict = extractCriticVerdict(text);
+    return verdict === null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs });
   } catch { return { status: "unavailable" }; }
+}
+
+/**
+ * C21B: a Critic child's message without a verdict, while exactly one admitted packet waits for that verdict, is sent back ONCE per child (`refuse: true`), because the
+ * calling agent would otherwise transcribe the verdict, it would finalize as caller-authored and the close would need a PO signature. The marker sits in the private packet
+ * directory, created exclusively; the hook fires twice per call, so the same step is refused again and any LATER step passes, which leaves a Critic that cannot state a verdict a way out.
+ */
+function noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) {
+  const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
+  if (typeof child !== "string" || child === "" || !existsSync(controlRoot)) return { status: "no-verdict" };
+  const open = openAdmittedPackets(controlRoot, runner, nowMs);
+  if (open === null || open.length !== 1 || open[0].issued === true) return { status: "no-verdict" };
+  const [target] = open;
+  const marker = join(target.packetDir, `verdict-requested-${sha256(child)}.json`);
+  let fd;
+  try { fd = openSync(marker, "wx", 0o600); }
+  catch (error) {
+    if (error?.code !== "EEXIST") return { status: "no-verdict", packetId: target.packetId };
+    let prior = null;
+    try { prior = JSON.parse(readFileSync(marker, "utf8")); } catch { prior = null; }
+    return Number.isSafeInteger(stepIdx) && prior?.stepIdx === stepIdx ? { status: "no-verdict", packetId: target.packetId, refuse: true } : { status: "no-verdict", packetId: target.packetId };
+  }
+  try { writeSync(fd, canonicalJson({ stepIdx: Number.isSafeInteger(stepIdx) ? stepIdx : null })); } finally { closeSync(fd); }
+  return { status: "no-verdict", packetId: target.packetId, refuse: true };
 }
 
 /** The shared half: bind the returned verdict to the one open admitted packet of this runner and write the record exclusively. */

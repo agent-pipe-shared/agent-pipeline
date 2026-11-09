@@ -578,7 +578,7 @@ const isCriticName = (value) => typeof value === "string" && bareNativeType(valu
  * G20-41 (AC-108): the Critic CHILD's final `send_message` to its parent issues the Source return record. The child is recognised only through facts the
  * runner wrote: its own conversationId in the payload (and an artifact directory of that same name), the host's descriptor under the PARENT's brain
  * directory (`attributed`, from evaluateNativeChildCall) naming the Critic by type or role, and a Recipient equal to the parent the DESCRIPTOR names --
- * never a value the Message supplies beyond the verdict itself. Anything else is `not-applicable` (a silent no-op). Never throws and never decides the tool call;
+ * never a value the Message supplies beyond the verdict itself. Anything else is `not-applicable` (a silent no-op). Never throws;
  * the hook fires twice per call (child worktree cwd, main repository cwd) and the record is created exclusively, so the second firing is `already-issued`.
  * @returns {{ status: string, packetId?: string }}
  */
@@ -594,9 +594,12 @@ export function issueAntigravityCriticReturn(input, attributed, { nowMs = Date.n
     let commonDir = null;
     for (const workspace of workspaces) { commonDir = resolveGitCommonDir(workspace); if (commonDir !== null) break; }
     if (commonDir === null) return { status: "unavailable" };
-    return issueCriticSourceReturnFromMessage({ commonDir, runner: "antigravity", text: args.Message, nowMs });
+    return issueCriticSourceReturnFromMessage({ commonDir, runner: "antigravity", text: args.Message, nowMs, child: attributed.childConversationId, stepIdx: input.stepIdx });
   } catch { return { status: "unavailable" }; }
 }
+
+/** C21B: the one refusal a Critic child gets when its message to the parent carries no verdict while its packet waits for one. */
+export const CRITIC_VERDICT_REQUIRED_DENIAL = "BLOCKED (Antigravity Critic return): CRITIC-VERDICT-JSON-REQUIRED: this message to your parent carries no machine-readable verdict, so the review cannot be bound to its packet and the feature close would need a PO signature. Send the same report again and end it with one fenced json block holding exactly the keys findings, deliberately_not_flagged, trajectory_verdict, trajectory_evidence, briefing_violations and pass (each finding: gap, risk, severity blocker|major|minor, evidence, spec_ref; trajectory_verdict: consistent|inconsistent|not verifiable). If you cannot state a verdict, send your message unchanged: this refusal happens once.";
 
 export async function runAntigravityPreToolGuard(rawInput) {
   // M4b: a native child in a branch worktree names the worktree FIRST in workspacePaths. The worktree is outside the project and carries no
@@ -635,11 +638,12 @@ export async function runAntigravityPreToolGuard(rawInput) {
   if (!nativeChild.ok) deny(`BLOCKED (Antigravity native child): ${nativeChild.reason}`);
   // G20-43: a resolved model that differs from the registry cell is recorded in the verdict and noticed here (one stderr line), never denied.
   if (nativeChild.notice) diagnostic("agy-native-child-model-mismatch", { child: nativeChild.attributed.typeName, resolved: nativeChild.modelCheck.resolved, expected: nativeChild.modelCheck.expected.value, duty: nativeChild.modelCheck.expected.duty });
-  // G20-41: the Critic child's final send_message to its parent issues the Source return record. This never decides the call; the write is the
-  // only effect and one diagnostic line says what became of it when it was applicable.
+  // G20-41: the Critic child's final send_message to its parent issues the Source return record, and one diagnostic line says what became of it when it was applicable.
+  // C21B: the only call this decides is a verdict-less message while its packet waits for a verdict, and that one is refused once per child.
   if (input?.toolCall?.name === "send_message") {
     const criticReturn = issueAntigravityCriticReturn(input, nativeChild.attributed);
     if (criticReturn.status !== "not-applicable") diagnostic("critic-source-return", { status: criticReturn.status, packetId: criticReturn.packetId });
+    if (criticReturn.refuse === true) deny(CRITIC_VERDICT_REQUIRED_DENIAL);
   }
   // The host owns its brain and config directories; an agent write there would forge a child's identity or message.
   const brainRefusal = ["Edit", "Write", "Bash"].includes(normalized.toolName)
