@@ -187,6 +187,21 @@ test("Q3 a missing item is a typed gap, never silently skipped", () => {
   assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["approval-trace:gap:NOT-REFERENCED", "approval-proofs:gap:NOT-REFERENCED", "verify-record:gap:NOT-REFERENCED", "security-scan:gap:NOT-REFERENCED"]);
   assert.equal(plan.artifacts.length, 5); assert.equal(plan.evidence.traceStatus, null);
 });
+// C22 (CGR-12, AC-108): every Critic round report of the feature travels in the bundle; a round whose report was never exported (it lived only in a scratch directory) is a typed gap the README names.
+test("C22 CGR-12 the bundle carries every Critic round report, names a round without a readable report, and verifies offline", async () => {
+  const input = fixture(); const [one, two, three] = ["a", "b", "c"].map((letter) => letter.repeat(32));
+  mkdirSync(join(input.root, "evidence"), { recursive: true }); writeFileSync(join(input.root, "evidence/round-one.md"), "# round one\n");
+  const plan = planWith(input, { candidate: CANDIDATE, evidence: { criticReports: [{ packetId: one, path: "evidence/round-one.md" }, { packetId: two, path: null }, { packetId: three, path: "evidence/missing.md" }] } });
+  assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), [`critic-report:${one}:carried:null`, `critic-report:${two}:gap:REPORT-NOT-EXPORTED`, `critic-report:${three}:gap:UNREADABLE`], "no approval item is invented when only reports are named");
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  const readme = readFileSync(join(input.root, "bundle", "README.md"), "utf8");
+  assert.match(readme, /Critic round reports/u); assert.ok(readme.includes(two) && readme.includes("REPORT-NOT-EXPORTED") && readme.includes(three) && readme.includes("UNREADABLE"), "the README names what is missing");
+  const manifest = JSON.parse(readFileSync(join(input.root, "bundle", "manifest.json"), "utf8"));
+  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
+  writeFileSync(join(input.root, "bundle", manifest.artifacts.at(-1).path), "tampered");
+  assert.ok((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).findings.some((finding) => finding.startsWith("AB-DIGEST")));
+  assert.throws(() => planWith(fixture(), { evidence: { criticReports: [{ packetId: "../x", path: null }] } }), (error) => error.code === "AB-EVIDENCE-INPUT");
+});
 test("Q3 evidence bound to another candidate or not passing is a typed gap and is not carried", () => {
   const other = { commit: "e".repeat(40), tree: "f".repeat(40) }; const input = fixture();
   const plan = planWith(input, { evidence: { ...evidenceFiles(input.root, { traceCandidate: other, verifyCandidate: other, securityCandidate: other }) } });

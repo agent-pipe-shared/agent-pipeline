@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+import { acceptanceQuestion, acceptanceTarget, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
 
 const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
@@ -217,12 +218,15 @@ const HEX32 = /^[a-f0-9]{32}$/u;
 function stopResult(stage, code, reason, repair, extra = {}) { return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "stopped", stage, stop: Object.freeze({ code, reason: String(reason).slice(0, 1200), repair }), ...extra }); }
 function writeRepoJson(root, path, value) { const target = resolve(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`); return path; }
 
-export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null } = {}, deps = {}) {
+export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, openChecks = null } = {}, deps = {}) {
   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
   if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", "Feature close requires a known architecture impact.");
   if (criticPacketId !== null && !HEX32.test(criticPacketId)) fail("FINISH-CRITIC-PACKET", "The Critic packet id must be 32 lowercase hex characters.");
   if (resumeLifecycleId !== null && !/^[A-Za-z0-9._-]{1,100}$/u.test(resumeLifecycleId)) fail("FINISH-LIFECYCLE", "Lifecycle ID is invalid.");
+  // C22 (CGR-06): the human's literal answer to the acceptance question is recorded as given, so only its presence and size are checked.
+  if (humanAcceptance !== null && (typeof humanAcceptance !== "string" || humanAcceptance.trim() === "" || humanAcceptance.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(humanAcceptance))) fail("FINISH-ACCEPTANCE", "The human acceptance must be the human's literal answer: non-empty, at most 500 characters, no control characters.");
+  if (openChecks !== null && (!Array.isArray(openChecks) || openChecks.some((value) => typeof value !== "string"))) fail("FINISH-ACCEPTANCE", "The open checks must be a list of texts.");
   const runner = deps.runCommand ?? ((executable, argv) => spawnSync(executable, argv, { cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root } }));
   const actor = by.trim();
   const rawGit = (args) => { const out = runner("git", args); return out?.status === 0 ? String(out.stdout ?? "").trim() : null; };
@@ -235,6 +239,10 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   const rerun = (id) => `${rerunBase}${id || packetForRerun === null ? "" : ` --critic-packet-id ${packetForRerun}`}${id ? ` --resume-lifecycle-id ${id}` : ""}`;
   const repairFor = (error, id) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command: ${rerun(id)}`;
   const stages = [];
+  // The calibrated handover file (project/pipeline.json `handover`), the same resolution the coordinator's quality readback uses.
+  const handoverPath = (() => {
+    try { const configured = JSON.parse(readFileSync(resolve(root, "project/pipeline.json"), "utf8")).handover; return typeof configured === "string" && /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/u.test(configured) && !configured.split("/").includes("..") ? configured : "docs/state.md"; } catch { return "docs/state.md"; }
+  })();
   if (featureId !== undefined && !FEATURE.test(featureId)) fail("FINISH-FEATURE", "A valid active feature is required.");
   if (featureId === undefined && resumeLifecycleId === null) {
     return stopResult("preflight", "ONESHOT-NO-ACTIVE-FEATURE", "Pipeline State has no active feature, so there is nothing to close.", `if a close was started, rerun with the lifecycle id it printed: ${rerunBase} --resume-lifecycle-id <id>`);
@@ -282,6 +290,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     const requalify = resumeLifecycleId !== null && packageAt().moved && coordinatorStillBeforePrepared();
     const again = requalify ? resumeLifecycleId : null;
     if (resumeLifecycleId === null || requalify) {
+      let accepted = null;
       let packet = criticPacketId;
       if (packet === null && requalify) packet = packetOfAuditRequest(auditRequestPath);
       if (packet === null) {
@@ -321,9 +330,23 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
           commit: { paths: addenda.commitPaths, excluded: [], capability: null, message: addenda.subject, steps }, next: rerun(again),
           message: "The close derived the Critic addenda from the passed review and wrote them; Verify has not run yet. Run the commit, then the next command. Do not build addenda by hand." });
       }
+      // C22 (CGR-06): the human acceptance. The stop belongs here because nothing has been written yet (a stop costs no Verify and no cleanup), HEAD is final (the addenda commit above moved it) and the
+      // irreversible State close is still ahead. A resumed close (past the prepared stages) never enters this branch, so it never asks twice and a close already running is not broken. An acceptance recorded for
+      // this very candidate (committed or still uncommitted) is kept; a changed candidate asks again. Nothing is signed: the answer is an attribution record in the feature's acceptance.md.
+      const candidateHead = rawGit(["rev-parse", "HEAD"]);
+      if (candidateHead === null) return stopResult("acceptance", "ONESHOT-HEAD-UNREADABLE", "The candidate commit (HEAD) could not be read, so the acceptance cannot be bound to it.", `repair the repository, then rerun the identical command: ${rerun(again)}`);
+      const recorded = readAcceptanceRecord(root, featureId);
+      if (recorded !== null && recorded.candidate === candidateHead) accepted = { candidate: candidateHead, answer: recorded.answer, openChecks: recorded.openChecks };
+      else if (humanAcceptance !== null) accepted = { candidate: candidateHead, answer: humanAcceptance, openChecks: openChecksOf(openChecks) };
+      else {
+        const named = openChecks === null ? "" : ` --open-checks ${JSON.stringify(openChecks.join("; "))}`;
+        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-REQUIRED", acceptanceQuestion({ featureId, candidate: candidateHead, openChecks: openChecksOf(openChecks) }),
+          `nothing was written. Ask the human exactly this one sentence in the chat (reason above), then rerun the identical command with the answer exactly as given: ${rerun(again)}${named} --human-acceptance "<the human's literal answer>". If a check you know about is missing from the sentence (for example a real device check), first rerun with --open-checks "<check; check>" so the sentence names it, then ask. The answer is recorded in the feature's acceptance record as an attribution record; nothing is signed.`);
+      }
       // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward
       // (VEP-CVL-CARRY-RANGE; a human had to reset). Only a tree whose every dirty path is such an output, with an evidence file proving an earlier attempt, is rolled back; the stages write the same again.
-      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath]);
+      // C22: the acceptance record is such an output too (the answer is already held in `accepted`, and written again after the package moves below).
+      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath, acceptanceTarget(root, featureId).path, `specs/${featureId}/acceptance.md`, `${evidenceDir}/human-acceptance.md`]);
       const leftovers = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
       const dirtyOutputs = leftovers?.status === 0 ? String(leftovers.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => ({ tracked: !line.startsWith("??"), path: line.slice(3) })) : [];
       if (dirtyOutputs.some(({ tracked, path }) => !tracked && (path === auditRequestPath || path === verifyPath)) && dirtyOutputs.every(({ path }) => ownOutputs.has(path))) {
@@ -362,8 +385,22 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       criticVerifyLifecycle = lifecycleFile.slice(0, -5);
       let coreVersion = "0.0.0";
       try { coreVersion = String(JSON.parse(readFileSync(PLUGIN_MANIFEST, "utf8")).version).split(/[+-]/u)[0]; } catch { /* the request is refused by the coordinator with its typed code */ }
+      // C22 (CGR-06): after the Verify and the package moves, so the Verify ran on the tree the candidate names; the record then travels in the one close commit (specs/<feature>).
+      stages.push("acceptance-record");
+      writeAcceptanceRecord({ root, featureId, record: accepted, ...(deps.nowFn === undefined ? {} : { now: deps.nowFn }) });
+      // C22 (CGR-12): every Critic round of the feature: the tracked exports (specs/<feature>/evidence/critic/<packet>/report.md), the rounds of the registered lineage files and the packet this close is bound to.
+      // A round whose report was never exported (it lived only in a scratch directory) is named with a null path, so the bundle README states what is missing instead of omitting it.
+      const rounds = new Map();
+      const listed = (relative) => { try { return readdirSync(resolve(root, relative)); } catch { return []; } };
+      for (const name of listed(`${evidenceDir}/critic`).filter((entry) => HEX32.test(entry))) rounds.set(name, existsSync(resolve(root, `${evidenceDir}/critic/${name}/report.md`)) ? `${evidenceDir}/critic/${name}/report.md` : null);
+      for (const name of listed(evidenceDir).filter((entry) => /^critic-lineage-[a-f0-9]{64}\.json$/u.test(entry))) {
+        let text = ""; try { text = readFileSync(resolve(root, `${evidenceDir}/${name}`), "utf8"); } catch { text = ""; }
+        for (const match of text.matchAll(/"packetId"\s*:\s*"([a-f0-9]{32})"/gu)) if (!rounds.has(match[1])) rounds.set(match[1], null);
+      }
+      if (!rounds.has(packet)) rounds.set(packet, null);
+      const criticReports = [...rounds].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([packetId, path]) => ({ packetId, path }));
       stages.push("audit-request");
-      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle });
+      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports } });
       if (state.continuity !== null && typeof state.continuity === "object") {
         let current = state;
         if (state.continuity.queueHead?.nextAction !== "close") {
@@ -406,7 +443,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   const closedFeatureId = featureId ?? observed.value.identity?.featureId;
   const commitFacts = () => {
     // not rawGit: its trim() would eat the leading space of the first " M" status entry
-    const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`]);
+    // C22: the calibrated handover is part of the one close commit when the close rewrote it (CGF-12).
+    const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`, ...(existsSync(resolve(root, handoverPath)) ? [handoverPath] : [])]);
     const tokens = (status?.status === 0 ? String(status.stdout ?? "") : "").split("\0").filter((token) => token !== "");
     const paths = []; for (let index = 0; index < tokens.length; index += 1) { const code = tokens[index].slice(0, 2); paths.push(tokens[index].slice(3)); if (/[RC]/u.test(code)) index += 1; }
     paths.sort();
@@ -423,11 +461,21 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     let resultBytes = null; try { resultBytes = readFileSync(resolve(root, resultPath)); } catch { resultBytes = null; }
     if (resultBytes === null) return stopResult("tracked-close-finalized", "ONESHOT-RESULT-MISSING", `The Result ${resultPath} is missing.`, `restore it, then rerun the identical command: ${rerun(id)}`, { resumeLifecycleId: id, next: rerun(id) });
     const trackedPath = `specs/${closedFeatureId}/evidence/tracked-close.json`;
-    // Only resultSha256 and pipelineStateSha256 are compared by the coordinator; a project without the other artefacts uses the empty-input digest (PO rule).
-    writeRepoJson(root, trackedPath, { schema: "pipeline.close-tracked-effects.v1", resultSha256: sha256Hex(resultBytes), backlogSha256: EMPTY_SHA256, handoverSha256: EMPTY_SHA256, historySha256: EMPTY_SHA256, telemetrySha256: EMPTY_SHA256, retrospectiveSha256: EMPTY_SHA256, pipelineStateSha256: sha256Hex(readFileSync(resolve(root, statePath))) });
+    // C22 (CGF-12, CGF-29): the calibrated handover is brought to the closed state by its existing writer (pipeline-state.mjs update-public-handover) BEFORE its bytes are digested, so the handover that is
+    // committed no longer reads as active in design or implementation. A project whose handover does not exist, or whose layout the writer cannot update, is never blocked: the result names it.
+    let handover = null;
+    if (existsSync(resolve(root, handoverPath))) {
+      stages.push("update-public-handover");
+      const updated = runner(process.execPath, [STATE_WRITER, "update-public-handover"]);
+      handover = { path: handoverPath, status: updated?.status === 0 ? "current" : "not-updated", ...(updated?.status === 0 ? {} : { reason: failedText(updated).slice(0, 300) }) };
+    }
+    // C22 (CGR-05): hash what exists. Measured, the project-defined files are the calibrated handover and the telemetry ledger the close-feature skill names (telemetry/costs.md); a project has no defined
+    // file for backlog, history or retrospective (the backlog is a directory), so those keep the marked empty digest (PO rule 2026-11-01). Only resultSha256 and pipelineStateSha256 are compared by the coordinator.
+    const digestOf = (relative) => { try { return sha256Hex(readFileSync(resolve(root, relative))); } catch { return EMPTY_SHA256; } };
+    writeRepoJson(root, trackedPath, { schema: "pipeline.close-tracked-effects.v1", resultSha256: sha256Hex(resultBytes), backlogSha256: EMPTY_SHA256, handoverSha256: digestOf(handoverPath), historySha256: EMPTY_SHA256, telemetrySha256: digestOf("telemetry/costs.md"), retrospectiveSha256: EMPTY_SHA256, pipelineStateSha256: sha256Hex(readFileSync(resolve(root, statePath))) });
     const tracked = step("tracked-close-finalized", () => transition("tracked-close-finalized", { evidence: trackedPath })); if (tracked.stop) return tracked.stop;
     const commit = commitFacts();
-    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId: closedFeatureId, lifecycleId: id, resumeLifecycleId: id, stages, commit,
+    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId: closedFeatureId, lifecycleId: id, resumeLifecycleId: id, stages, commit, ...(handover === null ? {} : { handover }),
       next: rerun(id), message: "Run the commit (the pre-commit hook admits exactly these bytes), then run the next command: it continues to closed-local. Nothing here signs or pushes." });
   }
   if (phase === "tracked-close-finalized") {
@@ -472,13 +520,13 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
 }
 
 function parseOneShot(argv) {
-  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id"]; const value = {};
+  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--open-checks"]; const value = {};
   for (let i = 0; i < argv.length; i += 2) {
     const flag = argv[i]; const next = argv[i + 1];
-    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>]");
+    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<the human's literal answer>\"] (the first call stops once with the acceptance question for the human)");
     value[flag] = next;
   }
-  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null };
+  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";") };
 }
 
 function parse(argv) {

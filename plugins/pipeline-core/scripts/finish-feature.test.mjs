@@ -9,6 +9,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { finishFeature, oneShotClose } from "./finish-feature.mjs";
 import { canonical } from "../lib/po-approval-proof.mjs";
+import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+import { applyAcceptanceSection, renderAcceptanceSection } from "../lib/close-acceptance-record.mjs";
+import { syncPublicCurrentState } from "./pipeline-state.mjs";
 
 function response(value) { return { status: 0, stdout: JSON.stringify(value), stderr: "" }; }
 function closeAction(criticVerifyLifecycle) {
@@ -249,7 +252,10 @@ const sha256Of = (value) => createHash("sha256").update(value).digest("hex");
 const STATE_PATH = ".claude/pipeline-state.json";
 const COORD = new URL("./close-coordinator.mjs", import.meta.url).pathname;
 const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false } = {}) {
+// C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
+// human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
+// tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
+function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false } = {}) {
   const independenceChecks = [];
   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
@@ -261,6 +267,8 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
     ...(continuity ? { continuity: { revision: 3, queueHead: { nextAction }, authority: { result: resultBound ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
   const writeState = (value) => writeFileSync(join(root, STATE_PATH), `${JSON.stringify(value)}\n`);
   writeState(closed ? { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] } : stateValue("review"));
+  if (handover) { mkdirSync(join(root, "project")); mkdirSync(join(root, "docs")); writeFileSync(join(root, "project/pipeline.json"), `${JSON.stringify({ handover: "docs/state.md" })}\n`); writeFileSync(join(root, "docs/state.md"), "# State\n\n## Current state\n\nFeature `feature-abc` is active in implementation.\n"); }
+  if (telemetry) { mkdirSync(join(root, "telemetry")); writeFileSync(join(root, "telemetry/costs.md"), "| session | cost |\n"); }
   git("add", "-A"); git("commit", "-q", "-m", "baseline");
   const packetId = "a".repeat(32); const lifecycleId = "c".repeat(64);
   if (packetOnDisk) mkdirSync(join(root, ".git/agent-pipeline/critic-packets", packetId), { recursive: true });
@@ -286,6 +294,8 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
     if (script === "pipeline-state.mjs") {
       if (sub === "feature-package-plan") return json({ planSha256: "9".repeat(64) });
       if (sub === "feature-package-apply") return json({ status: "applied" });
+      // C22 (CGF-12): the existing handover writer; this stand-in rewrites the generated Current state sentence the way the writer does for a closed feature.
+      if (sub === "update-public-handover") { writeFileSync(join(root, "docs/state.md"), "# State\n\n## Current state\n\n**Lifecycle phase:** no active feature\nFeature `feature-abc` is closed locally.\n"); return json({ status: "current", path: "docs/state.md", currentState: "updated" }); }
       if (sub === "continuity-result-close-plan") return json({ applyAction: { executable: process.execPath, argv: [STATE_WRITER, "continuity-result-close-apply", "--feature-id", "feature-abc"] } });
       if (sub === "continuity-result-close-apply") { writeState(stateValue("close")); return json({ status: "applied" }); }
       if (sub === "close-feature") { writeState({ schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] }); return { status: 0, stdout: "Feature \"feature-abc\" closed", stderr: "" }; }
@@ -304,7 +314,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
     }
     throw new Error(`unexpected ${script} ${sub}`);
   };
-  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId } };
+  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept this feature package" } : {}) } };
 }
 const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
 
@@ -619,6 +629,142 @@ test("CGF-21: closed-local names the Critic-bound push Verify with the packet of
     const again = oneShotClose(resumed, { runCommand: f.runner });
     assert.match(again.pushEvidence.note, /move the existing evidence\/verify-latest\.json aside/u);
     assert.deepEqual(forbidden(f.calls), []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// ---- C22 (AC-108, PO decisions 2026-11-09): the human acceptance question, the effects the close really touched, the closed handover, the Critic reports ----
+const ACCEPTANCE_FILE = "specs/feature-abc/acceptance.md"; const SPEC_POINTER = "# Acceptance pointer: feature-abc\n\nThe criteria are the approved Spec's (specs/feature-abc/spec.md).\n";
+const EMPTY_DIGEST = sha256Of("");
+const headOf = (f) => f.git("rev-parse", "HEAD").trim();
+function packageFixture(f, { acceptanceAuthority = false } = {}) {
+  const base = join(f.root, "specs/feature-abc"); const bytes = { "prd.md": "prd\n", "spec.md": "spec\n", "acceptance.md": SPEC_POINTER, "result.md": "# Result\n", "evidence/candidate.json": "{}\n" };
+  for (const [name, text] of Object.entries(bytes)) writeFileSync(join(base, name), text);
+  const entry = (cls, name, authority, mutability) => ({ class: cls, path: `specs/feature-abc/${name}`, sha256: sha256Of(bytes[name]), authority, mutability, retention: "active" });
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: "feature-abc", rigor: 1 }, state: "completed", artifacts: [entry("prd", "prd.md", true, "mutable"), entry("spec", "spec.md", true, "mutable"), entry("acceptance", "acceptance.md", acceptanceAuthority, "immutable"), entry("result", "result.md", false, "immutable"), entry("candidate-evidence", "evidence/candidate.json", false, "immutable")], candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, supersedes: null };
+  writeFileSync(join(base, "lifecycle.json"), `${JSON.stringify(manifest, null, 2)}\n`); f.git("add", "-A"); f.git("commit", "-q", "-m", "package");
+  return { manifestPath: "specs/feature-abc/lifecycle.json", pointerSha: sha256Of(SPEC_POINTER) };
+}
+
+test("C22 CGR-06: the one-shot stops once, before anything is written, with the one sentence to ask the human; the sentence says the close counts as the acceptance and names the open checks", () => {
+  const f = oneShotFixture({ acceptance: false });
+  try {
+    const stopped = oneShotClose({ ...f.input, openChecks: ["real device check"] }, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
+    assert.equal(stopped.stage, "acceptance"); assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
+    assert.match(stopped.stop.reason, /counts as the human acceptance of this feature package/u); assert.match(stopped.stop.reason, /real device check/u); assert.ok(stopped.stop.reason.includes("feature-abc"));
+    assert.match(stopped.stop.repair, /--human-acceptance/u); assert.match(stopped.stop.repair, /--open-checks/u);
+    assert.deepEqual(f.calls, [], "no Verify, package or close stage ran"); assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false); assert.equal(f.git("status", "--porcelain").trim(), "");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C22 CGR-06: the answer is recorded in the feature's acceptance.md with the literal answer, the candidate commit and the open checks, labelled as an attribution record and not a signature", () => {
+  const f = oneShotFixture({ acceptance: false });
+  try {
+    const head = headOf(f); const answer = "Yes, I accept \"this\" package";
+    const result = oneShotClose({ ...f.input, humanAcceptance: answer, openChecks: ["real device check"] }, { runCommand: f.runner });
+    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 400));
+    const text = readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8");
+    assert.ok(text.includes(JSON.stringify(answer)), "the literal answer"); assert.ok(text.includes(head), "the candidate commit"); assert.match(text, /real device check/u);
+    assert.match(text, /attribution record/u); assert.match(text, /not a signature/u);
+    assert.ok(result.commit.paths.includes(ACCEPTANCE_FILE), "the record travels in the one close commit"); assert.deepEqual(forbidden(f.calls), []);
+    assert.throws(() => oneShotClose({ ...f.input, humanAcceptance: "  " }, { runCommand: f.runner }), (error) => error.code === "FINISH-ACCEPTANCE");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C22 CGR-06: a rerun with an acceptance recorded for the same candidate does not ask again, and a changed candidate asks again", () => {
+  const f = oneShotFixture({ acceptance: false });
+  try {
+    const answer = "accepted, as asked";
+    assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required");
+    f.git("checkout", "--", STATE_PATH);
+    const again = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(again.status, "commit-required", JSON.stringify(again).slice(0, 400)); assert.ok(readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8").includes(JSON.stringify(answer)), "the recorded answer is kept");
+    f.git("add", "-A"); f.git("commit", "-q", "-m", "close outputs"); f.git("checkout", "HEAD~1", "--", STATE_PATH);
+    const changed = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(changed.stage, "acceptance"); assert.equal(changed.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C22 CGR-06: a resumed close never asks (the question belongs to the evidence stages before the irreversible part)", () => {
+  const f = oneShotFixture({ acceptance: false, startPhase: "checkpointed" });
+  try {
+    const resumed = oneShotClose({ ...f.input, criticPacketId: null, resumeLifecycleId: "lc-1" }, { runCommand: f.runner });
+    assert.notEqual(resumed.stop?.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(resumed).slice(0, 300));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C22 CGR-06: the generated immutable pointer is replaced by the record WITHOUT a signature: the package entry is rebound with an amendment and the package still validates; an authority entry is never edited", () => {
+  const f = oneShotFixture({ acceptance: false });
+  try {
+    const { manifestPath, pointerSha } = packageFixture(f);
+    assert.equal(oneShotClose({ ...f.input, humanAcceptance: "yes" }, { runCommand: f.runner }).status, "commit-required");
+    const text = readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8"); assert.ok(text.includes("# Acceptance pointer: feature-abc") && text.includes("\"yes\""));
+    const entry = JSON.parse(readFileSync(join(f.root, manifestPath), "utf8")).artifacts.find((item) => item.class === "acceptance");
+    assert.equal(entry.sha256, sha256Of(text)); assert.equal(entry.amendment.previousSha256, pointerSha); assert.equal(entry.mutability, "immutable"); assert.equal(entry.authority, false);
+    assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true, JSON.stringify(validateFeaturePackage(f.root, manifestPath).findings));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  const g = oneShotFixture({ acceptance: false });
+  try {
+    const { manifestPath } = packageFixture(g, { acceptanceAuthority: true }); const before = readFileSync(join(g.root, manifestPath), "utf8");
+    assert.equal(oneShotClose({ ...g.input, humanAcceptance: "yes" }, { runCommand: g.runner }).status, "commit-required");
+    assert.equal(readFileSync(join(g.root, ACCEPTANCE_FILE), "utf8"), SPEC_POINTER, "a bound authority acceptance stays byte for byte"); assert.equal(readFileSync(join(g.root, manifestPath), "utf8"), before);
+    assert.match(readFileSync(join(g.root, "specs/feature-abc/evidence/human-acceptance.md"), "utf8"), /"yes"/u);
+  } finally { rmSync(g.root, { recursive: true, force: true }); }
+});
+
+test("C22 CGR-05: the tracked effects hash what exists (the calibrated handover, written by its own writer first, and the telemetry file) and keep the marked empty digest only for the rest", () => {
+  const f = oneShotFixture({ handover: true, telemetry: true });
+  try {
+    const result = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 400));
+    const tracked = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/tracked-close.json"), "utf8"));
+    assert.equal(tracked.handoverSha256, sha256Of(readFileSync(join(f.root, "docs/state.md"))), "the bytes after the writer ran"); assert.match(readFileSync(join(f.root, "docs/state.md"), "utf8"), /closed locally/u);
+    assert.equal(tracked.telemetrySha256, sha256Of(readFileSync(join(f.root, "telemetry/costs.md"))));
+    for (const key of ["backlogSha256", "historySha256", "retrospectiveSha256"]) assert.equal(tracked[key], EMPTY_DIGEST, key);
+    assert.deepEqual(Object.keys(tracked).sort(), ["backlogSha256", "handoverSha256", "historySha256", "pipelineStateSha256", "resultSha256", "retrospectiveSha256", "schema", "telemetrySha256"]);
+    assert.ok(f.calls.indexOf("pipeline-state update-public-handover") > f.calls.indexOf("pipeline-state close-feature"), f.calls.join());
+    assert.ok(result.commit.paths.includes("docs/state.md"), result.commit.paths.join());
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  const g = oneShotFixture();
+  try {
+    oneShotClose(g.input, { runCommand: g.runner });
+    const tracked = JSON.parse(readFileSync(join(g.root, "specs/feature-abc/evidence/tracked-close.json"), "utf8"));
+    for (const key of ["backlogSha256", "handoverSha256", "historySha256", "telemetrySha256", "retrospectiveSha256"]) assert.equal(tracked[key], EMPTY_DIGEST, `a project without the artefact keeps the marked empty digest (${key})`);
+    assert.equal(g.calls.includes("pipeline-state update-public-handover"), false);
+  } finally { rmSync(g.root, { recursive: true, force: true }); }
+});
+
+test("C22 CGF-12/CGF-29: after the close the calibrated handover is no longer active in design or implementation and states technical close, product acceptance and push as three facts, through the existing public-handover writer", () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "closed-handover-")));
+  try {
+    mkdirSync(join(dir, "docs")); mkdirSync(join(dir, "specs/feature-abc"), { recursive: true });
+    writeFileSync(join(dir, "docs/state.md"), "# State\n\n## Current state\n\nFeature `feature-abc` is active in implementation (PO profile: `light`).\nProject prose stays.\n\n## Decisions\n\nKeep this.\n");
+    writeFileSync(join(dir, "specs/feature-abc/lifecycle.json"), `${JSON.stringify({ candidate: { commit: "c".repeat(40), tree: "d".repeat(40) }, artifacts: [] })}\n`);
+    const closedState = { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc", closedBy: "PO" }] };
+    assert.equal(syncPublicCurrentState(dir, closedState, "docs/state.md", "2026-11-09T10:00:00.000Z"), "updated");
+    const text = readFileSync(join(dir, "docs/state.md"), "utf8");
+    assert.doesNotMatch(text, /is active in/u); assert.match(text, /closed locally/u); assert.ok(text.includes("c".repeat(40)), "the candidate");
+    for (const label of ["Technical close", "Product acceptance", "Push"]) assert.match(text, new RegExp(`^\\*\\*${label}:\\*\\*`, "mu"), label);
+    assert.match(text, /^\*\*Product acceptance:\*\* not recorded/mu); assert.ok(text.includes("Project prose stays.") && text.includes("## Decisions\n\nKeep this.\n"));
+    assert.equal(syncPublicCurrentState(dir, closedState, "docs/state.md", "2026-11-09T10:00:00.000Z"), "current", "idempotent");
+    writeFileSync(join(dir, "specs/feature-abc/acceptance.md"), applyAcceptanceSection(null, renderAcceptanceSection({ candidate: "c".repeat(40), answer: "accepted", openChecks: ["device check"] })));
+    assert.equal(syncPublicCurrentState(dir, closedState, "docs/state.md", "2026-11-09T10:00:00.000Z"), "updated");
+    assert.match(readFileSync(join(dir, "docs/state.md"), "utf8"), /^\*\*Product acceptance:\*\* recorded/mu);
+    const next = { schema: "pipeline.state.v0", activeFeature: { id: "feature-two", phase: "design" }, closedFeatures: closedState.closedFeatures };
+    syncPublicCurrentState(dir, next, "docs/state.md", "2026-11-10T10:00:00.000Z");
+    assert.doesNotMatch(readFileSync(join(dir, "docs/state.md"), "utf8"), /closed locally|Technical close/u, "a new active feature leaves no stale closed projection");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("C22 CGR-12: the audit request carries every Critic round report of the feature, and a round without an exported report is named, not omitted", () => {
+  const f = oneShotFixture();
+  try {
+    const evidence = join(f.root, "specs/feature-abc/evidence"); const exported = "b".repeat(32); const lineageOnly = "c".repeat(32);
+    mkdirSync(join(evidence, "critic", exported), { recursive: true }); writeFileSync(join(evidence, "critic", exported, "report.md"), "# report\n");
+    writeFileSync(join(evidence, `critic-lineage-${"1".repeat(64)}.json`), `${JSON.stringify({ rounds: [{ packetId: lineageOnly }] })}\n`);
+    assert.equal(oneShotClose(f.input, { runCommand: f.runner }).status, "commit-required");
+    const request = JSON.parse(readFileSync(join(evidence, "audit-request.json"), "utf8"));
+    assert.deepEqual(request.evidence.criticReports, [{ packetId: f.packetId, path: null }, { packetId: exported, path: `specs/feature-abc/evidence/critic/${exported}/report.md` }, { packetId: lineageOnly, path: null }]);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

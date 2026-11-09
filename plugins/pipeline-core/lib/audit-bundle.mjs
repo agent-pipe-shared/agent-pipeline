@@ -16,8 +16,12 @@ function exact(value, keys) { return value !== null && typeof value === "object"
 function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function evidenceSection(manifest) {
   if (!Object.hasOwn(manifest, "evidence")) return "";
-  const lines = manifest.evidence.items.map((entry) => `- ${entry.item}: ${entry.status}${entry.code ? ` (${entry.code})` : ""}${entry.bundlePath ? ` at \`${entry.bundlePath}\`` : ""}`).join("\n");
-  return `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${lines}\n`;
+  const line = (entry) => `- ${entry.item}: ${entry.status}${entry.code ? ` (${entry.code})` : ""}${entry.bundlePath ? ` at \`${entry.bundlePath}\`` : ""}`;
+  // C22 (CGR-12): the Critic round reports are their own section; a round without a report names what is missing instead of being left out.
+  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:")); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
+  const approvalText = approval.length === 0 ? "" : `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${approval.map(line).join("\n")}\n`;
+  const reportText = reports.length === 0 ? "" : `\n## Critic round reports\n\nOne entry per Critic round of the feature. \`REPORT-NOT-EXPORTED\` means the round's report was never exported into the repository's tracked evidence (it lived outside the tracked tree), and \`UNREADABLE\` that the named file was missing or empty at the close: the report is NOT part of this bundle.\n\n${reports.map(line).join("\n")}\n`;
+  return `${approvalText}${reportText}`;
 }
 function auditorReadme(manifest) {
   const artifactLines = manifest.artifacts.map((artifact) => `- \`${artifact.path}\` (source: \`${artifact.sourcePath}\`, SHA-256: \`${artifact.sha256}\`)`).join("\n");
@@ -158,14 +162,14 @@ function followUpFindings(root, manifest) {
   return proofFindings(root, list.proofs);
 }
 function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
-const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan"]);
-const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan" });
+const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report"]);
+const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report" });
 const TRACE_SCHEMA = "pipeline.human-approval-trace.v1"; const TRACE_STATUSES = new Set(["traced", "attribution-only", "untraceable"]);
 const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
 function evidenceShape(value) {
   return exact(value, ["schema", "candidateBound", "traceStatus", "items"]) && value.schema === "pipeline.audit-bundle-evidence.v1" && value.candidateBound === true
     && (value.traceStatus === null || TRACE_STATUSES.has(value.traceStatus)) && Array.isArray(value.items) && value.items.length <= 64
-    && value.items.every((entry) => exact(entry, ["item", "status", "code", "bundlePath"]) && /^[a-z-]+(?::[a-z-]{1,40})?$/u.test(entry.item) && EVIDENCE_ITEMS.has(entry.item.split(":")[0])
+    && value.items.every((entry) => exact(entry, ["item", "status", "code", "bundlePath"]) && /^[a-z-]+(?::[a-z0-9-]{1,40})?$/u.test(entry.item) && EVIDENCE_ITEMS.has(entry.item.split(":")[0])
       && (entry.status === "carried" || entry.status === "gap") && (entry.code === null || /^[A-Z0-9-]{3,48}$/u.test(entry.code))
       && (entry.bundlePath === null || /^artifacts\/[0-9]{3}-[a-z-]+$/u.test(entry.bundlePath)) && (entry.status === "gap" ? entry.code !== null && entry.bundlePath === null : entry.bundlePath !== null));
 }
@@ -186,12 +190,18 @@ const sameCandidate = (value, candidate) => value !== null && typeof value === "
  */
 function collectEvidence(root, candidate, evidence, firstIndex) {
   if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) fail("AB-EVIDENCE-INPUT");
-  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath"]);
+  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports"]);
   if (Object.keys(evidence).some((key) => !known.has(key)) || (evidence.proofPaths !== undefined && (!Array.isArray(evidence.proofPaths) || evidence.proofPaths.length > 16))) fail("AB-EVIDENCE-INPUT");
+  // C22 (CGR-12): one entry per Critic round of the feature; a null path is a round whose report was never exported.
+  const reports = evidence.criticReports;
+  if (reports !== undefined && (!Array.isArray(reports) || reports.length > 40 || !reports.every((entry) => exact(entry, ["packetId", "path"]) && /^[a-f0-9]{32}$/u.test(entry.packetId) && (entry.path === null || typeof entry.path === "string")) || new Set(reports.map((entry) => entry.packetId)).size !== reports.length)) fail("AB-EVIDENCE-INPUT");
+  const approvalNamed = ["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath"].some((key) => evidence[key] !== undefined);
   const artifacts = []; const items = []; let traceStatus = null; let traceHasProof = false;
   const carry = (cls, sourcePath, sha256) => { const bundlePath = `artifacts/${String(firstIndex + artifacts.length + 1).padStart(3, "0")}-${cls}`; artifacts.push({ sourcePath, bundlePath, sha256 }); return bundlePath; };
   const gap = (item, code) => items.push({ item, status: "gap", code, bundlePath: null });
   let traceBundlePath = null;
+  // Only reports named (the close's own request): no approval item is invented, so a gap there is not a claim this request made.
+  if (approvalNamed || reports === undefined) {
   if (evidence.traceReportPath === undefined) gap("approval-trace", "NOT-REFERENCED");
   else {
     const file = readEvidenceFile(root, evidence.traceReportPath); const report = file && jsonOrNull(file.bytes);
@@ -226,6 +236,14 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
     else if (!sameCandidate(record.candidate, candidate)) gap("security-scan", "OTHER-CANDIDATE");
     else if (record.exitCode !== 0 || record.findings.length > 0) gap("security-scan", "NOT-PASSING");
     else items.push({ item: "security-scan", status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.security, evidence.securityScanPath, file.sha256) });
+  }
+  }
+  for (const entry of reports ?? []) {
+    const item = `critic-report:${entry.packetId}`;
+    if (entry.path === null) { gap(item, "REPORT-NOT-EXPORTED"); continue; }
+    const file = readEvidenceFile(root, entry.path);
+    if (file === null || file.bytes.length === 0) gap(item, "UNREADABLE");
+    else items.push({ item, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.critic, entry.path, file.sha256) });
   }
   return { artifacts, evidence: Object.freeze({ schema: "pipeline.audit-bundle-evidence.v1", candidateBound: true, traceStatus, items: Object.freeze(items.map((entry) => Object.freeze(entry))) }) };
 }
