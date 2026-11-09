@@ -1,0 +1,48 @@
+diff --git a/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs b/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs
+index 9b8187585ece3f704485adb7921e97b944230ef4..1437288d6d4960db7da1ee6a4b4632f1c85401b0 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs
+@@ -147,7 +147,9 @@ const GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH = pathJoin(dirname(fileURLToPath(impor
+  * supply its own scanner-config override (see the constants' doc comments above).
+  */
+ export function resolveGitleaksConfigPath() {
+-  if (existsSync(GITLEAKS_CONFIG_PATH)) return GITLEAKS_CONFIG_PATH;
++  // C21B: four directories above an INSTALLED plugin is the runner's own cache or marketplace folder, and a `.gitleaks.toml` found there replaced the shipped ruleset, so the
++  // Pipeline's own artefact exemptions never applied and a consumer's close failed on its own Critic lineage. Only the Agent-Pipeline source checkout (which has harness/) uses the repo-root file.
++  if (existsSync(GITLEAKS_CONFIG_PATH) && existsSync(pathJoin(dirname(GITLEAKS_CONFIG_PATH), "harness", "scripts", "verify.mjs"))) return GITLEAKS_CONFIG_PATH;
+   if (existsSync(GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH)) return GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH;
+   return null;
+ }
+diff --git a/plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs b/plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs
+index 55aba52f241d4e534e5e3e2dd2c45b6aaf76bfa5..ad2e154f999fc522b323cb92b1614f1e4176058a 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs
+@@ -244,6 +244,28 @@ test("run() resolves the plugin-shipped default config from an installed-plugin
+   }
+ });
+ 
++test("C21B a stray .gitleaks.toml four directories above an installed plugin never replaces the shipped ruleset; only a source checkout with harness/ uses the repo-root file", async () => {
++  const fixtureRoot = mkdtempSync(join(tmpdir(), "gitleaks-stray-config-"));
++  try {
++    const adapterDir = join(fixtureRoot, "plugins", "pipeline-core", "scripts", "security-adapters");
++    const configDir = join(fixtureRoot, "plugins", "pipeline-core", "config", "security");
++    mkdirSync(adapterDir, { recursive: true });
++    mkdirSync(configDir, { recursive: true });
++    copyFileSync(fileURLToPath(new URL("./gitleaks.mjs", import.meta.url)), join(adapterDir, "gitleaks.mjs"));
++    copyFileSync(fileURLToPath(new URL("../../config/security/gitleaks-default.toml", import.meta.url)), join(configDir, "gitleaks-default.toml"));
++    writeFileSync(join(fixtureRoot, ".gitleaks.toml"), "[extend]\nuseDefault = true\n");
++    const url = pathToFileURL(join(adapterDir, "gitleaks.mjs")).href;
++    const installed = await import(`${url}?installed`);
++    assert.equal(installed.resolveGitleaksConfigPath(), join(configDir, "gitleaks-default.toml"), "the runner's cache folder must not supply the ruleset");
++    mkdirSync(join(fixtureRoot, "harness", "scripts"), { recursive: true });
++    writeFileSync(join(fixtureRoot, "harness", "scripts", "verify.mjs"), "\n");
++    const checkout = await import(`${url}?checkout`);
++    assert.equal(checkout.resolveGitleaksConfigPath(), join(fixtureRoot, ".gitleaks.toml"), "the source checkout keeps its repo-root file");
++  } finally {
++    rmSync(fixtureRoot, { recursive: true, force: true });
++  }
++});
++
+ test("run() degrades to SKIPPED/success (never ERROR) from an installed-plugin fixture where NEITHER the repo-root NOR the plugin-shipped config exists (fail-safe for a stripped/corrupted install)", async () => {
+   const fixtureRoot = mkdtempSync(join(tmpdir(), "gitleaks-installed-fixture-noconfig-"));
+   const scanRootDir = mkdtempSync(join(tmpdir(), "gitleaks-installed-fixture-noconfig-scanroot-"));

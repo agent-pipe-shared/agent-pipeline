@@ -1,0 +1,142 @@
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 02f144201ee6346e270d6af4cf89cc7e0cbe8235..441cfcb10afc72808df9a897db2991df3c86c935 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -351,7 +351,7 @@ function assertCriticIndependenceForClose({ root, common, lifecycle }) {
+   // route) admits the identical close; the label stays caller-authored-fallback and travels with the acknowledgement reference.
+   const acknowledgement = findCriticAcknowledgement({ gitCommonDir: common, packetId, receipt });
+   if (acknowledgement !== null) return Object.freeze({ independence, acknowledgement });
+-  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk; repair: record the PO acknowledgement of this caller-authored Critic for exactly this packet and its candidate with node <plugin-root>/scripts/pipeline-state.mjs approve-critic-acknowledgement --by <name> --critic-packet ${packetId} (in signature mode also --proof-request/--proof-authority/--proof from the signing step), then run the identical close command again; a runner whose Critic subagent stop issues the Source return record needs no acknowledgement`);
++  fail("CLOSE-CRITIC-CALLER-AUTHORED", `the Critic verdict of packet ${packetId} was authored by the calling agent (caller-authored fallback), which satisfies the feature close only at rigor 0 and low risk; found rigor ${rigor ?? "unreadable"} and ${highRisk ? "high" : "low"} risk; repair: record the PO acknowledgement of this caller-authored Critic for exactly this packet and its candidate with node ${STATE_WRITER} approve-critic-acknowledgement --by <name> --critic-packet ${packetId}, where <name> is the name the PO gives for this command (in signature mode that exact command prints the signing command for this packet; after the PO signed, repeat it with --proof-request/--proof-authority/--proof set to the paths the signing step printed), then run the identical close command again; a runner whose Critic subagent stop issues the Source return record needs no acknowledgement`);
+ }
+ function startPlan(values) {
+   const root = physicalRoot(values.root);
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index d36f4a210173df202247f702389217ada7e391ee..3e721c5039f530667718e6be398156903868f223 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -259,6 +259,11 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+           `finish the Critic review (it records the packet), then run: ${rerunBase} --critic-packet-id <packet-id>`);
+       }
+       packetForRerun = packet;
++      // C21B: a Continuity feature without a bound Result cannot pass the Result close block below; stop BEFORE Verify, so no partial close evidence has to be cleaned up by hand.
++      if (state.continuity !== null && typeof state.continuity === "object" && state.continuity.queueHead?.nextAction !== "close" && !state.continuity.authority?.result) {
++        return stopResult("result-bootstrap", "ONESHOT-RESULT-NOT-BOUND", "Continuity authority.result is null, so this feature has no bound Implementation Result; nothing was written.",
++          `in the project root ${root} (the first command takes no flags and reads the working directory): (1) node ${STATE_WRITER} continuity-result-bootstrap-plan; (2) run the applyAction it returns; (3) when its completion prints a reconcileCommand, run it, and a plan that needs the PO also prints the signatureCommand for the PO; (4) node ${join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs")} --root ${root} --agent; (5) ${rerun(null)}`);
++      }
+       stages.push("verify-candidate");
+       const verify = runner(process.execPath, [VERIFY_PRODUCER, "--root", root, "--mode", "candidate", "--critic-packet-id", packet, "--critic-evidence-feature-id", featureId, "--out", verifyPath]);
+       if (verify?.status !== 0) return stopResult("verify-candidate", "ONESHOT-VERIFY-RED", failedText(verify), `fix what the Verify output names without committing, then rerun the identical command: ${rerun(null)}`);
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index d560699c35c1d31670d274ce19a6087c8bbee428..20b9b600c0364239e2cd80040bed1efaf4c3048d 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -4,7 +4,7 @@ import test from "node:test";
+ 
+ import { createHash } from "node:crypto";
+ import { execFileSync, spawnSync } from "node:child_process";
+-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import { finishFeature, oneShotClose } from "./finish-feature.mjs";
+@@ -248,7 +248,7 @@ const sha256Of = (value) => createHash("sha256").update(value).digest("hex");
+ const STATE_PATH = ".claude/pipeline-state.json";
+ const COORD = new URL("./close-coordinator.mjs", import.meta.url).pathname;
+ const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
+-function oneShotFixture({ continuity = false, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false } = {}) {
++function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false } = {}) {
+   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
+   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+   git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+@@ -256,7 +256,7 @@ function oneShotFixture({ continuity = false, verifyRed = false, securityBlockin
+   writeFileSync(join(root, "specs/feature-abc/result.md"), "# Result\n");
+   const resultSha = sha256Of("# Result\n");
+   const stateValue = (nextAction) => ({ schema: "pipeline.state.v0", activeFeature: { id: "feature-abc" },
+-    ...(continuity ? { continuity: { revision: 3, queueHead: { nextAction }, authority: { result: { path: "specs/feature-abc/result.md", sha256: resultSha } } } } : {}) });
++    ...(continuity ? { continuity: { revision: 3, queueHead: { nextAction }, authority: { result: resultBound ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
+   const writeState = (value) => writeFileSync(join(root, STATE_PATH), `${JSON.stringify(value)}\n`);
+   writeState(closed ? { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] } : stateValue("review"));
+   git("add", "-A"); git("commit", "-q", "-m", "baseline");
+@@ -335,6 +335,18 @@ test("P3: a feature with Continuity gets its Result close block and close reques
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++test("C21B: a Continuity feature with no bound Result stops before Verify with the exact bootstrap chain and writes no close evidence", () => {
++  const f = oneShotFixture({ continuity: true, resultBound: false });
++  try {
++    const stopped = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
++    assert.equal(stopped.stop.code, "ONESHOT-RESULT-NOT-BOUND");
++    assert.deepEqual(f.calls, [], "Verify and the package stages must not run");
++    for (const needle of ["continuity-result-bootstrap-plan", "applyAction", "reconcileCommand", "commit-pipeline-owned.mjs", `--critic-packet-id ${f.packetId}`]) assert.ok(stopped.stop.repair.includes(needle), needle);
++    for (const name of ["audit-request.json", "verify-candidate.json", "close-request.json"]) assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence", name)), false, name);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("P3: every stop that needs a human is one typed reason with its exact repair, and nothing later ran", () => {
+   const missing = oneShotFixture({ packetOnDisk: false });
+   try {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index afe39f525780003867f0f4e4da3a1f688cf249d0..b47648d10cb40be099849908c914ee52c7a082d1 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -9888,13 +9888,22 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+ // G20-39 (candidate 20): a PO acknowledgement of a caller-authored Critic for exactly one consumed packet and the candidate it reviewed. This is the
+ // bridge for a runner that issues no Source return record; the close gate names this command as its one runnable repair. Recorded through the same
+ // human-approval route as `feature-package-reconcile` (signature or chat per `gates.human_approval`), into the private approval store, never inferred.
++/** C21B: the cause and the next step behind the two proof refusals that otherwise leave an agent reading plugin source. Empty for every other code. */
++function criticalProofRefusalHint(code) {
++  if (code === "CRITICAL-PROOF-EXTERNAL-PATH") return " The three proof paths must be absolute, must exist and must lie outside this repository: pass the requestPath, authorityPath and proofPath the signing step printed, never a copy under scratch/ or anywhere else in the project.";
++  if (code === "CRITICAL-ACTION-REQUEST-MISMATCH") return " The signed request is not the one this action expects: sign the printed signatureCommand unchanged, because any edited value, --expires-at included, makes a different request. When its window has passed, run this command again without the proof flags to get a fresh one.";
++  return "";
++}
++
+ function runApproveCriticAcknowledgement({ dir, rest, base, now, deps }) {
+   const kind = CRITIC_ACKNOWLEDGEMENT_KIND;
+-  const refuse = (code) => { console.error(`Error: approve-critic-acknowledgement refused (${code}).`); return 2; };
++  const refuse = (code) => { console.error(`Error: approve-critic-acknowledgement refused (${code}).${criticalProofRefusalHint(code)}`); return 2; };
+   const configured = criticalProofWaiverFor(dir, kind);
+   if (configured.code !== null && configured.code !== undefined) return refuse(configured.code);
+   const waived = configured.waived === true;
+-  const parsed = parseExactFlags(rest, new Set(waived ? ["by", "critic-packet"] : ["by", "critic-packet", "proof-request", "proof-authority", "proof"]));
++  // C21B: leaving all three proof flags out asks for the signing command, the same answer blank values get below; a partial set stays an error.
++  const proofOmitted = !["--proof-request", "--proof-authority", "--proof"].some((flag) => rest.includes(flag));
++  const parsed = parseExactFlags(rest, new Set(waived || proofOmitted ? ["by", "critic-packet"] : ["by", "critic-packet", "proof-request", "proof-authority", "proof"]));
+   const flags = parsed.value ?? {};
+   if (!parsed.ok || isBlank(flags.by) || isBlank(flags["critic-packet"])) {
+     console.error("Error: approve-critic-acknowledgement requires --by and --critic-packet and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index d881b1ea80674816a4f26b9655845ae5260e838c..34d30ad064afc4b07e0eb990253ba96a86ab526d 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -3443,6 +3443,29 @@ function c11SignatureFiles(fx, findings, { cand = candidate, reasonClass } = {})
+ 
+ const c11Minor = [c11Finding("gap one", "minor"), c11Finding("gap two", "minor")];
+ 
++c11Case("C21B approve-critic-acknowledgement without proof flags prints the signing command, a partial proof set stays an error, and a proof path inside the repository names its cause", () => {
++  const fx = c11Fixture({ findings: c11Minor });
++  const printed = []; const originalLog = console.log; console.log = (line) => { printed.push(String(line)); };
++  try {
++    const receipt = { ...fx.made.receipt, independence: "caller-authored-fallback" };
++    const deps = { ...fx.deps, readConsumedCandidateReceiptFn: () => ({ packet: fx.made.packet, receipt }) };
++    const verb = ["approve-critic-acknowledgement", "--by", "PO", "--critic-packet", receipt.packetId];
++    const bound = JSON.parse(readFileSync(fx.statePathFile, "utf8")); // the signing command names the Continuity Spec, which this fixture otherwise leaves out
++    bound.continuity = { authority: { spec: { path: "specs/sprint-nova-epic/spec.md" } } };
++    writeFileSync(fx.statePathFile, JSON.stringify(bound, null, 2));
++    const omitted = capturedStderr(() => run(verb, deps));
++    assert.equal(omitted.result, 2, omitted.lines.join(" "));
++    assert.match(omitted.lines.join(" "), /CRITICAL-PROOF-FLAGS-PROOF-REQUIRED/u);
++    const signing = JSON.parse(printed.at(-1));
++    assert.equal(signing.schema, "pipeline.critic-acknowledgement-signing.v1"); assert.equal(signing.status, "signature-required"); assert.equal(signing.signatureCommand.executed, false);
++    const partial = capturedStderr(() => run([...verb, "--proof", join(fx.root, "proof.json")], deps));
++    assert.match(partial.lines.join(" "), /requires --by and --critic-packet/u);
++    const inside = join(fx.root, "scratch", "copy.json");
++    const copied = capturedStderr(() => run([...verb, "--proof-request", inside, "--proof-authority", inside, "--proof", inside], deps));
++    assert.match(copied.lines.join(" "), /CRITICAL-PROOF-EXTERNAL-PATH\)\. The three proof paths must be absolute/u);
++  } finally { console.log = originalLog; fx.cleanup(); }
++});
++
+ c11Case("C11-a chat mode records an attended residual acceptance and the lifecycle then qualifies the failed all-minor receipt", () => {
+   const fx = c11Fixture({ chat: true, findings: c11Minor });
+   try {

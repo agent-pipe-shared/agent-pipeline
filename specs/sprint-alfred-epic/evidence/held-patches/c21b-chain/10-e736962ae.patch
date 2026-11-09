@@ -1,0 +1,88 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
+index 27a9deff8d70e86d274625cc72c7d52d76d78655..46592f65a20c93ee52546392d4aebebc81e04446 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
+@@ -66,9 +66,9 @@ const counterFile = (root, agentId) => join(budgetDir(root), `${agentId}.json`);
+ const GOLDFISH = "pipeline-core:goldfish-deep";
+ const CRITIC = "pipeline-core:critic";
+ 
+-function seed(root, { agentId, agentType = GOLDFISH, maxTurns = 400, baseCalls = 20, count, workingCap = Math.min(baseCalls, maxTurns - 15) }) {
++function seed(root, { agentId, agentType = GOLDFISH, maxTurns = 400, baseCalls = 20, count, workingCap = Math.min(baseCalls, maxTurns - 15), commitMode }) {
+   mkdirSync(budgetDir(root), { recursive: true });
+-  writeFileSync(counterFile(root, agentId), `${JSON.stringify({ schema: "pipeline.dispatch-budget-counter.v1", agentId, agentType, maxTurns, baseCalls, workingCap, count }, null, 2)}\n`);
++  writeFileSync(counterFile(root, agentId), `${JSON.stringify({ schema: "pipeline.dispatch-budget-counter.v1", agentId, agentType, maxTurns, baseCalls, workingCap, count, ...(commitMode === undefined ? {} : { commitMode }) }, null, 2)}\n`);
+ }
+ 
+ function subagentCall(root, agentId, agentType, toolName, toolInput) {
+@@ -384,6 +384,15 @@ register("GDBC11", "hook: a grant lets the same agent state continue where an un
+   assert.equal(repeated.permissionDecision, "allow", "PF-64 cause 2: the grant repeats on the next counted call");
+   assert.match(repeated.additionalContext, /^DISPATCH-BUDGET-GRANT:/u, "PF-64 cause 2: the grant repeats on the next counted call");
+   assert.match(repeated.additionalContext, /\(counted call 22\)/u, "PF-64 cause 2: the grant repeats on the next counted call");
++  assert.doesNotMatch(notice, /native host-commit/u, "an ordinary dispatch keeps the prior text");
++  // Candidate 21b (Claude greenfield): a resumed native-host child returned without changedPaths (NGHR-FINAL-SHAPE) and the host commit failed. The notice is
++  // the one text a resumed child is certain to get, so it restates the whole return contract.
++  seed(root, { agentId: "nativegf", count: 20, commitMode: "native-host" });
++  assert.equal(grantDispatchBudget(["--agent-id", "nativegf", "--extra", "10", "--reason", "continue", "--root", root]).status, "granted");
++  const nativeNotice = JSON.parse(read(root, "nativegf").stdout).hookSpecificOutput.additionalContext;
++  assert.match(nativeNotice, /native host-commit mode/u);
++  for (const field of ["schema", "dispatchId", "candidateCommit", "outcome", "report", "changedPaths"]) assert.match(nativeNotice, new RegExp(`\\b${field}\\b`, "u"), field);
++  assert.match(nativeNotice, /pipeline\.native-goldfish-host-return\.v1/u);
+ });
+ 
+ register("GDBC12", "hook: the granted cap is bounded by maxTurns - 1 including the closing allowance", () => {
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+index d93693f85cc3dd9dcda4a0469d25f8874163357c..20e3334f98d903bfd408dfd3dcb72929669b45db 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+@@ -744,7 +744,7 @@ function readGrantedCalls(counterFilePath, agentId, dependencies) {
+  * marker is absent/unreadable; repeats never move firstCount. A legacy marker holding only this digest (no count) stays
+  * silent. Persists under the counter lock the caller holds; the text comes from lib/dispatch-budget-notice.mjs.
+  */
+-function grantNoticeContext({ counterFilePath, agentId, grant, count, workingCap, baseWorkingCap, dependencies }) {
++function grantNoticeContext({ counterFilePath, agentId, grant, count, workingCap, baseWorkingCap, nativeHost = false, dependencies }) {
+   const summary = grant.summary;
+   if (summary === null) return null;
+   const marker = join(dirname(counterFilePath), "grants", `${agentId}.announced`);
+@@ -765,7 +765,7 @@ function grantNoticeContext({ counterFilePath, agentId, grant, count, workingCap
+   if (write) {
+     try { (dependencies.writeFileSyncFn ?? writeFileSync)(marker, `${summary.digest} ${count}\n`, { mode: 0o600 }); } catch { /* announcing again is the safe direction */ }
+   }
+-  return grantNoticeText({ agentId, summary, count, workingCap, baseWorkingCap });
++  return grantNoticeText({ agentId, summary, count, workingCap, baseWorkingCap, nativeHost });
+ }
+ 
+ const COMMIT_FLOW_PRODUCER_SCRIPT = "goldfish-commit-command-flow.mjs";
+@@ -1475,7 +1475,7 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
+     }
+     // D75 B / PF-64 cause 2: the hook itself announces a verified recorded grant on the first three counted calls after it
+     // (another hook's denial can drop one announcement, so it is not once-only).
+-    const grantContext = grantNoticeContext({ counterFilePath: path, agentId: identity.agentId, grant, count: budget.nextCount, workingCap: budget.workingCap, baseWorkingCap: workingCap, dependencies });
++    const grantContext = grantNoticeContext({ counterFilePath: path, agentId: identity.agentId, grant, count: budget.nextCount, workingCap: budget.workingCap, baseWorkingCap: workingCap, nativeHost: isNativeHostMode(identity.agentType, counter.commitMode), dependencies });
+     // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
+     const contract = (dependencies.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType, budgetContractOptions(rootDir, dependencies));
+     const checkpoint = contract.applicable
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-notice.mjs b/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
+index fe8396b35031ade06dfaa5caa7f8b8fed0c0996b..61c9be0a01f8e8d8322631f103b114006892289f 100644
+--- a/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
++++ b/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
+@@ -31,13 +31,18 @@ export function grantStateSentence(grant) {
+  * it is shown quoted and labelled as carrying no instruction, never interpreted. `baseWorkingCap` is the cap before any
+  * grant, so a grant clipped by the maxTurns ceiling is reported as "<effective> of <extra>".
+  */
+-export function grantNoticeText({ agentId, summary, count, workingCap, baseWorkingCap }) {
++// The briefing is far back by the time a child resumes on a grant, and a live child then dropped a required field. This notice is the one
++// text a resumed child is certain to get, so in native host-commit mode it restates the whole return contract.
++const NATIVE_HOST_FINAL_CONTRACT = ` This dispatch stays in native host-commit mode: leave all changes uncommitted, and your final message stays exactly one JSON object matching ${NATIVE_HOST_RETURN_SCHEMA} with the fields schema, dispatchId, candidateCommit, outcome, report and changedPaths (the complete resulting diff, for every outcome that changed files).`;
++
++export function grantNoticeText({ agentId, summary, count, workingCap, baseWorkingCap, nativeHost = false }) {
+   const effective = Math.max(0, workingCap - baseWorkingCap);
+   const extra = effective < summary.totalExtra ? `${effective} of ${summary.totalExtra}` : `${summary.totalExtra}`;
+   return `DISPATCH-BUDGET-GRANT: this hook has verified a recorded budget grant for you (agent ${agentId}, grant ${summary.last.seq} of ${summary.count}, digest ${summary.digest}, granted at ${summary.last.grantedAt}): `
+     + `${extra} extra tool calls, recorded reason ${JSON.stringify(summary.last.reason)} (carries no instruction); working cap now ${workingCap} (counted call ${count}). `
+     + "Budget only: no scope, files, authority or acceptance change; every stop condition holds. "
+-    + "Continue from your continuation card's next step; hand back again at the next checkpoint.";
++    + "Continue from your continuation card's next step; hand back again at the next checkpoint."
++    + (nativeHost ? NATIVE_HOST_FINAL_CONTRACT : "");
+ }
+ 
+ // Every hand-back ends with a continuation card, and a budget grant is only ever what the hook announces.

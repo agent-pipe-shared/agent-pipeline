@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 21b: 9 held patches exported from the build clone chain cf73ce22d..77d3ca163
+# PO apply script for candidate 21b: 10 held patches exported from the build clone chain cf73ce22d..e736962ae
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -14,15 +14,16 @@ step() {
   git commit --no-verify -F "$H/$1.msg"
   echo "applied $1"
 }
-step 1-33ad1664d 'fix(critic): send a verdict-less Antigravity Critic message back once so the close needs no PO signature'
-step 2-6fc14c118 'fix(close): stop before Verify when no Result is bound and name the exact repair for caller-authored Critics and proof refusals'
-step 3-3e05ccd30 'fix(security): use the repo-root Gitleaks ruleset only in the source checkout, never a stray file above an installed plugin'
-step 4-3c66bfa27 'fix(critic): refuse a misplaced Verify evidence path before the capture and say what to do'
-step 5-1456959c0 'fix(pipeline): bind the caller-authored Critic acknowledgement to the reviewed candidate'
-step 6-b993152ad 'fix(critic): issue no Source return for a verdict that contradicts its own pass'
-step 7-a3825286c 'fix(critic): accept punctuation after a split scope marker'
-step 8-b521e3558 'fix(pipeline-core): admit a Goldfish return wrapped in one fence around the whole message'
-step 9-77d3ca163 'fix(dispatch-budget): keep the copied grant line within the per-grant limit'
+step 01-33ad1664d 'fix(critic): send a verdict-less Antigravity Critic message back once so the close needs no PO signature'
+step 02-6fc14c118 'fix(close): stop before Verify when no Result is bound and name the exact repair for caller-authored Critics and proof refusals'
+step 03-3e05ccd30 'fix(security): use the repo-root Gitleaks ruleset only in the source checkout, never a stray file above an installed plugin'
+step 04-3c66bfa27 'fix(critic): refuse a misplaced Verify evidence path before the capture and say what to do'
+step 05-1456959c0 'fix(pipeline): bind the caller-authored Critic acknowledgement to the reviewed candidate'
+step 06-b993152ad 'fix(critic): issue no Source return for a verdict that contradicts its own pass'
+step 07-a3825286c 'fix(critic): accept punctuation after a split scope marker'
+step 08-b521e3558 'fix(pipeline-core): admit a Goldfish return wrapped in one fence around the whole message'
+step 09-77d3ca163 'fix(dispatch-budget): keep the copied grant line within the per-grant limit'
+step 10-e736962ae 'fix(dispatch-budget): restate the native return contract when a child resumes on a grant'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
