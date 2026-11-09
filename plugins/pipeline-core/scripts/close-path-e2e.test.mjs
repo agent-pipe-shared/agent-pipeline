@@ -42,6 +42,7 @@ import { buildRootProjectCalibrationIdentity } from "../lib/project-calibration-
 import { readState, run } from "./pipeline-state.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../lib/architecture-map-scaffold.mjs";
 import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+import { readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { NEUTRAL_MANIFEST } from "../lib/project-authority.mjs";
 import * as po from "../lib/po-gate-authority.mjs";
@@ -258,8 +259,9 @@ const WALKS = Object.freeze([
   Object.freeze({ identity: RUNNER_IDENTITIES.find((entry) => entry.runner === "claude"), criticReturn: "stop-hook", catalogue: true }),
 ]);
 
-test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 600_000 }, async () => {
-  for (const { identity, criticReturn, catalogue } of WALKS) {
+// C22 (CGF-04): the walk body is one function so the same fixture, Critic course and close prerequisites serve the manual coordinator walks (below) and the one-shot close walk.
+async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false }) {
+  {
     const log = [];
     const fx = consumerFixture(log, identity);
     walkEnv = runnerEnv(identity.runner, fx.root);
@@ -403,11 +405,22 @@ test("G20-35: the close path from implementation to release preflight is walked 
       const coordinator = (verb, extra) => json(step(log, `${identity.runner}: close-coordinator ${verb}`, process.execPath,
         [script("close-coordinator.mjs"), verb, "--root", fx.root, "--lifecycle", lifecycle, ...extra], { cwd: fx.root }));
       const runAction = (label, action) => json(step(log, `${identity.runner}: ${label}`, action.executable, action.argv, { cwd: fx.root }));
-      const started = coordinator("plan-start", ["--actor", "PO", "--close-intent", "durable-stop"]);
-      const startedApplied = runAction("apply-start", started.nextAction);
-      assert.equal(startedApplied.status, "applied");
+      // C22 (CGF-04): the one-shot walk lets finish-feature.mjs start the close itself, so the hand-driven start and checkpoint are the manual walks' only.
+      const started = oneShot ? null : coordinator("plan-start", ["--actor", "PO", "--close-intent", "durable-stop"]);
+      const startedApplied = oneShot ? null : runAction("apply-start", started.nextAction);
+      if (!oneShot) assert.equal(startedApplied.status, "applied");
       const transition = (phase, extra = []) => runAction(`apply ${phase}`, coordinator("plan-transition", ["--actor", "PO", "--phase", phase, ...extra]).nextAction);
-      transition("checkpointed");
+      if (!oneShot) transition("checkpointed");
+      // C22 (CGF-04): the real one-shot CLI, one call per stop. Its result is typed JSON on stdout (exit 0 for a result, 2 for a stop); every assertion below reads stored state or a typed code.
+      const oneShotCli = (extra = []) => {
+        const out = spawnSync(process.execPath, [script("finish-feature.mjs"), "--one-shot", "--root", fx.root, "--by", "Fixture PO", "--architecture-impact", "architecture-conforms", "--critic-packet-id", packetId, ...extra],
+          { cwd: fx.root, env: walkEnv, encoding: "utf8", shell: false, windowsHide: true, timeout: 300_000, maxBuffer: 1 << 26 });
+        log.push({ label: `${identity.runner}: finish-feature --one-shot ${extra.join(" ")}`.trim(), status: out.status });
+        let result;
+        try { result = json(out); } catch { assert.fail(`${identity.runner}: finish-feature printed no JSON (exit ${out.status})\n${out.stdout}\n${out.stderr}`); }
+        return { status: out.status, result, code: result.status === "stopped" ? result.stop.code : result.status };
+      };
+      const porcelain = () => git(log, fx.root, ["status", "--porcelain=v1", "--untracked-files=all"]);
       // The Result is bound to the Continuity state and the queue head says close (the work package's own output); the close request names the
       // exported Critic receipt as its close evidence, which the skill names as the usual choice.
       const STATE = "project/pipeline-state.json"; // the project authority tier (the baseline twin project/pipeline.json selects it)
@@ -415,6 +428,15 @@ test("G20-35: the close path from implementation to release preflight is walked 
       const fileSha = (rel) => createHash("sha256").update(readFileSync(join(fx.root, rel))).digest("hex");
       const resultPath = `specs/${FEATURE_ID}/result.md`;
       const stateWriter = (label, verb, extra = []) => step(log, `${identity.runner}: ${label}`, process.execPath, [script("pipeline-state.mjs"), verb, ...extra], { cwd: fx.root });
+      if (oneShot) {
+        // C22 (CGF-04), first stop of the real CLI: a Continuity feature with no bound Result stops BEFORE any evidence is written, with the bootstrap chain as its repair.
+        const treeBefore = porcelain();
+        const unbound = oneShotCli();
+        assert.equal(unbound.status, 2, JSON.stringify(unbound.result).slice(0, 600));
+        assert.equal(unbound.code, "ONESHOT-RESULT-NOT-BOUND", JSON.stringify(unbound.result).slice(0, 600));
+        assert.match(unbound.result.stop.repair, /continuity-result-bootstrap-plan/u);
+        assert.equal(porcelain(), treeBefore, `${identity.runner}: a stop that wrote nothing leaves the tree as it was`);
+      }
       const bootstrap = json(stateWriter("continuity-result-bootstrap-plan", "continuity-result-bootstrap-plan"));
       const bootstrapApplied = step(log, `${identity.runner}: continuity-result-bootstrap-apply (the action the plan returned)`, bootstrap.applyAction.executable, bootstrap.applyAction.argv, { cwd: fx.root });
       // Measured (w265 finding 2): a REGISTERED package lags the Result the bootstrap just bound. G20-38 (PO decision 2026-11-07), restated
@@ -441,6 +463,53 @@ test("G20-35: the close path from implementation to release preflight is walked 
       const reconciled = step(log, `${identity.runner}: feature-package-reconcile (agent-run, result-only)`, completion.reconcileCommand.executable, completion.reconcileCommand.argv, { cwd: fx.root });
       assert.deepEqual(JSON.parse(reconciled.stdout).approval, { basis: "agent-result-only-reconcile-no-po-proof", poProof: false });
       commit(log, fx.root, "chore: bind the Result and reconcile the feature package");
+      if (oneShot) {
+        // C22 (CGF-04): the whole close through the real one-shot CLI, one call per stop. The question for the human comes once and writes nothing; the answer is recorded for exactly the HEAD it was
+        // given at; every commit the close asks for is made from the paths it names (so the close's own evidence commits are part of the walk); a resume never asks again and never lands in
+        // FCA-PACKAGE or in a second commit request for the same outputs. The final gates (freeze, Verify, scan) are read from the typed codes the CLI ends on.
+        const stateOf = () => JSON.parse(readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8"));
+        const treeBefore = porcelain();
+        const asked = oneShotCli();
+        assert.equal(asked.status, 2, JSON.stringify(asked.result).slice(0, 600));
+        assert.equal(asked.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(asked.result).slice(0, 600));
+        assert.equal(porcelain(), treeBefore, `${identity.runner}: the acceptance question wrote nothing`);
+        assert.equal(readAcceptanceRecord(fx.root, FEATURE_ID), null);
+        assert.deepEqual(stateOf().closedFeatures ?? [], [], "the close has not started");
+        const candidateAsked = git(log, fx.root, ["rev-parse", "HEAD"]);
+        const answer = "Fixture PO: accepted for this candidate";
+        const seen = [asked.code];
+        let args = ["--human-acceptance", answer];
+        let last = null;
+        for (let turn = 0; turn < 6; turn += 1) {
+          last = oneShotCli(args);
+          seen.push(last.code);
+          if (turn === 0) {
+            const record = readAcceptanceRecord(fx.root, FEATURE_ID);
+            assert.equal(record?.answer, answer, `${identity.runner}: the literal answer is recorded: ${JSON.stringify(last.result).slice(0, 800)}`);
+            assert.equal(record.candidate, candidateAsked, "the acceptance binds the HEAD it was given at");
+            assert.equal(last.code, "commit-required", JSON.stringify(last.result).slice(0, 800));
+            assert.ok(last.result.commit.paths.includes(record.path), `the close commit carries the acceptance record ${record.path}: ${last.result.commit.paths}`);
+            assert.equal(stateOf().closedFeatures.at(-1).id, FEATURE_ID, "the State close happened once, before the commit");
+          }
+          if (last.code !== "commit-required") break;
+          commitPaths(last.result.commit.message, last.result.commit.paths);
+          if (turn === 0) {
+            // CGF-04: the evidence a human step needs (a signature needs a clean tree) lands as its OWN commit between the close commit and the resume, so HEAD moves past the commit the close named.
+            const note = `specs/${FEATURE_ID}/evidence/post-close-note.md`;
+            writeFileSync(join(fx.root, note), "# Evidence committed between the close commit and the resume\n");
+            commitPaths("docs: evidence committed between the close commit and the resume", [note]);
+          }
+          args =["--resume-lifecycle-id", last.result.resumeLifecycleId];
+        }
+        assert.ok(!seen.includes("FCA-PACKAGE"), `${identity.runner}: the close never becomes unresolvable through its own evidence commits: ${seen}`);
+        assert.equal(seen.filter((code) => code === "ONESHOT-ACCEPTANCE-REQUIRED").length, 1, `the human is asked once: ${seen}`);
+        assert.equal(seen.filter((code) => code === "ONESHOT-COMMIT-PENDING").length, 0, `no close output is left uncommitted after its commit: ${seen}`);
+        assert.deepEqual(seen, ["ONESHOT-ACCEPTANCE-REQUIRED", "commit-required", "closed-local"], `${identity.runner}: the whole close is one question, one commit request and the end at closed-local: ${JSON.stringify(last.result).slice(0, 800)}`);
+        for (const stage of ["verify-candidate-frozen", "security-scan", "final-verify-green", "cleanup-complete", "closed-local"]) assert.ok(last.result.stages.includes(stage), `${identity.runner}: the resumed close ran ${stage}: ${last.result.stages}`);
+        assert.match(last.result.pushEvidence?.command ?? "", /--mode release --critic-packet-id/u, "the push boundary names the Critic-bound Verify, which the close never writes itself");
+        assert.equal(stateOf().closedFeatures.filter((entry) => entry.id === FEATURE_ID).length, 1, "the feature is closed exactly once");
+        return;
+      }
       const bound = JSON.parse(readFileSync(statePath, "utf8"));
       // review -> close through the sanctioned Result-close verb (plan, then the action it returns); no hand edit of the Continuity state
       const closePlan = json(stateWriter("continuity-result-close-plan", "continuity-result-close-plan", ["--feature-id", FEATURE_ID,
@@ -509,7 +578,7 @@ test("G20-35: the close path from implementation to release preflight is walked 
       assert.equal(prepared.phase, "feature-close-prepared");
       // Without a record the acknowledgement walk ends here: the identical close command above was admitted only after it. The rest of the close
       // (identical on every route) is walked by the three issuing identities.
-      if (criticReturn === "none") continue;
+      if (criticReturn === "none") return;
       assert.ok(prepared.nextAction.argv.includes("--continuity-close-request"), `the returned close-feature action keeps the Continuity flag: ${JSON.stringify(prepared.nextAction.argv.slice(1))}`);
       // The State writer prints a plain sentence, not JSON.
       const closed = step(log, `${identity.runner}: close-feature (State writer action returned by the coordinator)`, prepared.nextAction.executable, prepared.nextAction.argv, { cwd: fx.root });
@@ -587,7 +656,7 @@ test("G20-35: the close path from implementation to release preflight is walked 
           { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
         assert.equal(refusedChat.status, 2, refusedChat.stdout);
         assert.match(refusedChat.stderr, /state-push-source-requester[\s\S]*--proof-request/u);
-        continue;
+        return;
       }
       step(log, `${identity.runner}: approve-push (the line push-prepare printed)`, process.execPath,
         [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"], { cwd: fx.root });
@@ -656,4 +725,12 @@ test("G20-35: the close path from implementation to release preflight is walked 
       rmSync(fx.parent, { recursive: true, force: true, maxRetries: 3 });
     }
   }
+}
+
+test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 600_000 }, async () => {
+  for (const walk of WALKS) await walkTheClosePath(walk);
+});
+
+test("C22 CGF-04: the one-shot close CLI walks the whole close on the real fixture: its stops, the acceptance question, the commits the close asks for, and the resume", { timeout: 600_000 }, async () => {
+  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true });
 });
