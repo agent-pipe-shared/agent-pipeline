@@ -307,6 +307,33 @@ export function inspectArchitectureDesignDraft({ rootDir, planPath, expectedPlan
   }
 }
 
+/**
+ * A feature close clears the plan approval, not the architecture that plan accepted. With no plan approval in force, the receipt of a
+ * closed feature still names the approved design while its plan and every materialized target are byte-equal. Read-only orientation:
+ * it is never authority for new work, the planning gate and implementation entry keep their own check.
+ */
+export function inspectClosedFeatureArchitecture(rootDir) {
+  const root = resolve(rootDir);
+  try {
+    const state = JSON.parse(bytes(root, selectedArchitectureState(root).state));
+    requireValue(!state.planApproval?.poGateAuthority, "ARCHITECTURE-DESIGN-APPROVAL-IN-FORCE");
+    const receipt = JSON.parse(bytes(root, "architecture/design-materialization.json"));
+    requireValue(receipt?.schema === "pipeline.architecture-design-materialization.v1" && typeof receipt.featureId === "string"
+      && Array.isArray(state.closedFeatures) && state.closedFeatures.some(entry => entry?.id === receipt.featureId), "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+    const prd = bytes(root, receipt.planPath);
+    requireValue(hash(prd) === receipt.planSha256, "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+    const input = parseArchitectureDesign(prd);
+    const targets = architectureDesignTargets(input);
+    requireValue(hash(json(input)) === receipt.designSha256
+      && JSON.stringify(targets.map(target => ({ path: target.path, sha256: hash(target.bytes) }))) === JSON.stringify(receipt.targets), "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+    requireValue(targets.every(target => bytes(root, target.path) === target.bytes), "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
+    return { ok: true, status: "closed-feature-design", featureId: receipt.featureId, designSha256: receipt.designSha256,
+      scope: input.disposition.scope, rationale: input.disposition.rationale };
+  } catch (error) {
+    return { ok: false, status: "unavailable", code: architectureDesignFailureCode(error) };
+  }
+}
+
 /** Read-only authority projection: no adoption record or second PO decision is fabricated. */
 export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) {
   const root = resolve(rootDir);

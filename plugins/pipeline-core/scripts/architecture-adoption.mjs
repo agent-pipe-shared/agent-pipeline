@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { loadBaseline } from "./architecture-fitness.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 const stateSchema = JSON.parse(fs.readFileSync(new URL("../schemas/pipeline.adoption-state.v1.json", import.meta.url), "utf8"));
-import { inspectArchitectureDesign } from "../lib/architecture-design.mjs";
+import { inspectArchitectureDesign, inspectClosedFeatureArchitecture } from "../lib/architecture-design.mjs";
 const proposalSchema = JSON.parse(fs.readFileSync(new URL("../schemas/pipeline.adoption-proposal.v1.json", import.meta.url), "utf8"));
 import {
   buildAdoptionSubject,
@@ -136,6 +136,14 @@ export function resolveAdoptionState(rootDir = DEFAULT_ROOT, now = new Date()) {
       };
     }
   }
+
+  const closed = inspectClosedFeatureArchitecture(rootDir);
+  if (closed.ok) return {
+    schema: SCHEMA_ADOPTION_STATE, state: STATE_APPROVED_SCOPED, scope: closed.scope,
+    decidedAt: null, expiresAt: null, reviewDate: null,
+    decisionRef: "approved-design-package:" + closed.designSha256,
+    rationale: closed.rationale, coverageClass: "evaluated", confidence: "measured", closedFeature: closed.featureId,
+  };
 
   return {
     schema: SCHEMA_ADOPTION_STATE,

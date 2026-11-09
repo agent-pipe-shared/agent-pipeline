@@ -6,7 +6,9 @@ import { join } from 'node:path';
 import test from 'node:test';
 import * as fixture from './architecture-prospective-materialization.fixture.mjs';
 import { inspectArchitectureEntryReadiness } from './architecture-entry-readiness.mjs';
-import { architectureCommitStep, inspectArchitectureDesign } from './architecture-design.mjs';
+import { architectureCommitStep, inspectArchitectureDesign, inspectClosedFeatureArchitecture } from './architecture-design.mjs';
+import { observeArchitectureAdoptionOrientation } from './architecture-adoption-orientation.mjs';
+import { checkPlanningAdoptionDisposition, resolveAdoptionState } from '../scripts/architecture-adoption.mjs';
 
 const readiness = f => inspectArchitectureEntryReadiness({ rootDir: f.dir, taskScope: fixture.PLAN,
   deps: { readCheckpointArchitectureDebt: () => ({ ok: true, debt: [], resolvedDebt: [] }) } });
@@ -112,6 +114,47 @@ test('G20-36 materialize-architecture names the exact commit step while the mate
   fixture.git(f, 'add', '--', ...output.uncommittedPaths);
   fixture.git(f, 'commit', '-q', '-m', 'docs(architecture): commit the materialized architecture\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true');
   assert.deepEqual(architectureCommitStep(f.dir), { uncommittedPaths: [], commitStep: null });
+});
+
+function closeFeatureInState(f) {
+  const statePath = join(f.dir, fixture.stateRelative(f));
+  const { activeFeature, planApproval, ...rest } = JSON.parse(readFileSync(statePath, 'utf8'));
+  assert(activeFeature?.id && planApproval);
+  writeFileSync(statePath, JSON.stringify({ ...rest, planApproved: false, closedFeatures: [{ id: activeFeature.id, planPath: activeFeature.planPath }] }, null, 2));
+}
+
+test('CGF-30 a feature close does not turn the accepted architecture into adoption-required, and grants no new authority', () => {
+  const f = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
+  const executed = fixture.invoke(f, ['materialize-architecture']);
+  assert.equal(executed.status, 0, executed.text);
+  closeFeatureInState(f);
+  const receipt = JSON.parse(readFileSync(join(f.dir, 'architecture/design-materialization.json'), 'utf8'));
+  const adoption = resolveAdoptionState(f.dir);
+  assert.equal(adoption.state, 'approved-scoped', JSON.stringify(adoption));
+  assert.equal(adoption.decisionRef, `approved-design-package:${receipt.designSha256}`);
+  assert.equal(adoption.closedFeature, receipt.featureId);
+  assert.equal(observeArchitectureAdoptionOrientation({ rootDir: f.dir }).status, 'decision-recorded');
+  assert.equal(checkPlanningAdoptionDisposition(f.dir, fixture.PLAN).ok, false, 'the planning gate still needs an approval in force');
+  writeFileSync(join(f.dir, fixture.PLAN), Buffer.concat([readFileSync(join(f.dir, fixture.PLAN)), Buffer.from('\nDrift.\n')]));
+  assert.equal(resolveAdoptionState(f.dir).state, 'adoption-required', 'an edited plan no longer names the accepted design');
+});
+
+test('CGF-30 a drifted target or an unclosed receipt keeps adoption-required after the approval is gone', () => {
+  const drifted = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
+  assert.equal(fixture.invoke(drifted, ['materialize-architecture']).status, 0);
+  const receipt = JSON.parse(readFileSync(join(drifted.dir, 'architecture/design-materialization.json'), 'utf8'));
+  closeFeatureInState(drifted);
+  writeFileSync(join(drifted.dir, receipt.targets[0].path), Buffer.concat([readFileSync(join(drifted.dir, receipt.targets[0].path)), Buffer.from('\ndrift\n')]));
+  assert.equal(inspectClosedFeatureArchitecture(drifted.dir).code, 'ARCHITECTURE-DESIGN-ARTIFACT-DRIFT');
+  assert.equal(resolveAdoptionState(drifted.dir).state, 'adoption-required');
+
+  const unclosed = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
+  assert.equal(fixture.invoke(unclosed, ['materialize-architecture']).status, 0);
+  assert.equal(inspectClosedFeatureArchitecture(unclosed.dir).code, 'ARCHITECTURE-DESIGN-APPROVAL-IN-FORCE');
+  closeFeatureInState(unclosed);
+  const statePath = join(unclosed.dir, fixture.stateRelative(unclosed));
+  writeFileSync(statePath, JSON.stringify({ ...JSON.parse(readFileSync(statePath, 'utf8')), closedFeatures: [] }, null, 2));
+  assert.equal(inspectClosedFeatureArchitecture(unclosed.dir).code, 'ARCHITECTURE-DESIGN-RECEIPT-STALE');
 });
 
 test('G27-PUBLIC-007 wrong source root has no Greenfield materialization authority', () => {
