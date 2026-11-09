@@ -1762,6 +1762,24 @@
       "nonOverlapNote": "Text and file functions of the handover block; the one-shot close wiring is covered in the finish-feature suite"
     },
     {
+      "name": "generated-artefact-schema-tests",
+      "file": "plugins/pipeline-core/lib/generated-artefact-schema.test.mjs",
+      "invariantPinned": "A scanner match is treated as a generated digest field only for the exact artefact schema and field shape, anything else stays a normal finding",
+      "nonOverlapNote": "Pure schema check; the discounted count in a scan is covered in the gitleaks adapter suite"
+    },
+    {
+      "name": "critical-action-signature-round-trip-tests",
+      "file": "plugins/pipeline-core/scripts/critical-action-signature-round-trip.test.mjs",
+      "invariantPinned": "The signature command handed to the human produces a proof that the matching verifier accepts for the critical action kinds it covers, and a changed digest is refused",
+      "nonOverlapNote": "End-to-end sign and verify round trip on this platform; request and authorization logic stays in the critical action authorization suites"
+    },
+    {
+      "name": "repository-mode-promote-tests",
+      "file": "plugins/pipeline-core/scripts/repository-mode-promote.test.mjs",
+      "invariantPinned": "Only local-only moves to remote-tracked, only with a configured remote, by one token in both calibration twins, and every other direction is refused with its remaining route",
+      "nonOverlapNote": "The writer command only; the commit-boundary admission of the same change is covered in the pre-commit hook suite"
+    },
+    {
       "name": "critic-route-assurance-tests",
       "file": "plugins/pipeline-core/lib/critic-route-assurance.test.mjs",
       "invariantPinned": "Before dispatch a planned Critic route states exactly the assurance it delivers and whether the close needs an acknowledgement, never a stronger word",
