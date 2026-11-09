@@ -2596,11 +2596,21 @@ function freshRepoIn(parentDir, name, { approvedMini = false } = {}) {
       stderrEmpty: true,
     });
   }
+  for (const [id, command] of [
+    ["PG-K153-07", "git rev-parse HEAD^{tree}"],
+    ["PG-K153-07a", "git rev-parse feat/branch^{tree}"],
+  ]) {
+    check(`${id} allow  the one unquoted tree read: ${command}`, command, dir, ALLOW, { stderrEmpty: true });
+  }
   // Nothing about the reader set loosens an actual push, an unquoted brace, a chained push or a hidden substitution push.
   for (const [id, command] of [
     ["PG-K153-05", 'git push origin "main:refs/heads/{a,b}"'],
     ["PG-K153-06", "git push origin main:refs/heads/{a,b}"],
-    ["PG-K153-07", "git rev-parse HEAD^{tree}"],
+    // PG-K153-07 moved to the allow list below (QG-04 restatement, PO decision 2026-11-09 CGR-08): exactly this one unquoted read is admitted.
+    ["PG-K153-07b", "git rev-parse HEAD^{commit}"],
+    ["PG-K153-07c", "git cat-file -p HEAD^{tree}"],
+    ["PG-K153-07d", "git rev-parse HEAD^{tree} ; git push origin main:refs/heads/feature-test"],
+    ["PG-K153-07e", "git rev-parse --git-dir^{tree}"],
     ["PG-K153-08", 'git rev-parse "HEAD^{tree}" ; git push origin main:refs/heads/feature-test'],
     ["PG-K153-09", 'git rev-parse "$(git push origin main:refs/heads/feature-test)"'],
     ["PG-K153-10", 'git cat-file -p "HEAD^{tree}" && git push origin main:refs/heads/feature-test'],

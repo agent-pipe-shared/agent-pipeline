@@ -395,8 +395,13 @@ function substitutionBodyIsPlain(body) {
   return !commandIsGitPush(body);
 }
 
+// PO decision 2026-11-09 (CGR-08): 29 Critic refusals in one greenfield run. Exactly this one read is admitted unquoted; the whole text must match,
+// so a chain, a pipe, a substitution or another brace form still takes the strict path below. Bash and zsh leave a brace with no comma literal.
+const REV_PARSE_TREE_READ_RE = /^git rev-parse [A-Za-z0-9_][A-Za-z0-9_./@-]*\^\{tree\}$/u;
+
 function provenNonPushMarkerCandidate(text) {
   if (typeof text !== "string" || text === "" || text.length > 4096) return false;
+  if (REV_PARSE_TREE_READ_RE.test(text)) return true;
   if (/[^\x20-\x7e\t]/u.test(text) || text.includes("\\")) return false;
   const words = [];
   const bodies = [];

@@ -1743,6 +1743,12 @@
       "nonOverlapNote": "Pure decision-table suite for critic-lane-fallback.mjs; the selected-host route integration is codex-critic-selected-host-fallback-tests"
     },
     {
+      "name": "codex-critic-launch-route-tests",
+      "file": "plugins/pipeline-core/lib/codex-critic-launch-route.test.mjs",
+      "invariantPinned": "A Codex Critic launch always ends in a running Critic: only a passing sandbox preflight receipt selects the sandboxed role, every other case selects the labelled fallback with exit 0",
+      "nonOverlapNote": "Pure launch-route decision for the projected Critic role, distinct from the selected-host sandbox lane covered by critic-lane-fallback-tests"
+    },
+    {
       "name": "codex-critic-selected-host-fallback-tests",
       "file": "plugins/pipeline-core/scripts/codex-critic-selected-host-fallback.test.mjs",
       "invariantPinned": "A selected-host Codex Critic pre-launch failure keeps its code and carries the typed lane fallback with its lane record, failure class and terminal code",
