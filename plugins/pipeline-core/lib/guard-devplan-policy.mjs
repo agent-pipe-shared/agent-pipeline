@@ -404,6 +404,24 @@ function normalize(p) {
 }
 
 /**
+ * C21F (PO decision 2026-11-09): a feature package at `verifying` or `completed` moves only through its writer. A live Antigravity run rewound one by editing
+ * `specs/<feature>/lifecycle.json` and committed that; the one-shot close has its own requalification for exactly that case. Earlier states stay editable, and an
+ * unreadable or absent file is left to the rest of the gate. @returns {string|null} the refusal text, or null.
+ */
+export function completedFeaturePackageEditDenial(relPath, projectDir) {
+  const slashed = String(relPath ?? "").replace(/\\/g, "/");
+  if (!/^specs\/[^/]+\/lifecycle\.json$/iu.test(slashed)) return null;
+  let state = null;
+  try { state = JSON.parse(readFileSync(join(projectDir, slashed), "utf8"))?.state ?? null; } catch { return null; }
+  if (state !== "verifying" && state !== "completed") return null;
+  return [
+    `BLOCKED (guard-devplan, plugin pipeline-core): GUARD-FEATURE-PACKAGE-HAND-EDIT: ${slashed} is at state "${state}" and moves only through its writer.`,
+    "If HEAD moved past the candidate, rerun the one-shot close (finish-feature.mjs --one-shot, with the --resume-lifecycle-id it printed): it qualifies the current HEAD again and rebinds the package.",
+    "Do not rewind this file by hand.",
+  ].join("\n");
+}
+
+/**
  * The Dev-Plan-Gate's pure decision function, moved nearly verbatim out of
  * `guard-devplan.mjs` (see that file's own header for the full rationale behind
  * each step -- absolute/relative resolution, traversal hardening, the
@@ -442,6 +460,8 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = 
   // ---- scratch/: UNCONDITIONAL allow, before any gate evaluation ---------------------
   if (!forceLifecycleGate && (normalizedPath.startsWith("scratch/") || isCriticScratchNotesPath(normalizedPath))) return { verdict: "allow" };
   if (!forceLifecycleGate && isDispatchRecordCoordinationPath(normalizedPath)) return { verdict: "allow" };
+  const packageEditDenial = completedFeaturePackageEditDenial(relPath, projectDir);
+  if (packageEditDenial !== null) return { verdict: "block", reason: packageEditDenial };
 
   // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
   const manifestResult = loadManifest(projectDir);

@@ -298,6 +298,19 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   });
 }
 
+// ---- C21F a feature package past implementing refuses a hand edit, on the real hook -----
+{
+  const dir = freshDir("package-hand-edit");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, APPROVED_STATE);
+  mkdirSync(join(dir, "specs", "feature-abc"), { recursive: true });
+  writeFileSync(join(dir, "specs", "feature-abc", "lifecycle.json"), JSON.stringify({ state: "completed" }));
+  check("C21F block hand edit of a completed feature package", "Edit", "specs/feature-abc/lifecycle.json", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["GUARD-FEATURE-PACKAGE-HAND-EDIT", "--one-shot"],
+  });
+}
+
 // ---- DP08 default exempt prefixes -> allow ----------------------------------------------
 {
   const prefixes = ["docs/", "specs/", ".claude/", "backlog/", "scratch/"];

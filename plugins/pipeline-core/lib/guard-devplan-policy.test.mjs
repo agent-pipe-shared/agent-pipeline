@@ -4,7 +4,7 @@ import test from "node:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { devPlanGateVerdict, evaluateStagedDevPlanPaths, isCriticScratchNotesPath } from "./guard-devplan-policy.mjs";
+import { completedFeaturePackageEditDenial, devPlanGateVerdict, evaluateStagedDevPlanPaths, isCriticScratchNotesPath } from "./guard-devplan-policy.mjs";
 
 function lifecycleFixture({ phase = "design", planApproved = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "staged-devplan-policy-"));
@@ -18,6 +18,32 @@ function lifecycleFixture({ phase = "design", planApproved = false } = {}) {
   }));
   return root;
 }
+
+test("C21F: a feature package at verifying or completed refuses a hand edit and names the one-shot route; earlier states and other files stay with the gate", () => {
+  const root = mkdtempSync(join(tmpdir(), "package-hand-edit-"));
+  try {
+    mkdirSync(join(root, "specs", "feature-abc"), { recursive: true });
+    const manifest = join(root, "specs", "feature-abc", "lifecycle.json");
+    for (const state of ["verifying", "completed"]) {
+      writeFileSync(manifest, JSON.stringify({ state }));
+      for (const filePath of ["specs/feature-abc/lifecycle.json", manifest, "specs\\feature-abc\\lifecycle.json"]) {
+        const result = devPlanGateVerdict({ filePath, projectDir: root });
+        assert.equal(result.verdict, "block", `${state} ${filePath}`);
+        assert.match(result.reason, /GUARD-FEATURE-PACKAGE-HAND-EDIT/u);
+        assert.match(result.reason, /--one-shot/u);
+      }
+    }
+    for (const state of ["draft", "approved", "implementing"]) {
+      writeFileSync(manifest, JSON.stringify({ state }));
+      assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/lifecycle.json", root), null, state);
+    }
+    writeFileSync(manifest, "not json");
+    assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/lifecycle.json", root), null, "unreadable stays with the gate");
+    writeFileSync(manifest, JSON.stringify({ state: "completed" }));
+    assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/spec.md", root), null);
+    assert.equal(completedFeaturePackageEditDenial("specs/feature-abc/nested/lifecycle.json", root), null);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("isCriticScratchNotesPath identifies critic notes and dispatch scratch paths", () => {
   assert.equal(isCriticScratchNotesPath("scratch/dispatch/TASK-1/critic-notes.md"), true);

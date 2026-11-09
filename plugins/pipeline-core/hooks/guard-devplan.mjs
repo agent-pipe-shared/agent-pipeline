@@ -148,7 +148,7 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
-import { designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath, isOnboardingScaffoldPath, unverifiedApprovalAdvisory } from "../lib/guard-devplan-policy.mjs";
+import { completedFeaturePackageEditDenial, designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath, isOnboardingScaffoldPath, unverifiedApprovalAdvisory } from "../lib/guard-devplan-policy.mjs";
 // NVA-B-REBWIRE-1 (backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-
 // after-every-conflict.md): the dev-plan gate's ONE relief and its denial disclosure, owned by
 // the policy module both of this gate's lanes already share, never re-decided here. See that
@@ -417,6 +417,9 @@ const normalizedPath = normalize(relPath);
 // still uses).
 if (normalizedPath.startsWith("scratch/")) process.exit(0);
 if (isDispatchRecordCoordinationPath(normalizedPath)) process.exit(0);
+// C21F: the shared refusal of a hand edit of a feature package past `implementing` (lib/guard-devplan-policy.mjs).
+const packageEditDenial = completedFeaturePackageEditDenial(relPath, projectDir);
+if (packageEditDenial !== null) { process.stderr.write(`${packageEditDenial}\n`); process.exit(2); }
 
 // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
 const manifestResult = loadManifest(projectDir);
