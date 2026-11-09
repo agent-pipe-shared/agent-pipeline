@@ -364,6 +364,21 @@ test("C21C: a missing PO acknowledgement of a caller-authored Critic stops befor
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test("C21E: the acknowledgement stop names the uncommitted paths before the PO is asked to sign, and says nothing on a clean tree", () => {
+  const f = oneShotFixture({ acknowledgementMissing: true });
+  try {
+    assert.doesNotMatch(oneShotClose(f.input, { runCommand: f.runner }).stop.repair, /uncommitted/u, "a clean tree needs no note");
+    writeFileSync(join(f.root, "untracked-note.md"), "note\n");
+    writeFileSync(join(f.root, STATE_PATH), `${readFileSync(join(f.root, STATE_PATH), "utf8")} \n`);
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 400));
+    assert.match(stopped.stop.repair, /first commit the 2 uncommitted path\(s\)/u);
+    assert.ok(stopped.stop.repair.includes("untracked-note.md") && stopped.stop.repair.includes(STATE_PATH), stopped.stop.repair);
+    assert.match(stopped.stop.repair, /rerun the identical command/u);
+    assert.deepEqual(f.calls, [], "the note changes no stage order");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("C21E: the close writes the Critic addenda before Verify, asks for their commit, and the rerun goes on to Verify", () => {
   const f = oneShotFixture({ addendaWritten: true });
   try {

@@ -293,7 +293,13 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         const independence = command(runner, process.execPath, [COORDINATOR, "critic-independence", "--root", root, "--packet", packet], "ONESHOT-CRITIC-INDEPENDENCE");
         if (independence?.status === "acknowledgement-required") acknowledgementGap = String(independence.message ?? "");
       } catch { acknowledgementGap = null; /* the close keeps its own check */ }
-      if (acknowledgementGap !== null) return stopResult("critic-acknowledgement", "CLOSE-CRITIC-CALLER-AUTHORED", acknowledgementGap, `nothing was written; record the acknowledgement as the reason says, then rerun the identical command: ${rerun(again)}`);
+      if (acknowledgementGap !== null) {
+        // C21E: the signing command behind this acknowledgement refuses a dirty tree, and the PO should not find that out by entering a passphrase. The raw runner keeps the status column intact; rawGit trims it away.
+        const porcelain = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
+        const dirty = porcelain?.status === 0 ? String(porcelain.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => line.slice(3)) : [];
+        const dirtyNote = dirty.length === 0 ? "" : `first commit the ${dirty.length} uncommitted path(s) or move them out of the work tree, because the signing command refuses a dirty tree (${dirty.slice(0, 8).join(", ")}${dirty.length > 8 ? ", ..." : ""}); `;
+        return stopResult("critic-acknowledgement", "CLOSE-CRITIC-CALLER-AUTHORED", acknowledgementGap, `nothing was written; ${dirtyNote}record the acknowledgement as the reason says, then rerun the identical command: ${rerun(again)}`);
+      }
       // C21E: the close writes the Critic addenda itself, and their commit moves HEAD. Doing that here, before Verify, keeps the candidate of the Verify below current.
       let addenda = null;
       try { addenda = command(runner, process.execPath, [COORDINATOR, "critic-addenda", "--root", root], "ONESHOT-CRITIC-ADDENDA"); } catch { addenda = null; /* the close keeps its own check */ }
