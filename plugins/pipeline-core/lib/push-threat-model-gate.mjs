@@ -15,8 +15,11 @@
  */
 import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { gateConfig, loadManifestSafe } from "./manifest.mjs";
+import { isPushThreatModelTemplateUnchanged } from "./push-threat-model-materialize.mjs";
+import { isCriticalStakes, readCalibrationStakes } from "./security-close-status.mjs";
 
 export const PUSH_THREAT_MODEL_FILE = "project/push-threat-model.md";
 export const PUSH_THREAT_MODEL_GATE_SCHEMA = "pipeline.push-threat-model-gate.v1";
@@ -36,7 +39,30 @@ const refused = (code, message, repairCommand) => ({
   schema: PUSH_THREAT_MODEL_GATE_SCHEMA, active: true, ok: false, code, path: PUSH_THREAT_MODEL_FILE, message,
   repair: { command: repairCommand, commitRule: PUSH_THREAT_MODEL_COMMIT_RULE },
 });
-const REPLACE_COMMAND = `write the reviewed threat model into ${PUSH_THREAT_MODEL_FILE} (start from the shipped template plugins/pipeline-core/docs/default-push-threat-model.md; the command that creates the file from that template refuses while a file exists)`;
+// Candidate 22 (CGR-18, CGF-19): a file that is still the shipped template, or still carries the judgement marker `materialize-push-threat-model` leaves,
+// is named `template-unchanged`. It blocks only in the critical profile (stakes in the project calibration), the way a scanner that did not execute does.
+export const PUSH_THREAT_MODEL_TEMPLATE_STATE = "template-unchanged";
+export const PUSH_THREAT_MODEL_TEMPLATE_CODE = "PUSH-THREAT-MODEL-TEMPLATE-UNCHANGED";
+const SHIPPED_TEMPLATE_PATH = fileURLToPath(new URL("../docs/default-push-threat-model.md", import.meta.url));
+const TEMPLATE_UNCHANGED_FACT = `${PUSH_THREAT_MODEL_FILE} is still the unchanged shipped template (${PUSH_THREAT_MODEL_TEMPLATE_STATE}): it describes the signing ceremony, not this project`;
+export const PUSH_THREAT_MODEL_TEMPLATE_NOTICE = `Notice: ${TEMPLATE_UNCHANGED_FACT}. Answer the questions of its "Project judgement" section and delete the marker line above them; this does not block outside the critical profile.`;
+const TEMPLATE_UNCHANGED_REPAIR = `answer the questions of the "Project judgement" section of ${PUSH_THREAT_MODEL_FILE} for this project and delete the marker line above them (a file that was never created from the template needs the same: write the project's own threat model; the command that creates the file refuses while a file exists)`;
+
+function shippedTemplate() {
+  try { return readFileSync(SHIPPED_TEMPLATE_PATH, "utf8"); } catch { return null; }
+}
+
+/** True when the file at the conventional path exists as a regular file and reads template-unchanged. Never throws; false for anything unreadable. */
+export function pushThreatModelFileUnchanged(root) {
+  try {
+    const target = join(root, PUSH_THREAT_MODEL_FILE);
+    const info = lstatSync(target);
+    if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_MODEL_BYTES) return false;
+    return isPushThreatModelTemplateUnchanged(readFileSync(target, "utf8"), shippedTemplate());
+  } catch { return false; }
+}
+
+const REPLACE_COMMAND =`write the reviewed threat model into ${PUSH_THREAT_MODEL_FILE} (start from the shipped template plugins/pipeline-core/docs/default-push-threat-model.md; the command that creates the file from that template refuses while a file exists)`;
 
 /** @returns {{schema: string, active: boolean, ok: boolean, code: string|null, path: string, message: string|null, repair: {command: string, commitRule: string}|null}} */
 export function pushThreatModelVerdict(root, deps = {}) {
@@ -53,6 +79,11 @@ export function pushThreatModelVerdict(root, deps = {}) {
   try { text = readFileSync(target, "utf8"); } catch (error) { return refused("PUSH-THREAT-MODEL-INVALID", `${PUSH_THREAT_MODEL_FILE} cannot be read (${error?.code ?? "error"})`, REPLACE_COMMAND); }
   if (text.trim() === "") return refused("PUSH-THREAT-MODEL-EMPTY", `${PUSH_THREAT_MODEL_FILE} is empty and the push approval is active`, REPLACE_COMMAND);
   if (!HEADING.test(text)) return refused("PUSH-THREAT-MODEL-INVALID", `${PUSH_THREAT_MODEL_FILE} has no markdown heading, so it is not a threat model document`, REPLACE_COMMAND);
+  if (isPushThreatModelTemplateUnchanged(text, shippedTemplate())) {
+    const ok = !isCriticalStakes(readCalibrationStakes(root));
+    if (!ok) return { ...refused(PUSH_THREAT_MODEL_TEMPLATE_CODE, `${TEMPLATE_UNCHANGED_FACT}, and this project is calibrated critical (stakes in the project calibration)`, TEMPLATE_UNCHANGED_REPAIR), templateState: PUSH_THREAT_MODEL_TEMPLATE_STATE };
+    return { schema: PUSH_THREAT_MODEL_GATE_SCHEMA, active: true, ok: true, code: null, path: PUSH_THREAT_MODEL_FILE, message: null, repair: null, templateState: PUSH_THREAT_MODEL_TEMPLATE_STATE, notice: PUSH_THREAT_MODEL_TEMPLATE_NOTICE };
+  }
   return { schema: PUSH_THREAT_MODEL_GATE_SCHEMA, active: true, ok: true, code: null, path: PUSH_THREAT_MODEL_FILE, message: null, repair: null };
 }
 

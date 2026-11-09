@@ -33,6 +33,7 @@ import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import * as scanModule from "./security-scan.mjs";
 import { deriveSummaryVerdict, formatScannerLine, resolveEvidenceRoot, runSecurityScan } from "./security-scan.mjs";
+import { elementsOfCompletedScan, formatSecurityCloseStatus } from "../lib/security-close-status.mjs";
 // NVA-SECGATE-1: security-scan.mjs's own gate-mode resolution now delegates to this exact
 // shared function -- see the pinning test below.
 // NVA-R18-SCANBOOT: also imports checkSecurityCompleteness -- the SAME function guard-push.mjs
@@ -2163,6 +2164,33 @@ security:
   });
   assertIncludes("local-only: CLI prints the typed destination", cli.stdout, "destination: local-only");
   assertIncludes("local-only: CLI says the evidence cannot be used for a push", cli.stdout, "cannot be used for a push");
+}
+
+// AC-108 (closest accepted criterion), CGR-10 (candidate 22): the scan result and the close summary show which rules or rule sets really ran,
+// for each scanner, and the v2 plan source says what it is (a project without the Pipeline's own control catalog reads catalog-unavailable BY DESIGN).
+{
+  const rootDir = makeRootDir("rule-provenance-root");
+  writeManifest(rootDir, "schema: pipeline.manifest.v0\n\ngates:\n  security:\n    mode: blocking\n    type: automated\n");
+  commitFixture(rootDir);
+  const { evidence, verdictV2 } = await runSecurityScan({
+    rootDir, spawnFn: fixtureSpawnFn, timeoutMs: 30000, assessTrustedExecutablePath: mockAssessFixtureBinary,
+    env: { PIPELINE_GITLEAKS_PATH: gitleaksClean, PIPELINE_OSV_SCANNER_PATH: osvClean, PIPELINE_SEMGREP_PATH: semgrepClean },
+  });
+  const byTool = (tool) => evidence.scanners.find((s) => s.tool === tool);
+  const semgrep = byTool("semgrep")?.ruleSet;
+  assertEqual("rule provenance: semgrep names the plugin default rule file it really passed to --config", [semgrep?.source, semgrep?.ref], ["plugin-default", "plugin:security/semgrep/pipeline.yml"]);
+  assertEqual("rule provenance: semgrep lists the rule ids of that file", semgrep?.ruleIds, ["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval"]);
+  assertTrue("rule provenance: semgrep binds the rule file bytes by digest", /^[0-9a-f]{64}$/u.test(semgrep?.sha256 ?? ""), JSON.stringify(semgrep));
+  assertEqual("rule provenance: gitleaks names its config and says it extends the built-in default ruleset", [byTool("gitleaks")?.ruleSet?.ref?.endsWith("gitleaks-default.toml") || byTool("gitleaks")?.ruleSet?.ref === ".gitleaks.toml", /built-in default/u.test(byTool("gitleaks")?.ruleSet?.description ?? "")], [true, true]);
+  assertEqual("rule provenance: osv-scanner says it uses the advisory database of the detected package sources, not a rule file", byTool("osv-scanner")?.ruleSet?.source, "builtin");
+  assertEqual("rule provenance: license-check names the allowlist it used", [byTool("license-check")?.ruleSet?.source, byTool("license-check")?.ruleSet?.ref], ["plugin-default", "plugin:config/security/license-allowlist.default.json"]);
+  const lines = scanModule.formatRuleSetLines(evidence.scanners);
+  assertTrue("rule provenance: one printed line per scanner, semgrep's with its rule ids", lines.length === 4 && lines.some((l) => l.startsWith("semgrep: ") && l.includes("pipeline-default-hardcoded-private-key")), JSON.stringify(lines));
+  assertTrue("rule provenance: a scanner that did not run reads as not run, never with a rule set", scanModule.formatRuleSetLines([{ tool: "semgrep", status: "SKIPPED", classification: "binary_missing" }])[0] === "semgrep: no rules ran (scanner did not execute)", "skipped line");
+  assertEqual("rule provenance: the v2 verdict names the plan source and says what it means", [verdictV2?.plan?.source, /by design/u.test(verdictV2?.plan?.sourceNote ?? ""), /exit code/u.test(verdictV2?.plan?.sourceNote ?? "")], ["catalog-unavailable", true, true]);
+  assertEqual("rule provenance: the v2 rule pack ref agrees with the v1 rule set ref", scanModule.formatRuleSetLines(evidence.scanners).find((l) => l.startsWith("semgrep: ")).includes(semgrep.ref), true);
+  const closeLines = formatSecurityCloseStatus(elementsOfCompletedScan(evidence.scanners));
+  assertTrue("rule provenance: the close summary lines carry the rule set of each scanner that ran", closeLines.find((l) => l.startsWith("semgrep: "))?.includes("pipeline-default-hardcoded-private-key"), JSON.stringify(closeLines));
 }
 
 // ---- Summary -------------------------------------------------------------------------------------

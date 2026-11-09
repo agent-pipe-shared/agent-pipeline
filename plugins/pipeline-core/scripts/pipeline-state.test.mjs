@@ -545,6 +545,23 @@ for (const kind of ["closed", "discarded"]) {
   assert.equal(readFileSync(join(root, "project", "push-threat-model.md"), "utf8"), before, "an existing artifact must be byte-for-byte untouched");
 }
 
+// AC-108 (closest accepted criterion), CGF-19 (candidate 22): the verb fills every project-known field of the file it creates and names the
+// one judgement section left to the agent; the file it creates is reported template-unchanged until that marker is deleted.
+{
+  const { root, deps } = freshFixture();
+  writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ project: "fixture-project", stakes: "standard", repositoryMode: "remote-tracked" }));
+  const { PUSH_THREAT_MODEL_UNCHANGED_MARKER } = await import("../lib/push-threat-model-materialize.mjs");
+  const out = [];
+  const originalLog = console.log;
+  console.log = (...args) => { out.push(args.join(" ")); };
+  try { assert.equal(run(["materialize-push-threat-model"], deps), 0); } finally { console.log = originalLog; }
+  const text = readFileSync(join(root, "project", "push-threat-model.md"), "utf8");
+  assert.ok(text.startsWith(readFileSync(new URL("../docs/default-push-threat-model.md", import.meta.url), "utf8")), "the shipped template stays whole and first");
+  assert.ok(text.includes("fixture-project") && text.includes("remote-tracked") && text.includes("standard"), "project, repository mode and stakes are filled in");
+  assert.ok(text.includes(PUSH_THREAT_MODEL_UNCHANGED_MARKER), "the judgement section is marked");
+  assert.ok(out.some((line) => /template-unchanged/u.test(line)), "the command output names what is left for the agent");
+}
+
 // A non-UNAVAILABLE refusal (an unsafe file already at the conventional path)
 // is reported plainly and does NOT steer the operator at
 // materialize-push-threat-model, which would only refuse again there.

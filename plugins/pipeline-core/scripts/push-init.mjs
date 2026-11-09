@@ -579,10 +579,13 @@ function drivePushInitCore({
     return { schema: SCHEMA, root, outcome: "error", steps, error: { faultCode: "usage-error", message: prepare.error } };
   }
   if (!prepare.report.ready) failedChecks.push(...prepare.report.checks.filter((check) => !check.ok));
+  // Candidate 22 (CGR-19, CGF-19): the prepare report's named notices (a repository mode that does not match the push target, an unchanged
+  // threat-model template) reach the result as advice; they move neither the outcome nor the checks.
+  const noticeFields = Array.isArray(prepare.report.notices) && prepare.report.notices.length > 0 ? { notices: prepare.report.notices } : {};
 
   if (failedChecks.length > 0) {
     return {
-      schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks,
+      schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks, ...noticeFields,
       recovery: buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks: failedChecks, actions: recoveryActions }),
     };
   }
@@ -595,7 +598,7 @@ function drivePushInitCore({
   if (["chat", "chat-attributed-unattested"].includes(prepare.report.humanApproval)) {
     return {
       schema: SCHEMA, root, by, remote, destination, base,
-      outcome: "chat-ready", humanApproval: prepare.report.humanApproval, steps,
+      outcome: "chat-ready", humanApproval: prepare.report.humanApproval, steps, ...noticeFields,
       approvePushLines: prepare.lines.approvePush,
       gitPushLine: prepare.lines.gitPush,
     };
@@ -606,7 +609,7 @@ function drivePushInitCore({
   // there is no code path above this line, or below it, that spawns or imports
   // po-human-approval.mjs.
   return {
-    schema: SCHEMA, root, by, remote, destination, base, outcome: "signature-required", steps,
+    schema: SCHEMA, root, by, remote, destination, base, outcome: "signature-required", steps, ...noticeFields,
     subjectSha256: prepare.report.subjectSha256,
     // CGF-07/22: a Codex and a Claude run each spent turn after turn re-checking a signature only the human can produce.
     // Claude greenfield report: the design step sees its own signature arrive, the push made the PO paste the output back. The same bounded wait, when the proof lands where it can be watched.

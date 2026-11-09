@@ -404,6 +404,7 @@ import { awaitSignatureFields, commandText as proofCommandText, proofWaitCommand
 import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+import { collectPushThreatModelFacts, renderPushThreatModel } from "../lib/push-threat-model-materialize.mjs";
 import { fileURLToPath } from "node:url";
 import {
   applyCourseDecisionIntent,
@@ -12234,11 +12235,14 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       }
       // D4a (candidate 19): with an active push approval the push threat model has to be usable before the plan is submitted for approval,
       // so it is in the same draft commit as the feature package; created later it moves the candidate after the Critic and Verify ran.
-      const threatModelRefusal = pushThreatModelRefusalText(pushThreatModelVerdict(dir), "submit-plan");
+      const threatModelVerdict = pushThreatModelVerdict(dir);
+      const threatModelRefusal = pushThreatModelRefusalText(threatModelVerdict, "submit-plan");
       if (threatModelRefusal !== null) {
         console.error(`Error: ${threatModelRefusal} No submission or signature request was recorded.`);
         return 2;
       }
+      // Candidate 22 (CGF-19): an unchanged template is named here too, as a notice outside the critical profile (the verdict refuses in it).
+      if (typeof threatModelVerdict.notice === "string") console.error(threatModelVerdict.notice);
       let submitDesignDraft = null;
       if (["epic", "feature"].includes(profileName)) {
         const designDraft = (deps.architectureDesignDraft ?? inspectArchitectureDesignDraft)({ rootDir: dir,
@@ -13738,7 +13742,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       }
       let templateBytes;
       try {
-        templateBytes = readFileSync(DEFAULT_PUSH_THREAT_MODEL_DOC);
+        // Candidate 22 (CGF-19): the template stays whole and first; every project-known fact is filled in after it and the agent keeps one
+        // marked judgement section, so the file is reported template-unchanged until that is written (lib/push-threat-model-materialize.mjs).
+        templateBytes = Buffer.from(renderPushThreatModel(readFileSync(DEFAULT_PUSH_THREAT_MODEL_DOC, "utf8"), collectPushThreatModelFacts(dir)), "utf8");
       } catch (err) {
         console.error(`Error: materialize-push-threat-model refused -- the plugin's shipped template could not be read (${err.message}).`);
         return 2;
@@ -13757,7 +13763,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         if (fd !== undefined) closeSync(fd);
       }
       console.log(
-        `Created ${PUSH_THREAT_MODEL_DEFAULT_PATH} from the plugin's shipped template. Review it, then commit it ` +
+        `Created ${PUSH_THREAT_MODEL_DEFAULT_PATH} from the plugin's shipped template with this project's known facts filled in. ` +
+        "It still reads template-unchanged (a notice outside the critical profile, a refusal in it): answer the questions of its " +
+        "\"Project judgement\" section for this project and delete the marker line above them. Then review it and commit it " +
         `(git add ${PUSH_THREAT_MODEL_DEFAULT_PATH}; git commit) BEFORE running approve-push -- the human's ` +
         "signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an " +
         "uncommitted file sits only in the working copy and is never part of what git push transmits.",

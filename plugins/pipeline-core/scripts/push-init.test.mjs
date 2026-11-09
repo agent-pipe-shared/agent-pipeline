@@ -550,6 +550,36 @@ test("drivePushInit: signature preparation keeps the existing signature-required
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// AC-108 (closest accepted criterion), CGR-19 / CGF-19: the named notices of the prepare report (a repository mode that does not match the push
+// target, an unchanged threat-model template) reach the driver's result; they are advice, so the outcome stays what it was.
+test("drivePushInit: the prepare report's notices are carried into the result and move neither the outcome nor the checks", async () => {
+  const { pushPrepareReport: real } = await import("./push-prepare.mjs");
+  const notices = [{ id: "repository-mode", code: "PUSH-REPOSITORY-MODE-MISMATCH", message: "named notice" }];
+  const root = freshFixtureRoot();
+  try {
+    const drive = (withNotices) => drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(),
+      pushPrepareReport: (...args) => {
+        const prepared = real(...args);
+        if (withNotices) prepared.report.notices = notices; else delete prepared.report.notices;
+        return prepared;
+      },
+    });
+    const noted = drive(true);
+    assert.equal(noted.outcome, "signature-required", JSON.stringify(noted));
+    assert.deepEqual(noted.notices, notices);
+    assert.equal(Object.hasOwn(drive(false), "notices"), false, "no notice, no field");
+    const unmet = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      assessPushGateSatisfiability: () => ({ ok: true, report: { satisfiable: true, checks: [] } }),
+      pushPrepareReport: () => ({ ok: true, report: { ready: false, notices, checks: [{ id: "working-tree-clean", ok: false, message: "dirty" }] } }),
+    });
+    assert.equal(unmet.outcome, "precondition-unmet");
+    assert.deepEqual(unmet.notices, notices, "a refused preparation still shows its notices");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("drivePushInit: a proof that can be watched is handed over with its wait action, so the human reports nothing back; without one the turn ends", async () => {
   const { pushPrepareReport: real } = await import("./push-prepare.mjs");
   const waitAction = { executable: "node", argv: ["proof-wait.mjs"] };

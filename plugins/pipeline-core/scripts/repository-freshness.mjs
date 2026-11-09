@@ -73,7 +73,8 @@ function outputBase(status, fields = {}) {
   };
 }
 
-function declaredRepositoryMode(repo) {
+// Exported for push-prepare (candidate 22, CGR-19): the one reader of the calibrated repository mode.
+export function declaredRepositoryMode(repo) {
   const authority = resolveProjectAuthorityPaths({ rootDir: repo });
   const calibration = join(
     repo,

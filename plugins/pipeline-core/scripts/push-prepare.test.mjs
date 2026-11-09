@@ -1877,3 +1877,85 @@ test("AC-108: the export never runs while a recorded approval is outstanding for
   assert.deepEqual(exportGovernedQueueHandover(root, outstanding), { exported: false, reason: "approval-outstanding" });
   assert.equal(gitAtFold(root, "rev-parse", "HEAD").stdout.trim(), head);
 });
+
+// AC-108 (closest accepted criterion), CGR-19 (candidate 22): the calibrated repository mode is written once at onboarding and nothing read it, so a
+// project that says local-only was pushed. The report now names one notice; it is advice: ready does not move, nothing is written, nothing is refused.
+test("CGR-19: a calibrated local-only mode against a configured push remote is named once with the sanctioned correction; nothing is written or refused", () => {
+  const root = mkdtempSync(join(tmpdir(), "cgr19-"));
+  try {
+    for (const args of [["init", "-q", "-b", "main"], ["remote", "add", "origin", "https://example.invalid/project.git"]]) {
+      assert.equal(spawnSync("git", ["-C", root, ...args], { encoding: "utf8" }).status, 0);
+    }
+    mkdirSync(join(root, "project"), { recursive: true });
+    const calibrationPath = join(root, "project", "pipeline.json");
+    const argv = (remote) => ["--by", "tester", "--remote", remote, "--destination", "refs/heads/main"];
+    const prepare = (remote = "origin") => pushPrepareReport(argv(remote), readyDeps({ dir: root }), { foldPendingApprovalWrite: false });
+    const tree = () => spawnSync("git", ["-C", root, "status", "--porcelain=v1", "--untracked-files=all"], { encoding: "utf8" }).stdout;
+
+    writeFileSync(calibrationPath, `${JSON.stringify({ project: "p", repositoryMode: "local-only" }, null, 2)}\r\n`);
+    const treeBefore = tree();
+    const bytesBefore = readFileSync(calibrationPath);
+    const mismatch = prepare();
+    assert.equal(mismatch.report.ready, true, "a notice is never a refusal");
+    assert.equal(mismatch.report.notices.length, 1);
+    const [notice] = mismatch.report.notices;
+    assert.equal(notice.code, "PUSH-REPOSITORY-MODE-MISMATCH");
+    assert.match(notice.message, /local-only/u);
+    assert.match(notice.message, /"origin"/u, "names the real push target");
+    assert.match(notice.message, /refs\/heads\/main/u);
+    assert.match(notice.message, /"remote-tracked"/u, "names the value the calibration is corrected to");
+    assert.match(notice.message, /project\/pipeline\.json/u, "names the file that holds it");
+    assert.match(notice.message, /override/u, "names the sanctioned route: the calibration is gate-strength protected, no direct edit");
+    assert.match(notice.message, /no verb|no sanctioned writer/u, "says there is no dedicated verb for this field");
+    assert.deepEqual(readFileSync(calibrationPath), bytesBefore, "the calibration (CRLF included) is untouched");
+    assert.equal(tree(), treeBefore, "nothing was written into the tree by the report");
+
+    writeFileSync(calibrationPath, JSON.stringify({ project: "p", repositoryMode: "remote-tracked" }));
+    assert.equal(Object.hasOwn(prepare().report, "notices"), false, "a matching mode adds no notice");
+    writeFileSync(calibrationPath, JSON.stringify({ project: "p" }));
+    assert.equal(Object.hasOwn(prepare().report, "notices"), false, "an absent mode reads remote-tracked, as everywhere else");
+    writeFileSync(calibrationPath, JSON.stringify({ project: "p", repositoryMode: "local-only" }));
+    assert.equal(Object.hasOwn(prepare("nowhere").report, "notices"), false, "a remote this repository does not have cannot be compared, so no notice");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// AC-108 (closest accepted criterion), CGR-18 / CGF-19: the unchanged shipped template passed the push threat-model gate; it is now named
+// template-unchanged everywhere the gate result is shown, and blocks only in the critical profile (as a scanner that did not execute does).
+test("CGF-19: an unchanged threat-model template is named template-unchanged in the check and the notices; it blocks only in the critical profile", () => {
+  const template = readFileSync(join(REPO_ROOT, "plugins", "pipeline-core", "docs", "default-push-threat-model.md"), "utf8");
+  const manifest = "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nphases:\n  - name: design\n    enabled: true\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n";
+  const roots = [];
+  const make = ({ model, stakes = null, withManifest = true }) => {
+    const root = mkdtempSync(join(tmpdir(), "cgf19-"));
+    roots.push(root);
+    mkdirSync(join(root, "project"), { recursive: true });
+    if (withManifest) { mkdirSync(join(root, ".claude"), { recursive: true }); writeFileSync(join(root, ".claude", "pipeline.yaml"), manifest); }
+    writeFileSync(join(root, "project", "push-threat-model.md"), model);
+    if (stakes !== null) writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ project: "p", stakes }));
+    return root;
+  };
+  try {
+    const standard = checkPushThreatModel(make({ model: template, stakes: "standard" }));
+    assert.equal(standard.ok, true, "outside the critical profile it is a named notice, not a refusal");
+    assert.equal(standard.code, "template-unchanged");
+    assert.match(standard.message, /template-unchanged/u);
+    const crlf = checkPushThreatModel(make({ model: template.replace(/\n/gu, "\r\n") }));
+    assert.equal(crlf.code, "template-unchanged", "a Windows checkout of the same template reads the same");
+    assert.equal(checkPushThreatModel(make({ model: template, withManifest: false })).code, "template-unchanged", "the check also names it when no push approval is active");
+    const critical = checkPushThreatModel(make({ model: template, stakes: "critical" }));
+    assert.equal(critical.ok, false);
+    assert.equal(critical.code, "PUSH-THREAT-MODEL-TEMPLATE-UNCHANGED");
+    assert.match(critical.message, /template-unchanged/u);
+    assert.doesNotMatch(critical.remedy, /materialize-push-threat-model/u, "materialize refuses while the file exists");
+    const written = checkPushThreatModel(make({ model: "# Threat model of this project\n\nWhat a signature binds here.\n", stakes: "critical" }));
+    assert.deepEqual({ ok: written.ok, code: written.code }, { ok: true, code: undefined }, "a project-specific model passes in every profile");
+
+    const root = make({ model: template, stakes: "standard" });
+    const prepared = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({ dir: root }), { foldPendingApprovalWrite: false });
+    assert.equal(prepared.report.ready, true);
+    assert.deepEqual(prepared.report.notices.map((entry) => [entry.id, entry.code]), [["push-threat-model", "template-unchanged"]]);
+    const refused = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({ dir: make({ model: template, stakes: "critical" }) }), { foldPendingApprovalWrite: false });
+    assert.equal(refused.report.ready, false);
+    assert.equal(refused.report.checks.find((entry) => entry.id === "push-threat-model").code, "PUSH-THREAT-MODEL-TEMPLATE-UNCHANGED");
+  } finally { for (const root of roots) rmSync(root, { recursive: true, force: true }); }
+});

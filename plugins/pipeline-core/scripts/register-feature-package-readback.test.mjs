@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
 
 import { PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
 import { PUSH_THREAT_MODEL_GATE_SCHEMA, pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+import {
+  PUSH_THREAT_MODEL_UNCHANGED_MARKER, collectPushThreatModelFacts, isPushThreatModelTemplateUnchanged, renderPushThreatModel,
+} from "../lib/push-threat-model-materialize.mjs";
 import { pushThreatModelReadback } from "./register-feature-package.mjs";
 
 const SHIPPED_TEMPLATE = join(dirname(fileURLToPath(import.meta.url)), "..", "docs", "default-push-threat-model.md");
@@ -101,6 +104,52 @@ test("PTG5: a present threat model passes: a handwritten one and the shipped tem
   mkdirSync(join(copied, "project"), { recursive: true });
   copyFileSync(SHIPPED_TEMPLATE, join(copied, PUSH_THREAT_MODEL_FILE));
   assert.equal(pushThreatModelVerdict(copied).ok, true);
+});
+
+// AC-108 (closest accepted criterion), CGR-18 / CGF-19 (candidate 22): an unchanged template is named, and blocks only in the critical profile.
+const withCalibration = (root, calibration) => { mkdirSync(join(root, "project"), { recursive: true }); writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify(calibration)); return root; };
+
+test("PTG8: the unchanged shipped template passes outside the critical profile but is named template-unchanged, also with CRLF line ends", () => {
+  const template = readFileSync(SHIPPED_TEMPLATE, "utf8");
+  for (const model of [template, template.replace(/\n/gu, "\r\n")]) {
+    const verdict = pushThreatModelVerdict(withCalibration(project({ approval: "required", model }), { project: "p", stakes: "standard" }));
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.templateState, "template-unchanged");
+    assert.match(verdict.notice, /template-unchanged/u);
+  }
+  const written = pushThreatModelVerdict(project({ approval: "required", model: "# Threat model\n\nwhat a signature binds\n" }));
+  assert.equal(Object.hasOwn(written, "templateState"), false);
+  assert.equal(Object.hasOwn(written, "notice"), false);
+});
+
+test("PTG9: in the critical profile an unchanged template is refused with a typed code, a repair that does not offer materialize, and the commit rule", () => {
+  const verdict = pushThreatModelVerdict(withCalibration(project({ approval: "required", model: readFileSync(SHIPPED_TEMPLATE, "utf8") }), { project: "p", stakes: "critical" }));
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.code, "PUSH-THREAT-MODEL-TEMPLATE-UNCHANGED");
+  assert.equal(verdict.templateState, "template-unchanged");
+  assert.ok(!verdict.repair.command.includes("materialize-push-threat-model"));
+  assert.match(pushThreatModelRefusalText(verdict, "the close"), /template-unchanged/u);
+  const handwritten = pushThreatModelVerdict(withCalibration(project({ approval: "required", model: "# Threat model\n\nwhat a signature binds\n" }), { project: "p", stakes: "critical" }));
+  assert.equal(handwritten.ok, true);
+});
+
+test("PTG10: materialising fills every project-known field and leaves one marked judgement section; deleting the marker is the agent's claim that it is written", () => {
+  const root = withCalibration(project({ approval: "required" }), { project: "demo-project", stakes: "critical", repositoryMode: "remote-tracked" });
+  const facts = collectPushThreatModelFacts(root, { branch: "main", remotes: ["origin"], approvalMode: "signature" });
+  assert.deepEqual(facts, {
+    project: "demo-project", stakes: "critical", repositoryMode: "remote-tracked", pushApproval: "required", approvalMode: "signature",
+    checkpointNamespace: null, branch: "main", remotes: ["origin"],
+  });
+  const template = readFileSync(SHIPPED_TEMPLATE, "utf8");
+  const rendered = renderPushThreatModel(template, facts);
+  assert.ok(rendered.startsWith(template), "the shipped template stays whole and first");
+  for (const value of ["demo-project", "critical", "remote-tracked", "required", "signature", "main", "origin"]) assert.ok(rendered.includes(value), value);
+  assert.equal(rendered.split(PUSH_THREAT_MODEL_UNCHANGED_MARKER).length, 2, "exactly one marker");
+  assert.equal(isPushThreatModelTemplateUnchanged(rendered, template), true);
+  assert.equal(isPushThreatModelTemplateUnchanged(rendered.replace(`${PUSH_THREAT_MODEL_UNCHANGED_MARKER}\n`, ""), template), false);
+  assert.equal(isPushThreatModelTemplateUnchanged(template, template), true);
+  assert.equal(pushThreatModelVerdict(withCalibration(project({ approval: "required", model: rendered }), { project: "p", stakes: "critical" })).code, "PUSH-THREAT-MODEL-TEMPLATE-UNCHANGED");
+  assert.equal(renderPushThreatModel(template, { ...facts, remotes: [], branch: null }).includes("not set"), true, "an unknown fact reads as not set, never invented");
 });
 
 test("PTG6: the refusal text carries the code, the path, the repair command and the commit rule; a passing verdict has no text", () => {

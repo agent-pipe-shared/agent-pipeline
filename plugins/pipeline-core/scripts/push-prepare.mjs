@@ -51,7 +51,8 @@ import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { CHECKPOINT_LANE, PUSH_DESTINATION_POLICY_SCHEMA, classifyPushDestination } from "../lib/push-destination-policy.mjs";
 import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
-import { pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+import { PUSH_THREAT_MODEL_TEMPLATE_NOTICE, PUSH_THREAT_MODEL_TEMPLATE_STATE, pushThreatModelFileUnchanged, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
+import { declaredRepositoryMode } from "./repository-freshness.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { exportHandoverQueue, sliceQueueLocation } from "../lib/slice-queue-location.mjs";
@@ -345,7 +346,36 @@ export function checkPushThreatModel(dir, deps = {}) {
       remedy: PUSH_THREAT_MODEL_REMEDY,
     };
   }
+  // Candidate 22 (CGR-18, CGF-19): an unchanged template is named template-unchanged. The critical profile already refused it above (active gate);
+  // everywhere else it is a notice (the verdict carries it when the gate is active, the file itself is read when it is not).
+  if (verdict.templateState === PUSH_THREAT_MODEL_TEMPLATE_STATE || (!verdict.active && pushThreatModelFileUnchanged(dir))) {
+    return { id: "push-threat-model", ok: true, code: PUSH_THREAT_MODEL_TEMPLATE_STATE, message: verdict.notice ?? PUSH_THREAT_MODEL_TEMPLATE_NOTICE };
+  }
   return { id: "push-threat-model", ok: true, message: `${PUSH_THREAT_MODEL_PATH} is present.` };
+}
+
+/**
+ * Candidate 22 (CGR-19): `repositoryMode` is written once at onboarding and nothing read it, so a project that says `local-only` was pushed.
+ * Compares the calibrated mode with the real push target (a remote this repository has) and names ONE notice on a mismatch, null otherwise.
+ * Advice only: it writes nothing and refuses nothing, so the report's `ready` does not move. There is no verb that writes the field; the notice names
+ * the route that exists (the calibration is gate-strength protected, so a PO-approved override) and that the fix is a commit, hence before the candidate.
+ */
+export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
+  let declared;
+  try { declared = (deps.declaredRepositoryMode ?? declaredRepositoryMode)(dir); } catch { return null; }
+  if (declared?.mode !== "local-only") return null;
+  const remotes = (gitOutput(dir, ["remote"], deps) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
+  if (!remotes.includes(remote)) return null;
+  const file = existsSync(join(dir, "project", "pipeline.json")) ? "project/pipeline.json" : ".claude/pipeline.json";
+  const mirror = existsSync(join(dir, "project", "pipeline.json")) && existsSync(join(dir, ".claude", "pipeline.json")) ? " and in its byte-equal mirror .claude/pipeline.json" : "";
+  return {
+    id: "repository-mode",
+    code: "PUSH-REPOSITORY-MODE-MISMATCH",
+    message: `the calibration (${file}) declares repositoryMode "local-only" (written once at onboarding), but this push targets the configured remote "${remote}" (${destination}). `
+      + `Correct the calibration: set "repositoryMode" to "remote-tracked" in ${file}${mirror}. There is no sanctioned writer (no verb) for this field and the file is gate-strength protected, `
+      + "so the change goes through a PO-approved guard override (plan it with node <plugin-root>/scripts/guard-human-override.mjs plan); it is a commit, so make it before the candidate is fixed and run push-prepare again. "
+      + "Nothing was written now and nothing is refused; if \"local-only\" is the truth, the push target is what is wrong.",
+  };
 }
 
 /**
@@ -903,6 +933,13 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
     ready: checks.every((check) => check.ok),
   };
   if (slim) report.profile = "feature-checkpoint";
+  // Candidate 22: named notices (advice, never a check): an unchanged threat-model template, a repository mode that does not match the push target.
+  const notices = [];
+  const modelCheck = checks.find((check) => check.id === "push-threat-model");
+  if (modelCheck?.ok === true && modelCheck.code === PUSH_THREAT_MODEL_TEMPLATE_STATE) notices.push({ id: modelCheck.id, code: modelCheck.code, message: modelCheck.message });
+  const modeNotice = repositoryModeNotice(dir, { remote, destination }, deps);
+  if (modeNotice !== null) notices.push(modeNotice);
+  if (notices.length > 0) report.notices = notices;
   // Slim profile pushes the exact checked-out branch; the default profile keeps HEAD.
   const sourceRef = slim ? checkpointSourceRef() : "HEAD";
   const profileNote = slim
