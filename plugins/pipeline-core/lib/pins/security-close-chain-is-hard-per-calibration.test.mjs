@@ -350,7 +350,16 @@ const EXCEPTIONS_SCHEMA = "pipeline.security-scanner-exceptions.v1";
 const FUTURE = "2999-01-01T00:00:00Z";
 const PAST = "2000-01-01T00:00:00Z";
 const exception = (over = {}) => ({ scanner: "license-check", reason: "no licence policy is declared for this internal tool", expires: FUTURE, confirmedBy: "chat-2026-11-09", ...over });
-const writeExceptions = (dir, entries, schema = EXCEPTIONS_SCHEMA) => writeJson(dir, EXCEPTIONS_PATH, { schema, exceptions: entries });
+// "Recorded beforehand" is enforced: only a file HEAD holds admits anything, so a fixture commits it.
+const commitExceptions = (dir) => {
+  const git = (...args) => spawnSync("git", ["-C", dir, ...args], { encoding: "utf8" });
+  git("init", "-q");
+  git("config", "user.name", "Fixture Author");
+  git("config", "user.email", "fixture@example.invalid");
+  git("add", "--", EXCEPTIONS_PATH);
+  git("commit", "-q", "-m", "record the exceptions");
+};
+const writeExceptions = (dir, entries, schema = EXCEPTIONS_SCHEMA) => { writeJson(dir, EXCEPTIONS_PATH, { schema, exceptions: entries }); commitExceptions(dir); };
 // A clean capability scan (gitleaks passed) whose license-check control was skipped: license-check is a control, so the real scan records it
 // in the verdict document's `controls`, never in the envelope's `capabilities`.
 function licenseSkipped(dir) {
@@ -450,6 +459,7 @@ test("C15 an expired, malformed or unknown entry is ignored for admission and na
   const notJson = project("critical");
   licenseSkipped(notJson);
   put(notJson, EXCEPTIONS_PATH, "{ not json");
+  commitExceptions(notJson);
   assert.match(gateFailures(notJson)[0], /JSON/u);
   // One bad entry does not poison a good one.
   const mixed = project("critical");
@@ -474,18 +484,20 @@ test("C16 a scanner that ran and reported findings is never covered by an except
 test("C17 the close.pre entry point: critical + skipped license-check exits 2; with a valid exception it exits 0, prints the exception and never GREEN", () => {
   const closeLicense = (stakes, exceptionEntries) => {
     const fixture = closeFixture({ gate: "blocking", stakes });
+    // The exception is committed before the scan evidence is bound to HEAD, as a real close orders them.
+    if (exceptionEntries) writeExceptions(fixture.dir, exceptionEntries);
+    const rev = (ref) => spawnSync("git", ["-C", fixture.dir, "rev-parse", ref], { encoding: "utf8" }).stdout.trim();
     licenseSkipped(fixture.dir);
     const envelopePath = join(fixture.dir, "evidence/security-latest.v2.json");
     const envelope = JSON.parse(readFileSync(envelopePath, "utf8"));
-    envelope.input.commit = fixture.commit;
-    envelope.input.tree = fixture.tree;
+    envelope.input.commit = rev("HEAD");
+    envelope.input.tree = rev("HEAD^{tree}");
     writeFileSync(envelopePath, JSON.stringify(envelope));
     // The scan lists every scanner the project enables; only license-check was skipped (osv-scanner found no package sources).
     writeJson(fixture.dir, "evidence/security-latest.json", { scanners: [
       { tool: "gitleaks", status: "PASS", classification: "success" }, { tool: "osv-scanner", status: "SKIPPED", classification: "success", reason: "no package sources in project" },
       { tool: "semgrep", status: "PASS", classification: "success" }, { tool: "license-check", status: "SKIPPED", classification: "success", reason: "no license policy configured" },
     ] });
-    if (exceptionEntries) writeExceptions(fixture.dir, exceptionEntries);
     return runClose(fixture.dir);
   };
   const refused = closeLicense("critical", null);
@@ -536,11 +548,34 @@ test("C18 the Verify security check and the scan summary apply the same reading 
   // The real CLI prints the status lines with the exception applied.
   const cli = make("critical");
   writeExceptions(cli, [exception()]);
-  const res = spawnSync(process.execPath, [scanScript, "--root", cli, "--timeout-ms", "5000"], { encoding: "utf8", shell: false, env: { HOME: cli, USERPROFILE: cli, SystemRoot: process.env.SystemRoot ?? "", PATH: "", Path: "" } });
+  // Git's own exec directory: the exception check needs git, and no scanner lives there.
+  const gitOnly = spawnSync("git", ["--exec-path"], { encoding: "utf8" }).stdout.trim();
+  const res = spawnSync(process.execPath, [scanScript, "--root", cli, "--timeout-ms", "5000"], { encoding: "utf8", shell: false, env: { HOME: cli, USERPROFILE: cli, SystemRoot: process.env.SystemRoot ?? "", PATH: gitOnly, Path: gitOnly } });
   assert.match(res.stdout, /^ {2}license-check: not executed.*named exception.*chat-2026-11-09/mu, res.stdout + res.stderr);
   const plain = make("standard");
   const plainRes = spawnSync(process.execPath, [scanScript, "--root", plain, "--timeout-ms", "5000"], { encoding: "utf8", shell: false, env: { HOME: plain, USERPROFILE: plain, SystemRoot: process.env.SystemRoot ?? "", PATH: "", Path: "" } });
   assert.match(plainRes.stdout, /^ {2}license-check: not applicable/mu, plainRes.stdout + plainRes.stderr);
+});
+
+test("C20 recorded beforehand is enforced: an exception HEAD does not hold admits nothing and the refusal says why; line endings are not a change", () => {
+  const dir = project("critical");
+  licenseSkipped(dir);
+  const path = join(dir, EXCEPTIONS_PATH);
+  writeJson(dir, EXCEPTIONS_PATH, { schema: EXCEPTIONS_SCHEMA, exceptions: [exception()] });
+  writeFileSync(path, JSON.stringify(JSON.parse(readFileSync(path, "utf8")), null, 2));
+  const uncommitted = gateFailures(dir);
+  assert.equal(uncommitted.length, 1, uncommitted.join("\n"));
+  assert.match(uncommitted[0], /SEC-CLOSE-SCANNER-NOT-EXECUTED/u);
+  assert.match(uncommitted[0], /not committed at HEAD/u);
+  commitExceptions(dir);
+  assert.deepEqual(gateFailures(dir), []);
+  const bytes = readFileSync(path, "utf8");
+  writeFileSync(path, bytes.replace(/\n/gu, "\r\n"));
+  assert.deepEqual(gateFailures(dir), [], "a CRLF checkout of the committed file is the committed file");
+  writeFileSync(path, bytes.replace("no licence policy", "a different reason, no licence policy"));
+  const changed = gateFailures(dir);
+  assert.equal(changed.length, 1, changed.join("\n"));
+  assert.match(changed[0], /changed since the last commit/u);
 });
 
 test("C19 the close quality readback names an applied exception in its security evidence", async () => {

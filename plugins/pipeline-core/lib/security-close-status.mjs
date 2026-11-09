@@ -11,6 +11,7 @@
 // The calibration rule is one field: `stakes` of the project calibration (project/pipeline.json, else .claude/pipeline.json).
 // A critical calibration (critical/high, or the German kritisch/hoch) turns a scanner that did not execute into a typed refusal;
 // any other value, or an absent field, keeps today's behaviour (admitted, status "not executed"). Pure and offline: no scanner is spawned.
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -120,12 +121,24 @@ export function parseScannerExceptions(text, now = new Date()) {
   return { valid, rejected };
 }
 
-/** The exceptions of the project under `projectDir` (committed file; absent = none). Pure and offline. */
+// "Recorded beforehand" (PO decision 2026-11-09): the file counts only as it stands in HEAD, the commit the security evidence is bound to, so an
+// exception written at the close does not admit that close. Line endings are not a change: a Windows checkout may hold CRLF over an LF blob.
+function exceptionFileNotCommitted(projectDir, text) {
+  const shown = spawnSync("git", ["-C", projectDir, "show", `HEAD:./${SCANNER_EXCEPTIONS_PATH}`], { encoding: "utf8", timeout: 5000, maxBuffer: 1 << 20, windowsHide: true });
+  if (shown.error) return "could not be compared with HEAD (git did not run)";
+  if (shown.status !== 0) return "not committed at HEAD (commit it before the candidate is frozen)";
+  const lf = (value) => value.replace(/\r\n/gu, "\n");
+  return lf(shown.stdout) === lf(text) ? null : "changed since the last commit (commit it before the candidate is frozen)";
+}
+
+/** The exceptions of the project under `projectDir` (absent = none). An existing file that HEAD does not hold byte for byte admits nothing. Spawns no scanner. */
 export function readScannerExceptions(projectDir, now = new Date()) {
   const path = join(projectDir, SCANNER_EXCEPTIONS_PATH);
   if (!existsSync(path)) return { valid: [], rejected: [] };
   let text;
   try { text = readFileSync(path, "utf8"); } catch { return { valid: [], rejected: [{ ref: SCANNER_EXCEPTIONS_PATH, why: "could not be read" }] }; }
+  const notCommitted = exceptionFileNotCommitted(projectDir, text);
+  if (notCommitted) return { valid: [], rejected: [{ ref: SCANNER_EXCEPTIONS_PATH, why: notCommitted }] };
   return parseScannerExceptions(text, now);
 }
 
