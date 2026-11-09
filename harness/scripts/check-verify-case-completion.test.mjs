@@ -171,6 +171,8 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // unchanged classifier: close-path-e2e 89->98, critic-dispatch-preflight 409->488, g23-quoted-pipeline-reads 18->19, guard-dispatch-budget-checkpoint 157->169.
   // Only these four numbers change; names, paths, classifications and the other counts stay as pinned, and no assertion is weakened.
   // Restated 2026-11-08 (split without a module plan, then delivery records, QG-04, extension only): critic-dispatch-preflight 488->508->520, measured with the unchanged classifier; only this number changes.
+  // Restated 2026-11-09 (candidate 22, QG-04, extension only): three sites counts were outgrown by their suites, measured on the candidate 22 chain with the unchanged classifier:
+  // critic-dispatch-preflight 527->544, critic-generic-batch 119->157, guard-dispatch-budget-checkpoint 169->178. Only these three numbers change and close-path-e2e-tests leaves the list (see its comment).
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",36],
@@ -190,13 +192,13 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["claude-task-output-read-scope-tests","plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs","top-level-assertions",20],
     ["claude-task-output-scope-posttool-tests","plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs","top-level-assertions",9],
     ["clone-hook-readiness-rollback-tests","plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs","top-level-assertions",86],
-    ["close-path-e2e-tests","plugins/pipeline-core/scripts/close-path-e2e.test.mjs","node-test-single",99], // cand. 21 (QG-04: restated, measured): 98->99, the briefing-binds-HEAD line; cand. 20b (QG-04: extension only): the legacy-process-only row of candidate 20 step 54, measured 86; 87 after G20-54 (the fixture asserts materialize-architecture registered the package); 89 after the two set-phase output assertions (package step named, "below" only when the tiers follow)
+    // cand. 22 (QG-04, restated): close-path-e2e-tests gained the close-flow walk (two node:test cases), so the classifier no longer reports it `node-test-single`.
     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",349],
-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",527], // cand. 21 (QG-04: extension only): the move into the state archive and the printed refusal reason; before that cand. 20 w252: G20-11 retained prior result cases, measured
-    ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",119], // cand. 20 w252 (QG-04: extension only), measured
+    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",544], // cand. 21 (QG-04: extension only): the move into the state archive and the printed refusal reason; before that cand. 20 w252: G20-11 retained prior result cases, measured
+    ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",157], // cand. 20 w252 (QG-04: extension only), measured
     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
     ["current-session-artifact-export-tests","plugins/pipeline-core/lib/current-session-artifact-export.test.mjs","top-level-assertions",20],
@@ -228,7 +230,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["gitleaks-scratch-clones-exclusion-tests","plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs","node-test-single",5],
     ["governance-scope-win32-acl-tests","plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs","top-level-assertions",7],
     ["guard-devplan-design-approval-v7-tests","plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","top-level-assertions",18],
-    ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",169],
+    ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",178],
     ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",25], // W7-R7 (QG-04): 19->25, the restated GDM04/GDM05 (dc8204a28) carry more assertion sites; classifier unchanged
     // cand. 21 (QG-04, restated): guard-grep-max-count-read-tests gained the C21 context-flag case (two node:test cases), so the classifier no longer reports it `node-test-single`.
     ["hardened-private-directory-install-tests","plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs","top-level-assertions",6],
