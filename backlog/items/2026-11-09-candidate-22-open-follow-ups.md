@@ -23,6 +23,7 @@ Candidate 22 (40 patches, stamp `ef16e1b86`) carries the P0 to P2 findings of th
 - **CGR-13:** commits stay as they are. The close result and the audit bundle count product and evidence commits separately.
 - **CGR-19:** one narrow command moves `repositoryMode` from `local-only` to `remote-tracked`, only with a configured remote. Every other direction stays on the guard-override route.
 - **Read grammar:** combined short flags are admitted by checking each flag against the existing list.
+- **Recursive grep (PO decision on measured reach):** `grep -r` is admitted through its own screen, because the existing recursive screen follows the reach of `rg` and `grep -r` also reads ignored and hidden files. The common shapes count (`-rl`, `-rE`, `--include`), since the goal is fewer wasted turns. `-R` stays refused.
 - **Stay in 0.7.1:** CGF-16, CGF-24, CGF-25 with CGF-01, CGF-26, CGF-36, the CGR-07 queue, straight-run tests 1, 2, 3 and 5.
 
 ## Built in 22b (implementation complete, PO acceptance pending)
@@ -55,6 +56,7 @@ The chain is in `specs/sprint-alfred-epic/evidence/held-patches/c22b-chain/`. On
 
 - A host commit stops with `AGY-HOST-COMMIT-PATH-MISMATCH` when a re-dispatch writes the same deliverable paths as a stopped dispatch whose files are still untracked. The second dispatch is then not delivered by the host, and the Elephant has to commit those deliverables.
 - A hand-typed return with a misspelled key stops with `NGHR-FINAL-SHAPE` after the work is finished. The work is intact, but the host commit is lost.
+- `rg needle <dir>` is refused as a whole when the tree holds a secret-named file that `rg` would not read, such as a hidden `.env`. The same strictness also covers positive file filters such as `-g '*.key'`, so narrowing it needs its own design. Measured 2026-11-09.
 - The commit helper of the clone route stages everything. Carried slices left uncommitted land in the next commit with the wrong message.
 
 ## Accepted risk
