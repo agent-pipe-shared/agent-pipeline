@@ -635,6 +635,7 @@ function scannerEntry(adapter, result, executableSha256 = null) {
   };
   if (result.reason) entry.reason = result.reason;
   if (result.ignored) entry.ignored = result.ignored;
+  if (result.discounted) entry.discounted = result.discounted; // C22B: findings in digest fields of generated Pipeline files, counted under their own policy id
   return entry;
 }
 
@@ -1202,7 +1203,9 @@ export function formatScannerLine(s) {
   const coverageSuffix = s.coverage?.status === "degraded" && Array.isArray(s.coverage.files)
     ? ` -- coverage: degraded (${s.coverage.files.length} files partially parsed)`
     : "";
-  return `${s.tool}: ${statusLabel(s.status)} [${s.classification}] (${s.findingCount} findings)${reasonSuffix}${coverageSuffix}`;
+  // C22B: a discounted finding never disappears silently; the count (not the value) is named on the scanner's own line.
+  const discountedSuffix = s.discounted?.findingCount > 0 ? ` -- discounted: ${s.discounted.findingCount} finding(s) in digest fields of generated Pipeline files (${s.discounted.policy})` : "";
+  return `${s.tool}: ${statusLabel(s.status)} [${s.classification}] (${s.findingCount} findings)${reasonSuffix}${coverageSuffix}${discountedSuffix}`;
 }
 
 /**

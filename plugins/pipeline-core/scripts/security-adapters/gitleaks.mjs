@@ -77,6 +77,15 @@
  * recomputes the entry in place -- never run automatically, never touching detection. A finding
  * with no entry at that location at all is untouched (still a genuine new finding, exactly as
  * loud as before).
+ *
+ * GENERATED-DIGEST FIELD EXCEPTION (C22B, CGF-06, AC-108): the Pipeline's own generated JSON carries bare digests under key-shaped
+ * field names (`idempotencyKey`, `scopeKey`, ...), which the generic key rules read as secrets. After the exact-match suppression
+ * above, a retained finding is DISCOUNTED only when ALL hold: the rule is one of the two measured digest-reading rules, the finding
+ * is one line and its Secret is a bare lower-case hex digest, its file (in-root, regular, bounded) parses as a JSON object that
+ * `classifyGeneratedArtefact` accepts as a Pipeline schema file, and exactly one string field the classifier names as a digest field
+ * holds that digest on the finding's own line (the field is located from the finding, never from a digest merely being somewhere in
+ * the file). Anything else stays a finding. A discounted finding is counted in the result's `discounted` block (its own policy id,
+ * next to `ignored`) and the printed security line names the count. Neither `.gitleaks.toml` nor its plugin mirror is involved.
  */
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
@@ -84,6 +93,7 @@ import { tmpdir } from "node:os";
 import { delimiter as PATH_DELIM, dirname, isAbsolute, join as pathJoin, relative, sep } from "node:path";
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { classifyGeneratedArtefact } from "../../lib/generated-artefact-schema.mjs";
 
 export const name = "gitleaks";
 
@@ -93,6 +103,11 @@ const WIN_EXTS = [".exe", ".cmd", ".bat"];
 const IGNORE_FILE = ".gitleaksignore";
 const CONTENT_AUTHORITY_PREFIX = "content-v1:";
 const MAX_IGNORE_BYTES = 256 * 1024;
+// C22B: the two built-in rules measured to read a bare digest under a key-shaped name (the same pair the config's ledger allowlist names).
+const DIGEST_FIELD_RULES = new Set(["generic-api-key", "sentry-access-token"]);
+const DIGEST_FIELD_POLICY = "pipeline.gitleaks-generated-digest-field.v1";
+const BARE_DIGEST = /^[0-9a-f]{32,64}$/u;
+const MAX_GENERATED_BYTES = 4 * 1024 * 1024; // the classifier's own bound
 
 // Fixed, repo-relative gitleaks rule config (PHX-WP-GITLEAKS-RULE-SCOPE): a per-path allowlist
 // that disables ONLY `sentry-access-token`/`generic-api-key` for `backlog/transitions.ndjson`
@@ -301,6 +316,86 @@ export function normalizeCandidateFindingPath(finding, rootDir) {
   }
 }
 
+// C22B: the text of a finding's file when it is one physical, regular, bounded file inside the candidate root; otherwise null (the finding then blocks as before).
+function readCandidateFileText(rootDir, file) {
+  try {
+    const path = isAbsolute(file) ? file : pathJoin(rootDir, file);
+    const info = lstatSync(path);
+    if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_GENERATED_BYTES) return null;
+    const relativePath = relative(realpathSync(rootDir), realpathSync(path));
+    if (relativePath === ".." || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) return null;
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+// C22B: every string held by an OBJECT property of an already valid JSON text, with the classifier's path syntax, the property name and the 1-based line of its value (a JSON
+// string never holds a raw line break). Strings that are array elements are skipped, as the classifier skips them.
+function stringFieldsWithLines(text) {
+  const fields = [];
+  let at = 0;
+  let line = 1;
+  const skipSpace = () => { for (; at < text.length && " \t\r\n".includes(text[at]); at++) if (text[at] === "\n") line++; };
+  const readString = () => { const start = at++; while (text[at] !== "\"") at += text[at] === "\\" ? 2 : 1; return text.slice(start, ++at); };
+  const readValue = (path, propertyName) => {
+    skipSpace();
+    if (text[at] === "\"") {
+      const valueLine = line;
+      const raw = readString();
+      if (propertyName !== null) fields.push({ path, name: propertyName, value: JSON.parse(raw), line: valueLine });
+    } else if (text[at] === "{" || text[at] === "[") {
+      const isObject = text[at++] === "{";
+      skipSpace();
+      if (text[at] === (isObject ? "}" : "]")) { at++; return; }
+      for (let index = 0; ; index++) {
+        let key = null;
+        if (isObject) { skipSpace(); key = JSON.parse(readString()); skipSpace(); at++; }
+        readValue(isObject ? (path === "" ? key : `${path}.${key}`) : `${path}[${index}]`, key);
+        skipSpace();
+        if (text[at++] !== ",") return;
+      }
+    } else {
+      while (at < text.length && !",]} \t\r\n".includes(text[at])) at++;
+    }
+  };
+  readValue("", null);
+  return fields;
+}
+
+// C22B: the digest-valued string fields (with their lines) of a file the classifier accepts as a Pipeline schema file, else null.
+function generatedDigestFields(rootDir, file) {
+  const text = readCandidateFileText(rootDir, file);
+  if (text === null) return null;
+  const artefact = classifyGeneratedArtefact(text);
+  if (artefact.class !== "pipeline-generated") return null;
+  const digestPaths = new Set(artefact.digestFields.map((field) => field.path));
+  try {
+    return stringFieldsWithLines(text.replace(/^﻿/u, "")).filter((field) => digestPaths.has(field.path) && BARE_DIGEST.test(field.value));
+  } catch {
+    return null;
+  }
+}
+
+// C22B: true only when the finding lies in exactly one digest field of a Pipeline schema file (see the header). The field is located from the finding's own line and
+// secret, and, when two fields on that line hold the same digest, from its match text; still ambiguous means it blocks.
+function liesInGeneratedDigestField(finding, rootDir, cache) {
+  const rule = finding?.RuleID ?? finding?.rule;
+  const secret = finding?.Secret ?? finding?.secret;
+  const line = finding?.StartLine ?? finding?.line;
+  const file = finding?.File ?? finding?.file;
+  const match = finding?.Match ?? finding?.match;
+  if (!DIGEST_FIELD_RULES.has(rule) || typeof secret !== "string" || !BARE_DIGEST.test(secret)) return false;
+  if (!Number.isSafeInteger(line) || (finding?.EndLine ?? finding?.endLine ?? line) !== line) return false;
+  if (typeof file !== "string" || file.length === 0 || (match !== undefined && (typeof match !== "string" || !match.includes(secret)))) return false;
+  if (!cache.has(file)) cache.set(file, generatedDigestFields(rootDir, file));
+  const fields = cache.get(file);
+  if (fields === null) return false;
+  let candidates = fields.filter((field) => field.line === line && field.value === secret);
+  if (candidates.length > 1 && typeof match === "string") candidates = candidates.filter((field) => match.includes(JSON.stringify(field.name)));
+  return candidates.length === 1;
+}
+
 /** Env override -> plain PATH walk. Returns { installed, path? , reason? }. Never throws. */
 function resolveBinary(env) {
   const override = env?.[ENV_VAR];
@@ -487,10 +582,13 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
 
   const retained = [];
   let ignoredFindingCount = 0;
+  let discountedFindingCount = 0;
+  const generatedFileCache = new Map();
   for (const rawFinding of parsed) {
     const finding = normalizeCandidateFindingPath(rawFinding, rootDir);
     const key = authorityKey(finding);
     if (key !== null && contentAuthority.entries.has(key)) ignoredFindingCount++;
+    else if (liesInGeneratedDigestField(finding, rootDir, generatedFileCache)) discountedFindingCount++; // C22B: counted below, never silent
     else retained.push(finding);
   }
 
@@ -540,6 +638,7 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
       authoritySha256: contentAuthority.sha256,
       findingCount: ignoredFindingCount,
     },
+    discounted: { policy: DIGEST_FIELD_POLICY, findingCount: discountedFindingCount },
   };
 }
 
@@ -571,6 +670,7 @@ export const CAPABILITY_CONTRACT_V2 = Object.freeze({
     "`--no-git` is passed to `detect`, so the scan is a pure filesystem content scan of rootDir (gitleaks' own --help wording: \"treat git repo as a regular directory and scan those files\") with ZERO git object/ref/history traversal. rootDir is an immutable, identity-verified single-commit-tree snapshot (security-scan.mjs materializeCandidate, git-detached-worktree.v1), so this is the literal `candidate-tree` coverage the security-evidence schema claims. Historical / deleted-secret / cross-ancestry mining is deliberately NOT performed: it was never a documented capability of this adapter and, because a git worktree shares the main clone's `.git` object database, that default `detect` traversal was the source of cross-branch false positives (backlog 2026-07-25-security-scan-cross-branch-gitleaks-findings).",
     "Single-shot, full scan per invocation -- no --baseline-path or other incremental/diff mechanism; every run() call re-scans the entirety of rootDir from scratch.",
     "GITLEAKS_CONFIG_PATH resolution is self-application-scoped (ADR-0015): the repo-root .gitleaks.toml is only found when this module executes from its canonical position inside the Agent-Pipeline repo's own checkout. A plugin-only distribution/marketplace install (no repo root) instead resolves GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH, a byte-for-byte mirror of that same config shipped inside the plugin package itself (config/security/gitleaks-default.toml, NVA-J-GITLEAKSCONFIG) -- so an installed deployment now finds a real ruleset and scans normally. Only if NEITHER resolves does run() degrade to a SKIPPED/success result before ever spawning gitleaks (gitleaksConfigMissingResult) rather than a blocking ERROR -- the same SKIPPED-as-success shape osv-scanner/license-check already use for their own absent-input cases; this is a fail-safe for a corrupted/stripped install, not the normal installed-plugin path.",
+    "C22B generated-digest field exception (adapter-side, not in the rule file): after the exact-match `.gitleaksignore` suppression, a `generic-api-key` or `sentry-access-token` finding is discounted only when its single line holds a bare lower-case hex digest (32..64) that is the value of exactly one string field `classifyGeneratedArtefact` names as a digest field of an in-root JSON object with a Pipeline schema id (`pipeline.<name>.v<N>`). A non-digest value, a file without a Pipeline schema, an unreadable or non-JSON file, an ambiguous field and every other rule keep their findings. The count is reported in `discounted` (policy `pipeline.gitleaks-generated-digest-field.v1`) next to `ignored` and named on the printed scanner line.",
   ]),
   exitCodeMapping: Object.freeze({
     "0": "always -- status derived from parsed report content, never from exit code (forced via --exit-code 0)",

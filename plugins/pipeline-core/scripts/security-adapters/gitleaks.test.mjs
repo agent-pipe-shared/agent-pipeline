@@ -17,6 +17,7 @@
  * Exit: 0 = all cases pass, non-zero = at least one case failed.
  */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -205,6 +206,14 @@ test("resolveGitleaksConfigPath() in THIS checkout resolves to the repo-root con
   assert.ok(!resolved.includes(join("config", "security", "gitleaks-default.toml")), `must not have fallen back to the plugin-shipped default, got: ${resolved}`);
 });
 
+// C22B (QG-04, restated in place, nothing weakened): the adapter now imports lib/generated-artefact-schema.mjs, which every installed plugin ships next to scripts/; the fixtures below
+// copy the adapter alone into a synthetic plugin tree, so they carry that one sibling as the real install does. Their assertions are unchanged.
+function copyGeneratedArtefactClassifier(fixtureRoot) {
+  const libDir = join(fixtureRoot, "plugins", "pipeline-core", "lib");
+  mkdirSync(libDir, { recursive: true });
+  copyFileSync(fileURLToPath(new URL("../../lib/generated-artefact-schema.mjs", import.meta.url)), join(libDir, "generated-artefact-schema.mjs"));
+}
+
 test("run() resolves the plugin-shipped default config from an installed-plugin fixture with no repo root anywhere (real resolution algorithm via a copied module, not a mocked path)", async () => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), "gitleaks-installed-fixture-"));
   const scanRootDir = mkdtempSync(join(tmpdir(), "gitleaks-installed-fixture-scanroot-"));
@@ -217,6 +226,7 @@ test("run() resolves the plugin-shipped default config from an installed-plugin 
     // (climbing from the copy's own on-disk location), not a reimplementation of it.
     const realAdapterPath = fileURLToPath(new URL("./gitleaks.mjs", import.meta.url));
     copyFileSync(realAdapterPath, join(adapterDir, "gitleaks.mjs"));
+    copyGeneratedArtefactClassifier(fixtureRoot);
     // Copy the REAL plugin-shipped default config (added by this task) into the same relative
     // position -- proves the shipped file itself, not a synthetic stand-in.
     const realDefaultConfigPath = fileURLToPath(new URL("../../config/security/gitleaks-default.toml", import.meta.url));
@@ -252,6 +262,7 @@ test("C21B a stray .gitleaks.toml four directories above an installed plugin nev
     mkdirSync(adapterDir, { recursive: true });
     mkdirSync(configDir, { recursive: true });
     copyFileSync(fileURLToPath(new URL("./gitleaks.mjs", import.meta.url)), join(adapterDir, "gitleaks.mjs"));
+    copyGeneratedArtefactClassifier(fixtureRoot);
     copyFileSync(fileURLToPath(new URL("../../config/security/gitleaks-default.toml", import.meta.url)), join(configDir, "gitleaks-default.toml"));
     writeFileSync(join(fixtureRoot, ".gitleaks.toml"), "[extend]\nuseDefault = true\n");
     const url = pathToFileURL(join(adapterDir, "gitleaks.mjs")).href;
@@ -276,6 +287,7 @@ test("run() degrades to SKIPPED/success (never ERROR) from an installed-plugin f
     // under fixtureRoot.
     const realAdapterPath = fileURLToPath(new URL("./gitleaks.mjs", import.meta.url));
     copyFileSync(realAdapterPath, join(adapterDir, "gitleaks.mjs"));
+    copyGeneratedArtefactClassifier(fixtureRoot);
 
     const fixtureModuleUrl = pathToFileURL(join(adapterDir, "gitleaks.mjs")).href;
     const fixtureAdapter = await import(fixtureModuleUrl);
@@ -528,7 +540,10 @@ test(
       // Control: the IDENTICAL secret-shaped content, at a DIFFERENT path -- the load-bearing proof
       // that the allowlist stayed scoped to backlog/transitions.ndjson and did not weaken the rule
       // anywhere else.
-      writeFileSync(join(rootDir, "other", "copy.ndjson"), amendmentLine);
+      // C22B (QG-04, restated in place, nothing weakened): the line carries a Pipeline schema id, and its digests are exactly the bare digests under key-shaped names that the adapter's
+      // generated-digest field exception now discounts (a finding in a digest field of a Pipeline schema file). This control proves the CONFIG allowlist stays path-scoped, so its copy
+      // carries a foreign schema id and is otherwise identical; the exception covering the Pipeline-schema copy is pinned by the C22B cases below.
+      writeFileSync(join(rootDir, "other", "copy.ndjson"), amendmentLine.replace("pipeline.backlog-transition.v1", "vendor.backlog-transition.v1"));
 
       const result = await run({ rootDir, config: { binaryPath: gitleaksProbe.path }, timeoutMs: 20000 });
       assert.equal(result.status, "FINDINGS", `expected the control file to still trip a finding, got ${result.status} (${result.reason ?? ""})`);
@@ -694,3 +709,212 @@ test(
     }
   },
 );
+
+// ===============================================================================================
+// C22B (CGF-06, AC-108): a finding is discounted ONLY when it lies in a digest field of a file with a
+// known Pipeline schema. Findings are injected the way the cases above inject them (a spy spawn writes
+// the report); digests are built at runtime so this source holds no key-shaped literal of its own.
+// ===============================================================================================
+const DG_POLICY = "pipeline.gitleaks-generated-digest-field.v1";
+const dg32 = "3f7f".repeat(8);
+const dg64 = "a1b2".repeat(16);
+const dgFinding = (file, line, secret, key, extra = {}) => ({
+  File: file, RuleID: "generic-api-key", StartLine: line, EndLine: line, StartColumn: 3, EndColumn: 3 + key.length + secret.length,
+  Match: `"${key}": "${secret}`, Secret: secret, Description: "Generic API Key", ...extra,
+});
+async function scanInjected(files, buildFindings) {
+  const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-digest-field-"));
+  try {
+    for (const [rel, content] of Object.entries(files)) {
+      mkdirSync(dirname(join(rootDir, rel)), { recursive: true });
+      writeFileSync(join(rootDir, rel), content);
+    }
+    const findings = buildFindings(rootDir);
+    const spySpawn = (cmd, args) => {
+      writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify(findings));
+      return { status: 0, stdout: "", stderr: "", error: null };
+    };
+    return await run({ rootDir, config: { binaryPath: join(rootDir, "unused-fake-gitleaks") }, spawnFn: spySpawn, timeoutMs: 5000 });
+  } finally {
+    rmSync(rootDir, { recursive: true, force: true });
+  }
+}
+const dgEvent = (extra = {}, schema = "pipeline.human-guard-event.v1") => JSON.stringify({ schema, id: "evt-1", idempotencyKey: dg32, scopeKey: dg64, ...extra }, null, 2);
+
+test("C22B a key-shaped bare digest of a Pipeline schema file is discounted, stays accounted under its own policy, and the absolute path gitleaks reports resolves", async () => {
+  const result = await scanInjected({ "evidence/event.json": dgEvent() }, (root) => [
+    dgFinding(join(root, "evidence", "event.json"), 4, dg32, "idempotencyKey"),
+    dgFinding(join(root, "evidence", "event.json"), 5, dg64, "scopeKey"),
+  ]);
+  assert.equal(result.status, "PASS");
+  assert.deepEqual(result.findings, []);
+  assert.deepEqual(result.discounted, { policy: DG_POLICY, findingCount: 2 });
+  assert.equal(result.ignored.findingCount, 0, "the exact-match authority count is untouched");
+});
+
+test("C22B CRLF line ends, a byte-order mark and compact one-line JSON locate the same field; a finding that does not name its key on a line with two equal digests stays", async () => {
+  const pretty = `﻿${dgEvent().replace(/\n/gu, "\r\n")}`;
+  const compact = JSON.stringify({ schema: "pipeline.human-guard-event.v1", idempotencyKey: dg32, scopeKey: dg32 });
+  const result = await scanInjected({ "a/pretty.json": pretty, "a/compact.json": compact }, (root) => [
+    dgFinding(join(root, "a", "pretty.json"), 4, dg32, "idempotencyKey"),
+    dgFinding(join(root, "a", "compact.json"), 1, dg32, "scopeKey"),
+    dgFinding(join(root, "a", "compact.json"), 1, dg32, "idempotencyKey", { Match: dg32 }),
+  ]);
+  assert.equal(result.discounted.findingCount, 2);
+  assert.equal(result.findings.length, 1, "two fields hold this digest on one line and the match text does not say which: not exactly one field, so it blocks");
+  assert.equal(result.status, "FINDINGS");
+});
+
+test("C22B a repository-relative finding path (the form a relative report gives) is read from the root too", async () => {
+  const result = await scanInjected({ "evidence/event.json": dgEvent() }, () => [dgFinding("evidence/event.json", 4, dg32, "idempotencyKey")]);
+  assert.equal(result.discounted.findingCount, 1);
+  assert.equal(result.status, "PASS");
+});
+
+test("C22B a key-shaped value that is not a bare lower-case digest in a Pipeline schema file still blocks, and a real credential next to a digest is not excused", async () => {
+  const text = dgEvent({ token: "not-a-digest-but-a-long-looking-value", password: dg64.toUpperCase(), apiKey: `${dg32}ab-extra` });
+  const result = await scanInjected({ "evidence/event.json": text }, (root) => {
+    const file = join(root, "evidence", "event.json");
+    return [
+      dgFinding(file, 4, dg32, "idempotencyKey"),
+      dgFinding(file, 6, "not-a-digest-but-a-long-looking-value", "token"),
+      dgFinding(file, 7, dg64.toUpperCase(), "password"),
+      dgFinding(file, 8, `${dg32}ab-extra`, "apiKey"),
+    ];
+  });
+  assert.equal(result.discounted.findingCount, 1);
+  assert.deepEqual(result.findings.map((f) => f.line), [6, 7, 8]);
+  assert.equal(result.status, "FINDINGS");
+});
+
+test("C22B a digest in a file with no Pipeline schema still blocks (no schema, a foreign schema, a bad schema id, an array)", async () => {
+  const files = {
+    "x/none.json": JSON.stringify({ idempotencyKey: dg32 }, null, 2),
+    "x/foreign.json": JSON.stringify({ schema: "vendor.thing.v1", idempotencyKey: dg32 }, null, 2),
+    "x/bad-id.json": JSON.stringify({ schema: "pipeline.x", idempotencyKey: dg32 }, null, 2),
+    "x/array.json": JSON.stringify([{ schema: "pipeline.human-guard-event.v1", idempotencyKey: dg32 }], null, 2),
+  };
+  const result = await scanInjected(files, (root) => [
+    dgFinding(join(root, "x", "none.json"), 2, dg32, "idempotencyKey"),
+    dgFinding(join(root, "x", "foreign.json"), 3, dg32, "idempotencyKey"),
+    dgFinding(join(root, "x", "bad-id.json"), 3, dg32, "idempotencyKey"),
+    dgFinding(join(root, "x", "array.json"), 4, dg32, "idempotencyKey"),
+  ]);
+  assert.equal(result.discounted.findingCount, 0);
+  assert.equal(result.findings.length, 4);
+});
+
+test("C22B a digest in a field the classifier does not name as a digest field still blocks (embedded in a longer value, in a key, on another line, or in a nested string of an array)", async () => {
+  const text = JSON.stringify({ schema: "pipeline.human-guard-event.v1", note: `prefix ${dg32} suffix`, [dg64]: "x", list: [dg32], idempotencyKey: dg32 }, null, 2);
+  const result = await scanInjected({ "evidence/event.json": text }, (root) => {
+    const file = join(root, "evidence", "event.json");
+    return [
+      dgFinding(file, 3, dg32, "note"),
+      dgFinding(file, 4, dg64, dg64),
+      dgFinding(file, 6, dg32, "list"),
+      dgFinding(file, 2, dg32, "idempotencyKey"),
+    ];
+  });
+  assert.equal(result.discounted.findingCount, 0, "the only digest-valued field is on line 8, not on any reported line");
+  assert.equal(result.findings.length, 4);
+});
+
+test("C22B an unreadable, missing, non-JSON, oversized, outside-the-root or directory path still blocks", async () => {
+  const outside = mkdtempSync(join(tmpdir(), "gitleaks-digest-outside-"));
+  try {
+    writeFileSync(join(outside, "event.json"), dgEvent());
+    const result = await scanInjected({ "x/text.json": `not json ${dg32}`, "x/big.json": `${dgEvent()}${" ".repeat(5 * 1024 * 1024)}`, "x/dir.json/keep.txt": "d" }, (root) => [
+      dgFinding(join(root, "x", "missing.json"), 4, dg32, "idempotencyKey"),
+      dgFinding(join(root, "x", "text.json"), 1, dg32, "idempotencyKey"),
+      dgFinding(join(root, "x", "big.json"), 4, dg32, "idempotencyKey"),
+      dgFinding(join(root, "x", "dir.json"), 1, dg32, "idempotencyKey"),
+      dgFinding(join(outside, "event.json"), 4, dg32, "idempotencyKey"),
+      { ...dgFinding("x/text.json", 1, dg32, "idempotencyKey"), File: 7 },
+    ]);
+    assert.equal(result.discounted.findingCount, 0);
+    assert.equal(result.findings.length, 6);
+  } finally {
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("C22B through the real scan runner the discounted count reaches the v1 scanner entry and the printed scanner line; a line without a discount reads as before", async () => {
+  const { chmodSync } = await import("node:fs");
+  const { formatScannerLine, runSecurityScan } = await import("../security-scan.mjs");
+  const parent = mkdtempSync(join(tmpdir(), "gitleaks-digest-runner-"));
+  try {
+    const root = join(parent, "root");
+    const git = (...args) => { const r = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false }); if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${r.stderr}`); };
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n\nsecurity:\n  scanners:\n    gitleaks:\n      enabled: true\n    osv-scanner:\n      enabled: false\n    semgrep:\n      enabled: false\n    license-check:\n      enabled: false\n");
+    writeFileSync(join(root, "evidence", "event.json"), dgEvent());
+    git("init", "-q");
+    git("config", "user.name", "Fixture");
+    git("config", "user.email", "fixture@example.invalid");
+    git("remote", "add", "origin", "https://example.invalid/pipeline/fixture.git");
+    git("add", "-A");
+    git("commit", "-qm", "fixture");
+    // A fixture "gitleaks": reports one finding for the digest field of the scanned snapshot, with the absolute path the real tool reports.
+    const body = `import { writeFileSync } from "node:fs";
+const a = process.argv.slice(2);
+const source = a[a.indexOf("--source") + 1];
+const secret = ${JSON.stringify(dg32)};
+writeFileSync(a[a.indexOf("--report-path") + 1], JSON.stringify([{ File: source + "/evidence/event.json", RuleID: "generic-api-key", StartLine: 4, EndLine: 4, StartColumn: 3, EndColumn: 60, Match: '"idempotencyKey": "' + secret, Secret: secret, Description: "Generic API Key" }]));
+process.exit(0);
+`;
+    const bin = join(parent, process.platform === "win32" ? "gitleaks.cmd" : "gitleaks");
+    if (process.platform === "win32") { writeFileSync(join(parent, "gitleaks.mjs"), body); writeFileSync(bin, `@echo off\r\nnode "${join(parent, "gitleaks.mjs")}" %*\r\n`); }
+    else { writeFileSync(bin, `#!/usr/bin/env node\n${body}`); chmodSync(bin, 0o755); }
+    const { evidence, exitCode, evidenceV2, verdictV2 } = await runSecurityScan({
+      rootDir: root, env: { PIPELINE_GITLEAKS_PATH: bin }, timeoutMs: 30000,
+      spawnFn: (cmd, args, opts) => spawnSync(cmd, args, { ...opts, shell: process.platform === "win32" && cmd !== process.execPath }),
+      assessTrustedExecutablePath: (path) => (typeof path === "string" && path.startsWith(parent) ? { ok: true, path } : { ok: false, status: "untrusted_path" }),
+    });
+    const entry = evidence.scanners.find((s) => s.tool === "gitleaks");
+    assert.equal(exitCode, 0, "the only finding is a discounted generated digest");
+    assert.equal(entry.status, "PASS");
+    assert.ok(evidenceV2 && verdictV2?.verdict, "the additive accounting does not stop the v2 evidence from being built and judged (a v2 fault would otherwise only degrade to a diagnostic)");
+    assert.deepEqual(entry.discounted, { policy: DG_POLICY, findingCount: 1 });
+    assert.match(formatScannerLine(entry), /^gitleaks: OK \[success\] \(0 findings\) -- discounted: 1 finding\(s\) in digest fields of generated Pipeline files \(pipeline\.gitleaks-generated-digest-field\.v1\)$/u);
+    assert.equal(formatScannerLine({ tool: "osv-scanner", status: "PASS", classification: "success", findingCount: 0 }), "osv-scanner: OK [success] (0 findings)");
+    assert.equal(formatScannerLine({ tool: "gitleaks", status: "PASS", classification: "success", findingCount: 0, discounted: { policy: DG_POLICY, findingCount: 0 } }), "gitleaks: OK [success] (0 findings)");
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test("C22B real gitleaks report shape: the digests under key-shaped names of a Pipeline schema file are discounted, the same content under a foreign schema is not (real gitleaks binary)", { skip: gitleaksOnlySkip }, async () => {
+  const hex = (seed) => createHash("sha256").update(seed).digest("hex");
+  const body = (schema) => JSON.stringify({ schema, id: "evt-1", idempotencyKey: hex("one").slice(0, 32), scopeKey: hex("two"), reuseKeySha256: hex("three"), courseKey: hex("four") }, null, 2);
+  const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-digest-real-"));
+  try {
+    mkdirSync(join(rootDir, "evidence"), { recursive: true });
+    mkdirSync(join(rootDir, "vendor"), { recursive: true });
+    writeFileSync(join(rootDir, "evidence", "event.json"), `﻿${body("pipeline.human-guard-event.v1").replace(/\n/gu, "\r\n")}`);
+    writeFileSync(join(rootDir, "evidence", "compact.json"), JSON.stringify(JSON.parse(body("pipeline.human-guard-event.v1"))));
+    writeFileSync(join(rootDir, "vendor", "event.json"), body("vendor.event.v1"));
+    const result = await run({ rootDir, config: { binaryPath: gitleaksProbe.path }, timeoutMs: 20000 });
+    const control = result.findings.filter((f) => f.path === "vendor/event.json");
+    assert.ok(control.length > 0, `the control (foreign schema) must still be read as secrets by the scanner, got: ${JSON.stringify(result.findings)}`);
+    assert.deepEqual(result.findings.filter((f) => f.path.startsWith("evidence/")), [], "no finding of the Pipeline schema files is left");
+    assert.ok(result.discounted.findingCount > 0, "the Pipeline schema files' findings are counted, not lost");
+  } finally {
+    rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("C22B another rule on the same digest field is untouched, and a mixed report keeps exactly the findings the exception does not cover", async () => {
+  const result = await scanInjected({ "evidence/event.json": dgEvent() }, (root) => {
+    const file = join(root, "evidence", "event.json");
+    return [
+      dgFinding(file, 4, dg32, "idempotencyKey", { RuleID: "aws-access-token" }),
+      dgFinding(file, 4, dg32, "idempotencyKey"),
+      dgFinding(join(root, "evidence", "other.txt"), 1, "not-a-digest-at-all-xyz", "token"),
+    ];
+  });
+  assert.equal(result.discounted.findingCount, 1);
+  assert.deepEqual(result.findings.map((f) => f.rule).sort(), ["aws-access-token", "generic-api-key"]);
+  assert.equal(result.status, "FINDINGS");
+});
+
