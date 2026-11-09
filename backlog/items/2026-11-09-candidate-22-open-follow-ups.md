@@ -58,6 +58,7 @@ The chain is in `specs/sprint-alfred-epic/evidence/held-patches/c22b-chain/`. On
 - A host commit stops with `AGY-HOST-COMMIT-PATH-MISMATCH` when a re-dispatch writes the same deliverable paths as a stopped dispatch whose files are still untracked. The second dispatch is then not delivered by the host, and the Elephant has to commit those deliverables.
 - A hand-typed return with a misspelled key stops with `NGHR-FINAL-SHAPE` after the work is finished. The work is intact, but the host commit is lost.
 - `rg needle <dir>` is refused as a whole when the tree holds a secret-named file that `rg` would not read, such as a hidden `.env`. The same strictness also covers positive file filters such as `-g '*.key'`, so narrowing it needs its own design. Measured 2026-11-09.
+- `lib/node-sandbox-probe.mjs` reports `ready: false` for a version-manager `node` even when it found a stable system `node` of the same version, and the hooks start `node` through `PATH`. PO decision 2026-11-09: fix it with the next candidate. Report ready when a stable `node` with the same major version is found, warn with both versions when they differ, keep today's warning when none is found. How Antigravity hooks start `node` was not established.
 - The commit helper of the clone route stages everything. Carried slices left uncommitted land in the next commit with the wrong message.
 
 ## Accepted risk
