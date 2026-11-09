@@ -647,7 +647,9 @@ function opusCriticPromptLines({ root, result, env, registry, trigger }) {
   const counts = names === null ? "" : ` (${files.length} changed file${files.length === 1 ? "" : "s"} in ${modules.size} top-level path${modules.size === 1 ? "" : "s"})`;
   return [
     `Batch scope (MP-07): the reviewed range ${base.slice(0, 12)}..${head.slice(0, 12)}${counts}, one batch.`,
-    `Rationale (MP-07): the registered Critic route duty.${duty} is ${cell.selector.value} at effort ${cell.effort}; it is used for critical architecture or security review of this one batch only.`,
+    // CGR-20: the cell is what the route REQUESTS. Nothing at this point observes the effort that is applied, and the project calibration is
+    // a different value that this line neither reads nor overwrites, so the line says "requests" and states the missing observation.
+    `Rationale (MP-07): the registered Critic route duty.${duty} requests ${cell.selector.value} at effort ${cell.effort}; it is used for critical architecture or security review of this one batch only. The applied effort is not observed by this packet: report the requested effort as requested, and name an applied effort only where a dispatch receipt shows it.`,
   ];
 }
 

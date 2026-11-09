@@ -2139,6 +2139,30 @@ test("G20-71 an Opus Critic route carries the MP-07 prompt lines the dispatch po
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
+// CGR-20 (candidate 22, w306): a Critic report named effort max while the calibration said medium and nothing showed what was applied.
+// The printed rationale states the effort the route REQUESTS (the registry cell, per duty) and, separately, that the applied effort is
+// not observed here; it never presents the requested value as an observed fact and never reads the project calibration.
+test("CGR-20 the Opus Critic rationale names the requested effort and says the applied effort is not observed", () => {
+  const fx = fixture();
+  try {
+    const claude = { env: { CLAUDE_CODE_SESSION_ID: "session-cgr20" } };
+    // No matched record row: the strictest default, the high-risk Critic duty. The effort printed is the registry cell, whatever it is.
+    for (const requested of [loadRunnerProfilesV3Registry().duties.critic_high_risk.claude.effort, "medium"]) {
+      const registry = structuredClone(loadRunnerProfilesV3Registry());
+      registry.duties.critic_high_risk.claude.effort = requested;
+      const line = g2069Printed(fx, {}, { ...claude, registry }).criticDispatchPromptLines[1];
+      assert.match(line, new RegExp(`duty\\.critic_high_risk requests \\S+ at effort ${requested}\\b`, "u"), line);
+      assert.doesNotMatch(line, /duty\.critic_high_risk is /u, "the request is not worded as a fact");
+      assert.match(line, /applied effort is not observed/iu, line);
+      assert.match(line, /rationale/iu);
+      assert.match(line, /\b(?:architecture|security)\b/iu, "the dispatch policy still admits the line");
+    }
+    const prompt = (extra) => ["Model/effort for this run: claude-opus-4-1 / max", `Ruleset SHA: ${fx.candidate}`, ...extra].join("\n");
+    const lines = g2069Printed(fx, {}, claude).criticDispatchPromptLines;
+    assert.equal(dispatchFindings({ subagentType: "critic", prompt: prompt(lines) }).findings.some(({ code }) => code === "DISPATCH-OPUS-NO-BATCH-RATIONALE"), false);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 test("G20-69 the request trigger is the applied Critic row of the matched dispatch record where admit has that trigger, else the strictest default", () => {
   const fx = fixture();
   try {
