@@ -24,7 +24,7 @@ const ADMIT_REQUEST_FILE = "scratch/session-critic-finalization-request.json";
 export const PREPARE_DISPATCH_HELP = `Usage:
   node <plugin-root>/scripts/prepare-dispatch.mjs goldfish --root <root> --package <package.json> [--out scratch/<briefing>.md] [--no-goldfish-running]
   node <plugin-root>/scripts/prepare-dispatch.mjs critic --root <root> --spec <path> --base <ref> --candidate <full commit id> [--guardrail <path>]... [--evidence <path>]...
-       [--task-id <id>] [--prior-critic <path>] [--delta-request <path>] [--correction-input-bindings <file>] [--label <name> -- <check command> <args>]
+       [--task-id <id>] [--prior-critic <path>] [--delta-request <path>] [--correction-input-bindings <file>] [--registration-commit <full commit id>] [--label <name> -- <check command> <args>]
   node <plugin-root>/scripts/prepare-dispatch.mjs --help | -h
 
 Prints one JSON object of schema ${DISPATCH_PREPARATION_SCHEMA}: status "ready" (exit 0), "commit-required" or "stopped" (exit 2).
@@ -38,7 +38,7 @@ critic: with --label, runs the check command as Critic diagnostic evidence under
   "commit-required": commit exactly commitPaths in one evidence-only commit, then run the identical command again. Without --label, pass existing --evidence.
   It then runs the preflight and writes ${ADMIT_REQUEST_FILE}; "next.placeholders" names the values only you can fill before "next.admitCommand".
   A request you had already filled is kept and named in "previousRequest": if that Critic still runs, finalize it with that file. A --label that recorded another candidate is refused.
-  --candidate must be the full commit id, because the evidence commit moves HEAD.
+  --candidate must be the full commit id, because the evidence commit moves HEAD. The preflight derives the registration commit itself; pass --registration-commit only when it reports several candidates.
 `;
 
 const lastJson = (text) => {
@@ -64,7 +64,8 @@ const stepOf = (run) => (name, argv) => {
   const result = run(process.execPath, [scriptPath(name), ...argv]);
   return { exit: result.status ?? 1, value: lastJson(result.stdout) ?? lastJson(result.stderr), raw: `${result.stdout ?? ""}${result.stderr ?? ""}`.trim() };
 };
-const asReason = (step) => step.value ?? { reason: step.raw };
+// A step that gives a code but no words still has to show what it printed: the repair points at this output.
+const asReason = (step) => (step.value?.reason ?? step.value?.message ?? step.value?.error ? step.value : { ...(step.value ?? {}), reason: step.raw === "" ? undefined : step.raw });
 
 function packageRunner(root, packagePath, deps) {
   try { return JSON.parse((deps.readFile ?? readFileSync)(resolve(root, packagePath), "utf8")).runner ?? "claude"; } catch { return "claude"; }
@@ -126,7 +127,7 @@ function setAsideFilledRequest(target, deps) {
 
 export function prepareCriticDispatch(input, deps = {}) {
   const verb = "critic";
-  const { root, spec, base, candidate, guardrails = [], evidence = [], taskId = null, priorCritic = null, deltaRequest = null, correctionInputBindings = null, label = null, command = [] } = input;
+  const { root, spec, base, candidate, guardrails = [], evidence = [], taskId = null, priorCritic = null, deltaRequest = null, correctionInputBindings = null, registrationCommit = null, label = null, command = [] } = input;
   for (const [flag, value] of [["--spec", spec], ["--base", base], ["--candidate", candidate]]) {
     if (typeof value !== "string" || value === "") return stopped(verb, "arguments", { code: "PREP-ARGUMENT", reason: `${flag} is required`, repair: PREPARE_DISPATCH_HELP }, "PREP-ARGUMENT");
   }
@@ -137,16 +138,13 @@ export function prepareCriticDispatch(input, deps = {}) {
   const step = stepOf(run);
   const exists = deps.exists ?? existsSync;
   const evidencePaths = [...evidence];
-  let registrationCommit = null;
   if (label !== null) {
     const evidenceDir = posix.join(posix.dirname(spec.replace(/\\/gu, "/")), "evidence");
     const out = `${evidenceDir}/${label}.json`, log = `${evidenceDir}/${label}.log`;
     if (exists(resolve(root, out)) && recordedDiagnosticCandidate(resolve(root, out), deps.readFile ?? readFileSync) !== candidate) {
       return stopped(verb, "diagnostic", { code: "PREP-LABEL-OTHER-CANDIDATE", reason: `${out} does not record the candidate ${candidate}`, repair: "pass a new --label for this candidate: the evidence of an earlier candidate cannot stand for this one" }, "PREP-LABEL-OTHER-CANDIDATE");
     }
-    registrationCommit = gitOutput(run, ["log", "-1", "--format=%H", "--", out]);
-    if (registrationCommit === "") {
-      registrationCommit = null;
+    if (gitOutput(run, ["log", "-1", "--format=%H", "--", out]) === "") {
       if (!exists(resolve(root, out))) {
         const produced = step("critic-diagnostic-evidence.mjs", ["--root", root, "--spec", spec, "--log", log, "--out", out, "--candidate", candidate, "--base", base, ...guardrails.flatMap((path) => ["--guardrail", path]), "--", ...command]);
         if (produced.exit !== 0) return stopped(verb, "diagnostic", asReason(produced), "PREP-DIAGNOSTIC-FAILED");
@@ -187,12 +185,12 @@ function criticArgv(input) {
   return ["critic", "--root", input.root, "--spec", input.spec, "--base", input.base, "--candidate", input.candidate,
     ...(input.guardrails ?? []).flatMap((path) => ["--guardrail", path]), ...(input.evidence ?? []).flatMap((path) => ["--evidence", path]),
     ...pair("--task-id", input.taskId), ...pair("--prior-critic", input.priorCritic), ...pair("--delta-request", input.deltaRequest),
-    ...pair("--correction-input-bindings", input.correctionInputBindings), ...pair("--label", input.label),
+    ...pair("--correction-input-bindings", input.correctionInputBindings), ...pair("--registration-commit", input.registrationCommit), ...pair("--label", input.label),
     ...((input.command ?? []).length === 0 ? [] : ["--", ...input.command])];
 }
 
 const SINGLE_FLAGS = { goldfish: { "--root": "root", "--package": "packagePath", "--out": "out" },
-  critic: { "--root": "root", "--spec": "spec", "--base": "base", "--candidate": "candidate", "--task-id": "taskId", "--prior-critic": "priorCritic", "--delta-request": "deltaRequest", "--correction-input-bindings": "correctionInputBindings", "--label": "label" } };
+  critic: { "--root": "root", "--spec": "spec", "--base": "base", "--candidate": "candidate", "--task-id": "taskId", "--prior-critic": "priorCritic", "--delta-request": "deltaRequest", "--correction-input-bindings": "correctionInputBindings", "--registration-commit": "registrationCommit", "--label": "label" } };
 
 export function parsePrepareDispatchArgv(argv) {
   const verb = argv[0];

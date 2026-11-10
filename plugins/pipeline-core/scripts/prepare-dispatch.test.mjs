@@ -161,7 +161,7 @@ test("the identical rerun finds the evidence commit, reaches packet-ready and wr
   assert.match(result.next.admitCommand[1], /session-critic-finalizer\.mjs$/u);
   assert.doesNotMatch(result.next.admitCommand[1], /PIPELINE_PLUGIN_ROOT/u);
   const argv = steps.calls.at(-1).argv;
-  assert.equal(argv[argv.indexOf("--registration-commit") + 1], commit);
+  assert.equal(argv.includes("--registration-commit"), false, "the preflight derives it: in a correction round it is the later delta registration, not the evidence commit");
   assert.equal(argv[argv.indexOf("--evidence") + 1], "specs/f/evidence/suite.json");
   assert.equal(written.length, 1);
   assert.deepEqual(JSON.parse(written[0][1]), PACKET_READY.admitRequest);
@@ -171,6 +171,18 @@ test("a preflight refusal keeps its own code and reason", () => {
   const steps = stub({ "critic-dispatch-preflight.mjs": no({ status: "rejected", code: "CDP-EVIDENCE", reason: "no evidence", repair: "produce it" }, 1) });
   const result = prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"] }, { ...noFiles, runCommand: steps.runCommand });
   assert.deepEqual(result.stop, { step: "preflight", code: "CDP-EVIDENCE", reason: "no evidence", repair: "produce it" });
+});
+
+test("an explicit registration commit passes through, and a step with a code but no words shows its output", () => {
+  const given = "9".repeat(40);
+  const passed = stub({ "critic-dispatch-preflight.mjs": ok(PACKET_READY) });
+  prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"], registrationCommit: given }, { ...noFiles, runCommand: passed.runCommand });
+  const argv = passed.calls.at(-1).argv;
+  assert.equal(argv[argv.indexOf("--registration-commit") + 1], given);
+  const silent = stub({ "critic-dispatch-preflight.mjs": no({ code: "CDP-GIT" }, 1) });
+  const result = prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"] }, { ...noFiles, runCommand: silent.runCommand });
+  assert.equal(result.stop.code, "CDP-GIT");
+  assert.match(result.stop.reason, /CDP-GIT/u);
 });
 
 test("a symbolic candidate is refused before any step, because the evidence commit moves HEAD", () => {
