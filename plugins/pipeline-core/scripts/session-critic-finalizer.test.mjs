@@ -2381,15 +2381,29 @@ test("PF94 export (1) the export result names the lineage registration before th
   } finally { cleanup(fx); }
 });
 
+test("a round holding only minors is recorded as passed, whatever the Critic set for pass, and the minor stays in the verdict", () => {
+  const fx = fixture();
+  try {
+    const packetId = "3".repeat(32);
+    const finding = { gap: "missing edge", risk: "small", severity: "minor", evidence: "specs/spec.md:1", spec_ref: "AC-1" };
+    const given = verdict({ findings: [finding], pass: false });
+    const done = finalizeSessionCriticReview(preadmitted(fx, { packetId, verdict: given }));
+    assert.equal(done.status, "completed");
+    assert.equal(done.receipt.reviewPass, true);
+    assert.equal(done.receipt.findingCount, 1);
+    assert.equal(given.pass, false, "the Critic's own verdict is not rewritten");
+  } finally { cleanup(fx); }
+});
+
 test("a failing review exports too, with reviewPass false and its finding count", () => {
   const fx = fixture();
   try {
     const packetId = "2".repeat(32);
-    const finding = { gap: "missing edge", risk: "failure", severity: "minor", evidence: "specs/spec.md:1", spec_ref: "AC-1" };
+    const finding = { gap: "missing edge", risk: "failure", severity: "major", evidence: "specs/spec.md:1", spec_ref: "AC-1" };
     const done = finalizeSessionCriticReview(preadmitted(fx, { packetId, verdict: verdict({ findings: [finding], pass: false }) }));
     assert.equal(done.status, "completed");
     assert.equal(done.receipt.reviewPass, false);
-    criticNotes(fx, "# Critic notes\n\nOne minor finding.\n");
+    criticNotes(fx, "# Critic notes\n\nOne major finding.\n");
     const options = exportOptions(fx, packetId);
     exportSessionCriticEvidence(options);
     const index = JSON.parse(readFileSync(join(fx.root, options.outDir, "index.json"), "utf8"));
@@ -2400,7 +2414,7 @@ test("a failing review exports too, with reviewPass false and its finding count"
     assert.equal(sha(readFileSync(join(fx.root, options.outDir, "receipt.json"))), index.receiptSha256);
     // C24: the close coordinator's read-only verb reports the same standing with the counts the one-shot close needs.
     const standing = (packet) => JSON.parse(spawnSync(process.execPath, [fileURLToPath(new URL("./close-coordinator.mjs", import.meta.url)), "critic-standing", "--root", fx.root, "--packet", packet], { encoding: "utf8" }).stdout);
-    assert.deepEqual([standing(packetId).status, standing(packetId).blockers, standing(packetId).majors, standing(packetId).minors], ["failed", 0, 0, 1]);
+    assert.deepEqual([standing(packetId).status, standing(packetId).blockers, standing(packetId).majors, standing(packetId).minors], ["failed", 0, 1, 0]);
     assert.equal(standing("9".repeat(32)).status, "unknown");
   } finally { cleanup(fx); }
 });

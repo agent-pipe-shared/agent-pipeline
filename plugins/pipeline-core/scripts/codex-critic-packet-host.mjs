@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import { criticRoundPassed } from "../lib/critic-round-pass.mjs";
 import { checkCriticExport, deriveCriticExportView } from "../lib/critic-export-policy.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { diagnosticReviewerReferences } from "../lib/critic-diagnostic-packet.mjs";
@@ -228,7 +229,7 @@ export function finalizeCodexPacketDispatch(options, deps = {}) {
     residualRisks: [...CODEX_RESIDUAL_RISKS],
     liveness: options.hostReturn.liveness,
     verdict: sanitizedVerdict(options.hostReturn.verdict),
-    reviewPass: options.hostReturn.verdict.pass,
+    reviewPass: criticRoundPassed(options.hostReturn.verdict),
   };
   consumeCandidatePacket({ controlRoot: options.controlRoot, packetId: packet.packetId, receipt }, deps);
   try {

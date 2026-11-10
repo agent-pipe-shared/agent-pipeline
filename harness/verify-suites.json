@@ -2341,6 +2341,12 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs"
     },
     {
+      "name": "critic-round-pass-tests",
+      "file": "plugins/pipeline-core/lib/critic-round-pass.test.mjs",
+      "invariantPinned": "A round holding only minors passes on every receipt route; a blocker, major, briefing violation, unverified trajectory or partial review does not",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-round-pass.test.mjs"
+    },
+    {
       "name": "critic-generic-batch-tests",
       "file": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-generic-batch.test.mjs",

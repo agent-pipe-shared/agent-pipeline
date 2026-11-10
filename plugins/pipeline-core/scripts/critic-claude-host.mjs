@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import { criticRoundPassed } from "../lib/critic-round-pass.mjs";
 import { checkCriticExport, deriveCriticExportView } from "../lib/critic-export-policy.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
@@ -405,7 +406,7 @@ export function finalizeClaudePacketReview(options, deps = {}) {
     },
     assurance: result.assurance,
     verdictSha256: sha256(canonicalJson(result.verdict)),
-    reviewPass: result.verdict.pass === true,
+    reviewPass: criticRoundPassed(result.verdict),
   };
   consumeCandidatePacket({ controlRoot: options.controlRoot, packetId: prepared.packet.packetId, receipt }, deps);
   try {

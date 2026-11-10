@@ -4,6 +4,7 @@ import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-laun
 import { randomBytes } from "node:crypto";
 import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
+import { criticRoundPassed } from "../lib/critic-round-pass.mjs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -595,7 +596,7 @@ function receiptFor(result) {
     assurance: result.assurance,
     verdictSha256: sha256(canonicalJson(result.verdict)),
     findingCount: result.verdict.findings.length,
-    reviewPass: result.verdict.pass,
+    reviewPass: criticRoundPassed(result.verdict),
     ...(Object.hasOwn(result, "independence") ? { independence: result.independence } : {}),
     ...(Object.hasOwn(result, "splitSha256") ? { splitSha256: result.splitSha256 } : {}),
   });

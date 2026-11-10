@@ -17,6 +17,7 @@ import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAd
 import { canonicalJson, sha256, normalizePacketPath, inspectCandidatePacket,
   inspectClaimedCandidatePacket, readConsumedSessionAdmission } from "../scripts/critic-packet-preflight.mjs";
 import { readCriticCourseAdmission } from "./critic-course-admission.mjs";
+import { receiptMatchesVerdict } from "./critic-round-pass.mjs";
 
 export const GENERIC_CRITIC_BATCH_SCHEMA = "pipeline.critic-generic-batch.v1";
 export const GENERIC_CRITIC_BATCH_V2_SCHEMA = "pipeline.critic-generic-batch.v2";
@@ -473,7 +474,7 @@ function consumedParent(c, r, requested) {
   if (packetDigest(p.packet) !== r.packetDigest || p.admission.claimSha256 !== r.claimSha256
     || p.admission.preflightSha256 !== r.preflightSha256 || p.admission.courseSourceSha256 !== r.sourceSha256
     || p.admission.courseDecisionSha256 !== r.decisionSha256 || (requested && requested.receiptSha256 !== receiptSha256)
-    || typeof p.result?.verdict?.pass !== "boolean" || p.receipt.reviewPass !== p.result.verdict.pass) fail("CGB-PARENT");
+    || typeof p.result?.verdict?.pass !== "boolean" || !receiptMatchesVerdict(p.receipt.reviewPass, p.result.verdict)) fail("CGB-PARENT");
   return { ...p, parent: { packetId: r.packetId, packetDigest: r.packetDigest, receiptSha256 } };
 }
 function deltaSource(root, s, correction, parent, round) {
@@ -511,7 +512,7 @@ function appendCorrection(input) {
     const prior = retained.at(-1);
     const parent = consumedParent(c, prior, input.parent);
     // D199: a PASS ends the batch only for the same candidate; real commits after it continue as a diff round.
-    if (parent.result.verdict.pass && s.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
+    if (parent.receipt.reviewPass && s.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
     // Delivery owner ends at integration; one fresh fix owner carries this same batch.
     if (s.target.kind !== "authored-delivery" && s.target.kind !== "orchestrator-attested-delivery") fail("CGB-CORRECTION-OWNER");
     if (prior.ordinal === 1) {
@@ -556,7 +557,7 @@ function admission(c, input, packet) {
   let parent = null, ordinal = 1, mode = "full", code = "CGB-FULL-ADMITTED";
   if (full) {
     parent = consumedParent(c, retained.at(-1));
-    if (parent.result.verdict.pass && m.value.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
+    if (parent.receipt.reviewPass && m.value.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
     if (m.value.kind !== "correction" || !eq(m.value.parent, parent.parent) || !m.value.delta
       || !eq(m.value.delta.diagnosticBundle, packet.diagnostics)) fail("CGB-DELTA");
     const attempt = admitReviewAttempt(m.value.delta.attempt);
@@ -1004,7 +1005,7 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
       }
       if(prior.length!==ordinal-1 || ordinal>MAX_BATCH_DELTA_ORDINAL)fail("CGB-BUDGET",`The course asks for round ${ordinal}, but this batch holds ${prior.length} admitted round(s) and needs ${ordinal-1} before round ${ordinal}. An earlier round was reviewed outside this batch or its reservation is missing; register the missing round or take the batch over with the session-critic-finalizer verbs. Nothing is deleted.`);
       const parent=prior.length?consumedParent(c,prior.at(-1)):null;
-      if(parent?.result.verdict.pass && packet.candidate.commit===parent.packet.candidate.commit)fail("CGB-PASS-STOPS");
+      if(parent?.receipt.reviewPass && packet.candidate.commit===parent.packet.candidate.commit)fail("CGB-PASS-STOPS");
       if(parent && (projection.parent?.packetId!==parent.parent.packetId || projection.parent.receiptSha256!==sha256Canonical(parent.receipt)))fail("CGB-PARENT");
       const member=writeMember(c,owned.batchRef,{schema:GENERIC_CRITIC_MEMBER_SCHEMA,...owned.batchRef,kind:ordinal===1?"origin":"correction",logicalWorkIds:work,
         target:targetForPacket(packet),parent:parent?.parent??null,range:packet.candidate,delta:ordinal===1?null:projection});
