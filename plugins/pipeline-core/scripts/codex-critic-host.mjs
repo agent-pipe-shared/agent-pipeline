@@ -35,6 +35,7 @@ import {
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+import { criticRoundPassed } from "../lib/critic-round-pass.mjs";
 import { createInterface } from "node:readline";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -1711,11 +1712,7 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
   const verdictValidation = validateAgainstSchema(result.verdict, verdictSchema);
   if (!verdictValidation.valid) fail(`critic verdict invalid: ${verdictValidation.errors.join("; ")}`);
   assertSafeResultText(result);
-  const hasBlockingFinding = result.verdict.findings.some(({ severity }) => severity === "blocker" || severity === "major");
-  const reviewPass = result.verdict.pass === true
-    && !hasBlockingFinding
-    && result.verdict.briefing_violations.length === 0
-    && result.verdict.trajectory_verdict === "consistent";
+  const reviewPass = criticRoundPassed(result.verdict);
   if (result.verdict.pass === true && !reviewPass) fail("critic pass contradicts findings, briefing, or trajectory evidence");
   return { execution, result, reviewPass };
 }
@@ -1905,10 +1902,12 @@ function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution
     fail("receipt review-plan binding drift");
   }
   if (receipt.state.mutationObserved !== false) fail("receipt mutation claim drift");
-  if (receipt.reviewPass !== sanitizedVerdict.pass || receipt.reviewPass !== (sanitizedVerdict.pass
-    && sanitizedVerdict.findings.every(({ severity }) => !["blocker", "major"].includes(severity))
+  const verdictUnblocked = sanitizedVerdict.findings.every(({ severity }) => !["blocker", "major"].includes(severity))
     && sanitizedVerdict.briefingViolationCount === 0
-    && sanitizedVerdict.trajectoryVerdict === "consistent")) fail("receipt review verdict drift");
+    && sanitizedVerdict.trajectoryVerdict === "consistent";
+  if (sanitizedVerdict.pass
+    ? receipt.reviewPass !== true || !verdictUnblocked
+    : receipt.reviewPass === true && !(verdictUnblocked && sanitizedVerdict.findings.length > 0)) fail("receipt review verdict drift");
   if (!/^[0-9a-f]{32}$/.test(receipt.dispatchId) || receipt.dispatchId !== prepared.dispatchId) fail("receipt dispatch binding invalid");
   const hashKeys = [
     "preparedSha256", "requestSha256", "referenceSetSha256", "resultSha256", "reviewFingerprintBefore",

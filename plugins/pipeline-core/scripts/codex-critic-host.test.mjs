@@ -72,7 +72,7 @@ import { expectedPipelineScriptsRunnerAllowlistEntries } from "../lib/project-on
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
-const EXPECTED_CASE_COUNT = 137;
+const EXPECTED_CASE_COUNT = 140;
 const caseResults = Array.from({ length: EXPECTED_CASE_COUNT }, () => {
   let resolveCase;
   let rejectCase;
@@ -956,6 +956,31 @@ check("verify-time observer mutation is detected before baselining", () => {
 const validReturn = successfulReturn(prepared, preparedRecord.sha256);
 check("valid host return passes pure validation", () => {
   assert.equal(validateHostReturn(prepared, preparedRecord.sha256, validReturn).reviewPass, true);
+});
+function returnWithVerdict(fields) {
+  const value = structuredClone(validReturn);
+  value.critic_result.verdict = {
+    findings: [],
+    deliberately_not_flagged: [],
+    trajectory_verdict: "consistent",
+    trajectory_evidence: "evidence/verify-latest.json matches the reviewed commit",
+    briefing_violations: [],
+    pass: false,
+    ...fields,
+  };
+  rebindCompletion(value);
+  return value;
+}
+const MINOR_FINDING = { gap: "Small gap.", risk: "Low risk.", severity: "minor", evidence: "specs/review.md:1", spec_ref: "AC-1" };
+check("a round holding only minor findings has passed, whatever the Critic set for pass", () => {
+  assert.equal(validateHostReturn(prepared, preparedRecord.sha256, returnWithVerdict({ findings: [MINOR_FINDING], pass: false })).reviewPass, true);
+  assert.equal(validateHostReturn(prepared, preparedRecord.sha256, returnWithVerdict({ findings: [MINOR_FINDING], pass: true })).reviewPass, true);
+});
+check("a pass of false with no finding at all stays a failure", () => {
+  assert.equal(validateHostReturn(prepared, preparedRecord.sha256, returnWithVerdict({})).reviewPass, false);
+});
+check("a pass claim next to a major finding is still refused as a contradiction", () => {
+  assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, returnWithVerdict({ findings: [{ ...MINOR_FINDING, severity: "major" }], pass: true })), /critic pass contradicts/);
 });
 check("T1 rejects the normal-lane assurance claim", () => {
   const value = structuredClone(validReturn);
