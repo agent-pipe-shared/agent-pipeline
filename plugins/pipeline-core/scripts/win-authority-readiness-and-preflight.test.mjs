@@ -77,6 +77,27 @@ test("E2: a Windows owner route process is dead when it vanished or was replaced
   assert.equal(bridge.ownerRouteProcessStatus(nativeRecord, { platform: "win32", observeWindows: () => { throw new Error("x"); }, same }), "unknown");
 });
 
+test("Windows argv: one file spelled with forward slashes or backslashes is no drift, another file still is", () => {
+  const module = "D:\\plugin\\scripts\\continuity-owner-route.mjs";
+  assert.equal(bridge.windowsSameArgvPath("D:/plugin/scripts/continuity-owner-route.mjs", module), true);
+  assert.equal(bridge.windowsSameArgvPath("D:\\plugin/scripts\\continuity-owner-route.mjs", module), true, "the mixed form the bootstrap prints");
+  assert.equal(bridge.windowsSameArgvPath(module, module), true);
+  assert.equal(bridge.windowsSameArgvPath("D:/plugin/scripts/other.mjs", module), false);
+  assert.equal(bridge.windowsSameArgvPath(undefined, module), false);
+});
+
+test("Windows argv: the owner route expects its module as really spelled there, and stays byte-exact on POSIX", () => {
+  const module = "D:\\plugin\\scripts\\continuity-owner-route.mjs", spelled = "D:/plugin/scripts/continuity-owner-route.mjs";
+  const base = { argv0: "node", execArgv: [], module, args: ["run", "--root", "D:/repo"] };
+  assert.deepEqual(bridge.ownerRouteExpectedArgv({ ...base, platform: "win32", observedArgv: ["node", spelled, "run", "--root", "D:/repo"] }), ["node", spelled, "run", "--root", "D:/repo"]);
+  assert.deepEqual(bridge.ownerRouteExpectedArgv({ ...base, platform: "win32", observedArgv: ["node", "D:/plugin/scripts/other.mjs", "run"] })[1], module, "another file keeps the expected spelling, so the equality check refuses it");
+  assert.deepEqual(bridge.ownerRouteExpectedArgv({ ...base, platform: "win32", execArgv: ["--no-warnings"], observedArgv: ["node", "--no-warnings", spelled] })[2], spelled, "the module position follows the runtime flags");
+  assert.deepEqual(bridge.ownerRouteExpectedArgv({ ...base, platform: "linux", observedArgv: ["node", spelled] })[1], module);
+  assert.equal(bridge.ownerRouteRootArgumentMatches({ platform: "win32", argument: "D:/repo", root: "D:\\repo" }), true);
+  assert.equal(bridge.ownerRouteRootArgumentMatches({ platform: "win32", argument: "D:/other", root: "D:\\repo" }), false);
+  assert.equal(bridge.ownerRouteRootArgumentMatches({ platform: "linux", argument: "/repo/", root: "/repo" }), false);
+});
+
 test("E2: the lock repair text names inspect, then heal, last resort move-aside", () => {
   assert.equal(typeof registry.registryLockRepairText, "function");
   for (const owner of ["live", "unknown", "dead"]) {

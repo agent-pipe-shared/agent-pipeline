@@ -987,11 +987,28 @@ function osvPhysicalRef(path){
   const ref={path,sha256,size:s.size,identity:{dev:s.dev,ino:s.ino,mode:s.mode,uid:s.uid,gid:s.gid,nlink:s.nlink}};
   osvPhysical(ref);return ref;
 }
+/**
+ * Native Windows greenfield: the only shell lane that admits a Pipeline script there is Git Bash, where an unquoted backslash path does not survive,
+ * so a script is usually started with forward slashes, while Node resolves process.argv[1] to backslashes. One file, two spellings: a separator
+ * difference is no drift, every other byte still has to match. The bytes of the file itself are authenticated separately (osvPhysicalRef).
+ */
+export function windowsSameArgvPath(observed,expected){
+  return typeof observed==='string'&&typeof expected==='string'&&observed.replaceAll('/','\\')===expected.replaceAll('/','\\');
+}
+/** The argv the owner route expects, spelling its own module the way the process was really started (Windows only; POSIX stays byte-exact). */
+export function ownerRouteExpectedArgv({platform=process.platform,argv0,execArgv,module,args,observedArgv}){
+  const token=Array.isArray(observedArgv)?observedArgv[1+execArgv.length]:undefined;
+  return [argv0,...execArgv,platform==='win32'&&windowsSameArgvPath(token,module)?token:module,...args];
+}
+/** The --root token against the normalized root: same separator rule, Windows only. */
+export function ownerRouteRootArgumentMatches({platform=process.platform,argument,root}){
+  return platform==='win32'?windowsSameArgvPath(argument,root):argument===root;
+}
 function osvProgram(actual){
   if(process.platform==='win32'){
     const fresh=osvObservedProcess(process.pid);if(!osvSameProcess(actual,fresh)||fresh.cwd!==realpathSync(process.cwd()))osvFail('OSV-INPUT-DRIFT');
     const executable=osvPhysicalRef(realpathSync(process.execPath)),module=osvPhysicalRef(process.argv[1]);
-    if(executable.path!==fresh.executable||fresh.argv.length<2||!fresh.argv.includes(module.path))osvFail('OSV-INPUT-DRIFT');
+    if(executable.path!==fresh.executable||fresh.argv.length<2||!fresh.argv.some(value=>windowsSameArgvPath(value,module.path)))osvFail('OSV-INPUT-DRIFT');
     return {executable,module,argv:[...fresh.argv],cwd:fresh.cwd};
   }
   if(process.platform==='darwin'){
@@ -1589,12 +1606,13 @@ function approvedControllerProgram(rootDir){
   const controller=osvObservedProcess(process.pid),program=osvProgram(controller);
   const module=fileURLToPath(new URL('../scripts/owning-verification-controller.mjs',import.meta.url));
   const args=process.argv.slice(2);
-  if(program.module.path!==module||program.cwd!==rootDir||args.length!==6||args[0]!=='--root'||args[1]!==rootDir
-    ||args[2]!=='--suite'||!ID.test(args[3])||args[4]!=='--task-source'||!isAbsolute(args[5])||resolve(args[5])!==args[5])osvFail('OSV-OWNER-UNAVAILABLE');
+  const taskSource=process.platform==='win32'&&typeof args[5]==='string'?args[5].replaceAll('/','\\'):args[5];
+  if(program.module.path!==module||program.cwd!==rootDir||args.length!==6||args[0]!=='--root'||!ownerRouteRootArgumentMatches({argument:args[1],root:rootDir})
+    ||args[2]!=='--suite'||!ID.test(args[3])||args[4]!=='--task-source'||!isAbsolute(taskSource)||resolve(taskSource)!==taskSource)osvFail('OSV-OWNER-UNAVAILABLE');
   // The ordinary task-content input selects no authority; retain its genuine physical image.
-  const taskSourceRef=osvPhysicalRef(args[5]);
-  if(relative(rootDir,args[5]).startsWith('..'+sep)||relative(rootDir,args[5])==='..'||isAbsolute(relative(rootDir,args[5])))osvFail('OSV-OWNER-UNAVAILABLE');
-  osvSame(program.argv,[process.argv0,...process.execArgv,module,...args]);
+  const taskSourceRef=osvPhysicalRef(taskSource);
+  if(relative(rootDir,taskSource).startsWith('..'+sep)||relative(rootDir,taskSource)==='..'||isAbsolute(relative(rootDir,taskSource)))osvFail('OSV-OWNER-UNAVAILABLE');
+  osvSame(program.argv,ownerRouteExpectedArgv({argv0:process.argv0,execArgv:process.execArgv,module,args,observedArgv:program.argv}));
   return {controller,program,taskSourceRef,suiteId:args[3]};
 }
 /** Fixed production entry only; no session/PID/origin/dependency issuer inputs. */
@@ -1701,10 +1719,10 @@ function ownerRouteProgram(rootDir){
   const args=process.argv.slice(2);
   // run --root <root> --lifecycle <id> -- <entry> <entry argv...>: the lifecycle id is part of the authenticated argv, so a
   // process cannot be admitted for a Close lifecycle it did not name (a directory scan cannot tell several lifecycles apart).
-  if(program.module.path!==module||program.cwd!==rootDir||args.length<7||args.length>262||args[0]!=='run'||args[1]!=='--root'||args[2]!==rootDir
+  if(program.module.path!==module||program.cwd!==rootDir||args.length<7||args.length>262||args[0]!=='run'||args[1]!=='--root'||!ownerRouteRootArgumentMatches({argument:args[2],root:rootDir})
     ||args[3]!=='--lifecycle'||!ID.test(args[4])||args[5]!=='--'||!OWNER_ROUTE_ENTRIES.includes(args[6])
     ||args.slice(6).some(value=>typeof value!=='string'||value.length<1||value.length>4096||/[\0\r\n]/u.test(value)))osvFail('OSV-OWNER-UNAVAILABLE');
-  osvSame(program.argv,[process.argv0,...process.execArgv,module,...args]);
+  osvSame(program.argv,ownerRouteExpectedArgv({argv0:process.argv0,execArgv:process.execArgv,module,args,observedArgv:program.argv}));
   return {controller,program,lifecycleId:args[4],entry:args[6],entryArgvSha256:digest(args.slice(6))};
 }
 function ownerRouteValidRoot(rootDir){
