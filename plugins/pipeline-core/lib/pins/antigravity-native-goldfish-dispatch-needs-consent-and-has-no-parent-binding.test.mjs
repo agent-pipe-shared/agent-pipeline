@@ -192,6 +192,7 @@ test("G20-43: a child whose resolved modelName differs from the selected model i
     const notices = res.stderr.split("\n").filter((line) => line.includes("agy-native-child-model-mismatch"));
     assert.equal(notices.length, 1, res.stderr);
     assert.ok(notices[0].includes("some-other-model") && notices[0].includes(selectedModel("implement")), notices[0]);
+    assert.match(notices[0], /notice only, this refuses nothing/u, "the line must not read as the cause of a refusal next to it");
     // The expected model resolves: recorded as a match, no notice.
     const right = payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: selectedModel("implement"), toolCall: childCall });
     const matched = evaluateNativeChildCall(right);
@@ -346,6 +347,36 @@ test("M4b: a governed child's writes and shell are confined to its own worktree 
     const shell = projectNativeChildInput(childPayload(fx, wt, { name: "run_command", args: { CommandLine: "git status", Cwd: wt.path } }), governed);
     assert.equal(shell.toolCall.args.Cwd, fx.workspace);
     assert.equal(input.toolCall.args.TargetFile, join(wt.path, "src", "a.mjs"), "the original payload is not mutated");
+    // C23: the projection keeps the directory the command really runs in beside the mapped input.
+    assert.equal(shell.nativeChildCwd, wt.path);
+    mkdirSync(join(wt.path, "src"), { recursive: true });
+    assert.equal(projectNativeChildInput(childPayload(fx, wt, { name: "run_command", args: { CommandLine: "git status", Cwd: join(wt.path, "src") } }), governed).nativeChildCwd, join(wt.path, "src"));
+    assert.equal(projectNativeChildInput(childPayload(fx, wt, { name: "run_command", args: { CommandLine: "git status", Cwd: "src" } }), governed).nativeChildCwd, join(wt.path, "src"), "a relative directory resolves in the worktree");
+    assert.equal(projectNativeChildInput(childPayload(fx, wt, { name: "run_command", args: { CommandLine: "git status" } }), governed).nativeChildCwd, wt.path, "no directory means the worktree");
+    assert.equal(projectNativeChildInput(childPayload(fx, wt, { name: "run_command", args: { CommandLine: "git status", Cwd: fx.workspace } }), governed).nativeChildCwd, wt.path, "a directory outside the worktree is never carried");
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+// C23 (Antigravity greenfield A): all six Goldfish of a run were refused GIT-03-UNREADABLE-MESSAGE-FILE on a message file in their own worktree.
+test("C23: a child's commit reads a relative message file from its own worktree through the whole adapter chain", () => {
+  const fx = brainFixture();
+  try {
+    const wt = worktreeFixture(fx);
+    descriptor(fx, CHILD, "goldfish-implementor");
+    mkdirSync(join(wt.path, "scratch", "commit-msg"), { recursive: true });
+    writeFileSync(join(wt.path, "scratch", "commit-msg", "own.txt"), "feat(x): a thing\n\nWhy it matters.\n\nAI-Assisted: true\nDispatch: C23-A (goldfish)\n");
+    const commit = (CommandLine, Cwd) => runAdapter(fx, childPayload(fx, wt, { name: "run_command", args: { CommandLine, Cwd } }));
+    // This fixture's session is not ready, so the lifecycle guard answers first and only names the other guards that denied as well.
+    const gitDenied = /Additional active guard denials:[^\n]*guard-git\.mjs/u;
+    const own = commit("git commit -F scratch/commit-msg/own.txt", wt.path);
+    assert.doesNotMatch(`${own.stdout}${own.stderr}`, gitDenied, `${own.stdout}${own.stderr}`);
+    // The file really is looked up by that directory: a name that exists nowhere stays refused.
+    const missing = commit("git commit -F scratch/commit-msg/absent.txt", wt.path);
+    assert.equal(missing.status, 2, `${missing.stdout}${missing.stderr}`);
+    assert.match(`${missing.stdout}${missing.stderr}`, gitDenied);
+    // A host-supplied value on a call that is not a governed child is not carried: the parent's lookup stays in the project.
+    const parent = runAdapter(fx, { ...payload(fx, { conversationId: PARENT, toolCall: { name: "run_command", args: { CommandLine: "git commit -F scratch/commit-msg/own.txt", Cwd: fx.workspace } } }), nativeChildCwd: wt.path });
+    assert.match(`${parent.stdout}${parent.stderr}`, gitDenied, `${parent.stdout}${parent.stderr}`);
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
 });
 

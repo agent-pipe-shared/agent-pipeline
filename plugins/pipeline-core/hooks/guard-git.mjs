@@ -324,6 +324,8 @@ try {
   const input = JSON.parse(readFileSync(0, "utf8"));
   cmd = String(input?.tool_input?.command ?? input?.tool_input?.CommandLine ?? "");
   if (typeof input?.tool_input?.cwd === "string" && isAbsolute(input.tool_input.cwd)) toolCwd = input.tool_input.cwd;
+  // A governed child's tool_input is projected onto the parent repository for policy; the adapter carries its real directory beside it.
+  if (typeof input?.native_child_cwd === "string" && isAbsolute(input.native_child_cwd)) toolCwd = input.native_child_cwd;
 } catch {
   process.exit(0); // fail-open: guard is a safety net, not a prison
 }

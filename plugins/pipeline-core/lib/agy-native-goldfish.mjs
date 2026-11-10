@@ -246,7 +246,11 @@ export function projectNativeChildInput(input, governed) {
   const mapped = (container) => (container !== null && typeof container === "object" && !Array.isArray(container)
     ? Object.fromEntries(Object.entries(container).map(([key, value]) => [key, PROJECTED_PATH_KEYS.includes(key) ? map(value) : value]))
     : container);
-  const projected = { ...input, workspacePaths: [governed.repoRoot, governed.worktreeRoot] };
+  // C23 (Antigravity greenfield A): the mapping above is for judging policy. A guard that reads a file the command names (git commit -F) needs
+  // the directory the command really runs in, so that one stays physical and travels beside the projected input.
+  const requested = [input?.toolCall?.args?.Cwd, input?.toolCall?.args?.cwd, input?.tool_input?.cwd].find((value) => typeof value === "string" && value !== "");
+  const physicalCwd = requested === undefined ? governed.worktreeRoot : physicalPath(isAbsolute(requested) ? requested : resolve(governed.worktreeRoot, requested));
+  const projected = { ...input, workspacePaths: [governed.repoRoot, governed.worktreeRoot], nativeChildCwd: inside(governed.worktreeRoot, physicalCwd) ? physicalCwd : governed.worktreeRoot };
   if (input?.toolCall && typeof input.toolCall === "object") projected.toolCall = { ...input.toolCall, args: mapped(input.toolCall.args) };
   if (input?.tool_input && typeof input.tool_input === "object") projected.tool_input = mapped(input.tool_input);
   return projected;

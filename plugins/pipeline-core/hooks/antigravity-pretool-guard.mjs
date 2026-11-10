@@ -363,6 +363,8 @@ export function antigravityGuardPayload(input, normalized, projectRoot) {
     tool_use_id: input?.tool_use_id ?? input?.toolUseId,
     // G20-49: the host's conversation id, the hook-observed owner of a governed native Goldfish dispatch (guard-dispatch).
     ...(typeof input?.conversationId === "string" ? { antigravity_conversation_id: input.conversationId } : {}),
+    // C23: only the projection of a governed child sets this; the entry point strips a host-supplied value on every other call.
+    ...(typeof input?.nativeChildCwd === "string" ? { native_child_cwd: input.nativeChildCwd } : {}),
     antigravity_artifact_host: antigravityArtifactHostContext(input),
   };
 }
@@ -642,6 +644,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
   let input;
   try { input = JSON.parse(rawInput); }
   catch { deny("Antigravity PreToolUse input is not valid JSON; pipeline guards fail closed."); }
+  if (childWorktree.status !== "governed" && input !== null && typeof input === "object") delete input.nativeChildCwd;
 
   const normalized = normalizeAntigravityToolInput(input);
   if (input?.toolCall?.name === "invoke_subagent" && normalized.nativeShapeError) {
@@ -652,7 +655,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
   const nativeChild = evaluateNativeChildCall(input);
   if (!nativeChild.ok) deny(`BLOCKED (Antigravity native child): ${nativeChild.reason}`);
   // G20-43: a resolved model that differs from the registry cell is recorded in the verdict and noticed here (one stderr line), never denied.
-  if (nativeChild.notice) diagnostic("agy-native-child-model-mismatch", { child: nativeChild.attributed.typeName, resolved: nativeChild.modelCheck.resolved, expected: nativeChild.modelCheck.expected.value, duty: nativeChild.modelCheck.expected.duty });
+  if (nativeChild.notice) diagnostic("agy-native-child-model-mismatch", { child: nativeChild.attributed.typeName, resolved: nativeChild.modelCheck.resolved, expected: nativeChild.modelCheck.expected.value, duty: nativeChild.modelCheck.expected.duty, effect: "notice only, this refuses nothing; a refusal of this call has its own BLOCKED line" });
   // G20-41: the Critic child's final send_message to its parent issues the Source return record, and one diagnostic line says what became of it when it was applicable.
   // C21B: the only call this decides is a verdict-less message while its packet waits for a verdict, and that one is refused once per child.
   if (input?.toolCall?.name === "send_message") {

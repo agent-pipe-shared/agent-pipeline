@@ -70,11 +70,11 @@ const GUARD = fileURLToPath(new URL("./guard-git.mjs", import.meta.url));
  * didn't ask for it. `envOverride` lets an override-mechanism case opt back into a
  * session-level arming deliberately (AC-1 env-fallback path).
  */
-function runGuard(command, projectDir, envOverride = {}, toolCwd = undefined) {
+function runGuard(command, projectDir, envOverride = {}, toolCwd = undefined, nativeChildCwd = undefined) {
   enrollFixtureGovernance(projectDir);
   const { PIPELINE_GUARD_OVERRIDE: _dropInherited, ...baseEnv } = process.env;
   const res = spawnSync(process.execPath, [GUARD], {
-    input: JSON.stringify({ tool_input: toolCwd === undefined ? { command } : { command, cwd: toolCwd } }),
+    input: JSON.stringify({ tool_input: toolCwd === undefined ? { command } : { command, cwd: toolCwd }, ...(nativeChildCwd === undefined ? {} : { native_child_cwd: nativeChildCwd }) }),
     encoding: "utf8",
     cwd: projectDir,
     env: { ...baseEnv, CLAUDE_PROJECT_DIR: projectDir, ...envOverride },
@@ -92,8 +92,8 @@ const NO_CONFIG_DIR = mkdtempSync(join(tmpdir(), "guard-test-no-config-"));
 
 let pass = 0;
 const failures = [];
-function check(id, command, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrEmpty, env = {}, toolCwd = undefined } = {}) {
-  const { code, stderr } = runGuard(command, projectDir, env, toolCwd);
+function check(id, command, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrEmpty, env = {}, toolCwd = undefined, nativeChildCwd = undefined } = {}) {
+  const { code, stderr } = runGuard(command, projectDir, env, toolCwd, nativeChildCwd);
   const problems = [];
   if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit})`);
   for (const needle of [].concat(stderrIncludes ?? [])) {
@@ -879,6 +879,15 @@ check("GIT03-14 block  a -F escaping the directory the command runs in stays ref
   `git commit -F ${join("..", basename(GIT03_OUTSIDE_DIR), "clean.txt")}`, BLOCK, {
     projectDir: GIT03_BLOCKING_DIR,
     toolCwd: GIT03_CHILD_DIR,
+    stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE"],
+  });
+check("GIT03-15 allow  the adapter's physical child directory wins over the projected tool directory",
+  "git commit -F child-only.txt", ALLOW, { projectDir: GIT03_BLOCKING_DIR, toolCwd: GIT03_BLOCKING_DIR, nativeChildCwd: GIT03_CHILD_DIR });
+check("GIT03-16 block  a relative child directory is ignored",
+  "git commit -F child-only.txt", BLOCK, {
+    projectDir: GIT03_BLOCKING_DIR,
+    toolCwd: GIT03_BLOCKING_DIR,
+    nativeChildCwd: "guard-test-relative",
     stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE"],
   });
 
