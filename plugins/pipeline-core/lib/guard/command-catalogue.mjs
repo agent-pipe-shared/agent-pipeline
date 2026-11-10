@@ -655,8 +655,8 @@ const BOTH_HELP_FLAGS = ["--help", "-h"], LONG_HELP_FLAG = ["--help"];
 export const SCRIPTS_ANSWERING_HELP = new Map([
   ...["antigravity-native-dispatch-prepare", "architecture-baseline", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "onboarding-init",
     "pipeline-state", "prepare-dispatch", "plan-runtime-projection-v2", "plan-runtime-projection-v3", "po-human-approval", "project-authority-migration", "project-onboarding-v3",
-    "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
-    "validate-runner-profiles-v2"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
+    "publication-readback", "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
+    "validate-runner-profiles-v2", "wait-host-commit"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
   ...["check-backlog-done-predicate", "check-protected-delta", "close-coordinator", "codex-host-advisor-route", "critic-diagnostic-evidence", "critic-export-consent", "handover-rotate",
     "publish-evidence-run", "reconcile-backlog-delivery", "register-feature-package", "repair-map", "rotate-handover-sections", "run-codex-critic-isolation",
     "session-critic-finalizer", "verify-evidence-producer"].map((name) => [`${name}.mjs`, LONG_HELP_FLAG]),
