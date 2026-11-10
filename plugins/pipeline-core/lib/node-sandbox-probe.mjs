@@ -37,6 +37,18 @@ export function observeNodeSandboxProbe({
     const normalized = execPath.replaceAll("\\", "/").toLowerCase();
     if (NODE_VERSION_MANAGER_PATTERN.test(normalized)) {
       const stableNode = findStableNode({ platform, env, exists, spawn, stableCandidates });
+      const resolvedVersion = versionOf(probe);
+      const resolvedMajor = majorOf(resolvedVersion);
+      const stableMajor = stableNode.found ? majorOf(stableNode.version) : null;
+      if (resolvedMajor !== null && stableMajor !== null) {
+        // A stable node of the same major is what a daemon falls back to, so a version-manager path alone is no warning.
+        if (resolvedMajor === stableMajor) return { ...base, status: "version-manager-path", ready: true, stableNode };
+        return {
+          ...base, status: "version-manager-path", ready: false, code: "NODE-SANDBOX-STABLE-VERSION-DIFFERS", stableNode,
+          versions: { resolved: resolvedVersion, stable: stableNode.version },
+          remedy: `The resolved node (${resolvedVersion}) lives under a version-manager path and the stable node at ${stableNode.path} has another major version (${stableNode.version}). A hook started by a background daemon may run the stable one. Align the two versions, then restart the runner.`,
+        };
+      }
       return {
         ...base, status: "version-manager-path", ready: false, code: "NODE-SANDBOX-UNREACHABLE", stableNode,
         remedy: stableNode.found ? NODE_SANDBOX_REMEDY : NODE_NO_STABLE_REMEDY,
@@ -48,7 +60,10 @@ export function observeNodeSandboxProbe({
   }
 }
 
-/** Wanted 3: first existing stable-path node that answers a bounded `--version`; never throws, never reports ready. */
+const versionOf = (run) => (typeof run?.stdout === "string" ? run.stdout.trim() : "");
+const majorOf = (version) => /^v?(\d+)\./u.exec(version ?? "")?.[1] ?? null;
+
+/** Wanted 3: first existing stable-path node that answers a bounded `--version`, with that version; never throws. */
 function findStableNode({ platform, env, exists, spawn, stableCandidates }) {
   try {
     const candidates = Array.isArray(stableCandidates) ? stableCandidates
@@ -58,7 +73,7 @@ function findStableNode({ platform, env, exists, spawn, stableCandidates }) {
       try {
         if (!exists(path)) continue;
         const run = spawn(path, ["--version"], { encoding: "utf8", shell: false, timeout: 3_000, windowsHide: true });
-        if (!run?.error && run?.status === 0) return { found: true, path };
+        if (!run?.error && run?.status === 0) return { found: true, path, version: versionOf(run) };
       } catch { /* an unreadable candidate is simply not found */ }
     }
   } catch { /* fall through */ }
