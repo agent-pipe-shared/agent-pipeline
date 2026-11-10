@@ -399,6 +399,7 @@ import { isCriticalStakes, readCalibrationStakes, readScannerExceptions, scanner
 import { runToolchainPreflight } from "./toolchain-preflight.mjs";
 import { tmpdir as hostTmpdir } from "node:os";
 import { readPipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
+import { readMachineOperatorLabel } from "../lib/machine-plane.mjs";
 import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { awaitSignatureFields, commandText as proofCommandText, proofWaitCommand } from "../lib/signed-proof-wait.mjs";
 import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
@@ -4077,6 +4078,11 @@ const MIXED_PLAN_RECOVERY_REASON_PLACEHOLDER = "<MIXED_PLAN_RECOVERY_REASON>";
 // GIT_CEILING_DIRECTORIES scoping this function's own header comment
 // explains. No behavior change to the draft branch: this is the exact same
 // spawn call it always made, only named and reusable.
+// C27 (PO decision 2026-11-10, EL-36 amended): the name recorded once for this machine comes first; Git's local user.name stays the fallback.
+function resolveRecordedActorName(dir, deps = {}) {
+  return readMachineOperatorLabel({ homedirFn: deps.homedirFn }) ?? resolveLocalGitUserName(dir, deps);
+}
+
 function resolveLocalGitUserName(dir, deps = {}) {
   const spawn = deps.spawn ?? spawnSync;
   const gitResult = spawn("git", ["config", "--local", "--get", "user.name"], {
@@ -4199,7 +4205,7 @@ function resolveDraftPlanSubmissionDefaults(dir, deps = {}) {
     const actor = readPipelineActorAssignment(dir);
     if (actor?.scopes.includes("submit-plan")) actorLabel = actor.label;
   } catch { actorLabel = null; }
-  const by = actorLabel ?? resolveLocalGitUserName(dir, deps);
+  const by = actorLabel ?? resolveRecordedActorName(dir, deps);
   let profile = null;
   try {
     const state = readState(dir);
@@ -4364,7 +4370,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     };
   }
   if (lifecycle.nextAction === 'reopen-design') {
-    const by = resolveLocalGitUserName(dir, deps);
+    const by = resolveRecordedActorName(dir, deps);
     const rendered = boundedCopySafeCommand({ executable: process.execPath,
       argv: [fileURLToPath(import.meta.url), 'reopen-design', '--by', by ?? placeholder("<recovery actor's name>")] });
     const action = { kind: 'command', ...rendered, mutation: true, requiresConfirmation: true };
@@ -4435,7 +4441,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
         expectedPlanSha256: submission.planSha256 });
       if (!designDraft.ok) {
         const scriptPath = fileURLToPath(import.meta.url);
-        const by = resolveLocalGitUserName(dir, deps);
+        const by = resolveRecordedActorName(dir, deps);
         const cancelArgv = [scriptPath, "cancel-submitted-plan", "--by", by ?? placeholder("<recovery actor's name>"),
           "--submission-sha256", lifecycle.submissionSha256];
         const cancelAction = { kind: "command", ...boundedCopySafeCommand({ executable: process.execPath, argv: cancelArgv }),
@@ -4496,7 +4502,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
       && (!requiresWorkflowPackage || state.planPresentation.schema === PLAN_PRESENTATION_DWP_SCHEMA);
     if (!presentationCurrent) {
       const scriptPath = fileURLToPath(import.meta.url);
-      const by = resolveLocalGitUserName(dir, deps);
+      const by = resolveRecordedActorName(dir, deps);
       if (requiresWorkflowPackage) {
         const packagePath = deps.designWorkflowPackagePath;
         if (typeof packagePath === "string" && DESIGN_WORKFLOW_PACKAGE_PATH_RE.test(packagePath)) {
@@ -4774,7 +4780,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
       };
     }
     const pushInitScript = join(runtimePluginRoot, "scripts", "push-init.mjs");
-    const pushInitBy = resolveLocalGitUserName(dir);
+    const pushInitBy = resolveRecordedActorName(dir, deps);
     const pushInitCommand = boundedCopySafeCommand({
       executable: process.execPath,
       argv: [
@@ -6247,7 +6253,7 @@ function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
   const root = realpathSync(resolve(dir));
   const approvalKind = "feature-package-reconcile";
   const placeholders = [
-    { flag: "--by", token: "<po-name>", from: "the PO's own name, supplied by the PO who ran the signing step; never the agent (EL-36)" },
+    { flag: "--by", token: "<po-name>", from: "the PO's own name: the operatorLabel the PO recorded for this machine, otherwise supplied by the PO who ran the signing step; never invented by the agent (EL-36)" },
     { flag: "--proof-request", token: "<proof-request>", from: "scratchMirror.request (scratch/critical-feature-package-reconcile-request-<fingerprint>.json, readable by the agent) in the signing step's output, or requestPath (externalPaths.request)" },
     { flag: "--proof-authority", token: "<proof-authority>", from: "scratchMirror.authority (scratch/critical-feature-package-reconcile-authority-<fingerprint>.json) in the signing step's output, or authorityPath (externalPaths.authority)" },
     { flag: "--proof", token: "<proof>", from: "scratchMirror.proof (scratch/critical-feature-package-reconcile-proof-<fingerprint>.json) in the signing step's output, or proofPath (externalPaths.proof)" },

@@ -178,7 +178,7 @@ test("AC-8 (G9 EL-36/EL-37/EL-38): the three greenfield rules are defined with t
   assert.ok(!INCLUDED_EL_IDS.includes("EL-38"), "EL-38 is a dispatch-pipeline duty and stays out of the printed block");
   assert.ok(Object.prototype.hasOwnProperty.call(EXCLUDED_EL_IDS, "EL-38"), "EL-38 must be excluded with a stated reason");
   const generated = renderRoleProhibitions().replace(/\s+/gu, " ");
-  assert.match(generated, /EL-36 Never fill `--by`, or any operator\/actor label, with a value the PO did not supply for that exact command/u);
+  assert.match(generated, /EL-36 Never fill `--by`, or any operator\/actor label, with a value the PO did not supply, either for that exact command or once in this machine's `operatorLabel`/u);
   assert.match(generated, /EL-37 A protected or guard-denied mutation goes only through its sanctioned route/u);
   assert.match(generated, /Role prohibitions loaded: [^ ]*EL-35\/EL-36\/EL-37 —/u);
   assert.doesNotMatch(generated, /EL-38/u, "the excluded EL-38 must not be printed");

@@ -2563,6 +2563,17 @@ test("K139 MP-04 readback: with the variable set the real preflight line reads s
   }
 });
 
+test("C27 EL-36 readback: the Elephant's preflight line shows the --by name recorded for this machine, or absent; a Goldfish or Critic line does not carry it", () => {
+  const home = mkdtempSync(join(tmpdir(), "c27-operator-label-"));
+  try {
+    assert.deepEqual(runPreflightProcess({ HOME: home, USERPROFILE: home }).line.operatorLabel, { status: "absent" });
+    mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+    writeFileSync(join(home, ".agent-pipeline", "machine.json"), `${JSON.stringify({ schema: "pipeline.machine-plane.v1", poKeyDirectory: null, pushApprovalDefault: "signature", routing: null, language: null, session: null, usage: null, operatorLabel: "Alex", updatedAt: "2026-11-10T00:00:00.000Z" })}\n`);
+    assert.deepEqual(runPreflightProcess({ HOME: home, USERPROFILE: home }, ["--role", "elephant"]).line.operatorLabel, { status: "recorded", label: "Alex" });
+    for (const role of ["goldfish", "critic"]) assert.equal(Object.hasOwn(runPreflightProcess({ HOME: home, USERPROFILE: home }, ["--role", role]).line, "operatorLabel"), false, role);
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
 test("K139 MP-04 readback: the readback is the Elephant's duty, a Goldfish or Critic preflight line does not carry it", () => {
   for (const role of ["goldfish", "critic"]) {
     const { line } = runPreflightProcess({ [MP04_VARIABLE]: MP04_VALUE_SENTINEL }, ["--role", role]);

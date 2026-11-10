@@ -16,6 +16,7 @@ export const MACHINE_PLANE_SCHEMA = "pipeline.machine-plane.v1";
 const MACHINE_PLANE_KEYS = Object.freeze([
   "schema", "poKeyDirectory", "pushApprovalDefault", "routing", "language", "session", "usage", "updatedAt",
 ]);
+const OPTIONAL_MACHINE_PLANE_KEYS = Object.freeze(["operatorLabel"]);
 const PUSH_APPROVAL_DEFAULTS = Object.freeze(["signature", "chat"]);
 
 /**
@@ -54,7 +55,7 @@ function keySetIssue(value) {
   if (!object(value)) return { code: "MP-NOT-OBJECT" };
   const keys = Object.keys(value);
   for (const key of keys) {
-    if (!MACHINE_PLANE_KEYS.includes(key)) return { code: "MP-UNKNOWN-KEY", detail: key };
+    if (!MACHINE_PLANE_KEYS.includes(key) && !OPTIONAL_MACHINE_PLANE_KEYS.includes(key)) return { code: "MP-UNKNOWN-KEY", detail: key };
   }
   for (const key of MACHINE_PLANE_KEYS) {
     if (!keys.includes(key)) return { code: "MP-MISSING-KEY", detail: key };
@@ -86,6 +87,12 @@ function validLanguage(value) {
     && value.length > 0 && value.length <= 64 && !/[\r\n\0]/u.test(value));
 }
 
+/** One short single-line name that cannot be read as a flag (copy of machine-plane.mjs). */
+function validOperatorLabel(value) {
+  return typeof value === "string" && value.trim() === value && value.length > 0 && value.length <= 64
+    && !value.startsWith("-") && !/[\x00-\x1f\x7f]/u.test(value);
+}
+
 /** `routing`/`session`/`usage`: null (not yet configured), or an opaque plain object.
  * Their internal taxonomy is out of this task's scope (SS6) and is not invented here. */
 function nullOrPlainObject(value) { return value === null || object(value); }
@@ -107,6 +114,9 @@ export function validateMachinePlane(value) {
   if (!nullOrPlainObject(value.session)) return { ok: false, code: "MP-SESSION", detail: "session" };
   if (!nullOrPlainObject(value.usage)) return { ok: false, code: "MP-USAGE", detail: "usage" };
   if (!validUpdatedAt(value.updatedAt)) return { ok: false, code: "MP-UPDATED-AT", detail: "updatedAt" };
+  if (Object.hasOwn(value, "operatorLabel") && value.operatorLabel !== null && !validOperatorLabel(value.operatorLabel)) {
+    return { ok: false, code: "MP-OPERATOR-LABEL", detail: "operatorLabel" };
+  }
   return { ok: true };
 }
 

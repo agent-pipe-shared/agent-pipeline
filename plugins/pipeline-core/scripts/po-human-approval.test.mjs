@@ -4133,6 +4133,27 @@ function r7kAssertAccepted(outcome, label) {
 }
 const r7kMentions = (text, path) => text.includes(path) || text.includes(realpathSync(path));
 
+import { HUMAN_PO_SIGNING_COMMANDS } from "./po-human-approval.mjs";
+test("C27: set-operator-label records the --by name once in the machine plane, keeps every other field, needs --replace to change it, and stays out of the human-signing verbs", () => {
+  const home = outsideRepositoryTemp("c27-operator-label-home-");
+  const set = (...argv) => r76Outcome(() => runHumanApproval(["set-operator-label", ...argv], { homedirFn: () => home }));
+  try {
+    assert.equal(HUMAN_PO_SIGNING_COMMANDS.includes("set-operator-label"), false, "agent-runnable like set-po-key-directory, with a value the PO states");
+    r7kAssertAccepted(set("--label", "Alex"), "first write on an empty home");
+    const first = readMachinePlane({ homedirFn: () => home });
+    assert.equal(first.status, "valid");
+    assert.equal(first.plane.operatorLabel, "Alex");
+    assert.equal(first.plane.poKeyDirectory, null);
+    assert.equal(set("--label", "Alex").value.changed, false, "the same name again changes nothing");
+    assert.equal(r7kRefused(set("--label", "Other")), true, "a different name needs --replace");
+    assert.equal(readMachinePlane({ homedirFn: () => home }).plane.operatorLabel, "Alex");
+    r7kAssertAccepted(set("--label", "Other", "--replace", "Alex"), "replace with the current value named");
+    assert.equal(readMachinePlane({ homedirFn: () => home }).plane.operatorLabel, "Other");
+    for (const bad of ["", " padded", "--flag", "two\nlines", "x".repeat(65)]) assert.equal(r7kRefused(set("--label", bad, "--replace", "Other")), true, JSON.stringify(bad));
+    assert.equal(r7kRefused(set("--name", "Alex")), true, "an unknown option is refused");
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
 test("R7-6k: set-po-key-directory on a home with no machine plane creates a valid plane that holds the directory, with every other field not configured and nothing else written (decision AC)", () => {
   const home = outsideRepositoryTemp("r7-6k-home-");
   const directory = outsideRepositoryTemp("r7-6k-keys-");

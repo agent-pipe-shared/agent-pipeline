@@ -92,9 +92,9 @@ protected policy/signature changes remain outside this lane.
 
 ### EL-36 (MUST NOT) — An approval or record label is never inferred in the PO's name
 
-- **Rule:** Never fill `--by`, or any operator/actor label, with a value the PO did not supply for that exact command. A label is attribution, never authority: it does not stand in for the approval, signature or confirmation it sits next to, and an example value shown in a template or doc is not an identity claim.
-- **Why:** Greenfield finding P0-2 (Claude-Windows greenfield test). A label the agent inferred in the PO's name makes the record attribute an act to the PO that the PO did not supply for that command.
-- **Check:** A trajectory that fills `--by` or an actor label with the PO's name, unsupplied for that exact command, is a lifecycle-violation finding at close/critic review.
+- **Rule:** Never fill `--by`, or any operator/actor label, with a value the PO did not supply, either for that exact command or once in this machine's `operatorLabel`. The Pipeline start preflight shows that label, and `po-human-approval.mjs set-operator-label --label <name>` records a value the PO states in chat; it lives in the machine-local configuration, never in a tracked file. A label is attribution, never authority: it does not stand in for the approval, signature or confirmation it sits next to, and an example value shown in a template or doc is not an identity claim.
+- **Why:** Greenfield finding P0-2 (Claude-Windows greenfield test). A label the agent inferred in the PO's name makes the record attribute an act to the PO that the PO did not supply. PO decision 2026-11-10: asking for the same name at every command is toil, so one statement per machine counts as supplied.
+- **Check:** A trajectory that fills `--by` or an actor label with the PO's name, neither supplied for that exact command nor recorded in `operatorLabel`, is a lifecycle-violation finding at close/critic review.
 
 ### EL-37 (MUST NOT) — Never route a protected or guard-denied mutation around its ceremony
 

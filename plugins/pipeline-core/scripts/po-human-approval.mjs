@@ -44,7 +44,7 @@ import { DESIGN_APPROVAL_REQUEST_SCHEMA, describeUnreviewedCorrections, validate
 import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
+import { MACHINE_PLANE_SCHEMA, readMachinePlane, validOperatorLabel, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { REPO_KEY_DIRECTORY_SCHEMA, readRepoKeyDirectory, repoScopedKeyDirectoryPath, resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
@@ -753,6 +753,41 @@ function runSetPoKeyDirectory(argv, dependencies) {
   writePlane(next, dependencies);
   return { ok: true, code: "PO-HUMAN-SET-PO-KEY-DIRECTORY-READY", directory, changed: true, replaced: stored };
 }
+
+// C27 (PO decision 2026-11-10, EL-36 amended): records the `--by` name once for this machine and user, in the machine plane, never in a tracked file.
+// It takes a value the PO states in chat. Attribution only: it grants no trust and is no signature.
+const SET_OPERATOR_LABEL_COMMAND = "set-operator-label";
+function runSetOperatorLabel(argv, dependencies) {
+  const usage = `${SET_OPERATOR_LABEL_COMMAND}: expected --label <name> [--replace <current-value>]`;
+  const values = {};
+  const rest = argv.slice(1);
+  if (rest.length % 2 !== 0) fail(usage);
+  for (let index = 0; index < rest.length; index += 2) {
+    const name = rest[index] === "--label" ? "label" : rest[index] === "--replace" ? "replace" : null;
+    if (name === null || Object.hasOwn(values, name)) fail(usage);
+    values[name] = rest[index + 1];
+  }
+  if (!validOperatorLabel(values.label)) fail(`${SET_OPERATOR_LABEL_COMMAND}: --label must be one short line (at most 64 characters, no leading dash)`);
+  const plane = (dependencies.readMachinePlaneFn ?? readMachinePlane)(dependencies);
+  if (plane.status === "invalid") {
+    fail(`${SET_OPERATOR_LABEL_COMMAND}: the machine plane is invalid (${plane.code}); it was not changed -- repair or remove it first`);
+  }
+  const current = plane.status === "valid" ? plane.plane : null;
+  const stored = typeof current?.operatorLabel === "string" ? current.operatorLabel : null;
+  if (stored === values.label) return { ok: true, code: "PO-HUMAN-SET-OPERATOR-LABEL-READY", label: stored, changed: false };
+  if (stored !== null && values.replace !== stored) {
+    fail(`${SET_OPERATOR_LABEL_COMMAND}: the machine plane already records ${stored}; to replace it pass --replace ${stored}`);
+  }
+  const updatedAt = new Date().toISOString();
+  (dependencies.writeMachinePlaneFn ?? writeMachinePlane)(current !== null
+    ? { ...current, operatorLabel: values.label, updatedAt }
+    : {
+      schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: null, pushApprovalDefault: "signature",
+      routing: null, language: null, session: null, usage: null, operatorLabel: values.label, updatedAt,
+    }, dependencies);
+  return { ok: true, code: "PO-HUMAN-SET-OPERATOR-LABEL-READY", label: values.label, changed: true, replaced: stored };
+}
+
 // Recorded as non-enumerable: pre-existing exact-shape assertions elsewhere
 // (lib/threat-model-approval-request.test.mjs) compare the whole parseHumanArgs()/
 // parseGateArgs() return value with assert.deepStrictEqual, which considers only own
@@ -1087,7 +1122,7 @@ export function parseHumanArgs(argv, dependencies = {}) {
   // must not see a new own-enumerable field on this object.
   Object.defineProperty(values, "keyReferenceSupplied", { value: supplied.has("keyReference"), enumerable: false, configurable: true });
   if (!new Set(KNOWN_COMMANDS).has(command)) {
-    const suggestion = suggestSubcommand(command, [...KNOWN_COMMANDS, "set-po-key-directory"]);
+    const suggestion = suggestSubcommand(command, [...KNOWN_COMMANDS, "set-po-key-directory", "set-operator-label"]);
     return { error: suggestion ? `${USAGE}\nUnknown subcommand "${command}". Did you mean "${suggestion}"?` : USAGE };
   }
   // R7-6-F3 (PO decision AC, Spec 22.6 delta, supersedes the earlier PO-KEYDIR-01(A)/SETUP-2b/AC-11/
@@ -2374,6 +2409,7 @@ function loadCriticSigningProvider(args) {
 export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
   // R7-6-T11: not a ceremony command, so it never reaches parseHumanArgs (no --repo-root, no signing).
   if (argv[0] === SET_PO_KEY_DIRECTORY_COMMAND) return runSetPoKeyDirectory(argv, dependencies);
+  if (argv[0] === SET_OPERATOR_LABEL_COMMAND) return runSetOperatorLabel(argv, dependencies);
   const args =parseHumanArgs(argv, dependencies); if (args.error) failParse(args);
   // Fail closed rather than fall through: the fork-disposition commands need an
   // async fork inspection this synchronous entry point cannot perform, and they

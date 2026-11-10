@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import { run, SCHEMA_ID, statePath as resolveStatePath } from "./pipeline-state.mjs";
 import { applyOnboardingIntakeConsent, nextActionSection } from "../lib/onboarding-continuity.mjs";
 import { mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
+import { MACHINE_PLANE_SCHEMA, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { fixtureAdoption } from "./architecture-adoption-test-fixture.mjs";
 
@@ -220,6 +221,21 @@ test("awaiting-approval surfaces present-plan as a runnable command when no pres
   ]);
   assert.equal(payload.nextAction.mutation, true);
   assert.equal(payload.nextAction.requiresConfirmation, false);
+});
+
+// C27 (PO tile 2026-11-10, EL-36): the label the PO stored once on this machine wins over the Git name.
+test("present-plan's --by prefers the local machine operator label over the Git user name, and falls back to it when no label is stored", () => {
+  const { root } = awaitingApprovalFixture("awaiting-approval-machine-label");
+  setLocalGitUserName(root, "Jordan Example");
+  const home = freshRoot("machine-label-home");
+  const homedirFn = () => home;
+
+  const fallback = JSON.parse(invoke(root, ["inspect"], { homedirFn }).out);
+  assert.equal(fallback.nextAction.argv[3], "Jordan Example");
+
+  writeMachinePlane({ schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: null, pushApprovalDefault: "chat", routing: null, language: null, session: null, usage: null, updatedAt: NOW, operatorLabel: "Stored Label" }, { homedirFn });
+  const labelled = JSON.parse(invoke(root, ["inspect"], { homedirFn }).out);
+  assert.deepEqual(labelled.nextAction.argv, [PIPELINE_STATE_SCRIPT_PATH, "present-plan", "--by", "Stored Label"]);
 });
 
 // Same gap, but --by is not derivable: the branch must fall back to

@@ -20,11 +20,13 @@ import test from "node:test";
 import {
   MACHINE_PLANE_SCHEMA,
   machinePlaneFilePath,
+  readMachineOperatorLabel,
   readMachinePlane,
   resolveLocalOperatorKeyAnchor,
   validateMachinePlane,
   writeMachinePlane,
 } from "./machine-plane.mjs";
+import { readMachinePlane as readHumanApprovalMachinePlane } from "./po-human-approval-read.mjs";
 
 const SCRATCH_ROOT = fileURLToPath(new URL("../../../scratch/", import.meta.url));
 
@@ -177,6 +179,26 @@ test("AC-2: an additional, otherwise-harmless key makes the plane invalid, namin
   const plane = { ...validPlane(), extraField: "not permitted" };
   const checked = validateMachinePlane(plane);
   assert.deepEqual(checked, { ok: false, code: "MP-UNKNOWN-KEY", detail: "extraField" });
+});
+
+test("C27: operatorLabel is optional, so a plane without it stays valid; a present value must be one short line or null, and the reader returns it", () => {
+  assert.deepEqual(validateMachinePlane(validPlane()), { ok: true });
+  for (const operatorLabel of ["Alex", "A. Person", null]) assert.deepEqual(validateMachinePlane(validPlane({ operatorLabel })), { ok: true }, String(operatorLabel));
+  for (const operatorLabel of ["", " x", "x ", "--flag", "a\nb", "x".repeat(65), 7, {}]) {
+    assert.deepEqual(validateMachinePlane(validPlane({ operatorLabel })), { ok: false, code: "MP-OPERATOR-LABEL", detail: "operatorLabel" }, JSON.stringify(operatorLabel));
+  }
+  const { home, target } = homeFixture();
+  try {
+    const dependencies = { homedirFn: () => home };
+    assert.equal(readMachineOperatorLabel(dependencies), null, "no file");
+    writeMachinePlane(validPlane(), dependencies);
+    assert.equal(readMachineOperatorLabel(dependencies), null, "no key");
+    writeMachinePlane(validPlane({ operatorLabel: "Alex" }), dependencies);
+    assert.equal(readMachineOperatorLabel(dependencies), "Alex");
+    assert.equal(readHumanApprovalMachinePlane(dependencies).status, "valid", "the read-only copy used by the signing path accepts the same file");
+    writeFileSync(target, "{}\n");
+    assert.equal(readMachineOperatorLabel(dependencies), null, "an invalid plane yields no value");
+  } finally { rmSync(home, { recursive: true, force: true }); }
 });
 
 test("AC-2: any single missing key makes the plane invalid, naming that key", () => {

@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync, lstatSync, opendirSync } from "node:fs";
 import { homedir } from "node:os";
+import { readMachineOperatorLabel } from "../lib/machine-plane.mjs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadManifestSafe, resolveHumanFacingLanguage } from "../lib/manifest.mjs";
@@ -2495,6 +2496,7 @@ export function main(options = {}) {
     ...(agyStartHint === undefined || agyStartHint === null ? {} : { agyStartHint }),
     ...(options?.nodeSandbox === undefined ? {} : { nodeSandbox: options.nodeSandbox }),
     ...(options?.subagentModelEnv === undefined ? {} : { subagentModelEnv: options.subagentModelEnv }),
+    ...(options?.operatorLabel === undefined ? {} : { operatorLabel: options.operatorLabel }),
     ...(options?.hostSkillCatalog === undefined ? {} : { hostSkillCatalog: options.hostSkillCatalog }),
   };
   // C19-G5: the typed runbook link (start path, preflight step) is the last key, once per session, and always when the preflight is not ready.
@@ -2533,6 +2535,11 @@ export function defaultRegistryLockProbe({ cwd = process.cwd(), inspect = inspec
   catch { return { status: "unknown" }; }
 }
 
+function observeOperatorLabel() {
+  const label = readMachineOperatorLabel();
+  return label === null ? { status: "absent" } : { status: "recorded", label };
+}
+
 /** Process entry only (not exported): observe the readiness report, then hand it to the synchronous `main`. */
 async function runEntry(argv = process.argv.slice(2)) {
   const environmentReadiness = await observeEnvironmentReadiness();
@@ -2546,7 +2553,8 @@ async function runEntry(argv = process.argv.slice(2)) {
     // D210: the host skill-catalog readback (the only writer of the sealed private record); absent outside an active governed repository.
     hostSkillCatalog: observeHostSkillCatalogReadback(),
     // MP-04 is the Elephant's bootstrap duty (policies/model-policy.md): an absent or `elephant` role only.
-    ...(role === undefined || role === "elephant" ? { subagentModelEnv: observeSubagentModelEnv() } : {}),
+    // EL-36: the `--by` name the PO recorded once for this machine; absent means the agent asks.
+    ...(role === undefined || role === "elephant" ? { subagentModelEnv: observeSubagentModelEnv(), operatorLabel: observeOperatorLabel() } : {}),
     ...(role === undefined ? {} : { role }),
     ...(modelRoleBootstrap === undefined ? {} : { modelRoleBootstrap }),
   });
