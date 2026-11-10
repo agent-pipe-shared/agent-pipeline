@@ -7,7 +7,7 @@
  * commits, pushes, signs or approves. The single scripts keep working and stay the fallback (references/happy-path.md).
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -37,6 +37,7 @@ goldfish: probes the package and reports ALL failures at once, builds the briefi
 critic: with --label, runs the check command as Critic diagnostic evidence under the Spec's evidence directory, registers it and stops once with
   "commit-required": commit exactly commitPaths in one evidence-only commit, then run the identical command again. Without --label, pass existing --evidence.
   It then runs the preflight and writes ${ADMIT_REQUEST_FILE}; "next.placeholders" names the values only you can fill before "next.admitCommand".
+  A request you had already filled is kept and named in "previousRequest": if that Critic still runs, finalize it with that file. A --label that recorded another candidate is refused.
   --candidate must be the full commit id, because the evidence commit moves HEAD.
 `;
 
@@ -109,6 +110,19 @@ export function prepareGoldfishDispatch({ root, packagePath, out = null, noGoldf
 }
 
 const gitOutput = (run, argv) => { const result = run("git", argv); return result.status === 0 ? String(result.stdout ?? "").trim() : ""; };
+const recordedDiagnosticCandidate = (path, read) => { try { return JSON.parse(read(path, "utf8"))?.candidate?.commit ?? null; } catch { return null; } };
+
+/** `finalize` reads this same file. A request the agent has already filled keeps its content under its packet's name; an untouched draft is simply replaced. */
+function setAsideFilledRequest(target, deps) {
+  if (!(deps.exists ?? existsSync)(target)) return null;
+  let held;
+  try { held = JSON.parse((deps.readFile ?? readFileSync)(target, "utf8")); } catch { return null; }
+  if (admitRequestPlaceholderPaths(held).length > 0) return null;
+  const packet = String(held?.packetId ?? "unknown").replace(/[^A-Za-z0-9._-]/gu, "_");
+  const aside = ADMIT_REQUEST_FILE.replace(/\.json$/u, `.${packet}.json`);
+  (deps.rename ?? renameSync)(target, join(dirname(target), basename(aside)));
+  return aside;
+}
 
 export function prepareCriticDispatch(input, deps = {}) {
   const verb = "critic";
@@ -127,6 +141,9 @@ export function prepareCriticDispatch(input, deps = {}) {
   if (label !== null) {
     const evidenceDir = posix.join(posix.dirname(spec.replace(/\\/gu, "/")), "evidence");
     const out = `${evidenceDir}/${label}.json`, log = `${evidenceDir}/${label}.log`;
+    if (exists(resolve(root, out)) && recordedDiagnosticCandidate(resolve(root, out), deps.readFile ?? readFileSync) !== candidate) {
+      return stopped(verb, "diagnostic", { code: "PREP-LABEL-OTHER-CANDIDATE", reason: `${out} does not record the candidate ${candidate}`, repair: "pass a new --label for this candidate: the evidence of an earlier candidate cannot stand for this one" }, "PREP-LABEL-OTHER-CANDIDATE");
+    }
     registrationCommit = gitOutput(run, ["log", "-1", "--format=%H", "--", out]);
     if (registrationCommit === "") {
       registrationCommit = null;
@@ -152,11 +169,13 @@ export function prepareCriticDispatch(input, deps = {}) {
   // A current-artifact review scope prints no admit request; the preflight's own result then says what follows.
   if (value.admitRequest === undefined) return outcome(verb, "ready", { preflight: value, next: { nextStep: value.nextStep ?? "the preflight returned packet-ready without an admit request; follow its result" } });
   const target = resolve(root, ADMIT_REQUEST_FILE);
+  const previousRequest = setAsideFilledRequest(target, deps);
   (deps.mkdir ?? mkdirSync)(dirname(target), { recursive: true });
   (deps.writeFile ?? writeFileSync)(target, `${JSON.stringify(value.admitRequest, null, 2)}\n`, "utf8");
   const admitCommand = (value.admitCommand ?? []).map((part) => part.replace("${PIPELINE_PLUGIN_ROOT}/scripts/", `${HERE.replace(/\\/gu, "/")}/`));
   return outcome(verb, "ready", {
     packetId: value.admitRequest.packetId, candidate: value.candidate?.commit ?? candidate,
+    ...(previousRequest === null ? {} : { previousRequest }),
     next: { requestPath: ADMIT_REQUEST_FILE, placeholders: admitRequestPlaceholderPaths(value.admitRequest), admitCommand, nextStep: value.nextStep,
       ...(value.criticDispatchPromptLines === undefined ? {} : { criticDispatchPromptLines: value.criticDispatchPromptLines }),
       ...(value.taskIdResolution === undefined ? {} : { taskIdResolution: value.taskIdResolution }), ...(value.split === undefined ? {} : { split: value.split }) },

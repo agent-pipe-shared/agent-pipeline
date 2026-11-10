@@ -109,6 +109,7 @@ const CRITIC = { root: ROOT, spec: "specs/f/spec.md", base: "b".repeat(40), cand
 const PACKET_READY = { status: "packet-ready", candidate: { commit: CANDIDATE }, nextStep: "write and admit",
   admitRequest: { packetId: "c".repeat(32), sessionId: "<FILL sessionId: hint>", taskId: "T1" }, admitCommand: ["node", "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs", "admit"] };
 const noFiles = { exists: () => false, mkdir: () => {}, writeFile: () => {} };
+const SAME_CANDIDATE = JSON.stringify({ candidate: { commit: CANDIDATE } });
 
 test("the first Critic call produces and registers evidence, stops once with the exact paths and commits nothing", () => {
   const steps = stub({ "git log": { status: 0, stdout: "\n", stderr: "" }, "critic-diagnostic-evidence.mjs": ok({ path: "x" }),
@@ -123,16 +124,37 @@ test("the first Critic call produces and registers evidence, stops once with the
 
 test("a registered evidence that is still uncommitted is registered again and asks for the same commit, without producing it twice", () => {
   const steps = stub({ "git log": { status: 0, stdout: "", stderr: "" }, "register-feature-package.mjs": ok({ status: "registered", commitPaths: [] }) });
-  const result = prepareCriticDispatch(CRITIC, { ...noFiles, exists: () => true, runCommand: steps.runCommand });
+  const result = prepareCriticDispatch(CRITIC, { ...noFiles, exists: () => true, readFile: () => SAME_CANDIDATE, runCommand: steps.runCommand });
   assert.equal(result.status, "commit-required");
   assert.deepEqual(steps.keys(), ["git log", "register-feature-package.mjs"]);
+});
+
+test("a label that recorded another candidate is refused before anything runs", () => {
+  const steps = stub({});
+  const result = prepareCriticDispatch(CRITIC, { ...noFiles, exists: () => true, readFile: () => JSON.stringify({ candidate: { commit: "e".repeat(40) } }), runCommand: steps.runCommand });
+  assert.equal(result.stop.code, "PREP-LABEL-OTHER-CANDIDATE");
+  assert.deepEqual(steps.calls, []);
+});
+
+test("a rerun keeps a request the agent already filled and replaces an untouched draft", () => {
+  const commit = "d".repeat(40);
+  const answers = { "git log": { status: 0, stdout: `${commit}\n`, stderr: "" }, "critic-dispatch-preflight.mjs": ok(PACKET_READY) };
+  const requestOr = (request) => (path) => (String(path).endsWith("session-critic-finalization-request.json") ? JSON.stringify(request) : SAME_CANDIDATE);
+  const renamed = [];
+  const files = { mkdir: () => {}, writeFile: () => {}, exists: () => true, rename: (from, to) => renamed.push([from, to]) };
+  const filled = prepareCriticDispatch(CRITIC, { ...files, readFile: requestOr({ packetId: "old-packet", sessionId: "s1" }), runCommand: stub(answers).runCommand });
+  assert.equal(filled.previousRequest, "scratch/session-critic-finalization-request.old-packet.json");
+  assert.match(renamed[0][1], /session-critic-finalization-request\.old-packet\.json$/u);
+  const draft = prepareCriticDispatch(CRITIC, { ...files, readFile: requestOr(PACKET_READY.admitRequest), runCommand: stub(answers).runCommand });
+  assert.equal(draft.previousRequest, undefined);
+  assert.equal(renamed.length, 1);
 });
 
 test("the identical rerun finds the evidence commit, reaches packet-ready and writes the admit request", () => {
   const commit = "d".repeat(40);
   const written = [];
   const steps = stub({ "git log": { status: 0, stdout: `${commit}\n`, stderr: "" }, "critic-dispatch-preflight.mjs": ok(PACKET_READY) });
-  const result = prepareCriticDispatch(CRITIC, { mkdir: () => {}, writeFile: (path, text) => written.push([path, text]), exists: () => true, runCommand: steps.runCommand });
+  const result = prepareCriticDispatch(CRITIC, { mkdir: () => {}, writeFile: (path, text) => written.push([path, text]), exists: (path) => !String(path).endsWith("finalization-request.json"), readFile: () => SAME_CANDIDATE, runCommand: steps.runCommand });
   assert.equal(result.status, "ready");
   assert.equal(result.packetId, "c".repeat(32));
   assert.deepEqual(result.next.placeholders, ["sessionId"]);
