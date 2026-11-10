@@ -69,7 +69,7 @@ function fail(code) { return { ok: false, code }; }
 // Names each held dependency with the cause that actually holds it (Critic F1): only a deliverable,
 // non-cancelled slice can be released by a "Dispatch: <slice> (goldfish)" commit.
 export function heldDependencyRepair() {
-  return `a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit`;
+  return `a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit; when its Goldfish no longer runs and the work landed another way, add --started and use --class integrated-elsewhere`;
 }
 // PO 2026-10-30 (D203): when the registry cannot be read (a producer refuses its reconcile), the refusal names the whole
 // repair route itself: inspect, then the routine heal, and when heal did not clear it and no Goldfish runs, move-aside.

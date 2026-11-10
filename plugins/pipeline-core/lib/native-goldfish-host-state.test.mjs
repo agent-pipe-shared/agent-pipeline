@@ -1490,6 +1490,8 @@ const cases = [
     // The reservation-publish refusal is only reachable on an admission race, so it is pinned at its source and through the one shared text.
     assert.equal(typeof mod.heldDependencyRepair,"function","heldDependencyRepair is exported");
     namesRepair(mod.heldDependencyRepair(),'heldDependencyRepair');
+    // Live (candidate 23): a started slice whose host commit was lost and whose work was committed by hand has no goldfish commit to wait for.
+    assert.match(mod.heldDependencyRepair(),/add --started and use --class integrated-elsewhere/u,"the repair names the route for a started slice");
     const source=readFileSync(new URL("./native-goldfish-host-state.mjs",import.meta.url),"utf8");
     assert.match(source,/item-delivery-integration-dependency-held:[^\n]*\n?[^\n]*heldDependencyRepair\(\)|heldDependencyRepair\(\)[^\n]*item-delivery-integration-dependency-held/u,"the reservation-publish throw attaches the repair");
     // PO 2026-10-30: an unreadable registry (a producer refuses its reconcile) names inspect, the routine heal and the human move-aside.
