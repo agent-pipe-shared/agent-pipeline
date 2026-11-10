@@ -42,7 +42,7 @@ export const BOUNDARY_POLICY_PATH = "architecture/boundary-policy.json";
 export const DEFAULT_LINE_BOUND = 1000;
 export const BOUNDARY_RULES = Object.freeze(["unowned-path", "ambiguous-ownership", "forbidden-dependency", "over-line-bound"]);
 /** What a pass of this check does and does not say (Codex greenfield report): a green verdict must not read as "every dependency was seen". */
-export const BOUNDARY_COVERAGE = "Checked: file ownership, file length, and relative imports written in JavaScript or TypeScript files. Not seen: runtime or browser globals, HTML and CSS references, bundler output, imports in other languages, and whether code honours a module's contract.";
+export const BOUNDARY_COVERAGE = "Checked: file ownership, file length, and relative imports written in JavaScript or TypeScript files. Not seen: runtime or browser globals, HTML and CSS references, bundler output, imports in other languages, import paths built at runtime, and whether code honours a module's contract.";
 export const DEFAULT_SOURCE_EXTENSIONS = Object.freeze([
   ".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx", ".py", ".go", ".rs", ".java", ".kt",
   ".rb", ".cs", ".swift", ".c", ".h", ".cc", ".cpp", ".hpp", ".php", ".scala",

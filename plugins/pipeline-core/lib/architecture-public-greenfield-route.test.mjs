@@ -147,6 +147,7 @@ test('CGF-30 a drifted target or an unclosed receipt keeps adoption-required aft
   writeFileSync(join(drifted.dir, receipt.targets[0].path), Buffer.concat([readFileSync(join(drifted.dir, receipt.targets[0].path)), Buffer.from('\ndrift\n')]));
   assert.equal(inspectClosedFeatureArchitecture(drifted.dir).code, 'ARCHITECTURE-DESIGN-ARTIFACT-DRIFT');
   assert.equal(resolveAdoptionState(drifted.dir).state, 'adoption-required');
+  assert.match(resolveAdoptionState(drifted.dir).rationale, /no longer matches the closed feature's approved design/u, 'a drifted map must not read as no architecture at all');
 
   const unclosed = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
   assert.equal(fixture.invoke(unclosed, ['materialize-architecture']).status, 0);
