@@ -21,7 +21,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { mergeSplitVerdicts } from "../lib/critic-split.mjs";
-import { readAdmittedSplit, readCriticSplitSourceReturns, settleSplitReturns } from "../lib/critic-source-return.mjs";
+import { readAdmittedSplit, readCriticReturnProblems, readCriticSplitSourceReturns, settleSplitReturns } from "../lib/critic-source-return.mjs";
 
 export const CRITIC_SPLIT_MERGE_RESULT_SCHEMA = "pipeline.critic-split-merge-result.v1";
 const MAX_BYTES = 1024 * 1024;
@@ -36,12 +36,18 @@ function childrenFromPacket(root, packetId) {
   const packetsRoot = join(resolve(root, common.stdout.trim()), "agent-pipeline", "critic-packets");
   let records = [];
   try { records = readCriticSplitSourceReturns({ controlRoot: packetsRoot, packetId }); } catch { records = []; }
-  if (records.length === 0) throw new MergeUsageError(`packet ${JSON.stringify(String(packetId).slice(0, 40))} holds no Critic Source return; repair: let the module Critics return through their stop, or pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-NO-RECORDS");
+  const problems = problemText(readCriticReturnProblems({ controlRoot: packetsRoot, packetId }));
+  if (records.length === 0) throw new MergeUsageError(`packet ${JSON.stringify(String(packetId).slice(0, 40))} holds no Critic Source return${problems}; repair: let the module Critics return through their stop, or pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-NO-RECORDS");
   const digests = new Set(records.map((record) => record?.splitSha256));
   const split = digests.size === 1 ? readAdmittedSplit(join(packetsRoot, packetId), [...digests][0]) : undefined;
   if (split === undefined) throw new MergeUsageError(`the Source returns of packet ${packetId} do not bind one admitted split; repair: pass --split <split file> and one --child <entryId>=<verdict file> per entry`, "CSM-PACKET-SPLIT");
   // CGR-09: a resumed child's later return replaces its earlier one; two different children for one entry still reach the merge as duplicates and are refused there.
-  return { split, children: settleSplitReturns(records).map((record) => ({ entryId: record.entryId, verdict: record.verdict })) };
+  return { split, problems, children: settleSplitReturns(records).map((record) => ({ entryId: record.entryId, verdict: record.verdict })) };
+}
+
+/** C23: the recorded reasons as one clause of a refusal, with the step they call for; empty when no Critic left one. */
+function problemText(problems) {
+  return problems.length === 0 ? "" : `. A Critic of this round returned without a record because ${problems.slice(0, 3).join("; and ")}. Send that Critic this reason so its corrected final message counts for its entry, or dispatch a fresh Critic for the missing entry`;
 }
 
 function repoFile(root, path, label) {
@@ -84,7 +90,7 @@ export function runCriticSplitMergeCli(argv) {
       return { split, children };
     })();
     const merged = mergeSplitVerdicts(input.split, input.children);
-    if (!merged.ok) return { exitCode: 1, stdout: "", stderr: `${JSON.stringify({ schema: CRITIC_SPLIT_MERGE_RESULT_SCHEMA, status: "rejected", code: merged.code, message: merged.message })}\n` };
+    if (!merged.ok) return { exitCode: 1, stdout: "", stderr: `${JSON.stringify({ schema: CRITIC_SPLIT_MERGE_RESULT_SCHEMA, status: "rejected", code: merged.code, message: `${merged.message}${merged.code === "CSM-CHILD-MISSING" ? input.problems ?? "" : ""}` })}\n` };
     if (flags.out !== undefined) {
       const out = repoFile(root, flags.out, "--out");
       let fd;

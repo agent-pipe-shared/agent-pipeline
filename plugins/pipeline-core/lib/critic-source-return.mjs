@@ -15,7 +15,7 @@
  * `send_message` to its parent (hooks/antigravity-pretool-guard.mjs recognises the child; whether a stop event fires for an Antigravity child is not
  * measured and nothing is built on it). Imports only the packet read half and the schema checker.
  */
-import { closeSync, existsSync, openSync, readFileSync, readdirSync, writeSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import { PACKET_ID, SESSION_REVIEW_TTL_SECONDS, SPLIT_FILE, canonicalJson, currentState, packetContext, readJson, sha256 } from "./critic-packet-preflight-read.mjs";
 import { attributeVerdict, criticSplitDigest, criticSplitProblem, verdictPassContradiction } from "./critic-split.mjs";
@@ -35,11 +35,12 @@ const CRITIC_AGENT_TYPES = new Set(["critic", "critic-high-risk"]);
 
 const normalizedAgentType = (value) => typeof value !== "string" ? null : value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
 
+const VERDICT_FENCE = /```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```/gu;
 /** The verdict a Critic returned: its whole message, else the content of the LAST fenced block, as a schema-shaped object; otherwise null. */
 export function extractCriticVerdict(text) {
   if (typeof text !== "string" || text.length === 0 || text.length > 4 * 1024 * 1024) return null;
   const candidates = [text.trim()];
-  const blocks = [...text.matchAll(/```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```/gu)];
+  const blocks = [...text.matchAll(VERDICT_FENCE)];
   if (blocks.length > 0) candidates.push(blocks.at(-1)[1]);
   for (const candidate of candidates) {
     let value;
@@ -91,8 +92,56 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
       const handback = readHandbackFn(input);
       if (handback?.ok === true) verdict = extractCriticVerdict(handback.message);
     }
-    return issueForVerdict({ commonDir, runner, verdict, nowMs, child: childDigest(input.agent_id) });
+    const child = childDigest(input.agent_id);
+    const result = issueForVerdict({ commonDir, runner, verdict, nowMs, child });
+    noteReturnProblem({ commonDir, runner, nowMs, child, result, text: input.last_assistant_message });
+    return result;
   } catch { return { status: "unavailable" }; }
+}
+
+/** In words, why a Critic's final message holds no verdict that can be recorded. */
+function verdictProblemText(text) {
+  if (typeof text !== "string" || text.trim() === "") return "its final message was empty";
+  const blocks = [...text.matchAll(VERDICT_FENCE)];
+  let value;
+  try { value = JSON.parse(blocks.length > 0 ? blocks.at(-1)[1] : text.trim()); }
+  catch { return blocks.length > 0 ? "the last fenced block of its final message is not valid JSON" : "its final message does not end in a fenced JSON verdict"; }
+  const { errors } = validateAgainstSchema(value, VERDICT_SCHEMA);
+  return errors.length > 0 ? `its verdict does not match the verdict schema (${errors.slice(0, 3).join("; ")})` : "its final message holds no verdict";
+}
+
+const returnProblemFile = (child) => `return-problem-${child ?? "unknown"}.json`;
+/**
+ * C23 (Claude greenfield 2026-11-09: a split entry stayed without a record, the merge could only say it was missing and the agent resumed that Critic twice in the dark). The reason a return
+ * left no record goes to the private packet directory, because a stop hook's own output never reaches the calling agent; the merge prints it. A later good return of that child clears it.
+ * Best effort: it never changes what the stop did.
+ */
+function noteReturnProblem({ commonDir, runner, nowMs, child, result, text }) {
+  try {
+    const controlRoot = join(commonDir, "agent-pipeline", "critic-packets");
+    if (result.status === "issued") {
+      if (child !== null && typeof result.packetId === "string") rmSync(join(controlRoot, result.packetId, returnProblemFile(child)), { force: true });
+      return;
+    }
+    const reason = result.status === "no-verdict" ? verdictProblemText(text)
+      : result.status === "contradictory-verdict" ? `its verdict contradicts its own pass: true (${result.reason})`
+        : result.status === "unattributed" ? `its verdict names no split entry: trajectory_evidence must begin with one of ${result.entries.join(", ")}`
+          : null;
+    if (reason === null || !existsSync(controlRoot)) return;
+    const open = openAdmittedPackets(controlRoot, runner, nowMs);
+    if (open === null || open.length !== 1 || !open[0].split) return;
+    writeFileSync(join(open[0].packetDir, returnProblemFile(child)), canonicalJson({ reason: reason.slice(0, 800), atMs: nowMs }), { mode: 0o600 });
+  } catch { /* a diagnostic never fails the stop */ }
+}
+
+/** C23: why Critics of this split packet returned without a record, newest first; [] when none did. */
+export function readCriticReturnProblems({ controlRoot, packetId } = {}) {
+  try {
+    if (typeof controlRoot !== "string" || !PACKET_ID.test(packetId ?? "")) return [];
+    const dir = join(controlRoot, packetId);
+    return readdirSync(dir).filter((name) => /^return-problem-(?:[a-f0-9]{64}|unknown)\.json$/u.test(name))
+      .map((name) => JSON.parse(readFileSync(join(dir, name), "utf8"))).sort((left, right) => right.atMs - left.atMs).map((problem) => String(problem.reason));
+  } catch { return []; }
 }
 
 /** CGR-09: the identity of the returning child as a digest (never the raw id), or null when the runner reports none. */

@@ -2828,6 +2828,29 @@ test("C21B a child verdict that passes against its own fields issues no Source r
   } finally { cleanup(fx); }
 });
 
+test("C23: a Critic return that leaves no record states why in the merge refusal, and a corrected return of the same child clears the reason", async () => {
+  const { runCriticSplitMergeCli } = await import("./critic-split-merge.mjs");
+  const fx = g2072Fixture();
+  try {
+    const admitted = g2072Admit(fx);
+    const merge = () => JSON.parse(runCriticSplitMergeCli(["--root", fx.root, "--packet", admitted.packetId]).stderr);
+    const problems = () => readdirSync(admitted.packetDir).filter((name) => name.startsWith("return-problem-"));
+    for (const id of ["api", "shared"]) assert.match(g2072Hook(fx, criticReturn(g2072Child(id))).stderr, /Source return issued/u);
+    const child = { agent_id: "agent-core" };
+    g2072Hook(fx, criticReturn({ ...g2072Child("core"), severity: "extra" }), child);
+    assert.equal(problems().length, 1);
+    const schema = merge();
+    assert.equal(schema.code, "CSM-CHILD-MISSING");
+    assert.match(schema.message, /no child verdict for entry core[\s\S]*does not match the verdict schema \(.*severity[\s\S]*Send that Critic this reason/u, schema.message);
+    g2072Hook(fx, "The review is finished, no block here.", child);
+    assert.match(merge().message, /does not end in a fenced JSON verdict/u);
+    g2072Hook(fx, criticReturn(verdict()), child);
+    assert.match(merge().message, /names no split entry: trajectory_evidence must begin with one of scope:/u);
+    assert.match(g2072Hook(fx, criticReturn(g2072Child("core")), child).stderr, /Source return issued/u);
+    assert.deepEqual(problems(), [], "the corrected return clears the reason");
+  } finally { cleanup(fx); }
+});
+
 test("G20-72 admit binds the split; the Critic stop hook issues one Source return per returning child; the whole chain ends in one source-issued verdict whose receipt carries the split digest", async () => {
   const { criticSplitDigest } = await import("../lib/critic-split.mjs");
   const fx = g2072Fixture();
