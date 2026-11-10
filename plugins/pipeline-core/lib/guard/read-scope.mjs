@@ -534,7 +534,7 @@ function passiveTargetIsFile(raw, root) {
 // project root BOTH lexically and physically (no link or junction escape), carries no dot-segment in the path it NAMES, and re-uses
 // isAllowedPassiveReadTarget -- including its whole-tree secret screen -- unchanged. The Glob wildcard listing additionally walks the subtree below the
 // named path and is admitted only when no directory there is hidden (qp4NoHiddenDirectoryAtOrBelow), so .git private state and .claude are not listed
-// through a parent directory either. There is NO Grep directory lane: guardrails/security.md SEC-11 requires native Grep to name an exact file.
+// through a parent directory either. The Grep directory lane (grepInRootDirectory, guardrails/security.md SEC-11) uses the all-files tree screen instead.
 function qp4PhysicallyInsideProject(candidate, root) {
   try {
     const lexical = resolve(candidate);
@@ -568,12 +568,46 @@ function qp4InRootWildcardListing(raw, selector, root, extraRoots) {
   // C21 (AC-108): `<literal directories>/**/*` lists the entry names of the whole subtree of one such directory. It is judged by exactly the same checks
   // (the whole-tree secret screen, the hidden-directory walk with its entry and depth bounds); the only addition is that the recursive form never names
   // the project root itself, which always holds hidden directories. `**` anywhere else, a second wildcard segment and a trailing `**` alone stay refused.
-  const recursive = parts.length >= 2 && parts[parts.length - 2] === "**" && parts[parts.length - 1] === "*";
+  // C27 (PO decision 2026-11-10): the final segment may also be a name filter (`*slice-ledger*`); it can only narrow the listing the two checks already admit.
+  const finalSegment = parts[parts.length - 1];
+  if (!qp4ListingFinalSegment(finalSegment)) return false;
+  const recursive = parts.length >= 2 && parts[parts.length - 2] === "**";
   const literal = parts.slice(0, recursive ? -2 : -1);
-  if ((!recursive && parts[parts.length - 1] !== "*") || literal.some((part) => /[?*]/u.test(part))) return false;
+  if (literal.some((part) => /[?*]/u.test(part))) return false;
   const directory = literal.length === 0 ? raw : join(raw, ...literal);
   if (recursive && qp4IsProjectRoot(directory, root)) return false;
   return qp4InRootDirectory(directory, root, extraRoots) && qp4NoHiddenDirectoryAtOrBelow(passiveCandidate(directory, root), root);
+}
+
+// `*`, or one bounded name filter holding a wildcard. A filter ending in a literal extension must pass the same credential-extension test as every other Glob.
+function qp4ListingFinalSegment(segment) {
+  if (segment === "*") return true;
+  if (!/[?*]/u.test(segment) || segment.includes("**") || !/^[A-Za-z0-9_.*?-]{1,64}$/u.test(segment)) return false;
+  // Whatever follows the last dot must be one literal, admitted extension (`*.m*`, `*.*` and an over-long extension stay refused, as for every other Glob).
+  const lastDot = segment.lastIndexOf(".");
+  if (lastDot !== -1) {
+    const tail = segment.slice(lastDot + 1);
+    if (!new RegExp(`^${GLOB_LITERAL_EXTENSION}$`, "u").test(tail) || !globExtensionAdmitted(tail)) return false;
+  }
+  // A filter that spells a secret name (`id_rsa*`) stays refused even in a tree that holds none.
+  const roots = PASSIVE_READ_CREDENTIAL_ROOTS;
+  return !new RegExp(roots.secretBasenameRegex.source, roots.secretBasenameRegex.flags).test(segment.replace(/[*?]/gu, ""));
+}
+
+// C27 (PO decision 2026-11-10, supersedes the 2026-10-16 refusal; SEC-11 amended): native Grep may name one non-hidden project directory, as `rg` and `grep -r`
+// may. The host's Grep can read hidden and ignored files, so the directory passes the all-files screen of `grep -r`: no secret-named file and no .git anywhere
+// below it, at most 10000 entries. The project root holds .git and therefore stays refused. A `glob` filter only narrows a tree that passed that screen.
+const GREP_DIRECTORY_GLOB_MAX_LENGTH = 256;
+
+function grepInRootDirectory(raw, selector, root, pluginPath) {
+  if (pluginPath === false || typeof raw !== "string" || raw === "" || /[\0$\x60*?\[\]{}]/u.test(raw) || raw.startsWith("~")) return false;
+  if (selector !== undefined && (typeof selector !== "string" || selector === ""
+    || selector.length > GREP_DIRECTORY_GLOB_MAX_LENGTH || /[\0\r\n]/u.test(selector)
+    // The filter narrows a screened tree; one that names a parent, .git or an absolute path is not a filter.
+    || /^[\\/]|(?:^|[\\/])\.(?:\.|git)(?:[\\/]|$)/iu.test(selector))) return false;
+  const candidate = passiveCandidate(raw, root);
+  if (!qp4PhysicallyInsideProject(candidate, root) || !existsDirectory(candidate)) return false;
+  return isAllowedPassiveReadTarget(raw, { rootDir: root, recursive: true, allFiles: true });
 }
 
 function qp4IsProjectRoot(raw, root) {
@@ -827,7 +861,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
     ? claudeTaskOutputReadScope(path, input, root, dependencies)
     : null;
   // ALF-C-P15-01B (AC-239): a glob filter on native Grep can only narrow, never widen, a search that names one
-  // exact, admitted file, so it is admitted for that shape alone (SEC-11 stays: no Grep directory lane).
+  // exact, admitted file, so it is admitted for that shape here; a named directory has its own lane below.
   // ALF-C-P15-01D: the glob lane additionally requires the resolved, physical target to be inside the project root
   // (qp4PhysicallyInsideProject: lexical + realpath containment, fails closed on escape, missing or unresolvable path).
   const grepExactFile = toolName === "Grep" && pluginPath !== false
@@ -853,7 +887,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
   const scoped = targetSafe && selectorSafe;
   if (scoped) return verdict(0);
   if (toolName === "Glob" && qp4InRootWildcardListing(path, selector, root, sessionRoots)) return verdict(0);
-  // R2-1 (SEC-11): there is no Grep directory lane; Grep with a directory path is refused exactly as at HEAD.
+  if (toolName === "Grep" && grepInRootDirectory(path, selector, root, pluginPath)) return verdict(0);
   if (toolName === "Read" && qp4MissingInRootTarget(path, root)) {
     // G20-67: a Read of a missing in-root file is an existence probe; it reads nothing and the host reports the missing file. Only a canon
     // pointer the plugin ships keeps the refusal, because its text names the plugin copy to read instead (G20-9).
@@ -874,18 +908,18 @@ export function readToolScopeVerdict(input, root, dependencies) {
   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
     + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
     + (toolName === "Glob"
-      ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or lists one non-hidden project directory: <directory>/* or <directory>/**/* (a subtree), either with path set to that directory and the pattern * or **/*, or with the directory inside the pattern; a bare ** or * over the project root is not, because the root holds hidden directories.\n"
+      ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or lists one non-hidden project directory: <directory>/* or <directory>/**/* (a subtree), also with a name filter as the last part (<directory>/**/*ledger*), either with path set to that directory and the pattern * or **/*, or with the directory inside the pattern; a bare ** or * over the project root is not, because the root holds hidden directories.\n"
       : ""));
 }
 
 // C19C-W169 (W5): a project directory that is not a credential root was refused with a text that spoke only of plugin files and named no protected
-// root. The refusal itself is unchanged (SEC-11: native Grep names one exact file); the text now says which roots are protected, that a plain project
-// directory is not one of them, and which spelling is admitted instead. Also printed by the PowerShell dialect's read refusal.
+// root. The text says which roots are protected, that a plain project directory is not one of them, and which spelling is admitted instead (SEC-11,
+// amended C27: native Grep names one exact file or one non-hidden project directory). Also printed by the PowerShell dialect's read refusal.
 export function readTargetProtectedRootsAdvice() {
   const stores = PASSIVE_READ_CREDENTIAL_ROOTS.homeRelativePaths.slice(0, 6).join(", ");
   return `Protected roots: credential stores under the home directory (${stores}, ...), the machine and repository PO key-directory pointers, system pseudo-files, and secret-named files (id_*, credentials, *.pem, *.key, ...). `
-    + "A project directory that is not a protected root is not what was refused: native Grep searches one exact file (guardrail SEC-11), so list the directory with Glob "
-    + "(path = the directory, pattern * or *.ext) and then Grep or Read the exact file you need; where the runner offers a Bash tool, rg -n <pattern> <dir> is admitted inside the project.";
+    + "A project directory that is not a protected root is not what was refused: native Grep takes one exact file, or one non-hidden project directory whose tree holds no secret-named file and no .git (guardrail SEC-11), so the project root itself is out; name a subdirectory, or list the directory with Glob "
+    + "(path = the directory, pattern * or *.ext) and then Grep or Read the exact file you need; where the runner offers a Bash tool, rg -n <pattern> <dir> is admitted inside the project, the root included.";
 }
 
 // The operand(s) of a native Read/Grep/Glob that name the path itself: the file or search path, plus the joined path of a Glob with a literal

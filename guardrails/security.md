@@ -195,8 +195,10 @@ new term for this case).
 - The lifecycle guard admits exact, existing regular files in user-visible
   host paths outside the active repository. Names-only directory listing is
   separately bounded. Recursive content search remains scoped and checks its
-  traversed inventory before admission; native Grep requires an exact file.
-  Filesystem permissions remain enforced by the host.
+  traversed inventory before admission; native Grep names an exact file or one
+  non-hidden project directory whose whole tree holds no secret-named file and
+  no `.git`, the same all-files screen as `grep -r`, so the project root stays
+  a shell `rg` search. Filesystem permissions remain enforced by the host.
 - Both the machine and repository PO key-directory pointers, known credential
   stores and files, system pseudo-files, and their physical symlink aliases
   stay excluded. Invalid authority readback does not broaden the read lane.

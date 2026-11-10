@@ -12326,7 +12326,7 @@ test("QP4-3 R4 an existing in-root file through tail, wc and head is admitted; t
   }
 });
 
-test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G4); .git and escapes stay refused (G2); every directory-scoped Grep stays refused (R2-1, SEC-11)", async (t) => {
+test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G4); .git and escapes stay refused (G2); directory Grep follows the rg screen (SEC-11)", async (t) => {
   const path = qp4Fixture();
   const outside = qp4Fixture();
   try {
@@ -12358,28 +12358,23 @@ test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G
         assert.equal(r.exitCode, 2, JSON.stringify(input));
         assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
       }
-      // R2-1 (SEC-11 "native Grep requires an exact file"): the directory-scoped Grep lane is removed. Round 1 admitted these five shapes; each is
-      // refused again, exactly as at HEAD (content search over a tree uses the admitted `git grep`).
+      // C27 (PO tile 2026-11-10, SEC-11): native Grep on a named directory inside the project passes the same all-files screen as `rg`.
       for (const input of [
         { pattern: "authorize-commit|apply", path: join(path, "scratch"), glob: "*.md" },
         { pattern: "authorize", path: join(path, "scratch"), glob: "**/*.md" },
         { pattern: "authorize", path: qp4Fwd(join(path, "scratch")), glob: "*.mjs" },
         { pattern: "authorize", path: "scratch", glob: "*.md" },
-        { pattern: "apply", path: join(path, "plugins", "pipeline-core"), glob: "**/*.mjs" },
-      ]) {
-        const r = tool("Grep", input);
-        assert.equal(r.exitCode, 2, JSON.stringify(input));
-        assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
-      }
-      for (const input of [
         { pattern: "x", path: join(path, "scratch") },
+        // The screen covers every file below the directory before the glob applies, so a filter can only narrow it.
+        { pattern: "x", path: join(path, "scratch"), glob: "*.pem" },
+        { pattern: "x", path: join(path, "scratch"), glob: "*" },
+      ]) assert.equal(tool("Grep", input).exitCode, 0, JSON.stringify(input));
+      for (const input of [
         { pattern: "x", glob: "*.md" },
         { pattern: "x", path: join(path, ".git"), glob: "*.json" },
         { pattern: "x", path: join(path, ".git", "agent-pipeline"), glob: "**/*.json" },
         { pattern: "x", path: join(path, "vault"), glob: "*.md" },
         { pattern: "x", path, glob: "*.md" },
-        { pattern: "x", path: join(path, "scratch"), glob: "*.pem" },
-        { pattern: "x", path: join(path, "scratch"), glob: "*" },
         { pattern: "x", path: join(path, "scratch"), glob: "../*.md" },
         { pattern: "x", path: join(path, "scratch"), glob: ".git/*.md" },
         { pattern: "x", path: join(outside, "scratch"), glob: "*.md" },
@@ -13064,15 +13059,14 @@ test("TR-B T77 rg -g lane: bounded basename-extension filters, including *.test.
   }
 });
 
-test("TR-B T74 directory Grep: the Grep tool on a directory stays refused with GUARD-READ-TARGET (SEC-11; also pinned by QP4-4, repeated here under the row)", () => {
+test("TR-B T74 directory Grep: a named project directory is admitted, one holding a secret-named file stays refused with GUARD-READ-TARGET (SEC-11; also pinned by QP4-4)", () => {
   const path = trbFixture();
   try {
     qp4WithoutAppDataRoots(() => {
-      for (const input of [{ pattern: "apply", path: join(path, "scratch") }, { pattern: "apply", path: join(path, "vault") }]) {
-        const verdict = qp4Verdict({ tool_name: "Grep", tool_input: input }, path);
-        assert.equal(verdict.exitCode, 2, JSON.stringify(input));
-        assert.match(verdict.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
-      }
+      assert.equal(qp4Verdict({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "scratch") } }, path).exitCode, 0);
+      const verdict = qp4Verdict({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "vault") } }, path);
+      assert.equal(verdict.exitCode, 2);
+      assert.match(verdict.text, new RegExp(QP4_READ_TARGET));
     });
   } finally {
     rmSync(path, { recursive: true, force: true });

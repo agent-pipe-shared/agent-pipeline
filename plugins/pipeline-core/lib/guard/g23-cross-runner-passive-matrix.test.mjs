@@ -159,8 +159,7 @@ if (worker) {
       }
       for (const path of ['docs', join(root, 'docs')]) {
         const verdict = inspect({ tool_name: 'Grep', tool_input: { pattern: 'synthetic', path } });
-        assert.equal(verdict.exitCode, 2);
-        assert.match(verdict.stderr, /GUARD-READ-TARGET:/u);
+        assert.equal(verdict.exitCode, 0, verdict.stderr);
       }
       for (const path of ['docs', join(root, 'docs')]) {
         const verdict = inspect({ tool_name: 'Glob', tool_input: { path, pattern: '*.md' } });

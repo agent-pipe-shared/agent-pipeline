@@ -182,7 +182,7 @@ test("U1b the exact-file glob lane is restricted to the project root: an exact f
 }));
 
 test("P7 a glob filter does not widen native Grep: secret file, subtree and out-of-root targets stay denied with a glob", () => withFixture((path) => {
-  for (const target of [join(path, "vault", "id_rsa"), join(path, "docs"), join(path, "..", "..", "outside.md")]) {
+  for (const target of [join(path, "vault", "id_rsa"), join(path, "vault"), join(path, "..", "..", "outside.md")]) {
     const r = run({ tool_name: "Grep", tool_input: { pattern: "x", path: target, glob: "*" } }, path);
     assert.equal(r.exitCode, 2, `${target}\n${r.text}`);
     assert.deepEqual(denialProblems(r.text), [], `${target}\n${r.text}`);
@@ -194,14 +194,27 @@ test("P6 native Grep on an exact in-repo file with a type filter is admitted (A1
   assert.equal(r.exitCode, 0, r.text);
 }));
 
-test("U2 (PO decision 2026-10-16: REFUSE, SEC-11 exact-file rule stays) native Grep on an in-repo subtree is refused with or without a glob filter; the credential directory stays denied too", () => withFixture((path) => {
-  for (const target of [join(path, "docs"), join(path, "vault")]) {
-    for (const extra of [{ glob: "2026-09-2*-*.md" }, { glob: "*" }, {}]) {
-      const r = run({ tool_name: "Grep", tool_input: { pattern: "apply", path: target, ...extra } }, path);
-      assert.equal(r.exitCode, 2, `${target} ${JSON.stringify(extra)}\n${r.text}`);
-      assert.deepEqual(denialProblems(r.text), [], `${target}\n${r.text}`);
-    }
+test("U2 (PO decision 2026-11-10, SEC-11 amended) native Grep on a plain project directory is admitted with or without a glob filter; a tree holding a secret-named file stays denied", () => withFixture((path) => {
+  for (const extra of [{ glob: "2026-09-2*-*.md" }, { glob: "*" }, {}]) {
+    const admitted = run({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "docs"), ...extra } }, path);
+    assert.equal(admitted.exitCode, 0, `${JSON.stringify(extra)}\n${admitted.text}`);
+    const r = run({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "vault"), ...extra } }, path);
+    assert.equal(r.exitCode, 2, `${JSON.stringify(extra)}\n${r.text}`);
+    assert.deepEqual(denialProblems(r.text), [], r.text);
   }
+}));
+
+test("U2b the native Grep directory lane is bounded: the glob filter's length and line breaks, hidden directories, and a project root holding .git", () => withFixture((path) => {
+  const grep = (target, extra = {}) => run({ tool_name: "Grep", tool_input: { pattern: "apply", path: target, ...extra } }, path).exitCode;
+  mkdirSync(join(path, ".git"), { recursive: true });
+  mkdirSync(join(path, ".hidden"), { recursive: true });
+  assert.equal(grep(path), 2, "the project root holds .git");
+  assert.equal(grep(join(path, ".hidden")), 2, "a hidden directory is never named");
+  assert.equal(grep(join(path, "docs"), { glob: "x".repeat(257) }), 2);
+  assert.equal(grep(join(path, "docs"), { glob: "a\nb" }), 2);
+  assert.equal(grep(join(path, "docs"), { glob: "" }), 2);
+  writeFileSync(join(path, "docs", "deploy.pem"), "");
+  assert.equal(grep(join(path, "docs")), 2, "the tree now holds a secret-named file");
 }));
 
 // ---- A3: the cross-runner matrix (Claude row above and in P1-P7; Codex and Antigravity rows below) ------------------
@@ -469,7 +482,6 @@ test("M8 Claude native Read, Grep and Glob of a credential target are refused wi
   // Negative controls: the path is not a credential, so the refusal keeps its own code (and the text of the previous behaviour).
   for (const input of [
     { tool_name: "Read", tool_input: { file_path: join(path, "..", "..", "outside.md") } },
-    { tool_name: "Grep", tool_input: { pattern: "a", path: join(path, "docs") } },
     { tool_name: "Grep", tool_input: { pattern: "a", path: join(path, "vault") } },
     { tool_name: "Glob", tool_input: { pattern: "../*", path } },
   ]) {

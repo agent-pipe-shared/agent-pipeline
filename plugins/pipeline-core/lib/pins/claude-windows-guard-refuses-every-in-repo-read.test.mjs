@@ -218,15 +218,20 @@ test("AP8 a Read of a missing in-repo file gets the distinct GUARD-READ-TARGET-M
   }
 }));
 
-test("AP9 Glob wildcard listing of an in-repo directory is admitted; hidden/escaping listings and directory Grep (SEC-11) stay refused", () => withFixture((path) => {
+test("AP9 Glob wildcard listing of an in-repo directory is admitted, with a name filter too; hidden/escaping listings stay refused; native Grep may name a plain directory (SEC-11)", () => withFixture((path) => {
+  assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "scratch/**/*ledger*" } }, path).exitCode, 0);
+  assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "**/*ledger*", path: join(path, "scratch") } }, path).exitCode, 0);
+  assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "scratch/**/*.pem" } }, path).exitCode, 2);
+  assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "**/*ledger*", path } }, path).exitCode, 2);
   assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "scratch/*", path } }, path).exitCode, 0);
   assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "scratch/sub/*" } }, path).exitCode, 0);
   assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "*", path: join(path, ".git") } }, path).exitCode, 2);
   assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "../*", path } }, path).exitCode, 2);
   assert.equal(verdict({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "docs", "state.md") } }, path).exitCode, 0);
   const dirGrep = verdict({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "scratch"), glob: "*.md" } }, path);
-  assert.equal(dirGrep.exitCode, 2);
-  assert.match(dirGrep.text, /GUARD-READ-TARGET/u);
+  assert.equal(dirGrep.exitCode, 0, dirGrep.text);
+  const gitGrep = verdict({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, ".git") } }, path);
+  assert.equal(gitGrep.exitCode, 2);
 }));
 
 test("AP9b a native Glob may end in any literal extension that is not credential-shaped, or in one trailing brace group of such extensions (PO 2026-11-01); credential extensions, braces anywhere else, extension wildcards, hidden parts and escapes stay refused", () => withFixture((path) => {
