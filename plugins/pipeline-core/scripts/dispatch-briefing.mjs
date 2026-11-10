@@ -58,6 +58,13 @@ const USAGE = `Usage:
   node <plugin-root>/scripts/dispatch-briefing.mjs build --package <package.json> [--out scratch/<briefing>.md] [--root <directory>]
   node <plugin-root>/scripts/dispatch-briefing.mjs probe --package <package.json> [--root <directory>]
 
+Package fields (JSON object, pipeline.dispatch-briefing-package.v1):
+  required strings: id, item, agentType, modelId, check, title, ac, goal
+  required lists of strings: paths, context, targeted
+  optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner, effortEscalation, module, modulePlan
+  optional lists of strings: newFiles, forbidden, stops, facts
+  optional: estimatedToolCalls (positive integer), visualCheck ({ question, evidencePath })
+
 probe runs every dispatch-time check of that package in dry-run (package fields, binding refusals, plan approval, registry lock),
   writes no file, takes no lock, reserves no slice, and prints ALL failures at once as JSON, each with its repair; exit 0 when ready, 2 otherwise.
 

@@ -213,7 +213,7 @@ export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagent
   });
   if (batch.status !== "prepared") return { ...rejected(batch.code, "packets"), preparation: batch };
   if (packets.some((packet) => packet.transport !== "antigravity" || packet.resultDestination?.kind !== "return")) {
-    return rejected("AGY-NATIVE-PACKET-BOUNDARY", "packets");
+    return { ...rejected("AGY-NATIVE-PACKET-BOUNDARY", "packets"), repair: "every packet needs \"transport\": \"antigravity\" and \"resultDestination\": { \"kind\": \"return\" }, because a native child hands its result back in its return; a result file path is not a field of this packet" };
   }
   if (packets.some((packet) => packet.candidate.commit !== state.head || packet.candidate.tree !== state.tree)) {
     return rejected("AGY-NATIVE-CANDIDATE", "packets.candidate");

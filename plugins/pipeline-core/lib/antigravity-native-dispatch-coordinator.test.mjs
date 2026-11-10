@@ -318,7 +318,9 @@ test("preparation rejects partial packet arrays", () => withFixture((value) => {
 
 test("preparation rejects non-return native results", () => withFixture((value) => {
   value.packets[0].resultDestination = { kind: "stream" };
-  assert.equal(prepareAntigravityNativeDispatch(value).code, "AGY-NATIVE-PACKET-BOUNDARY");
+  const refused = prepareAntigravityNativeDispatch(value);
+  assert.equal(refused.code, "AGY-NATIVE-PACKET-BOUNDARY");
+  assert.match(refused.repair, /"resultDestination": \{ "kind": "return" \}/u, "C23: the refusal names the field and value the packet needs");
 }));
 
 test("preparation rejects a recursive/non-native transport", () => withFixture((value) => {

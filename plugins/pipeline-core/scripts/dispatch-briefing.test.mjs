@@ -127,6 +127,11 @@ for (const flag of ["--help", "-h"]) test(`public ${flag} prints actionable usag
   assert.match(result.stdout, /Usage:[\s\S]*binding[\s\S]*build/u);
 });
 
+test("C23: the help lists exactly the package fields the validator knows", async () => {
+  const { BRIEFING_PACKAGE_FIELDS_HELP } = await import("../lib/dispatch-briefing-build.mjs");
+  assert.ok(spawnSync(process.execPath, [SCRIPT, "--help"], { encoding: "utf8" }).stdout.includes(BRIEFING_PACKAGE_FIELDS_HELP));
+});
+
 test("public --help and -h work before setup without private reads, processes or filesystem effects", () => {
   const root = mkdtempSync(join(tmpdir(), "dispatch-help-"));
   const held = lstatSync(root);

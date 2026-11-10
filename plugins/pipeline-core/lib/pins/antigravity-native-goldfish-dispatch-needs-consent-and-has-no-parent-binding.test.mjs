@@ -200,6 +200,14 @@ test("G20-43: a child whose resolved modelName differs from the selected model i
     assert.equal(matched.modelCheck.status, "match");
     assert.equal(matched.notice, undefined);
     assert.doesNotMatch(runAdapter(fx, right).stderr, /agy-native-child-model-mismatch/u);
+    // C23: the host's alias of the configured family is recorded as a tier match, without a notice on every child call; another family still gets it.
+    const family = (expected, resolved) => expected.replace(/flash.*|pro.*/u, "") + resolved;
+    const tierName = selectedModel("implement").includes("pro") ? "pro" : "flash";
+    const sameFamily = payload(fx, { conversationId: CHILD, lastUserInput: "", modelName: family(selectedModel("implement"), `${tierName}-agent`), toolCall: childCall });
+    const tiered = evaluateNativeChildCall(sameFamily);
+    assert.equal(tiered.modelCheck.status, "tier-match", JSON.stringify(tiered.modelCheck));
+    assert.equal(tiered.notice, undefined);
+    assert.doesNotMatch(runAdapter(fx, sameFamily).stderr, /agy-native-child-model-mismatch/u);
     // Every other check still governs: an ambiguous binding is still refused whatever the model.
     mkdirSync(join(fx.brain, "44444444-dddd-4ddd-8ddd-000000000004"), { recursive: true });
     descriptor(fx, CHILD, "goldfish-implementor", "SUBAGENT_STATE_ALIVE", "44444444-dddd-4ddd-8ddd-000000000004");

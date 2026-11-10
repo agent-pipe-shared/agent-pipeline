@@ -128,8 +128,12 @@ export function evaluateNativeChildCall(input, { routeSource } = {}) {
   // G20-43: the resolved model is RECORDED next to the expected registry cell and never refused. The host's Model alias does not select a
   // model (measured), so a refusal here only blocked every happy-path child with a repair nobody could run.
   const resolved = input?.modelName ?? null;
-  const modelCheck = { status: normalizeModel(resolved) === normalizeModel(expected.value) ? "match" : "mismatch", resolved, expected };
-  if (modelCheck.status === "match") return { ok: true, attributed, modelCheck };
+  // C23 (Antigravity greenfield report): the host names the configured model family with its own alias (gemini-3-flash-agent for gemini-3.8-flash-medium), so a notice on every child call
+  // said nothing the reader could act on. The same family is recorded as tier-match, and only another family earns the notice.
+  const tierOf = (value) => { const name = normalizeModel(value); return /flash.?lite/u.test(name) ? "flash-lite" : /flash/u.test(name) ? "flash" : /(?:^|-)pro(?:-|$)/u.test(name) ? "pro" : null; };
+  const status = normalizeModel(resolved) === normalizeModel(expected.value) ? "match" : tierOf(resolved) !== null && tierOf(resolved) === tierOf(expected.value) ? "tier-match" : "mismatch";
+  const modelCheck = { status, resolved, expected };
+  if (status !== "mismatch") return { ok: true, attributed, modelCheck };
   return {
     ok: true, attributed, modelCheck,
     notice: `AGY-NATIVE-CHILD-MODEL-NOTICE: child ${bound.typeName} (parent ${bound.parentConversationId}) resolved to model ${JSON.stringify(resolved)}, the expected cell for duty.${expected.duty} is ${JSON.stringify(expected.value)}; admitted and recorded (the host's Model alias does not select a model).`,

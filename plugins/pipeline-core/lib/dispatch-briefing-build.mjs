@@ -35,6 +35,13 @@ export const RECON_NOTE_PREFIXES = Object.freeze(["scratch/", "specs/"]);
 const REQUIRED_LISTS = Object.freeze(["paths", "context", "targeted"]);
 const OPTIONAL_LISTS = Object.freeze(["newFiles", "forbidden", "stops", "facts"]);
 const KNOWN_KEYS = new Set([...REQUIRED_STRINGS, ...OPTIONAL_STRINGS, ...REQUIRED_LISTS, ...OPTIONAL_LISTS, "estimatedToolCalls", "visualCheck"]);
+// C23 (Antigravity greenfield report: five attempts at the package fields): the help text is built from the lists the validator uses, so it cannot drift from them.
+export const BRIEFING_PACKAGE_FIELDS_HELP = `Package fields (JSON object, ${BRIEFING_PACKAGE_SCHEMA}):
+  required strings: ${REQUIRED_STRINGS.join(", ")}
+  required lists of strings: ${REQUIRED_LISTS.join(", ")}
+  optional strings: ${OPTIONAL_STRINGS.join(", ")}
+  optional lists of strings: ${OPTIONAL_LISTS.join(", ")}
+  optional: estimatedToolCalls (positive integer), visualCheck ({ question, evidencePath })`;
 // C18-15 (AC-239): an optional visual check; a closed { question, evidencePath } object, rendered as a fixed block in field 3.
 const VISUAL_CHECK_KEYS = Object.freeze(["evidencePath", "question"]);
 const VISUAL_QUESTION_MAX = 300;
