@@ -579,7 +579,8 @@ function pushApprovalProofHolds({ common, anchorDir, approval }) {
 /**
  * PO tile 2026-11-10: a consumer release includes its push, so a release is two signatures in all (design and release). This admits the approval check of the one push
  * the release approval names: exactly the approved commit, to origin's main, as a fast-forward of what origin holds (or the first push). It answers only the question of
- * the approval: Verify, Security and every other check of the push gate still run.
+ * the approval: Verify, Security and every other check of the push gate still run. Only a SIGNED release approval stands in: a chat-mode release approval is written with no
+ * human input at all, so there `approve-push --by` stays the attributed human act of the push.
  * @returns {{ok: true, tag: string} | {ok: false, code: string, message: string}}
  */
 export function authorizeReleaseIncludedPush({ projectDir, anchorDir = projectDir, commit, remote, destination } = {}) {
@@ -588,7 +589,8 @@ export function authorizeReleaseIncludedPush({ projectDir, anchorDir = projectDi
   const common = resolveCriticalApprovalCommonDir(projectDir);
   const approval = common === null ? null : readLastPrivateApproval(common, "release-preflight")?.approval ?? null;
   if (!object(approval) || approval.forCommit !== commit) return refuse("NO-APPROVAL", "no recorded release approval names this commit");
-  if (!releaseApprovalProofHolds({ common, anchorDir, approval })) return refuse("PROOF-MISSING", "this project demands a signed release approval and the recorded one carries no consumed proof");
+  const proof = object(approval.criticalProof) ? approval.criticalProof.proofSha256 : null;
+  if (approval.mode !== "signature" || !SHA256.test(proof ?? "") || !isCriticalProofConsumedPrivately(common, proof)) return refuse("NOT-SIGNED", "only a signed release approval includes the push; record the push approval for this commit");
   const tip = spawnSync("git", ["-C", projectDir, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/main"], { encoding: "utf8", timeout: 5000 });
   if (tip.status === 0 && String(tip.stdout).trim() !== "" && spawnSync("git", ["-C", projectDir, "merge-base", "--is-ancestor", String(tip.stdout).trim(), commit], { timeout: 5000 }).status !== 0) return refuse("NOT-FAST-FORWARD", "the approved commit does not build on what origin's main holds");
   return { ok: true, tag: approval.tag };
@@ -600,25 +602,35 @@ export function authorizeReleaseIncludedPush({ projectDir, anchorDir = projectDi
  * destination WITHOUT another approval, and only that: it must be exactly one commit on top of P, P must be the published tip of the destination, P must carry either a
  * recorded push approval for this remote and destination or a release approval for origin's main with its annotated tag, and the diff must ADD, as regular files, nothing
  * but `proofs/NNN-<kind>.json` files and one new list (`proofs/follow-up.json` or `proofs/follow-up-NNN.json`) of ONE bundle that already exists at P (create-only). Every
- * proof must be exactly the public proof object the store recorded; every evidence file a size-bounded Verify or Security record of a known schema, bound to an ancestor of P,
+ * proof must be exactly the public proof object the store recorded; every evidence file a size-bounded record of a known schema whose digest a close of this history recorded,
  * with no private key. A list that carries the release approval needs that approval and its tag at P. Anything else falls through to the full push gate, unchanged.
  * @returns {{ok: true, approvedCommit: string, bundle: string, paths: string[]} | {ok: false, code: string, message: string}}
  */
 const FOLLOWUP_FILE = /^audit-bundles\/([a-z][a-z0-9-]{2,63})\/([0-9a-f]{40}|[0-9a-f]{64})\/proofs\/(?:([0-9]{3}-[a-z-]{1,40})|follow-up(?:-[0-9]{3})?)\.json$/u;
 const FOLLOWUP_LIST_FILE = /\/proofs\/follow-up(?:-[0-9]{3})?\.json$/u;
 const FOLLOWUP_PROOF_SCHEMA = "pipeline.po-approval-proof.v1"; const FOLLOWUP_LIST_SCHEMA = "pipeline.audit-bundle-followup.v1"; const FOLLOWUP_MAX_BYTES = 16_384; export const FOLLOWUP_EVIDENCE_MAX_BYTES = 1_048_576;
-/** The closed set of records a follow-up may carry: where the writer finds each one and the schemas the guard accepts. */
+/**
+ * The closed set of records a follow-up may carry, the final Verify and Security results of the close (PO tile 2026-11-10). A record has no approval of its own, so each one
+ * is admitted only by the digest the close recorded for it privately (`digest`, a field of `pipeline.close-final-verification.v1`). `copy` is the file the close keeps next to that
+ * record, because a later scan may overwrite the working-tree `source`. Records the close recorded no digest for (the raw scanner output, the push-boundary Verify) do not travel.
+ */
 export const FOLLOWUP_EVIDENCE = Object.freeze({
-  "final-verify": Object.freeze({ source: "evidence/verify-candidate.json", schemas: Object.freeze(["pipeline.verify-evidence.v0"]) }),
-  "push-verify": Object.freeze({ source: "evidence/verify-latest.json", schemas: Object.freeze(["pipeline.verify-evidence.v0"]) }),
-  "final-security": Object.freeze({ source: "evidence/security-latest.json", schemas: Object.freeze(["pipeline.security-evidence.v0", "pipeline.security-evidence.v1"]) }),
-  "security-verdict": Object.freeze({ source: "evidence/security-latest.v2.verdict.json", schemas: Object.freeze(["pipeline.security-verdict.v2"]) }),
+  "final-verify": Object.freeze({ source: "evidence/verify-candidate.json", copy: "final-verify.record.json", digest: "verifySha256", schemas: Object.freeze(["pipeline.verify-evidence.v0"]) }),
+  "security-verdict": Object.freeze({ source: "evidence/security-latest.v2.verdict.json", copy: "final-security-verdict.record.json", digest: "securitySha256", schemas: Object.freeze(["pipeline.security-verdict.v2"]) }),
 });
-/** The commit a carried record is bound to, or null when it names none. A verdict names none of its own and stands next to the record that does. */
-export function followUpEvidenceCommit(kind, record) {
-  if (kind === "security-verdict") return "";
-  const commit = record?.commit ?? record?.candidate?.commit;
-  return typeof commit === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(commit) ? commit : null;
+/** The green final results recorded by this repository's closes whose candidate `inHistory` accepts: the digest per evidence kind and the private directory of each close. */
+export function recordedFinalEvidence({ common, inHistory } = {}) {
+  if (typeof common !== "string" || common === "" || typeof inHistory !== "function") return [];
+  const base = join(common, "agent-pipeline", "publication-close");
+  let lifecycles = []; try { lifecycles = readdirSync(base).sort().slice(0, 256); } catch { return []; }
+  const found = [];
+  for (const lifecycle of lifecycles) {
+    const directory = join(base, lifecycle, "evidence");
+    let record = null; try { record = JSON.parse(readFileSync(join(directory, "final-verification.json"), "utf8")); } catch { continue; }
+    if (!object(record) || record.schema !== "pipeline.close-final-verification.v1" || record.verifyStatus !== "green" || record.securityStatus !== "green" || !SHA256.test(record.verifySha256 ?? "") || !SHA256.test(record.securitySha256 ?? "") || !inHistory(record.candidateOid)) continue;
+    found.push({ directory, digests: Object.fromEntries(Object.entries(FOLLOWUP_EVIDENCE).map(([kind, { digest }]) => [kind, record[digest]])) });
+  }
+  return found;
 }
 const exactKeys = (value, keys) => object(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 export function authorizeAuditProofFollowUp({ projectDir, anchorDir = projectDir, commit, remote, destination } = {}) {
@@ -693,13 +705,12 @@ export function authorizeAuditProofFollowUp({ projectDir, anchorDir = projectDir
     if (release === null) return refuse("NO-RELEASE-APPROVAL", "the list carries a release approval the parent commit does not have");
     if (!releaseTagHolds()) return refuse("RELEASE-TAG", "the annotated release tag at the approved commit does not hold");
   }
-  if (evidenceEntries.some((entry) => entry?.kind === "security-verdict") && !evidenceEntries.some((entry) => entry?.kind === "final-security")) return refuse("LIST", "a security verdict travels only with the security record it belongs to");
+  const closes = evidenceEntries.length === 0 ? [] : recordedFinalEvidence({ common, inHistory: (candidate) => oid.test(candidate ?? "") && git(["merge-base", "--is-ancestor", bundleCommit, candidate]).status === 0 && git(["merge-base", "--is-ancestor", candidate, parent]).status === 0 });
   for (const entry of evidenceEntries) {
     if (!exactKeys(entry, ["kind", "path", "sha256"]) || !Object.hasOwn(FOLLOWUP_EVIDENCE, entry.kind)) return refuse("LIST", "the follow-up list holds a malformed evidence entry");
     const { bytes, parsed } = blobs.get(`${bundle}/${entry.path}`) ?? {};
     if (bytes === undefined || createHash("sha256").update(bytes).digest("hex") !== entry.sha256 || !FOLLOWUP_EVIDENCE[entry.kind].schemas.includes(parsed.schema)) return refuse("CONTENT", `${entry.path} is not a ${entry.kind} record`);
-    const boundTo = followUpEvidenceCommit(entry.kind, parsed);
-    if (boundTo === null || (boundTo !== "" && git(["merge-base", "--is-ancestor", boundTo, parent]).status !== 0)) return refuse("CONTENT", `${entry.path} is not bound to the approved history`);
+    if (!closes.some((close) => close.digests[entry.kind] === entry.sha256)) return refuse("CONTENT", `${entry.path} is not the ${entry.kind} record a close of this history recorded`);
   }
   for (const entry of entries) {
     if (!exactKeys(entry, ["kind", "path", "sha256", "intentSha256"])) return refuse("LIST", "the follow-up list holds a malformed proof entry");

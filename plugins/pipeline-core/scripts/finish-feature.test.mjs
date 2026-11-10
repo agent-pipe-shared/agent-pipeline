@@ -807,8 +807,10 @@ test("the close fetches a missing Critic report itself, inside its own evidence 
     };
     const fetched = "c".repeat(32);
     writeFileSync(join(evidence, `critic-lineage-${"1".repeat(64)}.json`), `${JSON.stringify({ rounds: [{ packetId: fetched }] })}\n`);
-    assert.equal(oneShotClose(f.input, { runCommand: f.runner, exportCriticRoundFn }).status, "commit-required");
+    const closed = oneShotClose(f.input, { runCommand: f.runner, exportCriticRoundFn });
+    assert.equal(closed.status, "commit-required");
     assert.deepEqual(seen.sort(), [f.packetId, fetched].sort());
+    assert.ok(closed.commit.paths.includes(`specs/feature-abc/evidence/critic/${fetched}/report.md`), `the fetched report travels in the one close commit: ${closed.commit.paths}`);
     const request = JSON.parse(readFileSync(join(evidence, "audit-request.json"), "utf8"));
     assert.deepEqual(request.evidence.criticReports, [{ packetId: f.packetId, path: null }, { packetId: fetched, path: `specs/feature-abc/evidence/critic/${fetched}/report.md` }]);
   } finally { rmSync(f.root, { recursive: true, force: true }); }

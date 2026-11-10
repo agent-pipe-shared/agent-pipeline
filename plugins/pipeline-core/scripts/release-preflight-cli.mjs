@@ -53,6 +53,7 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import { closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { canonicalJson, createReleasePreflight, validateReleasePreflight } from "./release-preflight.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
@@ -852,7 +853,8 @@ if (isDirectInvocation(import.meta.url)) {
         // The agent's last steps; the push guard admits exactly this annotated tag at exactly this commit. PO tile 2026-11-10: the release includes the push of the approved commit
         // when it is not on main yet. With an audit bundle (C20E-AP) the proofs and final records reach the remote next, in the ONE evidence-only follow-up commit the guard admits without a further approval; the tag still names the approved commit.
         nextActions: [`git tag -a ${approval.tag} -m "version tag" ${approval.forCommit}`,
-          ...(commitIsOnPublishedMain(resolve(options.rootDir), approval.forCommit) ? [] : ["git push origin HEAD:refs/heads/main"]),
+          // Only a signed release approval stands in for the push approval; in chat mode the push keeps its own attributed human act.
+          ...(commitIsOnPublishedMain(resolve(options.rootDir), approval.forCommit) ? [] : [...(approval.mode === "signature" ? [] : [`node ${JSON.stringify(fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url)))} approve-push --by <name> --remote origin --destination refs/heads/main`]), "git push origin HEAD:refs/heads/main"]),
           ...(followUp.status === "written" ? [...followUp.commit.steps, "git push origin HEAD:refs/heads/main"] : []),
           `git push origin refs/tags/${approval.tag}`],
         auditProofFollowUp: followUp,

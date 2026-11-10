@@ -18,7 +18,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AUDIT_BUNDLE_FOLLOWUP_NUMBERED, AUDIT_BUNDLE_FOLLOWUP_PATH, AUDIT_BUNDLE_FOLLOWUP_SCHEMA, auditBundleProofBytes, followUpAttributionShape, isCarriableProof } from "./audit-bundle.mjs";
-import { CRITICAL_APPROVAL_STORE_SCHEMA, FOLLOWUP_EVIDENCE, FOLLOWUP_EVIDENCE_MAX_BYTES, criticalApprovalStoreRoot, followUpEvidenceCommit, readLastPrivateApproval } from "./critical-action-authorization.mjs";
+import { CRITICAL_APPROVAL_STORE_SCHEMA, FOLLOWUP_EVIDENCE, FOLLOWUP_EVIDENCE_MAX_BYTES, criticalApprovalStoreRoot, readLastPrivateApproval, recordedFinalEvidence } from "./critical-action-authorization.mjs";
 import { canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
 
 const STORE_KINDS = Object.freeze(["push", "feature-package-reconcile"]);
@@ -102,19 +102,21 @@ export function writeAuditProofFollowUp({ root, bundleDir, approvedCommit, proof
   return { status: "written", bundleDir, files: [...[...written, ...writtenEvidence].map((entry) => ({ path: `${bundleDir}/${entry.path}`, sha256: entry.sha256 })), { path: `${bundleDir}/${listPath}`, sha256: sha256Hex(listBytes) }] };
 }
 
-/** The final Verify and Security records this commit's history stands on, as the guard will accept them. A missing, oversized, foreign or unbound record is simply not carried. */
-function collectFollowUpEvidence(root, approvedCommit) {
+/** The final Verify and Security records a close of this bundle recorded, as the guard will accept them: the bytes whose digest the close kept. Anything else is simply not carried. */
+function collectFollowUpEvidence(root, bundleDir, approvedCommit, common) {
+  const ancestor = (older, newer) => spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", older, newer], { timeout: 10_000 }).status === 0;
+  const bundleCommit = bundleDir.split("/").at(-1);
+  const closes = recordedFinalEvidence({ common, inHistory: (candidate) => OID.test(candidate ?? "") && ancestor(bundleCommit, candidate) && ancestor(candidate, approvedCommit) });
+  const read = (path) => { try { return readFileSync(path); } catch { return null; } };
   const found = [];
-  for (const [kind, { source, schemas }] of Object.entries(FOLLOWUP_EVIDENCE)) {
-    let bytes; try { bytes = readFileSync(join(root, source)); } catch { continue; }
-    if (bytes.length === 0 || bytes.length > FOLLOWUP_EVIDENCE_MAX_BYTES || /PRIVATE KEY/u.test(bytes.toString("utf8"))) continue;
+  for (const [kind, { source, copy, schemas }] of Object.entries(FOLLOWUP_EVIDENCE)) {
+    const candidates = closes.flatMap((close) => [read(join(close.directory, copy)), read(join(root, source))].filter((bytes) => bytes !== null && sha256Hex(bytes) === close.digests[kind]));
+    const bytes = candidates[0];
+    if (bytes === undefined || bytes.length === 0 || bytes.length > FOLLOWUP_EVIDENCE_MAX_BYTES || /PRIVATE KEY/u.test(bytes.toString("utf8"))) continue;
     let record; try { record = JSON.parse(bytes.toString("utf8")); } catch { continue; }
-    if (!object(record) || !schemas.includes(record.schema)) continue;
-    const boundTo = followUpEvidenceCommit(kind, record);
-    if (boundTo === null || (boundTo !== "" && spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", boundTo, approvedCommit], { timeout: 10_000 }).status !== 0)) continue;
-    found.push({ kind, bytes });
+    if (object(record) && schemas.includes(record.schema)) found.push({ kind, bytes });
   }
-  return found.some((entry) => entry.kind === "final-security") ? found : found.filter((entry) => entry.kind !== "security-verdict");
+  return found;
 }
 
 function gitOut(root, args) { const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10_000 }); return result.status === 0 ? String(result.stdout).trim() : null; }
@@ -153,5 +155,5 @@ export function prepareAuditProofFollowUp({ root, featureId, approvedCommit, com
   }
   if (isCarriableProof(releaseProof)) proofs.push({ kind: "release-preflight", proof: { ...releaseProof } });
   else if (object(releaseApproval)) attributions.push({ kind: "release-preflight", mode: attributionMode(releaseApproval.mode), approvedAt: attributionTime(releaseApproval.approvedAt) });
-  return writeAuditProofFollowUp({ root, bundleDir, approvedCommit, proofs, attributions, evidence: collectFollowUpEvidence(root, approvedCommit) });
+  return writeAuditProofFollowUp({ root, bundleDir, approvedCommit, proofs, attributions, evidence: collectFollowUpEvidence(root, bundleDir, approvedCommit, common) });
 }

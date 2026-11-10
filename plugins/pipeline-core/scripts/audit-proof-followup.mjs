@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 /**
- * After a signed push of a consumer project: adds the push proof and the final Verify and Security records to the feature's audit bundle as new files, arms the commit of
+ * After a signed push of a consumer project: adds the push proof and the final Verify and Security results the close recorded to the feature's audit bundle as new files, arms the commit of
  * exactly those files and prints the commit steps and the push. PO tile 2026-11-10: every evidence reaches the repository, also without a release, with no further signature.
  * The push guard admits exactly that one commit (`authorizeAuditProofFollowUp`). Never blocking: a project with nothing to carry gets a typed status and exit 0.
  *

@@ -23,6 +23,7 @@ import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summa
 import { closeSecurityScope, describeCloseSecurityScope } from "../lib/security-close-status.mjs";
 import { declaredRepositoryMode } from "./repository-freshness.mjs";
 import { exportCriticRoundFromJournal } from "./session-critic-finalizer.mjs";
+import { FOLLOWUP_EVIDENCE } from "../lib/critical-action-authorization.mjs";
 
 const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
@@ -575,6 +576,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       const evidencePath = join(directory, "final-verification.json");
       ensurePrivateDirectory(directory);
       writePrivateJsonAtomic(evidencePath, { schema: "pipeline.close-final-verification.v1", candidateOid: head, candidateTree: tree, verifyStatus: "green", verifySha256: sha256Hex(readFileSync(resolve(root, "evidence/verify-candidate.json"))), securityStatus: "green", securitySha256: sha256Hex(readFileSync(resolve(root, "evidence/security-latest.v2.verdict.json"))) });
+      // PO tile 2026-11-10: the exact bytes those digests name, kept next to the record: a later scan may overwrite the working-tree files, and the evidence follow-up carries these.
+      for (const { source, copy } of Object.values(FOLLOWUP_EVIDENCE)) writeFileSync(join(directory, copy), readFileSync(resolve(root, source)), { mode: 0o600 });
       return transition("final-verify-green", { evidence: evidencePath });
     }); if (final.stop) return final.stop;
     phase = "final-verify-green";

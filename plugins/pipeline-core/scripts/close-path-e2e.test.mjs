@@ -674,11 +674,15 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         const result = JSON.parse(released.stdout); const followUp = result.auditProofFollowUp;
         assert.equal(followUp.status, "written", released.stdout);
         const tagPushCommand = `git push origin refs/tags/${version}`;
-        assert.deepEqual(result.nextActions, [`git tag -a ${version} -m "version tag" ${approved}`, pushCommand, ...followUp.commit.steps, pushCommand, tagPushCommand]);
+        const approvePush = result.nextActions[1];
+        assert.match(approvePush, /approve-push --by <name> --remote origin --destination refs\/heads\/main$/u, "a chat-mode release names the attributed human act of its push");
+        assert.deepEqual(result.nextActions, [`git tag -a ${version} -m "version tag" ${approved}`, approvePush, pushCommand, ...followUp.commit.steps, pushCommand, tagPushCommand]);
         step(log, `${identity.runner}: annotated version tag`, "git", ["-C", fx.root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "tag", "-a", version, "-m", "version tag", approved]);
+        assert.equal(guardPush(pushCommand).status, 2, `${identity.runner}: a chat-mode release approval is no human act, so it does not stand in for the push approval`);
+        step(log, `${identity.runner}: approve-push (the human act a chat-mode release keeps)`, process.execPath, [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"], { cwd: fx.root });
         const included = guardPush(pushCommand);
-        assert.equal(included.status, 0, `${identity.runner}: the release includes the push of its own commit\n${included.stderr}`);
-        hookedPush("the push the release includes", "HEAD:refs/heads/main");
+        assert.equal(included.status, 0, `${identity.runner}: with the attributed approval the push of the released commit is admitted\n${included.stderr}`);
+        hookedPush("the approved push of the released commit", "HEAD:refs/heads/main");
         hookedCommit(followUp.paths, followUp.commit.message);
         const followed = guardPush(pushCommand);
         assert.equal(followed.status, 0, `${identity.runner}: the follow-up needs no further approval\n${followed.stderr}`);
@@ -688,7 +692,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         hookedPush("the version tag push", `refs/tags/${version}`);
         assert.equal(verifyBundle(followUp.bundleDir).status, "verified");
         const list = JSON.parse(readFileSync(join(fx.root, followUp.bundleDir, "proofs", "follow-up.json"), "utf8"));
-        assert.ok(list.evidence.some((entry) => entry.kind === "push-verify"), JSON.stringify(list));
+        assert.deepEqual(list.evidence.map((entry) => entry.kind).sort(), ["final-verify", "security-verdict"], JSON.stringify(list));
         assert.match(git(log, fx.root, ["ls-remote", "origin"]), /refs\/tags\/v0\.1\.0\^\{\}/u);
         return;
       }
@@ -707,7 +711,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         hookedPush("the follow-up push", `HEAD:${branch}`);
         assert.equal(verifyBundle(followUp.bundleDir).status, "verified");
         const list = JSON.parse(readFileSync(join(fx.root, followUp.bundleDir, "proofs", "follow-up.json"), "utf8"));
-        for (const kind of ["final-verify", "push-verify", "final-security", "security-verdict"]) assert.ok(list.evidence.some((entry) => entry.kind === kind), `${kind} travels with the follow-up: ${JSON.stringify(list.evidence)}`);
+        assert.deepEqual(list.evidence.map((entry) => entry.kind).sort(), ["final-verify", "security-verdict"], `the close's two recorded results travel, and nothing else: ${JSON.stringify(list.evidence)}`);
         assert.equal(followUpRun().status, "no-push-approval", "the follow-up commit itself carries no approval, so nothing can chain onto it");
         return;
       }
@@ -749,7 +753,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
       const approvedCommit = git(log, fx.root, ["rev-parse", "HEAD"]);
       const followUp = releaseResult.auditProofFollowUp;
       assert.equal(followUp.status, "written", released.stdout);
-      assert.deepEqual(followUp.paths.filter((path) => !/proofs\/[0-9]{3}-(?:final-verify|push-verify|final-security|security-verdict)\.json$/u.test(path)), [`${followUp.bundleDir}/proofs/follow-up.json`], `${identity.runner}: a chat-mode approval is an attribution record, never a proof file; next to it only the final records travel`);
+      assert.deepEqual(followUp.paths.filter((path) => !/proofs\/[0-9]{3}-(?:final-verify|security-verdict)\.json$/u.test(path)), [`${followUp.bundleDir}/proofs/follow-up.json`], `${identity.runner}: a chat-mode approval is an attribution record, never a proof file; next to it only the final records travel`);
       assert.deepEqual(releaseResult.nextActions, [`git tag -a ${tag} -m "version tag" ${approvedCommit}`, ...followUp.commit.steps, pushCommand, `git push origin refs/tags/${tag}`]);
       const bundleVerify = () => JSON.parse(step(log, `${identity.runner}: audit-bundle verify`, process.execPath, [script("audit-bundle.mjs"), "verify", "--bundle", join(fx.root, followUp.bundleDir)], { cwd: fx.root }).stdout);
       const followUpList = JSON.parse(readFileSync(join(fx.root, followUp.bundleDir, "proofs", "follow-up.json"), "utf8"));

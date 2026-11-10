@@ -410,14 +410,14 @@ the Pipeline's own source release above is unchanged. It is the LAST step of the
    records the approval; in `signature` mode the command stops with `RPC-CONSUMER-PO-APPROVAL` and prints the PO's exact signing command for
    this subject, then runs again with `--proof-request`/`--proof`.
 4. The agent runs the `nextActions` the command prints, in order: `git tag -a v<VERSION> -m "version tag" <commit>`; `git push origin HEAD:refs/heads/main` when the
-   commit is not on origin's main yet (the release approval stands in for the push approval of exactly this commit, `authorizeReleaseIncludedPush`; Verify, Security and the other gates still run);
+   commit is not on origin's main yet (a signed release approval stands in for the push approval of exactly this commit, `authorizeReleaseIncludedPush`; Verify, Security and the other gates still run. In `chat` mode the printed `approve-push --by <name>` line comes first, with the name the human gives);
    the follow-up commit and its push, when the feature has a bundle; `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
    (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above. The generated pre-push hook decides all three through the same predicates.
 
 **The follow-up commit: the evidence reaches the repository after every signed push (C20E-AP, ADR-0090).** The approval signs the commit that carries
 `audit-bundles/<feature>/<candidate>/`, so its proof cannot sit inside that commit, and the final Verify and Security records are produced after it. A release command adds them itself; after a push to a feature branch run the
 `afterPush.followUp` command `push-prepare` printed (`scripts/audit-proof-followup.mjs --root <root> --remote <remote> --destination <ref>`). Either way the step adds, as NEW files only, the public proof objects of the approvals and the final records
-(`final-verify`, `push-verify`, `final-security`, `security-verdict`) to the bundle's `proofs/` directory (numbering continues after everything already there) plus one list, `proofs/follow-up.json` or, for a later approved commit, `proofs/follow-up-NNN.json`, that binds them by digest to the
+(`final-verify`, `security-verdict`, each admitted only by the digest the close recorded for it) to the bundle's `proofs/` directory (numbering continues after everything already there) plus one list, `proofs/follow-up.json` or, for a later approved commit, `proofs/follow-up-NNN.json`, that binds them by digest to the
 approved commit and to the bundle's candidate. `manifest.json` and `README.md` stay byte for byte, so the bundle's own `audit-bundle.mjs verify` still
 passes and also checks the follow-up (`AB-FOLLOWUP`, `AB-DIGEST`, `AB-PROOF-INTENT`, `AB-PROOF-SIGNATURE`). Never a private key: a `chat` or waiver
 approval is carried as an attribution record (kind, mode, time) and never as a proof. The step arms the commit of exactly those files (G20-66) and prints it with the push.

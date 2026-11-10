@@ -533,6 +533,11 @@ function checkHook(id, result, expectExit, { includes = [], notIncludes = [] } =
   if (problems.length === 0) { pass++; console.log(`  ok  ${id}`); } else failures.push(`${id}: ${problems.join("; ")}`);
 }
 const headOf = (dir) => gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+function recordClose(s, { candidateOid = s.approved, verifySha256 = "0".repeat(64), securitySha256 = "0".repeat(64) } = {}) {
+  const directory = join(s.dir, ".git", "agent-pipeline", "publication-close", "close-x", "evidence");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, "final-verification.json"), `${JSON.stringify({ schema: "pipeline.close-final-verification.v1", candidateOid, candidateTree: "t".repeat(40), verifyStatus: "green", verifySha256, securityStatus: "green", securitySha256 })}\n`);
+}
 function branchFollowUp(prefix, overrides = {}) {
   return followUpScenario(prefix, { destination: "refs/heads/feat-x", releaseApproval: false, tag: false, carry: ["push"], ...overrides });
 }
@@ -546,34 +551,44 @@ function branchFollowUp(prefix, overrides = {}) {
 }
 {
   const s = branchFollowUp("followup-evidence");
-  const record = (commit) => ({ schema: VERIFY_SCHEMA, commit, status: "passed" });
-  const bytes = Buffer.from(`${JSON.stringify(record(s.approved))}\n`);
+  const bytes = Buffer.from(`${JSON.stringify({ schema: VERIFY_SCHEMA, commit: s.approved, status: "passed" })}\n`);
+  recordClose(s, { verifySha256: sha256Hex(bytes) });
   s.write({ evidence: [{ kind: "final-verify", path: "proofs/005-final-verify.json", sha256: sha256Hex(bytes) }] });
   writeFileSync(join(s.dir, s.bundle, "proofs/005-final-verify.json"), bytes); s.commit();
-  check("PO-F3 allow  the follow-up may carry the final Verify record bound to the approved history", "git push origin HEAD:refs/heads/feat-x", s.dir, ALLOW, { stderrNotIncludes: ["BLOCKED"] });
+  check("PO-F3 allow  the follow-up may carry the final Verify record the close recorded", "git push origin HEAD:refs/heads/feat-x", s.dir, ALLOW, { stderrNotIncludes: ["BLOCKED"] });
 }
-for (const [id, mutate, why] of [
-  ["PO-F4", (record) => ({ ...record, commit: "e".repeat(40) }), "a record bound to a commit outside the approved history"],
-  ["PO-F5", (record) => ({ ...record, schema: "pipeline.something-else.v1" }), "a record of an unknown schema"],
-  ["PO-F6", (record) => ({ ...record, note: "-----BEGIN PRIVATE KEY-----" }), "a record holding a private key"],
+for (const [id, mutate, why, close, expected] of [
+  ["PO-F4", (record) => record, "a well-formed record of the right schema whose digest no close recorded", () => ({}), "AUDIT-FOLLOWUP-CONTENT"],
+  ["PO-F4b", (record) => record, "a record whose digest only a close of another history recorded", (s, digest) => ({ verifySha256: digest, candidateOid: "e".repeat(40) }), "AUDIT-FOLLOWUP-CONTENT"],
+  ["PO-F5", (record) => ({ ...record, schema: "pipeline.something-else.v1" }), "a record of an unknown schema", (s, digest) => ({ verifySha256: digest }), "AUDIT-FOLLOWUP-CONTENT"],
+  ["PO-F6", (record) => ({ ...record, note: "-----BEGIN PRIVATE KEY-----" }), "a record holding a private key", (s, digest) => ({ verifySha256: digest }), "AUDIT-FOLLOWUP-CONTENT"],
+  ["PO-F7", (record) => record, "a kind the close records no digest for", (s, digest) => ({ verifySha256: digest }), "AUDIT-FOLLOWUP-LIST"],
 ]) {
   const s = branchFollowUp(`followup-evidence-${id.toLowerCase()}`);
   const bytes = Buffer.from(`${JSON.stringify(mutate({ schema: VERIFY_SCHEMA, commit: s.approved, status: "passed" }))}\n`);
-  s.write({ evidence: [{ kind: "final-verify", path: "proofs/005-final-verify.json", sha256: sha256Hex(bytes) }] });
-  writeFileSync(join(s.dir, s.bundle, "proofs/005-final-verify.json"), bytes); s.commit();
+  recordClose(s, close(s, sha256Hex(bytes)));
+  const entryKind = id === "PO-F7" ? "push-verify" : "final-verify";
+  s.write({ evidence: [{ kind: entryKind, path: `proofs/005-${entryKind}.json`, sha256: sha256Hex(bytes) }] });
+  writeFileSync(join(s.dir, s.bundle, `proofs/005-${entryKind}.json`), bytes); s.commit();
   const got = authorizeAuditProofFollowUp({ projectDir: s.dir, anchorDir: s.dir, commit: headOf(s.dir), remote: "origin", destination: "refs/heads/feat-x" });
-  if (got.code === "AUDIT-FOLLOWUP-CONTENT") { pass++; console.log(`  ok  ${id} block  ${why}`); } else failures.push(`${id}: ${why} returned ${JSON.stringify(got)}`);
+  if (got.code === expected) { pass++; console.log(`  ok  ${id} block  ${why}`); } else failures.push(`${id}: ${why} returned ${JSON.stringify(got)}`);
 }
 {
   // The release includes its push: only the release approval exists, nothing is on origin yet.
   const s = followUpScenario("release-included", { pushApproval: false, tag: false, origin: "absent" });
-  const included = runGuard("git push origin HEAD:refs/heads/main", s.dir);
-  const lifted = !included.stderr.includes("raw Bash/Git cannot publish") && !included.stderr.includes("Push approval missing");
-  if (lifted) { pass++; console.log("  ok  PO-R1 the release approval lifts the main boundary and the push approval check for its own commit"); } else failures.push(`PO-R1: ${included.stderr.slice(0, 500)}`);
-  checkHook("PO-R1h the generated hook no longer asks for a push approval for that commit, and still demands the evidence", runHook(s.dir, s.approved, "refs/heads/main"), 1, { notIncludes: ["push approval missing or stale"] });
+  const included = authorizeReleaseIncludedPush({ projectDir: s.dir, anchorDir: s.dir, commit: s.approved, remote: "origin", destination: "refs/heads/main" });
+  if (included.ok === true) { pass++; console.log("  ok  PO-R1 a signed release approval stands in for the push approval of its own commit"); } else failures.push(`PO-R1: ${JSON.stringify(included)}`);
+  checkHook("PO-R1h the generated hook no longer asks for a push approval for that commit, and still demands the evidence", runHook(s.dir, s.approved, "refs/heads/main"), 1, { includes: ["verify"], notIncludes: ["push approval missing or stale"] });
   writeEvidence(s.dir, "src/other.js", "x\n"); s.commit("a later commit the release did not approve");
   check("PO-R2 block  a commit the release approval does not name is outside the included push", "git push origin HEAD:refs/heads/main", s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
   checkHook("PO-R2h the generated hook still asks for a push approval for that commit", runHook(s.dir, headOf(s.dir), "refs/heads/main"), 1, { includes: ["push approval"] });
+}
+{
+  // A chat-mode release approval is written with no human input, so it never stands in for the push approval, whatever the project waives.
+  const s = followUpScenario("release-chat", { pushApproval: false, tag: false, origin: "absent", releaseApproval: false });
+  if (writeCriticalApproval({ gitCommonDir: join(s.dir, ".git"), kind: "release-preflight", approval: { schema: "pipeline.consumer-release-approval.v1", forCommit: s.approved, version: "1.0.0", tag: "v1.0.0", mode: "chat-attributed-unattested", criticalProof: null, approvedAt: "2026-11-08T10:00:00.000Z" } }).ok !== true) throw new Error("fixture chat release approval was not recorded");
+  const got = authorizeReleaseIncludedPush({ projectDir: s.dir, anchorDir: s.dir, commit: s.approved, remote: "origin", destination: "refs/heads/main" });
+  if (got.code === "RELEASE-PUSH-NOT-SIGNED") { pass++; console.log("  ok  PO-R4 a chat-mode release approval does not include the push"); } else failures.push(`PO-R4: ${JSON.stringify(got)}`);
 }
 {
   const s = followUpScenario("release-diverged", { pushApproval: false, tag: false, origin: "absent" });

@@ -15,16 +15,16 @@ A consumer release also demanded an earlier signed push to main, so a release to
 ## Decision
 
 1. **The close exports every Critic round itself** from the private journal (the verdict, checked against the digest in the receipt) into the feature, inside the one close commit. Working notes stay out. A round it cannot read stays named and never stops the close.
-2. **One follow-up commit after any signed push or release, to the same destination, with no further signature.** It carries the push or release proof and the final Verify and Security records as new files under the bundle's `proofs/`. The guard admits it only when it is exactly one commit on an approved and published parent and adds only public proof objects, one list and records of a known schema bound to the approved history. Nothing can chain onto it: the follow-up commit itself carries no approval.
-3. **A release includes its push.** The human approves two things in all: the design, and then either a branch push or a release. The release approval names one commit, and it stands in for the push approval of exactly that commit to origin's main as a fast-forward. Verify, Security and every other gate still run.
+2. **One follow-up commit after any signed push or release, to the same destination, with no further signature.** It carries the push or release proof, the final Verify record and the final Security verdict as new files under the bundle's `proofs/`. The guard admits it only when it is exactly one commit on an approved and published parent and adds only public proof objects, one list and exactly the two records whose digests the close recorded privately for a candidate of this history. The raw scanner output and the push-boundary Verify have no recorded digest and do not travel. Nothing can chain onto it: the follow-up commit itself carries no approval.
+3. **A signed release includes its push.** The human signs two things in all: the design, and then either a branch push or a release. The signed release approval names one commit, and it stands in for the push approval of exactly that commit to origin's main as a fast-forward. Verify, Security and every other gate still run. In `chat` mode the release approval is written without any human input, so it does not stand in: that push keeps its own `approve-push --by` act.
 4. The generated pre-push hook decides these cases through the same predicates as the push guard.
 
 This changes the decision of 2026-11-08 that the proof travels only with the version tag, and moves the proof and evidence part of CGF-25 out of 0.7.1. The portable auditor package stays in 0.7.1.
 
 ## Consequences
 
-Evidence reaches the repository on both routes without a further stop. The guard relaxes one narrow shape; any other content meets the full gate unchanged. Final Verify and Security records become tracked, so what they name becomes visible to whoever reads the repository. A release can now be the first thing that reaches main, so its approval carries the weight the push approval carried before.
+Evidence reaches the repository on both routes without a further stop. The guard relaxes one narrow shape; any other content meets the full gate unchanged. The final Verify record and the Security verdict become tracked, so what they name becomes visible to whoever reads the repository. A signed release can now be the first thing that reaches main, so its approval carries the weight the push approval carried before.
 
 ## Affected contracts
 
-ADR-0056 stays: every push still needs a human approval. The release approval is that approval for its own push. `docs/push-release-flow.md` describes both routes.
+ADR-0056 stays: every push still needs a human approval. A signed release approval is that approval for its own push; in `chat` mode `approve-push --by` remains it. `docs/push-release-flow.md` describes both routes.
