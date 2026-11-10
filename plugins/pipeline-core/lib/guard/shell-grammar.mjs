@@ -1120,7 +1120,7 @@ const QP4_RG_LONG_VALUE = new Set(["regexp", "file", "glob", "iglob", "max-count
 const QP4_GREP_LONG_VALUE = new Set(["regexp", "file", "max-count", "after-context", "before-context", "context", "directories", "devices", "include",
   "exclude", "exclude-from", "exclude-dir", "label", "binary-files", "group-separator"]);
 
-function qp4ReadTargetOperands(name, argv) {
+export function qp4ReadTargetOperands(name, argv) {
   const rg = name === "rg";
   const shortValue = rg ? QP4_RG_SHORT_VALUE : QP4_GREP_SHORT_VALUE;
   const longValue = rg ? QP4_RG_LONG_VALUE : QP4_GREP_LONG_VALUE;

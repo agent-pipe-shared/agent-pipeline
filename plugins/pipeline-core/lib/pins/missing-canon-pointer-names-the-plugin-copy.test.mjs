@@ -4,7 +4,7 @@
 // create it first") and then went looking for the plugin copy. Canon pointers mean the repository file when it exists, else the plugin's
 // own copy. The refusal now names that copy. The read itself stays refused; only the text changes.
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 
 import { missingProjectTargetDenialText, pluginCopyOfMissingProjectPath } from "../guard/read-scope.mjs";
 import { readToolScopeVerdict } from "../guard/read-scope.mjs";
+import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
 
 function fixture(fn) {
   const base = mkdtempSync(join(tmpdir(), "c20-w252-g20-9-"));
@@ -74,4 +75,32 @@ test("the native Read refusal of a missing canon pointer names the running plugi
   assert.equal(verdict.exitCode, 2, "the read stays refused");
   assert.match(verdict.stderr, /GUARD-READ-TARGET-MISSING/u);
   assert.ok(verdict.stderr.includes(join(pluginRoot, "templates", "prompts", "goldfish-task.md")), verdict.stderr);
+}));
+
+// C23 (PO word 2026-11-09, Codex greenfield F17): a shell read of a guessed plugin path read as a scope problem. Run through the real guard.
+test("C23 a shell read of a file the plugin does not have says it does not exist and names a listing that works", () => fixture(({ project, plugin: outside }) => {
+  mkdirSync(join(project, ".claude"), { recursive: true });
+  mkdirSync(join(project, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(project, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
+    schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-09-29T00:00:00.000Z",
+  }));
+  const pluginRoot = realpathSync(fileURLToPath(new URL("../..", import.meta.url)));
+  const hooks = join(pluginRoot, "hooks");
+  const guessed = join(hooks, "absent", "guessed.mjs");
+  const run = (command) => evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, { projectDir: project });
+  for (const command of [`cat ${guessed}`, `rg -n needle ${guessed}`, `head -n 5 ${guessed}`]) {
+    const refused = run(command);
+    assert.equal(refused.exitCode, 2, command);
+    assert.match(refused.stderr, /GUARD-READ-TARGET-MISSING: the file does not exist in the Pipeline plugin \(hooks\/absent\/guessed\.mjs\)/u, command);
+    assert.doesNotMatch(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+    assert.ok(refused.stderr.includes(`\`ls ${hooks}\``), refused.stderr);
+  }
+  assert.equal(run(`ls ${hooks}`).exitCode, 0, "the listing the refusal names is admitted");
+  const existingOutside = join(outside, "templates", "prompts", "agent-obligations.md");
+  for (const command of [`cat ${join(outside, "absent.md")}`, `cat ${guessed} ${existingOutside}`]) {
+    const refused = run(command);
+    assert.equal(refused.exitCode, 2, command);
+    assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+    assert.doesNotMatch(refused.stderr, /does not exist in the Pipeline plugin/u, command);
+  }
 }));

@@ -26,7 +26,7 @@ import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation
 import { isClaudeSessionMemoryWritePath, isIntakeLifecycleScratchWrite, isMachinePlaneWritePath } from "./write-scope.mjs";
 import { DISPATCH_RECORD_COLLISION_DENIAL_CODE, EVIDENCE_HOST_PATH_DENIAL_CODE, blockedDispatchRecordCollision, blockedEvidenceHostPath, checkDispatchRecordCollision, claimDispatchRecordOwnership, extractWritePayload, isEvidenceArtifactPath } from "./dispatch-record-lane.mjs";
 import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestPathShellFaultBlocked, protectedTestPathShellRefusalHit } from "./gate-strength-lane.mjs";
-import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, missingProjectTargetDenialText, missingReadOperandIsOnlyFault, missingSingleReadTargetOperand, pluginCopyOfMissingProjectPath, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
+import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, missingPluginFileShellDenialText, missingProjectTargetDenialText, missingReadOperandIsOnlyFault, missingSingleReadTargetOperand, pluginCopyOfMissingProjectPath, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
 import { externalPoSigningOnly, isForbiddenCrossRepositoryMutation, isHostOnlyClaudeCaptureInvocation, isHumanPoProfileChangeCommand, isHumanPoSigningCommand } from "./po-commands.mjs";
 import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice, rebaseAuthorityShapeBlocked, rebaseAuthorityShapeRefusal } from "./rebase-lane.mjs";
 import { isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
@@ -515,6 +515,10 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
         { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM },
       );
       outsideRoot = isOutsideRootSingleCommandRead(rejected, root) || qp4OperandResolvesOutsideRoot(rejected, root);
+      if (outsideRoot) {
+        const missingPluginFile = missingPluginFileShellDenialText(rejected, root);
+        if (missingPluginFile !== null) return withLifts(lifts, verdict(2, missingPluginFile));
+      }
       // K96 (PO decision 2026-10-23, rows 6/16, M7): an in-root read whose target is a credential location is refused for the PATH, so it
       // gets its own typed code (checked only when the target is inside the root: an outside-root credential read keeps the scope code, QP4-1).
       credentialTarget = !outsideRoot && qp4OperandIsCredentialTarget(rejected, root);

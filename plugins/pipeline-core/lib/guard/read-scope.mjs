@@ -9,7 +9,7 @@ import { readClaudeTaskOutputReadScope } from "../claude-task-output-read-scope.
 import { isBoundedReadOnlyPipeline, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM, MAX_CLAUDE_TASK_OUTPUT_READ_BYTES } from "./constants.mjs";
 import { commandPath, isPathWithinRoot, pathInside, rawReadCandidatePath } from "./path-containment.mjs";
-import { isBoundedCatPipeline, isBoundedGitPipeline, isBoundedGrepPipeline, isBoundedReadOnlyAndChain, isChainSegmentAdmitted, isReadOnlyDiagnosticCommand, isReadOnlySimpleWords, isSafeExactPassiveFile, passiveCandidate, splitTopLevelAndChain } from "./shell-grammar.mjs";
+import { isBoundedCatPipeline, isBoundedGitPipeline, isBoundedGrepPipeline, isBoundedReadOnlyAndChain, isChainSegmentAdmitted, isReadOnlyDiagnosticCommand, isReadOnlySimpleWords, isSafeExactPassiveFile, passiveCandidate, qp4ReadTargetOperands, splitTopLevelAndChain } from "./shell-grammar.mjs";
 import { verdict } from "./verdict.mjs";
 import { claudeSessionMemoryDirectory } from "./write-scope.mjs";
 
@@ -685,6 +685,36 @@ export function pluginCopyOfMissingProjectPath(raw, root, pluginRoots = BOUNDED_
   return null;
 }
 
+function missingPluginFileDenialText(target, listing) {
+  return "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the file does not exist in the Pipeline plugin "
+    + `(${target.relative}); nothing to read at that path. List the nearest existing plugin directory ${listing} `
+    + "and read an exact file it shows; a skill names the references it uses in its own skill file.\n";
+}
+
+/**
+ * C23 (PO word 2026-11-09, Codex greenfield F17): a shell read of a guessed plugin path was refused GUARD-READ-SCOPE-OUTSIDE-ROOT, which
+ * reads as a permission problem although the file simply does not exist. The refusal text for a rejected single read whose every target
+ * outside the project is such a missing plugin file; null otherwise (a target that exists, or lies elsewhere, keeps the scope code).
+ * Label selection only: the command stays refused.
+ */
+export function missingPluginFileShellDenialText(parsed, root, pluginRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
+  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1) return null;
+  const { executable, argv } = parsed.segments[0];
+  const name = basename(String(executable ?? "")).toLowerCase();
+  const operands = name === "rg" || name === "grep" ? qp4ReadTargetOperands(name, argv) : argv;
+  const rootResolved = resolve(root);
+  let first = null;
+  for (const token of operands) {
+    if (typeof token !== "string" || token.includes("\0")) continue;
+    const candidate = rawReadCandidatePath(token, root);
+    if (candidate === null || pathInside(rootResolved, resolve(candidate))) continue;
+    const missing = missingRegisteredPluginTarget(token, root, pluginRoots);
+    if (missing === null) return null;
+    first ??= missing;
+  }
+  return first === null ? null : missingPluginFileDenialText(first, `with \`ls ${first.listDirectory}\``);
+}
+
 /** The missing-project-target refusal, naming the plugin copy when there is one. */
 export function missingProjectTargetDenialText(raw, root, pluginRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
   const copy = pluginCopyOfMissingProjectPath(raw, root, pluginRoots);
@@ -839,9 +869,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
   // guessed a plugin path (seven times in one run). Name the real cause and the nearest existing plugin directory to list instead.
   const pluginMissing = toolName === "Read" ? missingRegisteredPluginTarget(path, root, pluginRoots) : null;
   if (pluginMissing !== null) {
-    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the file does not exist in the Pipeline plugin "
-      + `(${pluginMissing.relative}); nothing to read at that path. List the nearest existing plugin directory with Glob (path ${pluginMissing.listDirectory}, pattern *) `
-      + "and read an exact file it shows; a skill names the references it uses in its own skill file.\n");
+    return verdict(2, missingPluginFileDenialText(pluginMissing, `with Glob (path ${pluginMissing.listDirectory}, pattern *)`));
   }
   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
     + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
