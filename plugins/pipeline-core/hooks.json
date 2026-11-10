@@ -23,6 +23,11 @@
         "type": "command",
         "command": "node hooks/antigravity-stop-hook.mjs",
         "timeout": 15
+      },
+      {
+        "type": "command",
+        "command": "node hooks/publication-readback-stop.mjs",
+        "timeout": 30
       }
     ],
     "PreInvocation": [

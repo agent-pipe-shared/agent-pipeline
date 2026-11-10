@@ -944,7 +944,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   if (modeNotice !== null) notices.push(modeNotice);
   if (notices.length > 0) report.notices = notices;
   // The step after the push: it asks the remote what it holds and records that privately, so the tracked handover's "not done by the close" is no longer the last word. No commit.
-  report.afterPush = { command: ["node", fileURLToPath(new URL("./publication-readback.mjs", import.meta.url)), "record", "--root", dir, "--remote", remote, "--destination", destination], why: "right after the push: records what the remote really holds, needs no commit" };
+  report.afterPush = { command: ["node", fileURLToPath(new URL("./publication-readback.mjs", import.meta.url)), "record", "--root", dir, "--remote", remote, "--destination", destination], why: "recorded automatically at the end of the turn in which the push happened; run this only if `publication-readback.mjs inspect` shows no record for it (for example a remote without a fetch refspec). It asks the remote what it holds and needs no commit" };
   // Slim profile pushes the exact checked-out branch; the default profile keeps HEAD.
   const sourceRef = slim ? checkpointSourceRef() : "HEAD";
   const profileNote = slim

@@ -15,6 +15,20 @@
         ]
       }
     ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/publication-readback-stop.mjs\"",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/publication-readback-stop.mjs\"",
+            "timeout": 30,
+            "statusMessage": "Recording what the remote holds after a push"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "spawn_agent|update_plan",

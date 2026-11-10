@@ -4827,6 +4827,12 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/publication-readback.test.mjs"
     },
     {
+      "name": "publication-readback-stop-tests",
+      "file": "plugins/pipeline-core/lib/publication-readback-stop.test.mjs",
+      "invariantPinned": "A push is recognised at turn end from the reflog of its remote-tracking ref and recorded once; a local commit or a fetch records nothing, and an unreachable remote is not asked again for 15 minutes",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/publication-readback-stop.test.mjs"
+    },
+    {
       "name": "wait-host-commit-tests",
       "file": "plugins/pipeline-core/scripts/wait-host-commit.test.mjs",
       "invariantPinned": "The wait for a background Goldfish's stop answers from the stop's own last record: committed, checkpoint, stop-failed with the stop's recovery, or still-waiting; another dispatch or an earlier attempt under the same id never answers for this one, and it changes nothing",
