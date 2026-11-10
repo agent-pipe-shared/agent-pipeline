@@ -178,7 +178,11 @@ export function issueCriticSourceReturnFromMessage({ commonDir, runner, text, no
     if (!MESSAGE_RUNNERS.has(runner)) return { status: "not-applicable" };
     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
     const verdict = extractCriticVerdict(text);
-    return verdict === null || verdictPassContradiction(verdict) !== null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs, child: childDigest(child) });
+    const contradiction = verdict === null ? null : verdictPassContradiction(verdict);
+    const digest = childDigest(child);
+    const result = verdict === null || contradiction !== null ? noVerdictFromMessage({ commonDir, runner, nowMs, child, stepIdx }) : issueForVerdict({ commonDir, runner, verdict, nowMs, child: digest });
+    noteReturnProblem({ commonDir, runner, nowMs, child: digest, result: contradiction === null ? result : { status: "contradictory-verdict", reason: contradiction }, text });
+    return result;
   } catch { return { status: "unavailable" }; }
 }
 

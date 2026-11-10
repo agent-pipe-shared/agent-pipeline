@@ -2727,12 +2727,12 @@ function g2072Fixture() {
 const g2072Child = (id, overrides = {}) => verdict({ deliberately_not_flagged: [`reviewed ${id}`], trajectory_evidence: `scope:${id} read the diff of ${id}`, ...overrides });
 const g2072Finding = (overrides = {}) => ({ gap: "a gap", risk: "a risk", severity: "major", evidence: "src/core/m0.mjs:1", spec_ref: "AC-1", ...overrides });
 // Prints (the real wrapper), fills the placeholders, admits through the real CLI; returns the printed split and the packet.
-function g2072Admit(fx) {
+function g2072Admit(fx, route = options(fx).route) {
   const printed = preflightCriticDispatchWithAdmitRequest(options(fx).preflightInput, { env: {} });
   assert.equal(printed.status, "packet-ready", JSON.stringify(printed));
   assert.ok(printed.split, "the range is above the bound");
   const request = structuredClone(printed.admitRequest);
-  Object.assign(request, { projectId: "pipeline", sessionId: "session-g2072-1", route: options(fx).route, verdictPath: "evidence/critic-verdict.json", event: null });
+  Object.assign(request, { projectId: "pipeline", sessionId: "session-g2072-1", route, verdictPath: "evidence/critic-verdict.json", event: null });
   request.review.genericBatchRef = batchFor(fx);
   const requestPath = writeScratchRequest(fx, "g2072-request.json", request);
   const admitted = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]);
@@ -2849,6 +2849,23 @@ test("C23: a Critic return that leaves no record states why in the merge refusal
     assert.match(g2072Hook(fx, criticReturn(g2072Child("core")), child).stderr, /Source return issued/u);
     assert.deepEqual(problems(), [], "the corrected return clears the reason");
   } finally { cleanup(fx); }
+});
+
+test("C23: an Antigravity Critic message that leaves no record states why in the merge refusal too, and a corrected message clears the reason", async () => {
+  const { runCriticSplitMergeCli } = await import("./critic-split-merge.mjs");
+  const fx = g2072Fixture();
+  const brain = agyBrain();
+  try {
+    const admitted = g2072Admit(fx, AGY_ROUTE);
+    const problems = () => readdirSync(admitted.packetDir).filter((name) => name.startsWith("return-problem-"));
+    const send = (stepIdx, message) => agyIssue({ ...agySendMessage(fx, brain, { message }), stepIdx });
+    await send(9, "The review is finished, no block here.");
+    assert.equal(problems().length, 1);
+    assert.match(JSON.parse(runCriticSplitMergeCli(["--root", fx.root, "--packet", admitted.packetId]).stderr).message, /does not end in a fenced JSON verdict/u);
+    const corrected = await send(11, criticReturn(g2072Child("core")));
+    assert.equal(corrected.status, "issued", JSON.stringify(corrected));
+    assert.deepEqual(problems(), [], "the corrected message clears the reason");
+  } finally { rmSync(brain, { recursive: true, force: true }); cleanup(fx); }
 });
 
 test("G20-72 admit binds the split; the Critic stop hook issues one Source return per returning child; the whole chain ends in one source-issued verdict whose receipt carries the split digest", async () => {
