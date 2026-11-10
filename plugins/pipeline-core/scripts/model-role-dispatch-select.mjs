@@ -13,7 +13,7 @@ import { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } from ".
 import { createModelFamilyInvocationEntry } from "../lib/model-family-invocation.mjs";
 import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
 import { CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE } from "../lib/model-role-route-source.mjs";
-import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+import { loadProjectRoutingRegistry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 
 const fail = (code) => ({ ok: false, code, status: "unavailable" });
 const legacy = ({ runner, taskRoute, sessionId = null, diagnostic = null, v3Route }) => ({
@@ -66,7 +66,7 @@ export function selectModelRoleForTask({ rootDir, runner, taskRoute,
   familyInvocationEntry = null,
   makeInvocationId = randomUUID,
   readCandidate = readGitCandidate,
-  routeSource = undefined, readRegistry = loadRunnerProfilesV3Registry,
+  routeSource = undefined, readRegistry = undefined,
   readCommonDir = readGitCommonDir, makeStore = createModelRoleHostStore } = {}) {
   if (typeof rootDir !== "string" || !isAbsolute(rootDir)) return fail("MODEL-ROLE-SELECT-SOURCE");
   familyInvocationEntry ??= createModelFamilyInvocationEntry({
@@ -90,9 +90,11 @@ export function selectModelRoleForTask({ rootDir, runner, taskRoute,
   // registered V3 route before considering its derived role projection: a
   // damaged projection may not strand an otherwise usable approved route.
   let registry;
-  try { registry = readRegistry(); }
+  // C23: the route is the PROJECT's own routing for rootDir (already validated by shape, the registry with a warning when its
+  // pipeline.user.yaml is absent or invalid). An injected registry is still validated against the frozen contract.
+  try { registry = readRegistry ? readRegistry() : loadProjectRoutingRegistry(rootDir); }
   catch { return fail("MODEL-ROLE-SELECT-SOURCE"); }
-  if (!validateRunnerProfilesV3Registry(registry).ok) return fail("MODEL-ROLE-SELECT-SOURCE");
+  if (readRegistry && !validateRunnerProfilesV3Registry(registry).ok) return fail("MODEL-ROLE-SELECT-SOURCE");
   const parts = typeof taskRoute === "string" ? taskRoute.split(".") : [];
   const cell = ["claude", "codex", "antigravity"].includes(runner)
     ? parts.length === 3 && parts[0] === "profile"

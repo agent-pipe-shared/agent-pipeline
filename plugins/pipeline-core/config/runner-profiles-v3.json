@@ -281,7 +281,7 @@
           "kind": "alias",
           "value": "sonnet"
         },
-        "effort": "medium",
+        "effort": "high",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       },

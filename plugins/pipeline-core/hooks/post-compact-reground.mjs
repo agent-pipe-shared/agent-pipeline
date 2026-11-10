@@ -11,6 +11,7 @@ import {
 } from "../lib/continuity-state.mjs";
 import { buildContinuationLine } from "../lib/interaction-continuity.mjs";
 import { reconcileMainSessionRoute } from "../lib/main-session-route.mjs";
+import { loadProjectRoutingRegistry } from "../lib/runner-profiles-v3.mjs";
 import { readModelIdentityObservation } from "../lib/main-session-route-attestation.mjs";
 import {
   boundedNarrativeExcerpt,
@@ -203,6 +204,8 @@ function mainSessionRouteProjection(input, phase, rootDir = null) {
     observed: context.observed ?? null,
     reportedEventIds: context.reportedEventIds ?? [],
     poException: context.poException ?? null,
+    // C23: the desired route is the PROJECT's own (its pipeline.user.yaml); without a root the registry seed answers.
+    registry: rootDir ? loadProjectRoutingRegistry(rootDir) : undefined,
   });
   const sessionId = typeof input?.session_id === "string"
     ? input.session_id

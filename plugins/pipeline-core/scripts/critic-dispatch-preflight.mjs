@@ -27,7 +27,7 @@ import { criticCoverageAdvisory, listUncoveredCriticRecords, terminalAuthoredDel
 import { criticDisposition } from "../lib/critic-skip-decision.mjs";
 import { SAFE_ID, admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
 import { SPLIT_MAX_ENTRIES, buildCriticSplit } from "../lib/critic-split.mjs";
-import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+import { loadProjectRoutingRegistry } from "../lib/runner-profiles-v3.mjs";
 import {
   CriticGuardrailDerivationError,
   deriveRequiredCriticGuardrails,
@@ -648,7 +648,10 @@ function opusCriticPromptLines({ root, result, env, registry, trigger }) {
   const runner = env.CODEX_SESSION_ID !== undefined || env.CODEX_THREAD_ID !== undefined ? "codex" : "claude";
   const duty = trigger === "T1" || trigger === "T2" ? "critic_high_risk" : "critic_normal";
   let cell;
-  try { cell = (registry ?? loadRunnerProfilesV3Registry()).duties?.[duty]?.[runner]; } catch { return null; }
+  // C23: the Critic route of the PROJECT (its pipeline.user.yaml), not the shipped registry. This CLI's stderr protocol is closed
+  // (a complete packet-ready result prints nothing there), so a fallback to the registry is not announced here; the line below only
+  // quotes the route it found.
+  try { cell = (registry ?? loadProjectRoutingRegistry(root, { warn: () => {} })).duties?.[duty]?.[runner]; } catch { return null; }
   if (!isObject(cell) || cell.state === "unavailable" || !isObject(cell.selector) || typeof cell.selector.value !== "string" || !/opus/iu.test(cell.selector.value)) return null;
   const base = result.base.commit ?? result.base.tree, head = result.candidate.commit;
   const names = gitOrNull(root, ["diff", "--name-only", base, head]);

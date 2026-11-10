@@ -163,3 +163,43 @@ test("DME13 G20-43 the Goldfish roles pass Model flash and the Critic passes no 
     assert.match(dispatchModelRefusalText(refused), /omit Model/u);
   }
 });
+
+// C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 4): the dispatch route reader returns the project's own value.
+test("DME-C23 the dispatch model check reads the project's routing for its root, and falls back to the registry with a warning", async () => {
+  const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { loadRunnerProfilesV3Registry, RUNNER_PROFILES_V3_REGISTRY_SHA256 } = await import("./runner-profiles-v3.mjs");
+  const registry = loadRunnerProfilesV3Registry();
+  const render = (value, indent = "") => Object.keys(value).map((key) => {
+    const item = value[key];
+    if (Array.isArray(item)) return item.length === 0 ? `${indent}${key}: []\n` : `${indent}${key}:\n${item.map((entry) => (entry !== null && typeof entry === "object"
+      ? `${indent}  -\n${render(entry, `${indent}    `)}` : `${indent}  - ${JSON.stringify(entry)}\n`)).join("")}`;
+    return item !== null && typeof item === "object" ? `${indent}${key}:\n${render(item, `${indent}  `)}` : `${indent}${key}: ${JSON.stringify(item)}\n`;
+  }).join("");
+  const intent = {
+    schema: "pipeline.user.v3", core_registry_sha256: RUNNER_PROFILES_V3_REGISTRY_SHA256,
+    language: { human_facing: "en", agent_facing: "en" }, agent_runtime: "other", runners: { enabled: ["claude"], default: "claude" },
+    routing: { profiles: registry.profiles, duties: structuredClone(registry.duties) },
+    usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
+    autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
+    gates: { dev_plan: "blocking", push: "blocking", security: "warn", claude_md_max_lines: 300 }, critic_export: registry.criticExportPolicy,
+  };
+  intent.routing.duties.mechanic.claude.selector = { kind: "model-id", value: "my-local-model" };
+  const root = mkdtempSync(join(tmpdir(), "c23-enforce-"));
+  try {
+    const ask = (model, extra = {}) => evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-mechanic", model, root, ...extra });
+    const absent = [];
+    // No configuration yet: the registry answers, so the project's model id is not known and is refused as unrouted.
+    assert.equal(ask("my-local-model", { warn: (text) => absent.push(text) }).findings[0].code, "DISPATCH-MODEL-UNROUTED");
+    assert.equal(absent.length, 1);
+    writeFileSync(join(root, "pipeline.user.yaml"), render(intent));
+    assert.equal(ask("my-local-model").ok, true);
+    assert.equal(ask("my-local-model").findings.length, 0);
+    // The project's own value is the one the check names, the registry's alias is no longer the route.
+    assert.equal(ask(undefined).findings[0].code, "DISPATCH-MODEL-MISSING");
+    assert.match(ask(undefined).findings[0].message, /duty\.mechanic = "my-local-model"/u);
+    // An explicit routeSource still wins (the pure decision stays injectable).
+    assert.equal(ask("my-local-model", { routeSource: routes() }).findings[0].code, "DISPATCH-MODEL-UNROUTED");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

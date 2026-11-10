@@ -804,9 +804,11 @@ if (isDirectInvocation(import.meta.url)) {
   // D84: Claude's direct model parameter is checked here. K152B checks each native
   // Antigravity Subagents[].Model separately below, before any child is launched.
   if (["Task", "Agent"].includes(input?.tool_name)) {
+    // The route is the PROJECT's own routing (draft ADR "a project's pipeline.user.yaml owns its routing"), read from the project root.
+    const modelRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
     const modelCheck = Array.isArray(toolInput.Subagents)
-      ? toolInput.Subagents.map((entry) => evaluateDispatchModel({ runner: "antigravity", subagentType: entry?.TypeName, model: entry?.Model }))
-      : [evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model })];
+      ? toolInput.Subagents.map((entry) => evaluateDispatchModel({ runner: "antigravity", subagentType: entry?.TypeName, model: entry?.Model, root: modelRoot }))
+      : [evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model, root: modelRoot })];
     for (const check of modelCheck) {
       const modelWarnings = dispatchModelWarningText(check);
       if (modelWarnings !== "") process.stderr.write(modelWarnings);

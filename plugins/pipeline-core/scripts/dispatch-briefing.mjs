@@ -110,7 +110,7 @@ const {
 } = cliHelp ? {} : await import("../lib/native-goldfish-host-return.mjs");
 const { acceptedFamilyForms, modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } = cliHelp ? {} : await import("../lib/agent-model-registry.mjs");
 const { ANTIGRAVITY_NATIVE_MODELS, antigravityNativeTierForTaskRoute } = cliHelp ? {} : await import("../lib/dispatch-model-enforcement.mjs");
-const { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } = cliHelp ? {} : await import("../lib/model-role-route-source.mjs");
+const { functionalTaskRoutesForRunner, projectFunctionalTaskRoutes } = cliHelp ? {} : await import("../lib/model-role-route-source.mjs");
 const {
   BRIEFING_BUILD_SCHEMA,
   BriefingPackageRefusal,
@@ -237,31 +237,33 @@ function listDirectoryFiles(root, path, limit = MAX_ALLOWED_PATHS) {
 }
 
 /** The Codex task route of a duty (read-only registry projection), or null when the registry yields none. */
-function defaultCodexRoute(taskRoute) {
+// C23 (draft ADR "a project's pipeline.user.yaml owns its routing"): the four default route readers below read the PROJECT's own
+// routing for `root` (the registry, with a warning on stderr, only when its pipeline.user.yaml is absent or invalid).
+function defaultCodexRoute(taskRoute, root) {
   try {
-    const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "codex");
+    const scoped = functionalTaskRoutesForRunner(projectFunctionalTaskRoutes(root), "codex");
     return scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute) ?? null : null;
   } catch { return null; }
 }
 
-/** The Antigravity native model alias of a duty (read-only registry projection), or null when the registry yields none. */
-function defaultAntigravityRoute(taskRoute) {
-  try { return antigravityNativeTierForTaskRoute(taskRoute); } catch { return null; }
+/** The Antigravity native model alias of a duty (read-only projection of the project's routing), or null when it yields none. */
+function defaultAntigravityRoute(taskRoute, root) {
+  try { return antigravityNativeTierForTaskRoute(taskRoute, projectFunctionalTaskRoutes(root)); } catch { return null; }
 }
 
-/** The concrete model id the registry names for an Antigravity duty, or null. The briefing states it because the alias alone names no model (MP-05). */
-function defaultAntigravityRouteModel(taskRoute) {
+/** The concrete model id the project's routing names for an Antigravity duty, or null. The briefing states it because the alias alone names no model (MP-05). */
+function defaultAntigravityRouteModel(taskRoute, root) {
   try {
-    const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "antigravity");
+    const scoped = functionalTaskRoutesForRunner(projectFunctionalTaskRoutes(root), "antigravity");
     const value = scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute)?.selector?.value : null;
     return typeof value === "string" ? value : null;
   } catch { return null; }
 }
 
-/** The Claude task route of a duty (read-only registry projection), or null when the registry yields none. */
-function defaultClaudeRoute(taskRoute) {
+/** The Claude task route of a duty (read-only projection of the project's routing), or null when it yields none. */
+function defaultClaudeRoute(taskRoute, root) {
   try {
-    const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "claude");
+    const scoped = functionalTaskRoutesForRunner(projectFunctionalTaskRoutes(root), "claude");
     return scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute) ?? null : null;
   } catch { return null; }
 }
@@ -945,7 +947,7 @@ export function generateDispatchBinding(options, deps = {}) {
   let codexRoute = null;
   if (runner === "codex") {
     const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
-    codexRoute = (deps.codexRoute ?? defaultCodexRoute)(taskRoute);
+    codexRoute = (deps.codexRoute ?? defaultCodexRoute)(taskRoute, root);
     if (!codexRoute || codexRoute.state === "unavailable" || typeof codexRoute.selector?.value !== "string") {
       refuse("DBG-MODEL-ROUTE-UNAVAILABLE", `the Codex route ${taskRoute} for ${agentType} is ${codexRoute?.state === "unavailable" ? "unavailable" : "not registered"} in the runner profile registry, so model id ${modelId} cannot be checked against it; repair: pick the --agent-type whose Codex route is available (${Object.entries(DUTY_ROUTE_OF_AGENT).map(([type, route]) => `${type} = ${route}`).join(", ")}; \`node <plugin-root>/scripts/model-role-dispatch-select.mjs --repo-root <repo> --runner codex --task-route ${taskRoute}\` shows the route), or dispatch with --runner claude`);
     }
@@ -956,7 +958,7 @@ export function generateDispatchBinding(options, deps = {}) {
     }
   } else if (runner === "antigravity") {
     const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
-    const expected = (deps.antigravityRoute ?? defaultAntigravityRoute)(taskRoute);
+    const expected = (deps.antigravityRoute ?? defaultAntigravityRoute)(taskRoute, root);
     if (typeof expected !== "string" || !ANTIGRAVITY_NATIVE_MODELS.includes(expected)) {
       refuse("DBG-MODEL-ROUTE-UNAVAILABLE", `the Antigravity route ${taskRoute} for ${agentType} is not registered in the runner profile registry, so model id ${modelId} cannot be checked against it; repair: pick the --agent-type whose Antigravity route is registered (${Object.entries(DUTY_ROUTE_OF_AGENT).map(([type, route]) => `${type} = ${route}`).join(", ")}), or dispatch with --runner claude`);
     }
@@ -980,7 +982,7 @@ export function generateDispatchBinding(options, deps = {}) {
   // Antigravity: the agent definition's effort is the briefed effort (no Antigravity effort is selectable; the Claude route is not read).
   if (runner === "claude") {
     const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
-    const route = (deps.claudeRoute ?? defaultClaudeRoute)(taskRoute);
+    const route = (deps.claudeRoute ?? defaultClaudeRoute)(taskRoute, root);
     const routeEffort = route && route.state !== "unavailable" && typeof route.effort === "string" && route.effort !== "" ? route.effort : null;
     if (routeEffort === null) {
       warnings.push({ code: "DBG-EFFORT-ROUTE-UNKNOWN", message: `the Claude route ${taskRoute} for ${agentType} could not be read from the runner profile registry, so the effort ${resolved.effort} of the agent definition was not checked against the configured route` });
@@ -1137,7 +1139,7 @@ export function generateDispatchBinding(options, deps = {}) {
     runner === "codex"
       ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Codex route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`).`
       : runner === "antigravity"
-        ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Antigravity native model alias, route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`, route model \`${(deps.antigravityRouteModel ?? defaultAntigravityRouteModel)(DUTY_ROUTE_OF_AGENT[agentType]) ?? "not registered"}\`).`
+        ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Antigravity native model alias, route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`, route model \`${(deps.antigravityRouteModel ?? defaultAntigravityRouteModel)(DUTY_ROUTE_OF_AGENT[agentType], root) ?? "not registered"}\`).`
         : `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; agent definition alias \`${resolved.model}\`${claudeRouteDuty === null ? "" : `; Claude route \`${claudeRouteDuty}\``}).`,
     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
     // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.

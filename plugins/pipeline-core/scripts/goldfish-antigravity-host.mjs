@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { AGY_ERROR_TAXONOMY, invokeAgy, parseAgyOutput } from "../lib/antigravity-execution-host.mjs";
 import { bindStoredModelRoleDispatch } from "../lib/model-role-host-session.mjs";
 import { createModelRoleHostStore } from "../lib/model-role-host-store.mjs";
-import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+import { loadProjectRoutingRegistry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { ROLE_DISPATCH_PREFLIGHT_SCHEMA, ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { validateControlPlacement } from "./control-placement.mjs";
 import { validateRecord } from "./enforcement-conformance.mjs";
@@ -338,9 +338,11 @@ export async function dispatchGoldfishToAntigravity({
     const baseRoute = packet.role === "pipeline-core:goldfish-mechanic"
       ? "duty.implement" : taskRoute;
     let registry;
-    try { registry = dependencies.readRegistry?.() ?? loadRunnerProfilesV3Registry(); }
+    // C23: the route is the PROJECT's own (its pipeline.user.yaml, validated by shape when read); an injected registry is still
+    // validated against the frozen contract.
+    try { registry = dependencies.readRegistry ? dependencies.readRegistry() : loadProjectRoutingRegistry(root); }
     catch { return refused(E3_CODES.MODEL_ROLE_NOT_BOUND, "sessionId"); }
-    if (!validateRunnerProfilesV3Registry(registry).ok)
+    if (dependencies.readRegistry && !validateRunnerProfilesV3Registry(registry).ok)
       return refused(E3_CODES.MODEL_ROLE_NOT_BOUND, "sessionId");
     const cell = baseRoute?.startsWith("duty.")
       ? registry.duties?.[baseRoute.slice(5)]?.antigravity : null;

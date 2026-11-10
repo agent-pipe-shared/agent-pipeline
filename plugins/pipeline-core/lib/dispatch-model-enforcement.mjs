@@ -8,7 +8,7 @@
  * selectors the configuration allows. An unreadable route source gives no opinion, so a broken
  * configuration can never leave a dispatch that no caller can repair.
  */
-import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
+import { projectFunctionalTaskRoutes, registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
 import { isShippedPipelineAgentType } from "./dispatch-policy.mjs";
 
 /** Runners whose dispatch tool carries a tool-layer `model` parameter this guard can observe. */
@@ -47,7 +47,19 @@ function selectorMatches(selector, model) {
   return selector.kind === "alias" && new RegExp(`^claude-${wanted}(?:-|$)`, "u").test(given);
 }
 
-export function evaluateDispatchModel({ runner, subagentType, model, routeSource = registeredFunctionalTaskRoutes() } = {}) {
+/**
+ * The route source is the project's own routing for `root` unless a caller injects one (draft ADR "a project's pipeline.user.yaml
+ * owns its routing"). A fallback to the registry is reported through `warn`, else as a warning on the returned evaluation.
+ */
+export function evaluateDispatchModel({ root, warn, routeSource, ...rest } = {}) {
+  const notes = [];
+  const source = routeSource ?? projectFunctionalTaskRoutes(root, { warn: warn ?? ((text) => notes.push(text)) });
+  const result = decideDispatchModel({ ...rest, routeSource: source });
+  return notes.length === 0 ? result
+    : { ...result, warnings: [...(result.warnings ?? []), ...notes.map((message) => ({ code: "DISPATCH-ROUTING-SOURCE-FALLBACK", message }))] };
+}
+
+function decideDispatchModel({ runner, subagentType, model, routeSource } = {}) {
   if (runner === "antigravity") {
     // Antigravity's enum is routed through the explicit PO-approved nativeTier projection
     // in model-role-route-source. Concrete V3 model IDs remain a separate CLI route.

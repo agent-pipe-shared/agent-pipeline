@@ -4,7 +4,7 @@
  * routing registry. Product-name similarity never assigns a functional role.
  * This is a read-only projection, not bootstrap admission or a model approval.
  */
-import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
+import { loadProjectRoutingRegistry, loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 
 const RUNNERS = ["claude", "codex", "antigravity"];
 const PROFILES = ["epic", "feature", "mini"];
@@ -161,6 +161,15 @@ export function registeredFunctionalTaskRoutes(registry = loadRunnerProfilesV3Re
     configuredRoutes: [...configured.values()].sort((a, b) =>
       `${a.runner}:${a.role}:${a.effort}`.localeCompare(`${b.runner}:${b.role}:${b.effort}`)),
   };
+}
+
+/**
+ * The task routes a run of the project at `root` selects: the project's own validated routing, or the registry (with a warning
+ * through `warn`, or on stderr) when its `pipeline.user.yaml` is absent or invalid. Every reader that SELECTS a route for a run
+ * uses this; a reader that needs only the seed or the shape keeps `loadRunnerProfilesV3Registry()`.
+ */
+export function projectFunctionalTaskRoutes(root, { warn } = {}) {
+  return registeredFunctionalTaskRoutes(loadProjectRoutingRegistry(root, { warn }));
 }
 
 /** A session observes only its installed runner; the full source remains the approval subject. */

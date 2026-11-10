@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateHumanDecisionLabel } from "./human-role-labels.mjs";
+import { parseYaml } from "./yaml-lite.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CONFIG_DIR = join(HERE, "..", "config");
@@ -20,6 +21,7 @@ const SCRIPTS_DIR = join(HERE, "..", "scripts");
 const REGISTRY_PATH = join(CONFIG_DIR, "runner-profiles-v3.json");
 const USER_SCHEMA_PATH = join(SCRIPTS_DIR, "pipeline-user-v3.schema.json");
 const MAX_ERRORS = 100;
+const PROJECT_USER_FILE = "pipeline.user.yaml";
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -73,29 +75,39 @@ export function registeredCriticExportPolicy(registry = FROZEN_REGISTRY) {
 }
 
 /**
- * Core-owned V3 source surfaces: top-level `pipeline.user.v3` keys the
- * validator below requires to equal the frozen registry byte-for-byte
- * (`compareExact(value.routing.profiles, registry.profiles, ...)`,
- * `compareExact(value.routing.duties, registry.duties, ...)` and
- * `compareExact(value.critic_export, FROZEN_REGISTRY.criticExportPolicy, ...)`
- * a few lines further down). A surface the validator compares exactly against
- * the registry is Core-owned by construction: refreshing it wholesale from
- * the registry can never discard something a project owns. This table is the
- * single source `refreshKnownV3RegistryDelta()` in runner-profile-migration-
- * v3.mjs drives its recovery refresh from, by iteration -- adding a future
- * Core-owned surface needs exactly one new entry here, never a new branch in
- * that function. Deliberately NOT wired into the validator itself in this
- * change: unifying the two risks a validator behavior change, which is a
- * separate decision from "make the refresh table-driven".
+ * Add the cells of the registry that a project's routing lacks, and change nothing the project holds. The advisory duty keeps its
+ * own frozen contract (the validator compares it exactly), so it is the one duty restored from the registry. Pure.
+ */
+export function fillAbsentRouting(current, registry = FROZEN_REGISTRY) {
+  const seed = registeredRouting(registry);
+  if (!isObject(current)) return seed;
+  const merge = (held, base, levels) => {
+    if (held === undefined) return clone(base);
+    if (levels === 0 || !isObject(held) || !isObject(base)) return held;
+    const merged = { ...held };
+    for (const key of Object.keys(base)) merged[key] = merge(held[key], base[key], levels - 1);
+    return merged;
+  };
+  const duties = merge(current.duties, seed.duties, 2);
+  if (isObject(duties) && Object.hasOwn(seed.duties, "advisory")) duties.advisory = clone(seed.duties.advisory);
+  return { ...current, profiles: merge(current.profiles, seed.profiles, 3), duties };
+}
+
+/**
+ * Core-owned V3 source surfaces: top-level `pipeline.user.v3` keys a recovery refresh may fill from the registry.
+ * `critic_export` is compared exactly against the frozen registry by the validator, so it is Core-owned by construction and is
+ * refreshed wholesale. `routing` is project-owned (draft ADR "a project's pipeline.user.yaml owns its routing"): the validator
+ * checks its shape only, and the refresh fills absent cells through `refresh` and never overwrites a value the project holds. This
+ * table is the single source `refreshKnownV3RegistryDelta()` in runner-profile-migration-v3.mjs drives its recovery refresh from,
+ * by iteration -- adding a future Core-owned surface needs exactly one new entry here, never a new branch in that function.
  */
 export const CORE_OWNED_V3_SURFACES = Object.freeze([
   Object.freeze({
     path: "routing",
     registryValue: registeredRouting,
-    // Routing is refreshed as one whole registry, not per-route: an absent
-    // and a present-but-stale `routing` key are reported under the same
-    // compatibility-delta name, because both replace the identical whole
-    // subtree with the identical registered replacement.
+    // Additive: the project's own value wins, only absent duties, profiles and runner cells are filled. An absent and a
+    // present-but-incomplete `routing` key are reported under the same compatibility-delta name.
+    refresh: fillAbsentRouting,
     absentDelta: Object.freeze({ name: "closed-v3-routing-registry-refresh", from: "previous-public-core-registry", to: "current-public-core-registry" }),
     staleDelta: Object.freeze({ name: "closed-v3-routing-registry-refresh", from: "previous-public-core-registry", to: "current-public-core-registry" }),
   }),
@@ -316,10 +328,67 @@ function validateRoot(value, errors) {
   compareExact(value.critic_export, FROZEN_REGISTRY.criticExportPolicy, "$.critic_export", errors, "export_policy");
 }
 
+const ROUTE_EFFORTS = Object.freeze(["low", "medium", "high", "xhigh", "max", "not-applicable"]);
+const ROUTE_STATES = Object.freeze(["default", "opt-in", "unavailable"]);
+const SELECTOR_KINDS = Object.freeze(["alias", "model-id"]);
+
+/** The key set of `actual` must be exactly the key set of `expected`; reports a missing and an unregistered key. */
+function closedKeysOf(actual, expected, path, errors) {
+  if (!isObject(actual)) {
+    add(errors, path, "type", `${path} must be an object`, "restore the registered routing structure");
+    return false;
+  }
+  for (const key of Object.keys(expected)) if (!Object.hasOwn(actual, key)) add(errors, `${path}.${key}`, "required", "registered entry is missing", "restore every registered entry");
+  for (const key of Object.keys(actual)) if (!Object.hasOwn(expected, key)) add(errors, `${path}.${key}`, "additional_property", "entry is not registered", "remove the unregistered entry");
+  return true;
+}
+
+/** One route cell: its keys stay closed, state/selector kind/effort stay enumerated, the selector value is any non-empty string. */
+function validateRouteCell(cell, seed, path, errors) {
+  if (!closedKeysOf(cell, seed, path, errors)) return;
+  if (Object.hasOwn(cell, "state") && !ROUTE_STATES.includes(cell.state)) add(errors, `${path}.state`, "enum", `state must be one of ${ROUTE_STATES.join(", ")}`, "use a registered state");
+  if (Object.hasOwn(cell, "effort") && !ROUTE_EFFORTS.includes(cell.effort)) add(errors, `${path}.effort`, "enum", `effort must be one of ${ROUTE_EFFORTS.join(", ")}`, "use a listed effort");
+  if (Object.hasOwn(cell, "selector")) {
+    if (closedKeysOf(cell.selector, seed.selector, `${path}.selector`, errors)) {
+      if (Object.hasOwn(cell.selector, "kind") && !SELECTOR_KINDS.includes(cell.selector.kind)) add(errors, `${path}.selector.kind`, "enum", `selector kind must be one of ${SELECTOR_KINDS.join(", ")}`, "use alias or model-id");
+      if (Object.hasOwn(cell.selector, "value") && (typeof cell.selector.value !== "string" || cell.selector.value.trim() === "")) add(errors, `${path}.selector.value`, "type", "selector value must be a non-empty string", "name a model id or alias");
+    }
+  }
+  // Everything else on a cell (what happens when it is unavailable, which evidence it leaves) is not a model or an effort choice.
+  for (const key of Object.keys(seed)) if (!["state", "effort", "selector"].includes(key) && Object.hasOwn(cell, key)) compareExact(cell[key], seed[key], `${path}.${key}`, errors);
+}
+
+/** Shape of a project's routing against the registry's structure; values are the project's own. Advisory keeps its frozen contract. */
+function validateRoutingShape(routing, registry, errors) {
+  if (closedKeysOf(routing.profiles, registry.profiles, "$.routing.profiles", errors)) {
+    for (const [profile, phases] of Object.entries(registry.profiles)) {
+      const path = `$.routing.profiles.${profile}`;
+      if (!Object.hasOwn(routing.profiles, profile) || !closedKeysOf(routing.profiles[profile], phases, path, errors)) continue;
+      for (const [phase, runners] of Object.entries(phases)) {
+        if (!Object.hasOwn(routing.profiles[profile], phase) || !closedKeysOf(routing.profiles[profile][phase], runners, `${path}.${phase}`, errors)) continue;
+        for (const [runner, seed] of Object.entries(runners)) {
+          if (Object.hasOwn(routing.profiles[profile][phase], runner)) validateRouteCell(routing.profiles[profile][phase][runner], seed, `${path}.${phase}.${runner}`, errors);
+        }
+      }
+    }
+  }
+  if (closedKeysOf(routing.duties, registry.duties, "$.routing.duties", errors)) {
+    for (const [duty, runners] of Object.entries(registry.duties)) {
+      const path = `$.routing.duties.${duty}`;
+      if (!Object.hasOwn(routing.duties, duty)) continue;
+      if (duty === "advisory") { validateAdvisorContract(routing.duties.advisory, path, errors); continue; }
+      if (!closedKeysOf(routing.duties[duty], runners, path, errors)) continue;
+      for (const [runner, seed] of Object.entries(runners)) {
+        if (Object.hasOwn(routing.duties[duty], runner)) validateRouteCell(routing.duties[duty][runner], seed, `${path}.${runner}`, errors);
+      }
+    }
+  }
+}
+
 /**
- * Validates a complete pipeline.user.v3 intent. Routing is deliberately exact:
- * V3 is a one-way authority cutover, not another compatibility layer for the
- * old `design.advisor` phase.
+ * Validates a complete pipeline.user.v3 intent. A project owns the VALUES of its routing (draft ADR "a project's pipeline.user.yaml
+ * owns its routing"): the closed sets of profiles, phases, duties, runners and cell keys, the enumerations and the advisory
+ * contract are checked, any model id or alias and any listed effort is valid. `critic_export` stays exact.
  */
 export function validatePipelineUserV3(value, { source = "pipeline.user.v3", registry = FROZEN_REGISTRY } = {}) {
   const errors = [];
@@ -335,11 +404,38 @@ export function validatePipelineUserV3(value, { source = "pipeline.user.v3", reg
   if (isObject(value)) {
     const routingIsClosed = validateClosedObject(value.routing, "$.routing", ["profiles", "duties"], errors, "restore exactly the registered routing object");
     if (routingIsClosed) {
-      compareExact(value.routing.profiles, registry.profiles, "$.routing.profiles", errors);
-      compareExact(value.routing.duties, registry.duties, "$.routing.duties", errors);
+      validateRoutingShape(value.routing, registry, errors);
     }
   }
   return result(errors, source, { advisoryExport });
+}
+
+/**
+ * The project's validated routing for a root, read from its `pipeline.user.yaml`; the registry (the seed) with a warning when the
+ * file is absent, unreadable or invalid. Pure apart from the read; one parser (yaml-lite), no second copy of the contract.
+ */
+export function readProjectRouting(root = process.cwd(), { readText = (path) => readFileSync(path, "utf8") } = {}) {
+  const fallback = (why) => ({ source: "registry", routing: registeredRouting(), warnings: [`${PROJECT_USER_FILE} ${why}; the plugin registry routes this run`] });
+  let intent;
+  try { intent = parseYaml(readText(join(String(root), PROJECT_USER_FILE))); }
+  catch (error) { return fallback(error?.code === "ENOENT" ? "was not found" : `could not be read (${error?.name === "YamlLiteError" ? error.message : "unreadable"})`); }
+  const checked = validatePipelineUserV3(intent, { source: PROJECT_USER_FILE });
+  if (!checked.ok) return fallback(`is not a valid pipeline.user.v3 (${checked.errors[0]?.path ?? "$"}: ${checked.errors[0]?.code ?? "invalid"})`);
+  return { source: "project", routing: { profiles: clone(intent.routing.profiles), duties: clone(intent.routing.duties) }, warnings: [] };
+}
+
+const WARNED = new Set();
+/**
+ * The registry-shaped object route readers hand to `registeredFunctionalTaskRoutes`: the registry with the project's own routing in
+ * place of the seed's. A fallback is announced once per process on stderr (or through `warn`), never silently.
+ */
+export function loadProjectRoutingRegistry(root = process.cwd(), { readText, warn } = {}) {
+  const read = readProjectRouting(root, readText ? { readText } : {});
+  for (const text of read.warnings) {
+    if (warn) warn(text);
+    else if (!WARNED.has(`${root}\0${text}`)) { WARNED.add(`${root}\0${text}`); process.stderr.write(`WARNING (project-routing): ${text}\n`); }
+  }
+  return { ...loadRunnerProfilesV3Registry(), profiles: read.routing.profiles, duties: read.routing.duties };
 }
 
 export function validatePipelineUserV3Json(text, options = {}) {

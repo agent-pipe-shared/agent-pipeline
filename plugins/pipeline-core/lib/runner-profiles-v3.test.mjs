@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import * as profiles from "./runner-profiles-v3.mjs";
 import {
   loadPipelineUserV3Schema,
   loadRunnerProfilesV3Registry,
@@ -100,7 +104,9 @@ const cases = [
       "critic-high-risk.antigravity": "inherit / high",
       "critic-normal.codex": "gpt-6-sol / medium", "critic-normal.claude": "opus / medium",
       "critic-normal.antigravity": "inherit / high",
-      "deep.codex": "gpt-6-sol / medium", "deep.claude": "sonnet / medium",
+      // QG-04 restated (C23, PO tile 2026-11-09, D184): the shipped default effort of the Claude deep duty is high (was medium). A
+      // project keeps its own value; this pin is the seed a new project starts from.
+      "deep.codex": "gpt-6-sol / medium", "deep.claude": "sonnet / high",
       "deep.antigravity": "gemini-3.8-flash-high / high",
       "implement.codex": "gpt-6-luna / high", "implement.claude": "sonnet / medium",
       "implement.antigravity": "gemini-3.8-flash-medium / medium",
@@ -268,6 +274,100 @@ const cases = [
     const checked = validatePipelineUserV3(value);
     assert.equal(checked.ok, false);
     assert.ok(has(checked, "$.gates.reconcile_approval", "contract"));
+  }],
+  // C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decisions 1-4): the routing of a project is validated by
+  // shape only; any model id or alias and any listed effort is valid, the closed sets of duties, runners and keys stay closed.
+  ["a project with a changed effort and a changed model id validates", () => {
+    const value = completeIntent();
+    value.routing.duties.deep.claude.effort = "xhigh";
+    value.routing.duties.mechanic.claude.selector = { kind: "model-id", value: "claude-haiku-9" };
+    value.routing.duties.implement.codex.selector = { kind: "alias", value: "any-alias-the-project-names" };
+    value.routing.profiles.mini.execution_phase.codex.effort = "low";
+    const checked = validatePipelineUserV3(value);
+    assert.equal(checked.ok, true, JSON.stringify(checked.errors));
+  }],
+  ["a project value equal to the previous shipped registry stays valid", () => {
+    const value = completeIntent();
+    value.routing.duties.deep.claude.effort = "medium";
+    assert.equal(validatePipelineUserV3(value).ok, true);
+    value.routing.duties.deep.claude.effort = "high";
+    assert.equal(validatePipelineUserV3(value).ok, true);
+  }],
+  ["the shape of a project's routing stays closed", () => {
+    const unknownDuty = completeIntent(); unknownDuty.routing.duties.invented = clone(unknownDuty.routing.duties.implement);
+    assert.ok(has(validatePipelineUserV3(unknownDuty), "$.routing.duties.invented", "additional_property"));
+    const unknownRunner = completeIntent(); unknownRunner.routing.duties.deep.invented = clone(unknownRunner.routing.duties.deep.claude);
+    assert.ok(has(validatePipelineUserV3(unknownRunner), "$.routing.duties.deep.invented", "additional_property"));
+    const extraKey = completeIntent(); extraKey.routing.duties.deep.claude.extra = "x";
+    assert.ok(has(validatePipelineUserV3(extraKey), "$.routing.duties.deep.claude.extra", "additional_property"));
+    const missingKey = completeIntent(); delete missingKey.routing.duties.deep.claude.effort;
+    assert.ok(has(validatePipelineUserV3(missingKey), "$.routing.duties.deep.claude.effort", "required"));
+    const badEffort = completeIntent(); badEffort.routing.duties.deep.claude.effort = "turbo";
+    assert.ok(has(validatePipelineUserV3(badEffort), "$.routing.duties.deep.claude.effort", "enum"));
+    const badState = completeIntent(); badState.routing.duties.deep.claude.state = "maybe";
+    assert.ok(has(validatePipelineUserV3(badState), "$.routing.duties.deep.claude.state", "enum"));
+    const badKind = completeIntent(); badKind.routing.duties.deep.claude.selector.kind = "guess";
+    assert.ok(has(validatePipelineUserV3(badKind), "$.routing.duties.deep.claude.selector.kind", "enum"));
+    const emptyValue = completeIntent(); emptyValue.routing.duties.deep.claude.selector.value = "";
+    assert.ok(has(validatePipelineUserV3(emptyValue), "$.routing.duties.deep.claude.selector.value", "type"));
+    const missingDuty = completeIntent(); delete missingDuty.routing.duties.deep;
+    assert.ok(has(validatePipelineUserV3(missingDuty), "$.routing.duties.deep", "required"));
+    const profileCell = completeIntent(); profileCell.routing.profiles.epic.design_phase.codex.effort = "turbo";
+    assert.ok(has(validatePipelineUserV3(profileCell), "$.routing.profiles.epic.design_phase.codex.effort", "enum"));
+  }],
+  ["the critic export policy stays exactly the registry's", () => {
+    const value = completeIntent(); value.critic_export = { ...value.critic_export, extra: true };
+    assert.equal(validatePipelineUserV3(value).ok, false);
+  }],
+  ["the reader returns the project's own routing, and falls back to the registry with a visible warning", () => {
+    const render = (value, indent = "") => Object.keys(value).map((key) => {
+      const item = value[key];
+      if (Array.isArray(item)) return item.length === 0 ? `${indent}${key}: []\n` : `${indent}${key}:\n${item.map((entry) => (entry !== null && typeof entry === "object"
+        ? `${indent}  -\n${render(entry, `${indent}    `)}` : `${indent}  - ${JSON.stringify(entry)}\n`)).join("")}`;
+      return item !== null && typeof item === "object" ? `${indent}${key}:\n${render(item, `${indent}  `)}` : `${indent}${key}: ${JSON.stringify(item)}\n`;
+    }).join("");
+    const root = mkdtempSync(join(tmpdir(), "c23-reader-"));
+    try {
+      const warnings = [];
+      const absent = profiles.readProjectRouting(root);
+      assert.equal(absent.source, "registry");
+      assert.ok(absent.warnings.length > 0);
+      assert.deepEqual(absent.routing, { profiles: registry.profiles, duties: registry.duties });
+
+      const changed = completeIntent();
+      changed.core_registry_sha256 = profiles.RUNNER_PROFILES_V3_REGISTRY_SHA256;
+      changed.routing.duties.deep.claude.effort = "xhigh";
+      changed.routing.duties.mechanic.claude.selector = { kind: "model-id", value: "claude-haiku-9" };
+      writeFileSync(join(root, "pipeline.user.yaml"), render(changed));
+      const project = profiles.readProjectRouting(root);
+      assert.equal(project.source, "project");
+      assert.deepEqual(project.warnings, []);
+      assert.equal(project.routing.duties.deep.claude.effort, "xhigh");
+      assert.equal(project.routing.duties.mechanic.claude.selector.value, "claude-haiku-9");
+      const merged = profiles.loadProjectRoutingRegistry(root, { warn: (text) => warnings.push(text) });
+      assert.equal(merged.duties.deep.claude.effort, "xhigh");
+      assert.deepEqual(merged.criticExportPolicy, registry.criticExportPolicy);
+      assert.deepEqual(warnings, []);
+
+      const invalid = clone(changed); invalid.routing.duties.deep.claude.effort = "turbo";
+      writeFileSync(join(root, "pipeline.user.yaml"), render(invalid));
+      const fallback = profiles.readProjectRouting(root);
+      assert.equal(fallback.source, "registry");
+      assert.ok(fallback.warnings.length > 0);
+      assert.equal(fallback.routing.duties.deep.claude.effort, registry.duties.deep.claude.effort);
+      profiles.loadProjectRoutingRegistry(root, { warn: (text) => warnings.push(text) });
+      assert.equal(warnings.length, 1);
+      assert.match(warnings[0], /pipeline\.user\.yaml/u);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }],
+  ["the reader joins a backslash drive-letter root to the project file", () => {
+    let seen = null;
+    const result = profiles.readProjectRouting("C:\\work\\project", { readText: (path) => { seen = path; throw new Error("not here"); } });
+    assert.match(String(seen), /^C:\\work\\project[\\/]pipeline\.user\.yaml$/u);
+    assert.equal(result.source, "registry");
+  }],
+  ["the shipped default for the Claude deep duty is high", () => {
+    assert.equal(registry.duties.deep.claude.effort, "high");
   }],
 ];
 

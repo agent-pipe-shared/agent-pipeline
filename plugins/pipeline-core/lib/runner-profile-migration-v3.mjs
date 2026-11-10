@@ -76,10 +76,13 @@ const READ_DUTY_PREDECESSOR_REGISTRY_SHA256 = "12ec7be9e63630f0c3621761b2efb41f5
 // critic_export are Core-owned (the validator compares them byte-exact with the registry), so a project bound to one of these
 // digests is refreshed wholesale to the current registry: nothing a project owns is discarded. `c1641d49...` is the registry every
 // 0.7 candidate shipped from 2026-09-27 until G20-43 changed the Antigravity cells; without this entry every project onboarded on
-// it was refused (`frozen_mapping`) with no runnable repair. An UNKNOWN digest (possibly a newer Core) keeps the refusal, so an
+// it was refused (`frozen_mapping`) with no runnable repair. Since C23 routing is project-owned, so the refresh only fills what such a
+// project lacks and keeps its values. An UNKNOWN digest (possibly a newer Core) keeps the refusal, so an
 // older installed plugin still never rewrites a newer project's routes. Add the outgoing digest here whenever the registry changes.
 const KNOWN_OLDER_REGISTRY_SHA256 = Object.freeze(new Set([
   "c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac",
+  // C23: the registry before the shipped default of the Claude deep duty became `high`.
+  "20ee1ddb3fc4d717cc3fd93e6f22898611cb1737c41601fda1ed0d48cb4a9d4a",
 ]));
 const OID = /^[0-9a-f]{40}$/u;
 const PLUGIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
@@ -474,10 +477,9 @@ function v3IntentFromV2(v2) {
 // Recovers a V3 source that has fallen behind the current Public-Core
 // registry -- as opposed to one that is genuinely invalid -- by refreshing
 // every Core-owned surface named in CORE_OWNED_V3_SURFACES (runner-profiles-
-// v3.mjs, next to the registry it describes). Each surface is refreshed
-// wholesale, never merged field-by-field: a closed Public-Core authority can
-// only be replaced as one whole registered value, the same way a routing
-// entry always was. Nothing outside that table is ever read, written, or
+// v3.mjs, next to the registry it describes). A Core-owned surface is
+// refreshed wholesale; `routing` is project-owned and only gains the cells it
+// lacks (`refresh` on its table entry). Nothing outside that table is ever read, written, or
 // compared here -- a future Core-owned surface needs exactly one new table
 // entry, never a new branch in this function.
 function refreshKnownV3RegistryDelta(parsed) {
@@ -494,10 +496,8 @@ function refreshKnownV3RegistryDelta(parsed) {
     && previousBinding !== RUNNER_PROFILES_V3_REGISTRY_SHA256
     && !boundToKnownOlderRegistry) {
     if (!boundToReadDutyPredecessor || !Object.hasOwn(registry.duties, "read")) return null;
-    const oldDuties = clone(registry.duties);
-    delete oldDuties.read;
-    if (!same(parsed.routing, { profiles: registry.profiles, duties: oldDuties })
-      || !same(parsed.critic_export, registry.criticExportPolicy)) return null;
+    // Routing is project-owned: the predecessor's project values are kept and the additive refresh below fills the new duty.
+    if (!same(parsed.critic_export, registry.criticExportPolicy)) return null;
   }
   const candidate = clone(parsed);
   const compatibilityDeltas = [];
@@ -510,7 +510,8 @@ function refreshKnownV3RegistryDelta(parsed) {
 
   for (const surface of CORE_OWNED_V3_SURFACES) {
     const present = Object.hasOwn(parsed, surface.path);
-    const refreshedValue = surface.registryValue(registry);
+    // A surface with a `refresh` is project-owned: it only gains what it lacks. Any other surface is Core-owned and replaced.
+    const refreshedValue = present && surface.refresh ? surface.refresh(parsed[surface.path], registry) : surface.registryValue(registry);
     if (present && same(parsed[surface.path], refreshedValue)) continue;
     candidate[surface.path] = refreshedValue;
     const delta = present ? surface.staleDelta : surface.absentDelta;

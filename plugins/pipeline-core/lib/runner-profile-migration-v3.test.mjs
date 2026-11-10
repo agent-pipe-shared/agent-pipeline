@@ -361,7 +361,9 @@ record("a V3 authority update refreshes every frozen routing mapping as one regi
     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
     const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
     const registry = loadRunnerProfilesV3Registry();
-    assert.deepEqual(refreshed.routing, { profiles: registry.profiles, duties: registry.duties });
+    // QG-04 restated (C23, routing is project-owned): the refresh keeps every value the project holds (the low efforts and the
+    // changed model ids above) and restores only the advisory duty, whose frozen contract the validator still compares exactly.
+    assert.deepEqual(refreshed.routing, { profiles: source.routing.profiles, duties: { ...source.routing.duties, advisory: registry.duties.advisory } });
     assert.doesNotMatch(JSON.stringify(refreshed.routing), /fable/u);
     assert.equal(validatePipelineUserV3(refreshed).ok, true);
     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /advisor_epic:\n    model: opus/u);
@@ -371,7 +373,10 @@ record("a V3 authority update refreshes every frozen routing mapping as one regi
 
 record("v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection", () => {
   const source = v3Intent();
+  // QG-04 restated (C23, routing is project-owned): a low effort is the project's own value and no longer makes a source stale, so
+  // the source is made stale by a missing cell instead; the project's low effort must survive the refresh.
   source.routing.duties.implement.codex.effort = "low";
+  delete source.routing.duties.read.claude;
   const root = fixture(yaml(source));
   try {
     const advisor = join(root, ".codex/agents/consult-advisor.toml");
@@ -393,7 +398,7 @@ record("v3-refresh initializes a missing advisor target only with explicit opt-i
     const fresh = planRunnerProfileMigrationV3({ rootDir: root, initializeMissingRuntimeForSlimV3: true });
     assert.equal(applyRunnerProfileMigrationV3(fresh, { rootDir: root, activate: true }).status, "applied");
     assert.equal(existsSync(advisor), true);
-    assert.equal(parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).routing.duties.implement.codex.effort, loadRunnerProfilesV3Registry().duties.implement.codex.effort);
+    assert.equal(parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).routing.duties.implement.codex.effort, "low");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -666,7 +671,11 @@ record("the exact prior V3 registry upgrades its pure-read duty without weakenin
   altered.core_registry_sha256 = "12ec7be9e63630f0c3621761b2efb41f52e94bcd002c431655161befa6864ee5";
   const alteredRoot = fixture(yaml(altered));
   try {
-    assert.equal(inspectRunnerProfileMigrationV3({ rootDir: alteredRoot }).status, "invalid-source");
+    // QG-04 restated (C23, routing is project-owned): a model the project names is its own value, not a tampered registry, so the
+    // predecessor-bound project is refreshed (the new duty filled) and keeps its model; only an unknown binding stays refused.
+    const alteredInspection = inspectRunnerProfileMigrationV3({ rootDir: alteredRoot });
+    assert.equal(alteredInspection.status, "ready");
+    assert.equal(alteredInspection.sourceKind, "v3-refresh");
   } finally { rmSync(alteredRoot, { recursive: true, force: true }); }
 });
 
@@ -692,16 +701,17 @@ record("a project bound to a known older shipped registry is refreshed to the cu
     }
     assert.equal(inspection.status, "ready");
     assert.equal(inspection.sourceKind, "v3-refresh");
+    // QG-04 restated (C23, routing is project-owned): the digest binding is upgraded, the project's own cells (the older Antigravity
+    // cells above) are valid values and are kept, so no routing delta is recorded.
     assert.deepEqual(inspection.compatibilityDeltas.map((delta) => [delta.name, delta.path]),
-      [["known-v3-older-registry-upgrade", "core_registry_sha256"], ["closed-v3-routing-registry-refresh", "routing"]]);
+      [["known-v3-older-registry-upgrade", "core_registry_sha256"]]);
     const plan = planRunnerProfileMigrationV3({ rootDir: root });
     assert.equal(plan.status, "ready");
     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root }).status, "activation-required");
     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
     const upgraded = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
     assert.equal(upgraded.core_registry_sha256, RUNNER_PROFILES_V3_REGISTRY_SHA256);
-    const registry = loadRunnerProfilesV3Registry();
-    assert.deepEqual(upgraded.routing, { profiles: registry.profiles, duties: registry.duties });
+    assert.deepEqual(upgraded.routing, intent.routing);
     assert.equal(validatePipelineUserV3(upgraded).ok, true);
     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
   } finally { rmSync(root, { recursive: true, force: true }); }
@@ -1375,10 +1385,12 @@ record("legacy V3 Critic route and runnerRoutes refresh through sanctioned re-ap
     assert.equal(plan.sourceKind, "v3-refresh");
     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
     const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
-    assert.equal(refreshed.routing.duties.critic_normal.codex.selector.value, "gpt-6-sol");
-    assert.equal(refreshed.routing.duties.critic_normal.codex.effort, "medium");
+    // QG-04 restated (C23, routing is project-owned): the refresh fills critic_export (Core-owned) and keeps the project's own
+    // Critic route (gpt-5.6-terra / xhigh); the projected Codex Critic file carries that project value.
+    assert.equal(refreshed.routing.duties.critic_normal.codex.selector.value, "gpt-5.6-terra");
+    assert.equal(refreshed.routing.duties.critic_normal.codex.effort, "xhigh");
     assert.equal(refreshed.critic_export.schema, "pipeline.critic-export-policy.v1");
-    assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /model = "gpt-6-sol"/u);
+    assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /model = "gpt-5\.6-terra"/u);
     assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /^# critic-prefix-sentinel\n[\s\S]*name = "keep-critic"\nsandbox_mode = "read-only"\n\[metadata\]\nmodel_reasoning_effort = "nested-must-stay"\n$/u);
     assert.match(readFileSync(join(root, ".codex/agents/critic-high-risk.toml"), "utf8"), /name = "keep-critic-high-risk"\nsandbox_mode = "read-only"\n\[metadata\]\n/u);
     assert.doesNotMatch(readFileSync(join(root, ".codex/agents/critic-high-risk.toml"), "utf8"), /workspace-write/u);
@@ -1420,7 +1432,10 @@ record("the registry-refresh table covers every declared Core-owned V3 surface g
 
 record("a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded", () => {
   const intent = v3Intent();
+  // QG-04 restated (C23, routing is project-owned): a low effort no longer makes routing stale; a missing cell does, and the
+  // project's low effort must survive next to the filled cell.
   intent.routing.duties.critic_normal.codex.effort = "low";
+  delete intent.routing.duties.read.claude;
   intent.critic_export.rules.pop();
   const root = fixture(yaml(intent));
   try {
@@ -1447,10 +1462,50 @@ record("a source stale in both routing and critic_export classifies as v3-refres
     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
     const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
     const registry = loadRunnerProfilesV3Registry();
-    assert.deepEqual(refreshed.routing, { profiles: registry.profiles, duties: registry.duties });
+    assert.deepEqual(refreshed.routing, { profiles: registry.profiles, duties: { ...registry.duties, critic_normal: { ...registry.duties.critic_normal, codex: { ...registry.duties.critic_normal.codex, effort: "low" } } } });
     assert.deepEqual(refreshed.critic_export, registry.criticExportPolicy);
     assert.equal(validatePipelineUserV3(refreshed).ok, true);
     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 3): a refresh is additive for routing.
+record("a refresh keeps every changed routing value and fills a removed cell from the registry", () => {
+  const intent = v3Intent();
+  intent.routing.duties.deep.claude.effort = "xhigh";
+  intent.routing.duties.mechanic.claude.selector = { kind: "alias", value: "sonnet" };
+  intent.routing.profiles.mini.execution_phase.codex.effort = "low";
+  delete intent.routing.duties.read.claude;
+  delete intent.routing.profiles.mini.design_phase.antigravity;
+  const root = fixture(yaml(intent));
+  try {
+    const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(inspection.status, "ready");
+    assert.equal(inspection.sourceKind, "v3-refresh");
+    assert.deepEqual(inspection.compatibilityDeltas.map((delta) => [delta.name, delta.path]), [["closed-v3-routing-registry-refresh", "routing"]]);
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+    const registry = loadRunnerProfilesV3Registry();
+    assert.equal(refreshed.routing.duties.deep.claude.effort, "xhigh");
+    assert.deepEqual(refreshed.routing.duties.mechanic.claude.selector, { kind: "alias", value: "sonnet" });
+    assert.equal(refreshed.routing.profiles.mini.execution_phase.codex.effort, "low");
+    assert.deepEqual(refreshed.routing.duties.read.claude, registry.duties.read.claude);
+    assert.deepEqual(refreshed.routing.profiles.mini.design_phase.antigravity, registry.profiles.mini.design_phase.antigravity);
+    assert.equal(validatePipelineUserV3(refreshed).ok, true);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("a valid project whose routing differs from the registry needs no refresh and is not rewritten", () => {
+  const intent = v3Intent();
+  intent.routing.duties.deep.claude.effort = "xhigh";
+  const source = yaml(intent);
+  const root = fixture(source);
+  try {
+    assert.equal(inspectRunnerProfileMigrationV3({ rootDir: root }).sourceKind, "v3");
+    assert.equal(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), source);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -2022,7 +2077,9 @@ record("a later Codex activation adds only the Codex targets and shows no false 
 });
 
 // QG-04 restated (C20 G20-44): 60 -> 61, the known-older-registry refresh case was added; no case removed.
-assert.equal(cases.length, 61, "the complete runner profile migration corpus must be registered before execution begins");
+// QG-04 restated (C23): 61 -> 63, two additive-refresh cases were added (a refresh keeps changed values and fills a removed cell; a
+// valid project that differs from the registry is not rewritten); no case removed.
+assert.equal(cases.length, 63, "the complete runner profile migration corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

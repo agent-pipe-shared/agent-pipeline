@@ -21,7 +21,7 @@ import { AGY_FINAL_RETURN_JSON_SCHEMA, validateAgyFinalReturn, validateAgyFamily
 import { parseStrictJson } from "./governance-event.mjs";
 import { bindStoredModelRoleDispatch } from "./model-role-host-session.mjs";
 import { ROLE_DISPATCH_PREFLIGHT_SCHEMA, preflightRoleDispatch } from "./role-dispatch-preflight.mjs";
-import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
+import { loadProjectRoutingRegistry, validateRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 import { recheckAgyFamilyConsentBinding, AGY_FAMILY_BINDING_SCHEMA, releaseSourceOwnedAgyConsentAdmission, loadStoredConsent, validateConsentRecord } from "./agy-session-authority.mjs";
 import { observeModelFamilyActivation } from "./model-family-runtime-host.mjs";
 import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
@@ -642,7 +642,7 @@ export async function dispatchAgySession({
   fallbackPolicy,
   requestedModel,
   modelRoleStore,
-  readRegistry = loadRunnerProfilesV3Registry,
+  readRegistry = undefined,
   effort = "high",
   scope,
   inputSha256,
@@ -716,8 +716,10 @@ export async function dispatchAgySession({
   if (modelRoleStore !== undefined) {
     const taskRoute = packet.role === "pipeline-core:goldfish-mechanic" ? "duty.mechanic" : "duty.implement";
     let registry;
-    try { registry = readRegistry(); } catch { return rejected("AGY-SESSION-MODEL-ROLE-NOT-BOUND", "modelRoleStore"); }
-    if (!validateRunnerProfilesV3Registry(registry).ok)
+    // C23: the route is the PROJECT's own (its pipeline.user.yaml, validated by shape when read); an injected registry is still
+    // validated against the frozen contract.
+    try { registry = readRegistry ? readRegistry() : loadProjectRoutingRegistry(root); } catch { return rejected("AGY-SESSION-MODEL-ROLE-NOT-BOUND", "modelRoleStore"); }
+    if (readRegistry && !validateRunnerProfilesV3Registry(registry).ok)
       return rejected("AGY-SESSION-MODEL-ROLE-NOT-BOUND", "modelRoleStore");
     // Both bounded implementation agent types have the same productive V3
     // base duty. The mechanic-specific functional role is optional and may

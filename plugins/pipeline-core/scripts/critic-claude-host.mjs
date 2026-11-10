@@ -10,7 +10,7 @@ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { checkCriticExport, deriveCriticExportView } from "../lib/critic-export-policy.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
-import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+import { loadProjectRoutingRegistry, loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { diagnosticReviewerReferences } from "../lib/critic-diagnostic-packet.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
 import {
@@ -182,8 +182,10 @@ function validateClaudeCriticModelRoute(packet, deps) {
   }
   const taskRoute = trigger === "T1" || trigger === "T2"
     ? "duty.critic_high_risk" : "duty.critic_normal";
-  const registry = (deps.readRunnerProfilesV3RegistryFn ?? loadRunnerProfilesV3Registry)();
-  if (!validateRunnerProfilesV3Registry(registry).ok) fail("CLH-MODEL-ROLE-V3", "Claude V3 Critic routing source is invalid.");
+  // C23: the Critic route is the PROJECT's own (its pipeline.user.yaml, validated by shape when read); an injected registry is
+  // still validated against the frozen contract.
+  const registry = (deps.readRunnerProfilesV3RegistryFn ?? (() => loadProjectRoutingRegistry(packet.checkout?.realPath)))();
+  if (deps.readRunnerProfilesV3RegistryFn && !validateRunnerProfilesV3Registry(registry).ok) fail("CLH-MODEL-ROLE-V3", "Claude V3 Critic routing source is invalid.");
   const dutyId = taskRoute === "duty.critic_high_risk" ? "critic_high_risk" : "critic_normal";
   const v3 = registry.duties?.[dutyId]?.claude;
   if (!v3 || v3.state !== "default" || !v3.selector
