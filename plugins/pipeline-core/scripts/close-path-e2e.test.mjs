@@ -30,6 +30,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test, { after } from "node:test";
+import { applyInstall } from "./pre-push-hook-install.mjs";
 import { runSecurityScan } from "./security-scan.mjs";
 import { runSessionCriticFinalizerCli } from "./session-critic-finalizer.mjs";
 import { writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
@@ -260,7 +261,7 @@ const WALKS = Object.freeze([
 ]);
 
 // C22 (CGF-04): the walk body is one function so the same fixture, Critic course and close prerequisites serve the manual coordinator walks (below) and the one-shot close walk.
-async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false }) {
+async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false, route = "push-then-release" }) {
   {
     const log = [];
     const fx = consumerFixture(log, identity);
@@ -658,10 +659,58 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
       // G20-42: the consumer release preflight refuses until its prerequisites exist, each refusal naming the one missing step and leaving no record.
       const releaseArgs = [script("release-preflight-cli.mjs"), "--root", fx.root, "--base", base, "--lifecycle", MANIFEST];
       const releasePreflight = () => spawnSync(process.execPath, releaseArgs, { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
-      const noApproval = releasePreflight();
-      assert.equal(noApproval.status, 2, `${identity.runner}: ${noApproval.stdout}${noApproval.stderr}`);
-      assert.match(noApproval.stderr, /RPC-CONSUMER-PUSH-APPROVAL.*approve-push/u, `${identity.runner}: ${noApproval.stderr}`);
-      assert.equal(existsSync(join(fx.root, "evidence", "release-preflight.json")), false, "a refused preflight leaves no record");
+      // PO tiles 2026-11-10: the two routes with one signature after the design, each through the real generated pre-push hook and a real push to the local bare remote.
+      const hookedCommit = (paths, message) => {
+        git(log, fx.root, ["add", "--", ...paths]);
+        git(log, fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", message, "--", ...paths]);
+      };
+      const hookedPush = (label, ...refspec) => step(log, `${identity.runner}: ${label}`, "git", ["-C", fx.root, "push", "-q", "origin", ...refspec]);
+      const verifyBundle = (bundleDir) => JSON.parse(step(log, `${identity.runner}: audit-bundle verify`, process.execPath, [script("audit-bundle.mjs"), "verify", "--bundle", join(fx.root, bundleDir)], { cwd: fx.root }).stdout);
+      if (route === "release-only") {
+        assert.equal(applyInstall({ rootDir: fx.root }).status, "installed");
+        const version = "v0.1.0"; const approved = git(log, fx.root, ["rev-parse", "HEAD"]);
+        const released = releasePreflight();
+        assert.equal(released.status, 0, `${identity.runner}: a release needs no earlier push\n${released.stdout}${released.stderr}`);
+        const result = JSON.parse(released.stdout); const followUp = result.auditProofFollowUp;
+        assert.equal(followUp.status, "written", released.stdout);
+        const tagPushCommand = `git push origin refs/tags/${version}`;
+        assert.deepEqual(result.nextActions, [`git tag -a ${version} -m "version tag" ${approved}`, pushCommand, ...followUp.commit.steps, pushCommand, tagPushCommand]);
+        step(log, `${identity.runner}: annotated version tag`, "git", ["-C", fx.root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "tag", "-a", version, "-m", "version tag", approved]);
+        const included = guardPush(pushCommand);
+        assert.equal(included.status, 0, `${identity.runner}: the release includes the push of its own commit\n${included.stderr}`);
+        hookedPush("the push the release includes", "HEAD:refs/heads/main");
+        hookedCommit(followUp.paths, followUp.commit.message);
+        const followed = guardPush(pushCommand);
+        assert.equal(followed.status, 0, `${identity.runner}: the follow-up needs no further approval\n${followed.stderr}`);
+        hookedPush("the follow-up push", "HEAD:refs/heads/main");
+        const tagAllowed = guardPush(tagPushCommand);
+        assert.equal(tagAllowed.status, 0, tagAllowed.stderr);
+        hookedPush("the version tag push", `refs/tags/${version}`);
+        assert.equal(verifyBundle(followUp.bundleDir).status, "verified");
+        const list = JSON.parse(readFileSync(join(fx.root, followUp.bundleDir, "proofs", "follow-up.json"), "utf8"));
+        assert.ok(list.evidence.some((entry) => entry.kind === "push-verify"), JSON.stringify(list));
+        assert.match(git(log, fx.root, ["ls-remote", "origin"]), /refs\/tags\/v0\.1\.0\^\{\}/u);
+        return;
+      }
+      if (route === "branch-followup") {
+        assert.equal(applyInstall({ rootDir: fx.root }).status, "installed");
+        const branch = "refs/heads/feat-x"; const branchPush = `git push origin HEAD:${branch}`;
+        step(log, `${identity.runner}: approve-push for the feature branch`, process.execPath, [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", branch], { cwd: fx.root });
+        assert.equal(guardPush(branchPush).status, 0);
+        hookedPush("the approved branch push", `HEAD:${branch}`);
+        const followUpRun = () => JSON.parse(step(log, `${identity.runner}: audit-proof-followup`, process.execPath, [script("audit-proof-followup.mjs"), "--root", fx.root, "--remote", "origin", "--destination", branch], { cwd: fx.root }).stdout);
+        const followUp = followUpRun();
+        assert.equal(followUp.status, "written", JSON.stringify(followUp));
+        hookedCommit(followUp.paths, followUp.commit.message);
+        const admitted = guardPush(branchPush);
+        assert.equal(admitted.status, 0, `${identity.runner}: the follow-up reaches the same branch with no further approval\n${admitted.stderr}`);
+        hookedPush("the follow-up push", `HEAD:${branch}`);
+        assert.equal(verifyBundle(followUp.bundleDir).status, "verified");
+        const list = JSON.parse(readFileSync(join(fx.root, followUp.bundleDir, "proofs", "follow-up.json"), "utf8"));
+        for (const kind of ["final-verify", "push-verify", "final-security", "security-verdict"]) assert.ok(list.evidence.some((entry) => entry.kind === kind), `${kind} travels with the follow-up: ${JSON.stringify(list.evidence)}`);
+        assert.equal(followUpRun().status, "no-push-approval", "the follow-up commit itself carries no approval, so nothing can chain onto it");
+        return;
+      }
       if (catalogue) {
         // The close reached the push boundary. A chat approval stays refused in a catalogue project and names the signature route (K52).
         const refusedChat = spawnSync(process.execPath, [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"],
@@ -678,9 +727,6 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
       assert.equal(elsewhere.status, 2, `${identity.runner}: the approval is bound to its destination\n${elsewhere.stderr}`);
 
       // 5b the approved push really happens (the local bare repository is origin), which creates refs/remotes/origin/main: the published channel.
-      const unpushed = releasePreflight();
-      assert.equal(unpushed.status, 2, `${identity.runner}: ${unpushed.stdout}${unpushed.stderr}`);
-      assert.match(unpushed.stderr, /RPC-CONSUMER-NOT-PUSHED.*git push origin HEAD:refs\/heads\/main/u, `${identity.runner}: ${unpushed.stderr}`);
       step(log, `${identity.runner}: the approved push`, "git", ["-C", fx.root, "push", "-q", "origin", "HEAD:refs/heads/main"]);
 
       // 6 consumer release (G20-42, PO decision 2026-11-07: a release is a version tag). w266 finding 3 measured that the release preflight was the
@@ -703,7 +749,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
       const approvedCommit = git(log, fx.root, ["rev-parse", "HEAD"]);
       const followUp = releaseResult.auditProofFollowUp;
       assert.equal(followUp.status, "written", released.stdout);
-      assert.deepEqual(followUp.paths, [`${followUp.bundleDir}/proofs/follow-up.json`], `${identity.runner}: a chat-mode approval is an attribution record, never a proof file`);
+      assert.deepEqual(followUp.paths.filter((path) => !/proofs\/[0-9]{3}-(?:final-verify|push-verify|final-security|security-verdict)\.json$/u.test(path)), [`${followUp.bundleDir}/proofs/follow-up.json`], `${identity.runner}: a chat-mode approval is an attribution record, never a proof file; next to it only the final records travel`);
       assert.deepEqual(releaseResult.nextActions, [`git tag -a ${tag} -m "version tag" ${approvedCommit}`, ...followUp.commit.steps, pushCommand, `git push origin refs/tags/${tag}`]);
       const bundleVerify = () => JSON.parse(step(log, `${identity.runner}: audit-bundle verify`, process.execPath, [script("audit-bundle.mjs"), "verify", "--bundle", join(fx.root, followUp.bundleDir)], { cwd: fx.root }).stdout);
       const followUpList = JSON.parse(readFileSync(join(fx.root, followUp.bundleDir, "proofs", "follow-up.json"), "utf8"));
@@ -741,6 +787,14 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
 
 test("G20-35: the close path from implementation to release preflight is walked end to end on every runner identity", { timeout: 600_000 }, async () => {
   for (const walk of WALKS) await walkTheClosePath(walk);
+});
+
+test("PO tile 2026-11-10: a release with no earlier push includes it, and tag, push, follow-up and tag push go through the real pre-push hook", { timeout: 600_000 }, async () => {
+  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", route: "release-only" });
+});
+
+test("PO tile 2026-11-10: a push to a feature branch is followed by the one evidence commit with the proof and the final records, through the real pre-push hook", { timeout: 600_000 }, async () => {
+  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", route: "branch-followup" });
 });
 
 test("C22 CGF-04: the one-shot close CLI walks the whole close on the real fixture: its stops, the acceptance question, the commits the close asks for, and the resume", { timeout: 600_000 }, async () => {

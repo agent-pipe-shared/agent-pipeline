@@ -12,8 +12,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { authorizeRecordedChatPush, authorizeRecordedPush, withPrivateCriticalApprovals } from "./critical-action-authorization.mjs";
-import { criticalProofWaiverFor } from "./critical-human-proof-policy.mjs";
 import { resolveProjectAuthorityPaths } from "./project-authority.mjs";
 import { securityGateNotConfiguredRefusal } from "./security-close-status.mjs";
 
@@ -74,10 +72,10 @@ function readClosedFeatureIds(root) {
 }
 
 /**
- * @param {{root: string, featureId: string, version: string, candidate: {commit: string, tree: string}, pushReport: object, now?: string}} input
- *   `pushReport` is push-prepare's own report for origin/refs/heads/main (the SAME Verify, Critic-bound Verify and security checks the push used).
+ * @param {{root: string, featureId: string, version: string, candidate: {commit: string, tree: string}, pushReport: object}} input
+ *   `pushReport` is push-prepare's own report for origin/refs/heads/main (the SAME Verify, Critic-bound Verify and security checks the push uses).
  */
-export function firstConsumerReleaseBlocker({ root, featureId, version, candidate, pushReport, now = new Date().toISOString() }) {
+export function firstConsumerReleaseBlocker({ root, featureId, version, candidate, pushReport }) {
   const push = script("push-prepare.mjs");
   // 1 the feature is closed
   const closed = readClosedFeatureIds(root);
@@ -103,30 +101,13 @@ export function firstConsumerReleaseBlocker({ root, featureId, version, candidat
   if (securityRefusal !== null) {
     return { code: "RPC-CONSUMER-SECURITY", message: securityRefusal.split(": ")[0], repair: securityRefusal.slice(securityRefusal.indexOf("Run this command")) };
   }
-  // 4 the push approval for exactly this candidate exists
-  let approvalOk = false;
-  let approvalCode = "unavailable";
-  try {
-    const authority = resolveProjectAuthorityPaths({ rootDir: root });
-    const stateRaw = authority.status === "ready" ? JSON.parse(readFileSync(join(root, authority.state), "utf8")) : {};
-    const state = withPrivateCriticalApprovals(stateRaw, root);
-    const waived = criticalProofWaiverFor(root, "push").waived === true;
-    const input = { projectDir: root, anchorDir: root, state, candidate, remote: CONSUMER_RELEASE_REMOTE, destination: CONSUMER_RELEASE_DESTINATION };
-    const decision = waived ? authorizeRecordedChatPush(input) : authorizeRecordedPush({ ...input, now });
-    approvalOk = decision.authorized === true;
-    approvalCode = decision.code;
-  } catch { /* unreadable approval state reads as no approval */ }
-  if (!approvalOk) {
-    return { code: "RPC-CONSUMER-PUSH-APPROVAL", message: `no push approval is recorded for candidate ${candidate.commit.slice(0, 12)} (${approvalCode})`,
-      repair: `node ${word(push)} --root ${word(root)} --by <name> --remote ${CONSUMER_RELEASE_REMOTE} --destination ${CONSUMER_RELEASE_DESTINATION}, then the approve-push line it prints` };
+  // 4 PO tile 2026-11-10: the release approval includes the push, so no separate push approval is demanded. What the release needs from origin's main is only that its push is a fast-forward.
+  const publishedTip = gitOut(root, ["rev-parse", "--verify", "--quiet", `refs/remotes/${CONSUMER_RELEASE_REMOTE}/main`]);
+  if (publishedTip !== null && publishedTip !== "" && spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", publishedTip, candidate.commit], { encoding: "utf8", timeout: 10_000 }).status !== 0) {
+    return { code: "RPC-CONSUMER-NOT-FAST-FORWARD", message: `candidate ${candidate.commit.slice(0, 12)} does not build on refs/remotes/${CONSUMER_RELEASE_REMOTE}/main`,
+      repair: `bring the feature onto ${CONSUMER_RELEASE_REMOTE}'s main first (git fetch ${CONSUMER_RELEASE_REMOTE}, then integrate and close again); a release never rewrites what is published` };
   }
-  // 5 the candidate is on the published channel (ADR-0078 D5: origin/main)
-  const published = spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", candidate.commit, `refs/remotes/${CONSUMER_RELEASE_REMOTE}/main`], { encoding: "utf8", timeout: 10_000 });
-  if (published.status !== 0) {
-    return { code: "RPC-CONSUMER-NOT-PUSHED", message: `candidate ${candidate.commit.slice(0, 12)} is not on refs/remotes/${CONSUMER_RELEASE_REMOTE}/main`,
-      repair: `git push ${CONSUMER_RELEASE_REMOTE} HEAD:${CONSUMER_RELEASE_DESTINATION} (the approved push; the release tags what is already published)` };
-  }
-  // 6 the version tag is free or already names this commit
+  // 5 the version tag is free or already names this commit
   const tagged = gitOut(root, ["rev-parse", "--verify", "--quiet", `refs/tags/v${version}^{commit}`]);
   if (tagged !== null && tagged !== "" && tagged !== candidate.commit) {
     return { code: "RPC-CONSUMER-TAG-EXISTS", message: `tag v${version} already names ${tagged.slice(0, 12)}, not this candidate`, repair: "raise VERSION to the next version, commit it and release that" };

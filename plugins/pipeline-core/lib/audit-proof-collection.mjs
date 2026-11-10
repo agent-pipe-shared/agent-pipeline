@@ -17,8 +17,8 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { AUDIT_BUNDLE_FOLLOWUP_PATH, AUDIT_BUNDLE_FOLLOWUP_SCHEMA, auditBundleProofBytes, followUpAttributionShape, isCarriableProof } from "./audit-bundle.mjs";
-import { CRITICAL_APPROVAL_STORE_SCHEMA, criticalApprovalStoreRoot, readLastPrivateApproval } from "./critical-action-authorization.mjs";
+import { AUDIT_BUNDLE_FOLLOWUP_NUMBERED, AUDIT_BUNDLE_FOLLOWUP_PATH, AUDIT_BUNDLE_FOLLOWUP_SCHEMA, auditBundleProofBytes, followUpAttributionShape, isCarriableProof } from "./audit-bundle.mjs";
+import { CRITICAL_APPROVAL_STORE_SCHEMA, FOLLOWUP_EVIDENCE, FOLLOWUP_EVIDENCE_MAX_BYTES, criticalApprovalStoreRoot, followUpEvidenceCommit, readLastPrivateApproval } from "./critical-action-authorization.mjs";
 import { canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
 
 const STORE_KINDS = Object.freeze(["push", "feature-package-reconcile"]);
@@ -58,29 +58,63 @@ const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u; const KIND = /^[a-z-]{1,40}$/u;
 const sha256Hex = (bytes) => createHash("sha256").update(bytes).digest("hex");
 function followUpError(code, message) { const error = new Error(message); error.code = code; return error; }
 
+/** The follow-up lists already in a bundle, oldest first. */
+function existingFollowUpLists(root, bundleDir) {
+  let names = []; try { names = readdirSync(join(root, bundleDir, "proofs")); } catch { names = []; }
+  const ordered = [...names.filter((name) => name === "follow-up.json"), ...names.filter((name) => AUDIT_BUNDLE_FOLLOWUP_NUMBERED.test(name)).sort()];
+  return ordered.map((name) => ({ name, list: readJson(join(root, bundleDir, "proofs", name)) })).filter((entry) => object(entry.list));
+}
+
 /**
- * Adds the approved commit's proofs to an EXISTING bundle as new files: `proofs/NNN-<kind>.json` (numbering continues after the manifest's own proofs) and the one
- * list `proofs/follow-up.json`. manifest.json and README.md are never touched, every file is written create-only (`wx`), and a bundle that already has a
- * follow-up gets none (`already-followed-up`). `attributions` carry a chat-mode approval as kind, mode and time only: an attribution record, never a proof.
+ * Adds the approved commit's proofs and the final evidence records to an EXISTING bundle as new files: `proofs/NNN-<kind>.json` (numbering continues after everything
+ * already in the bundle) and one new list, `proofs/follow-up.json` or, when a list exists, `proofs/follow-up-NNN.json`. manifest.json and README.md are never touched,
+ * every file is written create-only (`wx`), and a commit that already has a list gets none (`already-followed-up`). `attributions` carry a chat-mode approval as kind,
+ * mode and time only: an attribution record, never a proof. What an earlier list carried is not carried again.
  * @returns {{status: "written", bundleDir: string, files: Array<{path: string, sha256: string}>} | {status: "already-followed-up"|"nothing-to-carry", bundleDir: string}}
  */
-export function writeAuditProofFollowUp({ root, bundleDir, approvedCommit, proofs = [], attributions = [] } = {}) {
-  if (typeof root !== "string" || !BUNDLE_DIR.test(bundleDir ?? "") || !OID.test(approvedCommit ?? "") || !Array.isArray(proofs) || !Array.isArray(attributions)) throw followUpError("AB-FOLLOWUP-INPUT", "The follow-up needs a repository, an existing bundle directory, the approved commit, proofs and attributions.");
+export function writeAuditProofFollowUp({ root, bundleDir, approvedCommit, proofs = [], attributions = [], evidence = [] } = {}) {
+  if (typeof root !== "string" || !BUNDLE_DIR.test(bundleDir ?? "") || !OID.test(approvedCommit ?? "") || !Array.isArray(proofs) || !Array.isArray(attributions) || !Array.isArray(evidence)) throw followUpError("AB-FOLLOWUP-INPUT", "The follow-up needs a repository, an existing bundle directory, the approved commit, proofs, attributions and evidence.");
   if (!proofs.every((entry) => object(entry) && KIND.test(entry.kind ?? "") && isCarriableProof(entry.proof))) throw followUpError("AB-PROOF-INVALID", "A signed proof envelope is not a verifiable public proof object.");
   if (!attributions.every(followUpAttributionShape)) throw followUpError("AB-FOLLOWUP-INPUT", "An attribution record is kind, mode and time only.");
+  if (!evidence.every((entry) => object(entry) && Object.hasOwn(FOLLOWUP_EVIDENCE, entry.kind ?? "") && Buffer.isBuffer(entry.bytes))) throw followUpError("AB-FOLLOWUP-INPUT", "An evidence entry is one known record kind and its bytes.");
   let manifest; try { manifest = parseStrictJson(readFileSync(join(root, bundleDir, "manifest.json"))); } catch { throw followUpError("AB-MANIFEST", "The bundle has no readable manifest.json."); }
-  if (existsSync(join(root, bundleDir, AUDIT_BUNDLE_FOLLOWUP_PATH))) return { status: "already-followed-up", bundleDir };
-  const carried = new Set((Array.isArray(manifest.proofs) ? manifest.proofs : []).map((entry) => entry?.intentSha256));
+  const earlier = existingFollowUpLists(root, bundleDir);
+  if (earlier.some((entry) => entry.list.approvedCommit === approvedCommit)) return { status: "already-followed-up", bundleDir };
+  const manifestProofs = Array.isArray(manifest.proofs) ? manifest.proofs : [];
+  const earlierProofs = earlier.flatMap((entry) => (Array.isArray(entry.list.proofs) ? entry.list.proofs : []));
+  const earlierEvidence = earlier.flatMap((entry) => (Array.isArray(entry.list.evidence) ? entry.list.evidence : []));
+  const carried = new Set([...manifestProofs, ...earlierProofs].map((entry) => entry?.intentSha256));
+  const carriedEvidence = new Set(earlierEvidence.map((entry) => entry?.sha256));
   const fresh = proofs.filter((entry) => !carried.has(entry.proof.intentSha256));
-  if (fresh.length + attributions.length === 0) return { status: "nothing-to-carry", bundleDir };
-  const first = (Array.isArray(manifest.proofs) ? manifest.proofs.length : 0) + 1;
-  const written = fresh.map((entry, index) => { const path = `proofs/${String(first + index).padStart(3, "0")}-${entry.kind}.json`; const bytes = auditBundleProofBytes(entry.proof); return { kind: entry.kind, path, bytes, sha256: sha256Hex(bytes), intentSha256: entry.proof.intentSha256 }; });
-  const list = { schema: AUDIT_BUNDLE_FOLLOWUP_SCHEMA, candidate: manifest.candidate, approvedCommit, proofs: written.map(({ kind, path, sha256, intentSha256 }) => ({ kind, path, sha256, intentSha256 })), attributions: attributions.map((entry) => ({ kind: entry.kind, mode: entry.mode, approvedAt: entry.approvedAt })) };
+  const freshEvidence = evidence.filter((entry) => !carriedEvidence.has(sha256Hex(entry.bytes)));
+  if (fresh.length + attributions.length + freshEvidence.length === 0) return { status: "nothing-to-carry", bundleDir };
+  const taken = [...manifestProofs, ...earlierProofs, ...earlierEvidence].map((entry) => Number(/^proofs\/([0-9]{3})-/u.exec(entry?.path ?? "")?.[1])).filter(Number.isFinite);
+  let number = Math.max(manifestProofs.length, 0, ...taken);
+  const nextPath = (kind) => { number += 1; return `proofs/${String(number).padStart(3, "0")}-${kind}.json`; };
+  const written = fresh.map((entry) => { const path = nextPath(entry.kind); const bytes = auditBundleProofBytes(entry.proof); return { kind: entry.kind, path, bytes, sha256: sha256Hex(bytes), intentSha256: entry.proof.intentSha256 }; });
+  const writtenEvidence = freshEvidence.map((entry) => ({ kind: entry.kind, path: nextPath(entry.kind), bytes: entry.bytes, sha256: sha256Hex(entry.bytes) }));
+  const listPath = earlier.length === 0 ? AUDIT_BUNDLE_FOLLOWUP_PATH : `proofs/follow-up-${String(earlier.length + 1).padStart(3, "0")}.json`;
+  const list = { schema: AUDIT_BUNDLE_FOLLOWUP_SCHEMA, candidate: manifest.candidate, approvedCommit, proofs: written.map(({ kind, path, sha256, intentSha256 }) => ({ kind, path, sha256, intentSha256 })), attributions: attributions.map((entry) => ({ kind: entry.kind, mode: entry.mode, approvedAt: entry.approvedAt })), ...(writtenEvidence.length === 0 ? {} : { evidence: writtenEvidence.map(({ kind, path, sha256 }) => ({ kind, path, sha256 })) }) };
   const listBytes = Buffer.from(`${canonicalizeJson(list)}\n`, "utf8");
   mkdirSync(join(root, bundleDir, "proofs"), { recursive: true });
-  for (const entry of written) writeFileSync(join(root, bundleDir, entry.path), entry.bytes, { flag: "wx", mode: 0o644 });
-  writeFileSync(join(root, bundleDir, AUDIT_BUNDLE_FOLLOWUP_PATH), listBytes, { flag: "wx", mode: 0o644 });
-  return { status: "written", bundleDir, files: [...written.map((entry) => ({ path: `${bundleDir}/${entry.path}`, sha256: entry.sha256 })), { path: `${bundleDir}/${AUDIT_BUNDLE_FOLLOWUP_PATH}`, sha256: sha256Hex(listBytes) }] };
+  for (const entry of [...written, ...writtenEvidence]) writeFileSync(join(root, bundleDir, entry.path), entry.bytes, { flag: "wx", mode: 0o644 });
+  writeFileSync(join(root, bundleDir, listPath), listBytes, { flag: "wx", mode: 0o644 });
+  return { status: "written", bundleDir, files: [...[...written, ...writtenEvidence].map((entry) => ({ path: `${bundleDir}/${entry.path}`, sha256: entry.sha256 })), { path: `${bundleDir}/${listPath}`, sha256: sha256Hex(listBytes) }] };
+}
+
+/** The final Verify and Security records this commit's history stands on, as the guard will accept them. A missing, oversized, foreign or unbound record is simply not carried. */
+function collectFollowUpEvidence(root, approvedCommit) {
+  const found = [];
+  for (const [kind, { source, schemas }] of Object.entries(FOLLOWUP_EVIDENCE)) {
+    let bytes; try { bytes = readFileSync(join(root, source)); } catch { continue; }
+    if (bytes.length === 0 || bytes.length > FOLLOWUP_EVIDENCE_MAX_BYTES || /PRIVATE KEY/u.test(bytes.toString("utf8"))) continue;
+    let record; try { record = JSON.parse(bytes.toString("utf8")); } catch { continue; }
+    if (!object(record) || !schemas.includes(record.schema)) continue;
+    const boundTo = followUpEvidenceCommit(kind, record);
+    if (boundTo === null || (boundTo !== "" && spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", boundTo, approvedCommit], { timeout: 10_000 }).status !== 0)) continue;
+    found.push({ kind, bytes });
+  }
+  return found.some((entry) => entry.kind === "final-security") ? found : found.filter((entry) => entry.kind !== "security-verdict");
 }
 
 function gitOut(root, args) { const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10_000 }); return result.status === 0 ? String(result.stdout).trim() : null; }
@@ -119,5 +153,5 @@ export function prepareAuditProofFollowUp({ root, featureId, approvedCommit, com
   }
   if (isCarriableProof(releaseProof)) proofs.push({ kind: "release-preflight", proof: { ...releaseProof } });
   else if (object(releaseApproval)) attributions.push({ kind: "release-preflight", mode: attributionMode(releaseApproval.mode), approvedAt: attributionTime(releaseApproval.approvedAt) });
-  return writeAuditProofFollowUp({ root, bundleDir, approvedCommit, proofs, attributions });
+  return writeAuditProofFollowUp({ root, bundleDir, approvedCommit, proofs, attributions, evidence: collectFollowUpEvidence(root, approvedCommit) });
 }

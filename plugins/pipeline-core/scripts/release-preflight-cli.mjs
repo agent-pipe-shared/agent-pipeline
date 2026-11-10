@@ -731,6 +731,11 @@ export function recordAuditProofFollowUp(root, built, options, approval) {
   }
 }
 
+/** Is the approved commit already on origin's main? Absent or unreadable reads as no: the included push is then named. */
+function commitIsOnPublishedMain(root, commit) {
+  return spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", commit, "refs/remotes/origin/main"], { timeout: 10_000 }).status === 0;
+}
+
 const USAGE = "Usage: release-preflight-cli.mjs --preflight-id <id> --base <commit> (--consent <repo-path> | --proof-request <external-path> --proof <external-path>) --lifecycle <path> --retention-policy <sha256> --out <path> [--gg03 <path>] [--root <repo>]";
 
 function parseArgs(argv) {
@@ -844,9 +849,10 @@ if (isDirectInvocation(import.meta.url)) {
       writtenTo: options.outPath,
       ...(approval === null ? {} : {
         tag: approval.tag,
-        // The agent's last steps; the push guard admits exactly this annotated tag at exactly this commit. With an audit bundle (C20E-AP) the approval proofs
-        // reach the remote first, in the ONE evidence-only follow-up commit the guard admits without a second approval; the tag still names the approved commit.
+        // The agent's last steps; the push guard admits exactly this annotated tag at exactly this commit. PO tile 2026-11-10: the release includes the push of the approved commit
+        // when it is not on main yet. With an audit bundle (C20E-AP) the proofs and final records reach the remote next, in the ONE evidence-only follow-up commit the guard admits without a further approval; the tag still names the approved commit.
         nextActions: [`git tag -a ${approval.tag} -m "version tag" ${approval.forCommit}`,
+          ...(commitIsOnPublishedMain(resolve(options.rootDir), approval.forCommit) ? [] : ["git push origin HEAD:refs/heads/main"]),
           ...(followUp.status === "written" ? [...followUp.commit.steps, "git push origin HEAD:refs/heads/main"] : []),
           `git push origin refs/tags/${approval.tag}`],
         auditProofFollowUp: followUp,

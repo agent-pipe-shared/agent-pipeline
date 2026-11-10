@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign as cryptoSign } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -327,6 +327,26 @@ async function followUpBundle(proofs = [{ kind: "plan-approval", proof: signedPr
   const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, proofs }); mkdirSync(join(input.root, "audit-bundles", "release-evidence"), { recursive: true }); await buildAuditBundle({ repositoryRoot: input.root, outputPath: `audit-bundles/release-evidence/${CANDIDATE.commit}`, plan });
   return { ...input, bundleDir: `audit-bundles/release-evidence/${CANDIDATE.commit}`, bundle: join(input.root, "audit-bundles", "release-evidence", CANDIDATE.commit) };
 }
+test("a later approved commit gets its own numbered list, numbering continues, nothing is carried twice, and a tampered evidence record is found", async () => {
+  const { writeAuditProofFollowUp } = await import("./audit-proof-collection.mjs");
+  const input = await followUpBundle();
+  const first = "a".repeat(40); const second = "b".repeat(40);
+  const record = { kind: "final-verify", bytes: Buffer.from(`${JSON.stringify({ schema: "pipeline.verify-evidence.v0", commit: first })}\n`) };
+  assert.equal(writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: first, proofs: [{ kind: "push", proof: signedProof("2".repeat(64)) }], evidence: [record] }).status, "written");
+  assert.equal(writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: first, proofs: [{ kind: "push", proof: signedProof("2".repeat(64)) }] }).status, "already-followed-up", "the same commit gets no second list");
+  const later = writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: second, proofs: [{ kind: "release-preflight", proof: signedProof("3".repeat(64)) }], evidence: [record] });
+  assert.equal(later.status, "written");
+  const names = readdirSync(join(input.bundle, "proofs")).sort();
+  assert.ok(names.includes("follow-up.json") && names.includes("follow-up-002.json"), names.join());
+  const list = JSON.parse(readFileSync(join(input.bundle, "proofs", "follow-up-002.json"), "utf8"));
+  assert.equal(Object.hasOwn(list, "evidence"), false, "the same record is not carried twice");
+  assert.deepEqual(list.proofs.map((entry) => entry.path), ["proofs/004-release-preflight.json"]);
+  assert.equal((await verifyAuditBundle({ bundleRoot: input.bundle })).status, "verified");
+  const carried = JSON.parse(readFileSync(join(input.bundle, "proofs", "follow-up.json"), "utf8")).evidence[0].path;
+  writeFileSync(join(input.bundle, carried), "{}\n");
+  assert.match(JSON.stringify(await verifyAuditBundle({ bundleRoot: input.bundle })), /AB-DIGEST/u);
+});
+
 test("C20E-AP the follow-up adds the push and release proofs as new files, leaves the manifest and README bytes alone, and the bundle verifies before and after", async () => {
   const { writeAuditProofFollowUp } = await import("./audit-proof-collection.mjs");
   const input = await followUpBundle(); const manifestBefore = readFileSync(join(input.bundle, "manifest.json")); const readmeBefore = readFileSync(join(input.bundle, "README.md"));

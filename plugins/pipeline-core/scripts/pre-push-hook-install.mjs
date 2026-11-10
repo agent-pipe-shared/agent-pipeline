@@ -501,9 +501,10 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
   const { criticalProofWaiverFor } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-human-proof-policy.mjs")).href);
   // D206: an approval (and its consumption entry) lives in the private store under the git common directory;
   // the tracked state record is only the legacy fallback. Reused from the shared owner, never copied.
-  const { withPrivateCriticalApprovals } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-action-authorization.mjs")).href);
+  // PO tile 2026-11-10: the follow-up commit, the push a release includes and the release tag are decided by the same predicates the push guard uses.
+  const { withPrivateCriticalApprovals, authorizeAuditProofFollowUp, authorizeRecordedReleaseTag, authorizeReleaseIncludedPush, isConsumerReleaseProject } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-action-authorization.mjs")).href);
   // N27a / D206: the ONE predicate guard-push.mjs also uses for "a tag on an already published commit". Reused, never copied.
-  const { classifyPublishedTagPush } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "published-tag-push.mjs")).href);
+  const { classifyPublishedTagPush, RELEASE_TAG_REF } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "published-tag-push.mjs")).href);
   // The repository-relative path of the pipeline state record: the one place a push approval is
   // read from, and the one dirty entry a signature-mode checkpoint tolerates (design 3.4).
   const stateRelPathFor = () => {
@@ -536,6 +537,24 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
   const failures = [];
   const securityFailures = [];
   let securityGateMode = "blocking";
+
+  // PO tile 2026-11-10 (consumer projects only): the evidence-only follow-up commit and the release tag publish nothing that was not approved, and the push a release includes
+  // needs no push approval of its own. Decided before the checkpoint lane, by the guard's own predicates. Only the follow-up and the tag end here; the included push still meets the Verify and Security checks below.
+  let releaseIncludedPush = false;
+  if (typeof remoteRef === "string" && isConsumerReleaseProject(projectRoot)) {
+    const peeled = git(["-C", projectRoot, "rev-parse", "--verify", "--quiet", commit + "^{commit}"], projectRoot);
+    const target = peeled.status === 0 ? peeled.stdout.trim() : commit;
+    if (remoteRef.startsWith("refs/heads/")) {
+      const followUp = authorizeAuditProofFollowUp({ projectDir: projectRoot, anchorDir: projectRoot, commit: target, remote, destination: remoteRef });
+      if (followUp.ok === true) return { hardBlock: null, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: true, note: "evidence-only follow-up commit of an approved push" };
+      releaseIncludedPush = authorizeReleaseIncludedPush({ projectDir: projectRoot, anchorDir: projectRoot, commit: target, remote, destination: remoteRef }).ok === true;
+    } else if (RELEASE_TAG_REF.test(remoteRef)) {
+      const onMain = git(["-C", projectRoot, "merge-base", "--is-ancestor", target, "refs/remotes/" + remote + "/main"], projectRoot);
+      if (onMain.status === 0 && authorizeRecordedReleaseTag({ projectDir: projectRoot, anchorDir: projectRoot, tagRef: remoteRef, commit: target }).ok === true) {
+        return { hardBlock: null, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: true, note: "release tag of a recorded release approval" };
+      }
+    }
+  }
 
   const checkpointClass = classifyPushDestination({
     manifestStatus: manifestResult.status,
@@ -596,7 +615,7 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
   }
 
   // (c) approval -- general mode only, see file header SCOPE.
-  if (pushGate.approval !== "standing-approved") {
+  if (pushGate.approval !== "standing-approved" && !releaseIncludedPush) {
     const authority = resolveProjectAuthorityPaths({ rootDir: projectRoot });
     const stateRelPath = authority.status === "ready"
       ? authority.state

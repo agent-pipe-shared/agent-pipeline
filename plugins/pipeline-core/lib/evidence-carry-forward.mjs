@@ -22,6 +22,7 @@ export const CARRY_FORWARD_SCHEMA = "pipeline.evidence-carry-forward.v1";
 export const EVIDENCE_PATH_PATTERNS = Object.freeze([
   /^specs\/[^/]+\/evidence\/.+$/u,
   /^specs\/[^/]+\/audit-bundles\/.+$/u,
+  /^audit-bundles\/[^/]+\/[^/]+\/proofs\/[^/]+\.json$/u,
   /^specs\/[^/]+\/lifecycle\.json$/u,
   /^specs\/[^/]+\/result\.md$/u,
   /^project\/push-threat-model\.md$/u,

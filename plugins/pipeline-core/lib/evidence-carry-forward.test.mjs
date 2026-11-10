@@ -48,7 +48,7 @@ function baseRepo() {
 }
 
 test("ECF1: the evidence set is closed by record class, everything else is product-bound", () => {
-  for (const path of ["specs/f/evidence/verify.json", "specs/f/evidence/deep/run.log", "specs/f/audit-bundles/b.json", "specs/f/lifecycle.json", "specs/f/result.md", "project/push-threat-model.md"]) {
+  for (const path of ["specs/f/evidence/verify.json", "specs/f/evidence/deep/run.log", "specs/f/audit-bundles/b.json", "audit-bundles/f/c/proofs/003-push.json", "specs/f/lifecycle.json", "specs/f/result.md", "project/push-threat-model.md"]) {
     assert.equal(isEvidencePath(path), true, path);
   }
   for (const path of ["specs/f/plan.md", "specs/f/spec.md", "specs/f/prd.md", "project/guard-config.json", "project/other.md", "src/app.mjs", "specs/f/sub/evidence/x.json",

@@ -136,7 +136,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
-import { authorizeAuditProofFollowUp, authorizeRecordedDeploy, authorizeRecordedPush, authorizeRecordedReleaseTag, isConsumerReleaseProject, withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
+import { authorizeAuditProofFollowUp, authorizeRecordedDeploy, authorizeRecordedPush, authorizeRecordedReleaseTag, authorizeReleaseIncludedPush, isConsumerReleaseProject, withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
 import { USER_SOURCE_PATH, criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
@@ -1120,14 +1120,18 @@ const mainPublicationAttempt = pushBinding.ok
     || (pushBinding.destination === null && new Set(["main", "refs/heads/main"]).has(pushBinding.source)));
 // Only evaluated when actually needed (attestedMainPublication does real git/fs work).
 const mainAttestation = mainPublicationAttempt ? attestedMainPublication(pushBinding) : null;
-// C20E-AP (AC-108): the ONE evidence-only follow-up commit of a consumer release (the PO's approval proofs added to the audit bundle) is not covered by the
-// push approval of the commit it follows, so for exactly that commit the boundary above is not the deciding check; `authorizeAuditProofFollowUp` admits it only when
-// its diff adds nothing but that bundle's proofs/ files. It does NOT allow the push: every later check (publication mode, deploy adapters, the manifest gate) still
-// runs, and the block after the consumer release tag decides. Any other commit is `null` or refused here and meets the boundary exactly as before.
-const auditFollowUp = mainPublicationAttempt && !mainAttestation.authorized && pushBinding.destination === "refs/heads/main" && isConsumerReleaseProject(pushBinding.projectDir)
+// C20E-AP (AC-108), widened by the PO tile of 2026-11-10: the ONE evidence-only follow-up commit of an approved push or release (the approval proofs and the final Verify
+// and Security records added to the audit bundle) is not covered by the approval of the commit it follows, so for exactly that commit the boundary above is not the deciding
+// check; `authorizeAuditProofFollowUp` admits it, on any branch, only when its diff adds nothing but that bundle's proofs/ files. It does NOT allow the push: every later check
+// (publication mode, deploy adapters, the manifest gate) still runs, and the block after the consumer release tag decides. Any other commit meets the boundary exactly as before.
+const auditFollowUp = pushBinding.ok && typeof pushBinding.destination === "string" && pushBinding.destination.startsWith("refs/heads/") && !(mainPublicationAttempt && mainAttestation.authorized) && isConsumerReleaseProject(pushBinding.projectDir)
   ? authorizeAuditProofFollowUp({ projectDir: pushBinding.projectDir, anchorDir: fallbackProjectDir(), commit: resolveSourceCommit(pushBinding), remote: pushBinding.remote, destination: pushBinding.destination })
   : null;
-if (mainPublicationAttempt && !mainAttestation.authorized && auditFollowUp?.ok !== true) {
+// PO tile 2026-11-10: a consumer release includes its push. The release approval stands in for the push approval of exactly its own commit to origin's main; Verify, Security and every other gate below still apply.
+const releaseIncludedPush = mainPublicationAttempt && !mainAttestation.authorized && auditFollowUp?.ok !== true && pushBinding.destination === "refs/heads/main" && isConsumerReleaseProject(pushBinding.projectDir)
+  ? authorizeReleaseIncludedPush({ projectDir: pushBinding.projectDir, anchorDir: fallbackProjectDir(), commit: resolveSourceCommit(pushBinding), remote: pushBinding.remote, destination: pushBinding.destination })
+  : null;
+if (mainPublicationAttempt && !mainAttestation.authorized && auditFollowUp?.ok !== true && releaseIncludedPush?.ok !== true) {
   // NVA-N-PUSHDIAG: the refusal names WHICH predicate refused, never just that one did.
   // `mainAttestation.code` is always a typed identifier (PUSH-PROOF-*), never free text --
   // it names the predicate that refused, not how to satisfy it, so it carries nothing an
@@ -2019,7 +2023,7 @@ if (manifestResult.status !== "ok" && declaresPushDestinationPolicy) {
   }
 }
 
-// C20E-AP (AC-108): the admitted evidence-only follow-up commit publishes only the public approval proofs of a commit that was already approved, pushed and tagged.
+// C20E-AP (AC-108): the admitted evidence-only follow-up commit publishes only the public approval proofs and final evidence records of a commit that was already approved and pushed.
 // Its Verify evidence and push approval are bound to that earlier commit and cannot be met by a commit that adds no code, so they are the only checks it skips; what
 // stays is every check above this block and the two that concern the pushed range itself: uncommitted evidence files and the anonymous-public identity range.
 if (auditFollowUp?.ok === true) {
@@ -2695,6 +2699,8 @@ try {
   // (c) approval.
   if (pushGate.approval === "standing-approved") {
     // auto-pass, no state needed at all.
+  } else if (releaseIncludedPush?.ok === true) {
+    // PO tile 2026-11-10: the recorded release approval of exactly this commit is the human approval of this push; no second record is needed.
   } else {
     // "required", or the field absent entirely -- treated as the safer default (a push
     // gate that is active at all, with no explicit standing-approval, should not

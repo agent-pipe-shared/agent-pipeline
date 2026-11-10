@@ -67,6 +67,7 @@ import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs"
 import { describeCriticCarry, readCarriedForwardReadback } from "../lib/critic-evidence-carry.mjs";
 import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
 import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
+import { isConsumerReleaseProject } from "../lib/critical-action-authorization.mjs";
 import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
 
 export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
@@ -944,7 +945,9 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   if (modeNotice !== null) notices.push(modeNotice);
   if (notices.length > 0) report.notices = notices;
   // The step after the push: it asks the remote what it holds and records that privately, so the tracked handover's "not done by the close" is no longer the last word. No commit.
-  report.afterPush = { command: ["node", fileURLToPath(new URL("./publication-readback.mjs", import.meta.url)), "record", "--root", dir, "--remote", remote, "--destination", destination], why: "right after the push: records what the remote really holds, needs no commit. A Stop hook tries the same at the end of the turn; running both adds no second line" };
+  report.afterPush = { command: ["node", fileURLToPath(new URL("./publication-readback.mjs", import.meta.url)), "record", "--root", dir, "--remote", remote, "--destination", destination], why: "right after the push: records what the remote really holds, needs no commit. A Stop hook tries the same at the end of the turn; running both adds no second line",
+    // PO tile 2026-11-10: the proof of this push and the final Verify and Security records reach the repository in one follow-up commit, with no further signature.
+    ...(isConsumerReleaseProject(dir) ? { followUp: { command: ["node", fileURLToPath(new URL("./audit-proof-followup.mjs", import.meta.url)), "--root", dir, "--remote", remote, "--destination", destination], why: "after the readback: prepares the one evidence commit of this push and prints its commit steps and push; a release prints its own follow-up instead" } } : {}) };
   // Slim profile pushes the exact checked-out branch; the default profile keeps HEAD.
   const sourceRef = slim ? checkpointSourceRef() : "HEAD";
   const profileNote = slim

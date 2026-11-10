@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Candidate-bound, offline-verifiable audit bundle service. */
 import { createHash, verify as cryptoVerify } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { copyFile, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { canonicalSha256, canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
@@ -164,13 +164,30 @@ export const AUDIT_BUNDLE_FOLLOWUP_PATH = "proofs/follow-up.json"; export const 
 export const auditBundleProofBytes = (proof) => proofBytes(proof);
 const FOLLOWUP_KEYS = ["schema", "candidate", "approvedCommit", "proofs", "attributions"]; const ATTRIBUTION_MODE = /^[a-z-]{1,64}$/u;
 export const followUpAttributionShape = (entry) => exact(entry, ["kind", "mode", "approvedAt"]) && PROOF_KIND.test(entry.kind) && ATTRIBUTION_MODE.test(entry.mode) && (entry.approvedAt === null || (typeof entry.approvedAt === "string" && entry.approvedAt.length <= 40));
+// PO tile 2026-11-10: a bundle can have one list per approved commit (`follow-up.json`, then `follow-up-NNN.json`), and a list can carry the final Verify and Security records.
+export const AUDIT_BUNDLE_FOLLOWUP_NUMBERED = /^follow-up-[0-9]{3}\.json$/u;
+function followUpListNames(root) {
+  let names; try { names = readdirSync(join(root, "proofs")); } catch { return ["follow-up.json"]; }
+  return ["follow-up.json", ...names.filter((name) => AUDIT_BUNDLE_FOLLOWUP_NUMBERED.test(name)).sort()];
+}
 function followUpFindings(root, manifest) {
-  let bytes; try { bytes = readFileSync(join(root, AUDIT_BUNDLE_FOLLOWUP_PATH)); } catch (error) { return error?.code === "ENOENT" ? [] : ["AB-FOLLOWUP"]; }
-  const list = jsonOrNull(bytes); const taken = new Set((manifest.proofs ?? []).map((entry) => entry?.path));
-  const proofsOk = Array.isArray(list?.proofs) && list.proofs.length <= 16 && list.proofs.every((entry) => exact(entry, ["kind", "path", "sha256", "intentSha256"]) && PROOF_KIND.test(entry.kind) && PROOF_PATH.test(entry.path) && SHA.test(entry.sha256) && SHA.test(entry.intentSha256) && !taken.has(entry.path)) && new Set(list.proofs.map((entry) => entry.path)).size === list.proofs.length;
-  const attributionsOk = Array.isArray(list?.attributions) && list.attributions.length <= 8 && list.attributions.every(followUpAttributionShape);
-  if (!exact(list, FOLLOWUP_KEYS) || list.schema !== AUDIT_BUNDLE_FOLLOWUP_SCHEMA || !sameCandidate(list.candidate, manifest.candidate ?? {}) || !OID.test(list.approvedCommit) || !proofsOk || !attributionsOk || list.proofs.length + list.attributions.length === 0) return ["AB-FOLLOWUP"];
-  return proofFindings(root, list.proofs);
+  const findings = []; const taken = new Set((manifest.proofs ?? []).map((entry) => entry?.path));
+  for (const name of followUpListNames(root)) {
+    let bytes; try { bytes = readFileSync(join(root, "proofs", name)); } catch (error) { if (error?.code !== "ENOENT") findings.push("AB-FOLLOWUP"); continue; }
+    const list = jsonOrNull(bytes);
+    const fresh = (path) => { if (taken.has(path)) return false; taken.add(path); return true; };
+    const proofsOk = Array.isArray(list?.proofs) && list.proofs.length <= 16 && list.proofs.every((entry) => exact(entry, ["kind", "path", "sha256", "intentSha256"]) && PROOF_KIND.test(entry.kind) && PROOF_PATH.test(entry.path) && SHA.test(entry.sha256) && SHA.test(entry.intentSha256) && fresh(entry.path));
+    const attributionsOk = Array.isArray(list?.attributions) && list.attributions.length <= 8 && list.attributions.every(followUpAttributionShape);
+    const evidence = Object.hasOwn(list ?? {}, "evidence") ? list.evidence : [];
+    const evidenceOk = Array.isArray(evidence) && evidence.length <= 8 && evidence.every((entry) => exact(entry, ["kind", "path", "sha256"]) && PROOF_KIND.test(entry.kind) && PROOF_PATH.test(entry.path) && SHA.test(entry.sha256) && fresh(entry.path));
+    if (!exact(list, Object.hasOwn(list ?? {}, "evidence") ? [...FOLLOWUP_KEYS, "evidence"] : FOLLOWUP_KEYS) || list.schema !== AUDIT_BUNDLE_FOLLOWUP_SCHEMA || !sameCandidate(list.candidate, manifest.candidate ?? {}) || !OID.test(list.approvedCommit) || !proofsOk || !attributionsOk || !evidenceOk || list.proofs.length + list.attributions.length + evidence.length === 0) { findings.push("AB-FOLLOWUP"); continue; }
+    findings.push(...proofFindings(root, list.proofs));
+    for (const entry of evidence) {
+      let record; try { record = readFileSync(join(root, entry.path)); } catch { findings.push(`AB-MISSING ${entry.path}`); continue; }
+      if (digest(record) !== entry.sha256) findings.push(`AB-DIGEST ${entry.path}`);
+    }
+  }
+  return findings;
 }
 function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
 const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report"]);
