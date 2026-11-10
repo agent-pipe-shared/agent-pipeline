@@ -92,7 +92,7 @@ modelRouting:
     effort: high
   goldfish_deep:
     model: sonnet-5
-    effort: medium
+    effort: high
   critic:
     model: opus
     effort: medium
