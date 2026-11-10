@@ -378,6 +378,7 @@ test("C24: a Critic round that did not pass stops before the Result bootstrap an
   assert.equal(major.result.stage, "critic-standing"); assert.equal(major.result.stop.code, "ONESHOT-CRITIC-NOT-PASSED");
   assert.match(major.result.stop.reason, /0 blocker, 3 major, 14 minor[\s\S]*A statement in chat is not an acceptance/u);
   assert.match(major.result.stop.repair, /Critic delta round[\s\S]*--critic-packet-id <new-packet-id>[\s\S]*uncorrectable-past-authorship[\s\S]*has to be corrected/u);
+  assert.match(major.result.stop.repair, /--proof-request[\s\S]*authorize-critical --kind accept-residual-critic-findings/u, "a signature gate needs its proof flags named");
   assert.deepEqual(major.calls, [], "nothing runs before the stop"); assert.equal(major.evidence, false);
   assert.match(stoppedFor({ status: "failed", blockers: 1, majors: 0, minors: 0 }).result.stop.repair, /A blocker can never be accepted/u);
   const minor = stoppedFor({ status: "failed", blockers: 0, majors: 0, minors: 2 }).result.stop.repair;

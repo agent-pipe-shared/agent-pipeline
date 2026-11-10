@@ -336,9 +336,10 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       let standing = null;
       try { standing = command(runner, process.execPath, [COORDINATOR, "critic-standing", "--root", root, "--packet", packet], "ONESHOT-CRITIC-STANDING"); } catch { standing = null; /* the close keeps its own check */ }
       if (standing?.status === "failed" && !state.residualAcceptance?.lastAccepted) {
+        const signed = ` Under a signature gate that step also needs --proof-request, --proof-authority and --proof, which the PO's terminal prepares with node ${join(dirname(STATE_WRITER), "po-human-approval.mjs")} authorize-critical --kind accept-residual-critic-findings --critic-packet ${packet} and that command's usual flags.`;
         const acceptance = standing.blockers > 0 ? "A blocker can never be accepted."
-          : standing.majors > 0 ? `A major can be accepted only when no commit can correct it (the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet} --reason-class uncorrectable-past-authorship); a major that a commit can correct has to be corrected.`
-            : `Only minor findings are open, so the PO may instead accept them in the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet}.`;
+          : standing.majors > 0 ? `A major can be accepted only when no commit can correct it (the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet} --reason-class uncorrectable-past-authorship); a major that a commit can correct has to be corrected.${signed}`
+            : `Only minor findings are open, so the PO may instead accept them in the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet}.${signed}`;
         return stopResult("critic-standing", "ONESHOT-CRITIC-NOT-PASSED", `The Critic round ${packet} did not pass (${standing.blockers} blocker, ${standing.majors} major, ${standing.minors} minor) and no PO residual acceptance is on record, so this candidate cannot close. A statement in chat is not an acceptance.`,
           `nothing was written; correct the findings through a dispatch, run a Critic delta round on the new candidate, then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <new-packet-id>. ${acceptance}`);
       }
