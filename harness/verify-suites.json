@@ -110,6 +110,12 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/guard-push-promotion.test.mjs"
     },
     {
+      "name": "guard-push-read-search-tests",
+      "file": "plugins/pipeline-core/hooks/guard-push-read-search.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/guard-push-read-search.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/guard-push-read-search.test.mjs"
+    },
+    {
       "name": "agy-session-authority-tests",
       "file": "plugins/pipeline-core/lib/agy-session-authority.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/agy-session-authority.test.mjs",
