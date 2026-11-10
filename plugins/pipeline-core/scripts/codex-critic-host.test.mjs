@@ -72,7 +72,7 @@ import { expectedPipelineScriptsRunnerAllowlistEntries } from "../lib/project-on
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
-const EXPECTED_CASE_COUNT = 140;
+const EXPECTED_CASE_COUNT = 141;
 const caseResults = Array.from({ length: EXPECTED_CASE_COUNT }, () => {
   let resolveCase;
   let rejectCase;
@@ -1453,6 +1453,55 @@ check("a failed review receipt also consumes the dispatch", () => {
     receiptPath: join(failureControl, "replayed-receipt.json"),
     observers,
   }), /already consumed/);
+});
+
+const minorControl = join(root, "minor-only-control");
+mkdirSync(minorControl, { mode: 0o700 });
+const minorPreparedPath = join(minorControl, "prepared.json");
+const minorStatePath = join(minorControl, "state.json");
+prepareNativeCritic({
+  repoRoot: repo,
+  pipelineRoot: rulesetRoot,
+  controlDir: minorControl,
+  dispatchStatePath: minorStatePath,
+  requestPath,
+  preparedPath: minorPreparedPath,
+  reviewRoot: join(minorControl, "review"),
+  observers,
+}, {
+  randomBytes: () => Buffer.alloc(32, 10),
+  now: () => "2026-07-15T00:02:00.000Z",
+  runVerify: (checkout) => {
+    mkdirSync(join(checkout, "evidence"), { recursive: true });
+    writeJson(join(checkout, "evidence", "verify-latest.json"), { schema: "fixture.verify.v1", exitCode: 0, commit: candidate.commit });
+    return { command: "node verify.mjs", stdoutSha256: sha256("ok"), stderrSha256: sha256(""), stdoutBytes: 2, stderrBytes: 0, completedTestSteps: 1 };
+  },
+});
+const minorPreparedRecord = readJsonBounded(minorPreparedPath);
+const minorReturn = successfulReturn(minorPreparedRecord.value, minorPreparedRecord.sha256);
+minorReturn.critic_result.verdict = {
+  findings: [{ gap: "Small gap.", risk: "Low risk.", severity: "minor", evidence: "specs/review.md:1", spec_ref: "AC-1" }],
+  deliberately_not_flagged: [],
+  trajectory_verdict: "consistent",
+  trajectory_evidence: "evidence/verify-latest.json matches the reviewed commit",
+  briefing_violations: [],
+  pass: false,
+};
+rebindCompletion(minorReturn);
+const minorReturnPath = join(minorControl, "return.json");
+const minorReceiptPath = join(minorControl, "receipt.json");
+writeJson(minorReturnPath, minorReturn);
+const minorFinalize = { repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: minorControl, dispatchStatePath: minorStatePath, preparedPath: minorPreparedPath, returnPath: minorReturnPath, receiptPath: minorReceiptPath, observers };
+check("a minor-only round writes a passed receipt beside the Critic's own false flag, and recovery reads it back", () => {
+  assert.equal(finalizeNativeCritic({ ...minorFinalize, cleanup: false }).reviewPass, true);
+  const receipt = readJsonBounded(minorReceiptPath).value;
+  assert.equal(receipt.reviewPass, true);
+  assert.equal(receipt.verdict.pass, false);
+  assert.equal(receipt.verdict.findings[0].severity, "minor");
+  rmSync(`${minorStatePath}.complete`);
+  const recovered = finalizeNativeCritic(minorFinalize);
+  assert.equal(recovered.recovered, true);
+  assert.equal(recovered.reviewPass, true);
 });
 
 check("affected Codex Critic launches consume the generic selected read-only transport", () => {
