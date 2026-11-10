@@ -176,6 +176,7 @@ export function prepareCriticDispatch(input, deps = {}) {
     ...(previousRequest === null ? {} : { previousRequest }),
     next: { requestPath: ADMIT_REQUEST_FILE, placeholders: admitRequestPlaceholderPaths(value.admitRequest), admitCommand, nextStep: value.nextStep,
       ...(value.criticDispatchPromptLines === undefined ? {} : { criticDispatchPromptLines: value.criticDispatchPromptLines }),
+      ...(value.criticRunnerPromptLines === undefined ? {} : { criticRunnerPromptLines: value.criticRunnerPromptLines }),
       ...(value.taskIdResolution === undefined ? {} : { taskIdResolution: value.taskIdResolution }), ...(value.split === undefined ? {} : { split: value.split }) },
   });
 }

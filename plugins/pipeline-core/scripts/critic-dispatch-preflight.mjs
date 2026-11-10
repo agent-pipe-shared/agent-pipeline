@@ -602,6 +602,14 @@ const TASK_ID_CANDIDATE_LIMIT = 25;
 const fillPlaceholder = (path, hint) => `<FILL ${path}: ${hint}>`;
 
 /** The calibration project name in the form admit accepts (SAFE_ID, lower case), or null. Read-only. */
+// Read here rather than through repository-freshness.mjs, whose imports would take this preflight out of its write-free closure (CDPF086). The first readable calibration decides, as in calibrationProjectId.
+function calibrationRepositoryMode(root) {
+  for (const relativePath of ["project/pipeline.json", ".claude/pipeline.json"]) {
+    try { return JSON.parse(readFileSync(resolve(root, relativePath), "utf8"))?.repositoryMode ?? null; } catch { /* no readable calibration at this path */ }
+  }
+  return null;
+}
+
 function calibrationProjectId(root) {
   for (const relativePath of ["project/pipeline.json", ".claude/pipeline.json"]) {
     try {
@@ -729,7 +737,15 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
     const reason = `This range needs ${split.entries.length} split entries, above the bound of ${SPLIT_MAX_ENTRIES} for one review round (${split.changedFileCount} changed files).`;
     fail("CDP-SPLIT-TOO-LARGE", reason, { reason, repair: "Review a narrower exact range (a later --base), or review the range in several delivery units." });
   }
+  // 2026-11 greenfield report: all six Antigravity Critics lost their first read to "path is not absolute", because a Critic briefing carries repository-relative paths only. One generated line names the root; the paths themselves stay as they are.
+  const runnerPromptLines = criticRunnerFromEnv(deps.env ?? process.env) === "antigravity"
+    ? [`Repository root: ${root}. This runner's native file tools take absolute paths only: join every repository-relative path in this briefing with that root before the first read.`]
+    : null;
+  // R9: the last moment a calibration commit is free: it then sits inside the reviewed range. After the last Critic round it ends the push's Critic carry (CVL-CARRY-CONTENT-CHANGED).
+  const remotes = calibrationRepositoryMode(root) === "local-only" ? String(gitOrNull(root, ["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
   const nextStep = [
+    ...(remotes.length === 0 ? [] : [`This project's calibration says repositoryMode local-only, but it has a remote (${remotes.join(", ")}). If the project is meant to be published, correct that BEFORE this Critic round, so the commit is inside the reviewed range: node \${PIPELINE_PLUGIN_ROOT}/scripts/repository-mode-promote.mjs --root <repo> --to remote-tracked, commit the paths it prints, then run this preflight again with the new candidate. After the last Critic round that commit would end the push's Critic carry.`]),
+    ...(runnerPromptLines === null ? [] : ["Put criticRunnerPromptLines into the Critic dispatch prompt: without the repository root every first read of an Antigravity child fails."]),
     `Write admitRequest verbatim as ${ADMIT_REQUEST_FILE} (JSON), replace only its placeholders (${admitRequestPlaceholderPaths(request).join(", ")}), then run admitCommand; admit refuses an unfilled placeholder by name.`,
     `trigger ${trigger} is ${trigger === appliedRow ? "the applied Critic row of the matched dispatch record" : "the strictest default (no matched record row of T1 to T3)"}; change it only if your Critic-required decision says otherwise.`,
     ...(taskIdResolution === null ? [] : [`taskId: ${taskIdResolution.reason}.`]),
@@ -738,7 +754,7 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
     ...(split === null ? [] : [`SPLIT: this range has ${split.changedFileCount} changed files, above the bound of ${split.maxChangedFiles} one Critic can read, so it is split (split.entries, ${split.entries.length} entries, plan ${split.plan.status}; bound exclusions and the delivery records named in the review protocol §2.2 are in no entry). Dispatch one Critic per split entry from the template, each with its entry's reviewerInput, its entry's batchScopeLine as the Batch scope (MP-07) line${promptLines === null ? "" : " (in place of criticDispatchPromptLines[0]; keep the rationale line)"} and the instruction to begin trajectory_evidence with its scopeMarker; run each entry's Critic once (a second run for an entry makes finalize refuse the round). When every child has returned, merge them without copying any verdict: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-split-merge.mjs --root <repo> --packet <packetId> --out <merged verdict file>; only for a child without a Source return, save split as a JSON file under scratch/ and pass --split <split file> and --child <entryId>=<verdict file> (one per entry) instead of --packet; admit binds the split, finalize takes the merged verdict as verdictPath and labels it source-issued only when every child returned through the Critic stop.`]),
   ].join(" ");
   return { ...result, admitRequest: request, admitCommand: ["node", ADMIT_SCRIPT, "admit", "--root", input.root, "--request", ADMIT_REQUEST_FILE], nextStep,
-    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(split === null ? {} : { split }),
+    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(runnerPromptLines === null ? {} : { criticRunnerPromptLines: runnerPromptLines }), ...(split === null ? {} : { split }),
     routeAssurance };
 }
 

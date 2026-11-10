@@ -2118,6 +2118,39 @@ test("G20-69 --task-id is taken as given; zero or several matching admission tar
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
+test("R9: a local-only calibration beside a real remote is named before the Critic round, nothing else is", () => {
+  const fx = fixture();
+  try {
+    const calibration = join(fx.root, fs.existsSync(join(fx.root, "project", "pipeline.json")) ? "project" : ".claude", "pipeline.json");
+    const original = fs.existsSync(calibration) ? JSON.parse(readFileSync(calibration, "utf8")) : {};
+    mkdirSync(path.dirname(calibration), { recursive: true });
+    const declare = (mode) => writeFileSync(calibration, JSON.stringify({ ...original, repositoryMode: mode }));
+    declare("local-only");
+    assert.doesNotMatch(g2069Printed(fx).nextStep, /repository-mode-promote/u, "local-only without a remote is true");
+    childProcess.execFileSync("git", ["-C", fx.root, "remote", "add", "publish", "https://example.invalid/x.git"]);
+    const named = g2069Printed(fx).nextStep;
+    assert.match(named, /local-only, but it has a remote \(publish\)/u);
+    assert.match(named, /BEFORE this Critic round/u);
+    declare("remote-tracked");
+    assert.doesNotMatch(g2069Printed(fx).nextStep, /repository-mode-promote/u);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("AGY report: an Antigravity Critic gets one generated line naming the repository root, the dispatch policy admits it, other runners get none", () => {
+  const fx = fixture();
+  try {
+    const printed = g2069Printed(fx, {}, { env: { ANTIGRAVITY_AGENT: "antigravity" } });
+    assert.equal(printed.criticRunnerPromptLines.length, 1);
+    assert.ok(printed.criticRunnerPromptLines[0].startsWith(`Repository root: ${fs.realpathSync(fx.root)}. `), printed.criticRunnerPromptLines[0]);
+    assert.match(printed.criticRunnerPromptLines[0], /absolute paths only/u);
+    assert.match(printed.nextStep, /criticRunnerPromptLines/u);
+    assert.deepEqual(dispatchFindings({ subagentType: "critic", prompt: [`Ruleset SHA: ${fx.candidate}`, ...printed.criticRunnerPromptLines].join("\n") }).findings.filter(({ code }) => code.startsWith("DISPATCH-CONTAMINATION")), []);
+    for (const env of [{ CLAUDE_CODE_SESSION_ID: "s" }, { CODEX_SESSION_ID: "s" }, {}]) {
+      assert.equal(Object.hasOwn(g2069Printed(fx, {}, { env }), "criticRunnerPromptLines"), false, JSON.stringify(env));
+    }
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 test("G20-71 an Opus Critic route carries the MP-07 prompt lines the dispatch policy admits unchanged; a non-Opus route carries none", () => {
   const fx = fixture();
   try {
