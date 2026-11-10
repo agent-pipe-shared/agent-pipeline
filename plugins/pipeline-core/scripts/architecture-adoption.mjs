@@ -53,6 +53,12 @@ export function greenfieldMaterializationPending(rootDir, deps = {}) {
   }
 }
 
+/** Codex greenfield report: a map updated on purpose after the design must not read as "this repository has no architecture". */
+export function adoptionRequiredRationale(closedCode) {
+  if (closedCode === "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT") return "The architecture map no longer matches the closed feature's approved design, so that design no longer stands as this repository's baseline. A deliberate map update after the design ends up here; it blocks nothing now. At the next feature start, compare architecture/design-materialization.json with the map and decide the adoption scope.";
+  return "No architecture baseline or adoption decision exists for this repository";
+}
+
 function contractExists(rootDir, contractPath) {
   const directoryGlob = typeof contractPath === "string" && contractPath.endsWith("/**");
   const relativePath = directoryGlob ? contractPath.slice(0, -3) : contractPath;
@@ -153,7 +159,7 @@ export function resolveAdoptionState(rootDir = DEFAULT_ROOT, now = new Date()) {
     expiresAt: null,
     reviewDate: null,
     decisionRef: null,
-    rationale: "No architecture baseline or adoption decision exists for this repository",
+    rationale: adoptionRequiredRationale(closed.code),
     coverageClass: "unavailable",
     confidence: "estimated"
   };

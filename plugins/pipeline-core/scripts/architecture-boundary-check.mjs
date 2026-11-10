@@ -41,6 +41,8 @@ export const BOUNDARY_POLICY_SCHEMA = "pipeline.architecture-boundary-policy.v1"
 export const BOUNDARY_POLICY_PATH = "architecture/boundary-policy.json";
 export const DEFAULT_LINE_BOUND = 1000;
 export const BOUNDARY_RULES = Object.freeze(["unowned-path", "ambiguous-ownership", "forbidden-dependency", "over-line-bound"]);
+/** What a pass of this check does and does not say (Codex greenfield report): a green verdict must not read as "every dependency was seen". */
+export const BOUNDARY_COVERAGE = "Checked: file ownership, file length, and relative imports written in JavaScript or TypeScript files. Not seen: runtime or browser globals, HTML and CSS references, bundler output, imports in other languages, and whether code honours a module's contract.";
 export const DEFAULT_SOURCE_EXTENSIONS = Object.freeze([
   ".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx", ".py", ".go", ".rs", ".java", ".kt",
   ".rb", ".cs", ".swift", ".c", ".h", ".cc", ".cpp", ".hpp", ".php", ".scala",
@@ -193,7 +195,7 @@ function boundaryVerdictLabel(rootDir, status, deps, reportOnlyOpen = []) {
  */
 export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExtensions = DEFAULT_SOURCE_EXTENSIONS } = {}, deps = {}) {
   const root = path.resolve(rootDir);
-  const base = { schema: BOUNDARY_CHECK_SCHEMA, rules: BOUNDARY_RULES };
+  const base = { schema: BOUNDARY_CHECK_SCHEMA, rules: BOUNDARY_RULES, coverage: BOUNDARY_COVERAGE };
   if (!existsSync(path.join(root, "architecture/map"))) {
     return { ...base, status: "not-applicable", reason: "no architecture/map in this project", violations: [] };
   }
@@ -373,6 +375,7 @@ function runCli(argv) {
     for (const line of result.errors ?? []) process.stdout.write(`  - ${line}\n`);
     if (result.reason) process.stdout.write(`  - ${result.reason}\n`);
     for (const violation of result.violations) process.stdout.write(`  - [${violation.rule}] ${violation.detail}\n`);
+    process.stdout.write(`  ${BOUNDARY_COVERAGE}\n`);
   }
   return exitCodeForBoundaryCheck(result);
 }

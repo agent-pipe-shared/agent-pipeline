@@ -53,6 +53,14 @@ test("ABC01 a project without an architecture map is not-applicable, never faile
   assert.equal(exitCodeForBoundaryCheck(result), 0);
 });
 
+test("ABC13 every verdict states what the check does not see, in the result and on the human output", () => {
+  const root = fixture({ files: { "src/app/main.mjs": "export {};\n", "src/lib/x.mjs": "export {};\n" } });
+  const result = checkArchitectureBoundaries({ rootDir: root });
+  assert.match(result.coverage, /Not seen: runtime or browser globals, HTML and CSS references/u);
+  const run = spawnSync(process.execPath, [SCRIPT, "--root", root], { encoding: "utf8" });
+  assert.match(run.stdout, /Not seen: runtime or browser globals/u);
+});
+
 test("ABC02 owned files importing along allowedDependencies pass; docs and package imports are out of scope", () => {
   const root = fixture({ files: {
     "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\nimport fs from "node:fs";\nimport y from "left-pad";\n',

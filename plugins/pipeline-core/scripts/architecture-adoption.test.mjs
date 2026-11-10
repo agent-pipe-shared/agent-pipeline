@@ -17,6 +17,7 @@ import { setupAdoptionFixture, signAdoptionRequest, fixtureGit } from "./archite
 
 import {
   resolveAdoptionState,
+  adoptionRequiredRationale,
   generateAdoptionProposal,
   checkPlanningAdoptionDisposition,
   STATE_ADOPTION_REQUIRED,
@@ -51,6 +52,14 @@ describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
       assert.equal(state.coverageClass, "unavailable");
       assert.equal(state.confidence, "estimated");
       assert.ok(state.rationale);
+    });
+
+    it("says a map drifted from the closed design instead of claiming no architecture exists", () => {
+      const drift = adoptionRequiredRationale("ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
+      assert.match(drift, /no longer matches/u);
+      assert.match(drift, /blocks nothing/u);
+      assert.doesNotMatch(drift, /No architecture baseline/u);
+      assert.match(adoptionRequiredRationale(undefined), /No architecture baseline/u);
     });
 
     it("applies and resolves approved-scoped adoption decision", () => {
