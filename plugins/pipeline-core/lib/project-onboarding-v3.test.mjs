@@ -6183,6 +6183,8 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
       ["./security-scanner-diagnostics-publication.mjs", ["plugins", "pipeline-core", "lib", "security-scanner-diagnostics-publication.mjs"]],
       ["./security-remote-identity.mjs", ["plugins", "pipeline-core", "lib", "security-remote-identity.mjs"]],
       ["../scripts/security-adapters/gitleaks.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "gitleaks.mjs"]],
+      // QG-04 restatement (candidate 22b CGF-06): the gitleaks adapter now reads the known Pipeline schemas from this module, so the import closure of this fixture grew by it.
+      ["./generated-artefact-schema.mjs", ["plugins", "pipeline-core", "lib", "generated-artefact-schema.mjs"]],
       ["../scripts/security-adapters/osv-scanner.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "osv-scanner.mjs"]],
       ["../scripts/security-adapters/semgrep.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "semgrep.mjs"]],
       ["../scripts/security-adapters/license-check.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "license-check.mjs"]],
