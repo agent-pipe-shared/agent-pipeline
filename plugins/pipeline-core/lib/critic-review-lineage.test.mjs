@@ -984,3 +984,19 @@ n20Check("N20 CRL-HISTORY-CHAIN names the one condition that failed, each pinned
   assert.equal(variant((r) => { r.lane.laneId = first.lane.laneId; r.lane.contextSha256 = first.lane.contextSha256; }), "CRL-HISTORY-CHAIN:lane-id-equal,context-equal");
 });
 console.log(`${n20Passed}/5 N20 checks passed.`);
+
+// C27: lane origin is optional and closed to the one caller-authored label.
+{
+  const first = compile({ coverage: completeCoverage(), verdict: findingsVerdict, findings: [findingOpen] });
+  const relabel = (origin) => {
+    const copy = structuredClone(first);
+    copy.lane.origin = origin;
+    const { recordSha256: _previous, ...core } = copy;
+    copy.recordSha256 = sha256Canonical(core);
+    return lineageCore.validateCriticReviewLineage(copy);
+  };
+  assert.equal(lineageCore.validateCriticReviewLineage(first).ok, true);
+  assert.equal(relabel("caller-authored-fallback").ok, true);
+  assert.equal(relabel("host-isolated").ok, false);
+  console.log("PASS C27 lane origin");
+}

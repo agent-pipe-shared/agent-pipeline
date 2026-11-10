@@ -309,7 +309,9 @@ function lineageCode(record) {
     || !REVIEW_MODES.has(record.request.mode)
     || typeof record.request.admissionCode !== "string"
     || !/^RE-[A-Z0-9-]{1,96}$/u.test(record.request.admissionCode)
-    || !exact(record.lane, ["laneId", "contextSha256", "independent", "evidenceSha256", "freshFromReviewId"])
+    // C27: `independent` means an own round lane. A round whose verdict the caller transcribed carries that label in `origin`; a record without the key stays valid.
+    || !exact(record.lane, ["laneId", "contextSha256", "independent", "evidenceSha256", "freshFromReviewId", ...(Object.hasOwn(record.lane ?? {}, "origin") ? ["origin"] : [])])
+    || (Object.hasOwn(record.lane, "origin") && record.lane.origin !== "caller-authored-fallback")
     || !identifier(record.lane.laneId)
     || !digest(record.lane.contextSha256)
     || record.lane.independent !== true

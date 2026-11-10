@@ -547,6 +547,7 @@
         "laneId": {"$ref": "#/$defs/id"},
         "contextSha256": {"$ref": "#/$defs/digest"},
         "independent": {"const": true},
+        "origin": {"const": "caller-authored-fallback"},
         "evidenceSha256": {"$ref": "#/$defs/digest"},
         "freshFromReviewId": {
           "anyOf": [

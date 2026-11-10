@@ -782,7 +782,7 @@ const pf94Bindings = (root, base, head) => {
 const pf94Origin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });
 /** course=true: the course path (claim written at admit). course=false: the previous behaviour, generic batch plus caller-authored fallback, no course claim. */
 // Options: course (true: course path with claim; false: generic batch + caller-authored fallback, no claim), failing (true: the round did NOT pass and carries one open major finding), featureId, logicalWorkIds, taskId.
-export function consumedCourseRoundFixture({ course = true, failing = false, featureId = "held-feature", logicalWorkIds = ["scope-one", "scope-two"], taskId = "feature-held-task", extraCandidateFiles = [], verdict = null } = {}) {
+export function consumedCourseRoundFixture({ course = true, failing = false, featureId = "held-feature", logicalWorkIds = ["scope-one", "scope-two"], taskId = "feature-held-task", extraCandidateFiles = [], verdict = null, callerAuthored = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "pf94-course-round-"));
   git(root, ["init", "-q", "-b", "main"]);
   mkdirSync(join(root, ".claude"), { recursive: true }); mkdirSync(join(root, "governance", "guidelines"), { recursive: true }); mkdirSync(join(root, "governance", "policies"), { recursive: true });
@@ -839,7 +839,8 @@ export function consumedCourseRoundFixture({ course = true, failing = false, fea
     request.allowCallerAuthoredFallback = true;
   }
   // Upgrade state: the round was admitted BEFORE the course rule existed, so its preflight ran with no generic batch registered. Today's preflight refuses a feature unit whose work ids a generic batch owns (CGB-CONFLICT), so the packet-ready result computed beforehand is replayed through the dependency seam.
-  const deps = course ? { readOriginalSourceReturnFn: pf94Origin } : { readOriginalSourceReturnFn: pf94Origin, preflightCriticDispatchFn: () => preflightBeforeBatch };
+  const origin = callerAuthored ? () => null : pf94Origin;
+  const deps = course ? { readOriginalSourceReturnFn: origin } : { readOriginalSourceReturnFn: origin, preflightCriticDispatchFn: () => preflightBeforeBatch };
   admitSessionCriticReview(request, course ? {} : { preflightCriticDispatchFn: deps.preflightCriticDispatchFn });
   const finalized = finalizeSessionCriticReview(request, deps);
   assert.equal(finalized.status, "completed");
@@ -877,6 +878,15 @@ test("PF94 LINEAGE (a) the verb registers the lineage of a real consumed course 
   // The fixture round PASSED, so the registered history of length 1 ends the course (RE-CONSUMED-PACKAGE-PASS); a round with findings asks for the delta request (CCA-DELTA-REQUIRED). Either way the history is read and CCA-REQUESTED-MODE is gone.
   assert.notEqual(after.decision.code, "CCA-REQUESTED-MODE", JSON.stringify(after.decision));
   assert.equal(after.decision.code, "RE-CONSUMED-PACKAGE-PASS", JSON.stringify(after.decision));
+});
+test("C27 LINEAGE the record of a course round says when the caller transcribed the verdict, and says nothing for a Source-issued round", () => {
+  const issued = consumedCourseRoundFixture();
+  assert.equal(Object.hasOwn(JSON.parse(readFileSync(join(issued.root, issued.finalizedLineage.lineagePath), "utf8")).lane, "origin"), false);
+  const transcribed = consumedCourseRoundFixture({ callerAuthored: true });
+  assert.equal(transcribed.finalizedLineage.status, "written", JSON.stringify(transcribed.finalizedLineage));
+  const lane = JSON.parse(readFileSync(join(transcribed.root, transcribed.finalizedLineage.lineagePath), "utf8")).lane;
+  assert.equal(lane.origin, "caller-authored-fallback");
+  assert.equal(lane.independent, true, "the field keeps meaning an own round lane");
 });
 test("PF97 LINEAGE (special file names) the real registration route of a consumed course round accepts special file names up to the registered lineage", () => {
   const specialPaths = ["src/app/(app)/(auth)/anmelden/page.tsx", "src/app/[slug]/page.tsx", "src/app/@modal/(.)photo/page.tsx", "routes/$id.tsx", "src/with space.ts", `src/m${String.fromCodePoint(252)}ller.ts`, "src/a+b=c,d~e.ts", "src/with:colon.ts"];

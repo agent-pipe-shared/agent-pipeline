@@ -367,7 +367,8 @@ function criticProjectionRecordCode(record) {
     || !new Set(["full", "delta", "none"]).has(record.request.mode)
     || typeof record.request.admissionCode !== "string"
     || !/^RE-[A-Z0-9-]{1,96}$/.test(record.request.admissionCode)
-    || !exactKeys(record.lane, ["laneId", "contextSha256", "independent", "evidenceSha256", "freshFromReviewId"])
+    || !exactKeys(record.lane, ["laneId", "contextSha256", "independent", "evidenceSha256", "freshFromReviewId", ...(Object.hasOwn(record.lane ?? {}, "origin") ? ["origin"] : [])])
+    || (Object.hasOwn(record.lane, "origin") && record.lane.origin !== "caller-authored-fallback")
     || !CRITIC_SAFE_ID.test(record.lane.laneId ?? "")
     || !SHA256.test(record.lane.contextSha256 ?? "")
     || record.lane.independent !== true
