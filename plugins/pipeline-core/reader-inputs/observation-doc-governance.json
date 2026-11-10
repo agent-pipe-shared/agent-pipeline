@@ -287,6 +287,7 @@
           "docs/adr/0087-owning-verification-authenticated-controller-test-channel.json",
           "docs/adr/0087-owning-verification-authenticated-controller-test-channel.md",
           "docs/adr/0088-test-economy.md",
+          "docs/adr/0089-project-routing-is-user-owned.md",
           "docs/adr/README.md"
         ]
       },
@@ -344,7 +345,6 @@
           "docs/adr/draft-modular-design-by-default-with-size-budgets.json",
           "docs/adr/draft-modular-design-by-default-with-size-budgets.md",
           "docs/adr/draft-po-acceptance-points.md",
-          "docs/adr/draft-project-routing-is-user-owned.md",
           "docs/adr/draft-read-scope-containment-boundary.md",
           "docs/adr/draft-repair-availability.json",
           "docs/adr/draft-repair-availability.md",
