@@ -1,0 +1,351 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index ea0f4b98052e60017a1ed26bfb7267231e6640dd..b9f964183f21e418bcf96494133e4c75f9a9675e 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1193,6 +1193,7 @@
+         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-check",
+         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",
+         "verify-phase:harness/scripts/verify.mjs:verify-topology-preflight-tests",
++        "verify-phase:harness/scripts/verify.mjs:wait-host-commit-tests",
+         "verify-phase:harness/scripts/verify.mjs:win-authority-readiness-and-preflight-tests",
+         "verify-phase:harness/scripts/verify.mjs:win-authority-rest-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-assurance-verify-registration-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 41c36b2081388a7affaab547d4d37910589da7f2..4a96e226ee12f8078dd9bd595a005e92dfdc5a9e 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4819,6 +4819,12 @@
+       "file": "plugins/pipeline-core/scripts/publication-readback.test.mjs",
+       "invariantPinned": "The publication readback records what the remote really holds in a private append-only chain without touching the working tree or writing a URL; a repeat appends nothing, a local commit ahead and a differing remote are told apart, and a changed or removed line is detected",
+       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/publication-readback.test.mjs"
++    },
++    {
++      "name": "wait-host-commit-tests",
++      "file": "plugins/pipeline-core/scripts/wait-host-commit.test.mjs",
++      "invariantPinned": "The wait for a background Goldfish's stop answers from the stop's own last record: committed, checkpoint, stop-failed with the stop's recovery, or still-waiting; another dispatch or an earlier attempt under the same id never answers for this one, and it changes nothing",
++      "nonOverlapNote": "Unique cases: the waiter and the launch notice command; claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs pins it once against the real stop hook"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index b346180afd144d7c4b412eb59bc808035f8b05a7..51d37fe734510b30ba1bb6883b359fa304ac1cb4 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -14,6 +14,7 @@ import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ import { admissionProgress } from "../lib/admission-progress.mjs";
+ import { observeEffectiveEffort } from "../lib/dispatch-model-enforcement.mjs";
++import { hostCommitWaitCommand, writeNativeGoldfishStopOutcome } from "../lib/native-goldfish-stop-outcome.mjs";
+ 
+ /**
+  * C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 6): beside a recorded Claude Goldfish commit the stop names the
+@@ -201,20 +202,22 @@ function stopFailureNotice(failure) {
+   return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeLock(failure.lock)}${describeFailureDetail(failure.detail)}${describeOthers(failure.others)}`;
+ }
+ 
+-export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {
+-  const base = nativeGoldfishHookBaseMessage(result);
++export function nativeGoldfishHookMessage(result, { stopFailure = null, waitCommand = null } = {}) {
++  const base = nativeGoldfishHookBaseMessage(result, waitCommand);
+   const notice = stopFailureNotice(stopFailure);
+   return base && notice ? `${base} ${notice}` : base ?? notice;
+ }
+ 
+-function nativeGoldfishHookBaseMessage(result) {
++function nativeGoldfishHookBaseMessage(result, waitCommand = null) {
+   if (!result || result.status === "not-applicable" || result.status === "agent-bound") return null;
+   if (result.status === "authored-commit-recorded") {
+     return `Goldfish host commit verified: ${result.commit}; v4 dispatch record: ${result.record?.target ?? "written"}.${result.delivery?` Item checks ${result.delivery.checkStatus?.verdict??"unqualified"}; Main integration ${result.integration?.status??"pending"} (${result.integration?.code??"held"}).`:""}`;
+   }
+   if (result.status === "awaiting-subagent-stop") {
+     // The SubagentStop completion route is registered and this launch is its pending state: nothing is committed yet.
+-    return `Goldfish background launch observed${result.dispatchId ? ` (${result.dispatchId})` : ""}: the host commit completes when this child stops (Claude SubagentStop hook), not at this launch. No commit or authorship record is claimed until then.`;
++    const launched = `Goldfish background launch observed${result.dispatchId ? ` (${result.dispatchId})` : ""}: the host commit completes when this child stops (Claude SubagentStop hook), not at this launch. No commit or authorship record is claimed until then.`;
++    const waiting = "The hand-back arrives before that commit and the later \"Agent finished\" notice starts no turn, so never end the turn to wait for it";
++    return waitCommand ? `${launched} ${waiting}: when the hand-back arrives, run exactly this in that same turn and continue from its answer: ${waitCommand}` : `${launched} ${waiting}: when the hand-back arrives, run scripts/wait-host-commit.mjs in that same turn and continue from its answer.`;
+   }
+   if (result.code === "NGHF-PENDING-UNAVAILABLE") {
+     const why = result.reason === "async-launch"
+@@ -323,7 +326,14 @@ if (isDirectInvocation(import.meta.url)) {
+     process.stdout.write(`${JSON.stringify(block)}\n`);
+     process.exit(0);
+   }
+-  const message = nativeGoldfishHookMessage(result, { stopFailure });
++  const projectRoot = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
++  const waitCommand = result?.status === "awaiting-subagent-stop" ? hostCommitWaitCommand({ root: projectRoot, dispatchId: result.dispatchId, after: new Date().toISOString() }) : null;
++  const message = nativeGoldfishHookMessage(result, { stopFailure, waitCommand });
++  // Last step of a Goldfish stop: the commit, the record and the integration are done, so whoever waits for this may start the next step.
++  if (input.hook_event_name === "SubagentStop" && typeof result?.stopDispatchId === "string") {
++    try { writeNativeGoldfishStopOutcome({ commonDir: resolveGitCommonDir(projectRoot), dispatchId: result.stopDispatchId, result, message }); }
++    catch { /* a stop never depends on this record */ }
++  }
+   // C23: the effective effort of the stopped Claude Goldfish, observed or unobserved; stderr only, never a decision.
+   try {
+     const effortNote = effortObservationNotice({ root: process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd(), runner, input, result });
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 3dbe8c085eba41a694191500bfc8e4362bcfdefb..07f9e445838563fb3448a52e7c91616509c770cb 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -337,8 +337,10 @@ export function finalizeNativeGoldfishHostReturn(args = {}, dependencies = {}) {
+   // C19L-W250: a marked stop whose pending state could not be resolved returns not-applicable (the hook stays non-blocking) but has just left a
+   // stop-failure record; the hook names that record at this very stop instead of only at a later PostToolUse that a background pair never has.
+   if (diagnostic.unresolved && result?.status === "not-applicable" && typeof diagnostic.unresolved.dispatchId === "string")
+-    return { ...result, unresolvedStop: { dispatchId: diagnostic.unresolved.dispatchId } };
+-  return result;
++    return { ...result, unresolvedStop: { dispatchId: diagnostic.unresolved.dispatchId }, stopDispatchId: diagnostic.unresolved.dispatchId };
++  // The hook records how this stop ended under this id, as its last step, for wait-host-commit.mjs; a success result carries no id of its own.
++  const stopDispatchId = args?.input?.hook_event_name === "SubagentStop" ? diagnostic.stop?.state?.binding?.dispatchId ?? diagnostic.dispatch?.dispatchId ?? null : null;
++  return typeof stopDispatchId === "string" ? { ...result, stopDispatchId } : result;
+ }
+ 
+ // AC-164: of a thrown error only its name, a short `code` and a slug `reason` travel; never a message, stack or path.
+diff --git a/plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs b/plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..72143b1348772b8452ab0946d63e127573c51067
+--- /dev/null
++++ b/plugins/pipeline-core/lib/native-goldfish-stop-outcome.mjs
+@@ -0,0 +1,43 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * The last thing a Goldfish SubagentStop does: one private record of how the stop ended, read by scripts/wait-host-commit.mjs. A Claude Elephant gets the child's hand-back
++ * before the stop commits, and Claude Code's "Agent finished" notice starts no turn (0 of 32 in one measured run), so nothing else tells it that the stop is over. The record
++ * is written after the host commit, the dispatch record and the integration, so a reader that sees it can start the next step without meeting the stop hook.
++ */
++import { createHash } from "node:crypto";
++import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
++import { dirname, join } from "node:path";
++import { fileURLToPath } from "node:url";
++
++const SCHEMA = "pipeline.native-goldfish-stop-outcome.v1";
++const MESSAGE_LIMIT = 2_000;
++const pathOf = (commonDir, dispatchId) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics", `stop-outcome-${createHash("sha256").update(dispatchId).digest("hex").slice(0, 32)}.json`);
++
++/** Never throws: a record that cannot be written leaves the waiter on its timeout, and the stop itself is not affected. */
++export function writeNativeGoldfishStopOutcome({ commonDir, dispatchId, result, message, now = () => new Date() } = {}) {
++  try {
++    if (typeof commonDir !== "string" || typeof dispatchId !== "string" || dispatchId === "") return false;
++    const path = pathOf(commonDir, dispatchId), temporary = `${path}.tmp`;
++    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
++    writeFileSync(temporary, `${JSON.stringify({ schema: SCHEMA, dispatchId, status: result?.status ?? null, code: result?.code ?? null, commit: typeof result?.commit === "string" ? result.commit : null,
++      integration: result?.integration?.status ?? null, message: String(message ?? "").slice(0, MESSAGE_LIMIT), observedAt: now().toISOString() })}\n`, { mode: 0o600 });
++    renameSync(temporary, path);
++    return true;
++  } catch { return false; }
++}
++
++/** The record of this dispatch written at or after `after`, or null. `after` keeps the outcome of an earlier attempt under the same id from answering for this one. */
++export function readNativeGoldfishStopOutcome({ commonDir, dispatchId, after } = {}) {
++  try {
++    const record = JSON.parse(readFileSync(pathOf(commonDir, dispatchId), "utf8"));
++    if (record?.schema !== SCHEMA || record.dispatchId !== dispatchId) return null;
++    return Date.parse(record.observedAt) >= Date.parse(after) ? record : null;
++  } catch { return null; }
++}
++
++/** The exact command for the launch notice, or null when a path cannot be quoted the one way both Bash and PowerShell read alike. */
++export function hostCommitWaitCommand({ root, dispatchId, after, pluginRoot = dirname(dirname(fileURLToPath(import.meta.url))) } = {}) {
++  const script = join(pluginRoot, "scripts", "wait-host-commit.mjs");
++  if (typeof root !== "string" || root === "" || `${script}${root}`.includes("'") || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(dispatchId ?? "")) return null;
++  return `node '${script}' --root '${root}' --dispatch ${dispatchId} --after ${after}`;
++}
+diff --git a/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs b/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
+index 0e3eb617329126430831842cbde0ef576243ea9c..90629466fce084e7f9f543d79361538accc62be7 100644
+--- a/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
++++ b/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
+@@ -26,10 +26,13 @@ test("the guide tells when to call the architecture-decision skill: at design pr
+ 
+ // G20-61 (Claude greenfield 2026-11-08 06:03 -> 06:59 UTC): the hand-back arrived before the host commit, the session reported
+ // and ended its turn, and the completion notification a minute later produced no action until the PO asked.
+-test("G20-61: the guide makes the Goldfish completion notification the cue to continue and forbids a status-report turn end", () => {
++// Measured 2026-11-10: that notification started no model turn in 32 of 32 cases, so the guide must not make it the cue.
++test("G20-61: the guide makes the wait command at the hand-back the cue to continue and forbids a status-report turn end", () => {
+   const guide = readFileSync(GUIDE, "utf8");
+   assert.match(guide, /hand-back message can arrive before that commit/u);
+-  assert.match(guide, /act on that notification, read `git log -1` and dispatch the next ready slice in the same turn/u);
++  assert.match(guide, /task-notification starts no turn/u);
++  assert.match(guide, /wait-host-commit\.mjs` command from the launch notice in that same turn/u);
++  assert.doesNotMatch(guide, /act on that notification/u);
+   assert.match(guide, /never end a turn with a status report/u);
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/wait-host-commit.mjs b/plugins/pipeline-core/scripts/wait-host-commit.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..0157f3648ba3be4351a23760e8fdf52f47bfa989
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/wait-host-commit.mjs
+@@ -0,0 +1,73 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * wait-host-commit.mjs -- wait in the same turn until a background Goldfish's stop has finished, then say how it ended.
++ *
++ * Usage: node <plugin-root>/scripts/wait-host-commit.mjs --root <project-root> --dispatch <dispatch id> --after <ISO time of the launch> [--timeout-seconds <1..170>]
++ *
++ * The launch notice of a background Goldfish prints this command complete. Run it when the child's hand-back arrives: the host commit lands 20 to 45 seconds after the hand-back,
++ * and Claude Code's "Agent finished" notice starts no turn, so a turn that ends to wait for it stalls until a human writes. The default of 100 seconds fits the shell tool's
++ * default time limit; run it a second time on `still-waiting`.
++ *
++ * Status: `committed`, `checkpoint` (a budget checkpoint, nothing committed), `stop-failed` (the stop ended without a commit), `still-waiting`, `refused`.
++ * Output: ONE JSON line. Exit 0 committed, checkpoint or still-waiting; 1 stop-failed or refused; 2 usage. It reads one private record and changes nothing.
++ */
++import { realpathSync, statSync } from "node:fs";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
++import { readNativeGoldfishStopOutcome } from "../lib/native-goldfish-stop-outcome.mjs";
++
++const RESULT_SCHEMA = "pipeline.wait-host-commit-result.v1";
++const USAGE = "usage: wait-host-commit.mjs --root <project-root> --dispatch <dispatch id> --after <ISO time of the launch> [--timeout-seconds <1..170>]";
++const DISPATCH = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
++const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/u;
++const DEFAULT_SECONDS = 100, MAX_SECONDS = 170, POLL_MS = 1_500;
++const CONTINUE = "Continue in this same turn with the next step; never end the turn to wait for a notice, because the \"Agent finished\" notice starts no turn.";
++const sleep = (ms) => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); };
++
++function fromOutcome(outcome, waitedSeconds) {
++  const common = { schema: RESULT_SCHEMA, dispatch: outcome.dispatchId, code: outcome.code, waitedSeconds };
++  if (outcome.status === "authored-commit-recorded") return { exitCode: 0, result: { ...common, status: "committed", commit: outcome.commit, integration: outcome.integration, message: `The host commit is in and the stop has finished. ${CONTINUE}` } };
++  if (outcome.status === "checkpoint-recorded") return { exitCode: 0, result: { ...common, status: "checkpoint", message: `The child stopped at a budget checkpoint and nothing was committed. Follow the checkpoint route of its hand-back, in this same turn. ${outcome.message}`.trim() } };
++  return { exitCode: 1, result: { ...common, status: "stop-failed", commit: outcome.commit, message: `The stop finished without a recorded host commit. Follow this recovery before committing anything by hand: ${outcome.message}`.trim() } };
++}
++
++/** `deps` ({ commonDir, now, pause }) is for tests. */
++export function waitForHostCommit({ root, dispatch, after, timeoutSeconds = DEFAULT_SECONDS }, deps = {}) {
++  let commonDir = deps.commonDir;
++  try { commonDir ??= resolveGitCommonDir(root); } catch { commonDir = null; }
++  if (typeof commonDir !== "string" || commonDir === "") return { exitCode: 1, result: { schema: RESULT_SCHEMA, status: "refused", code: "WHC-REPOSITORY-UNREADABLE", reason: "the Git directory could not be read", repair: "repair the repository, then run this again" } };
++  const now = deps.now ?? Date.now, pause = deps.pause ?? sleep, started = now();
++  for (;;) {
++    const elapsed = now() - started;
++    const outcome = readNativeGoldfishStopOutcome({ commonDir, dispatchId: dispatch, after });
++    if (outcome !== null) return fromOutcome(outcome, Math.round(elapsed / 1_000));
++    if (elapsed >= timeoutSeconds * 1_000) return { exitCode: 0, result: { schema: RESULT_SCHEMA, status: "still-waiting", code: "WHC-NO-STOP-OUTCOME-YET", dispatch, waitedSeconds: Math.round(elapsed / 1_000),
++      message: "The stop has not finished yet. Run this identical command once more in this same turn. If it answers still-waiting again, check whether the child is still running; if it has ended, inspect the working tree and recover with scripts/goldfish-host-commit-recover.mjs." } };
++    pause(POLL_MS);
++  }
++}
++
++function parse(argv) {
++  const value = {};
++  for (let index = 0; index < argv.length; index += 2) {
++    const flag = argv[index], next = argv[index + 1];
++    if (!["--root", "--dispatch", "--after", "--timeout-seconds"].includes(flag) || next === undefined || next === "" || Object.hasOwn(value, flag)) return null;
++    value[flag] = next;
++  }
++  const timeoutSeconds = value["--timeout-seconds"] === undefined ? DEFAULT_SECONDS : Number(value["--timeout-seconds"]);
++  if (value["--root"] === undefined || !DISPATCH.test(value["--dispatch"] ?? "") || !ISO_TIME.test(value["--after"] ?? "") || !Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > MAX_SECONDS) return null;
++  let root;
++  try { root = realpathSync(value["--root"]); if (!statSync(root).isDirectory()) return null; } catch { return null; }
++  return { root, dispatch: value["--dispatch"], after: value["--after"], timeoutSeconds };
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  const argv = process.argv.slice(2);
++  if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) { process.stdout.write(`${USAGE}\n`); process.exit(0); }
++  const input = parse(argv);
++  if (input === null) { process.stdout.write(`${JSON.stringify({ schema: RESULT_SCHEMA, status: "usage", code: "WHC-USAGE", message: USAGE })}\n`); process.exit(2); }
++  const { exitCode, result } = waitForHostCommit(input);
++  process.stdout.write(`${JSON.stringify(result)}\n`);
++  process.exit(exitCode);
++}
+diff --git a/plugins/pipeline-core/scripts/wait-host-commit.test.mjs b/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..cf292f569fc87cd237dea42613a0735e53abc386
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
+@@ -0,0 +1,80 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdtempSync, rmSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { test } from "node:test";
++import { fileURLToPath } from "node:url";
++import { hostCommitWaitCommand, writeNativeGoldfishStopOutcome } from "../lib/native-goldfish-stop-outcome.mjs";
++import { waitForHostCommit } from "./wait-host-commit.mjs";
++
++const SCRIPT = fileURLToPath(new URL("./wait-host-commit.mjs", import.meta.url));
++const AFTER = "2026-11-10T08:00:00.000Z";
++const at = (iso) => () => new Date(iso);
++const inside = (body) => { const commonDir = mkdtempSync(join(tmpdir(), "whc-")); try { return body(commonDir); } finally { rmSync(commonDir, { recursive: true, force: true }); } };
++const clock = () => { let t = 0; return { now: () => t, pause: (ms) => { t += ms; } }; };
++const COMMITTED = { status: "authored-commit-recorded", code: "NGHF-AUTHORED-RECORD-VERIFIED", commit: "a".repeat(40), integration: { status: "integrated" } };
++
++test("a finished stop answers at once with its commit and tells the agent to go on in this turn", () => inside((commonDir) => {
++  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-1", result: COMMITTED, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
++  const { exitCode, result } = waitForHostCommit({ root: "unused", dispatch: "fix-1", after: AFTER }, { commonDir, ...clock() });
++  assert.equal(exitCode, 0);
++  assert.equal(result.status, "committed");
++  assert.equal(result.commit, COMMITTED.commit);
++  assert.equal(result.integration, "integrated");
++  assert.match(result.message, /same turn/u);
++}));
++
++test("a stop that finishes during the wait is seen by the next poll", () => inside((commonDir) => {
++  const ticking = clock();
++  const pause = (ms) => { ticking.pause(ms); if (ticking.now() >= 6_000) writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-1", result: COMMITTED, message: "ok", now: at("2026-11-10T08:00:30.000Z") }); };
++  const { result } = waitForHostCommit({ root: "unused", dispatch: "fix-1", after: AFTER }, { commonDir, now: ticking.now, pause });
++  assert.equal(result.status, "committed");
++  assert.equal(result.waitedSeconds, 6);
++}));
++
++test("neither another dispatch's outcome nor an earlier attempt under the same id answers for this one", () => inside((commonDir) => {
++  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "other", result: COMMITTED, message: "ok", now: at("2026-11-10T08:00:30.000Z") });
++  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-1", result: COMMITTED, message: "ok", now: at("2026-11-10T07:59:59.000Z") });
++  const { exitCode, result } = waitForHostCommit({ root: "unused", dispatch: "fix-1", after: AFTER, timeoutSeconds: 3 }, { commonDir, ...clock() });
++  assert.equal(exitCode, 0);
++  assert.equal(result.status, "still-waiting");
++  assert.equal(result.code, "WHC-NO-STOP-OUTCOME-YET");
++  assert.match(result.message, /identical command once more/u);
++}));
++
++test("a stop without a commit hands over its own recovery and exits non-zero", () => inside((commonDir) => {
++  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-1", result: { status: "recovery-required", code: "NGHF-COMMIT-EXCEPTION", commit: null }, message: "inspect the worktree", now: at("2026-11-10T08:00:30.000Z") });
++  const { exitCode, result } = waitForHostCommit({ root: "unused", dispatch: "fix-1", after: AFTER }, { commonDir, ...clock() });
++  assert.equal(exitCode, 1);
++  assert.equal(result.status, "stop-failed");
++  assert.equal(result.code, "NGHF-COMMIT-EXCEPTION");
++  assert.match(result.message, /inspect the worktree/u);
++}));
++
++test("a budget checkpoint is its own status and claims no commit", () => inside((commonDir) => {
++  writeNativeGoldfishStopOutcome({ commonDir, dispatchId: "fix-1", result: { status: "checkpoint-recorded", code: "NGHF-CHECKPOINT-RESERVATION-LIVE", commit: null }, message: "", now: at("2026-11-10T08:00:30.000Z") });
++  const { exitCode, result } = waitForHostCommit({ root: "unused", dispatch: "fix-1", after: AFTER }, { commonDir, ...clock() });
++  assert.equal(exitCode, 0);
++  assert.equal(result.status, "checkpoint");
++  assert.equal(result.commit, undefined);
++}));
++
++test("the launch notice command carries the exact flags and refuses what it cannot quote", () => {
++  assert.equal(hostCommitWaitCommand({ root: "/r", dispatchId: "fix-1", after: AFTER, pluginRoot: "/p" }), `node '${join("/p", "scripts", "wait-host-commit.mjs")}' --root '/r' --dispatch fix-1 --after ${AFTER}`);
++  assert.equal(hostCommitWaitCommand({ root: "/r'x", dispatchId: "fix-1", after: AFTER, pluginRoot: "/p" }), null);
++  assert.equal(hostCommitWaitCommand({ root: "/r", dispatchId: "a b", after: AFTER, pluginRoot: "/p" }), null);
++});
++
++test("the command line: one JSON line, usage is typed, --help is free", () => inside((root) => {
++  const run = (...args) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8" });
++  assert.equal(run("--help").status, 0);
++  const usage = run("--root", root, "--dispatch", "fix-1");
++  assert.equal(usage.status, 2);
++  assert.equal(JSON.parse(usage.stdout).code, "WHC-USAGE");
++  assert.equal(run("--root", root, "--dispatch", "fix-1", "--after", AFTER, "--timeout-seconds", "171").status, 2);
++  const unreadable = run("--root", root, "--dispatch", "fix-1", "--after", AFTER, "--timeout-seconds", "1");
++  assert.equal(unreadable.status, 1, unreadable.stdout);
++  assert.equal(JSON.parse(unreadable.stdout).code, "WHC-REPOSITORY-UNREADABLE");
++}));
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index c66571870b44f82471ac8f15ed1cd59d1872a1d3..5aaeecd13365865ae9634c9dcf4d51d0db8d6f3f 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -85,8 +85,9 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
+      `status: "prepared"` call `invoke_subagent` with the fields of the returned `invocation` unchanged (the host takes flat arguments, one child per call). A native implementation consent is not available: read
+      `references/antigravity-native-dispatch.md` before the first dispatch and ask the PO when the sanctioned route does not return an authored commit.
+ 4. Commit what the dispatch produced under the host-commit rules of its runner; never hand-build a record the writer refuses (the refusal names its repair).
+-   On Claude the host commit of a background Goldfish lands at its SubagentStop. Its hand-back message can arrive before that commit, its completion
+-   task-notification arrives after it: act on that notification, read `git log -1` and dispatch the next ready slice in the same turn. While ready
++   On Claude the host commit of a background Goldfish lands at its SubagentStop. Its hand-back message can arrive before that commit, and the later
++   "Agent finished" task-notification starts no turn. So when the hand-back arrives, run the exact `wait-host-commit.mjs` command from the launch notice in that same turn,
++   run it once more on `still-waiting`, and dispatch the next ready slice from its answer. While ready
+    slices remain, never end a turn with a status report or to wait for the pipeline to commit; a turn that ends there waits for the PO.
+ 5. After the last slice and before the project's Verify, where the project has an architecture model: `architecture-fitness.mjs --root <root> --check` and `architecture-boundary-check.mjs --root <root> --json` (both read-only). A violation is fixed before the Critic reads the candidate.
+ 

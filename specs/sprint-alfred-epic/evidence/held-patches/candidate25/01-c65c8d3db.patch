@@ -1,0 +1,32 @@
+diff --git a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+index a4bbf531870981ca8848db2db9a5db7bb3fdbb83..2e97fdaf5cb810b9611e74ae50de9049ed90cb61 100644
+--- a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+@@ -336,7 +336,8 @@ function launchedPending(fx, toolUseId, extra) {
+   assert.equal(pre.status, 0, `PreToolUse must admit the launch -- ${pre.stderr.slice(0, 600)}`);
+   // D78: the fixture's hand-written briefing draws the generated-briefing WARNING (QG-06 warn state until 0.7.1);
+   // it is not what this pin is about, so only that one warning is tolerated -- any other warning or block still fails.
+-  const stderr = pre.stderr.split("\n").filter((line) => !/^WARNING \(guard-dispatch\): DBG-GENERATED-BRIEFING-REQUIRED:/u.test(line)).join("\n");
++  // The fixture's pipeline.user.yaml is deliberately not a full v3 file, so the routing-source note of candidate 23 is tolerated the same way.
++  const stderr = pre.stderr.split("\n").filter((line) => !/^WARNING \(guard-dispatch\): (?:DBG-GENERATED-BRIEFING-REQUIRED|DISPATCH-ROUTING-SOURCE-FALLBACK):/u.test(line)).join("\n");
+   assert.doesNotMatch(stderr, /WARNING|BLOCKED/u, `no warning or block expected -- ${stderr.slice(0, 600)}`);
+   const files = pendingFiles(fx);
+   assert.equal(files.length, 1, "the launch wrote exactly one pending state");
+@@ -355,8 +356,17 @@ test("(i) a launch with NO run_in_background key takes the SubagentStop route an
+   assert.match(context(posted), new RegExp(`Goldfish background launch observed \\(${fx.dispatchId}\\)`, "u"), posted.stdout);
+   assert.match(context(posted), /No commit or authorship record is claimed until then/u);
+   assert.equal(fx.gitOk("rev-parse", "HEAD"), fx.candidate, "the async launch acknowledgement commits nothing");
++  // The notice carries the whole wait command, and that command answers only once the real stop has finished.
++  const printed = context(posted).match(/--dispatch (\S+) --after (\S+)/u);
++  assert.ok(printed, context(posted));
++  assert.equal(printed[1], fx.dispatchId);
++  const wait = () => JSON.parse(spawnSync(process.execPath, [fileURLToPath(new URL("../../scripts/wait-host-commit.mjs", import.meta.url)), "--root", fx.root, "--dispatch", printed[1], "--after", printed[2], "--timeout-seconds", "1"], { encoding: "utf8" }).stdout);
++  assert.equal(wait().status, "still-waiting");
+   childWork(fx);
+   assertCommittedOnceAtStop(fx, "toolu_pf26b_keyless");
++  const answered = wait();
++  assert.equal(answered.status, "committed", JSON.stringify(answered));
++  assert.equal(answered.commit, hostCommits(fx)[0]);
+ });
+ 
+ test("(ii) an explicit run_in_background: true takes the same route in the item-governed course shape of this repository", () => {
