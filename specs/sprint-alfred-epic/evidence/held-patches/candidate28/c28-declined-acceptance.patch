@@ -1,0 +1,1045 @@
+diff --git a/plugins/pipeline-core/lib/close-acceptance-record.mjs b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+index f01b85a4d..d5fc19106 100644
+--- a/plugins/pipeline-core/lib/close-acceptance-record.mjs
++++ b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+@@ -29,9 +29,56 @@ export function openChecksOf(named) {
+   return [...own, STANDING_OPEN_CHECK];
+ }
+ 
+-/** The one sentence the agent asks the human in the chat. */
+-export function acceptanceQuestion({ featureId, candidate, openChecks }) {
+-  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}.`;
++/**
++ * C28 (AC-108): the ONE fixed answer form of a yes. The words come from the project's human-facing language as Continuity records it
++ * (`continuity.runtime.humanFacingLanguage`), so a German-speaking human answers in German; every other language, and a project without a
++ * Continuity binding, falls back to the English form. Only the form of the project's own language is a yes.
++ */
++export const ACCEPTANCE_YES_FORMS = Object.freeze({ en: "yes, I accept", de: "ja, ich akzeptiere" });
++export function acceptanceYesForm(language) {
++  const key = typeof language === "string" ? language.trim().toLowerCase().split(/[-_]/u)[0] : "";
++  return Object.hasOwn(ACCEPTANCE_YES_FORMS, key) ? ACCEPTANCE_YES_FORMS[key] : ACCEPTANCE_YES_FORMS.en;
++}
++const yesKey = (value) => String(value).trim().replace(/[.!]+$/u, "").trim().toLowerCase();
++/** An acceptance only for exactly the fixed form, normalised for case, surrounding space and closing `.` or `!`. No keyword search in free text. */
++export function isAcceptanceYes(answer, form) { return typeof answer === "string" && yesKey(answer) === yesKey(form); }
++
++/** The one sentence the agent asks the human in the chat; it ends with the fixed yes form. */
++export function acceptanceQuestion({ featureId, candidate, openChecks, form = ACCEPTANCE_YES_FORMS.en }) {
++  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer exactly "${form}"; any other answer is not an acceptance.`;
++}
++
++export const DECLINE_BEGIN = "<!-- close-decline:begin -->";
++export const DECLINE_END = "<!-- close-decline:end -->";
++/** Where the decline of this candidate with this answer is recorded: evidence, never one of the places `readAcceptanceRecord` reads. */
++export function declineRecordPath({ featureId, candidate, answer }) {
++  return `specs/${featureId}/evidence/human-decline-${candidate.slice(0, 12)}-${sha256Hex(Buffer.from(answer, "utf8")).slice(0, 8)}.md`;
++}
++export function renderDeclineRecord({ candidate, answer, openChecks, declinedAt }) {
++  return [DECLINE_BEGIN, "## Human decline of this feature package", "",
++    `- Candidate: \`${candidate}\``, `- Declined at: ${declinedAt}`, `- Answer (literal): ${JSON.stringify(answer)}`, "- Open checks:", ...openChecks.map((check) => `  - ${check}`),
++    "- Record type: an attribution record of the human's answer in the chat. It is not an acceptance and not a signature; the feature returns to a correction round (correction dispatch, Critic delta round, then the close again) without reopening the design.",
++    DECLINE_END, ""].join("\n");
++}
++/** The decline a text carries, or null. */
++export function parseDeclineRecord(text) {
++  const all = lines(text); const from = all.findIndex((line) => line.trim() === DECLINE_BEGIN); const to = all.findIndex((line, index) => index > from && line.trim() === DECLINE_END);
++  if (from < 0 || to < 0) return null;
++  const block = all.slice(from, to); let candidate = null; let answer = null;
++  for (const line of block) {
++    const found = /^- Candidate: `([0-9a-f]{40}|[0-9a-f]{64})`\s*$/u.exec(line); if (found) candidate = found[1];
++    const literal = /^- Answer \(literal\): (".*")\s*$/u.exec(line); if (literal) { try { answer = JSON.parse(literal[1]); } catch { answer = null; } }
++  }
++  return candidate === null || typeof answer !== "string" ? null : { candidate, answer };
++}
++/** Writes (idempotently: the same candidate and answer keep their first record and time) the decline record. Returns its path and digest. */
++export function writeDeclineRecord({ root, featureId, record, now = () => new Date().toISOString() }) {
++  const path = declineRecordPath({ featureId, candidate: record.candidate, answer: record.answer }); const file = resolve(root, path);
++  let existing = null; try { existing = parseDeclineRecord(readFileSync(file, "utf8")); } catch { existing = null; }
++  if (existing === null || existing.candidate !== record.candidate || existing.answer !== record.answer) {
++    mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, renderDeclineRecord({ ...record, declinedAt: now() }));
++  }
++  return { path, sha256: sha256Hex(readFileSync(file)) };
+ }
+ 
+ export function renderAcceptanceSection({ candidate, answer, openChecks }) {
+diff --git a/plugins/pipeline-core/lib/continuity-state.mjs b/plugins/pipeline-core/lib/continuity-state.mjs
+index b1ef1f248..223559a43 100644
+--- a/plugins/pipeline-core/lib/continuity-state.mjs
++++ b/plugins/pipeline-core/lib/continuity-state.mjs
+@@ -20,7 +20,11 @@ const ROOT_KEYS = new Set([
+   "closeTransition",
+   "nativeContinuation",
+   "retryBudget",
++  "resultRetirements",
+ ]);
++// C28 (AC-108): the history of Results a declined acceptance retired, newest last. Bounded; the declined feature is corrected, not retired again and again.
++const RESULT_RETIREMENT_KEYS = new Set(["path", "sha256", "retiredAt", "reason", "declineRecord"]);
++const MAX_RESULT_RETIREMENTS = 16;
+ const RUNTIME_KEYS = new Set(["humanFacingLanguage", "activeDuty", "sessionCleanup", "documentLanguage"]);
+ const SESSION_CLEANUP_KEYS = new Set(["sessionId", "descriptorSha256"]);
+ const ARTIFACT_KEYS = new Set(["path", "sha256"]);
+@@ -475,9 +479,16 @@ function result(ok, code, state = null, mutated = false) {
+   return { ok, code, mutated, state };
+ }
+ 
++function validResultRetirements(value) {
++  return value === undefined || (Array.isArray(value) && value.length <= MAX_RESULT_RETIREMENTS && value.every((entry) => exactKeys(entry, RESULT_RETIREMENT_KEYS)
++    && safePath(entry.path) && digest(entry.sha256) && typeof entry.retiredAt === "string" && Number.isFinite(Date.parse(entry.retiredAt))
++    && entry.reason === "declined-acceptance" && validArtifact(entry.declineRecord)));
++}
++
+ /** Validate one bounded continuity object. */
+ export function validateContinuityState(value, activeFeatureId = undefined) {
+-  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => !["closeTransition", "nativeContinuation", "retryBudget"].includes(key)))
++  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => !["closeTransition", "nativeContinuation", "retryBudget", "resultRetirements"].includes(key)))
++    || !validResultRetirements(value.resultRetirements)
+     || value.schema !== "pipeline.continuity.v0"
+     || !safeId(value.featureId)
+     || !safeInteger(value.revision)
+diff --git a/plugins/pipeline-core/lib/continuity-state.test.mjs b/plugins/pipeline-core/lib/continuity-state.test.mjs
+index 3b16ca50b..9a784f75a 100644
+--- a/plugins/pipeline-core/lib/continuity-state.test.mjs
++++ b/plugins/pipeline-core/lib/continuity-state.test.mjs
+@@ -1617,4 +1617,25 @@ await asyncCheck("generic CAS cannot forge or replace native readback evidence",
+   assert.equal(compareAndSwapContinuity(current, { expectedRevision: 3, next: forged }, FEATURE).code, "CS-PROTECTED-NATIVE-CONTINUATION");
+ });
+ 
++// C28 (AC-108): a Result retired by a declined acceptance stays in the history of the Continuity state.
++check("a retired Result stays in the history: resultRetirements validates against the validator and the schema, and a malformed history is refused", () => {
++  const entry = { path: "specs/x/result.md", sha256: A, retiredAt: "2026-11-10T12:00:00.000Z", reason: "declined-acceptance", declineRecord: { path: "specs/x/evidence/human-decline-aaaaaaaaaaaa-bbbbbbbb.md", sha256: B } };
++  const withHistory = { ...structuredClone(state()), resultRetirements: [entry] };
++  assert.equal(validateContinuityState(state()).ok, true, "the base state of this case is valid without a history");
++  assert.equal(validateContinuityState(withHistory).ok, true);
++  assert.equal(validateAgainstSchema(withHistory, schemaLiteSchema).valid, true);
++  for (const [label, mutate] of [
++    ["not a list", (value) => { value.resultRetirements = entry; }],
++    ["an unknown key", (value) => { value.resultRetirements[0].extra = true; }],
++    ["a bad digest", (value) => { value.resultRetirements[0].sha256 = "zz"; }],
++    ["an unknown reason", (value) => { value.resultRetirements[0].reason = "other"; }],
++    ["a missing decline record", (value) => { delete value.resultRetirements[0].declineRecord; }],
++    ["an unsafe path", (value) => { value.resultRetirements[0].path = "../outside.md"; }],
++    ["too many entries", (value) => { value.resultRetirements = Array.from({ length: 17 }, () => structuredClone(entry)); }],
++  ]) {
++    const broken = structuredClone(withHistory); mutate(broken);
++    assert.equal(validateContinuityState(broken).ok, false, label);
++  }
++});
++
+ process.stdout.write(`1..${passed}\n# pass ${passed}\n`);
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index 64e846879..047c6aa23 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -10369,7 +10369,7 @@ export function readOnboardingContinuityReleasedSettledImage({repository, record
+ // the process's own direct binding. close-feature is NOT on it (it needs the owner-descriptor retirement and the retired terminal
+ // for physical-readback, a separate slice): it keeps its present refusal here as well as in scripts/continuity-owner-route.mjs.
+ const CONTINUITY_OWNER_ROUTE_ENTRIES = new Set([
+-  'continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-close-plan','continuity-result-close-apply',
++  'continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-retire-plan','continuity-result-retire-apply','continuity-result-close-plan','continuity-result-close-apply',
+ ]);
+ /**
+  * Runs exactly one allowlisted entry through the existing port.executeCompanionOperation for the CURRENT process's direct binding
+@@ -10733,7 +10733,8 @@ const CONTINUITY_COMPANION_ENTRIES = new Set([
+   'afk-project',
+   'approve-plan','materialize-architecture','continuity-result-bootstrap-plan',
+   'continuity-result-bootstrap-apply','continuity-result-rebind-plan',
+-  'continuity-result-rebind-apply','continuity-result-close-plan','continuity-result-close-apply',
++  'continuity-result-rebind-apply','continuity-result-retire-plan','continuity-result-retire-apply',
++  'continuity-result-close-plan','continuity-result-close-apply',
+   'close-feature',
+ ]);
+ 
+diff --git a/plugins/pipeline-core/lib/plan-spec-state-v2.mjs b/plugins/pipeline-core/lib/plan-spec-state-v2.mjs
+index db8327e6c..780fcda16 100644
+--- a/plugins/pipeline-core/lib/plan-spec-state-v2.mjs
++++ b/plugins/pipeline-core/lib/plan-spec-state-v2.mjs
+@@ -1179,6 +1179,9 @@ export function reopenPlanDesign({
+     || !isNonBlankString(by)
+     || !isCanonicalIso(at)
+     || !INVALIDATION_REASONS.has(reason)) return fail("PLAN-REOPEN-REQUEST-INVALID");
++  // C28 (AC-108): a bound Implementation Result makes a reopened design a dead end (submit-plan refuses PLAN-SUBMIT-CONTINUITY-BUSY and nothing retires the binding);
++  // the way back to a correction round is the decline route of the one-shot close, which retires the Result first.
++  if (reason === "reopen-design" && state.continuity?.authority?.result != null) return fail("PLAN-REOPEN-RESULT-BOUND");
+   const submission = state.planSubmission;
+   if (!validPlanSubmission(submission)) {
+     if (reason === "enrollment-retirement" && state.planSubmission === undefined) {
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index 69ac1bdcd..db075cf42 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -1304,7 +1304,7 @@ export function executeSourceOwnedControlledContinuityTicketProbe(input) {
+ }
+ 
+ const companionRefreshTickets=new WeakMap();
+-const companionEntries=new Set(['discard-feature','set-feature','continuity-init','submit-plan','present-plan','approve-plan','materialize-architecture','continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-rebind-plan','continuity-result-rebind-apply','continuity-result-close-plan','continuity-result-close-apply','close-feature','afk-project']);
++const companionEntries=new Set(['discard-feature','set-feature','continuity-init','submit-plan','present-plan','approve-plan','materialize-architecture','continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-rebind-plan','continuity-result-rebind-apply','continuity-result-retire-plan','continuity-result-retire-apply','continuity-result-close-plan','continuity-result-close-apply','close-feature','afk-project']);
+ function companionEffectImage(repo,effect) {
+   exact(effect,['scope','path','preimage','postimage'],'companion-effect');
+   if(!['repository','common'].includes(effect.scope)||typeof effect.path!=='string'||isAbsolute(effect.path)||effect.path.includes('\\')||effect.path.split('/').some(p=>!p||p==='.'||p==='..')||(effect.scope==='repository'&&effect.path.split('/')[0]==='.git'))fail('SDC-PRIVATE-PATH','companion-effect-path');
+diff --git a/plugins/pipeline-core/lib/session-requester-bridge.mjs b/plugins/pipeline-core/lib/session-requester-bridge.mjs
+index 25b760da5..693086f79 100644
+--- a/plugins/pipeline-core/lib/session-requester-bridge.mjs
++++ b/plugins/pipeline-core/lib/session-requester-bridge.mjs
+@@ -1675,7 +1675,7 @@ export function inspectSourceOwnedApprovedControllerCourse(input){
+ // State write of exactly four Close-route entries, in exactly one closed script, only AFTER the Close lifecycle has started.
+ // Owner identity is a FRESH per-invocation descriptor (controller-<random>): neither the host session nor the hook-observed
+ // owner (documented as unauthenticated). The issuer admits nothing else: it reads no caller JSON, takes no session/PID input.
+-const OWNER_ROUTE_ENTRIES=Object.freeze(['continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-close-plan','continuity-result-close-apply']);
++const OWNER_ROUTE_ENTRIES=Object.freeze(['continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-retire-plan','continuity-result-retire-apply','continuity-result-close-plan','continuity-result-close-apply']);
+ const OWNER_ROUTE_SCHEMA='pipeline.continuity-owner-route-invocation.v1';
+ const OWNER_ROUTE_PRODUCER='continuity-owner-route';
+ const ownerRouteRuntimes=new Map();
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 979eb0944..69334a6f3 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -261,7 +261,7 @@ const WALKS = Object.freeze([
+ ]);
+ 
+ // C22 (CGF-04): the walk body is one function so the same fixture, Critic course and close prerequisites serve the manual coordinator walks (below) and the one-shot close walk.
+-async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false, route = "push-then-release" }) {
++async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false, decline = false, route = "push-then-release" }) {
+   {
+     const log = [];
+     const fx = consumerFixture(log, identity);
+@@ -446,6 +446,8 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+         if (catalogue) ownerLifecycle = /continuity-owner-route\.mjs run --root \S+ --lifecycle (\S+) --/u.exec(unbound.result.stop.repair)?.[1] ?? assert.fail(`the stop names the owner route: ${unbound.result.stop.repair}`);
+       }
+       const ownerRoute = (label, entryArgv) => step(log, `${identity.runner}: owner route ${label}`, process.execPath, [script("continuity-owner-route.mjs"), "run", "--root", fx.root, "--lifecycle", ownerLifecycle, "--", ...entryArgv], { cwd: fx.root });
++      // C28 (QG-04, restated in place): the Result binding is one function because a declined acceptance retires the bound Result and the second close binds it again through the very same verbs.
++      const bindResult = (first) => {
+       const bootstrap = ownerLifecycle === null ? json(stateWriter("continuity-result-bootstrap-plan", "continuity-result-bootstrap-plan")) : json(ownerRoute("continuity-result-bootstrap-plan", ["continuity-result-bootstrap-plan"]));
+       const bootstrapApplied = ownerLifecycle === null
+         ? step(log, `${identity.runner}: continuity-result-bootstrap-apply (the action the plan returned)`, bootstrap.applyAction.executable, bootstrap.applyAction.argv, { cwd: fx.root })
+@@ -458,8 +460,9 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+       assert.equal(completion.preview.requiredAuthority, "agent");
+       assert.equal(completion.signatureCommand, undefined, "no signing command is printed for an unchanged approved package");
+       assert.deepEqual(completion.reconcileCommand.requiredInputs, []);
+-      // The other side of the rule: when a non-result entry also drifted, the plan names the PO and the same command without a proof is refused.
+       const manifestRel = completion.manifest;
++      if (first) {
++      // The other side of the rule: when a non-result entry also drifted, the plan names the PO and the same command without a proof is refused.
+       const driftEntry = JSON.parse(readFileSync(join(fx.root, manifestRel), "utf8")).artifacts.find((entry) => !["result", "prd", "spec"].includes(entry.class));
+       assert.ok(driftEntry, "the registered package holds a non-result, non-authority artifact to drift");
+       const driftPath = join(fx.root, driftEntry.path); const driftOriginal = readFileSync(driftPath);
+@@ -473,10 +476,68 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+         [script("pipeline-state.mjs"), "feature-package-reconcile", "--root", fx.root, "--manifest", manifestRel, "--plan-sha256", mixed.planSha256], { cwd: fx.root, expectedStatus: 2 });
+       assert.match(unsigned.stderr, /FTP-RECONCILE-APPROVAL-REJECTED/);
+       writeFileSync(driftPath, driftOriginal); // the approved bytes are back: the plan is the result-only one again
++      }
+       const reconciled = step(log, `${identity.runner}: feature-package-reconcile (agent-run, result-only)`, completion.reconcileCommand.executable, completion.reconcileCommand.argv, { cwd: fx.root });
+       assert.deepEqual(JSON.parse(reconciled.stdout).approval, { basis: "agent-result-only-reconcile-no-po-proof", poProof: false });
+       commit(log, fx.root, "chore: bind the Result and reconcile the feature package");
++      };
++      bindResult(true);
+       if (oneShot) {
++        if (decline) {
++          // C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): the whole chain of a declined acceptance on the real fixture, real Git and the real State writer. The Critic round is the fixture's own
++          // (its stop hook ran above); a correction here is an evidence-only commit, which the Critic-bound Verify carries, because a new Critic delta round cannot run in a test (stated in the notes).
++          const stateText = () => readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8");
++          const stateJson = () => JSON.parse(stateText());
++          const bug = "Man kann die raeder in level 2 nicht drehen. sonst gut"; // the answer the Codex greenfield human gave, in German
++          const question = oneShotCli();
++          assert.equal(question.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(question.result).slice(0, 600));
++          assert.match(question.result.stop.reason, /"yes, I accept"/u); assert.match(question.result.stop.repair, /--human-decline/u);
++          const boundResult = stateJson().continuity.authority.result;
++          assert.ok(boundResult !== null, "the Result is bound at the acceptance question: every decline happens with a bound Result");
++          // a non-yes answer through --human-acceptance stops and records nothing
++          const treeBeforeAnswer = porcelain(); const stateBeforeAnswer = stateText();
++          const notYes = oneShotCli(["--human-acceptance", bug]);
++          assert.equal(notYes.status, 2, JSON.stringify(notYes.result).slice(0, 600)); assert.equal(notYes.code, "ONESHOT-ACCEPTANCE-NOT-YES", JSON.stringify(notYes.result).slice(0, 600));
++          assert.equal(porcelain(), treeBeforeAnswer, "a non-yes answer wrote nothing"); assert.equal(stateText(), stateBeforeAnswer); assert.equal(readAcceptanceRecord(fx.root, FEATURE_ID), null);
++          // reopen-design with a bound Result refuses before any write and names the decline route
++          const reopen = step(log, `${identity.runner}: reopen-design with a bound Result is refused`, process.execPath, [script("pipeline-state.mjs"), "reopen-design", "--by", "Fixture PO"], { cwd: fx.root, expectedStatus: 2 });
++          assert.match(reopen.stderr, /PLAN-REOPEN-RESULT-BOUND[\s\S]*--human-decline/u, reopen.stderr);
++          assert.equal(stateText(), stateBeforeAnswer, "the refused reopen wrote nothing"); assert.equal(porcelain(), treeBeforeAnswer);
++          // the decline records, retires the Result and returns the correction steps
++          const declined = oneShotCli(["--human-decline", bug]);
++          assert.equal(declined.status, 0, JSON.stringify(declined.result).slice(0, 1200)); assert.equal(declined.code, "declined", JSON.stringify(declined.result).slice(0, 1200));
++          const after = stateJson();
++          assert.equal(after.continuity.authority.result, null, "the bound Result is retired");
++          assert.equal(after.continuity.revision, JSON.parse(stateBeforeAnswer).continuity.revision + 1, "one revision step");
++          const retirement = after.continuity.resultRetirements.at(-1);
++          assert.deepEqual({ path: retirement.path, sha256: retirement.sha256 }, boundResult, "the retired binding stays in history");
++          assert.equal(retirement.reason, "declined-acceptance"); assert.equal(typeof retirement.retiredAt, "string");
++          assert.equal(retirement.declineRecord.path, declined.result.decline.path); assert.equal(retirement.declineRecord.sha256, sha256(readFileSync(join(fx.root, declined.result.decline.path))));
++          assert.ok(readFileSync(join(fx.root, declined.result.decline.path), "utf8").includes(JSON.stringify(bug)), "the literal words");
++          assert.equal(readAcceptanceRecord(fx.root, FEATURE_ID), null, "a decline is never an acceptance");
++          assert.deepEqual(declined.result.next.length >= 4, true, JSON.stringify(declined.result.next));
++          assert.match(declined.result.next[1], /prepare-dispatch\.mjs goldfish/u); assert.match(declined.result.next[2], /prepare-dispatch\.mjs critic --delta-request/u); assert.match(declined.result.next[3], /--critic-packet-id <new-packet-id>/u);
++          // zero mutation on a stale plan, a replay changes nothing
++          const afterBytes = stateText();
++          const action = declined.result.retired.apply;
++          // like the rebind pair, an apply whose expected post-state digest is the persisted one replays; any other digest matches neither the replay nor a plan, so it is refused with zero mutation
++          const stale = action.argv.map((token, index) => (action.argv[index - 1] === "--expected-post-state-sha256" ? `${token.slice(0, -1)}${token.endsWith("0") ? "1" : "0"}` : token));
++          step(log, `${identity.runner}: retire apply with a stale post-state digest is refused`, action.executable, stale, { cwd: fx.root, expectedStatus: 2 });
++          assert.equal(stateText(), afterBytes, "a mismatch changes nothing");
++          const replay = step(log, `${identity.runner}: retire apply replays`, action.executable, action.argv, { cwd: fx.root });
++          assert.equal(json(replay).status, "replayed"); assert.equal(stateText(), afterBytes);
++          // the declined outputs are committed by the paths the decline named, then the correction commit
++          commitPaths(declined.result.commit.message, declined.result.commit.paths);
++          assert.equal(porcelain(), "", "everything the decline wrote is committed");
++          const correction = `specs/${FEATURE_ID}/evidence/correction-note.md`;
++          writeFileSync(join(fx.root, correction), "# Correction of the declined acceptance\n");
++          commitPaths("fix: correct the declined acceptance", [correction]);
++          // the second close runs the Result bootstrap again for the new candidate
++          const again = oneShotCli();
++          assert.equal(again.code, "ONESHOT-RESULT-NOT-BOUND", JSON.stringify(again.result).slice(0, 800));
++          bindResult(false);
++          assert.notEqual(stateJson().continuity.authority.result.sha256, undefined, "a freshly bound Result");
++        }
+         // C22 (CGF-04): the whole close through the real one-shot CLI, one call per stop. The question for the human comes once and writes nothing; the answer is recorded for exactly the HEAD it was
+         // given at; every commit the close asks for is made from the paths it names (so the close's own evidence commits are part of the walk); a resume never asks again and never lands in
+         // FCA-PACKAGE or in a second commit request for the same outputs. The final gates (freeze, Verify, scan) are read from the typed codes the CLI ends on.
+@@ -489,7 +550,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+         assert.equal(readAcceptanceRecord(fx.root, FEATURE_ID), null);
+         assert.deepEqual(stateOf().closedFeatures ?? [], [], "the close has not started");
+         const candidateAsked = git(log, fx.root, ["rev-parse", "HEAD"]);
+-        const answer = "Fixture PO: accepted for this candidate";
++        const answer = "yes, I accept"; // C28 (QG-04, restated in place): the acceptance is recorded only for the one fixed yes form.
+         const seen = [asked.code];
+         let args = ["--human-acceptance", answer];
+         let last = null;
+@@ -805,6 +866,14 @@ test("C22 CGF-04: the one-shot close CLI walks the whole close on the real fixtu
+   await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true });
+ });
+ 
++test("C28 AC-108: a declined acceptance returns the feature to a correction round: a non-yes answer records nothing, the decline retires the bound Result, and the second close binds a Result again, asks again for the new candidate, and closes on a yes", { timeout: 900_000 }, async () => {
++  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, decline: true });
++});
++
++test("C28 AC-108: the same declined-acceptance chain in a project with a session-authority catalogue runs the State entry on the owner route and reuses the Close lifecycle the one-shot opened", { timeout: 900_000 }, async () => {
++  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, catalogue: true, decline: true });
++});
++
+ test("C23 F25: in a project with a catalogue from the start the one-shot close binds the Result on the owner route and closes without a detour", { timeout: 600_000 }, async () => {
+   await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, catalogue: true });
+ });
+diff --git a/plugins/pipeline-core/scripts/continuity-owner-route.mjs b/plugins/pipeline-core/scripts/continuity-owner-route.mjs
+index 59b989e5d..60ee1bfcd 100644
+--- a/plugins/pipeline-core/scripts/continuity-owner-route.mjs
++++ b/plugins/pipeline-core/scripts/continuity-owner-route.mjs
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+-// D231 owner route (PO decision 2026-11-01, option A). A plain-terminal process may own the State write of EXACTLY FOUR Close-route
+-// entries, and only here. For a project WITH a session-authority catalogue those entries refuse on the direct route
++// D231 owner route (PO decision 2026-11-01, option A). A plain-terminal process may own the State write of EXACTLY SIX Close-route
++// entries (C28 added the retire pair of a declined acceptance to the original four), and only here. For a project WITH a session-authority catalogue those entries refuse on the direct route
+ // (SDC-AUTHORITY-UNAVAILABLE) because the State write must be owner-bound to an armed onboarding-continuity member.
+ //
+ //   node continuity-owner-route.mjs run --root <root> --lifecycle <close lifecycle id> -- <entry> [<entry flags>]
+@@ -9,7 +9,7 @@
+ //
+ // ONE `run` call = bind, exactly one entry through the existing port.executeCompanionOperation (every gate unchanged), release, all in
+ // this process (the handles are process-local capabilities). Allowlist: continuity-result-bootstrap-plan, continuity-result-bootstrap-apply,
+-// continuity-result-close-plan, continuity-result-close-apply. close-feature is NOT on it (separate slice); the entry itself writes State,
++// continuity-result-retire-plan, continuity-result-retire-apply, continuity-result-close-plan, continuity-result-close-apply. close-feature is NOT on it (separate slice); the entry itself writes State,
+ // this script never does, and it never forces the registry or a member. The entry's own stdout passes through; the one-line result
+ // envelope (pipeline.continuity-owner-route-result.v1) goes to stderr. Exit: 0 completed, 2 refused, 3 held (a binding remains: run heal).
+ import { existsSync, realpathSync, readFileSync } from 'node:fs';
+@@ -29,7 +29,8 @@ const PIPELINE_STATE = fileURLToPath(new URL('./pipeline-state.mjs', import.meta
+ const CLOSE_COORDINATOR = fileURLToPath(new URL('./close-coordinator.mjs', import.meta.url));
+ export const OWNER_ROUTE_RESULT_SCHEMA = 'pipeline.continuity-owner-route-result.v1';
+ export const OWNER_ROUTE_ORPHAN_SCHEMA = 'pipeline.continuity-owner-route-orphan-release.v1';
+-const ALLOWLIST = Object.freeze(['continuity-result-bootstrap-plan', 'continuity-result-bootstrap-apply', 'continuity-result-close-plan', 'continuity-result-close-apply']);
++// C28 (AC-108): the declined-acceptance route retires the bound Result on the same route the bootstrap binds it (continuity-result-retire-plan, -apply).
++const ALLOWLIST = Object.freeze(['continuity-result-bootstrap-plan', 'continuity-result-bootstrap-apply', 'continuity-result-retire-plan', 'continuity-result-retire-apply', 'continuity-result-close-plan', 'continuity-result-close-apply']);
+ const USAGE = `node ${SELF} run --root <root> --lifecycle <close lifecycle id> -- <entry> [<entry flags>] (entries: ${ALLOWLIST.join(', ')})`;
+ const healCommand = (root) => `node ${ROUTINE_REPAIR} run heal --root ${root} --reason "<why the owner-route call was interrupted>"`;
+ 
+diff --git a/plugins/pipeline-core/scripts/continuity-state.schema.json b/plugins/pipeline-core/scripts/continuity-state.schema.json
+index a0972c99a..8d46299e4 100644
+--- a/plugins/pipeline-core/scripts/continuity-state.schema.json
++++ b/plugins/pipeline-core/scripts/continuity-state.schema.json
+@@ -101,6 +101,30 @@
+         }
+       }
+     },
++    "resultRetirements": {
++      "type": "array",
++      "maxItems": 16,
++      "items": {
++        "type": "object",
++        "additionalProperties": false,
++        "required": ["path", "sha256", "retiredAt", "reason", "declineRecord"],
++        "properties": {
++          "path": { "type": "string", "minLength": 1 },
++          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
++          "retiredAt": { "type": "string", "minLength": 1 },
++          "reason": { "type": "string", "enum": ["declined-acceptance"] },
++          "declineRecord": {
++            "type": "object",
++            "additionalProperties": false,
++            "required": ["path", "sha256"],
++            "properties": {
++              "path": { "type": "string", "minLength": 1 },
++              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
++            }
++          }
++        }
++      }
++    },
+     "retryBudget": {
+       "type": "object",
+       "additionalProperties": false,
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index c9e1e3521..9a9e8caed 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
+ import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
+ import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+-import { acceptanceQuestion, acceptanceTarget, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
++import { acceptanceQuestion, acceptanceTarget, acceptanceYesForm, isAcceptanceYes, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord, writeDeclineRecord } from "../lib/close-acceptance-record.mjs";
+ import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
+ import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
+ import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
+@@ -29,6 +29,7 @@ const HERE = new URL(".", import.meta.url);
+ const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
+ const STATE_WRITER = fileURLToPath(new URL("./pipeline-state.mjs", HERE));
+ const OWNER_ROUTE = fileURLToPath(new URL("./continuity-owner-route.mjs", HERE));
++const PREPARE_DISPATCH = fileURLToPath(new URL("./prepare-dispatch.mjs", HERE));
+ const VERIFY_PRODUCER = fileURLToPath(new URL("./verify-evidence-producer.mjs", HERE));
+ const REGISTER_PACKAGE = fileURLToPath(new URL("./register-feature-package.mjs", HERE));
+ const SECURITY_SCAN = fileURLToPath(new URL("./security-scan.mjs", HERE));
+@@ -226,7 +227,7 @@ const HEX32 = /^[a-f0-9]{32}$/u;
+ function stopResult(stage, code, reason, repair, extra = {}) { return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "stopped", stage, stop: Object.freeze({ code, reason: String(reason).slice(0, 1200), repair }), ...extra }); }
+ function writeRepoJson(root, path, value) { const target = resolve(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`); return path; }
+ 
+-export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, openChecks = null } = {}, deps = {}) {
++export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, humanDecline = null, openChecks = null } = {}, deps = {}) {
+   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
+   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
+   if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", `Feature close requires a known architecture impact; allowed --architecture-impact values: ${[...IMPACT].join(", ")}.`);
+@@ -234,6 +235,9 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+   if (resumeLifecycleId !== null && !/^[A-Za-z0-9._-]{1,100}$/u.test(resumeLifecycleId)) fail("FINISH-LIFECYCLE", "Lifecycle ID is invalid.");
+   // C22 (CGR-06): the human's literal answer to the acceptance question is recorded as given, so only its presence and size are checked.
+   if (humanAcceptance !== null && (typeof humanAcceptance !== "string" || humanAcceptance.trim() === "" || humanAcceptance.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(humanAcceptance))) fail("FINISH-ACCEPTANCE", "The human acceptance must be the human's literal answer: non-empty, at most 500 characters, no control characters.");
++  // C28: the human's literal words of a decline, held to the same bounds; the two answers exclude each other.
++  if (humanDecline !== null && (typeof humanDecline !== "string" || humanDecline.trim() === "" || humanDecline.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(humanDecline))) fail("FINISH-ACCEPTANCE", "The human decline must be the human's literal answer: non-empty, at most 500 characters, no control characters.");
++  if (humanAcceptance !== null && humanDecline !== null) fail("FINISH-ACCEPTANCE", "--human-acceptance and --human-decline are exclusive: the human either accepted (exactly the fixed yes form) or did not.");
+   if (openChecks !== null && (!Array.isArray(openChecks) || openChecks.some((value) => typeof value !== "string"))) fail("FINISH-ACCEPTANCE", "The open checks must be a list of texts.");
+   const runner = deps.runCommand ?? ((executable, argv) => spawnSync(executable, argv, { cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root } }));
+   const actor = by.trim();
+@@ -388,13 +392,67 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+       // this very candidate (committed or still uncommitted) is kept; a changed candidate asks again. Nothing is signed: the answer is an attribution record in the feature's acceptance.md.
+       const candidateHead = rawGit(["rev-parse", "HEAD"]);
+       if (candidateHead === null) return stopResult("acceptance", "ONESHOT-HEAD-UNREADABLE", "The candidate commit (HEAD) could not be read, so the acceptance cannot be bound to it.", `repair the repository, then rerun the identical command: ${rerun(again)}`);
++      // C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): one fixed yes form. An answer that is not exactly that form is never an acceptance and no keyword is searched in it; the way out is the decline.
++      const yesForm = acceptanceYesForm(state.continuity?.runtime?.humanFacingLanguage);
++      const named = openChecks === null ? "" : ` --open-checks ${JSON.stringify(openChecks.join("; "))}`;
++      const bothWays = `if the human answered exactly "${yesForm}", rerun the identical command: ${rerun(again)}${named} --human-acceptance "${yesForm}". Any other answer (a bug, a change request, a doubt, a question) is a decline, not an acceptance: rerun the identical command with ${rerun(again)}${named} --human-decline "<the human's literal answer>"; the feature then returns to a correction round without reopening the design.`;
++      if (humanDecline !== null) {
++        const declineRepair = (error) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command with --human-decline "<the human's literal answer>": ${rerun(again)}${named}`;
++        stages.push("decline-record");
++        let decline;
++        try { decline = writeDeclineRecord({ root, featureId, record: { candidate: candidateHead, answer: humanDecline, openChecks: openChecksOf(openChecks) }, ...(deps.nowFn === undefined ? {} : { now: deps.nowFn }) }); }
++        catch (error) { return stopResult("decline", "ONESHOT-DECLINE-RECORD", error.message, declineRepair(error)); }
++        const bound = state.continuity !== null && typeof state.continuity === "object" ? state.continuity.authority?.result ?? null : null;
++        let retired = null; let lifecycle = again;
++        if (bound !== null) {
++          stages.push("retire-result");
++          try {
++            const flags = ["--result-path", bound.path, "--decline-record", decline.path];
++            let applyAction;
++            if (ownerRouteRequired) {
++              lifecycle = ensureOwnerLifecycle();
++              const route = [OWNER_ROUTE, "run", "--root", root, "--lifecycle", lifecycle, "--"];
++              const plan = command(runner, process.execPath, [...route, "continuity-result-retire-plan", ...flags], "ONESHOT-RETIRE-PLAN");
++              if (!Array.isArray(plan.applyAction?.argv)) fail("ONESHOT-RETIRE-PLAN", "The Result retire plan returned no apply action.");
++              applyAction = { executable: process.execPath, argv: [...route, ...plan.applyAction.argv.slice(1)] };
++            } else {
++              const plan = command(runner, process.execPath, [STATE_WRITER, "continuity-result-retire-plan", ...flags], "ONESHOT-RETIRE-PLAN");
++              if (!Array.isArray(plan.applyAction?.argv)) fail("ONESHOT-RETIRE-PLAN", "The Result retire plan returned no apply action.");
++              applyAction = { executable: plan.applyAction.executable, argv: plan.applyAction.argv };
++            }
++            // The transition also restores result.md to the text before the bootstrap block and takes the package manifest's Result digest back with it: nothing is left to reconcile.
++            command(runner, applyAction.executable, applyAction.argv, "ONESHOT-RETIRE-APPLY");
++            retired = { path: bound.path, sha256: bound.sha256, apply: applyAction };
++          } catch (error) { return stopResult("retire-result", error.refusalCode ?? error.code, error.message, declineRepair(error), { decline: { path: decline.path, sha256: decline.sha256, candidate: candidateHead } }); }
++        }
++        // The decline's own outputs travel in one commit through the writer-commit capability the close uses; none of them is an output the leftover rollback below names.
++        const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${featureId}`]);
++        const tokens = (status?.status === 0 ? String(status.stdout ?? "") : "").split("\0").filter((token) => token !== "");
++        const paths = []; for (let index = 0; index < tokens.length; index += 1) { const code = tokens[index].slice(0, 2); paths.push(tokens[index].slice(3)); if (/[RC]/u.test(code)) index += 1; }
++        paths.sort();
++        const message = `chore(close): record the declined acceptance of ${featureId}`;
++        let armed = null;
++        if (paths.length > 0) { try { armed = armWriterCommitCapability({ rootDir: root, writer: "finish-feature.mjs --one-shot", rerun: rerun(lifecycle), files: paths.filter((path) => existsSync(resolve(root, path))).map((path) => ({ path, sha256: sha256Hex(readFileSync(resolve(root, path))) })) }); } catch { armed = null; } }
++        const commit = { paths, excluded: armed?.excluded ?? [], capability: armed?.id ?? null, message, steps: paths.length > 0 ? writerCommitSteps(paths, message) : [] };
++        const next = [
++          commit.paths.length > 0 ? `commit the decline outputs, nothing else (the pre-commit hook admits exactly these bytes): ${commit.steps.join(" && ")}` : "nothing to commit: the decline wrote no tracked output",
++          `correction dispatch: build the Goldfish briefing with node ${PREPARE_DISPATCH} goldfish --root ${root} (the human's literal words, recorded in ${decline.path}, are the correction request), run it, and commit its result`,
++          `Critic delta round on the new candidate: node ${PREPARE_DISPATCH} critic --delta-request <the delta request path> --root ${root} (see the critic-review skill); the packet it consumes is the new packet`,
++          `then run the identical close command with the new packet: ${rerunBase} --critic-packet-id <new-packet-id>; it runs the Result bootstrap again and asks the acceptance question again for the new candidate`,
++        ];
++        return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "declined", featureId, lifecycleId: lifecycle ?? null, resumeLifecycleId: lifecycle ?? null, stages: [...stages], decline: { path: decline.path, sha256: decline.sha256, candidate: candidateHead }, retired, commit, next,
++          message: "The acceptance was declined: the human's words are recorded (not as an acceptance), the bound Result is retired and the feature returns to a correction round without reopening the design. Nothing was verified, closed, signed or pushed. Follow `next` in order." });
++      }
++      if (humanAcceptance !== null && !isAcceptanceYes(humanAcceptance, yesForm)) {
++        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-NOT-YES", `The answer given with --human-acceptance is not the fixed yes form "${yesForm}" (case, surrounding space and a closing . or ! do not matter), so it is not recorded as an acceptance.`,
++          `nothing was written. ${bothWays} The answer is recorded as an attribution record in the feature's acceptance record only for the yes form; nothing is signed.`);
++      }
+       const recorded = readAcceptanceRecord(root, featureId);
+       if (recorded !== null && recorded.candidate === candidateHead) accepted = { candidate: candidateHead, answer: recorded.answer, openChecks: recorded.openChecks };
+       else if (humanAcceptance !== null) accepted = { candidate: candidateHead, answer: humanAcceptance, openChecks: openChecksOf(openChecks) };
+       else {
+-        const named = openChecks === null ? "" : ` --open-checks ${JSON.stringify(openChecks.join("; "))}`;
+-        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-REQUIRED", acceptanceQuestion({ featureId, candidate: candidateHead, openChecks: openChecksOf(openChecks) }),
+-          `nothing was written. In the same message, say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why, and then also name it with --open-checks. Ask the human exactly this one sentence in the chat (reason above), then rerun the identical command with the answer exactly as given: ${rerun(again)}${named} --human-acceptance "<the human's literal answer>". If a check you know about is missing from the sentence (for example a real device check), first rerun with --open-checks "<check; check>" so the sentence names it, then ask. The answer is recorded in the feature's acceptance record as an attribution record; nothing is signed.`);
++        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-REQUIRED", acceptanceQuestion({ featureId, candidate: candidateHead, openChecks: openChecksOf(openChecks), form: yesForm }),
++          `nothing was written. In the same message, say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why, and then also name it with --open-checks. Ask the human exactly this one sentence in the chat (reason above), then ${bothWays} If a check you know about is missing from the sentence (for example a real device check), first rerun with --open-checks "<check; check>" so the sentence names it, then ask. The answer is recorded in the feature's acceptance record as an attribution record; nothing is signed.`);
+       }
+       // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward
+       // (VEP-CVL-CARRY-RANGE; a human had to reset). Only a tree whose every dirty path is such an output, with an evidence file proving an earlier attempt, is rolled back; the stages write the same again.
+@@ -616,13 +674,13 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+ }
+ 
+ function parseOneShot(argv) {
+-  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--open-checks"]; const value = {};
++  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--human-decline", "--open-checks"]; const value = {};
+   for (let i = 0; i < argv.length; i += 2) {
+     const flag = argv[i]; const next = argv[i + 1];
+-    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<the human's literal answer>\"] (the first call stops once with the acceptance question for the human)");
++    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] (the first call stops once with the acceptance question for the human)");
+     value[flag] = next;
+   }
+-  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";") };
++  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, humanDecline: value["--human-decline"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";") };
+ }
+ 
+ function parse(argv) {
+@@ -642,6 +700,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === "-
+     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+     if (result.status === "stopped") { process.stderr.write(`finish-feature --one-shot: stopped at ${result.stage}: ${result.stop.code}: ${result.stop.reason}\nrepair: ${result.stop.repair}\n`); process.exitCode = 2; }
+     else if (result.status === "commit-required") process.stderr.write(`finish-feature --one-shot: run the commit, then the next command.\n${(result.commit.steps ?? []).join("\n")}\nnext: ${result.next}\n`);
++    else if (result.status === "declined") process.stderr.write(`finish-feature --one-shot: the acceptance was declined; the feature returns to a correction round. Next, in order:\n${result.next.map((line, index) => `${index + 1}. ${line}`).join("\n")}\n`);
+   } catch (error) { process.stderr.write(`finish-feature: ${error?.code ?? "FINISH-ERROR"}: ${error.message}\n`); process.exitCode = 2; }
+ } else if (process.argv[1] === fileURLToPath(import.meta.url)) {
+   try {
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 1da309612..fa3682ef0 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
+ import { finishFeature, oneShotClose } from "./finish-feature.mjs";
+ import { canonical } from "../lib/po-approval-proof.mjs";
+ import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+-import { applyAcceptanceSection, renderAcceptanceSection } from "../lib/close-acceptance-record.mjs";
++import { applyAcceptanceSection, readAcceptanceRecord, renderAcceptanceSection } from "../lib/close-acceptance-record.mjs";
+ import { syncPublicCurrentState } from "./pipeline-state.mjs";
+ 
+ function response(value) { return { status: 0, stdout: JSON.stringify(value), stderr: "" }; }
+@@ -258,8 +258,8 @@ const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
+ // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
+ // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
+ // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
+-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false } = {}) {
+-  const independenceChecks = [];
++function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null } = {}) {
++  const independenceChecks = []; let retired = false;
+   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
+   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+   git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+@@ -267,7 +267,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+   writeFileSync(join(root, "specs/feature-abc/result.md"), "# Result\n");
+   const resultSha = sha256Of("# Result\n");
+   const stateValue = (nextAction) => ({ schema: "pipeline.state.v0", activeFeature: { id: "feature-abc" }, ...(residualOnRecord ? { residualAcceptance: { lastAccepted: { findings: [] } } } : {}),
+-    ...(continuity ? { continuity: { revision: 3, queueHead: { nextAction }, authority: { result: resultBound ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
++    ...(continuity ? { continuity: { revision: retired ? 4 : 3, ...(language === null ? {} : { runtime: { humanFacingLanguage: language } }), queueHead: { nextAction }, authority: { result: resultBound && !retired ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
+   const writeState = (value) => writeFileSync(join(root, STATE_PATH), `${JSON.stringify(value)}\n`);
+   writeState(closed ? { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] } : stateValue("review"));
+   if (handover) { mkdirSync(join(root, "project")); mkdirSync(join(root, "docs")); writeFileSync(join(root, "project/pipeline.json"), `${JSON.stringify({ handover: "docs/state.md" })}\n`); writeFileSync(join(root, "docs/state.md"), "# State\n\n## Current state\n\nFeature `feature-abc` is active in implementation.\n"); }
+@@ -302,6 +302,9 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+       if (sub === "update-public-handover") { writeFileSync(join(root, "docs/state.md"), "# State\n\n## Current state\n\n**Lifecycle phase:** no active feature\nFeature `feature-abc` is closed locally.\n"); return json({ status: "current", path: "docs/state.md", currentState: "updated" }); }
+       if (sub === "continuity-result-close-plan") return json({ applyAction: { executable: process.execPath, argv: [STATE_WRITER, "continuity-result-close-apply", "--feature-id", "feature-abc"] } });
+       if (sub === "continuity-result-close-apply") { writeState(stateValue("close")); return json({ status: "applied" }); }
++      // C28: the decline route's stand-ins for the State transition that retires the bound Result and for the result-only package reconcile it names.
++      if (sub === "continuity-result-retire-plan") return json({ planSha256: "7".repeat(64), applyAction: { executable: process.execPath, argv: [STATE_WRITER, "continuity-result-retire-apply", "--feature-id", "feature-abc", "--decline-record", flag(argv, "--decline-record")] } });
++      if (sub === "continuity-result-retire-apply") { retired = true; writeState(stateValue("review")); return json({ status: "applied" }); }
+       if (sub === "close-feature") { writeState({ schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] }); return { status: 0, stdout: "Feature \"feature-abc\" closed", stderr: "" }; }
+     }
+     if (script === "close-coordinator.mjs") {
+@@ -318,7 +321,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+     }
+     throw new Error(`unexpected ${script} ${sub}`);
+   };
+-  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept this feature package" } : {}) } };
++  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept" } : {}) } }; // C28 (QG-04, restated in place): the acceptance is recorded only for the one fixed yes form, so the default answer is exactly that form.
+ }
+ const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
+ 
+@@ -687,7 +690,7 @@ test("C22 CGR-06: the one-shot stops once, before anything is written, with the
+ test("C22 CGR-06: the answer is recorded in the feature's acceptance.md with the literal answer, the candidate commit and the open checks, labelled as an attribution record and not a signature", () => {
+   const f = oneShotFixture({ acceptance: false });
+   try {
+-    const head = headOf(f); const answer = "Yes, I accept \"this\" package";
++    const head = headOf(f); const answer = "Yes, I accept."; // C28 (QG-04, restated in place): the fixed yes form, normalised for case and closing punctuation; the literal answer is recorded as given.
+     const result = oneShotClose({ ...f.input, humanAcceptance: answer, openChecks: ["real device check"] }, { runCommand: f.runner });
+     assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 400));
+     const text = readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8");
+@@ -701,7 +704,7 @@ test("C22 CGR-06: the answer is recorded in the feature's acceptance.md with the
+ test("C22 CGR-06: a rerun with an acceptance recorded for the same candidate does not ask again, and a changed candidate asks again", () => {
+   const f = oneShotFixture({ acceptance: false });
+   try {
+-    const answer = "accepted, as asked";
++    const answer = "yes, I accept"; // C28 (QG-04, restated in place): the fixed yes form.
+     assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required");
+     f.git("checkout", "--", STATE_PATH);
+     const again = oneShotClose(f.input, { runCommand: f.runner });
+@@ -720,12 +723,113 @@ test("C22 CGR-06: a resumed close never asks (the question belongs to the eviden
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++// ---- C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): one fixed yes form, and a decline route that returns the feature to a correction round ----
++const GERMAN_BUG_REPORT = "Man kann die raeder in level 2 nicht drehen. sonst gut"; // the answer a Codex greenfield human gave to the acceptance question
++test("C28: the acceptance question states the one fixed yes form and the stop names both ways on", () => {
++  const f = oneShotFixture({ acceptance: false });
++  try {
++    const stopped = oneShotClose(f.input, { runCommand: f.runner });
++    assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
++    assert.ok(stopped.stop.reason.includes("\"yes, I accept\""), `the question states the fixed form: ${stopped.stop.reason}`);
++    assert.match(stopped.stop.repair, /--human-acceptance "yes, I accept"/u); assert.match(stopped.stop.repair, /--human-decline "<the human's literal answer>"/u);
++    assert.deepEqual(f.calls, []); assert.equal(f.git("status", "--porcelain").trim(), "");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C28: an answer that is not the fixed yes form is never recorded as an acceptance: it is a typed stop that names both ways on and writes nothing, whatever it says", () => {
++  for (const answer of [GERMAN_BUG_REPORT, "yes, but the wheels do not turn", "yes", "ok", "no", "yes, I accept, but fix level 2", "yes, I accept?"]) {
++    const f = oneShotFixture({ acceptance: false });
++    try {
++      const stopped = oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner });
++      assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 300)); assert.equal(stopped.stage, "acceptance"); assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", answer);
++      assert.match(stopped.stop.repair, /--human-acceptance "yes, I accept"/u); assert.match(stopped.stop.repair, /--human-decline/u);
++      assert.deepEqual(f.calls, [], "no Verify, package or close stage ran"); assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false); assert.equal(f.git("status", "--porcelain").trim(), "", `nothing was written for ${JSON.stringify(answer)}`);
++    } finally { rmSync(f.root, { recursive: true, force: true }); }
++  }
++});
++
++test("C28: the fixed yes form is read normalised for case, surrounding space and closing punctuation, and the literal answer is recorded as given", () => {
++  for (const answer of ["  YES, I accept!  ", "Yes, I accept.", "yes, i ACCEPT"]) {
++    const f = oneShotFixture({ acceptance: false });
++    try {
++      assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required", answer);
++      assert.ok(readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8").includes(JSON.stringify(answer)), "the literal answer");
++    } finally { rmSync(f.root, { recursive: true, force: true }); }
++  }
++});
++
++test("C28: the fixed form follows the project's human-facing language so a German-speaking human answers in German, and falls back to English for any other language", () => {
++  const de = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
++  try {
++    const stopped = oneShotClose(de.input, { runCommand: de.runner });
++    assert.ok(stopped.stop.reason.includes("\"ja, ich akzeptiere\""), stopped.stop.reason);
++    assert.equal(oneShotClose({ ...de.input, humanAcceptance: "yes, I accept" }, { runCommand: de.runner }).stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", "the English form is not the German project's form");
++    assert.equal(oneShotClose({ ...de.input, humanAcceptance: "Ja, ich akzeptiere." }, { runCommand: de.runner }).status, "commit-required");
++  } finally { rmSync(de.root, { recursive: true, force: true }); }
++  const fr = oneShotFixture({ acceptance: false, continuity: true, language: "fr" });
++  try { assert.ok(oneShotClose(fr.input, { runCommand: fr.runner }).stop.reason.includes("\"yes, I accept\"")); } finally { rmSync(fr.root, { recursive: true, force: true }); }
++});
++
++test("C28: --human-acceptance and --human-decline are exclusive, and a decline needs the human's literal words", () => {
++  const f = oneShotFixture({ acceptance: false });
++  try {
++    for (const input of [{ humanAcceptance: "yes, I accept", humanDecline: GERMAN_BUG_REPORT }, { humanDecline: "  " }, { humanDecline: "x".repeat(501) }]) {
++      assert.throws(() => oneShotClose({ ...f.input, ...input }, { runCommand: f.runner }), (error) => error.code === "FINISH-ACCEPTANCE");
++    }
++    assert.deepEqual(f.calls, []);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C28: a decline records the literal words with the candidate and the time where an acceptance can never be read from, retires the bound Result through the State transition, runs no Verify and returns the correction steps in order", () => {
++  const f = oneShotFixture({ acceptance: false, continuity: true });
++  try {
++    const head = headOf(f); const stateBefore = readFileSync(join(f.root, STATE_PATH), "utf8");
++    const result = oneShotClose({ ...f.input, humanDecline: GERMAN_BUG_REPORT, openChecks: ["real device check"] }, { runCommand: f.runner, nowFn: () => "2026-11-10T12:00:00.000Z" });
++    assert.equal(result.status, "declined", JSON.stringify(result).slice(0, 600)); assert.equal(result.featureId, "feature-abc");
++    assert.match(result.decline.path, /^specs\/feature-abc\/evidence\/human-decline-[0-9a-f]{12}-[0-9a-f]{8}\.md$/u); assert.equal(result.decline.candidate, head);
++    const text = readFileSync(join(f.root, result.decline.path), "utf8");
++    assert.ok(text.includes(JSON.stringify(GERMAN_BUG_REPORT)), "the literal words"); assert.ok(text.includes(head), "the candidate commit"); assert.ok(text.includes("2026-11-10T12:00:00.000Z"), "the time"); assert.match(text, /not an acceptance/u);
++    assert.equal(result.decline.sha256, sha256Of(text), "the digest the State history carries");
++    assert.equal(readAcceptanceRecord(f.root, "feature-abc"), null, "a decline is never read as an acceptance, in either place");
++    assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false);
++    assert.deepEqual(f.calls.filter((call) => call.startsWith("pipeline-state")), ["pipeline-state continuity-result-retire-plan", "pipeline-state continuity-result-retire-apply"], "plan, then apply: the transition restores the Result and the package digest itself, so nothing is left to reconcile");
++    assert.ok(!f.calls.includes("verify-evidence-producer.mjs") && !f.calls.some((call) => call.startsWith("close-coordinator")), "no Verify and no close stage ran");
++    assert.notEqual(readFileSync(join(f.root, STATE_PATH), "utf8"), stateBefore); assert.equal(JSON.parse(readFileSync(join(f.root, STATE_PATH), "utf8")).continuity.authority.result, null);
++    assert.ok(result.commit.paths.includes(result.decline.path), `the decline record travels in its own commit: ${result.commit.paths}`); assert.equal(result.commit.message.includes("git"), false);
++    assert.ok(Array.isArray(result.next) && result.next.length >= 4, JSON.stringify(result.next));
++    const [commitStep, correction, delta, closeAgain] = result.next;
++    assert.match(commitStep, /commit/u); assert.match(correction, /prepare-dispatch\.mjs goldfish/u); assert.match(delta, /prepare-dispatch\.mjs critic --delta-request/u);
++    assert.match(closeAgain, /--one-shot[\s\S]*--critic-packet-id <new-packet-id>/u); assert.doesNotMatch(closeAgain, new RegExp(f.packetId, "u"), "the new packet replaces the old one");
++    assert.deepEqual(forbidden(f.calls), []);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C28: a decline in a project with no Continuity binding has no Result to retire and runs no State transition", () => {
++  const plain = oneShotFixture({ acceptance: false });
++  try {
++    const result = oneShotClose({ ...plain.input, humanDecline: GERMAN_BUG_REPORT }, { runCommand: plain.runner });
++    assert.equal(result.status, "declined", JSON.stringify(result).slice(0, 400)); assert.equal(result.retired, null);
++    assert.deepEqual(plain.calls, [], "no State transition, no Verify");
++  } finally { rmSync(plain.root, { recursive: true, force: true }); }
++});
++
++test("C28: the decline record is committed by the close's own commit route and is never rolled back by the leftover rule of a later close", () => {
++  const f = oneShotFixture({ acceptance: false, continuity: true });
++  try {
++    const declined = oneShotClose({ ...f.input, humanDecline: GERMAN_BUG_REPORT }, { runCommand: f.runner });
++    assert.equal(declined.status, "declined");
++    f.git("add", "--", ...declined.commit.paths); f.git("commit", "-q", "-m", "decline outputs");
++    assert.equal(f.git("status", "--porcelain").trim(), "", "everything the decline wrote is in the commit");
++    assert.ok(readFileSync(join(f.root, declined.decline.path), "utf8").includes(JSON.stringify(GERMAN_BUG_REPORT)));
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("C22 CGR-06: the generated immutable pointer is replaced by the record WITHOUT a signature: the package entry is rebound with an amendment and the package still validates; an authority entry is never edited", () => {
+   const f = oneShotFixture({ acceptance: false });
+   try {
+     const { manifestPath, pointerSha } = packageFixture(f);
+-    assert.equal(oneShotClose({ ...f.input, humanAcceptance: "yes" }, { runCommand: f.runner }).status, "commit-required");
+-    const text = readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8"); assert.ok(text.includes("# Acceptance pointer: feature-abc") && text.includes("\"yes\""));
++    assert.equal(oneShotClose({ ...f.input, humanAcceptance: "yes, I accept" }, { runCommand: f.runner }).status, "commit-required"); // C28 (QG-04, restated in place): the fixed yes form instead of a bare "yes".
++    const text = readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8"); assert.ok(text.includes("# Acceptance pointer: feature-abc") && text.includes("\"yes, I accept\""));
+     const entry = JSON.parse(readFileSync(join(f.root, manifestPath), "utf8")).artifacts.find((item) => item.class === "acceptance");
+     assert.equal(entry.sha256, sha256Of(text)); assert.equal(entry.amendment.previousSha256, pointerSha); assert.equal(entry.mutability, "immutable"); assert.equal(entry.authority, false);
+     assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true, JSON.stringify(validateFeaturePackage(f.root, manifestPath).findings));
+@@ -733,9 +837,9 @@ test("C22 CGR-06: the generated immutable pointer is replaced by the record WITH
+   const g = oneShotFixture({ acceptance: false });
+   try {
+     const { manifestPath } = packageFixture(g, { acceptanceAuthority: true }); const before = readFileSync(join(g.root, manifestPath), "utf8");
+-    assert.equal(oneShotClose({ ...g.input, humanAcceptance: "yes" }, { runCommand: g.runner }).status, "commit-required");
++    assert.equal(oneShotClose({ ...g.input, humanAcceptance: "yes, I accept" }, { runCommand: g.runner }).status, "commit-required");
+     assert.equal(readFileSync(join(g.root, ACCEPTANCE_FILE), "utf8"), SPEC_POINTER, "a bound authority acceptance stays byte for byte"); assert.equal(readFileSync(join(g.root, manifestPath), "utf8"), before);
+-    assert.match(readFileSync(join(g.root, "specs/feature-abc/evidence/human-acceptance.md"), "utf8"), /"yes"/u);
++    assert.match(readFileSync(join(g.root, "specs/feature-abc/evidence/human-acceptance.md"), "utf8"), /"yes, I accept"/u);
+   } finally { rmSync(g.root, { recursive: true, force: true }); }
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
+index 6b15b70c6..5e8f36cff 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
+@@ -533,6 +533,25 @@ test("draft next-action becomes a runnable submit-plan command once submitter an
+   assert.deepEqual(payload.nextAction.argv.slice(2), ["--by", "Jordan Example", "--profile", "feature"]);
+ });
+ 
++test("C28: a draft state whose Continuity still binds an Implementation Result names the decline route, not submit-plan, which would refuse PLAN-SUBMIT-CONTINUITY-BUSY", () => {
++  const root = freshRoot("draft-bound-result");
++  gitInitRoot(root);
++  setLocalGitUserName(root, "Jordan Example");
++  applyOnboardingIntakeConsent({ rootDir: root, granted: true, profile: "feature", activate: true });
++  assert.equal(run(["set-feature", "--id", "widget", "--plan-path", "specs/widget/prd.md"], { dir: root, now: () => NOW }), 0);
++  // The state of the observed failure: the design was reopened (draft) while the Continuity authority still binds the Result.
++  const file = resolveStatePath(root); const state = JSON.parse(readFileSync(file, "utf8"));
++  state.continuity = { authority: { prd: { path: "specs/widget/prd.md", sha256: "b".repeat(64) }, spec: { path: "specs/widget/spec.md", sha256: "c".repeat(64) }, result: { path: "specs/widget/result.md", sha256: "a".repeat(64) } } };
++  writeFileSync(file, `${JSON.stringify(state, null, 2)}\n`);
++  const result = invoke(root, ["inspect"]);
++  assert.equal(result.status, 0, result.err);
++  const payload = JSON.parse(result.out);
++  assert.equal(payload.status, "draft");
++  assert.notEqual(payload.nextAction?.argv?.[1], "submit-plan", "submit-plan would refuse PLAN-SUBMIT-CONTINUITY-BUSY while the Result is bound");
++  assert.equal(payload.nextAction.kind, "repair-required");
++  assert.match(JSON.stringify(payload.nextAction), /PLAN-SUBMIT-CONTINUITY-BUSY[\s\S]*--human-decline/u);
++});
++
+ test("draft next-action stays collect-input asking only for the missing profile when the submitter is derivable", () => {
+   const root = freshRoot("profile-missing");
+   gitInitRoot(root);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 2b6b5ace1..435213733 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -814,6 +814,7 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
+   "continuity-record-course-brief", "continuity-select-course", "continuity-apply-decision",
+   "continuity-clear-decision", "continuity-result-bootstrap-plan", "continuity-result-bootstrap-apply",
+   "continuity-result-rebind-plan", "continuity-result-rebind-apply",
++  "continuity-result-retire-plan", "continuity-result-retire-apply",
+   "continuity-result-case-migration-plan", "continuity-result-case-migration-apply",
+   "continuity-result-close-plan", "continuity-result-close-apply",
+   "continuity-authority-revision-plan", "continuity-authority-revision-apply", "continuity-authority-revision-recover",
+@@ -4383,6 +4384,15 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+     };
+   }
+   if (!lifecycle.ok || lifecycle.status === null) return null;
++  if (lifecycle.status === "draft" && state.continuity?.authority?.result != null) {
++    // C28 (AC-108): submit-plan would refuse PLAN-SUBMIT-CONTINUITY-BUSY while a Result is bound, so it is not the next action.
++    return {
++      kind: "repair-required",
++      code: "PLAN-SUBMIT-CONTINUITY-BUSY",
++      guidance: "The design is open but Continuity still binds an Implementation Result, so submit-plan would refuse PLAN-SUBMIT-CONTINUITY-BUSY. "
++        + "If the acceptance was declined, run the one-shot close with --human-decline \"<the human's literal answer>\" (finish-feature.mjs --one-shot): it records the answer and retires the bound Result (continuity-result-retire-plan/-apply), then submit-plan applies.",
++    };
++  }
+   if (lifecycle.status === "draft") {
+     const draftProfile = resolveDraftPlanSubmissionDefaults(dir).profile;
+     if (["epic", "feature"].includes(draftProfile)) {
+@@ -5320,6 +5330,182 @@ function runResultRebindCommand(sub, rest, deps) {
+   } finally { releaseContinuityLock(lock); }
+ }
+ 
++// ---- C28 (AC-108): retire the bound Result of a declined acceptance ----
++// The one-shot close asks the human for the acceptance AFTER the Result bootstrap, so every decline happens with a bound Result, and nothing else could
++// retire it: the bootstrap requires null, `continuity-result-rebind-*` only switches between Result.md and result.md, and submit-plan refuses
++// PLAN-SUBMIT-CONTINUITY-BUSY while one is bound. This pair (modelled on the rebind pair) sets continuity.authority.result to null, keeps the retired binding in
++// continuity.resultRetirements and restores result.md to the text the bootstrap accepts (it refuses a Result that already holds a pipeline-result block).
++// The State is written first and the file second; an identical apply replays and completes the file step.
++
++const RESULT_RETIRE_PLAN_SCHEMA = "pipeline.continuity-result-retire-plan.v1";
++const RESULT_RETIRE_APPLY_SCHEMA = "pipeline.continuity-result-retire-apply.v1";
++const RESULT_RETIRE_LOCK_TOKEN = "pipeline-result-retire-v1";
++const RESULT_RETIRE_REASON = "declined-acceptance";
++const DECLINE_RECORD_MARKER = "<!-- close-decline:begin -->";
++
++function resultRetireDeclineRecord(dir, featureId, declinePath) {
++  const prefix = `specs/${featureId}/evidence/`;
++  if (typeof declinePath !== "string" || !declinePath.startsWith(prefix) || !/^human-decline-[0-9a-f]{12}-[0-9a-f]{8}\.md$/u.test(declinePath.slice(prefix.length))) return null;
++  const file = physicalRebindFile(dir, declinePath);
++  return file === null || !file.bytes.toString("utf8").includes(DECLINE_RECORD_MARKER) ? null : { path: file.path, sha256: file.sha256 };
++}
++
++/** The bound Result without the canonical bootstrap block, or null when it carries anything else (course decisions, integrations) or the rest would not be accepted by the bootstrap again. */
++function resultRetireRestoredBytes(bytes) {
++  const suffix = canonicalResultBootstrapBytes();
++  if (bytes.byteLength <= suffix.byteLength || !bytes.subarray(bytes.byteLength - suffix.byteLength).equals(suffix)) return null;
++  const restored = bytes.subarray(0, bytes.byteLength - suffix.byteLength);
++  const text = restored.toString("utf8");
++  if (!Buffer.from(text, "utf8").equals(restored) || text.startsWith("﻿") || text.includes("\r") || !text.endsWith("\n") || /^```pipeline-result(?:\n|$)/mu.test(text)) return null;
++  return restored;
++}
++
++function resultRetireEligible(state, prd, spec, result) {
++  const continuity = state?.continuity;
++  const lifecycle = derivePlanLifecycle(state, { planSha256: prd.sha256, specSha256: spec.sha256 });
++  return Boolean(state?.activeFeature && state.schema === SCHEMA_ID && state.gateEstimate === undefined && lifecycle.ok && lifecycle.status === "implementing"
++    && validateContinuityState(continuity, state.activeFeature.id).ok && continuity.featureId === state.activeFeature.id && !isDraftAuthority(continuity)
++    && continuity.queueHead !== null && continuity.queueHead.dispatch === null && continuity.queueHead.nextAction !== "close"
++    && continuity.blocker === null && continuity.acknowledgedFinal === null && continuity.recovery === null && continuity.decisionTxn === null && continuity.closeTransition == null
++    && continuity.revision < Number.MAX_SAFE_INTEGER && state.activeFeature.planPath === prd.path
++    && continuity.authority.result !== null && continuity.authority.result.path === result.path && continuity.authority.result.sha256 === result.sha256
++    && (continuity.resultRetirements?.length ?? 0) < 16);
++}
++
++function resultRetireNextState(state, result, decline, updatedAt) {
++  const next = structuredClone(state);
++  next.continuity.revision += 1;
++  next.continuity.authority.result = null;
++  next.continuity.resultRetirements = [...(state.continuity.resultRetirements ?? []), { path: result.path, sha256: result.sha256, retiredAt: updatedAt, reason: RESULT_RETIRE_REASON, declineRecord: { path: decline.path, sha256: decline.sha256 } }];
++  next.continuity.resume = { ...next.continuity.resume, sourceRevision: next.continuity.revision };
++  next.updatedAt = updatedAt;
++  return next;
++}
++
++function buildResultRetirePlan(dir, existing, resultPath, declinePath, updatedAt) {
++  if (existing.status !== "ok" || !canonicalIso(updatedAt) || typeof resultPath !== "string") return { ok: false, code: "PS-RESULT-RETIRE-STATE" };
++  const state = existing.state;
++  const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
++  if (stateFile === null || stateFile.sha256 !== sha256Bytes(existing.raw)) return { ok: false, code: "PS-RESULT-RETIRE-STATE-IDENTITY" };
++  const prd = physicalRebindFile(dir, state?.continuity?.authority?.prd?.path);
++  const spec = physicalRebindFile(dir, state?.continuity?.authority?.spec?.path);
++  if (prd === null || spec === null) return { ok: false, code: "PS-RESULT-RETIRE-AUTHORITY" };
++  let prdText;
++  try { prdText = new TextDecoder("utf-8", { fatal: true }).decode(prd.bytes); } catch { return { ok: false, code: "PS-RESULT-RETIRE-PRD-MARKER" }; }
++  const marker = rebindMarker(prdText);
++  if (marker === null || marker.digest !== spec.sha256) return { ok: false, code: "PS-RESULT-RETIRE-PRD-MARKER" };
++  const result = physicalRebindFile(dir, state.continuity?.authority?.result?.path);
++  if (result === null || result.path !== resultPath || result.path !== resultBootstrapPath(dir, prd.path)) return { ok: false, code: "PS-RESULT-RETIRE-TARGET" };
++  // The rebind inventory also rejects any registered lifecycle.json (its case-collision topology does not apply here: the retire touches one Result file and the package is reconciled afterwards), so that entry is not part of this closure.
++  const inventory = resultRebindInventory(dir, state, prd, spec).filter((entry) => entry.artifact !== "lifecycle.json");
++  if (inventory.some((entry) => entry.status === "rejected")) return { ok: false, code: "PS-RESULT-RETIRE-AUTHORITY-CLOSURE", inventory };
++  if (!resultRetireEligible(state, prd, spec, result)) return { ok: false, code: "PS-RESULT-RETIRE-CONTINUITY", inventory };
++  const restored = resultRetireRestoredBytes(result.bytes);
++  if (restored === null) return { ok: false, code: "PS-RESULT-RETIRE-RESULT-BYTES", inventory };
++  const decline = resultRetireDeclineRecord(dir, state.activeFeature.id, declinePath);
++  if (decline === null) return { ok: false, code: "PS-RESULT-RETIRE-DECLINE-RECORD", inventory };
++  const nextState = resultRetireNextState(state, result, decline, updatedAt);
++  if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok) return { ok: false, code: "PS-RESULT-RETIRE-POSTIMAGE", inventory };
++  const restoredSha256 = sha256Bytes(restored);
++  const manifest = resultRetireManifest(dir, prd, result.sha256, restoredSha256, true);
++  if (!manifest.ok) return { ok: false, code: "PS-RESULT-RETIRE-PACKAGE", inventory };
++  const payload = {
++    schema: RESULT_RETIRE_PLAN_SCHEMA, root: realpathSync(resolve(dir)), featureId: state.activeFeature.id,
++    retired: { path: result.path, sha256: result.sha256, restoredSha256, identity: result.identity }, declineRecord: decline, authorityClosure: inventory,
++    package: manifest.value === null ? null : { manifest: manifest.value.path, sha256: manifest.value.sha256, postSha256: manifest.value.postSha256, identity: manifest.value.file.identity },
++    preimage: { state: { sha256: sha256Bytes(existing.raw), identity: stateFile.identity, updatedAt: state.updatedAt ?? null }, continuity: { revision: state.continuity.revision, authority: state.continuity.authority, resume: state.continuity.resume }, prd: { path: prd.path, sha256: prd.sha256, identity: prd.identity, technicalSpecSha256: marker.digest }, spec: { path: spec.path, sha256: spec.sha256, identity: spec.identity } },
++    postimage: { stateSha256: sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8")), revision: nextState.continuity.revision, updatedAt, resultSha256: restoredSha256 },
++    assurance: { regularFilesOnly: true, singleLinkOnly: true, stateWrittenBeforeResultFile: true, resultRestoredToTextBeforeBootstrapBlock: true, archiveMoveDelete: false },
++  };
++  return { ok: true, payload, planSha256: sha256CanonicalJson(payload), nextState, result, restored, manifest: manifest.value };
++}
++
++/**
++ * The package manifest side of the retire. The reconcile planner only moves a Result digest FORWARD (the fence before the bootstrap block must hash to the stale digest), so it
++ * cannot take the manifest back to the restored text. The retire does exactly that inverse step itself: the one result entry that binds the retired Result gets the digest of the
++ * restored text (which is the text the entry bound before the bootstrap), nothing else in the manifest changes, and no authority is lifted or granted. `value` is null for a project
++ * with no registered package. With `validate`, the package must be valid before the step (the plan); the replay reads it half-done and does not.
++ */
++function resultRetireManifest(dir, prd, retiredSha256, restoredSha256, validate) {
++  const path = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
++  const file = physicalRebindFile(dir, path);
++  if (file === null) { try { lstatSync(resolve(dir, path)); return { ok: false }; } catch (error) { return error?.code === "ENOENT" ? { ok: true, value: null } : { ok: false }; } }
++  if (validate && !validateFeaturePackage(dir, path).ok) return { ok: false };
++  let value; try { value = JSON.parse(file.bytes.toString("utf8")); } catch { return { ok: false }; }
++  const results = Array.isArray(value?.artifacts) ? value.artifacts.filter((entry) => entry?.class === "result") : [];
++  const entry = results.find((candidate) => candidate.authority === true && candidate.sha256 === retiredSha256);
++  if (results.length !== 1 || entry === undefined) return { ok: false };
++  const next = structuredClone(value); next.artifacts[value.artifacts.indexOf(entry)] = { ...entry, sha256: restoredSha256 };
++  const postBytes = Buffer.from(JSON.stringify(next, null, 2) + "\n", "utf8");
++  return { ok: true, value: { path, file, sha256: file.sha256, postBytes, postSha256: sha256Bytes(postBytes) } };
++}
++
++function parseResultRetirePlan(argv) {
++  const parsed = parseExactFlags(argv, new Set(["result-path", "decline-record"]));
++  return parsed.ok && typeof parsed.value["result-path"] === "string" && !isBlank(parsed.value["result-path"]) && typeof parsed.value["decline-record"] === "string" && !isBlank(parsed.value["decline-record"])
++    ? { resultPath: parsed.value["result-path"], declinePath: parsed.value["decline-record"] } : null;
++}
++
++function parseResultRetireApply(argv) {
++  if (argv.length !== 17 || argv[0] !== "--feature-id" || isBlank(argv[1]) || argv[2] !== "--result-path" || isBlank(argv[3]) || argv[4] !== "--decline-record" || isBlank(argv[5]) || argv[6] !== "--expected-revision" || !parseExpectedRevision(argv[7]).ok || argv[8] !== "--expected-state-sha256" || !SHA256_RE.test(argv[9]) || argv[10] !== "--expected-post-state-sha256" || !SHA256_RE.test(argv[11]) || argv[12] !== "--updated-at" || !canonicalIso(argv[13]) || argv[14] !== "--plan-sha256" || !SHA256_RE.test(argv[15]) || argv[16] !== "--activate") return null;
++  return { featureId: argv[1], resultPath: argv[3], declinePath: argv[5], expectedRevision: Number(argv[7]), expectedStateSha256: argv[9], expectedPostStateSha256: argv[11], updatedAt: argv[13], planSha256: argv[15] };
++}
++
++function runResultRetireCommand(sub, rest, deps) {
++  if (sub === "continuity-result-retire-plan") {
++    const selected = parseResultRetirePlan(rest);
++    if (selected === null) { console.error("Error: Result retire plan requires exactly --result-path <the bound result.md> and --decline-record <the decline record>."); return 2; }
++    const planned = buildResultRetirePlan(deps.dir, readStateRaw(deps.dir), selected.resultPath, selected.declinePath, deps.now());
++    if (!planned.ok) { console.error(`Error: Result retire plan refused (${planned.code}); zero mutation.`); return 2; }
++    const writer = fileURLToPath(import.meta.url);
++    console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: { executable: process.execPath, argv: [writer, "continuity-result-retire-apply", "--feature-id", planned.payload.featureId, "--result-path", selected.resultPath, "--decline-record", selected.declinePath, "--expected-revision", String(planned.payload.preimage.continuity.revision), "--expected-state-sha256", planned.payload.preimage.state.sha256, "--expected-post-state-sha256", planned.payload.postimage.stateSha256, "--updated-at", planned.payload.postimage.updatedAt, "--plan-sha256", planned.planSha256, "--activate"], mutation: true, requiresConfirmation: true, executionBoundary: "host-authorized-wsl", expected: { schema: RESULT_RETIRE_APPLY_SCHEMA, statuses: ["applied", "replayed"] } } }, null, 2));
++    return 0;
++  }
++  const apply = parseResultRetireApply(rest);
++  if (apply === null) { console.error("Error: Result retire apply requires the complete returned action and --activate confirmation."); return 2; }
++  const lock = acquireContinuityLock(deps.dir, RESULT_RETIRE_LOCK_TOKEN, deps);
++  if (!lock.ok) { console.error(`Error: Result retire apply refused (${lock.code}); zero mutation.`); return 2; }
++  try {
++    const current = readStateRaw(deps.dir);
++    if (current.status !== "ok") { console.error("Error: Result retire State is unavailable or malformed; zero mutation."); return 2; }
++    const root = realpathSync(resolve(deps.dir));
++    const restoreFile = (file, restored) => atomicRepairLegacyResult({ ...file, root, parent: dirname(file.absolute) }, file.bytes, restored, lock, deps);
++    if (sha256Bytes(current.raw) === apply.expectedPostStateSha256) {
++      const last = current.state.continuity?.resultRetirements?.at(-1);
++      if (current.state.activeFeature?.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity?.revision !== apply.expectedRevision + 1 || current.state.continuity?.authority?.result !== null || last?.path !== apply.resultPath || last?.declineRecord?.path !== apply.declinePath) { console.error("Error: Result retire replay postimage is invalid; zero mutation."); return 2; }
++      const file = physicalRebindFile(deps.dir, apply.resultPath);
++      let mutated = false;
++      if (file !== null && file.sha256 === last.sha256) {
++        const restored = resultRetireRestoredBytes(file.bytes);
++        if (restored === null || !restoreFile(file, restored).ok) { console.error("Error: Result retire replay could not complete the Result file step; inspect result.md before retry."); return 2; }
++        mutated = true;
++      }
++      const after = physicalRebindFile(deps.dir, apply.resultPath);
++      const prdFile = physicalRebindFile(deps.dir, current.state.continuity.authority.prd.path);
++      const pending = after === null || prdFile === null ? { ok: false } : resultRetireManifest(deps.dir, prdFile, last.sha256, after.sha256, false);
++      if (pending.ok && pending.value !== null) {
++        if (!restoreFile(pending.value.file, pending.value.postBytes).ok) { console.error("Error: Result retire replay could not complete the package manifest step; inspect the manifest before retry."); return 2; }
++        mutated = true;
++      }
++      const manifestPath = prdFile === null ? null : `${dirname(prdFile.path).split(sep).join("/")}/lifecycle.json`;
++      if (after === null || after.sha256 === last.sha256 || (manifestPath !== null && physicalRebindFile(deps.dir, manifestPath) !== null && !validateFeaturePackage(deps.dir, manifestPath).ok)) { console.error("Error: Result retire replay found the Result file or the package manifest half-done and could not complete it; inspect both before retry."); return 2; }
++      console.log(JSON.stringify({ schema: RESULT_RETIRE_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, retired: last, mutated }, null, 2)); return 0;
++    }
++    const planned = buildResultRetirePlan(deps.dir, current, apply.resultPath, apply.declinePath, apply.updatedAt);
++    if (sha256Bytes(current.raw) !== apply.expectedStateSha256 || !planned.ok || planned.planSha256 !== apply.planSha256 || planned.payload.featureId !== apply.featureId || planned.payload.preimage.continuity.revision !== apply.expectedRevision || planned.payload.postimage.stateSha256 !== apply.expectedPostStateSha256) { console.error("Error: Result retire apply inputs are stale or conflicting; zero mutation."); return 2; }
++    const written = atomicWriteContinuityState(deps.dir, planned.nextState, lock, deps);
++    if (!written.ok) { console.error(`Error: Result retire State write unresolved (${written.code}); mutation disposition is not success.`); return 2; }
++    const wroteFile = restoreFile(planned.result, planned.restored);
++    const wroteManifest = !wroteFile.ok ? wroteFile : planned.manifest === null ? { ok: true } : restoreFile(planned.manifest.file, planned.manifest.postBytes);
++    const persisted = readStateRaw(deps.dir);
++    const after = physicalRebindFile(deps.dir, apply.resultPath);
++    const manifestAfter = planned.manifest === null ? null : physicalRebindFile(deps.dir, planned.manifest.path);
++    if (!wroteFile.ok || !wroteManifest.ok || persisted.status !== "ok" || sha256Bytes(persisted.raw) !== apply.expectedPostStateSha256 || !sameJson(persisted.state, planned.nextState) || after === null || after.sha256 !== planned.payload.retired.restoredSha256
++      || (planned.manifest !== null && (manifestAfter === null || manifestAfter.sha256 !== planned.manifest.postSha256))) { console.error("Error: Result retire is unresolved after the State write (the Result file step or the readback failed); run the identical apply again to complete it."); return 2; }
++    console.log(JSON.stringify({ schema: RESULT_RETIRE_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, retired: persisted.state.continuity.resultRetirements.at(-1), mutated: true }, null, 2)); return 0;
++  } finally { releaseContinuityLock(lock); }
++}
++
+ // ---- Closed Result.md/result.md case-collision migration (Phoenix recovery) ----
+ 
+ function caseMigrationArchivePath(prdPath, inactivePath, archivePath) {
+@@ -11744,6 +11930,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+   if (sub === "continuity-result-rebind-plan" || sub === "continuity-result-rebind-apply") {
+     return runResultRebindCommand(sub, rest, { ...deps, dir, now });
+   }
++  if (sub === "continuity-result-retire-plan" || sub === "continuity-result-retire-apply") {
++    return runResultRetireCommand(sub, rest, { ...deps, dir, now, gitCandidate });
++  }
+   if (sub === "continuity-result-case-migration-plan" || sub === "continuity-result-case-migration-apply") {
+     return runResultCaseMigrationCommand(sub, rest, { ...deps, dir, now });
+   }
+@@ -12655,6 +12844,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         console.error("Error: reopen-design requires --by <name>.");
+         return 2;
+       }
++      // C28 (AC-108): refused before any write, naming the way back to a correction round.
++      if (base.continuity?.authority?.result != null) {
++        console.error("Error: reopen-design refused (PLAN-REOPEN-RESULT-BOUND); nothing was written. This feature has a bound Implementation Result, so a reopened design could not be submitted again (submit-plan refuses PLAN-SUBMIT-CONTINUITY-BUSY). "
++          + "If the human declined the acceptance, rerun the one-shot close with --human-decline \"<the human's literal answer>\" (finish-feature.mjs --one-shot): it records the answer, retires the Result and returns the correction steps without reopening the design.");
++        return 2;
++      }
+       let reopenedAt;
+       const written = writeState(dir, undefined, base, {
+         transition: (observed) => {
+@@ -15411,12 +15606,13 @@ const STATE_COMPANION_ENTRIES = new Set([
+   "discard-feature", "set-feature", "continuity-init", "submit-plan", "present-plan", "afk-project",
+   "approve-plan", "materialize-architecture", "continuity-result-bootstrap-plan",
+   "continuity-result-bootstrap-apply", "continuity-result-rebind-plan",
+-  "continuity-result-rebind-apply", "continuity-result-close-plan",
+-  "continuity-result-close-apply", "close-feature",
++  "continuity-result-rebind-apply", "continuity-result-retire-plan", "continuity-result-retire-apply",
++  "continuity-result-close-plan", "continuity-result-close-apply", "close-feature",
+ ]);
+ const STATE_COMPANION_RESULT_SELECTED_ONLY = new Set([
+   "continuity-result-bootstrap-plan", "continuity-result-rebind-plan",
+-  "continuity-result-rebind-apply", "continuity-result-close-plan", "continuity-result-close-apply",
++  "continuity-result-rebind-apply", "continuity-result-retire-plan", "continuity-result-retire-apply",
++  "continuity-result-close-plan", "continuity-result-close-apply",
+ ]);
+ const STATE_COMPANION_SUPPORTED = new Set(["set-feature","submit-plan","present-plan","materialize-architecture","continuity-init","close-feature","discard-feature","afk-project","continuity-result-bootstrap-apply",...STATE_COMPANION_RESULT_SELECTED_ONLY]);
+ function stateCompanionImage(repository, effect) {
+@@ -15514,6 +15710,18 @@ function prepareStateCompanion(frame, argv) {
+     // Original Result/request bytes and all lifecycle gates remain unchanged.
+     sourceEffects=sourceEffects.filter(effect=>effect.scope === "repository");
+   }
++  if(frame.sub === "continuity-result-retire-apply") {
++    // C28: the apply writes the selected State and restores result.md; both are declared, nothing else.
++    const retire=parseResultRetireApply(argv.slice(1));
++    if(!retire || !physicalRebindFile(frame.repository.primaryRoot,retire.resultPath)) {
++      stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-retire-original-source-scope-unavailable");
++    }
++    const declared=readStateRaw(frame.repository.primaryRoot);
++    const prdPath=declared.status === "ok" ? declared.state.continuity?.authority?.prd?.path : null;
++    const manifestPath=typeof prdPath === "string" ? `${dirname(prdPath).split(sep).join("/")}/lifecycle.json` : null;
++    sourceEffects=[sourceEffects[0],{scope:"repository",path:retire.resultPath},
++      ...(manifestPath !== null && physicalRebindFile(frame.repository.primaryRoot,manifestPath) !== null ? [{scope:"repository",path:manifestPath}] : [])];
++  }
+   if(frame.sub === "continuity-result-bootstrap-apply") {
+     const apply=parseResultBootstrapApply(argv.slice(1));
+     const source=readStateRaw(frame.repository.primaryRoot);
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 3108bce31..f6a5b66e0 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -25,7 +25,7 @@ It produces the Verify evidence in candidate mode bound to the Critic packet (fo
+ 
+ The command stops at `commit-required` and prints the paths and the commit message (`git add -- <paths>`, then `git commit`; the pre-commit hook admits exactly the bytes the stages wrote, G20-66). Run that commit, then run the printed `next` command (the same command with `--resume-lifecycle-id <id>`): it freezes the candidate, runs the final Verify and the Security scan, writes the final-verification and cleanup evidence and ends at `closed-local`. Exit code 2 and `status: "stopped"` mean one typed stop with its exact repair on stderr: `ONESHOT-CRITIC-PACKET-MISSING` (finish the Critic review; pass `--critic-packet-id`), `ONESHOT-VERIFY-RED` (fix what the Verify prints, rerun), `ONESHOT-COMMIT-PENDING` (the close outputs are not committed yet), `ONESHOT-SECURITY-BLOCKING`, `ONESHOT-RESULT-NOT-BOUND` (no Result is bound yet; in a project with a session-authority catalogue the command opens the Close lifecycle itself and its repair names each owner-route call), or the coordinator's own typed refusal (for example `CLOSE-CRITIC-CALLER-AUTHORED`). Rerunning the identical command is always safe. Publication, push and release stay separate human-gated steps. At `closed-local` the result's `pushEvidence.command` is the Critic-bound Verify the push gate reads (`evidence/verify-latest.json`): run it, then `push-init.mjs`.
+ 
+-**The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. In the same message say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why (never a gate; a result you could not run also goes into `--open-checks`). Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. Rerun the identical command with `--human-acceptance "<the human's literal answer>"` (pass it only when the human accepted; a decline means the close does not run). The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
++**The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. In the same message say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why (never a gate; a result you could not run also goes into `--open-checks`). Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. The sentence ends with ONE fixed answer form for yes (in the project's human-facing language: `yes, I accept`; `ja, ich akzeptiere` for a German project; English for any other language). If the human answers exactly that form (case, surrounding space and a closing `.` or `!` do not matter), rerun the identical command with `--human-acceptance "<the human's literal answer>"`. `--human-acceptance` records an acceptance for that form only: any other answer (a bug report, a change request, a doubt, a bare "yes") stops with `ONESHOT-ACCEPTANCE-NOT-YES`, records nothing and names both ways on; never search the answer for a keyword and never turn it into a yes yourself. **A decline is not the end of the feature:** rerun the identical command with `--human-decline "<the human's literal answer>"` (exclusive with `--human-acceptance`). The close records the human's words with the candidate and the time in `specs/<feature>/evidence/human-decline-<candidate>-<answer>.md` (never read as an acceptance), retires the bound Result (the State transition `continuity-result-retire-plan` / `-apply`: `continuity.authority.result` becomes null, the retired binding stays in `continuity.resultRetirements`, `result.md` is restored to the text before the bootstrap block, and the package is reconciled result-only, without a signature; in a project with a session-authority catalogue this runs on the owner route like the Result bootstrap, on the Close lifecycle the one-shot already opened) and returns status `declined` with `next` in order: the commit of exactly those outputs, a correction dispatch (`prepare-dispatch.mjs goldfish`, the human's words are the correction request), a Critic delta round on the new candidate (`prepare-dispatch.mjs critic --delta-request`), then the identical close command with `--critic-packet-id <new-packet-id>`. That second close runs the Result bootstrap again and asks the acceptance question again for the new candidate. Do not run `reopen-design` for a declined acceptance: with a bound Result it refuses (`PLAN-REOPEN-RESULT-BOUND`) and names this route, because `submit-plan` would refuse `PLAN-SUBMIT-CONTINUITY-BUSY` while a Result is bound. The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
+ 
+ **What the close touches.** The tracked-effects digests hash what exists: the calibrated handover (`project/pipeline.json` `handover`, first brought to the closed state by `pipeline-state.mjs update-public-handover`, the existing writer: closed-local, the verified candidate, and technical close, product acceptance and push as three separate facts) and `telemetry/costs.md`; backlog, history and retrospective have no defined project file and keep the marked empty digest. The audit request names every Critic round of the feature (`evidence.criticReports`); the bundle under `audit-bundles/<feature>/<commit>/` carries each exported round report (`specs/<feature>/evidence/critic/<packet>/report.md`) and its README section "Critic round reports" names a round whose report could not be exported instead of omitting it. The close fetches every missing report itself from the private Critic journal (the verdict and its findings, checked against the digest in the receipt; working notes stay out) and carries it in the one close commit; a hand export with `session-critic-finalizer.mjs export` is only needed to publish richer notes, and a round it cannot read never stops the close. The minors of the Critic round this close is bound to go into the handover under "Open minor findings", and the result's `openMinors` line says how many are open and where: put that line in the close report.
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 282566c90..116d67afe 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -25,6 +25,8 @@ start or open it the way the PO will and look at what it really shows. Then tell
+ see it and why. This holds for every kind of result (an app, a page, a command-line tool, a library, a document) and for every hand-over, not
+ only the acceptance question at the close. It is not a gate: the Pipeline cannot check what you saw, only you can.
+ 
++The acceptance question of the one-shot close ends with ONE fixed yes form (`yes, I accept`; `ja, ich akzeptiere` in a German project; English for any other language). Only exactly that form (case, surrounding space and a closing `.` or `!` aside) is recorded as the acceptance through `--human-acceptance`; any other answer stops with `ONESHOT-ACCEPTANCE-NOT-YES` and records nothing. If the human answers anything else (a bug, a change request), rerun the identical command with `--human-decline "<the human's literal answer>"`: the words are recorded (never as an acceptance), the bound Result is retired, and the close returns `declined` with the correction steps in order: commit, correction dispatch, Critic delta round, then the identical close command with the new packet. Do not reopen the design for a declined acceptance (`reopen-design` refuses with a bound Result and names this route).
++
+ ## 1. Design
+ 
+ 1. `pipeline-state.mjs set-feature --id <id> --plan-path <path>` (agent). Both flags are required.
