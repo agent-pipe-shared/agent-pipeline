@@ -1,0 +1,309 @@
+diff --git a/guardrails/security.md b/guardrails/security.md
+index b7b03eb0f3917ee2412c0d774f48ae8c6d9e5f24..5bb5444e55257e82cf8a50c87dec478df240a40a 100644
+--- a/guardrails/security.md
++++ b/guardrails/security.md
+@@ -195,8 +195,10 @@ new term for this case).
+ - The lifecycle guard admits exact, existing regular files in user-visible
+   host paths outside the active repository. Names-only directory listing is
+   separately bounded. Recursive content search remains scoped and checks its
+-  traversed inventory before admission; native Grep requires an exact file.
+-  Filesystem permissions remain enforced by the host.
++  traversed inventory before admission; native Grep names an exact file or one
++  non-hidden project directory whose whole tree holds no secret-named file and
++  no `.git`, the same all-files screen as `grep -r`, so the project root stays
++  a shell `rg` search. Filesystem permissions remain enforced by the host.
+ - Both the machine and repository PO key-directory pointers, known credential
+   stores and files, system pseudo-files, and their physical symlink aliases
+   stay excluded. Invalid authority readback does not broaden the read lane.
+diff --git a/plugins/pipeline-core/guardrails/security.md b/plugins/pipeline-core/guardrails/security.md
+index b7b03eb0f3917ee2412c0d774f48ae8c6d9e5f24..5bb5444e55257e82cf8a50c87dec478df240a40a 100644
+--- a/plugins/pipeline-core/guardrails/security.md
++++ b/plugins/pipeline-core/guardrails/security.md
+@@ -195,8 +195,10 @@ new term for this case).
+ - The lifecycle guard admits exact, existing regular files in user-visible
+   host paths outside the active repository. Names-only directory listing is
+   separately bounded. Recursive content search remains scoped and checks its
+-  traversed inventory before admission; native Grep requires an exact file.
+-  Filesystem permissions remain enforced by the host.
++  traversed inventory before admission; native Grep names an exact file or one
++  non-hidden project directory whose whole tree holds no secret-named file and
++  no `.git`, the same all-files screen as `grep -r`, so the project root stays
++  a shell `rg` search. Filesystem permissions remain enforced by the host.
+ - Both the machine and repository PO key-directory pointers, known credential
+   stores and files, system pseudo-files, and their physical symlink aliases
+   stay excluded. Invalid authority readback does not broaden the read lane.
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 85204d4b53efbe8a7cd15d82cff6f2c1584f93da..8b38f4c4ee36dd6b9be7297b58bf51add7388628 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -12326,7 +12326,7 @@ test("QP4-3 R4 an existing in-root file through tail, wc and head is admitted; t
+   }
+ });
+ 
+-test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G4); .git and escapes stay refused (G2); every directory-scoped Grep stays refused (R2-1, SEC-11)", async (t) => {
++test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G4); .git and escapes stay refused (G2); directory Grep follows the rg screen (SEC-11)", async (t) => {
+   const path = qp4Fixture();
+   const outside = qp4Fixture();
+   try {
+@@ -12358,28 +12358,23 @@ test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G
+         assert.equal(r.exitCode, 2, JSON.stringify(input));
+         assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+       }
+-      // R2-1 (SEC-11 "native Grep requires an exact file"): the directory-scoped Grep lane is removed. Round 1 admitted these five shapes; each is
+-      // refused again, exactly as at HEAD (content search over a tree uses the admitted `git grep`).
++      // C27 (PO tile 2026-11-10, SEC-11): native Grep on a named directory inside the project passes the same all-files screen as `rg`.
+       for (const input of [
+         { pattern: "authorize-commit|apply", path: join(path, "scratch"), glob: "*.md" },
+         { pattern: "authorize", path: join(path, "scratch"), glob: "**/*.md" },
+         { pattern: "authorize", path: qp4Fwd(join(path, "scratch")), glob: "*.mjs" },
+         { pattern: "authorize", path: "scratch", glob: "*.md" },
+-        { pattern: "apply", path: join(path, "plugins", "pipeline-core"), glob: "**/*.mjs" },
+-      ]) {
+-        const r = tool("Grep", input);
+-        assert.equal(r.exitCode, 2, JSON.stringify(input));
+-        assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+-      }
+-      for (const input of [
+         { pattern: "x", path: join(path, "scratch") },
++        // The screen covers every file below the directory before the glob applies, so a filter can only narrow it.
++        { pattern: "x", path: join(path, "scratch"), glob: "*.pem" },
++        { pattern: "x", path: join(path, "scratch"), glob: "*" },
++      ]) assert.equal(tool("Grep", input).exitCode, 0, JSON.stringify(input));
++      for (const input of [
+         { pattern: "x", glob: "*.md" },
+         { pattern: "x", path: join(path, ".git"), glob: "*.json" },
+         { pattern: "x", path: join(path, ".git", "agent-pipeline"), glob: "**/*.json" },
+         { pattern: "x", path: join(path, "vault"), glob: "*.md" },
+         { pattern: "x", path, glob: "*.md" },
+-        { pattern: "x", path: join(path, "scratch"), glob: "*.pem" },
+-        { pattern: "x", path: join(path, "scratch"), glob: "*" },
+         { pattern: "x", path: join(path, "scratch"), glob: "../*.md" },
+         { pattern: "x", path: join(path, "scratch"), glob: ".git/*.md" },
+         { pattern: "x", path: join(outside, "scratch"), glob: "*.md" },
+@@ -13064,15 +13059,14 @@ test("TR-B T77 rg -g lane: bounded basename-extension filters, including *.test.
+   }
+ });
+ 
+-test("TR-B T74 directory Grep: the Grep tool on a directory stays refused with GUARD-READ-TARGET (SEC-11; also pinned by QP4-4, repeated here under the row)", () => {
++test("TR-B T74 directory Grep: a named project directory is admitted, one holding a secret-named file stays refused with GUARD-READ-TARGET (SEC-11; also pinned by QP4-4)", () => {
+   const path = trbFixture();
+   try {
+     qp4WithoutAppDataRoots(() => {
+-      for (const input of [{ pattern: "apply", path: join(path, "scratch") }, { pattern: "apply", path: join(path, "vault") }]) {
+-        const verdict = qp4Verdict({ tool_name: "Grep", tool_input: input }, path);
+-        assert.equal(verdict.exitCode, 2, JSON.stringify(input));
+-        assert.match(verdict.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+-      }
++      assert.equal(qp4Verdict({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "scratch") } }, path).exitCode, 0);
++      const verdict = qp4Verdict({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "vault") } }, path);
++      assert.equal(verdict.exitCode, 2);
++      assert.match(verdict.text, new RegExp(QP4_READ_TARGET));
+     });
+   } finally {
+     rmSync(path, { recursive: true, force: true });
+diff --git a/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs b/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
+index 6e6dcd9560f72b627beb1a40fd4d8990ac3df00f..08ef33b1229dbeeb01af2d88c2ece10d0b8b5079 100644
+--- a/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
+@@ -159,8 +159,7 @@ if (worker) {
+       }
+       for (const path of ['docs', join(root, 'docs')]) {
+         const verdict = inspect({ tool_name: 'Grep', tool_input: { pattern: 'synthetic', path } });
+-        assert.equal(verdict.exitCode, 2);
+-        assert.match(verdict.stderr, /GUARD-READ-TARGET:/u);
++        assert.equal(verdict.exitCode, 0, verdict.stderr);
+       }
+       for (const path of ['docs', join(root, 'docs')]) {
+         const verdict = inspect({ tool_name: 'Glob', tool_input: { path, pattern: '*.md' } });
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index 2f551be349d8fdb68b2e4462b2cbe4f403164869..fbc69aa28ab2cea188464bb38d61df4a25ebbdf0 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -534,7 +534,7 @@ function passiveTargetIsFile(raw, root) {
+ // project root BOTH lexically and physically (no link or junction escape), carries no dot-segment in the path it NAMES, and re-uses
+ // isAllowedPassiveReadTarget -- including its whole-tree secret screen -- unchanged. The Glob wildcard listing additionally walks the subtree below the
+ // named path and is admitted only when no directory there is hidden (qp4NoHiddenDirectoryAtOrBelow), so .git private state and .claude are not listed
+-// through a parent directory either. There is NO Grep directory lane: guardrails/security.md SEC-11 requires native Grep to name an exact file.
++// through a parent directory either. The Grep directory lane (grepInRootDirectory, guardrails/security.md SEC-11) uses the all-files tree screen instead.
+ function qp4PhysicallyInsideProject(candidate, root) {
+   try {
+     const lexical = resolve(candidate);
+@@ -568,14 +568,48 @@ function qp4InRootWildcardListing(raw, selector, root, extraRoots) {
+   // C21 (AC-108): `<literal directories>/**/*` lists the entry names of the whole subtree of one such directory. It is judged by exactly the same checks
+   // (the whole-tree secret screen, the hidden-directory walk with its entry and depth bounds); the only addition is that the recursive form never names
+   // the project root itself, which always holds hidden directories. `**` anywhere else, a second wildcard segment and a trailing `**` alone stay refused.
+-  const recursive = parts.length >= 2 && parts[parts.length - 2] === "**" && parts[parts.length - 1] === "*";
++  // C27 (PO decision 2026-11-10): the final segment may also be a name filter (`*slice-ledger*`); it can only narrow the listing the two checks already admit.
++  const finalSegment = parts[parts.length - 1];
++  if (!qp4ListingFinalSegment(finalSegment)) return false;
++  const recursive = parts.length >= 2 && parts[parts.length - 2] === "**";
+   const literal = parts.slice(0, recursive ? -2 : -1);
+-  if ((!recursive && parts[parts.length - 1] !== "*") || literal.some((part) => /[?*]/u.test(part))) return false;
++  if (literal.some((part) => /[?*]/u.test(part))) return false;
+   const directory = literal.length === 0 ? raw : join(raw, ...literal);
+   if (recursive && qp4IsProjectRoot(directory, root)) return false;
+   return qp4InRootDirectory(directory, root, extraRoots) && qp4NoHiddenDirectoryAtOrBelow(passiveCandidate(directory, root), root);
+ }
+ 
++// `*`, or one bounded name filter holding a wildcard. A filter ending in a literal extension must pass the same credential-extension test as every other Glob.
++function qp4ListingFinalSegment(segment) {
++  if (segment === "*") return true;
++  if (!/[?*]/u.test(segment) || segment.includes("**") || !/^[A-Za-z0-9_.*?-]{1,64}$/u.test(segment)) return false;
++  // Whatever follows the last dot must be one literal, admitted extension (`*.m*`, `*.*` and an over-long extension stay refused, as for every other Glob).
++  const lastDot = segment.lastIndexOf(".");
++  if (lastDot !== -1) {
++    const tail = segment.slice(lastDot + 1);
++    if (!new RegExp(`^${GLOB_LITERAL_EXTENSION}$`, "u").test(tail) || !globExtensionAdmitted(tail)) return false;
++  }
++  // A filter that spells a secret name (`id_rsa*`) stays refused even in a tree that holds none.
++  const roots = PASSIVE_READ_CREDENTIAL_ROOTS;
++  return !new RegExp(roots.secretBasenameRegex.source, roots.secretBasenameRegex.flags).test(segment.replace(/[*?]/gu, ""));
++}
++
++// C27 (PO decision 2026-11-10, supersedes the 2026-10-16 refusal; SEC-11 amended): native Grep may name one non-hidden project directory, as `rg` and `grep -r`
++// may. The host's Grep can read hidden and ignored files, so the directory passes the all-files screen of `grep -r`: no secret-named file and no .git anywhere
++// below it, at most 10000 entries. The project root holds .git and therefore stays refused. A `glob` filter only narrows a tree that passed that screen.
++const GREP_DIRECTORY_GLOB_MAX_LENGTH = 256;
++
++function grepInRootDirectory(raw, selector, root, pluginPath) {
++  if (pluginPath === false || typeof raw !== "string" || raw === "" || /[\0$\x60*?\[\]{}]/u.test(raw) || raw.startsWith("~")) return false;
++  if (selector !== undefined && (typeof selector !== "string" || selector === ""
++    || selector.length > GREP_DIRECTORY_GLOB_MAX_LENGTH || /[\0\r\n]/u.test(selector)
++    // The filter narrows a screened tree; one that names a parent, .git or an absolute path is not a filter.
++    || /^[\\/]|(?:^|[\\/])\.(?:\.|git)(?:[\\/]|$)/iu.test(selector))) return false;
++  const candidate = passiveCandidate(raw, root);
++  if (!qp4PhysicallyInsideProject(candidate, root) || !existsDirectory(candidate)) return false;
++  return isAllowedPassiveReadTarget(raw, { rootDir: root, recursive: true, allFiles: true });
++}
++
+ function qp4IsProjectRoot(raw, root) {
+   try {
+     const candidate = passiveCandidate(raw, root);
+@@ -827,7 +861,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
+     ? claudeTaskOutputReadScope(path, input, root, dependencies)
+     : null;
+   // ALF-C-P15-01B (AC-239): a glob filter on native Grep can only narrow, never widen, a search that names one
+-  // exact, admitted file, so it is admitted for that shape alone (SEC-11 stays: no Grep directory lane).
++  // exact, admitted file, so it is admitted for that shape here; a named directory has its own lane below.
+   // ALF-C-P15-01D: the glob lane additionally requires the resolved, physical target to be inside the project root
+   // (qp4PhysicallyInsideProject: lexical + realpath containment, fails closed on escape, missing or unresolvable path).
+   const grepExactFile = toolName === "Grep" && pluginPath !== false
+@@ -853,7 +887,7 @@ export function readToolScopeVerdict(input, root, dependencies) {
+   const scoped = targetSafe && selectorSafe;
+   if (scoped) return verdict(0);
+   if (toolName === "Glob" && qp4InRootWildcardListing(path, selector, root, sessionRoots)) return verdict(0);
+-  // R2-1 (SEC-11): there is no Grep directory lane; Grep with a directory path is refused exactly as at HEAD.
++  if (toolName === "Grep" && grepInRootDirectory(path, selector, root, pluginPath)) return verdict(0);
+   if (toolName === "Read" && qp4MissingInRootTarget(path, root)) {
+     // G20-67: a Read of a missing in-root file is an existence probe; it reads nothing and the host reports the missing file. Only a canon
+     // pointer the plugin ships keeps the refusal, because its text names the plugin copy to read instead (G20-9).
+@@ -874,18 +908,18 @@ export function readToolScopeVerdict(input, root, dependencies) {
+   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n"
+     + `${READ_TARGET_EXACT_FILE_ADVICE}\n${readTargetProtectedRootsAdvice()}\n`
+     + (toolName === "Glob"
+-      ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or lists one non-hidden project directory: <directory>/* or <directory>/**/* (a subtree), either with path set to that directory and the pattern * or **/*, or with the directory inside the pattern; a bare ** or * over the project root is not, because the root holds hidden directories.\n"
++      ? "A Glob pattern is admitted when it ends in one literal non-credential extension (*.md, **/*.mjs, *.{md,mjs}) or lists one non-hidden project directory: <directory>/* or <directory>/**/* (a subtree), also with a name filter as the last part (<directory>/**/*ledger*), either with path set to that directory and the pattern * or **/*, or with the directory inside the pattern; a bare ** or * over the project root is not, because the root holds hidden directories.\n"
+       : ""));
+ }
+ 
+ // C19C-W169 (W5): a project directory that is not a credential root was refused with a text that spoke only of plugin files and named no protected
+-// root. The refusal itself is unchanged (SEC-11: native Grep names one exact file); the text now says which roots are protected, that a plain project
+-// directory is not one of them, and which spelling is admitted instead. Also printed by the PowerShell dialect's read refusal.
++// root. The text says which roots are protected, that a plain project directory is not one of them, and which spelling is admitted instead (SEC-11,
++// amended C27: native Grep names one exact file or one non-hidden project directory). Also printed by the PowerShell dialect's read refusal.
+ export function readTargetProtectedRootsAdvice() {
+   const stores = PASSIVE_READ_CREDENTIAL_ROOTS.homeRelativePaths.slice(0, 6).join(", ");
+   return `Protected roots: credential stores under the home directory (${stores}, ...), the machine and repository PO key-directory pointers, system pseudo-files, and secret-named files (id_*, credentials, *.pem, *.key, ...). `
+-    + "A project directory that is not a protected root is not what was refused: native Grep searches one exact file (guardrail SEC-11), so list the directory with Glob "
+-    + "(path = the directory, pattern * or *.ext) and then Grep or Read the exact file you need; where the runner offers a Bash tool, rg -n <pattern> <dir> is admitted inside the project.";
++    + "A project directory that is not a protected root is not what was refused: native Grep takes one exact file, or one non-hidden project directory whose tree holds no secret-named file and no .git (guardrail SEC-11), so the project root itself is out; name a subdirectory, or list the directory with Glob "
++    + "(path = the directory, pattern * or *.ext) and then Grep or Read the exact file you need; where the runner offers a Bash tool, rg -n <pattern> <dir> is admitted inside the project, the root included.";
+ }
+ 
+ // The operand(s) of a native Read/Grep/Glob that name the path itself: the file or search path, plus the joined path of a Glob with a literal
+diff --git a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+index 9cab314908fbe2618fd4a20065f6399e4a5480aa..ef3e1ff71912fcc5a2b600b5b8119fa87dc2d270 100644
+--- a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+@@ -218,15 +218,20 @@ test("AP8 a Read of a missing in-repo file gets the distinct GUARD-READ-TARGET-M
+   }
+ }));
+ 
+-test("AP9 Glob wildcard listing of an in-repo directory is admitted; hidden/escaping listings and directory Grep (SEC-11) stay refused", () => withFixture((path) => {
++test("AP9 Glob wildcard listing of an in-repo directory is admitted, with a name filter too; hidden/escaping listings stay refused; native Grep may name a plain directory (SEC-11)", () => withFixture((path) => {
++  assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "scratch/**/*ledger*" } }, path).exitCode, 0);
++  assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "**/*ledger*", path: join(path, "scratch") } }, path).exitCode, 0);
++  assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "scratch/**/*.pem" } }, path).exitCode, 2);
++  assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "**/*ledger*", path } }, path).exitCode, 2);
+   assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "scratch/*", path } }, path).exitCode, 0);
+   assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "scratch/sub/*" } }, path).exitCode, 0);
+   assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "*", path: join(path, ".git") } }, path).exitCode, 2);
+   assert.equal(verdict({ tool_name: "Glob", tool_input: { pattern: "../*", path } }, path).exitCode, 2);
+   assert.equal(verdict({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "docs", "state.md") } }, path).exitCode, 0);
+   const dirGrep = verdict({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "scratch"), glob: "*.md" } }, path);
+-  assert.equal(dirGrep.exitCode, 2);
+-  assert.match(dirGrep.text, /GUARD-READ-TARGET/u);
++  assert.equal(dirGrep.exitCode, 0, dirGrep.text);
++  const gitGrep = verdict({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, ".git") } }, path);
++  assert.equal(gitGrep.exitCode, 2);
+ }));
+ 
+ test("AP9b a native Glob may end in any literal extension that is not credential-shaped, or in one trailing brace group of such extensions (PO 2026-11-01); credential extensions, braces anywhere else, extension wildcards, hidden parts and escapes stay refused", () => withFixture((path) => {
+diff --git a/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs b/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+index 6525ed97e24ef866e7adba41aa79113236ea23e2..827673678a3909e85a5779282a32474321eb1757 100644
+--- a/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
++++ b/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+@@ -182,7 +182,7 @@ test("U1b the exact-file glob lane is restricted to the project root: an exact f
+ }));
+ 
+ test("P7 a glob filter does not widen native Grep: secret file, subtree and out-of-root targets stay denied with a glob", () => withFixture((path) => {
+-  for (const target of [join(path, "vault", "id_rsa"), join(path, "docs"), join(path, "..", "..", "outside.md")]) {
++  for (const target of [join(path, "vault", "id_rsa"), join(path, "vault"), join(path, "..", "..", "outside.md")]) {
+     const r = run({ tool_name: "Grep", tool_input: { pattern: "x", path: target, glob: "*" } }, path);
+     assert.equal(r.exitCode, 2, `${target}\n${r.text}`);
+     assert.deepEqual(denialProblems(r.text), [], `${target}\n${r.text}`);
+@@ -194,16 +194,29 @@ test("P6 native Grep on an exact in-repo file with a type filter is admitted (A1
+   assert.equal(r.exitCode, 0, r.text);
+ }));
+ 
+-test("U2 (PO decision 2026-10-16: REFUSE, SEC-11 exact-file rule stays) native Grep on an in-repo subtree is refused with or without a glob filter; the credential directory stays denied too", () => withFixture((path) => {
+-  for (const target of [join(path, "docs"), join(path, "vault")]) {
+-    for (const extra of [{ glob: "2026-09-2*-*.md" }, { glob: "*" }, {}]) {
+-      const r = run({ tool_name: "Grep", tool_input: { pattern: "apply", path: target, ...extra } }, path);
+-      assert.equal(r.exitCode, 2, `${target} ${JSON.stringify(extra)}\n${r.text}`);
+-      assert.deepEqual(denialProblems(r.text), [], `${target}\n${r.text}`);
+-    }
++test("U2 (PO decision 2026-11-10, SEC-11 amended) native Grep on a plain project directory is admitted with or without a glob filter; a tree holding a secret-named file stays denied", () => withFixture((path) => {
++  for (const extra of [{ glob: "2026-09-2*-*.md" }, { glob: "*" }, {}]) {
++    const admitted = run({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "docs"), ...extra } }, path);
++    assert.equal(admitted.exitCode, 0, `${JSON.stringify(extra)}\n${admitted.text}`);
++    const r = run({ tool_name: "Grep", tool_input: { pattern: "apply", path: join(path, "vault"), ...extra } }, path);
++    assert.equal(r.exitCode, 2, `${JSON.stringify(extra)}\n${r.text}`);
++    assert.deepEqual(denialProblems(r.text), [], r.text);
+   }
+ }));
+ 
++test("U2b the native Grep directory lane is bounded: the glob filter's length and line breaks, hidden directories, and a project root holding .git", () => withFixture((path) => {
++  const grep = (target, extra = {}) => run({ tool_name: "Grep", tool_input: { pattern: "apply", path: target, ...extra } }, path).exitCode;
++  mkdirSync(join(path, ".git"), { recursive: true });
++  mkdirSync(join(path, ".hidden"), { recursive: true });
++  assert.equal(grep(path), 2, "the project root holds .git");
++  assert.equal(grep(join(path, ".hidden")), 2, "a hidden directory is never named");
++  assert.equal(grep(join(path, "docs"), { glob: "x".repeat(257) }), 2);
++  assert.equal(grep(join(path, "docs"), { glob: "a\nb" }), 2);
++  assert.equal(grep(join(path, "docs"), { glob: "" }), 2);
++  writeFileSync(join(path, "docs", "deploy.pem"), "");
++  assert.equal(grep(join(path, "docs")), 2, "the tree now holds a secret-named file");
++}));
++
+ // ---- A3: the cross-runner matrix (Claude row above and in P1-P7; Codex and Antigravity rows below) ------------------
+ // The Claude row runs the lifecycle guard in-process. The Codex and Antigravity rows start the REAL native adapters
+ // (hooks/codex-pretool-guard.mjs, hooks/antigravity-pretool-guard.mjs) as processes with their own envelope shape,
+@@ -469,7 +482,6 @@ test("M8 Claude native Read, Grep and Glob of a credential target are refused wi
+   // Negative controls: the path is not a credential, so the refusal keeps its own code (and the text of the previous behaviour).
+   for (const input of [
+     { tool_name: "Read", tool_input: { file_path: join(path, "..", "..", "outside.md") } },
+-    { tool_name: "Grep", tool_input: { pattern: "a", path: join(path, "docs") } },
+     { tool_name: "Grep", tool_input: { pattern: "a", path: join(path, "vault") } },
+     { tool_name: "Glob", tool_input: { pattern: "../*", path } },
+   ]) {

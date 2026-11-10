@@ -1,0 +1,53 @@
+diff --git a/plugins/pipeline-core/hooks/post-compact-reground.mjs b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+index a5db031c0777c8a5c2e7f7cd915c45e75a1fa9da..0735fbc1144f467d23c63132f24474e8c44a64ca 100644
+--- a/plugins/pipeline-core/hooks/post-compact-reground.mjs
++++ b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+@@ -178,7 +178,7 @@ function stoppedProjection(code, featureId = null) {
+     blocker: null,
+     nextAction: null,
+     resume: null,
+-    dispatchEligibility: { allowed: false, code: "CS-INVALID" },
++    dispatchEligibility: { allowed: false, code: "CS-INVALID", scope: "continuity-only" },
+     decisionTxn: null,
+     recovery: null,
+   };
+@@ -261,7 +261,7 @@ export function resolveRegroundProjection(state, input = null, { rootDir = null
+     blocker: structuredClone(continuity.blocker),
+     nextAction: continuity.queueHead?.nextAction ?? null,
+     resume: structuredClone(continuity.resume),
+-    dispatchEligibility: { allowed: dispatch.allowed, code: dispatch.code },
++    dispatchEligibility: { allowed: dispatch.allowed, code: dispatch.code, scope: "continuity-only" },
+     decisionTxn: structuredClone(continuity.decisionTxn),
+     recovery: structuredClone(continuity.recovery),
+     mainSessionRoute: mainSessionRouteProjection(input, phase, rootDir),
+diff --git a/plugins/pipeline-core/hooks/post-compact-reground.test.mjs b/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
+index c91edce9f2031a79a9d1699cc3e81c1ea8c39edf..e9d1dcd2fa4d7fce3cce234148a3166f01d61761 100644
+--- a/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
++++ b/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
+@@ -156,7 +156,7 @@ check("English runtime projects complete validated queue state", () => {
+   assert.deepEqual(projection.queueHead, continuity().queueHead);
+   assert.equal(projection.revision, 4);
+   assert.equal(projection.nextAction, "dispatch");
+-  assert.deepEqual(projection.dispatchEligibility, { allowed: true, code: "CS-DISPATCHABLE" });
++  assert.deepEqual(projection.dispatchEligibility, { allowed: true, code: "CS-DISPATCHABLE", scope: "continuity-only" });
+   assert.deepEqual(projection.resume, continuity().resume);
+ });
+ 
+@@ -309,7 +309,7 @@ check("typed blocker is exact and explicitly prevents work resumption", () => {
+   assert.deepEqual(projection.blocker, blocker());
+   assert.equal(projection.queueHead, null);
+   assert.equal(projection.nextAction, null);
+-  assert.deepEqual(projection.dispatchEligibility, { allowed: false, code: "CS-BLOCKED" });
++  assert.deepEqual(projection.dispatchEligibility, { allowed: false, code: "CS-BLOCKED", scope: "continuity-only" });
+ });
+ 
+ check("pending decision transaction remains visible and non-runnable", () => {
+@@ -327,7 +327,7 @@ check("pending decision transaction remains visible and non-runnable", () => {
+   assert.equal(projection.code, "PCR-DECISION-PENDING");
+   assert.equal(projection.workResumptionAllowed, false);
+   assert.deepEqual(projection.decisionTxn, decisionTxn);
+-  assert.deepEqual(projection.dispatchEligibility, { allowed: false, code: "CS-DECISION-PENDING" });
++  assert.deepEqual(projection.dispatchEligibility, { allowed: false, code: "CS-DECISION-PENDING", scope: "continuity-only" });
+ });
+ 
+ check("one-shot recovery is projected without inventing isolation assurance", () => {

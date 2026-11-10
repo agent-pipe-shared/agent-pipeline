@@ -1,0 +1,111 @@
+diff --git a/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+index bcd2a2f8f66f00fdc124476c44c2b97b43505908..63572d2fa9368d2a1d03594961bb74fde163b053 100644
+--- a/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
++++ b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+@@ -16,6 +16,8 @@ done_when: manual
+ 
+ The records name who wrote a change and state that a test failed before it passed, but the agent that did the work is the one saying so. The records already label this as self-attested, so nothing claims more than it knows. A host-observed chain from a failing test to a passing one would be a new capability.
+ 
++The same limit applies to `lane.independent: true` in the Critic review lineage. The compiler writes it for every consumed session-mode round. It says that the round is its own Critic run with its own lane, derived from the hosting session and the round's packet. It does not say that the host isolated that run. An auditor index has to read it that way until isolation is observed.
++
+ ## Decision
+ 
+ PO tile 2026-11-10: after 0.7.0. It is not part of the 0.7.0 scope.
+diff --git a/backlog/items/2026-11-10-personal-routing-override-after-0-7-0.md b/backlog/items/2026-11-10-personal-routing-override-after-0-7-0.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..6e485bec59f4f3170bd49677d0448e33db7b050a
+--- /dev/null
++++ b/backlog/items/2026-11-10-personal-routing-override-after-0-7-0.md
+@@ -0,0 +1,27 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.personal-routing-override
++type: improvement
++owner: pipeline
++status: open
++created: 2026-11-10
++source: PO tile of 2026-11-10 on project-owned routing (ADR-0089)
++sprint: after-0.7.0
++done_when: manual
++---
++
++# Personal routing override on top of the project's routing
++
++## Description
++
++Routing stays in the tracked `pipeline.user.yaml` for 0.7.0, so every member of a team gets the same routes. The PO decided on 2026-11-10 that a personal override can follow after 0.7.0.
++
++## Scope
++
++- A local, untracked override, read from the machine plane, for the routes a single person wants to change.
++- The dispatch readback names which routes came from the override.
++- A plan approval records the routing it was approved under, so an override must not silently invalidate or bypass that record. The design has to settle how the two interact.
++
++## Done when
++
++The PO accepts the override behaviour and the interaction with an approved plan is pinned by a test.
+diff --git a/backlog/items/2026-11-10-read-allowlist-for-neighbour-folders-after-0-7-0.md b/backlog/items/2026-11-10-read-allowlist-for-neighbour-folders-after-0-7-0.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f82984d33b54638db8e5da689fb2fe14741bc3e4
+--- /dev/null
++++ b/backlog/items/2026-11-10-read-allowlist-for-neighbour-folders-after-0-7-0.md
+@@ -0,0 +1,27 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.read-allowlist-for-neighbour-folders
++type: improvement
++owner: pipeline
++status: open
++created: 2026-11-10
++source: Claude greenfield report 070_6 (F-READONLY-WIN) and the PO tile of 2026-11-10
++sprint: after-0.7.0
++done_when: manual
++---
++
++# Read allowlist for neighbour folders and script path arguments
++
++## Description
++
++A greenfield run on native Windows needed to read a folder next to its project on the PO's order, and the guard refused the read. A project script could still read outside the project, because script path arguments are not checked. The PO deferred both by tile on 2026-11-10.
++
++## Scope
++
++- A narrow, user-configured allowlist of read-only folders outside the project root, with the same secret-name screen the project lane uses.
++- A check of path arguments passed to scripts, or a stated limit that says why it cannot be checked.
++- The real closure of the observation boundary is OS isolation. This item does not replace it and must not claim to.
++
++## Done when
++
++The PO accepts the allowlist behaviour on Windows and Linux, and the guard text names the configured route.
+diff --git a/backlog/items/2026-11-10-stop-nudge-after-refused-push-after-0-7-0.md b/backlog/items/2026-11-10-stop-nudge-after-refused-push-after-0-7-0.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..61cd88238b9ac499f4c194b6e0f3e143f96ea588
+--- /dev/null
++++ b/backlog/items/2026-11-10-stop-nudge-after-refused-push-after-0-7-0.md
+@@ -0,0 +1,26 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.stop-nudge-after-refused-push
++type: improvement
++owner: pipeline
++status: open
++created: 2026-11-10
++source: Greenfield finding F37 and the PO tile of 2026-11-10
++sprint: after-0.7.0
++done_when: manual
++---
++
++# Stop hook nudge after a refused push (F37)
++
++## Description
++
++After a refused push a run can end its turn without saying that the push did not land. The PO decided on 2026-11-10 to take this up after 0.7.0.
++
++## Scope
++
++- At turn end, a refused push attempt that has no later successful push produces one short notice with the refusal code.
++- The notice comes from the push attempt record, so the three runners share one source.
++
++## Done when
++
++A test covers a refused push followed by turn end, and the PO accepts the wording.

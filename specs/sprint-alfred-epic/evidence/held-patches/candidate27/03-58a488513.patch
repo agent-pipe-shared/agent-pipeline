@@ -1,0 +1,58 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index da637dc9bad75d9eb6f9f54f87cb2aaf3fca8691..617c5d1e3c381f29ac26d6c48cb6c0434bc78316 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -73,6 +73,15 @@ export function heldDependencyRepair() {
+ }
+ // PO 2026-10-30 (D203): when the registry cannot be read (a producer refuses its reconcile), the refusal names the whole
+ // repair route itself: inspect, then the routine heal, and when heal did not clear it and no Goldfish runs, move-aside.
++/**
++ * C27 (Claude greenfield 2026-11-09: five parallel launches, read as "dependency held" and answered with serial work): a registry lock a sibling launch still held when the admission's wait ran out says nothing about the dependency.
++ * It gets its own code and the one repair that applies. Every other unreadable registry keeps the dependency code and the full repair route.
++ */
++export function integrationReadinessRefusal(readiness) {
++  if (readiness.code !== "SDC-LOCK-HELD") return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`,repair:readinessUnavailableRepair()};
++  return { ...fail("NGHS-ITEM-INTEGRATION-LOCK-HELD"), reason: `integration readiness not observed (${readiness.code}): the session registry lock was held by another launch`,
++    repair: "another launch held the session registry lock until this admission's wait ran out; the dependency itself was not judged. Send this dispatch again, alone, with one Agent call per message; nothing else needs repair" };
++}
+ export function readinessUnavailableRepair() {
+   const routine = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
+   return `the session-authority registry could not be read; run node ${REPAIR_SCRIPT} inspect --root <root> to see which producer refuses, then node ${routine} run heal --root <root> --reason "<why>" and inspect again. If a producer is still reconcile-refused and no Goldfish runs, run node ${REPAIR_SCRIPT} move-aside --no-goldfish-running --root <root> --reason "<why>" (the registry is retained aside, nothing is deleted, and the next dispatch initializes it fresh), then dispatch again`;
+@@ -301,7 +310,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+     if (!item || item.state !== "ready") return { ...fail("NGHS-ITEM-NOT-READY"), reason: itemNotReadyReason(named, item) };
+     if(item.delivery.criterionLocator&&!binding.itemDelivery)return fail("NGHS-ITEM-ORIGINAL-BRIEFING-REQUIRED");
+     if(item.dependsOn.length>0){checkpoint("integration-readiness");const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd(),admissionDeadline,publishRetry:dependencies.publishRetry});
+-      if(readiness.status!=='observed')return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`,repair:readinessUnavailableRepair()};
++      if(readiness.status!=='observed')return integrationReadinessRefusal(readiness);
+       const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
+       if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:heldDependencyReason(held,deliveryQueue.normalized.slices),repair:heldDependencyRepair()};}
+     if (item.delivery.baseCommit !== binding.candidateCommit) return fail("NGHS-ITEM-BASE-MISMATCH");
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index b97806980e63e40bbca91f6edf8171731d329081..278f25e07d8024f0609cdd89ca2dbe9f8aba6129 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -18,7 +18,7 @@ import { createGovernanceScopeController } from "./governance-scope.mjs";
+ import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+ import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
+ import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit } from "./agy-host-commit-admission.mjs";
+-import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority, retryPublishWhileLockHeld } from "./native-goldfish-host-state.mjs";
++import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority, retryPublishWhileLockHeld, integrationReadinessRefusal } from "./native-goldfish-host-state.mjs";
+ import { ADMISSION_DEADLINE_MARGIN_MS, admissionDeadlineActive, assertAdmissionDeadline, clearAdmissionDeadline, setAdmissionDeadline } from "./admission-deadline.mjs";
+ import { requiresGovernedItemAdmission } from "../hooks/guard-dispatch.mjs";
+ import { qualifyNativeGoldfishHookDelivery } from "../hooks/native-goldfish-host.mjs";
+@@ -119,6 +119,15 @@ function d177Setup(root, prepareBoth = true) {
+ }
+ 
+ const cases = [
++  { id: "C27-readiness-lock-is-not-a-held-dependency", name: "C27 a registry lock met by the readiness read is not reported as a held dependency", run: () => {
++    const lock = integrationReadinessRefusal({ status: "refused", code: "SDC-LOCK-HELD", reason: "registry-lock-held" });
++    assert.equal(lock.code, "NGHS-ITEM-INTEGRATION-LOCK-HELD");
++    assert.match(lock.repair, /Send this dispatch again, alone/u);
++    assert.doesNotMatch(lock.repair, /move-aside/u);
++    const unreadable = integrationReadinessRefusal({ status: "refused", code: "SAR-READ", reason: "unreadable" });
++    assert.equal(unreadable.code, "NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD");
++    assert.match(unreadable.repair, /move-aside/u);
++  } },
+   { id: "D177-a-memo-per-admission", name: "D177 the admission memo computes once per key and boundary and does not leak across boundaries", run: async () => {
+     const { memoPerAdmission } = await import("./native-goldfish-host-state.mjs");
+     const first = {}, second = {}; let calls = 0;

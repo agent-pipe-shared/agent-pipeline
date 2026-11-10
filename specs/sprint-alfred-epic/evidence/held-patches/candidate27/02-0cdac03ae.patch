@@ -1,0 +1,146 @@
+diff --git a/plugins/pipeline-core/hooks/guard-command-grammar.mjs b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+index 9cdc44067e0f5b4a17ca5d8df820e74037df483b..48bbc664c91b23a27907163dd6fe7e956d20ccf9 100644
+--- a/plugins/pipeline-core/hooks/guard-command-grammar.mjs
++++ b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+@@ -388,6 +388,14 @@ function validateRg(argv, root, windows, additionalRoots = []) {
+   const booleans = filesMode ? FILE_BOOLEAN : SEARCH_BOOLEAN;
+   // C22B: a cluster of flags this command admits on their own is judged flag by flag below (a repeated member is refused like a repeated flag).
+   args = expandBooleanShortClusters(args, booleans);
++  // C27 (Claude greenfield): the attached context spelling rg itself accepts (-A3), read as -A 3; grep already took it. Nothing after `--` is a flag.
++  if (!filesMode) {
++    const end = args.indexOf("--");
++    args = args.flatMap((arg, index) => {
++      const attached = (end === -1 || index < end) ? /^(-[ABC])([0-9]{1,3})$/u.exec(arg) : null;
++      return attached === null ? [arg] : [attached[1], attached[2]];
++    });
++  }
+   const values = filesMode ? FILE_VALUE : SEARCH_VALUE;
+   const seen = new Set();
+   const paths = [];
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 1b06c694e3552003271e791e3053fc17278d75b3..85204d4b53efbe8a7cd15d82cff6f2c1584f93da 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -2273,6 +2273,41 @@ test("NVA-CF-GITPIPEALLOWLIST: the admitted grammar shapes include the git-to-he
+ });
+ 
+ // backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
++test("C27: git cat-file in its closed form, a cd to the exact project root inside a read chain, and attached rg context are admitted; nothing wider is", () => {
++  const path = root();
++  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-c27-outside-"));
++  const oid = "e3a27578fcb3d70f47d96e2aca83d3e4fe8680bf";
++  try {
++    mkdirSync(join(path, "backlog/items"), { recursive: true });
++    writeFileSync(join(path, "backlog/items/passive-probe.txt"), "pattern fixture\n");
++    const file = "backlog/items/passive-probe.txt";
++    for (const command of [
++      `git cat-file -t ${oid}`,
++      `git cat-file -e ${oid}`,
++      `git rev-parse HEAD && git cat-file -t ${oid} && git diff --stat ${oid}..${oid}`,
++      `cd ${path} && rg -n pattern ${file}`,
++      `cd ${path} && git status --short`,
++      `rg -n -A3 pattern ${file}`,
++      `rg -n -C12 -B2 pattern ${file}`,
++    ]) assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
++    for (const command of [
++      "git cat-file --batch",
++      `git cat-file -t`,
++      `git cat-file -t ${oid} ${oid}`,
++      `git cat-file --textconv ${oid}`,
++      `cd ${outside} && rg -n pattern ${file}`,
++      `cd .. && rg -n pattern ${file}`,
++      `cd backlog && rg -n pattern items/passive-probe.txt`,
++      `cd ${path} && git push origin HEAD`,
++      `cd ${path} && node --test ${file}`,
++      `rg -n -A501 pattern ${file}`,
++      `rg -n -A3x pattern ${file}`,
++      `rg -n -nA3 pattern ${file}`,
++    ]) assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
++    assert.equal(isReadOnlyDiagnosticCommand(`rg -n pattern -- -A3`, path), false, "after -- it is a path, and that path is judged as one");
++  } finally { rmSync(path, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); }
++});
++
+ test("the &&-chain union (read-only classifier plus the small always-safe-write allowlist) and trailing 2>/dev/null admit exactly the backlog's triggering shapes, widened per NVA-I-GRAMMAR, and nothing more", () => {
+   const path = root();
+   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-and-chain-outside-"));
+diff --git a/plugins/pipeline-core/lib/guard/grammar-denials.mjs b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+index ec760dc603d878652ed7a9d4f27b8a1b8570ed5b..b1f1ed11e898ee002197182a917eb5aef97ade09 100644
+--- a/plugins/pipeline-core/lib/guard/grammar-denials.mjs
++++ b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+@@ -132,13 +132,13 @@ export const ADMITTED_GRAMMAR_SHAPES = [
+   {
+     spelling: `up to ${MAX_AND_CHAIN_SEGMENTS} "&&"-chained segments, admitted only when EVERY `
+       + "segment is independently one of the shapes above or the small always-safe-write "
+-      + "allowlist (echo; \"mkdir -p\" under scratch/ or .claude/worktrees/)",
++      + "allowlist (echo; \"mkdir -p\" under scratch/ or .claude/worktrees/; \"cd\" to the absolute project root)",
+     example: "rg -n needle probe.txt && rg -n needle probe.txt",
+   },
+   {
+     // C21 (AC-108): the listing and context forms a worker tries first; the paths are judged by the same scope as every other read.
+     spelling: "listing and context forms of those commands: \"rg --files <dir>...\"; a context flag \"-A N\" / \"-B N\" / \"-C N\" (grep: N of 1..3 digits, separate or attached "
+-      + "as -C5; rg: N up to 500, separate); \"ls\" with -l -a -R -1 -h (or combined, e.g. -la) over contained paths; listing a directory the project has yet to create is admitted; "
++      + "as -C5; rg: N up to 500, separate or attached as -C5);\"ls\" with -l -a -R -1 -h (or combined, e.g. -la) over contained paths; listing a directory the project has yet to create is admitted; "
+       + "rg and grep also take a combined cluster of flags that are each admitted on their own and take no value (e.g. -in); a flag with a value, such as -A or -m, stays separate; "
+       + "\"grep -rn <pattern> <dir>\" (also -rl, -ril, --include=GLOB, --exclude=GLOB) reads every file under the directory, hidden and ignored ones too, so it is admitted only when the tree holds no secret-named file and no .git "
+       + "(add --exclude-dir=.git, at most 8 --exclude-dir=NAME) -- otherwise use \"rg -n <pattern> <dir>\"; -R is not admitted",
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index d350d7ddcd2c5d5b7a790683b53a9c4eb89bd0aa..9b7ace48bdba64ff046a253aa546b14c17e28bcc 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -770,10 +770,21 @@ function isChainEligibleMkdirTarget(target, root) {
+  * argv beginning with `-C` or `-c` simply fails every subcommand match below and is
+  * refused.
+  */
++/** C27: true only for an absolute operand that is physically the project root, so a `cd` to it changes nothing the other segments are judged against. */
++function isProjectRootOperand(value, root) {
++  if (typeof value !== "string" || !isAbsolute(value)) return false;
++  try {
++    const [target, project] = [realpathSync(value), realpathSync(root)];
++    return process.platform === "win32" ? target.toLowerCase() === project.toLowerCase() : target === project;
++  } catch { return false; }
++}
++
+ function isChainEligibleSegment(segment, root) {
+   const executable = basename(segment.executable).toLowerCase();
+   const argv = segment.argv;
+   if (executable === "echo") return true;
++  // C27 (Claude greenfield): `cd <project root> && <admitted read>` is the most common shape dispatched agents reach for. Every other segment is judged against that root anyway.
++  if (executable === "cd") return argv.length === 1 && isProjectRootOperand(argv[0], root);
+   if (executable === "ls") return true;
+   if (executable === "mkdir") {
+     return argv.length === 2 && argv[0] === "-p" && isChainEligibleMkdirTarget(argv[1], root);
+@@ -1510,6 +1521,8 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
+   if (["status", "diff", "log", "show", "rev-parse", "ls-files", "ls-tree", "for-each-ref", "describe"].includes(subcommand)) {
+     return true;
+   }
++  // C27 (Claude greenfield: every Critic's first chain stopped on this): the closed form the `git -C` pipeline lane already admits, exactly one mode and one revision. `git show` of the same object is admitted.
++  if (subcommand === "cat-file") return subargs.length === 2 && GIT_CAT_FILE_MODES.has(subargs[0]) && isStrictGitRevision(subargs[1]);
+   // Closed stash readers only: no options, output, extra refs or mutating verbs.
+   if (subcommand === "stash") {
+     if (subargs.length === 1 && subargs[0] === "list") return true;
+diff --git a/plugins/pipeline-core/templates/prompts/agent-obligations.md b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+index 5042d3d7b37c368086d7fb72ec4ce17ef34c16c6..78bda3dafdeb06415975c7c38ba268015cb07a42 100644
+--- a/plugins/pipeline-core/templates/prompts/agent-obligations.md
++++ b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+@@ -29,7 +29,7 @@ spends a tool use from the budget that is also the stop condition.
+ No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining
+ with `&&` is admitted only as up to 6 segments, and only when every segment is
+ itself an admitted read-only shape (or the small always-safe-write allowlist:
+-`echo`, `mkdir -p` under `scratch/`). The only admitted piping is the bounded
++`echo`, `mkdir -p` under `scratch/`, `cd` to the absolute project root). The only admitted piping is the bounded
+ read-only diagnostic pipelines (a read command into `head` or `tail`, or `rg`/`grep` into
+ `rg`/`grep`); every grammar refusal prints the complete current list with its
+ bounds, so read that list instead of guessing.
+diff --git a/templates/prompts/agent-obligations.md b/templates/prompts/agent-obligations.md
+index 5042d3d7b37c368086d7fb72ec4ce17ef34c16c6..78bda3dafdeb06415975c7c38ba268015cb07a42 100644
+--- a/templates/prompts/agent-obligations.md
++++ b/templates/prompts/agent-obligations.md
+@@ -29,7 +29,7 @@ spends a tool use from the budget that is also the stop condition.
+ No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining
+ with `&&` is admitted only as up to 6 segments, and only when every segment is
+ itself an admitted read-only shape (or the small always-safe-write allowlist:
+-`echo`, `mkdir -p` under `scratch/`). The only admitted piping is the bounded
++`echo`, `mkdir -p` under `scratch/`, `cd` to the absolute project root). The only admitted piping is the bounded
+ read-only diagnostic pipelines (a read command into `head` or `tail`, or `rg`/`grep` into
+ `rg`/`grep`); every grammar refusal prints the complete current list with its
+ bounds, so read that list instead of guessing.

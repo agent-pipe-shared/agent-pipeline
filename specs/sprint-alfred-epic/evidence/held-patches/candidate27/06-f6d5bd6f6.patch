@@ -1,0 +1,526 @@
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index 5ec89100c06c406b7c8ff43bcaa8d0a00eaacfc8..114264853fc974c4f115f3fd0c789065fb999daf 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -166,7 +166,10 @@ still exempts exactly the tracked state path, for a repository that carries an
+ older tracked record.
+ A missing key directory is repaired once with `po-human-approval.mjs
+ set-po-key-directory --directory <the PO's key directory>` (agent-executable, no
+-signature).
++signature). The `--by` name is asked once per machine and user:
++`po-human-approval.mjs set-operator-label --label <the name the PO states>`
++keeps it in the machine-local configuration, never in a tracked file, and the
++Pipeline start preflight shows it. It is attribution only (EL-36).
+ 
+ There is no fallback classification. `main`, configured protected refs,
+ release/stable refs, tags, force/deletion forms, unknown destinations, and a
+diff --git a/harness/scripts/generate-elephant-role-prohibitions.test.mjs b/harness/scripts/generate-elephant-role-prohibitions.test.mjs
+index dc1659c2ff2b13caf7f1fd7e9ede2be241a690b8..c237b7c13aa7744f8b155171e99ac62db65e493d 100644
+--- a/harness/scripts/generate-elephant-role-prohibitions.test.mjs
++++ b/harness/scripts/generate-elephant-role-prohibitions.test.mjs
+@@ -178,7 +178,7 @@ test("AC-8 (G9 EL-36/EL-37/EL-38): the three greenfield rules are defined with t
+   assert.ok(!INCLUDED_EL_IDS.includes("EL-38"), "EL-38 is a dispatch-pipeline duty and stays out of the printed block");
+   assert.ok(Object.prototype.hasOwnProperty.call(EXCLUDED_EL_IDS, "EL-38"), "EL-38 must be excluded with a stated reason");
+   const generated = renderRoleProhibitions().replace(/\s+/gu, " ");
+-  assert.match(generated, /EL-36 Never fill `--by`, or any operator\/actor label, with a value the PO did not supply for that exact command/u);
++  assert.match(generated, /EL-36 Never fill `--by`, or any operator\/actor label, with a value the PO did not supply, either for that exact command or once in this machine's `operatorLabel`/u);
+   assert.match(generated, /EL-37 A protected or guard-denied mutation goes only through its sanctioned route/u);
+   assert.match(generated, /Role prohibitions loaded: [^ ]*EL-35\/EL-36\/EL-37 —/u);
+   assert.doesNotMatch(generated, /EL-38/u, "the excluded EL-38 must not be printed");
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index 5ec89100c06c406b7c8ff43bcaa8d0a00eaacfc8..114264853fc974c4f115f3fd0c789065fb999daf 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -166,7 +166,10 @@ still exempts exactly the tracked state path, for a repository that carries an
+ older tracked record.
+ A missing key directory is repaired once with `po-human-approval.mjs
+ set-po-key-directory --directory <the PO's key directory>` (agent-executable, no
+-signature).
++signature). The `--by` name is asked once per machine and user:
++`po-human-approval.mjs set-operator-label --label <the name the PO states>`
++keeps it in the machine-local configuration, never in a tracked file, and the
++Pipeline start preflight shows it. It is attribution only (EL-36).
+ 
+ There is no fallback classification. `main`, configured protected refs,
+ release/stable refs, tags, force/deletion forms, unknown destinations, and a
+diff --git a/plugins/pipeline-core/lib/machine-plane.mjs b/plugins/pipeline-core/lib/machine-plane.mjs
+index 85ba6ad0170557d6c84de9b7d7fcfd7ceb575c15..2539a7fe318158f83c3f722fe717ceebb6216d18 100644
+--- a/plugins/pipeline-core/lib/machine-plane.mjs
++++ b/plugins/pipeline-core/lib/machine-plane.mjs
+@@ -33,6 +33,9 @@ export const MACHINE_PLANE_SCHEMA = "pipeline.machine-plane.v1";
+ const MACHINE_PLANE_KEYS = Object.freeze([
+   "schema", "poKeyDirectory", "pushApprovalDefault", "routing", "language", "session", "usage", "updatedAt",
+ ]);
++// C27 (PO decision 2026-11-10, EL-36 amended): may be absent, so every machine file written before it stays valid. Attribution only: the label fills `--by`,
++// it never stands in for a signature or a PO decision.
++const OPTIONAL_MACHINE_PLANE_KEYS = Object.freeze(["operatorLabel"]);
+ const PUSH_APPROVAL_DEFAULTS = Object.freeze(["signature", "chat"]);
+ 
+ /**
+@@ -71,7 +74,7 @@ function keySetIssue(value) {
+   if (!object(value)) return { code: "MP-NOT-OBJECT" };
+   const keys = Object.keys(value);
+   for (const key of keys) {
+-    if (!MACHINE_PLANE_KEYS.includes(key)) return { code: "MP-UNKNOWN-KEY", detail: key };
++    if (!MACHINE_PLANE_KEYS.includes(key) && !OPTIONAL_MACHINE_PLANE_KEYS.includes(key)) return { code: "MP-UNKNOWN-KEY", detail: key };
+   }
+   for (const key of MACHINE_PLANE_KEYS) {
+     if (!keys.includes(key)) return { code: "MP-MISSING-KEY", detail: key };
+@@ -103,6 +106,12 @@ function validLanguage(value) {
+     && value.length > 0 && value.length <= 64 && !/[\r\n\0]/u.test(value));
+ }
+ 
++/** One short single-line name that cannot be read as a flag. */
++export function validOperatorLabel(value) {
++  return typeof value === "string" && value.trim() === value && value.length > 0 && value.length <= 64
++    && !value.startsWith("-") && !/[\x00-\x1f\x7f]/u.test(value);
++}
++
+ /** `routing`/`session`/`usage`: null (not yet configured), or an opaque plain object.
+  * Their internal taxonomy is out of this task's scope (SS6) and is not invented here. */
+ function nullOrPlainObject(value) { return value === null || object(value); }
+@@ -124,6 +133,9 @@ export function validateMachinePlane(value) {
+   if (!nullOrPlainObject(value.session)) return { ok: false, code: "MP-SESSION", detail: "session" };
+   if (!nullOrPlainObject(value.usage)) return { ok: false, code: "MP-USAGE", detail: "usage" };
+   if (!validUpdatedAt(value.updatedAt)) return { ok: false, code: "MP-UPDATED-AT", detail: "updatedAt" };
++  if (Object.hasOwn(value, "operatorLabel") && value.operatorLabel !== null && !validOperatorLabel(value.operatorLabel)) {
++    return { ok: false, code: "MP-OPERATOR-LABEL", detail: "operatorLabel" };
++  }
+   return { ok: true };
+ }
+ 
+@@ -158,6 +170,13 @@ export function readMachinePlane(dependencies = {}) {
+   return { status: "valid", plane: parsed };
+ }
+ 
++/** The label the PO recorded once for this machine, or null when none is recorded or the plane is not valid. Never throws. */
++export function readMachineOperatorLabel(dependencies = {}) {
++  const read = readMachinePlane(dependencies);
++  if (read.status !== "valid") return null;
++  return typeof read.plane.operatorLabel === "string" ? read.plane.operatorLabel : null;
++}
++
+ /** Shape check only, NOT a proof: looks for a PEM block marker or the substring
+  * "PRIVATE KEY" in any string value, recursively. It cannot detect key material that
+  * does not look like key material; it exists to catch an accidental paste, not to
+diff --git a/plugins/pipeline-core/lib/machine-plane.test.mjs b/plugins/pipeline-core/lib/machine-plane.test.mjs
+index e0794a4ef12bf0d33f354d392c8e879315ce47b9..9ab438e6b86c09342f2c433e14a6bd37ca6f34a1 100644
+--- a/plugins/pipeline-core/lib/machine-plane.test.mjs
++++ b/plugins/pipeline-core/lib/machine-plane.test.mjs
+@@ -20,11 +20,13 @@ import test from "node:test";
+ import {
+   MACHINE_PLANE_SCHEMA,
+   machinePlaneFilePath,
++  readMachineOperatorLabel,
+   readMachinePlane,
+   resolveLocalOperatorKeyAnchor,
+   validateMachinePlane,
+   writeMachinePlane,
+ } from "./machine-plane.mjs";
++import { readMachinePlane as readHumanApprovalMachinePlane } from "./po-human-approval-read.mjs";
+ 
+ const SCRATCH_ROOT = fileURLToPath(new URL("../../../scratch/", import.meta.url));
+ 
+@@ -179,6 +181,26 @@ test("AC-2: an additional, otherwise-harmless key makes the plane invalid, namin
+   assert.deepEqual(checked, { ok: false, code: "MP-UNKNOWN-KEY", detail: "extraField" });
+ });
+ 
++test("C27: operatorLabel is optional, so a plane without it stays valid; a present value must be one short line or null, and the reader returns it", () => {
++  assert.deepEqual(validateMachinePlane(validPlane()), { ok: true });
++  for (const operatorLabel of ["Alex", "A. Person", null]) assert.deepEqual(validateMachinePlane(validPlane({ operatorLabel })), { ok: true }, String(operatorLabel));
++  for (const operatorLabel of ["", " x", "x ", "--flag", "a\nb", "x".repeat(65), 7, {}]) {
++    assert.deepEqual(validateMachinePlane(validPlane({ operatorLabel })), { ok: false, code: "MP-OPERATOR-LABEL", detail: "operatorLabel" }, JSON.stringify(operatorLabel));
++  }
++  const { home, target } = homeFixture();
++  try {
++    const dependencies = { homedirFn: () => home };
++    assert.equal(readMachineOperatorLabel(dependencies), null, "no file");
++    writeMachinePlane(validPlane(), dependencies);
++    assert.equal(readMachineOperatorLabel(dependencies), null, "no key");
++    writeMachinePlane(validPlane({ operatorLabel: "Alex" }), dependencies);
++    assert.equal(readMachineOperatorLabel(dependencies), "Alex");
++    assert.equal(readHumanApprovalMachinePlane(dependencies).status, "valid", "the read-only copy used by the signing path accepts the same file");
++    writeFileSync(target, "{}\n");
++    assert.equal(readMachineOperatorLabel(dependencies), null, "an invalid plane yields no value");
++  } finally { rmSync(home, { recursive: true, force: true }); }
++});
++
+ test("AC-2: any single missing key makes the plane invalid, naming that key", () => {
+   for (const key of Object.keys(validPlane())) {
+     const plane = validPlane();
+diff --git a/plugins/pipeline-core/lib/po-human-approval-read.mjs b/plugins/pipeline-core/lib/po-human-approval-read.mjs
+index 3b1f188936d9d2bad0317f022fad628eaa178b8b..f7081164c1710eaa0b6ca97f45b9bc166df8998d 100644
+--- a/plugins/pipeline-core/lib/po-human-approval-read.mjs
++++ b/plugins/pipeline-core/lib/po-human-approval-read.mjs
+@@ -16,6 +16,7 @@ export const MACHINE_PLANE_SCHEMA = "pipeline.machine-plane.v1";
+ const MACHINE_PLANE_KEYS = Object.freeze([
+   "schema", "poKeyDirectory", "pushApprovalDefault", "routing", "language", "session", "usage", "updatedAt",
+ ]);
++const OPTIONAL_MACHINE_PLANE_KEYS = Object.freeze(["operatorLabel"]);
+ const PUSH_APPROVAL_DEFAULTS = Object.freeze(["signature", "chat"]);
+ 
+ /**
+@@ -54,7 +55,7 @@ function keySetIssue(value) {
+   if (!object(value)) return { code: "MP-NOT-OBJECT" };
+   const keys = Object.keys(value);
+   for (const key of keys) {
+-    if (!MACHINE_PLANE_KEYS.includes(key)) return { code: "MP-UNKNOWN-KEY", detail: key };
++    if (!MACHINE_PLANE_KEYS.includes(key) && !OPTIONAL_MACHINE_PLANE_KEYS.includes(key)) return { code: "MP-UNKNOWN-KEY", detail: key };
+   }
+   for (const key of MACHINE_PLANE_KEYS) {
+     if (!keys.includes(key)) return { code: "MP-MISSING-KEY", detail: key };
+@@ -86,6 +87,12 @@ function validLanguage(value) {
+     && value.length > 0 && value.length <= 64 && !/[\r\n\0]/u.test(value));
+ }
+ 
++/** One short single-line name that cannot be read as a flag (copy of machine-plane.mjs). */
++function validOperatorLabel(value) {
++  return typeof value === "string" && value.trim() === value && value.length > 0 && value.length <= 64
++    && !value.startsWith("-") && !/[\x00-\x1f\x7f]/u.test(value);
++}
++
+ /** `routing`/`session`/`usage`: null (not yet configured), or an opaque plain object.
+  * Their internal taxonomy is out of this task's scope (SS6) and is not invented here. */
+ function nullOrPlainObject(value) { return value === null || object(value); }
+@@ -107,6 +114,9 @@ export function validateMachinePlane(value) {
+   if (!nullOrPlainObject(value.session)) return { ok: false, code: "MP-SESSION", detail: "session" };
+   if (!nullOrPlainObject(value.usage)) return { ok: false, code: "MP-USAGE", detail: "usage" };
+   if (!validUpdatedAt(value.updatedAt)) return { ok: false, code: "MP-UPDATED-AT", detail: "updatedAt" };
++  if (Object.hasOwn(value, "operatorLabel") && value.operatorLabel !== null && !validOperatorLabel(value.operatorLabel)) {
++    return { ok: false, code: "MP-OPERATOR-LABEL", detail: "operatorLabel" };
++  }
+   return { ok: true };
+ }
+ 
+diff --git a/plugins/pipeline-core/roles/elephant.md b/plugins/pipeline-core/roles/elephant.md
+index 3ca1923779b698e19e3e38419bb500fd77333c09..a3dc6dc7170b33c2bc3612bc987e8655d6d69bfa 100644
+--- a/plugins/pipeline-core/roles/elephant.md
++++ b/plugins/pipeline-core/roles/elephant.md
+@@ -92,9 +92,9 @@ protected policy/signature changes remain outside this lane.
+ 
+ ### EL-36 (MUST NOT) — An approval or record label is never inferred in the PO's name
+ 
+-- **Rule:** Never fill `--by`, or any operator/actor label, with a value the PO did not supply for that exact command. A label is attribution, never authority: it does not stand in for the approval, signature or confirmation it sits next to, and an example value shown in a template or doc is not an identity claim.
+-- **Why:** Greenfield finding P0-2 (Claude-Windows greenfield test). A label the agent inferred in the PO's name makes the record attribute an act to the PO that the PO did not supply for that command.
+-- **Check:** A trajectory that fills `--by` or an actor label with the PO's name, unsupplied for that exact command, is a lifecycle-violation finding at close/critic review.
++- **Rule:** Never fill `--by`, or any operator/actor label, with a value the PO did not supply, either for that exact command or once in this machine's `operatorLabel`. The Pipeline start preflight shows that label, and `po-human-approval.mjs set-operator-label --label <name>` records a value the PO states in chat; it lives in the machine-local configuration, never in a tracked file. A label is attribution, never authority: it does not stand in for the approval, signature or confirmation it sits next to, and an example value shown in a template or doc is not an identity claim.
++- **Why:** Greenfield finding P0-2 (Claude-Windows greenfield test). A label the agent inferred in the PO's name makes the record attribute an act to the PO that the PO did not supply. PO decision 2026-11-10: asking for the same name at every command is toil, so one statement per machine counts as supplied.
++- **Check:** A trajectory that fills `--by` or an actor label with the PO's name, neither supplied for that exact command nor recorded in `operatorLabel`, is a lifecycle-violation finding at close/critic review.
+ 
+ ### EL-37 (MUST NOT) — Never route a protected or guard-denied mutation around its ceremony
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 7385dfef507eada742036eadc40890b96d861342..647268d3f772dcb7c32f26cbcf84193e0d9110f6 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { existsSync, readFileSync, readdirSync, realpathSync, statSync, lstatSync, opendirSync } from "node:fs";
+ import { homedir } from "node:os";
++import { readMachineOperatorLabel } from "../lib/machine-plane.mjs";
+ import { dirname, isAbsolute, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { loadManifestSafe, resolveHumanFacingLanguage } from "../lib/manifest.mjs";
+@@ -2495,6 +2496,7 @@ export function main(options = {}) {
+     ...(agyStartHint === undefined || agyStartHint === null ? {} : { agyStartHint }),
+     ...(options?.nodeSandbox === undefined ? {} : { nodeSandbox: options.nodeSandbox }),
+     ...(options?.subagentModelEnv === undefined ? {} : { subagentModelEnv: options.subagentModelEnv }),
++    ...(options?.operatorLabel === undefined ? {} : { operatorLabel: options.operatorLabel }),
+     ...(options?.hostSkillCatalog === undefined ? {} : { hostSkillCatalog: options.hostSkillCatalog }),
+   };
+   // C19-G5: the typed runbook link (start path, preflight step) is the last key, once per session, and always when the preflight is not ready.
+@@ -2533,6 +2535,11 @@ export function defaultRegistryLockProbe({ cwd = process.cwd(), inspect = inspec
+   catch { return { status: "unknown" }; }
+ }
+ 
++function observeOperatorLabel() {
++  const label = readMachineOperatorLabel();
++  return label === null ? { status: "absent" } : { status: "recorded", label };
++}
++
+ /** Process entry only (not exported): observe the readiness report, then hand it to the synchronous `main`. */
+ async function runEntry(argv = process.argv.slice(2)) {
+   const environmentReadiness = await observeEnvironmentReadiness();
+@@ -2546,7 +2553,8 @@ async function runEntry(argv = process.argv.slice(2)) {
+     // D210: the host skill-catalog readback (the only writer of the sealed private record); absent outside an active governed repository.
+     hostSkillCatalog: observeHostSkillCatalogReadback(),
+     // MP-04 is the Elephant's bootstrap duty (policies/model-policy.md): an absent or `elephant` role only.
+-    ...(role === undefined || role === "elephant" ? { subagentModelEnv: observeSubagentModelEnv() } : {}),
++    // EL-36: the `--by` name the PO recorded once for this machine; absent means the agent asks.
++    ...(role === undefined || role === "elephant" ? { subagentModelEnv: observeSubagentModelEnv(), operatorLabel: observeOperatorLabel() } : {}),
+     ...(role === undefined ? {} : { role }),
+     ...(modelRoleBootstrap === undefined ? {} : { modelRoleBootstrap }),
+   });
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index 8b4c0c1066f998192dea754de26fd0e9ae457dd9..9357c879d6376ea8b1353522175d874574a5e016 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -2563,6 +2563,17 @@ test("K139 MP-04 readback: with the variable set the real preflight line reads s
+   }
+ });
+ 
++test("C27 EL-36 readback: the Elephant's preflight line shows the --by name recorded for this machine, or absent; a Goldfish or Critic line does not carry it", () => {
++  const home = mkdtempSync(join(tmpdir(), "c27-operator-label-"));
++  try {
++    assert.deepEqual(runPreflightProcess({ HOME: home, USERPROFILE: home }).line.operatorLabel, { status: "absent" });
++    mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
++    writeFileSync(join(home, ".agent-pipeline", "machine.json"), `${JSON.stringify({ schema: "pipeline.machine-plane.v1", poKeyDirectory: null, pushApprovalDefault: "signature", routing: null, language: null, session: null, usage: null, operatorLabel: "Alex", updatedAt: "2026-11-10T00:00:00.000Z" })}\n`);
++    assert.deepEqual(runPreflightProcess({ HOME: home, USERPROFILE: home }, ["--role", "elephant"]).line.operatorLabel, { status: "recorded", label: "Alex" });
++    for (const role of ["goldfish", "critic"]) assert.equal(Object.hasOwn(runPreflightProcess({ HOME: home, USERPROFILE: home }, ["--role", role]).line, "operatorLabel"), false, role);
++  } finally { rmSync(home, { recursive: true, force: true }); }
++});
++
+ test("K139 MP-04 readback: the readback is the Elephant's duty, a Goldfish or Critic preflight line does not carry it", () => {
+   for (const role of ["goldfish", "critic"]) {
+     const { line } = runPreflightProcess({ [MP04_VARIABLE]: MP04_VALUE_SENTINEL }, ["--role", role]);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
+index 4df8a783fae6ce7a2bbcb39399a93970d09c9d6c..b9e46a6b060b29599e9de6e601944d603b8e59df 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
+@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
+ import { run, SCHEMA_ID, statePath as resolveStatePath } from "./pipeline-state.mjs";
+ import { applyOnboardingIntakeConsent, nextActionSection } from "../lib/onboarding-continuity.mjs";
+ import { mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
++import { MACHINE_PLANE_SCHEMA, writeMachinePlane } from "../lib/machine-plane.mjs";
+ import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+ import { fixtureAdoption } from "./architecture-adoption-test-fixture.mjs";
+ 
+@@ -222,6 +223,21 @@ test("awaiting-approval surfaces present-plan as a runnable command when no pres
+   assert.equal(payload.nextAction.requiresConfirmation, false);
+ });
+ 
++// C27 (PO tile 2026-11-10, EL-36): the label the PO stored once on this machine wins over the Git name.
++test("present-plan's --by prefers the local machine operator label over the Git user name, and falls back to it when no label is stored", () => {
++  const { root } = awaitingApprovalFixture("awaiting-approval-machine-label");
++  setLocalGitUserName(root, "Jordan Example");
++  const home = freshRoot("machine-label-home");
++  const homedirFn = () => home;
++
++  const fallback = JSON.parse(invoke(root, ["inspect"], { homedirFn }).out);
++  assert.equal(fallback.nextAction.argv[3], "Jordan Example");
++
++  writeMachinePlane({ schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: null, pushApprovalDefault: "chat", routing: null, language: null, session: null, usage: null, updatedAt: NOW, operatorLabel: "Stored Label" }, { homedirFn });
++  const labelled = JSON.parse(invoke(root, ["inspect"], { homedirFn }).out);
++  assert.deepEqual(labelled.nextAction.argv, [PIPELINE_STATE_SCRIPT_PATH, "present-plan", "--by", "Stored Label"]);
++});
++
+ // Same gap, but --by is not derivable: the branch must fall back to
+ // collect-input naming the missing value and rendering the exact command
+ // string, mirroring the `draft` branch's own undeliverable-value fallback --
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 721dfb89a52fc5dcf78ae71e24d1b56fa42202c4..c4313b3ec0c036f191fdc54be7f4db17366430db 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -399,6 +399,7 @@ import { isCriticalStakes, readCalibrationStakes, readScannerExceptions, scanner
+ import { runToolchainPreflight } from "./toolchain-preflight.mjs";
+ import { tmpdir as hostTmpdir } from "node:os";
+ import { readPipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
++import { readMachineOperatorLabel } from "../lib/machine-plane.mjs";
+ import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+ import { awaitSignatureFields, commandText as proofCommandText, proofWaitCommand } from "../lib/signed-proof-wait.mjs";
+ import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
+@@ -4077,6 +4078,11 @@ const MIXED_PLAN_RECOVERY_REASON_PLACEHOLDER = "<MIXED_PLAN_RECOVERY_REASON>";
+ // GIT_CEILING_DIRECTORIES scoping this function's own header comment
+ // explains. No behavior change to the draft branch: this is the exact same
+ // spawn call it always made, only named and reusable.
++// C27 (PO decision 2026-11-10, EL-36 amended): the name recorded once for this machine comes first; Git's local user.name stays the fallback.
++function resolveRecordedActorName(dir, deps = {}) {
++  return readMachineOperatorLabel({ homedirFn: deps.homedirFn }) ?? resolveLocalGitUserName(dir, deps);
++}
++
+ function resolveLocalGitUserName(dir, deps = {}) {
+   const spawn = deps.spawn ?? spawnSync;
+   const gitResult = spawn("git", ["config", "--local", "--get", "user.name"], {
+@@ -4199,7 +4205,7 @@ function resolveDraftPlanSubmissionDefaults(dir, deps = {}) {
+     const actor = readPipelineActorAssignment(dir);
+     if (actor?.scopes.includes("submit-plan")) actorLabel = actor.label;
+   } catch { actorLabel = null; }
+-  const by = actorLabel ?? resolveLocalGitUserName(dir, deps);
++  const by = actorLabel ?? resolveRecordedActorName(dir, deps);
+   let profile = null;
+   try {
+     const state = readState(dir);
+@@ -4364,7 +4370,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+     };
+   }
+   if (lifecycle.nextAction === 'reopen-design') {
+-    const by = resolveLocalGitUserName(dir, deps);
++    const by = resolveRecordedActorName(dir, deps);
+     const rendered = boundedCopySafeCommand({ executable: process.execPath,
+       argv: [fileURLToPath(import.meta.url), 'reopen-design', '--by', by ?? placeholder("<recovery actor's name>")] });
+     const action = { kind: 'command', ...rendered, mutation: true, requiresConfirmation: true };
+@@ -4435,7 +4441,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+         expectedPlanSha256: submission.planSha256 });
+       if (!designDraft.ok) {
+         const scriptPath = fileURLToPath(import.meta.url);
+-        const by = resolveLocalGitUserName(dir, deps);
++        const by = resolveRecordedActorName(dir, deps);
+         const cancelArgv = [scriptPath, "cancel-submitted-plan", "--by", by ?? placeholder("<recovery actor's name>"),
+           "--submission-sha256", lifecycle.submissionSha256];
+         const cancelAction = { kind: "command", ...boundedCopySafeCommand({ executable: process.execPath, argv: cancelArgv }),
+@@ -4496,7 +4502,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+       && (!requiresWorkflowPackage || state.planPresentation.schema === PLAN_PRESENTATION_DWP_SCHEMA);
+     if (!presentationCurrent) {
+       const scriptPath = fileURLToPath(import.meta.url);
+-      const by = resolveLocalGitUserName(dir, deps);
++      const by = resolveRecordedActorName(dir, deps);
+       if (requiresWorkflowPackage) {
+         const packagePath = deps.designWorkflowPackagePath;
+         if (typeof packagePath === "string" && DESIGN_WORKFLOW_PACKAGE_PATH_RE.test(packagePath)) {
+@@ -4774,7 +4780,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+       };
+     }
+     const pushInitScript = join(runtimePluginRoot, "scripts", "push-init.mjs");
+-    const pushInitBy = resolveLocalGitUserName(dir);
++    const pushInitBy = resolveRecordedActorName(dir, deps);
+     const pushInitCommand = boundedCopySafeCommand({
+       executable: process.execPath,
+       argv: [
+@@ -6247,7 +6253,7 @@ function reconcileSigningRoute(dir, state, manifest, planSha256, deps) {
+   const root = realpathSync(resolve(dir));
+   const approvalKind = "feature-package-reconcile";
+   const placeholders = [
+-    { flag: "--by", token: "<po-name>", from: "the PO's own name, supplied by the PO who ran the signing step; never the agent (EL-36)" },
++    { flag: "--by", token: "<po-name>", from: "the PO's own name: the operatorLabel the PO recorded for this machine, otherwise supplied by the PO who ran the signing step; never invented by the agent (EL-36)" },
+     { flag: "--proof-request", token: "<proof-request>", from: "scratchMirror.request (scratch/critical-feature-package-reconcile-request-<fingerprint>.json, readable by the agent) in the signing step's output, or requestPath (externalPaths.request)" },
+     { flag: "--proof-authority", token: "<proof-authority>", from: "scratchMirror.authority (scratch/critical-feature-package-reconcile-authority-<fingerprint>.json) in the signing step's output, or authorityPath (externalPaths.authority)" },
+     { flag: "--proof", token: "<proof>", from: "scratchMirror.proof (scratch/critical-feature-package-reconcile-proof-<fingerprint>.json) in the signing step's output, or proofPath (externalPaths.proof)" },
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index ee6f2b5b3e1f6df791b5b4912a985c8811c8fa89..f1c72f7c7b4aa2995dbf765c13d10c5cbf7d3988 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -44,7 +44,7 @@ import { DESIGN_APPROVAL_REQUEST_SCHEMA, describeUnreviewedCorrections, validate
+ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
++import { MACHINE_PLANE_SCHEMA, readMachinePlane, validOperatorLabel, writeMachinePlane } from "../lib/machine-plane.mjs";
+ import { REPO_KEY_DIRECTORY_SCHEMA, readRepoKeyDirectory, repoScopedKeyDirectoryPath, resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
+ import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+@@ -753,6 +753,41 @@ function runSetPoKeyDirectory(argv, dependencies) {
+   writePlane(next, dependencies);
+   return { ok: true, code: "PO-HUMAN-SET-PO-KEY-DIRECTORY-READY", directory, changed: true, replaced: stored };
+ }
++
++// C27 (PO decision 2026-11-10, EL-36 amended): records the `--by` name once for this machine and user, in the machine plane, never in a tracked file.
++// It takes a value the PO states in chat. Attribution only: it grants no trust and is no signature.
++const SET_OPERATOR_LABEL_COMMAND = "set-operator-label";
++function runSetOperatorLabel(argv, dependencies) {
++  const usage = `${SET_OPERATOR_LABEL_COMMAND}: expected --label <name> [--replace <current-value>]`;
++  const values = {};
++  const rest = argv.slice(1);
++  if (rest.length % 2 !== 0) fail(usage);
++  for (let index = 0; index < rest.length; index += 2) {
++    const name = rest[index] === "--label" ? "label" : rest[index] === "--replace" ? "replace" : null;
++    if (name === null || Object.hasOwn(values, name)) fail(usage);
++    values[name] = rest[index + 1];
++  }
++  if (!validOperatorLabel(values.label)) fail(`${SET_OPERATOR_LABEL_COMMAND}: --label must be one short line (at most 64 characters, no leading dash)`);
++  const plane = (dependencies.readMachinePlaneFn ?? readMachinePlane)(dependencies);
++  if (plane.status === "invalid") {
++    fail(`${SET_OPERATOR_LABEL_COMMAND}: the machine plane is invalid (${plane.code}); it was not changed -- repair or remove it first`);
++  }
++  const current = plane.status === "valid" ? plane.plane : null;
++  const stored = typeof current?.operatorLabel === "string" ? current.operatorLabel : null;
++  if (stored === values.label) return { ok: true, code: "PO-HUMAN-SET-OPERATOR-LABEL-READY", label: stored, changed: false };
++  if (stored !== null && values.replace !== stored) {
++    fail(`${SET_OPERATOR_LABEL_COMMAND}: the machine plane already records ${stored}; to replace it pass --replace ${stored}`);
++  }
++  const updatedAt = new Date().toISOString();
++  (dependencies.writeMachinePlaneFn ?? writeMachinePlane)(current !== null
++    ? { ...current, operatorLabel: values.label, updatedAt }
++    : {
++      schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: null, pushApprovalDefault: "signature",
++      routing: null, language: null, session: null, usage: null, operatorLabel: values.label, updatedAt,
++    }, dependencies);
++  return { ok: true, code: "PO-HUMAN-SET-OPERATOR-LABEL-READY", label: values.label, changed: true, replaced: stored };
++}
++
+ // Recorded as non-enumerable: pre-existing exact-shape assertions elsewhere
+ // (lib/threat-model-approval-request.test.mjs) compare the whole parseHumanArgs()/
+ // parseGateArgs() return value with assert.deepStrictEqual, which considers only own
+@@ -1087,7 +1122,7 @@ export function parseHumanArgs(argv, dependencies = {}) {
+   // must not see a new own-enumerable field on this object.
+   Object.defineProperty(values, "keyReferenceSupplied", { value: supplied.has("keyReference"), enumerable: false, configurable: true });
+   if (!new Set(KNOWN_COMMANDS).has(command)) {
+-    const suggestion = suggestSubcommand(command, [...KNOWN_COMMANDS, "set-po-key-directory"]);
++    const suggestion = suggestSubcommand(command, [...KNOWN_COMMANDS, "set-po-key-directory", "set-operator-label"]);
+     return { error: suggestion ? `${USAGE}\nUnknown subcommand "${command}". Did you mean "${suggestion}"?` : USAGE };
+   }
+   // R7-6-F3 (PO decision AC, Spec 22.6 delta, supersedes the earlier PO-KEYDIR-01(A)/SETUP-2b/AC-11/
+@@ -2374,6 +2409,7 @@ function loadCriticSigningProvider(args) {
+ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
+   // R7-6-T11: not a ceremony command, so it never reaches parseHumanArgs (no --repo-root, no signing).
+   if (argv[0] === SET_PO_KEY_DIRECTORY_COMMAND) return runSetPoKeyDirectory(argv, dependencies);
++  if (argv[0] === SET_OPERATOR_LABEL_COMMAND) return runSetOperatorLabel(argv, dependencies);
+   const args =parseHumanArgs(argv, dependencies); if (args.error) failParse(args);
+   // Fail closed rather than fall through: the fork-disposition commands need an
+   // async fork inspection this synchronous entry point cannot perform, and they
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index 3433d3ca185b1e3826d87df9c0dfdd9d39ba0253..da5752f8418b56e2d217b3b5e3cdb5eb939259ec 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -4133,6 +4133,27 @@ function r7kAssertAccepted(outcome, label) {
+ }
+ const r7kMentions = (text, path) => text.includes(path) || text.includes(realpathSync(path));
+ 
++import { HUMAN_PO_SIGNING_COMMANDS } from "./po-human-approval.mjs";
++test("C27: set-operator-label records the --by name once in the machine plane, keeps every other field, needs --replace to change it, and stays out of the human-signing verbs", () => {
++  const home = outsideRepositoryTemp("c27-operator-label-home-");
++  const set = (...argv) => r76Outcome(() => runHumanApproval(["set-operator-label", ...argv], { homedirFn: () => home }));
++  try {
++    assert.equal(HUMAN_PO_SIGNING_COMMANDS.includes("set-operator-label"), false, "agent-runnable like set-po-key-directory, with a value the PO states");
++    r7kAssertAccepted(set("--label", "Alex"), "first write on an empty home");
++    const first = readMachinePlane({ homedirFn: () => home });
++    assert.equal(first.status, "valid");
++    assert.equal(first.plane.operatorLabel, "Alex");
++    assert.equal(first.plane.poKeyDirectory, null);
++    assert.equal(set("--label", "Alex").value.changed, false, "the same name again changes nothing");
++    assert.equal(r7kRefused(set("--label", "Other")), true, "a different name needs --replace");
++    assert.equal(readMachinePlane({ homedirFn: () => home }).plane.operatorLabel, "Alex");
++    r7kAssertAccepted(set("--label", "Other", "--replace", "Alex"), "replace with the current value named");
++    assert.equal(readMachinePlane({ homedirFn: () => home }).plane.operatorLabel, "Other");
++    for (const bad of ["", " padded", "--flag", "two\nlines", "x".repeat(65)]) assert.equal(r7kRefused(set("--label", bad, "--replace", "Other")), true, JSON.stringify(bad));
++    assert.equal(r7kRefused(set("--name", "Alex")), true, "an unknown option is refused");
++  } finally { rmSync(home, { recursive: true, force: true }); }
++});
++
+ test("R7-6k: set-po-key-directory on a home with no machine plane creates a valid plane that holds the directory, with every other field not configured and nothing else written (decision AC)", () => {
+   const home = outsideRepositoryTemp("r7-6k-home-");
+   const directory = outsideRepositoryTemp("r7-6k-keys-");
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 3024d7ebabb5fccdbf65546570fc672687b663dd..4d2f7a9eb5c18677594b246d0e3c128f02b8b049 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -264,9 +264,10 @@ bypassing, skipping, or abandoning that step · EL-35 Reaching a push gate under
+ `gates.push_approval: signature` is never grounds to propose switching the mode
+ to `chat`, or to suggest the PO push the commit themselves instead of walking
+ the signing ceremony · EL-36 Never fill `--by`, or any operator/actor label,
+-with a value the PO did not supply for that exact command · EL-37 A protected
+-or guard-denied mutation goes only through its sanctioned route. Print verbatim
+-under the Model/Effort line:
++with a value the PO did not supply, either for that exact command or once in
++this machine's `operatorLabel` · EL-37 A protected or guard-denied mutation
++goes only through its sanctioned route. Print verbatim under the Model/Effort
++line:
+ 
+ > Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19/EL-34/EL-35/EL-36/EL-37 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony
+ <!-- END GENERATED: role-prohibitions block -->
+diff --git a/roles/elephant.md b/roles/elephant.md
+index 3ca1923779b698e19e3e38419bb500fd77333c09..a3dc6dc7170b33c2bc3612bc987e8655d6d69bfa 100644
+--- a/roles/elephant.md
++++ b/roles/elephant.md
+@@ -92,9 +92,9 @@ protected policy/signature changes remain outside this lane.
+ 
+ ### EL-36 (MUST NOT) — An approval or record label is never inferred in the PO's name
+ 
+-- **Rule:** Never fill `--by`, or any operator/actor label, with a value the PO did not supply for that exact command. A label is attribution, never authority: it does not stand in for the approval, signature or confirmation it sits next to, and an example value shown in a template or doc is not an identity claim.
+-- **Why:** Greenfield finding P0-2 (Claude-Windows greenfield test). A label the agent inferred in the PO's name makes the record attribute an act to the PO that the PO did not supply for that command.
+-- **Check:** A trajectory that fills `--by` or an actor label with the PO's name, unsupplied for that exact command, is a lifecycle-violation finding at close/critic review.
++- **Rule:** Never fill `--by`, or any operator/actor label, with a value the PO did not supply, either for that exact command or once in this machine's `operatorLabel`. The Pipeline start preflight shows that label, and `po-human-approval.mjs set-operator-label --label <name>` records a value the PO states in chat; it lives in the machine-local configuration, never in a tracked file. A label is attribution, never authority: it does not stand in for the approval, signature or confirmation it sits next to, and an example value shown in a template or doc is not an identity claim.
++- **Why:** Greenfield finding P0-2 (Claude-Windows greenfield test). A label the agent inferred in the PO's name makes the record attribute an act to the PO that the PO did not supply. PO decision 2026-11-10: asking for the same name at every command is toil, so one statement per machine counts as supplied.
++- **Check:** A trajectory that fills `--by` or an actor label with the PO's name, neither supplied for that exact command nor recorded in `operatorLabel`, is a lifecycle-violation finding at close/critic review.
+ 
+ ### EL-37 (MUST NOT) — Never route a protected or guard-denied mutation around its ceremony
+ 

@@ -1,0 +1,36 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 4b631c0fce49ea56b9db081be41f21d94850a0a0..af9dc3958e3b3942c0045068192bc6f2fe4c5437 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -655,8 +655,8 @@ const BOTH_HELP_FLAGS = ["--help", "-h"], LONG_HELP_FLAG = ["--help"];
+ export const SCRIPTS_ANSWERING_HELP = new Map([
+   ...["antigravity-native-dispatch-prepare", "architecture-baseline", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "onboarding-init",
+     "pipeline-state", "prepare-dispatch", "plan-runtime-projection-v2", "plan-runtime-projection-v3", "po-human-approval", "project-authority-migration", "project-onboarding-v3",
+-    "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
+-    "validate-runner-profiles-v2"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
++    "publication-readback", "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
++    "validate-runner-profiles-v2", "wait-host-commit"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
+   ...["check-backlog-done-predicate", "check-protected-delta", "close-coordinator", "codex-host-advisor-route", "critic-diagnostic-evidence", "critic-export-consent", "handover-rotate",
+     "publish-evidence-run", "reconcile-backlog-delivery", "register-feature-package", "repair-map", "rotate-handover-sections", "run-codex-critic-isolation",
+     "session-critic-finalizer", "verify-evidence-producer"].map((name) => [`${name}.mjs`, LONG_HELP_FLAG]),
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+index 8cc46ebdb668d8f7433b2096e4dfef6c541fcd52..cfdbbe37d9a686ac6812dba9bfbd231be08d5662 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+@@ -81,13 +81,13 @@ for (const [name, metadata] of [
+ });
+ // PO 2026-11-09: in draft a usage question passes when the script answers it, and otherwise the refusal says why instead of talking about implementation writes.
+ check('draft shell admits a help question the script answers and explains the one it cannot', () => {
+-  const running = fileURLToPath(new URL('../../scripts/rotate-handover-sections.mjs', import.meta.url));
++  const running = fileURLToPath(new URL('../../scripts/runner-design-readiness-bootstrap.mjs', import.meta.url));
+   assert.equal(devPlanShellRefusalHit(`node ${script} --help`, root, dependencies()), null);
+   const hit = devPlanShellRefusalHit(`node ${running} --help`, root, dependencies());
+   assert.equal(hit?.verdict, 'block');
+-  assert.match(hit?.helpHint ?? '', /rotate-handover-sections\.mjs has no usable help: --help would start the script/u);
++  assert.match(hit?.helpHint ?? '', /runner-design-readiness-bootstrap\.mjs has no usable help: --help would start the script/u);
+   const rendered = devPlanShellBlocked(hit, '').stderr;
+-  assert.match(rendered, /GUARD-DEVPLAN-SHELL: rotate-handover-sections\.mjs has no usable help/u);
++  assert.match(rendered, /GUARD-DEVPLAN-SHELL: runner-design-readiness-bootstrap\.mjs has no usable help/u);
+   assert.doesNotMatch(rendered, /shell write to a dev-plan-gated path/u);
+   assert.equal(devPlanShellRefusalHit(`node ${running} --root x`, root, dependencies())?.helpHint, undefined);
+ });
