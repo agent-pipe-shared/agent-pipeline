@@ -268,7 +268,7 @@
 import { existsSync, readFileSync, appendFileSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { commitMessageFindings, commitTypeFindings, markerPolicyMode, parseIntegrationTrailerBlock, finishedCommitMessageFindings } from "../lib/commit-message-policy.mjs";
@@ -317,9 +317,13 @@ const PHOENIX_OVERRIDE_REFERENCE_SCHEMA = "pipeline.git-override-authority-refer
 
 // ---- read tool input (fail-open) --------------------------------------------------
 let cmd = "";
+// C23 (Antigravity greenfield F24): the Antigravity adapter starts this hook in the project root and carries the directory the command
+// really runs in as tool_input.cwd, so a child in its own worktree had `-F scratch/msg.txt` looked up in the parent repository.
+let toolCwd = null;
 try {
   const input = JSON.parse(readFileSync(0, "utf8"));
   cmd = String(input?.tool_input?.command ?? input?.tool_input?.CommandLine ?? "");
+  if (typeof input?.tool_input?.cwd === "string" && isAbsolute(input.tool_input.cwd)) toolCwd = input.tool_input.cwd;
 } catch {
   process.exit(0); // fail-open: guard is a safety net, not a prison
 }
@@ -1009,7 +1013,7 @@ function gitInvocationCwd(command) {
   }
   if (!/^(?:.*[/\\])?git(?:\.exe)?$/i.test(tokens[index] ?? "")) return null;
   index += 1;
-  let cwd = process.cwd();
+  let cwd = toolCwd ?? process.cwd();
   while (index < tokens.length) {
     const token = tokens[index];
     if (token === "-C") {

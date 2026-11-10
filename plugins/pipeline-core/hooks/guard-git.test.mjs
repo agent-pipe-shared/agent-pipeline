@@ -35,7 +35,7 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
@@ -70,11 +70,11 @@ const GUARD = fileURLToPath(new URL("./guard-git.mjs", import.meta.url));
  * didn't ask for it. `envOverride` lets an override-mechanism case opt back into a
  * session-level arming deliberately (AC-1 env-fallback path).
  */
-function runGuard(command, projectDir, envOverride = {}) {
+function runGuard(command, projectDir, envOverride = {}, toolCwd = undefined) {
   enrollFixtureGovernance(projectDir);
   const { PIPELINE_GUARD_OVERRIDE: _dropInherited, ...baseEnv } = process.env;
   const res = spawnSync(process.execPath, [GUARD], {
-    input: JSON.stringify({ tool_input: { command } }),
+    input: JSON.stringify({ tool_input: toolCwd === undefined ? { command } : { command, cwd: toolCwd } }),
     encoding: "utf8",
     cwd: projectDir,
     env: { ...baseEnv, CLAUDE_PROJECT_DIR: projectDir, ...envOverride },
@@ -92,8 +92,8 @@ const NO_CONFIG_DIR = mkdtempSync(join(tmpdir(), "guard-test-no-config-"));
 
 let pass = 0;
 const failures = [];
-function check(id, command, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrEmpty, env = {} } = {}) {
-  const { code, stderr } = runGuard(command, projectDir, env);
+function check(id, command, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrEmpty, env = {}, toolCwd = undefined } = {}) {
+  const { code, stderr } = runGuard(command, projectDir, env, toolCwd);
   const problems = [];
   if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit})`);
   for (const needle of [].concat(stderrIncludes ?? [])) {
@@ -857,6 +857,29 @@ check("GIT03-10 block  body lines cannot pose as the final provenance block",
   "git commit -F body-only.txt", BLOCK, {
     projectDir: GIT03_BLOCKING_DIR,
     stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING"],
+  });
+// C23 (Antigravity greenfield F24): the hook process runs in the project root; the command runs in the child's own worktree, named by tool_input.cwd.
+const GIT03_CHILD_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-child-"));
+writeFileSync(join(GIT03_CHILD_DIR, "child-only.txt"),
+  "feat(x): a thing\n\nWhy it matters.\n\nAI-Assisted: true\nDispatch: NVA-GIT03 (goldfish)\n");
+check("GIT03-11 allow  a relative -F is read from the directory the command runs in",
+  "git commit -F child-only.txt", ALLOW, { projectDir: GIT03_BLOCKING_DIR, toolCwd: GIT03_CHILD_DIR });
+check("GIT03-12 block  without that directory the same file is not found in the project root",
+  "git commit -F child-only.txt", BLOCK, {
+    projectDir: GIT03_BLOCKING_DIR,
+    stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE"],
+  });
+check("GIT03-13 block  a relative tool directory is ignored rather than resolved against the hook",
+  "git commit -F child-only.txt", BLOCK, {
+    projectDir: GIT03_BLOCKING_DIR,
+    toolCwd: "guard-test-relative",
+    stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE"],
+  });
+check("GIT03-14 block  a -F escaping the directory the command runs in stays refused",
+  `git commit -F ${join("..", basename(GIT03_OUTSIDE_DIR), "clean.txt")}`, BLOCK, {
+    projectDir: GIT03_BLOCKING_DIR,
+    toolCwd: GIT03_CHILD_DIR,
+    stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE"],
   });
 
 const GIT03_WARN_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-warn-"));
