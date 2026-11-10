@@ -49,9 +49,13 @@ cases.push({ id: "SSH001", name: "optional workflow remains inert and explains i
   assert.match(optional.message, /optional project workflow/u);
   assert.match(optional.message, /before any project work/u);
   assert.doesNotMatch(optional.message, /before running any Pipeline command/u);
-  assert.match(optional.context, /ask whether it should be installed/u);
-  assert.match(optional.context, /End that turn and wait/u);
-  assert.match(optional.context, /do not invoke pipeline-core:pipeline-start/u);
+  // One consent question: the hint routes to the preflight's question and never asks a first one in the agent's own words.
+  assert.match(optional.context, /Ask no consent question of your own/u);
+  assert.match(optional.context, /consentQuestion is the only one/u);
+  assert.match(optional.context, /verbatim in one message, then end that turn and wait/u);
+  assert.match(optional.context, /do not execute its nextAction/u);
+  assert.doesNotMatch(optional.context, /ask whether it should be installed/u);
+  assert.doesNotMatch(optional.context, /do not invoke pipeline-core:pipeline-start/u);
   assert.doesNotMatch(optional.message, /run pipeline-core:pipeline-start/u);
   assert.equal(sessionStartMessage(root), optional.message);
 

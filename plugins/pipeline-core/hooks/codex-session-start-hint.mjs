@@ -173,16 +173,16 @@ export function sessionStartDecision(projectDir = process.cwd(), exists = exists
     };
   }
   const message =
-    "Agent Pipeline is available as an optional project workflow, but it is not active in this folder. Run the pipeline-start skill before any project work: its preflight carries the exact question to relay, so the user is asked once and not first in your own words.";
+    "Agent Pipeline is available as an optional project workflow, but it is not active in this folder. Run the pipeline-start skill before any project work: its preflight is read-only in this folder and carries the exact question to relay, so the user is asked once and not first in your own words.";
   return {
     governed,
     message,
     context: [
       message,
-      "On the user's first request, briefly explain that Agent Pipeline adds a structured, verifiable delivery workflow, then ask whether it should be installed for this repository.",
-      "End that turn and wait.",
-      "Before an explicit affirmative answer, do not invoke pipeline-core:pipeline-start, inspect or plan onboarding, initialize Git, or change project files.",
-      "After consent, invoke pipeline-core:pipeline-start; every returned mutating lifecycle action still keeps its own digest-bound confirmation.",
+      "Ask no consent question of your own, neither before that preflight result nor beside it: its consentQuestion is the only one, and it already says what Agent Pipeline is.",
+      "Relay its textByLanguage entry for the user's language (consentQuestion.text when that language has no entry) verbatim in one message, then end that turn and wait.",
+      "Before an explicit affirmative answer, run only that preflight: do not execute its nextAction, inspect or plan onboarding, initialize Git, or change project files.",
+      "After consent, execute the returned nextAction; the one yes covers the steps the question names, and the remaining onboarding questions arrive together as one batch.",
       "Reply in the user's language.",
     ].join(" "),
   };
