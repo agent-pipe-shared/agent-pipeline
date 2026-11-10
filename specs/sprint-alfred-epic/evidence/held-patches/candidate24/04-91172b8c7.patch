@@ -1,0 +1,29 @@
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index dcca7b7aa5dcb5de61f5d40bc35153110d46a70d..ecadf790170e4fde7359645435d26bf358dff645 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -336,9 +336,10 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+       let standing = null;
+       try { standing = command(runner, process.execPath, [COORDINATOR, "critic-standing", "--root", root, "--packet", packet], "ONESHOT-CRITIC-STANDING"); } catch { standing = null; /* the close keeps its own check */ }
+       if (standing?.status === "failed" && !state.residualAcceptance?.lastAccepted) {
++        const signed = ` Under a signature gate that step also needs --proof-request, --proof-authority and --proof, which the PO's terminal prepares with node ${join(dirname(STATE_WRITER), "po-human-approval.mjs")} authorize-critical --kind accept-residual-critic-findings --critic-packet ${packet} and that command's usual flags.`;
+         const acceptance = standing.blockers > 0 ? "A blocker can never be accepted."
+-          : standing.majors > 0 ? `A major can be accepted only when no commit can correct it (the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet} --reason-class uncorrectable-past-authorship); a major that a commit can correct has to be corrected.`
+-            : `Only minor findings are open, so the PO may instead accept them in the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet}.`;
++          : standing.majors > 0 ? `A major can be accepted only when no commit can correct it (the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet} --reason-class uncorrectable-past-authorship); a major that a commit can correct has to be corrected.${signed}`
++            : `Only minor findings are open, so the PO may instead accept them in the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet}.${signed}`;
+         return stopResult("critic-standing", "ONESHOT-CRITIC-NOT-PASSED", `The Critic round ${packet} did not pass (${standing.blockers} blocker, ${standing.majors} major, ${standing.minors} minor) and no PO residual acceptance is on record, so this candidate cannot close. A statement in chat is not an acceptance.`,
+           `nothing was written; correct the findings through a dispatch, run a Critic delta round on the new candidate, then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <new-packet-id>. ${acceptance}`);
+       }
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 28312510c0901318ddfbe98b8f2a9f5504d8cfd8..2cde145e72391e0299aeaea3b409bf11278eb181 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -378,6 +378,7 @@ test("C24: a Critic round that did not pass stops before the Result bootstrap an
+   assert.equal(major.result.stage, "critic-standing"); assert.equal(major.result.stop.code, "ONESHOT-CRITIC-NOT-PASSED");
+   assert.match(major.result.stop.reason, /0 blocker, 3 major, 14 minor[\s\S]*A statement in chat is not an acceptance/u);
+   assert.match(major.result.stop.repair, /Critic delta round[\s\S]*--critic-packet-id <new-packet-id>[\s\S]*uncorrectable-past-authorship[\s\S]*has to be corrected/u);
++  assert.match(major.result.stop.repair, /--proof-request[\s\S]*authorize-critical --kind accept-residual-critic-findings/u, "a signature gate needs its proof flags named");
+   assert.deepEqual(major.calls, [], "nothing runs before the stop"); assert.equal(major.evidence, false);
+   assert.match(stoppedFor({ status: "failed", blockers: 1, majors: 0, minors: 0 }).result.stop.repair, /A blocker can never be accepted/u);
+   const minor = stoppedFor({ status: "failed", blockers: 0, majors: 0, minors: 2 }).result.stop.repair;

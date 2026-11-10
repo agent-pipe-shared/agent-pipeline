@@ -1,0 +1,55 @@
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-admission.mjs b/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
+index 2b1a71536c8dd8996276b915c04cd238211f5828..b16c63b957d6735a9efbd67ef421addbb0f1c953 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-admission.mjs
+@@ -156,9 +156,13 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
+       conflicts.length !== 0 ? "unmerged-paths" : null, staged.length !== 0 ? "index-staged" : null].filter(Boolean);
+     return { ...fail("AGY-HOST-COMMIT-DRIFT"), detail: { conditions, ...(staged.length !== 0 ? { stagedPaths: boundedPaths(staged) } : {}) } };
+   }
+-  const preserved = untrackedDigests(baseline.root, baseline.untracked.map((entry) => entry.path));
+-  if (preserved === null || !same(preserved.map((entry) => `${entry.path}:${entry.sha256}`), baseline.untracked.map((entry) => `${entry.path}:${entry.sha256}`))) return fail("AGY-HOST-COMMIT-BASELINE-CHANGED");
+-  const newUntracked = untracked.filter((path) => !baseline.untracked.some((entry) => entry.path === path) && path !== baseline.resultPath);
++  // A re-dispatch inherits the untracked files of its stopped predecessor, so they are in the baseline. A child that claims such a path, inside its consent, owns it: it counts
++  // as this child's change and leaves the preserved set. Any other baseline file stays preserved byte for byte.
++  const reclaimed = baseline.untracked.map((entry) => entry.path).filter((path) => final.changedPaths.includes(path) && allowedPaths.includes(path));
++  const kept = baseline.untracked.filter((entry) => !reclaimed.includes(entry.path));
++  const preserved = untrackedDigests(baseline.root, kept.map((entry) => entry.path));
++  if (preserved === null || !same(preserved.map((entry) => `${entry.path}:${entry.sha256}`), kept.map((entry) => `${entry.path}:${entry.sha256}`))) return fail("AGY-HOST-COMMIT-BASELINE-CHANGED");
++  const newUntracked = untracked.filter((path) => (reclaimed.includes(path) || !baseline.untracked.some((entry) => entry.path === path)) && path !== baseline.resultPath);
+   const actual = [...new Set([...tracked, ...newUntracked])].filter(path=>!concurrent?.foreignPaths.includes(path)).sort();
+   if (!same(actual, final.changedPaths)) {
+     // pipeline.owned-gitignore-without-evidence-breaks-every-item-governed-host-commit: when the claim is exactly the actual change
+diff --git a/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs b/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs
+index 9590da9ed9780b2ea3974bb61ab2df4761584be0..34f523279eb351d6c6d249dde237079fd4c772d9 100644
+--- a/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs
++++ b/plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs
+@@ -226,7 +226,28 @@ test("AHC16 AC-108: a moved HEAD plus a staged change still drifts, naming both
+   assert.deepEqual(result.detail.conditions, ["head-moved", "index-staged"]);
+ }));
+ 
+-assert.equal(cases.length, 16,"the complete Agy Host Commit Admission corpus must be registered before execution begins");
++test("AHC17 a re-dispatch may claim the untracked file its stopped predecessor left, inside its consent only; every other baseline file stays preserved", () => fixture((context) => {
++  const left = "src/left.mjs";
++  writeFileSync(join(context.root, left), "export const left = 1;\n");
++  writeFileSync(join(context.root, "request.json"), "original\n");
++  const baseline = capture(context);
++  writeFileSync(join(context.root, left), "export const left = 2;\n");
++  const admitted = assessAgyHostCommit({ baseline, final: { changedPaths: [left] }, allowedPaths: [left] });
++  assert.equal(admitted.code, "AGY-HOST-COMMIT-ADMITTED");
++  assert.deepEqual(admitted.paths, [left]);
++  // Not claimed: the changed baseline file stays a refusal. Claimed outside the consent: not reclaimed, so it stays a refusal too.
++  assert.equal(assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs", left] }).code, "AGY-HOST-COMMIT-BASELINE-CHANGED");
++  assert.equal(assessAgyHostCommit({ baseline, final: { changedPaths: [left] }, allowedPaths: ["src/one.mjs"] }).code, "AGY-HOST-COMMIT-BASELINE-CHANGED");
++  // Another baseline file changed beside the claimed one: refused.
++  writeFileSync(join(context.root, "request.json"), "changed\n");
++  assert.equal(assessAgyHostCommit({ baseline, final: { changedPaths: [left] }, allowedPaths: [left] }).code, "AGY-HOST-COMMIT-BASELINE-CHANGED");
++  // A claimed file the child deleted is not an actual change of an untracked file: the claim is unbacked.
++  writeFileSync(join(context.root, "request.json"), "original\n");
++  rmSync(join(context.root, left));
++  assert.equal(assessAgyHostCommit({ baseline, final: { changedPaths: [left] }, allowedPaths: [left] }).code, "AGY-HOST-COMMIT-PATH-MISMATCH");
++}));
++
++assert.equal(cases.length, 17,"the complete Agy Host Commit Admission corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

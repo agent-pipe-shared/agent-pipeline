@@ -1,0 +1,102 @@
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.mjs b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+index 0af6d2fb79a807aefa5588ae1b295fcd79c0a9c1..314ffb5a17504bb506c6c7bfb7b4a4b9ea8e4b62 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+@@ -53,6 +53,12 @@ export function greenfieldMaterializationPending(rootDir, deps = {}) {
+   }
+ }
+ 
++/** Codex greenfield report: a map updated on purpose after the design must not read as "this repository has no architecture". */
++export function adoptionRequiredRationale(closedCode) {
++  if (closedCode === "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT") return "The architecture map no longer matches the closed feature's approved design, so that design no longer stands as this repository's baseline. A deliberate map update after the design ends up here; it blocks nothing now. At the next feature start, compare architecture/design-materialization.json with the map and decide the adoption scope.";
++  return "No architecture baseline or adoption decision exists for this repository";
++}
++
+ function contractExists(rootDir, contractPath) {
+   const directoryGlob = typeof contractPath === "string" && contractPath.endsWith("/**");
+   const relativePath = directoryGlob ? contractPath.slice(0, -3) : contractPath;
+@@ -153,7 +159,7 @@ export function resolveAdoptionState(rootDir = DEFAULT_ROOT, now = new Date()) {
+     expiresAt: null,
+     reviewDate: null,
+     decisionRef: null,
+-    rationale: "No architecture baseline or adoption decision exists for this repository",
++    rationale: adoptionRequiredRationale(closed.code),
+     coverageClass: "unavailable",
+     confidence: "estimated"
+   };
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+index 7f5f3c1c819e6ba530d76203edb54b220a8a3f91..aceaf03d8f96de73480e87145dd30489aa55ac05 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+@@ -17,6 +17,7 @@ import { setupAdoptionFixture, signAdoptionRequest, fixtureGit } from "./archite
+ 
+ import {
+   resolveAdoptionState,
++  adoptionRequiredRationale,
+   generateAdoptionProposal,
+   checkPlanningAdoptionDisposition,
+   STATE_ADOPTION_REQUIRED,
+@@ -53,6 +54,14 @@ describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
+       assert.ok(state.rationale);
+     });
+ 
++    it("says a map drifted from the closed design instead of claiming no architecture exists", () => {
++      const drift = adoptionRequiredRationale("ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
++      assert.match(drift, /no longer matches/u);
++      assert.match(drift, /blocks nothing/u);
++      assert.doesNotMatch(drift, /No architecture baseline/u);
++      assert.match(adoptionRequiredRationale(undefined), /No architecture baseline/u);
++    });
++
+     it("applies and resolves approved-scoped adoption decision", () => {
+       const decision = applyAdoptionDecision({
+         rootDir: tempDir,
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+index 56f2e7a54adcbc6a22c1db818056675288e76a31..84a1d638c316b8c90269a84aca17d4a6f9984b58 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+@@ -41,6 +41,8 @@ export const BOUNDARY_POLICY_SCHEMA = "pipeline.architecture-boundary-policy.v1"
+ export const BOUNDARY_POLICY_PATH = "architecture/boundary-policy.json";
+ export const DEFAULT_LINE_BOUND = 1000;
+ export const BOUNDARY_RULES = Object.freeze(["unowned-path", "ambiguous-ownership", "forbidden-dependency", "over-line-bound"]);
++/** What a pass of this check does and does not say (Codex greenfield report): a green verdict must not read as "every dependency was seen". */
++export const BOUNDARY_COVERAGE = "Checked: file ownership, file length, and relative imports written in JavaScript or TypeScript files. Not seen: runtime or browser globals, HTML and CSS references, bundler output, imports in other languages, and whether code honours a module's contract.";
+ export const DEFAULT_SOURCE_EXTENSIONS = Object.freeze([
+   ".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx", ".py", ".go", ".rs", ".java", ".kt",
+   ".rb", ".cs", ".swift", ".c", ".h", ".cc", ".cpp", ".hpp", ".php", ".scala",
+@@ -193,7 +195,7 @@ function boundaryVerdictLabel(rootDir, status, deps, reportOnlyOpen = []) {
+  */
+ export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExtensions = DEFAULT_SOURCE_EXTENSIONS } = {}, deps = {}) {
+   const root = path.resolve(rootDir);
+-  const base = { schema: BOUNDARY_CHECK_SCHEMA, rules: BOUNDARY_RULES };
++  const base = { schema: BOUNDARY_CHECK_SCHEMA, rules: BOUNDARY_RULES, coverage: BOUNDARY_COVERAGE };
+   if (!existsSync(path.join(root, "architecture/map"))) {
+     return { ...base, status: "not-applicable", reason: "no architecture/map in this project", violations: [] };
+   }
+@@ -373,6 +375,7 @@ function runCli(argv) {
+     for (const line of result.errors ?? []) process.stdout.write(`  - ${line}\n`);
+     if (result.reason) process.stdout.write(`  - ${result.reason}\n`);
+     for (const violation of result.violations) process.stdout.write(`  - [${violation.rule}] ${violation.detail}\n`);
++    process.stdout.write(`  ${BOUNDARY_COVERAGE}\n`);
+   }
+   return exitCodeForBoundaryCheck(result);
+ }
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+index 7d51e1feab18522e4b774099a937f30456e6dbb7..a0d29ad94c932ec8cf3a0591f7db87c13d531ec3 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+@@ -53,6 +53,14 @@ test("ABC01 a project without an architecture map is not-applicable, never faile
+   assert.equal(exitCodeForBoundaryCheck(result), 0);
+ });
+ 
++test("ABC13 every verdict states what the check does not see, in the result and on the human output", () => {
++  const root = fixture({ files: { "src/app/main.mjs": "export {};\n", "src/lib/x.mjs": "export {};\n" } });
++  const result = checkArchitectureBoundaries({ rootDir: root });
++  assert.match(result.coverage, /Not seen: runtime or browser globals, HTML and CSS references/u);
++  const run = spawnSync(process.execPath, [SCRIPT, "--root", root], { encoding: "utf8" });
++  assert.match(run.stdout, /Not seen: runtime or browser globals/u);
++});
++
+ test("ABC02 owned files importing along allowedDependencies pass; docs and package imports are out of scope", () => {
+   const root = fixture({ files: {
+     "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\nimport fs from "node:fs";\nimport y from "left-pad";\n',

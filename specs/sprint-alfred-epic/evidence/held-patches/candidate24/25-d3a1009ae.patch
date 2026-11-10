@@ -1,0 +1,286 @@
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index b25b6edd5f9389f846cc8163e5c81fa13b4237b0..e98df021a60538d49144d2391137bb33502b2d9a 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -624,6 +624,12 @@ returned `PUSH-PROOF-*` code. The push must write out its destination ref
+ (`HEAD:refs/heads/<branch>` or `<sha>:refs/heads/<branch>`); a `--force` or
+ `+refspec` push also matches `GG-01`/`GG-02` and still blocks, approval or not.
+ 
++**Right after the push, record what the remote holds.** `push-prepare` prints the command as
++`afterPush.command` (`scripts/publication-readback.mjs record`). It asks the remote itself and appends one
++chained line to a private record under the Git directory, so it needs no commit and is safe after the freeze.
++Its `handoverLine` goes into the next handover you write anyway; never make a commit only for it.
++`scripts/publication-readback.mjs inspect --root <repo>` reads the latest record in a later session.
++
+ **The Git transport credential is not the PO approval proof.** The proof
+ consumed in Layer 4 says the PO approved this candidate; whatever lets
+ `git push` reach the remote (an SSH key, a credential helper, a token) is the
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index b25b6edd5f9389f846cc8163e5c81fa13b4237b0..e98df021a60538d49144d2391137bb33502b2d9a 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -624,6 +624,12 @@ returned `PUSH-PROOF-*` code. The push must write out its destination ref
+ (`HEAD:refs/heads/<branch>` or `<sha>:refs/heads/<branch>`); a `--force` or
+ `+refspec` push also matches `GG-01`/`GG-02` and still blocks, approval or not.
+ 
++**Right after the push, record what the remote holds.** `push-prepare` prints the command as
++`afterPush.command` (`scripts/publication-readback.mjs record`). It asks the remote itself and appends one
++chained line to a private record under the Git directory, so it needs no commit and is safe after the freeze.
++Its `handoverLine` goes into the next handover you write anyway; never make a commit only for it.
++`scripts/publication-readback.mjs inspect --root <repo>` reads the latest record in a later session.
++
+ **The Git transport credential is not the PO approval proof.** The proof
+ consumed in Layer 4 says the PO approved this candidate; whatever lets
+ `git push` reach the remote (an SSH key, a credential helper, a token) is the
+diff --git a/plugins/pipeline-core/lib/close-acceptance-record.mjs b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+index 2b8ee974f5d39227cf2e13fbc8973681008970ef..f01b85a4de679fe6b3c52f51dc36b2292a929511 100644
+--- a/plugins/pipeline-core/lib/close-acceptance-record.mjs
++++ b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+@@ -122,5 +122,5 @@ export function closedHandoverLines(root, featureId, entry = null) {
+     technicalCloseLine(entry),
+     record === null ? "**Product acceptance:** not recorded in this feature's acceptance record; the human has not answered the acceptance question through the close."
+       : `**Product acceptance:** recorded in \`${record.path}\` for candidate \`${record.candidate}\` (an attribution record of the human's answer, not a signature); open checks: ${record.openChecks.join("; ")}.`,
+-    "**Push:** not done by the close. Publication and push are separate human-gated steps."];
++    "**Push:** not done by the close. Publication and push are separate human-gated steps. This sentence is written before any push and is not updated by one: what a remote holds is read with `<plugin-root>/scripts/publication-readback.mjs inspect --root <repo>`."];
+ }
+diff --git a/plugins/pipeline-core/scripts/publication-readback.mjs b/plugins/pipeline-core/scripts/publication-readback.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..28b9151cda3c7bd312e1a547582252a6201ced17
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/publication-readback.mjs
+@@ -0,0 +1,122 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * publication-readback.mjs -- the machine record of what a remote really holds after a push. Codex greenfield report (P2): after the push the tracked handover
++ * still said "Push: not done", and the run built its own forensic readback by hand.
++ *
++ * Usage: node <plugin-root>/scripts/publication-readback.mjs record --root <project-root> --remote <name> --destination refs/heads/<branch>
++ *        node <plugin-root>/scripts/publication-readback.mjs inspect --root <project-root>
++ *
++ * `record` asks the remote itself (`git ls-remote`, the same reader push-prepare uses), compares its answer with HEAD and appends one line to
++ * <git common dir>/agent-pipeline/publication-readback/records.jsonl. The file is private and outside the working tree on purpose: a pushed project must not need
++ * a commit to say that it was pushed, and a commit after the freeze is exactly what the close forbids. Every line carries the digest of the line before it, so a
++ * changed or removed line is detected. The remote's URL is never written, it can carry a credential. An identical repeat of the last line appends nothing.
++ *
++ * Status: `confirmed` (the remote holds HEAD), `local-ahead` (the remote holds an ancestor of HEAD), `differs` (anything else).
++ * Output: ONE JSON line. Exit 0 confirmed, local-ahead or a readable inspect; 1 refused or differs; 2 usage. It never pushes, fetches or changes a ref.
++ */
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { closeSync, existsSync, fsyncSync, openSync, readFileSync, realpathSync, statSync, writeSync } from "node:fs";
++import { dirname, join } from "node:path";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { ensurePrivateDirectory } from "../lib/private-boundary.mjs";
++import { remoteCommit } from "./push-prepare.mjs";
++
++export const PUBLICATION_READBACK_RECORD_SCHEMA = "pipeline.publication-readback.v1";
++const RESULT_SCHEMA = "pipeline.publication-readback-result.v1";
++const DESTINATION = /^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u;
++const USAGE = "usage: publication-readback.mjs record --root <project-root> --remote <name> --destination refs/heads/<branch> | publication-readback.mjs inspect --root <project-root>";
++const sha256 = (text) => createHash("sha256").update(text).digest("hex");
++
++function git(root, args) {
++  const run = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 15_000, maxBuffer: 1024 * 1024 });
++  return run.error || run.status !== 0 ? null : String(run.stdout).trim();
++}
++
++function recordsPath(root) {
++  const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
++  return common === null ? null : join(common, "agent-pipeline", "publication-readback", "records.jsonl");
++}
++
++/** Reads and checks the whole chain. `damaged` names the first line that does not follow from the one before it. */
++function readRecords(path) {
++  if (!existsSync(path)) return { status: "empty", records: [], lastDigest: null };
++  const lines = readFileSync(path, "utf8").split("\n").filter((line) => line !== "");
++  const records = [];
++  let lastDigest = null;
++  for (const [index, line] of lines.entries()) {
++    let record;
++    try { record = JSON.parse(line); } catch { return { status: "damaged", line: index + 1 }; }
++    if (record?.schema !== PUBLICATION_READBACK_RECORD_SCHEMA || record.previousSha256 !== lastDigest) return { status: "damaged", line: index + 1 };
++    records.push(record);
++    lastDigest = sha256(line);
++  }
++  return { status: records.length === 0 ? "empty" : "read", records, lastDigest };
++}
++
++function appendLine(path, line) {
++  ensurePrivateDirectory(dirname(path));
++  const descriptor = openSync(path, "a", 0o600);
++  try { writeSync(descriptor, `${line}\n`); fsyncSync(descriptor); } finally { closeSync(descriptor); }
++}
++
++const refused = (code, reason, repair) => ({ exitCode: 1, result: { schema: RESULT_SCHEMA, status: "refused", code, reason, repair } });
++const lineFor = (record) => `**Publication:** ${record.destination} on remote ${record.remote} holds ${record.remoteCommit.slice(0, 12)}, read back ${record.recordedAt} (${record.status}).`;
++const DAMAGED_REPAIR = "Do not edit the file. Compare it with the remote by hand and report it; the record is append-only, so there is no repair command.";
++
++/** @param {{root: string, remote: string, destination: string}} input `deps` ({ now, lsRemoteSpawn }) is for tests. */
++export function recordPublicationReadback({ root, remote, destination }, deps = {}) {
++  const remotes = String(git(root, ["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
++  if (!remotes.includes(remote)) return refused("PRB-REMOTE-UNKNOWN", `this repository has no remote named "${remote}"`, "use a name from git remote");
++  const head = git(root, ["rev-parse", "--verify", "HEAD^{commit}"]);
++  const path = recordsPath(root);
++  if (head === null || path === null) return refused("PRB-REPOSITORY-UNREADABLE", "HEAD or the Git directory could not be read", "repair the repository, then run this again");
++  const held = remoteCommit(root, remote, destination, deps);
++  if (held === null) return refused("PRB-REMOTE-UNREADABLE", `the remote gave no single answer for ${destination}; nothing was written`, "check that the push really happened and that the remote is reachable, then run this again");
++  const existing = readRecords(path);
++  if (existing.status === "damaged") return refused("PRB-RECORDS-DAMAGED", `line ${existing.line} of the readback record does not follow from the line before it; nothing was written`, DAMAGED_REPAIR);
++  const ancestor = held !== head && spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", held, head], { shell: false, timeout: 15_000 }).status === 0;
++  const status = held === head ? "confirmed" : ancestor ? "local-ahead" : "differs";
++  const last = existing.records.at(-1);
++  const same = last !== undefined && last.remote === remote && last.destination === destination && last.head === head && last.remoteCommit === held && last.status === status;
++  const record = same ? last : { schema: PUBLICATION_READBACK_RECORD_SCHEMA, recordedAt: (deps.now ?? (() => new Date()))().toISOString(), remote, destination, head, remoteCommit: held, status, previousSha256: existing.lastDigest };
++  if (!same) appendLine(path, JSON.stringify(record));
++  const meaning = status === "confirmed" ? "The remote holds HEAD." : status === "local-ahead" ? "The remote holds an ancestor of HEAD; the local commits after it are not published." : "The remote holds a commit that is not HEAD and not one of its ancestors: check what was pushed.";
++  return { exitCode: status === "differs" ? 1 : 0, result: { schema: RESULT_SCHEMA, status, record, unchanged: same, handoverLine: lineFor(record),
++    message: `${meaning} Recorded privately outside the working tree, so no commit is needed. Take handoverLine into the next handover you write anyway; never make a commit only for it, least of all after the freeze.` } };
++}
++
++export function inspectPublicationReadback({ root }) {
++  const path = recordsPath(root);
++  if (path === null) return refused("PRB-REPOSITORY-UNREADABLE", "the Git directory could not be read", "repair the repository, then run this again");
++  const existing = readRecords(path);
++  if (existing.status === "damaged") return refused("PRB-RECORDS-DAMAGED", `line ${existing.line} of the readback record does not follow from the line before it`, DAMAGED_REPAIR);
++  const latest = existing.records.at(-1) ?? null;
++  return { exitCode: 0, result: { schema: RESULT_SCHEMA, status: latest === null ? "no-record" : "read", count: existing.records.length, latest, ...(latest === null ? {} : { handoverLine: lineFor(latest) }) } };
++}
++
++function parse(argv) {
++  const [verb, ...rest] = argv;
++  if (verb !== "record" && verb !== "inspect") return null;
++  const value = {};
++  for (let index = 0; index < rest.length; index += 2) {
++    const flag = rest[index], next = rest[index + 1];
++    if (!["--root", ...(verb === "record" ? ["--remote", "--destination"] : [])].includes(flag) || next === undefined || next === "" || Object.hasOwn(value, flag)) return null;
++    value[flag] = next;
++  }
++  if (value["--root"] === undefined || (verb === "record" && (value["--remote"] === undefined || !DESTINATION.test(value["--destination"] ?? "")))) return null;
++  let root;
++  try { root = realpathSync(value["--root"]); if (!statSync(root).isDirectory()) return null; } catch { return null; }
++  return { verb, root, remote: value["--remote"], destination: value["--destination"] };
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  const argv = process.argv.slice(2);
++  if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) { process.stdout.write(`${USAGE}\n`); process.exit(0); }
++  const input = parse(argv);
++  if (input === null) { process.stdout.write(`${JSON.stringify({ schema: RESULT_SCHEMA, status: "usage", code: "PRB-USAGE", message: USAGE })}\n`); process.exit(2); }
++  const { exitCode, result } = input.verb === "record" ? recordPublicationReadback(input) : inspectPublicationReadback(input);
++  process.stdout.write(`${JSON.stringify(result)}\n`);
++  process.exit(exitCode);
++}
+diff --git a/plugins/pipeline-core/scripts/publication-readback.test.mjs b/plugins/pipeline-core/scripts/publication-readback.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..9f8fab1794364adafd4a4f83aa230e1282a62bc2
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/publication-readback.test.mjs
+@@ -0,0 +1,94 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { execFileSync, spawnSync } from "node:child_process";
++import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++import { inspectPublicationReadback, recordPublicationReadback } from "./publication-readback.mjs";
++
++const SCRIPT = fileURLToPath(new URL("./publication-readback.mjs", import.meta.url));
++const DESTINATION = "refs/heads/main";
++
++function fixture(run) {
++  const base = realpathSync(mkdtempSync(join(tmpdir(), "publication-readback-")));
++  const root = join(base, "work"), bare = join(base, "remote.git");
++  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
++  try {
++    execFileSync("git", ["init", "-q", "--bare", bare]);
++    execFileSync("git", ["init", "-q", root]);
++    git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
++    const commit = (name) => { writeFileSync(join(root, name), `${name}\n`); git("add", name); git("commit", "-qm", name); return git("rev-parse", "HEAD"); };
++    const head = commit("one.txt");
++    git("remote", "add", "publish", bare);
++    git("push", "-q", "publish", `HEAD:${DESTINATION}`);
++    run({ root, git, commit, head, records: join(root, ".git", "agent-pipeline", "publication-readback", "records.jsonl") });
++  } finally { rmSync(base, { recursive: true, force: true }); }
++}
++const record = (context, deps) => recordPublicationReadback({ root: context.root, remote: "publish", destination: DESTINATION }, deps);
++
++test("records what the remote really holds, privately, with the working tree untouched and no URL written", () => fixture((context) => {
++  assert.equal(inspectPublicationReadback(context).result.status, "no-record");
++  const { exitCode, result } = record(context);
++  assert.equal(exitCode, 0);
++  assert.equal(result.status, "confirmed");
++  assert.equal(result.record.remoteCommit, context.head);
++  assert.match(result.handoverLine, /refs\/heads\/main on remote publish holds/u);
++  assert.equal(context.git("status", "--porcelain"), "", "a pushed project needs no commit to say so");
++  assert.doesNotMatch(readFileSync(context.records, "utf8"), /remote\.git/u, "the URL can carry a credential");
++  assert.equal(inspectPublicationReadback(context).result.latest.status, "confirmed");
++}));
++
++test("an identical repeat appends nothing; a later local commit is told apart and chained", () => fixture((context) => {
++  record(context);
++  assert.equal(record(context).result.unchanged, true);
++  assert.equal(readFileSync(context.records, "utf8").trim().split("\n").length, 1);
++  context.commit("two.txt");
++  const ahead = record(context);
++  assert.equal(ahead.exitCode, 0);
++  assert.equal(ahead.result.status, "local-ahead");
++  assert.equal(inspectPublicationReadback(context).result.count, 2);
++  assert.notEqual(ahead.result.record.previousSha256, null);
++}));
++
++test("a remote holding something else is a typed differs with a non-zero exit", () => fixture((context) => {
++  context.git("checkout", "-q", "--orphan", "other");
++  const other = context.commit("other.txt");
++  const result = record(context);
++  assert.equal(result.exitCode, 1);
++  assert.equal(result.result.status, "differs");
++  assert.notEqual(result.result.record.remoteCommit, other);
++}));
++
++test("a changed or removed line is detected and nothing more is written", () => fixture((context) => {
++  record(context);
++  context.commit("two.txt");
++  record(context);
++  const lines = readFileSync(context.records, "utf8").trim().split("\n");
++  writeFileSync(context.records, `${lines[1]}\n`);
++  const damaged = record(context);
++  assert.equal(damaged.exitCode, 1);
++  assert.equal(damaged.result.code, "PRB-RECORDS-DAMAGED");
++  assert.equal(readFileSync(context.records, "utf8").trim().split("\n").length, 1, "append-only, also when refusing");
++  assert.equal(inspectPublicationReadback(context).result.code, "PRB-RECORDS-DAMAGED");
++}));
++
++test("an unknown remote or an unreadable answer refuses and writes nothing", () => fixture((context) => {
++  assert.equal(recordPublicationReadback({ root: context.root, remote: "nope", destination: DESTINATION }).result.code, "PRB-REMOTE-UNKNOWN");
++  assert.equal(recordPublicationReadback({ root: context.root, remote: "publish", destination: "refs/heads/absent" }).result.code, "PRB-REMOTE-UNREADABLE");
++  assert.equal(inspectPublicationReadback(context).result.status, "no-record");
++}));
++
++test("the command line: one JSON line, usage is typed, --help is free", () => fixture((context) => {
++  const run = (...args) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8" });
++  const done = run("record", "--root", context.root, "--remote", "publish", "--destination", DESTINATION);
++  assert.equal(done.status, 0, done.stdout);
++  assert.equal(JSON.parse(done.stdout).status, "confirmed");
++  assert.equal(JSON.parse(run("inspect", "--root", context.root).stdout).status, "read");
++  assert.equal(run("record", "--root", context.root, "--remote", "publish", "--destination", "main").status, 2, "a bare branch name is no destination");
++  assert.equal(run("record", "--root", context.root, "--root", context.root, "--remote", "publish", "--destination", DESTINATION).status, 2);
++  const help = run("--help");
++  assert.equal(help.status, 0);
++  assert.match(help.stdout, /^usage: /u);
++}));
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index b7e850da761cc20fb5dcf29c3f7a100179585006..3a3e2092f86a8281c23c29cc54cc00fc0bf91c08 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -943,6 +943,8 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+   const modeNotice = repositoryModeNotice(dir, { remote, destination }, deps);
+   if (modeNotice !== null) notices.push(modeNotice);
+   if (notices.length > 0) report.notices = notices;
++  // The step after the push: it asks the remote what it holds and records that privately, so the tracked handover's "not done by the close" is no longer the last word. No commit.
++  report.afterPush = { command: ["node", fileURLToPath(new URL("./publication-readback.mjs", import.meta.url)), "record", "--root", dir, "--remote", remote, "--destination", destination], why: "right after the push: records what the remote really holds, needs no commit" };
+   // Slim profile pushes the exact checked-out branch; the default profile keeps HEAD.
+   const sourceRef = slim ? checkpointSourceRef() : "HEAD";
+   const profileNote = slim

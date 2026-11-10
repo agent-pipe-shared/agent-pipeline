@@ -1,0 +1,51 @@
+diff --git a/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs b/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
+index c833a4c74b1a64432d06ad46cd4ff07600973072..b4d70f605abce7b2931496823cd6af5da8674b84 100644
+--- a/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
+@@ -147,6 +147,7 @@ test('CGF-30 a drifted target or an unclosed receipt keeps adoption-required aft
+   writeFileSync(join(drifted.dir, receipt.targets[0].path), Buffer.concat([readFileSync(join(drifted.dir, receipt.targets[0].path)), Buffer.from('\ndrift\n')]));
+   assert.equal(inspectClosedFeatureArchitecture(drifted.dir).code, 'ARCHITECTURE-DESIGN-ARTIFACT-DRIFT');
+   assert.equal(resolveAdoptionState(drifted.dir).state, 'adoption-required');
++  assert.match(resolveAdoptionState(drifted.dir).rationale, /no longer matches the closed feature's approved design/u, 'a drifted map must not read as no architecture at all');
+ 
+   const unclosed = fixture.makeAggregateFixture({ stage: 'approved-unmaterialized' });
+   assert.equal(fixture.invoke(unclosed, ['materialize-architecture']).status, 0);
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.mjs b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+index 314ffb5a17504bb506c6c7bfb7b4a4b9ea8e4b62..95886cac9d09b465717a6742512d6dcda203f181 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+@@ -55,7 +55,7 @@ export function greenfieldMaterializationPending(rootDir, deps = {}) {
+ 
+ /** Codex greenfield report: a map updated on purpose after the design must not read as "this repository has no architecture". */
+ export function adoptionRequiredRationale(closedCode) {
+-  if (closedCode === "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT") return "The architecture map no longer matches the closed feature's approved design, so that design no longer stands as this repository's baseline. A deliberate map update after the design ends up here; it blocks nothing now. At the next feature start, compare architecture/design-materialization.json with the map and decide the adoption scope.";
++  if (closedCode === "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT") return "The architecture map no longer matches the closed feature's approved design, so that design no longer stands as this repository's baseline. A deliberate map update after the design ends up here too. The closed feature, its close and its push are not affected. The next feature needs its own approved design in force; compare architecture/design-materialization.json with the map when writing it.";
+   return "No architecture baseline or adoption decision exists for this repository";
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+index aceaf03d8f96de73480e87145dd30489aa55ac05..2e09deb878f610cc623bcb1e12f31ba8734ac60b 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+@@ -57,7 +57,7 @@ describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
+     it("says a map drifted from the closed design instead of claiming no architecture exists", () => {
+       const drift = adoptionRequiredRationale("ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
+       assert.match(drift, /no longer matches/u);
+-      assert.match(drift, /blocks nothing/u);
++      assert.match(drift, /its close and its push are not affected/u);
+       assert.doesNotMatch(drift, /No architecture baseline/u);
+       assert.match(adoptionRequiredRationale(undefined), /No architecture baseline/u);
+     });
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+index 84a1d638c316b8c90269a84aca17d4a6f9984b58..36ff9fd61442e525dcad6deff23f8f99a77f92b9 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+@@ -42,7 +42,7 @@ export const BOUNDARY_POLICY_PATH = "architecture/boundary-policy.json";
+ export const DEFAULT_LINE_BOUND = 1000;
+ export const BOUNDARY_RULES = Object.freeze(["unowned-path", "ambiguous-ownership", "forbidden-dependency", "over-line-bound"]);
+ /** What a pass of this check does and does not say (Codex greenfield report): a green verdict must not read as "every dependency was seen". */
+-export const BOUNDARY_COVERAGE = "Checked: file ownership, file length, and relative imports written in JavaScript or TypeScript files. Not seen: runtime or browser globals, HTML and CSS references, bundler output, imports in other languages, and whether code honours a module's contract.";
++export const BOUNDARY_COVERAGE = "Checked: file ownership, file length, and relative imports written in JavaScript or TypeScript files. Not seen: runtime or browser globals, HTML and CSS references, bundler output, imports in other languages, import paths built at runtime, and whether code honours a module's contract.";
+ export const DEFAULT_SOURCE_EXTENSIONS = Object.freeze([
+   ".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx", ".py", ".go", ".rs", ".java", ".kt",
+   ".rb", ".cs", ".swift", ".c", ".h", ".cc", ".cpp", ".hpp", ".php", ".scala",

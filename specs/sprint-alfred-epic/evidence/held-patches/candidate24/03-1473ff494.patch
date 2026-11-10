@@ -1,0 +1,26 @@
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index a1659e97c5ce5bbcacb5ae266348f5d009633e44..dcca7b7aa5dcb5de61f5d40bc35153110d46a70d 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -240,7 +240,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+   const evidenceDir = featureId === undefined ? null : `specs/${featureId}/evidence`;
+   const rerunBase = `node ${fileURLToPath(import.meta.url)} --one-shot --root ${root} --by ${JSON.stringify(actor)} --architecture-impact ${architectureImpact}`;
+   let packetForRerun = criticPacketId;
+-  const rerun = (id) => `${rerunBase}${id || packetForRerun === null ? "" : ` --critic-packet-id ${packetForRerun}`}${id ? ` --resume-lifecycle-id ${id}` : ""}`;
++  // C24 (Claude greenfield): a resume dropped the packet, and with two Critic rounds on record the printed command stopped at ONESHOT-CRITIC-PACKET-MISSING.
++  const rerun = (id) => `${rerunBase}${packetForRerun === null ? "" : ` --critic-packet-id ${packetForRerun}`}${id ? ` --resume-lifecycle-id ${id}` : ""}`;
+   const repairFor = (error, id) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command: ${rerun(id)}`;
+   const stages = [];
+   // The calibrated handover file (project/pipeline.json `handover`), the same resolution the coordinator's quality readback uses.
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index ef027d14d4cc453bbcdb74af02527ff916daab88..28312510c0901318ddfbe98b8f2a9f5504d8cfd8 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -585,6 +585,7 @@ test("P3: every stop that needs a human is one typed reason with its exact repai
+     const stopped = oneShotClose(refused.input, { runCommand: runner });
+     assert.equal(stopped.status, "stopped"); assert.equal(stopped.stop.code, "CLOSE-CRITIC-CALLER-AUTHORED"); assert.match(stopped.stop.repair, /approve-critic-acknowledgement/u);
+     assert.match(stopped.next, /--resume-lifecycle-id /u, "the rerun resumes the started lifecycle and skips the evidence stages");
++    assert.match(stopped.next, new RegExp(`--critic-packet-id ${refused.input.criticPacketId} `, "u"), "the printed resume keeps the packet: with two rounds on record it would stop at ONESHOT-CRITIC-PACKET-MISSING");
+   } finally { rmSync(refused.root, { recursive: true, force: true }); }
+ });
+ 

@@ -1,0 +1,149 @@
+diff --git a/plugins/pipeline-core/lib/review-admission-read.mjs b/plugins/pipeline-core/lib/review-admission-read.mjs
+index 423f944414f4311122f2d1539694b44999e3a4b4..55d43457ae625219a753bd6e2ac1bd43ec2632ec 100644
+--- a/plugins/pipeline-core/lib/review-admission-read.mjs
++++ b/plugins/pipeline-core/lib/review-admission-read.mjs
+@@ -1231,7 +1231,7 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
+   }
+   const failedReceipt = critic.reviewPass !== true;
+   if (failedReceipt && (deps.residualAcceptance === undefined || deps.residualAcceptance === null)) {
+-    cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
++    cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate. Correct them through a dispatch and run a Critic delta round on the new candidate; only minor findings, or a major no commit can correct, can instead get a PO residual acceptance (pipeline-state.mjs approve-residual-acceptance, the PO's own attended step), and a statement in chat is not one.");
+   }
+   if (critic.candidate.commit !== sourceCandidate.commit || critic.candidate.tree !== sourceCandidate.tree
+     || critic.reviewRange.commit !== sourceCandidate.commit) cvlFail("CVL-CRITIC-STALE", "Private Critic receipt is not bound to the Verify candidate.");
+@@ -1244,7 +1244,7 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
+       if (deps.residualAcceptance !== undefined && deps.residualAcceptance !== null) {
+         cvlFail("CVL-CRITIC-FAILED", `Critic findings remain unresolved and the recorded PO residual acceptance no longer verifies (most often it has expired, the signature window is short, or it does not match the open findings); capture it again with pipeline-state.mjs approve-residual-acceptance --by <name> --critic-packet ${criticPacketId} and approve it again, then retry`);
+       }
+-      cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
++      cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate. Correct them through a dispatch and run a Critic delta round on the new candidate; only minor findings, or a major no commit can correct, can instead get a PO residual acceptance (pipeline-state.mjs approve-residual-acceptance, the PO's own attended step), and a statement in chat is not one.");
+     }
+   }
+   const roleRoute = criticRouteVerdict({ gitCommonDir: common, criticPacketId, critic, criticReceiptSha256 }, deps);
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 2da0cb3703364194fb0369301e1c007483fda567..74d28c0a82c996363aa221e42e8486fd1ea8184d 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -27,7 +27,7 @@ import { criticAddendumBindingFinding, evaluateRepositoryCriticSkipCoverage, wal
+ import { writeCriticDispositionAddendumObject } from "./dispatch-record-write.mjs";
+ import { CRITIC_EVIDENCE_SCHEMA } from "../lib/critic-skip-decision.mjs";
+ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
+-import { canonicalJson as criticPacketCanonicalJson, readConsumedCandidateReceipt } from "../lib/critic-packet-preflight-read.mjs";
++import { canonicalJson as criticPacketCanonicalJson, readConsumedCandidateReceipt, readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
+ import { findCriticAcknowledgement } from "../lib/critic-acknowledgement.mjs";
+ import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
+ import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+@@ -1398,6 +1398,20 @@ try {
+       if (error?.code === "CLOSE-CRITIC-CALLER-AUTHORED" && /authored by the calling agent/u.test(error.message)) emit({ schema: "pipeline.close-critic-independence.v1", status: "acknowledgement-required", code: error.code, message: error.message });
+       else emit({ schema: "pipeline.close-critic-independence.v1", status: "unknown" });
+     }
++  } else if (command === "critic-standing") {
++    // C24 (Claude greenfield): read-only, so the one-shot close can say BEFORE anything is written that this round did not pass. The close keeps its own check.
++    const parsed = exactArgs(argv, new Set(["root", "packet"]));
++    if (!parsed || !parsed.values.root || !/^[a-f0-9]{32}$/u.test(parsed.values.packet ?? "")) fail("CLOSE-ARGS", "critic-standing arguments invalid");
++    const controlRoot = join(gitCommonDir(physicalRoot(parsed.values.root)), "agent-pipeline", "critic-packets");
++    try {
++      const { receipt } = readConsumedCandidateReceipt({ controlRoot, packetId: parsed.values.packet });
++      if (receipt?.reviewPass === true) emit({ schema: "pipeline.close-critic-standing.v1", status: "passed" });
++      else {
++        const { findings } = readConsumedCandidateResult({ controlRoot, packetId: parsed.values.packet }).result.verdict;
++        const count = (severity) => findings.filter((finding) => finding?.severity === severity).length;
++        emit({ schema: "pipeline.close-critic-standing.v1", status: "failed", blockers: count("blocker"), majors: count("major"), minors: count("minor") });
++      }
++    } catch { emit({ schema: "pipeline.close-critic-standing.v1", status: "unknown" }); }
+   } else if (command === "critic-addenda") {
+     // C21E: the Critic addenda a close derives anyway, written BEFORE the one-shot close spends a Verify: their commit moves HEAD, so writing them inside the close made the candidate stale.
+     const parsed = exactArgs(argv, new Set(["root"]));
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 442e13b3cd5e6f53d5e762726a0e47d5ebeecf96..a1659e97c5ce5bbcacb5ae266348f5d009633e44 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -331,6 +331,16 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+           `finish the Critic review (it records the packet), then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <packet-id>`);
+       }
+       packetForRerun = packet;
++      // C24 (Claude greenfield): a round that did not pass used to surface only inside Verify, after the Result bootstrap, with no way out named, and a run took a PO's word in chat for an acceptance.
++      let standing = null;
++      try { standing = command(runner, process.execPath, [COORDINATOR, "critic-standing", "--root", root, "--packet", packet], "ONESHOT-CRITIC-STANDING"); } catch { standing = null; /* the close keeps its own check */ }
++      if (standing?.status === "failed" && !state.residualAcceptance?.lastAccepted) {
++        const acceptance = standing.blockers > 0 ? "A blocker can never be accepted."
++          : standing.majors > 0 ? `A major can be accepted only when no commit can correct it (the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet} --reason-class uncorrectable-past-authorship); a major that a commit can correct has to be corrected.`
++            : `Only minor findings are open, so the PO may instead accept them in the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet}.`;
++        return stopResult("critic-standing", "ONESHOT-CRITIC-NOT-PASSED", `The Critic round ${packet} did not pass (${standing.blockers} blocker, ${standing.majors} major, ${standing.minors} minor) and no PO residual acceptance is on record, so this candidate cannot close. A statement in chat is not an acceptance.`,
++          `nothing was written; correct the findings through a dispatch, run a Critic delta round on the new candidate, then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <new-packet-id>. ${acceptance}`);
++      }
+       // C21B: a Continuity feature without a bound Result cannot pass the Result close block below; stop BEFORE Verify, so no partial close evidence has to be cleaned up by hand.
+       if (state.continuity !== null && typeof state.continuity === "object" && state.continuity.queueHead?.nextAction !== "close" && !state.continuity.authority?.result) {
+         if (ownerRouteRequired) {
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index e7a415af2cdeb48fd3c443e7819315f3978ab18f..ef027d14d4cc453bbcdb74af02527ff916daab88 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -258,7 +258,7 @@ const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
+ // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
+ // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
+ // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
+-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false } = {}) {
++function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false } = {}) {
+   const independenceChecks = [];
+   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
+   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+@@ -266,7 +266,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+   mkdirSync(join(root, ".claude")); mkdirSync(join(root, "specs/feature-abc/evidence"), { recursive: true });
+   writeFileSync(join(root, "specs/feature-abc/result.md"), "# Result\n");
+   const resultSha = sha256Of("# Result\n");
+-  const stateValue = (nextAction) => ({ schema: "pipeline.state.v0", activeFeature: { id: "feature-abc" },
++  const stateValue = (nextAction) => ({ schema: "pipeline.state.v0", activeFeature: { id: "feature-abc" }, ...(residualOnRecord ? { residualAcceptance: { lastAccepted: { findings: [] } } } : {}),
+     ...(continuity ? { continuity: { revision: 3, queueHead: { nextAction }, authority: { result: resultBound ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
+   const writeState = (value) => writeFileSync(join(root, STATE_PATH), `${JSON.stringify(value)}\n`);
+   writeState(closed ? { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] } : stateValue("review"));
+@@ -281,6 +281,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
+   const runner = (executable, argv) => {
+     if (executable === "git") return spawnSync("git", argv, { cwd: root, encoding: "utf8" });
+     const script = argv[0].split("/").at(-1); const sub = argv[1];
++    if (script === "close-coordinator.mjs" && sub === "critic-standing") return json(criticStanding);
+     if (script === "close-coordinator.mjs" && sub === "critic-independence") { independenceChecks.push(flag(argv, "--packet")); return json(acknowledgementMissing ? { status: "acknowledgement-required", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "authored by the calling agent; record it with approve-critic-acknowledgement" } : { status: "satisfied" }); }
+     if (script === "close-coordinator.mjs" && sub === "critic-addenda") return json(addendaPending ? { status: "written", commitPaths: ["specs/feature-abc/evidence/critic-addendum-r1.json"], subject: "chore(evidence): bind the Critic course to the delivery records", message: "written" } : { status: "none" });
+     calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
+@@ -365,6 +366,26 @@ test("C21B: a Continuity feature with no bound Result stops before Verify with t
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++test("C24: a Critic round that did not pass stops before the Result bootstrap and Verify, names the delta round and says which severities can be accepted", () => {
++  const stoppedFor = (criticStanding, options = {}) => {
++    const f = oneShotFixture({ continuity: true, resultBound: false, criticStanding, ...options });
++    try {
++      const result = oneShotClose(f.input, { runCommand: f.runner });
++      return { result, calls: [...f.calls], evidence: existsSync(join(f.root, "specs/feature-abc/evidence/audit-request.json")) };
++    } finally { rmSync(f.root, { recursive: true, force: true }); }
++  };
++  const major = stoppedFor({ status: "failed", blockers: 0, majors: 3, minors: 14 });
++  assert.equal(major.result.stage, "critic-standing"); assert.equal(major.result.stop.code, "ONESHOT-CRITIC-NOT-PASSED");
++  assert.match(major.result.stop.reason, /0 blocker, 3 major, 14 minor[\s\S]*A statement in chat is not an acceptance/u);
++  assert.match(major.result.stop.repair, /Critic delta round[\s\S]*--critic-packet-id <new-packet-id>[\s\S]*uncorrectable-past-authorship[\s\S]*has to be corrected/u);
++  assert.deepEqual(major.calls, [], "nothing runs before the stop"); assert.equal(major.evidence, false);
++  assert.match(stoppedFor({ status: "failed", blockers: 1, majors: 0, minors: 0 }).result.stop.repair, /A blocker can never be accepted/u);
++  const minor = stoppedFor({ status: "failed", blockers: 0, majors: 0, minors: 2 }).result.stop.repair;
++  assert.match(minor, /approve-residual-acceptance --by <name> --critic-packet/u); assert.doesNotMatch(minor, /uncorrectable/u);
++  assert.equal(stoppedFor({ status: "failed", blockers: 0, majors: 0, minors: 2 }, { residualOnRecord: true }).result.stop.code, "ONESHOT-RESULT-NOT-BOUND", "a recorded acceptance goes on to the close's own check");
++  assert.equal(stoppedFor({ status: "unknown" }).result.stop.code, "ONESHOT-RESULT-NOT-BOUND", "an unreadable standing leaves the close's own check in charge");
++});
++
+ test("C21C: a missing PO acknowledgement of a caller-authored Critic stops before Verify and writes nothing", () => {
+   const f = oneShotFixture({ acknowledgementMissing: true });
+   try {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 4e1742c4ffc2a5c89628f531b570aa3e4787181b..66391264a16737ffb5e1a1db1ce118fc973dd6d1 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -2398,6 +2398,10 @@ test("a failing review exports too, with reviewPass false and its finding count"
+     const receipt = JSON.parse(readFileSync(join(fx.root, options.outDir, "receipt.json"), "utf8"));
+     assert.equal(receipt.reviewPass, false);
+     assert.equal(sha(readFileSync(join(fx.root, options.outDir, "receipt.json"))), index.receiptSha256);
++    // C24: the close coordinator's read-only verb reports the same standing with the counts the one-shot close needs.
++    const standing = (packet) => JSON.parse(spawnSync(process.execPath, [fileURLToPath(new URL("./close-coordinator.mjs", import.meta.url)), "critic-standing", "--root", fx.root, "--packet", packet], { encoding: "utf8" }).stdout);
++    assert.deepEqual([standing(packetId).status, standing(packetId).blockers, standing(packetId).majors, standing(packetId).minors], ["failed", 0, 0, 1]);
++    assert.equal(standing("9".repeat(32)).status, "unknown");
+   } finally { cleanup(fx); }
+ });
+ 

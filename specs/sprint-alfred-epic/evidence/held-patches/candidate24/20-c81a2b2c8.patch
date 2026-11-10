@@ -1,0 +1,80 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 114aeba4f86bab95305e1fe287d09334e9384ddf..db439d5914d827329b58a8aa1011884fcbd7a958 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -326,7 +326,8 @@ export function inspectClosedFeatureArchitecture(rootDir) {
+     const targets = architectureDesignTargets(input);
+     requireValue(hash(json(input)) === receipt.designSha256
+       && JSON.stringify(targets.map(target => ({ path: target.path, sha256: hash(target.bytes) }))) === JSON.stringify(receipt.targets), "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+-    requireValue(targets.every(target => bytes(root, target.path) === target.bytes), "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
++    const drifted = targets.filter((target) => bytes(root, target.path) !== target.bytes);
++    if (drifted.length > 0) return { ok: false, status: "unavailable", code: "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT", driftedTargets: drifted.map((target) => ({ path: target.path, change: committedOrWorkingTree(root, target.path) })) };
+     return { ok: true, status: "closed-feature-design", featureId: receipt.featureId, designSha256: receipt.designSha256,
+       scope: input.disposition.scope, rationale: input.disposition.rationale };
+   } catch (error) {
+@@ -334,6 +335,13 @@ export function inspectClosedFeatureArchitecture(rootDir) {
+   }
+ }
+ 
++/** R11: a drifted map file that equals HEAD was committed after the design (a deliberate update reads like this); one that differs from HEAD exists only in the working tree. "unknown" when Git cannot say. */
++function committedOrWorkingTree(root, path) {
++  const status = spawnSync("git", ["-C", root, "status", "--porcelain", "--", path], { encoding: "utf8", shell: false, timeout: 4_000 });
++  if (status.error || status.status !== 0) return "unknown";
++  return String(status.stdout).trim() === "" ? "committed" : "working-tree-only";
++}
++
+ /** Read-only authority projection: no adoption record or second PO decision is fabricated. */
+ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) {
+   const root = resolve(rootDir);
+diff --git a/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs b/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
+index b4d70f605abce7b2931496823cd6af5da8674b84..df8af2b700d5f1bba6c353c37273c3fa68619f9d 100644
+--- a/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs
+@@ -146,6 +146,7 @@ test('CGF-30 a drifted target or an unclosed receipt keeps adoption-required aft
+   closeFeatureInState(drifted);
+   writeFileSync(join(drifted.dir, receipt.targets[0].path), Buffer.concat([readFileSync(join(drifted.dir, receipt.targets[0].path)), Buffer.from('\ndrift\n')]));
+   assert.equal(inspectClosedFeatureArchitecture(drifted.dir).code, 'ARCHITECTURE-DESIGN-ARTIFACT-DRIFT');
++  assert.deepEqual(inspectClosedFeatureArchitecture(drifted.dir).driftedTargets.map((target) => target.path), [receipt.targets[0].path], 'only the file that really drifted is named');
+   assert.equal(resolveAdoptionState(drifted.dir).state, 'adoption-required');
+   assert.match(resolveAdoptionState(drifted.dir).rationale, /no longer matches the closed feature's approved design/u, 'a drifted map must not read as no architecture at all');
+ 
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.mjs b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+index 6f9466911639b7689a928d99ff373dc290f2cc33..b5d25e75dc70f0f72a574df0047644cf346ca6c0 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+@@ -54,8 +54,10 @@ export function greenfieldMaterializationPending(rootDir, deps = {}) {
+ }
+ 
+ /** Codex greenfield report: a map updated on purpose after the design must not read as "this repository has no architecture". */
+-export function adoptionRequiredRationale(closedCode) {
+-  if (closedCode === "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT") return "The architecture map no longer matches the closed feature's approved design, so that design no longer stands as this repository's baseline. A deliberate map update after the design ends up here too. This finding stops neither the closed feature's close nor its push. The next feature needs its own approved design in force; compare architecture/design-materialization.json with the map when writing it.";
++export function adoptionRequiredRationale(closedCode, driftedTargets = []) {
++  // R11: which files, and whether each was committed after the design (a deliberate update reads like this) or exists only in the working tree. `change` is measured; what it means stays the reader's call.
++  const named = (change, words) => { const paths = driftedTargets.filter((target) => target.change === change).map((target) => target.path); return paths.length === 0 ? "" : ` ${words}: ${paths.join(", ")}.`; };
++  if (closedCode === "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT") return `The architecture map no longer matches the closed feature's approved design, so that design no longer stands as this repository's baseline. A deliberate map update after the design ends up here too.${named("committed", "Committed after the design")}${named("working-tree-only", "Changed only in the working tree")} This finding stops neither the closed feature's close nor its push. The next feature needs its own approved design in force; compare architecture/design-materialization.json with the map when writing it.`;
+   return "No architecture baseline or adoption decision exists for this repository";
+ }
+ 
+@@ -159,7 +161,7 @@ export function resolveAdoptionState(rootDir = DEFAULT_ROOT, now = new Date()) {
+     expiresAt: null,
+     reviewDate: null,
+     decisionRef: null,
+-    rationale: adoptionRequiredRationale(closed.code),
++    rationale: adoptionRequiredRationale(closed.code, closed.driftedTargets),
+     coverageClass: "unavailable",
+     confidence: "estimated"
+   };
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+index 28934b3b03a073e977659118f2cd37702b88a600..79a0967fd806e01b0f6a97141faf7d27dfd91244 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+@@ -60,6 +60,9 @@ describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
+       assert.match(drift, /stops neither the closed feature's close nor its push/u);
+       assert.doesNotMatch(drift, /No architecture baseline/u);
+       assert.match(adoptionRequiredRationale(undefined), /No architecture baseline/u);
++      const named = adoptionRequiredRationale("ARCHITECTURE-DESIGN-ARTIFACT-DRIFT", [{ path: "architecture/a.md", change: "committed" }, { path: "architecture/b.md", change: "working-tree-only" }, { path: "architecture/c.md", change: "unknown" }]);
++      assert.match(named, /Committed after the design: architecture\/a\.md\. Changed only in the working tree: architecture\/b\.md\./u);
++      assert.doesNotMatch(named, /c\.md/u, "a change Git could not classify is not claimed either way");
+     });
+ 
+     it("applies and resolves approved-scoped adoption decision", () => {

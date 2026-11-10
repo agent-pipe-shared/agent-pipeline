@@ -1,0 +1,32 @@
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 6bccabb8b3a879cec7242a9da121b38cff20e80f..0d9709c785ee93ccd931d80a0b81257e4e0f2a7b 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -120,6 +120,12 @@ previous round's candidate). Earlier rounds may carry findings. The addendum is
+ exclusive and cannot be replaced. Rounds are not capped (D190/D199): a further
+ correction-diff Critic round is always allowed.
+ 
++**A product fix after a passed Critic round.** Commit it as usual. The close still accepts it, but the push's
++Critic carry does not (`CVL-CARRY-CONTENT-CHANGED`), so register a correction-DIFF round BEFORE the close
++(`register-feature-package.mjs --help`, "Critic delta request route"). That is the whole answer: there is no
++need to read the coordinator or the carry sources to find it. Details are under the carry-forward and
++`candidate-frozen` paragraphs below.
++
+ The returned action has this shape (the Continuity flag is mandatory whenever
+ it is present in the returned argv):
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+index 0cb109dfcb47358d929ded5df3bf26eaaff58470..ce0646af6fe8695a2b6dcc9e145bcd45d35daa0c 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/antigravity-native-dispatch.md
+@@ -70,7 +70,9 @@ transport only. Do not `define_subagent` a Pipeline role yourself; `dispatch-bri
+   same command as `apply` with the `--expect-sha256` digest it printed. `apply` writes the branch's net change into the working tree,
+   uncommitted and unstaged; it refuses a path outside the briefed scope, a path with local changes and a change that no longer applies. The
+   commit is then the existing recovery route (`scripts/goldfish-host-commit-recover.mjs plan|apply`). The host owns the worktree and the
+-  branch; do not remove them.
++  branch; do not remove them. To see what the child committed, stay in the project root: `git log <the child's branch>` and `git show
++  <the child's branch>` read the shared object database, so no `git -C <worktree>` is needed. The tool budget is field 6 of the generated
++  briefing and `guard-dispatch` reads it from there; nothing else is passed on the call. Neither step needs a look into the guard sources.
+ - **Briefing text, not a file pointer.** The generated `promptPointer` (`pipeline-briefing-file:` line) is admitted only in a direct
+   Claude Agent call; an Antigravity call carrying it is refused `DBG-REF-CARRIER`. Pass the full generated briefing as `Prompt`,
+   copied verbatim from the `--out` file including its final newline: the marker digest covers every byte, and a retyped or

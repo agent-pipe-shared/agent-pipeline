@@ -1,0 +1,52 @@
+diff --git a/plugins/pipeline-core/lib/critic-route-assurance.mjs b/plugins/pipeline-core/lib/critic-route-assurance.mjs
+index ee34d36b22bf28527b181c923ab19e6ce0108647..d302210d2723f6f6aea817059a3732105cfe7127 100644
+--- a/plugins/pipeline-core/lib/critic-route-assurance.mjs
++++ b/plugins/pipeline-core/lib/critic-route-assurance.mjs
+@@ -20,7 +20,7 @@ export const CRITIC_ROUTE_ASSURANCE_SCHEMA = "pipeline.critic-route-assurance.v1
+ export function criticRunnerFromEnv(env) {
+   const source = env !== null && typeof env === "object" ? env : {};
+   if (source.CODEX_SESSION_ID !== undefined || source.CODEX_THREAD_ID !== undefined) return "codex";
+-  if (source.ANTIGRAVITY_AGENT !== undefined) return "antigravity";
++  if (source.ANTIGRAVITY_AGENT !== undefined || source.AI_AGENT === "antigravity") return "antigravity";
+   if (source.CLAUDECODE !== undefined || source.CLAUDE_CODE_SESSION_ID !== undefined) return "claude";
+   return "unknown";
+ }
+diff --git a/plugins/pipeline-core/lib/critic-route-assurance.test.mjs b/plugins/pipeline-core/lib/critic-route-assurance.test.mjs
+index 0548b4994e4a83c7b6349dd27cad8ff9b2887697..e3932fa24854e45af05f380ff65ac6c1561bacda 100644
+--- a/plugins/pipeline-core/lib/critic-route-assurance.test.mjs
++++ b/plugins/pipeline-core/lib/critic-route-assurance.test.mjs
+@@ -63,6 +63,7 @@ test("wording is never upgraded: only a source-issued, fresh-context expectation
+   assert.equal(criticRunnerFromEnv({ CODEX_THREAD_ID: "x" }), "codex");
+   assert.equal(criticRunnerFromEnv({ CODEX_SESSION_ID: "x" }), "codex");
+   assert.equal(criticRunnerFromEnv({ ANTIGRAVITY_AGENT: "1" }), "antigravity");
++  assert.equal(criticRunnerFromEnv({ AI_AGENT: "antigravity" }), "antigravity", "the second marker every other runner reader accepts");
+   assert.equal(criticRunnerFromEnv({ CLAUDE_CODE_SESSION_ID: "x" }), "claude");
+   assert.equal(criticRunnerFromEnv({}), "unknown");
+   const unknown = describe({ runner: "unknown" });
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index cba9e54f60cfbd6c3c9ceb18da949865bea5fec8..4c98c2072419f69932cd99953be7b852756d0ca7 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -2144,7 +2144,8 @@ test("AGY report: an Antigravity Critic gets one generated line naming the repos
+     assert.ok(printed.criticRunnerPromptLines[0].startsWith(`Repository root: ${fs.realpathSync(fx.root)}. `), printed.criticRunnerPromptLines[0]);
+     assert.match(printed.criticRunnerPromptLines[0], /absolute paths only/u);
+     assert.match(printed.nextStep, /criticRunnerPromptLines/u);
+-    assert.deepEqual(dispatchFindings({ subagentType: "critic", prompt: [`Ruleset SHA: ${fx.candidate}`, ...printed.criticRunnerPromptLines].join("\n") }).findings.filter(({ code }) => code.startsWith("DISPATCH-CONTAMINATION")), []);
++    const findings = (extra) => dispatchFindings({ subagentType: "critic", prompt: [`Ruleset SHA: ${fx.candidate}`, ...extra].join("\n") }).findings.map(({ code }) => code).sort();
++    assert.deepEqual(findings(printed.criticRunnerPromptLines), findings([]), "the whole dispatch policy reads the prompt the same with and without the line");
+     for (const env of [{ CLAUDE_CODE_SESSION_ID: "s" }, { CODEX_SESSION_ID: "s" }, {}]) {
+       assert.equal(Object.hasOwn(g2069Printed(fx, {}, { env }), "criticRunnerPromptLines"), false, JSON.stringify(env));
+     }
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index e2155c0f751b5b43219d791f21b0d4fbe4bc99d6..b7e850da761cc20fb5dcf29c3f7a100179585006 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -376,7 +376,7 @@ export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
+     message: `the calibration (${file}) declares repositoryMode "local-only" (written once at onboarding), but this push targets the configured remote "${remote}" (${destination}). `
+       + `Correct the calibration: set "repositoryMode" to "remote-tracked" in ${file}${mirror} with the one narrow command node <plugin-root>/scripts/repository-mode-promote.mjs --root <project-root> --to remote-tracked `
+       + "(it changes only that one value, needs a configured remote and prints the paths to commit; the pre-commit hook admits exactly that change without a signature). "
+-      + "It is routine agent work and needs no separate PO decision; the push itself stays behind its signature. It is a commit, so make it before the feature close and before the candidate is fixed, and run push-prepare again. Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
++      + "It is routine agent work and needs no separate PO decision; the push itself stays behind its signature. It is a commit, so it belongs before the last Critic round; then run push-prepare again. If that round has already passed, leave it for this push (a calibration commit would end the Critic carry, CVL-CARRY-CONTENT-CHANGED) and make it the first commit of the next feature. Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
+       + "Nothing was written now and nothing is refused; if \"local-only\" is the truth, the push target is what is wrong.",
+   };
+ }

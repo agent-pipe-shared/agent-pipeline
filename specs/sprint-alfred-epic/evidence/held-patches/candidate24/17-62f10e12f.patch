@@ -1,0 +1,92 @@
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index b1e9c85aa7481ae6bed20b02512ac85e5fc7f30c..0115f08eb22deebdf62c9bfa2291c3a40369f924 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -15,7 +15,7 @@ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { observeGovernanceScope } from "../governance-scope.mjs";
+ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
+ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+-import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, recursiveGrepHint } from "../read-command-diagnosis.mjs";
++import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, recursiveGrepHint, repeatedFlagHint } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+ import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+ import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
+@@ -555,7 +555,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+           if (flag === null) { try { recursiveSearch = recursiveGrepHint(readCommand, root); } catch { recursiveSearch = null; } }
+           // Q2: a rejected `ls` flag on a protected directory says which listing spellings are admitted.
+           if (flag !== null) {
+-            try { listing = clusterSpellingHint(readCommand, flag, root) ?? lsListingHint(readCommand, flag, root); } catch { listing = null; }
++            try { listing = clusterSpellingHint(readCommand, flag, root) ?? lsListingHint(readCommand, flag, root) ?? repeatedFlagHint(readCommand, flag, root); } catch { listing = null; }
+           }
+         }
+       }
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+index 3ff3423ae410298cb79ae3123ab9c026fbc0f7f1..cdab07d72bf2e28440604fe36b79014ac0de6b40 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+@@ -148,6 +148,21 @@ export function lsListingHint(command, flag, root) {
+     + "`find <dir> -maxdepth 1` lists the same names; this is an intended read limit, not a fault of the directory";
+ }
+ 
++/**
++ * R6 (2026-11 greenfield report): the refusal said "a repeated option" without naming it. One sentence when the flag firstUnadmittedFlag named occurs more than once before `--`, else null. Prose only.
++ * @returns {string|null}
++ */
++export function repeatedFlagHint(command, flag, root) {
++  if (typeof command !== "string" || typeof flag !== "string") return null;
++  let parsed;
++  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
++  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1) return null;
++  const { argv } = parsed.segments[0];
++  const endOfOptions = argv.indexOf("--");
++  const options = endOfOptions === -1 ? argv : argv.slice(0, endOfOptions);
++  return options.filter((word) => word === flag).length > 1 ? `this option is given more than once and is admitted once here; keep one ${flag}` : null;
++}
++
+ /** @returns {string|null} the flag token (as written) whose removal makes the command admitted, else null. */
+ export function firstUnadmittedFlag(command, root) {
+   if (typeof command !== "string" || command.trim() === "") return null;
+@@ -166,6 +181,11 @@ export function firstUnadmittedFlag(command, root) {
+     // pattern itself vanish and be mistaken for a flag fault, so a bad value flag is simply not diagnosed (null).
+     const rest = argv.filter((_, position) => position !== index);
+     if (isReadOnlyDiagnosticCommand([executable, ...rest.map(quote)].join(" "), root)) return token;
++    // R6: an option taking a value, given twice (`-A 3 -A 5`). Only the repeat and the word after it go, so the earlier occurrence still proves the flag is admitted and no operand can vanish unnoticed.
++    if (argv.slice(0, index).includes(token) && index + 1 < limit) {
++      const withoutRepeat = argv.filter((_, position) => position !== index && position !== index + 1);
++      if (isReadOnlyDiagnosticCommand([executable, ...withoutRepeat.map(quote)].join(" "), root)) return token;
++    }
+     // C22B: a short-flag cluster that holds a value-taking flag (`-nA 5`) is refused although its flags spelled out are admitted. Removing the token cannot
+     // show that (the value would be left behind), so replacing it by its single flags is the one extra probe; clusterSpellingHint then prints the spelling.
+     if (/^-[A-Za-z]{2,}$/u.test(token)) {
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+index 2448e4453849b91d31885b8ed3b9c98f0e90eb66..93e7ee4fe25b102f574de4d4c48b4da4b33861ce 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+-import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint } from "./read-command-diagnosis.mjs";
++import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, repeatedFlagHint } from "./read-command-diagnosis.mjs";
+ import * as diagnosis from "./read-command-diagnosis.mjs";
+ import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
+ 
+@@ -120,6 +120,18 @@ test("RCD14: the refusal of an attached value prints the spelling to use, and bo
+   assert.match(String(result.stderr), /Rejected element: the flag "-A8" \(an attached value is not admitted; give it as a separate argument: -A 8\)\./u);
+ });
+ 
++test("RCD-R6: a repeated option is named, with or without a value, and only when the repeat is the whole fault", async () => {
++  for (const [command, flag] of [["rg -n -A 3 -A 5 needle docs", "-A"], ["rg -n -m 3 -m 5 needle docs", "-m"], ["head -n 3 -n 5 README.md", "-n"], ["rg -n -n needle README.md", "-n"]]) {
++    assert.equal(firstUnadmittedFlag(command, root), flag, command);
++    assert.equal(repeatedFlagHint(command, flag, root), `this option is given more than once and is admitted once here; keep one ${flag}`, command);
++  }
++  assert.equal(firstUnadmittedFlag("rg -n -A 3 -A 5 --hidden needle docs", root), null, "two faults: no single token explains it");
++  assert.equal(repeatedFlagHint("rg --hidden needle README.md", "--hidden", root), null, "a flag given once is no repeat");
++  assert.equal(repeatedFlagHint(undefined, "-n", root), null);
++  const result = await refusal("rg -n -A 3 -A 5 needle README.md");
++  assert.match(String(result.stderr), /Rejected element: the flag "-A" \(this option is given more than once and is admitted once here; keep one -A\)\./u);
++});
++
+ test("RCD15: a refused ls flag gets the names-only listing spellings, a names-only flag and other commands get none", () => {
+   const hint = String(lsListingHint("ls -la .git/agent-pipeline", "-la", root));
+   assert.match(hint, /listed as names only/u);

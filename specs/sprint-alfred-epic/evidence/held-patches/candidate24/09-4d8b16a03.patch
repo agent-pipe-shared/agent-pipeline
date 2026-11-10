@@ -1,0 +1,29 @@
+diff --git a/backlog/items/2026-11-10-a-complete-forensic-export-of-a-run.md b/backlog/items/2026-11-10-a-complete-forensic-export-of-a-run.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ff87ede499477b6f843ebb0c0554795ed651fe28
+--- /dev/null
++++ b/backlog/items/2026-11-10-a-complete-forensic-export-of-a-run.md
+@@ -0,0 +1,23 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.complete-forensic-export-of-a-run
++type: workflow-improvement
++owner: pipeline
++status: deferred
++created: 2026-11-10
++source: "Codex greenfield forensic report, finding R1 (rated P0 there); PO tile 2026-11-10: after 0.7.0"
++sprint: alfred
++done_when: manual
++---
++
++# A complete forensic export of one run
++
++## Description
++
++A run cannot be exported completely. `scripts/runner-transcript-recovery.mjs` bounds its search (`MAX_CANDIDATES` 2000), reports `metadataComplete: false` once that bound is reached, and leaves out the current session. Someone reconstructing a run therefore works from a partial record and has to read the raw transcripts for the rest.
++
++The Product Owner decided on 2026-11-10 to build this after 0.7.0. It does not touch the happy path and it is a new capability.
++
++## Wanted
++
++One command that exports one run completely: the sessions of all roles, the children, the Pipeline's own records, the effort accounting (report finding R10) and a statement of what is missing. It must work on Claude, Codex and Antigravity, on Windows and Linux, and write only inside the project's own scratch area. Secrets and private paths stay out of the export.

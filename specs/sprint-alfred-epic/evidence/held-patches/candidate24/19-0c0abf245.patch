@@ -1,0 +1,205 @@
+diff --git a/plugins/pipeline-core/lib/security-close-status.mjs b/plugins/pipeline-core/lib/security-close-status.mjs
+index 40abb986d61daa7b342f4e0a9389ed1c1601b2c3..1ad2c231a8cb4908631a8358e15fcdd3f9e10fab 100644
+--- a/plugins/pipeline-core/lib/security-close-status.mjs
++++ b/plugins/pipeline-core/lib/security-close-status.mjs
+@@ -211,6 +211,37 @@ export function formatSecurityCloseStatus(elements) {
+   });
+ }
+ 
++export const CLOSE_SECURITY_SCOPE_SCHEMA = "pipeline.close-security-scope.v1";
++const SCANNER_RAN = new Set(["pass", "findings"]);
++
++/**
++ * R8 (2026-11 greenfield report): the close said "green" with nothing about what that covers. Reads the v2 verdict the scan wrote: which authority decides the close's exit, whether the v2 verdict is only
++ * reporting, how large the capability plan is and which scanners really ran. Pure; a verdict it cannot read is typed unavailable, so this can never block the close.
++ */
++export function closeSecurityScope(doc) {
++  if (doc?.schema !== "pipeline.security-verdict.v2" || !Array.isArray(doc.controls) || !Array.isArray(doc.plan?.required) || !Array.isArray(doc.plan?.optional)) {
++    return { schema: CLOSE_SECURITY_SCOPE_SCHEMA, status: "unavailable", reason: "the v2 security verdict could not be read" };
++  }
++  const name = (control) => String(control.tool ?? control.control);
++  return {
++    schema: CLOSE_SECURITY_SCOPE_SCHEMA, status: "read",
++    exitAuthority: String(doc.exitAuthority),
++    v2VerdictReportingOnly: doc.exitAuthority === "v1-blocking-logic",
++    v2VerdictBlocking: doc.verdict?.blocking === true,
++    capabilityPlan: { required: doc.plan.required.length, optional: doc.plan.optional.length, empty: doc.plan.required.length + doc.plan.optional.length === 0 },
++    scannersRan: doc.controls.filter((control) => SCANNER_RAN.has(control.runOutcome)).map(name),
++    scannersNotRun: doc.controls.filter((control) => !SCANNER_RAN.has(control.runOutcome)).map((control) => ({ scanner: name(control), outcome: String(control.runOutcome), required: control.required === true })),
++  };
++}
++
++/** One sentence for a close report; "" when the scope is unavailable (the structured field then says why). */
++export function describeCloseSecurityScope(scope) {
++  if (scope?.status !== "read") return "";
++  const plan = scope.capabilityPlan.empty ? "empty" : `${scope.capabilityPlan.required} required, ${scope.capabilityPlan.optional} optional`;
++  const notRun = scope.scannersNotRun.length === 0 ? "none" : scope.scannersNotRun.map(({ scanner, outcome }) => `${scanner} (${outcome})`).join(", ");
++  return `Security scope: the exit is decided by ${scope.exitAuthority}${scope.v2VerdictReportingOnly ? ", the v2 policy verdict is reporting only" : ""}${scope.v2VerdictBlocking ? " and names a blocking capability" : ""}; capability plan: ${plan}; scanners that ran: ${scope.scannersRan.length === 0 ? "none" : scope.scannersRan.join(", ")}; did not run: ${notRun}.`;
++}
++
+ /**
+  * The typed refusal of a critical calibration whose manifest configures no security gate (no manifest, no gates.security, or mode off),
+  * or null for any other calibration (those keep reading "not applicable"). It names the exact repair argv: the physical plugin script
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 74d28c0a82c996363aa221e42e8486fd1ea8184d..e7a435e54216f02fa1d999aa4a1dce2db7d38a2c 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -412,7 +412,8 @@ function privateEvidence(common, lifecycle, path, label) {
+     sha256: sha256(readFileSync(requested)),
+   };
+ }
+-function evidence(root, common, lifecycle, path, schema, keys, { privateOnly = false } = {}) {
++const EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
++function evidence(root, common, lifecycle, path, schema, keys, { privateOnly = false, optionalKeys = [] } = {}) {
+   if (!path) fail("CLOSE-EVIDENCE", `${schema} evidence is required`);
+   const file = privateOnly
+     ? privateEvidence(common, lifecycle, path, schema)
+@@ -423,7 +424,7 @@ function evidence(root, common, lifecycle, path, schema, keys, { privateOnly = f
+     fail("CLOSE-JSON", `${schema} is not one JSON object`);
+   }
+   const observed = { ...file, value };
+-  if (observed.value.schema !== schema || Object.keys(observed.value).sort().join("\0") !== [...keys].sort().join("\0")) {
++  if (observed.value.schema !== schema || Object.keys(observed.value).filter((key) => !optionalKeys.includes(key)).sort().join("\0") !== [...keys].sort().join("\0")) {
+     fail("CLOSE-EVIDENCE", `${schema} evidence shape is invalid`);
+   }
+   return observed;
+@@ -820,8 +821,11 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
+     const tracked = evidence(root, common, values.lifecycle, values.evidence, "pipeline.close-tracked-effects.v1", [
+       "schema", "resultSha256", "backlogSha256", "handoverSha256", "historySha256",
+       "telemetrySha256", "retrospectiveSha256", "pipelineStateSha256",
+-    ]);
+-    for (const [key, value] of Object.entries(tracked.value)) if (key !== "schema" && !SHA256.test(value ?? "")) fail("CLOSE-EVIDENCE", "tracked effect digest is invalid");
++    ], { optionalKeys: ["emptyInputs"] });
++    for (const [key, value] of Object.entries(tracked.value)) if (key !== "schema" && key !== "emptyInputs" && !SHA256.test(value ?? "")) fail("CLOSE-EVIDENCE", "tracked effect digest is invalid");
++    // PO rule 2026-11-01: an empty input is marked, never passed off as a hash of something. The label is optional for evidence written before it existed; a label that is present must be true.
++    const emptyLabels = tracked.value.emptyInputs;
++    if (emptyLabels !== undefined && (!Array.isArray(emptyLabels) || emptyLabels.some((key) => key === "schema" || key === "emptyInputs" || tracked.value[key] !== EMPTY_SHA256))) fail("CLOSE-EVIDENCE", "tracked effect emptyInputs names a digest that is not the empty digest");
+     const closed = snapshot.state.closedFeatures?.at(-1);
+     if (snapshot.state.activeFeature !== undefined
+       || closed?.id !== stored.coordinator.featureId
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index 3104d8997ce8f602a983b5e753f31743299a7dce..af8130e5d662e8f8cd36ff8940c4b7e56c9ad5b7 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -431,6 +431,7 @@ function processFixture(name, options = {}) {
+     telemetrySha256: h("4"),
+     retrospectiveSha256: h("5"),
+     pipelineStateSha256: closedStateSha256,
++    ...(options.trackedExtra ?? {}),
+   });
+   transition("tracked-close-finalized", ["--evidence", paths.tracked]);
+   git(root, ["add", "."]);
+@@ -464,6 +465,13 @@ function processFixture(name, options = {}) {
+   };
+ }
+ 
++test("process: tracked effects may mark an empty digest by name; a mark on a real digest is refused", () => {
++  const empty = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
++  const marked = processFixture("empty-mark", { stopAfterFreeze: true, trackedExtra: { backlogSha256: empty, emptyInputs: ["backlogSha256"] } });
++  assert.equal(typeof marked.root, "string");
++  assert.throws(() => processFixture("empty-mark-false", { stopAfterFreeze: true, trackedExtra: { emptyInputs: ["backlogSha256"] } }));
++});
++
+ // Candidate 16a (consumer blocker): fixes found after the freeze (security remediation) need a new candidate. A freeze can be renewed to a
+ // successor commit; the close artefacts earlier phases bound must stay unchanged, and the renewal is one more recorded effect.
+ test("process: a frozen candidate can be renewed to a successor commit, and only then", () => {
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 2f766224323cc9e89dc006efa206d69ea62702ba..33d75b9381c7291cfc5ae0aad3caf2df862a0139 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -20,6 +20,8 @@ import { acceptanceQuestion, acceptanceTarget, openChecksOf, readAcceptanceRecor
+ import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
+ import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
+ import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
++import { closeSecurityScope, describeCloseSecurityScope } from "../lib/security-close-status.mjs";
++import { declaredRepositoryMode } from "./repository-freshness.mjs";
+ 
+ const HERE = new URL(".", import.meta.url);
+ const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
+@@ -540,7 +542,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     // C22 (CGR-05): hash what exists. Measured, the project-defined files are the calibrated handover and the telemetry ledger the close-feature skill names (telemetry/costs.md); a project has no defined
+     // file for backlog, history or retrospective (the backlog is a directory), so those keep the marked empty digest (PO rule 2026-11-01). Only resultSha256 and pipelineStateSha256 are compared by the coordinator.
+     const digestOf = (relative) => { try { return sha256Hex(readFileSync(resolve(root, relative))); } catch { return EMPTY_SHA256; } };
+-    writeRepoJson(root, trackedPath, { schema: "pipeline.close-tracked-effects.v1", resultSha256: sha256Hex(resultBytes), backlogSha256: EMPTY_SHA256, handoverSha256: digestOf(handoverPath), historySha256: EMPTY_SHA256, telemetrySha256: digestOf("telemetry/costs.md"), retrospectiveSha256: EMPTY_SHA256, pipelineStateSha256: sha256Hex(readFileSync(resolve(root, statePath))) });
++    const trackedDigests = { resultSha256: sha256Hex(resultBytes), backlogSha256: EMPTY_SHA256, handoverSha256: digestOf(handoverPath), historySha256: EMPTY_SHA256, telemetrySha256: digestOf("telemetry/costs.md"), retrospectiveSha256: EMPTY_SHA256, pipelineStateSha256: sha256Hex(readFileSync(resolve(root, statePath))) };
++    writeRepoJson(root, trackedPath, { schema: "pipeline.close-tracked-effects.v1", ...trackedDigests, emptyInputs: Object.keys(trackedDigests).filter((key) => trackedDigests[key] === EMPTY_SHA256).sort() });
+     const tracked = step("tracked-close-finalized", () => transition("tracked-close-finalized", { evidence: trackedPath })); if (tracked.stop) return tracked.stop;
+     const commit = commitFacts();
+     return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId: closedFeatureId, lifecycleId: id, resumeLifecycleId: id, stages, commit, ...(handover === null ? {} : { handover }), ...(openMinors === null ? {} : { openMinors }),
+@@ -589,8 +592,15 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     const closeStatus = { technicalClose: { status: phase, source: "close coordinator phase" },
+       productAcceptance: acceptance === null ? { status: "not-recorded", source: "the feature's acceptance record" } : { status: "recorded", candidate: acceptance.candidate, openChecks: acceptance.openChecks, source: acceptance.path },
+       push: { status: "not-done-by-the-close", source: "the close never pushes; publication and push are separate human-gated steps" } };
+-    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, commits, ...pushEvidenceStep(closedFeatureId),
+-      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. ${describeCommitSplit(commits)} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
++    let securityDocument = null; try { securityDocument = JSON.parse(readFileSync(resolve(root, "evidence/security-latest.v2.verdict.json"), "utf8")); } catch { securityDocument = null; }
++    const securityScope = closeSecurityScope(securityDocument);
++    const securitySentence = describeCloseSecurityScope(securityScope);
++    // R9: a project with a remote whose calibration still says local-only. Named here, never fixed here: a calibration commit after the last Critic round ends the push's Critic carry (CVL-CARRY-CONTENT-CHANGED).
++    let declaredMode = null; try { declaredMode = declaredRepositoryMode(root)?.mode ?? null; } catch { declaredMode = null; }
++    const remotes = declaredMode === "local-only" ? String(rawGit(["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
++    const repositoryMode = remotes.length === 0 ? null : { declared: "local-only", remotes, status: "calibration-behind-the-remote", next: "Leave it for this close: a calibration commit now ends the Critic carry of the push. Correct it as the first commit of the next feature with repository-mode-promote.mjs." };
++    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, securityScope, commits, ...(repositoryMode === null ? {} : { repositoryMode }), ...pushEvidenceStep(closedFeatureId),
++      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. ${describeCommitSplit(commits)}${securitySentence === "" ? "" : ` ${securitySentence}`}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
+   }
+   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
+ }
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index bcad10d07f41435d48444bafb2c53e00632720a3..0289e1b4b578ea5d3541caaea2b805b6deed3bfc 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -748,7 +748,8 @@ test("C22 CGR-05: the tracked effects hash what exists (the calibrated handover,
+     assert.equal(tracked.handoverSha256, sha256Of(readFileSync(join(f.root, "docs/state.md"))), "the bytes after the writer ran"); assert.match(readFileSync(join(f.root, "docs/state.md"), "utf8"), /closed locally/u);
+     assert.equal(tracked.telemetrySha256, sha256Of(readFileSync(join(f.root, "telemetry/costs.md"))));
+     for (const key of ["backlogSha256", "historySha256", "retrospectiveSha256"]) assert.equal(tracked[key], EMPTY_DIGEST, key);
+-    assert.deepEqual(Object.keys(tracked).sort(), ["backlogSha256", "handoverSha256", "historySha256", "pipelineStateSha256", "resultSha256", "retrospectiveSha256", "schema", "telemetrySha256"]);
++    assert.deepEqual(Object.keys(tracked).sort(), ["backlogSha256", "emptyInputs", "handoverSha256", "historySha256", "pipelineStateSha256", "resultSha256", "retrospectiveSha256", "schema", "telemetrySha256"]);
++    assert.deepEqual(tracked.emptyInputs, ["backlogSha256", "historySha256", "retrospectiveSha256"], "an empty input is marked by name");
+     assert.ok(f.calls.indexOf("pipeline-state update-public-handover") > f.calls.indexOf("pipeline-state close-feature"), f.calls.join());
+     assert.ok(result.commit.paths.includes("docs/state.md"), result.commit.paths.join());
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+@@ -899,6 +900,44 @@ test("C22B CGR-13: closed-local counts the product commits and the evidence comm
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++test("R8: closed-local states what the security result covers, read from the v2 verdict; a missing verdict is typed unavailable and never blocks", () => {
++  const f = closedLocalFixture();
++  try {
++    const none = oneShotClose(f.resumed, { runCommand: f.runner });
++    assert.equal(none.status, "closed-local", JSON.stringify(none).slice(0, 400));
++    assert.equal(none.securityScope.status, "unavailable");
++    assert.doesNotMatch(none.message, /Security scope:/u);
++    mkdirSync(join(f.root, "evidence"), { recursive: true });
++    writeFileSync(join(f.root, "evidence/security-latest.v2.verdict.json"), JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan: { required: [], optional: [] }, verdict: { blocking: false, offendingCapabilities: [] },
++      controls: [{ tool: "gitleaks", runOutcome: "pass", required: true }, { tool: "semgrep", runOutcome: "not-applicable", required: false }] }));
++    const done = oneShotClose(f.resumed, { runCommand: f.runner });
++    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
++    assert.equal(done.securityScope.v2VerdictReportingOnly, true);
++    assert.equal(done.securityScope.capabilityPlan.empty, true);
++    assert.deepEqual(done.securityScope.scannersRan, ["gitleaks"]);
++    assert.deepEqual(done.securityScope.scannersNotRun, [{ scanner: "semgrep", outcome: "not-applicable", required: false }]);
++    assert.match(done.message, /Security scope: the exit is decided by v1-blocking-logic, the v2 policy verdict is reporting only; capability plan: empty; scanners that ran: gitleaks; did not run: semgrep \(not-applicable\)\./u);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("R9: closed-local names a calibration that still says local-only beside a real remote and says to leave it for this close", () => {
++  const f = closedLocalFixture();
++  try {
++    assert.equal(Object.hasOwn(oneShotClose(f.resumed, { runCommand: f.runner }), "repositoryMode"), false, "no remote: nothing to say");
++    f.git("remote", "add", "publish", "https://example.invalid/x.git");
++    assert.equal(Object.hasOwn(oneShotClose(f.resumed, { runCommand: f.runner }), "repositoryMode"), false, "a remote but no local-only calibration: nothing to say");
++    const calibration = join(f.root, ".claude", "pipeline.json");
++    const before = existsSync(calibration) ? JSON.parse(readFileSync(calibration, "utf8")) : {};
++    mkdirSync(join(f.root, ".claude"), { recursive: true });
++    writeFileSync(calibration, JSON.stringify({ ...before, repositoryMode: "local-only" }));
++    const done = oneShotClose(f.resumed, { runCommand: f.runner });
++    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
++    assert.deepEqual(done.repositoryMode.remotes, ["publish"]);
++    assert.match(done.message, /still says local-only although a remote exists \(publish\)/u);
++    assert.match(done.message, /ends the Critic carry/u);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("C22B CGR-13: a range that cannot be read is typed unavailable and never blocks the close", () => {
+   const f = closedLocalFixture();
+   try {

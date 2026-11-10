@@ -1,0 +1,61 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 2645488fc62c7d00d84a0df5e8948b9e892416d8..4b631c0fce49ea56b9db081be41f21d94850a0a0 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -394,7 +394,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
+     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
+ }
+ 
+-import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, CODEX_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT, PROOF_WAIT_SCRIPT } from "./constants.mjs";
++import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, CODEX_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, REPOSITORY_MODE_PROMOTE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT, PROOF_WAIT_SCRIPT } from "./constants.mjs";
+ 
+ // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
+ // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
+@@ -760,6 +760,8 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
+   // C20 w257 (G20-25): exactly `--root <this root>`; the script validates the manifest itself and refuses without writing.
+   if (script === SECURITY_GATE_CONFIGURE_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
++  // The one narrow calibration change the push and close notices name; the script needs a configured remote and writes only that value, the commit stays at the hook.
++  if (script === REPOSITORY_MODE_PROMOTE_SCRIPT) return exactRoot(args, root, 0) && args[2] === "--to" && args[3] === "remote-tracked" && args.length === 4;
+   // C20 w260 (G20-29): exactly `sync|check --root <this root>`; sync writes only under audit/ and never overwrites an entry.
+   if (script === DURABLE_EVIDENCE_SCRIPT) return ["sync", "check"].includes(args[0]) && exactRoot(args, root, 1) && args.length === 3;
+   if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index 3a1e9c347c8b408705941276489f94a70db3cbbd..e6ccd2b13539e76e76f27daecdcbfda8fe5ae6bd 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -206,6 +206,8 @@ export const CREATE_ADR_SCRIPT = fileURLToPath(new URL("../../scripts/create-adr
+ export const BIND_ADR_PROPOSALS_SCRIPT = fileURLToPath(new URL("../../scripts/bind-adr-proposals.mjs", import.meta.url));
+ // C20 w257 (G20-25): the one command that configures a missing security gate (the repair a critical project's refusal names); exact `--root <root>` shape.
+ export const SECURITY_GATE_CONFIGURE_SCRIPT = fileURLToPath(new URL("../../scripts/security-gate-configure.mjs", import.meta.url));
++// The narrow calibration correction push-prepare and the close name (local-only to remote-tracked); exact `--root <root> --to remote-tracked` shape.
++export const REPOSITORY_MODE_PROMOTE_SCRIPT = fileURLToPath(new URL("../../scripts/repository-mode-promote.mjs", import.meta.url));
+ // C20 w260 (G20-29): the durable audit mirror (`sync|check --root <root>`), the repair every AUDIT-* finding names; closed argv grammar in command-catalogue.mjs.
+ export const DURABLE_EVIDENCE_SCRIPT = fileURLToPath(new URL("../../scripts/durable-evidence.mjs", import.meta.url));
+ // D165 (S1): the brownfield adoption route the preflight publishes; each is admitted by an exact argv grammar in command-catalogue.mjs.
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 31ab00724db9bc1593dee4ff1290b8e352fd4273..6e930f312d5fb67ea5123293bec778546448990e 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -734,6 +734,21 @@ test("C20 w257 security-gate-configure: exactly `--root <this root>` is admitted
+   });
+ });
+ 
++test("repository-mode-promote: exactly `--root <this root> --to remote-tracked` is admitted, every near-miss is not", () => {
++  withFixture("feature", f => {
++    const script = join(scriptsDir, "repository-mode-promote.mjs");
++    bothAdmit(scriptAction(script, "--root", f.root, "--to", "remote-tracked"), f, "exact shape");
++    for (const [label, action] of [
++      ["foreign root", scriptAction(script, "--root", join(f.root, ".."), "--to", "remote-tracked")],
++      ["relative root", scriptAction(script, "--root", ".", "--to", "remote-tracked")],
++      ["another target", scriptAction(script, "--root", f.root, "--to", "local-only")],
++      ["no target", scriptAction(script, "--root", f.root)],
++      ["extra flag", scriptAction(script, "--root", f.root, "--to", "remote-tracked", "--force")],
++      ["target before root", scriptAction(script, "--to", "remote-tracked", "--root", f.root)],
++    ]) bothRefuse(action, f, label);
++  });
++});
++
+ test("C20j the three read-only diagnostics are admitted in their closed shapes, every near-miss is not", () => {
+   withFixture("feature", f => {
+     const capabilities = join(scriptsDir, "runner-capabilities.mjs");
