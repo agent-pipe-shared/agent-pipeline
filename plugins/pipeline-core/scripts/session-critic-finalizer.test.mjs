@@ -39,7 +39,7 @@ import {
   SessionCriticFinalizerError,
   admitSessionCriticReview,
   describeCliError,
-  exportSessionCriticEvidence,
+  exportSessionCriticEvidence, exportCriticRoundFromJournal,
   finalizeSessionCriticReview as finalizeRaw,
   runSessionCriticFinalizerCli,
   validateSessionCriticReceipt,
@@ -2337,6 +2337,26 @@ function refused(action, code) {
 function journalReceiptBody(fx, packetId) {
   return JSON.parse(readFileSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", packetId, "receipt.json"), "utf8")).body;
 }
+
+test("the close's journal export writes the verdict, not the notes, checks the bound digest, and leaves the lineage alone", () => {
+  const fx = fixture();
+  try {
+    const packetId = "1".repeat(32); const outDir = `specs/alpha/evidence/critic/${packetId}`;
+    const finding = { gap: "a named gap", risk: "a named risk", severity: "minor", evidence: "a:1", spec_ref: "AC-1" };
+    assert.equal(finalizeSessionCriticReview(preadmitted(fx, { packetId, verdict: verdict({ findings: [finding] }) })).status, "completed");
+    criticNotes(fx, "SECRET WORKING NOTE\n");
+    const tampered = (reader) => (args) => { const real = reader(args); return { ...real, result: { ...real.result, verdict: { ...real.result.verdict, pass: false } } }; };
+    refused(() => exportCriticRoundFromJournal({ root: fx.root, packetId, outDir }, { readConsumedCandidateResultFn: tampered(readConsumedCandidateResult) }), "SCF-EXPORT-UNCONSUMED");
+    assert.equal(existsSync(join(fx.root, outDir)), false, "a digest mismatch writes nothing");
+    const result = exportCriticRoundFromJournal({ root: fx.root, packetId, outDir });
+    assert.equal(result.status, "exported"); assert.equal(result.lineage, undefined, "the close does not touch the lineage");
+    assert.deepEqual(readdirSync(join(fx.root, outDir)).sort(), [...EXPORT_FILES].sort());
+    const report = readFileSync(join(fx.root, outDir, "report.md"), "utf8");
+    assert.ok(report.includes("a named gap") && report.includes("a named risk") && report.includes("Findings: 1"), report);
+    assert.ok(!report.includes("SECRET WORKING NOTE"), "working notes stay out");
+    assert.equal(JSON.parse(readFileSync(join(fx.root, outDir, "index.json"), "utf8")).reportSha256, sha(Buffer.from(report, "utf8")));
+  } finally { cleanup(fx); }
+});
 
 test("export publishes a consumed review as receipt, report and index with matching hashes", () => {
   const fx = fixture();

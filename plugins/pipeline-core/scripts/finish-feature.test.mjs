@@ -796,6 +796,24 @@ test("C22 CGR-12: the audit request carries every Critic round report of the fea
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test("the close fetches a missing Critic report itself, inside its own evidence directory, and a failing export only leaves the round named", () => {
+  const f = oneShotFixture();
+  try {
+    const evidence = join(f.root, "specs/feature-abc/evidence"); const seen = [];
+    const exportCriticRoundFn = ({ root, packetId, outDir }) => {
+      seen.push(packetId);
+      if (packetId === f.packetId) throw new Error("no journal for this round");
+      mkdirSync(join(root, outDir), { recursive: true }); writeFileSync(join(root, outDir, "report.md"), "# from the journal\n");
+    };
+    const fetched = "c".repeat(32);
+    writeFileSync(join(evidence, `critic-lineage-${"1".repeat(64)}.json`), `${JSON.stringify({ rounds: [{ packetId: fetched }] })}\n`);
+    assert.equal(oneShotClose(f.input, { runCommand: f.runner, exportCriticRoundFn }).status, "commit-required");
+    assert.deepEqual(seen.sort(), [f.packetId, fetched].sort());
+    const request = JSON.parse(readFileSync(join(evidence, "audit-request.json"), "utf8"));
+    assert.deepEqual(request.evidence.criticReports, [{ packetId: f.packetId, path: null }, { packetId: fetched, path: `specs/feature-abc/evidence/critic/${fetched}/report.md` }]);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("C22 CGR-22: the minors of the bound Critic round are listed in the handover inside the close commit, the result names them, and an unreadable packet never blocks", () => {
   const verdict = { verdict: { findings: [{ severity: "minor", gap: "a small gap" }, { severity: "major", gap: "not a minor" }] } };
   const withHandover = () => { const fixture = oneShotFixture(); mkdirSync(join(fixture.root, "docs"), { recursive: true }); writeFileSync(join(fixture.root, "docs/state.md"), "# State\n"); return fixture; };

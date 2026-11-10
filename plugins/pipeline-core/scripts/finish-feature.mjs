@@ -22,6 +22,7 @@ import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit
 import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
 import { closeSecurityScope, describeCloseSecurityScope } from "../lib/security-close-status.mjs";
 import { declaredRepositoryMode } from "./repository-freshness.mjs";
+import { exportCriticRoundFromJournal } from "./session-critic-finalizer.mjs";
 
 const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
@@ -449,6 +450,12 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         for (const match of text.matchAll(/"packetId"\s*:\s*"([a-f0-9]{32})"/gu)) if (!rounds.has(match[1])) rounds.set(match[1], null);
       }
       if (!rounds.has(packet)) rounds.set(packet, null);
+      // PO tile 2026-11-10: the close fetches what is missing from the private journal itself, inside the one close commit. A round that cannot be exported stays named with a null path; this never stops the close.
+      for (const [packetId, reportPath] of [...rounds]) {
+        if (reportPath !== null) continue;
+        const outDir = `${evidenceDir}/critic/${packetId}`;
+        try { (deps.exportCriticRoundFn ?? exportCriticRoundFromJournal)({ root, packetId, outDir }); rounds.set(packetId, `${outDir}/report.md`); } catch { /* named in the bundle README as not exported */ }
+      }
       const criticReports = [...rounds].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([packetId, path]) => ({ packetId, path }));
       stages.push("audit-request");
       writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports } });
