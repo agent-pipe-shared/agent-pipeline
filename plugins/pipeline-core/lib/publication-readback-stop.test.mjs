@@ -70,7 +70,7 @@ test("outside a repository nothing happens and nothing throws", async () => {
 test("an unreachable remote writes no record and is not asked again for 15 minutes", () => fixture(async ({ root, bare, git, directory, lines }) => {
   git("push", "-q", "publish", "HEAD:refs/heads/main");
   rmSync(bare, { recursive: true, force: true });
-  const start = new Date("2026-11-10T10:00:00.000Z");
+  const start = new Date();
   let calls = 0;
   const failing = () => { calls += 1; return { result: { status: "refused", code: "PRB-REMOTE-UNREADABLE" } }; };
   assert.deepEqual((await recordPushesAtStop({ cwd: root }, { now: () => start, recordReadback: failing })).recorded, []);
@@ -81,6 +81,38 @@ test("an unreachable remote writes no record and is not asked again for 15 minut
   assert.equal(calls, 1);
   await recordPushesAtStop({ cwd: root }, { now: () => new Date(start.getTime() + 16 * 60_000), recordReadback: failing });
   assert.equal(calls, 2);
+}));
+
+test("the attempt is on file before the network call, so a killed hook does not ask again", () => fixture(async ({ root, git, directory }) => {
+  git("push", "-q", "publish", "HEAD:refs/heads/main");
+  let onFile = null;
+  const observing = () => { onFile = Object.keys(JSON.parse(readFileSync(join(directory, "stop-attempts.json"), "utf8"))).length; return { result: { status: "refused" } }; };
+  await recordPushesAtStop({ cwd: root }, { recordReadback: observing });
+  assert.equal(onFile, 1);
+}));
+
+test("an unreadable remote ends this Stop's attempts", () => fixture(async ({ root, git }) => {
+  for (const branch of ["a", "b", "c"]) git("push", "-q", "publish", `HEAD:refs/heads/${branch}`);
+  let calls = 0;
+  await recordPushesAtStop({ cwd: root }, { recordReadback: () => { calls += 1; return { result: { status: "refused" } }; } });
+  assert.equal(calls, 1);
+}));
+
+test("a remote that answers with another commit is not asked again about that push", () => fixture(async ({ root, git }) => {
+  git("push", "-q", "publish", "HEAD:refs/heads/main");
+  const start = new Date();
+  let calls = 0;
+  const other = () => { calls += 1; return { result: { status: "differs", record: { remoteCommit: "a".repeat(40) } } }; };
+  await recordPushesAtStop({ cwd: root }, { now: () => start, recordReadback: other });
+  await recordPushesAtStop({ cwd: root }, { now: () => new Date(start.getTime() + 16 * 60_000), recordReadback: other });
+  assert.equal(calls, 1);
+}));
+
+test("a push older than a day is left alone", () => fixture(async ({ root, git, lines }) => {
+  git("push", "-q", "publish", "HEAD:refs/heads/main");
+  const later = new Date(Date.now() + 25 * 60 * 60 * 1000);
+  assert.equal((await recordPushesAtStop({ cwd: root }, { now: () => later })).skipped, "no-push");
+  assert.equal(lines().length, 0);
 }));
 
 test("a second branch and a second remote resolve to the right destination", () => fixture(async ({ root, base, git, head }) => {

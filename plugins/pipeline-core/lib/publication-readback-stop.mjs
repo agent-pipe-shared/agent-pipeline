@@ -8,21 +8,24 @@
  * What this cannot see: a remote without a fetch refspec (no tracking ref exists), `core.logAllRefUpdates=false`, and a push whose reflog line a later fetch has
  * already covered. `publication-readback.mjs record` stays the manual route for those.
  *
- * Cost on an ordinary Stop is one git call and a few small reads. The heavy module is imported only when a push is really there to record. An attempt that did not
- * produce a matching record is remembered for 15 minutes, so an unreachable remote does not cost a network timeout on every Stop.
+ * Cost on an ordinary Stop is one git call and a few small reads. The heavy module is imported only when a push is really there to record. Only a push of the last
+ * 24 hours counts, so installing this does not send every old branch to the network. Each attempt is written down before the network call, because a hanging remote
+ * can get the hook killed by its runner: an unreadable remote is left alone for 15 minutes and ends this Stop's attempts, and a remote that answers with another
+ * commit is not asked again about that push.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ensurePrivateDirectory } from "./private-boundary.mjs";
 
-const PUSH_LINE = /^[0-9a-f]{40,64} ([0-9a-f]{40,64}) .*\tupdate by push$/u;
+const PUSH_LINE = /^[0-9a-f]{40,64} ([0-9a-f]{40,64}) .* ([0-9]{9,12}) [+-][0-9]{4}\tupdate by push$/u;
 const ZERO_OID = /^0+$/u;
 const BRANCH = /^[A-Za-z0-9._/-]{1,200}$/u;
 const MAX_REFS = 200;
 const MAX_LOG_BYTES = 1024 * 1024;
 const MAX_RECORDS_PER_STOP = 3;
 const RETRY_AFTER_MS = 15 * 60 * 1000;
+const MAX_PUSH_AGE_MS = 24 * 60 * 60 * 1000;
 
 function git(cwd, args) {
   const run = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8", shell: false, timeout: 5_000, maxBuffer: 1024 * 1024 });
@@ -41,12 +44,13 @@ function trackingLogs(directory, prefix = "", found = []) {
   return found;
 }
 
-function pushedCommit(path) {
+function pushedCommit(path, nowMs) {
   try {
     if (lstatSync(path).size > MAX_LOG_BYTES) return null;
     const last = readFileSync(path, "utf8").split("\n").filter((line) => line !== "").at(-1);
-    const commit = last === undefined ? null : PUSH_LINE.exec(last)?.[1] ?? null;
-    return commit === null || ZERO_OID.test(commit) ? null : commit;
+    const match = last === undefined ? null : PUSH_LINE.exec(last);
+    if (match === null || ZERO_OID.test(match[1]) || nowMs - Number(match[2]) * 1000 > MAX_PUSH_AGE_MS) return null;
+    return match[1];
   } catch { return null; }
 }
 
@@ -69,9 +73,10 @@ function recordedKeys(path) {
   return keys;
 }
 
+/** Each value is the time from which that push may be asked about again. */
 function readAttempts(path, nowMs) {
   try {
-    return Object.fromEntries(Object.entries(JSON.parse(readFileSync(path, "utf8"))).filter(([, at]) => typeof at === "number" && nowMs - at < RETRY_AFTER_MS));
+    return Object.fromEntries(Object.entries(JSON.parse(readFileSync(path, "utf8"))).filter(([, askAgainAt]) => typeof askAgainAt === "number" && askAgainAt > nowMs));
   } catch { return {}; }
 }
 
@@ -91,13 +96,13 @@ export async function recordPushesAtStop({ cwd }, deps = {}) {
   if (located === null) return { recorded: [], skipped: "no-repository" };
   const [common, root] = located.split(/\r?\n/u).filter(Boolean);
   if (common === undefined || root === undefined) return { recorded: [], skipped: "no-repository" };
+  const nowMs = (deps.now ?? (() => new Date()))().getTime();
   const logs = trackingLogs(join(common, "logs", "refs", "remotes"));
-  const pushes = logs.flatMap(({ ref, path }) => { const commit = pushedCommit(path); return commit === null ? [] : [{ ref, commit }]; });
+  const pushes = logs.flatMap(({ ref, path }) => { const commit = pushedCommit(path, nowMs); return commit === null ? [] : [{ ref, commit }]; });
   if (pushes.length === 0) return { recorded: [], skipped: "no-push" };
   const remotes = String(git(root, ["remote"]) ?? "").split(/\r?\n/u).map((name) => name.trim()).filter(Boolean);
   const directory = join(common, "agent-pipeline", "publication-readback");
   const attemptsPath = join(directory, "stop-attempts.json");
-  const nowMs = (deps.now ?? (() => new Date()))().getTime();
   const attempts = readAttempts(attemptsPath, nowMs);
   const known = recordedKeys(join(directory, "records.jsonl"));
   const open = pushes.flatMap(({ ref, commit }) => {
@@ -109,12 +114,14 @@ export async function recordPushesAtStop({ cwd }, deps = {}) {
   if (open.length === 0) return { recorded: [], skipped: "nothing-new" };
   const recordReadback = deps.recordReadback ?? (await import("../scripts/publication-readback.mjs")).recordPublicationReadback;
   const recorded = [];
-  let attemptsChanged = false;
   for (const { remote, destination, commit, key } of open) {
+    attempts[key] = nowMs + RETRY_AFTER_MS;
+    writeAttempts(attemptsPath, attempts);
     const { result } = recordReadback({ root, remote, destination }, deps);
-    if (result.record?.remoteCommit === commit) recorded.push({ remote, destination, commit, status: result.status });
-    else { attempts[key] = nowMs; attemptsChanged = true; }
+    if (result.record?.remoteCommit === commit) { recorded.push({ remote, destination, commit, status: result.status }); continue; }
+    if (result.record === undefined) break; // Unreadable: the next remote may hang the same way, and the runner's hook timeout is short.
+    attempts[key] = nowMs + MAX_PUSH_AGE_MS + RETRY_AFTER_MS;
+    writeAttempts(attemptsPath, attempts);
   }
-  if (attemptsChanged) writeAttempts(attemptsPath, attempts);
   return { recorded };
 }

@@ -624,12 +624,13 @@ returned `PUSH-PROOF-*` code. The push must write out its destination ref
 (`HEAD:refs/heads/<branch>` or `<sha>:refs/heads/<branch>`); a `--force` or
 `+refspec` push also matches `GG-01`/`GG-02` and still blocks, approval or not.
 
-**What the remote holds is recorded at the end of the turn.** A Stop hook (`hooks/publication-readback-stop.mjs`)
-recognises the push from Git's reflog of the remote-tracking ref and runs the readback. It asks the remote itself and
-appends one chained line to a private record under the Git directory, so it needs no commit and is safe after the
-freeze. It cannot see a remote without a fetch refspec, a repository with `core.logAllRefUpdates=false`, or a push whose
-reflog line a later fetch has already covered; for those, run `afterPush.command` from `push-prepare` by hand
-(`scripts/publication-readback.mjs record`).
+**Right after the push, record what the remote holds.** `push-prepare` prints the command as
+`afterPush.command` (`scripts/publication-readback.mjs record`). It asks the remote itself and appends one
+chained line to a private record under the Git directory, so it needs no commit and is safe after the freeze.
+A Stop hook (`hooks/publication-readback-stop.mjs`) also tries this at the end of the turn, from Git's reflog of the
+remote-tracking ref, for pushes of the last 24 hours; running both adds no second line. The hook is silent and cannot see a
+remote without a fetch refspec, a repository with `core.logAllRefUpdates=false`, or a push whose reflog line a later
+fetch has already covered, so the command stays the step to run.
 The record's `handoverLine` goes into the next handover you write anyway; never make a commit only for it.
 `scripts/publication-readback.mjs inspect --root <repo>` reads the latest record in a later session.
 
