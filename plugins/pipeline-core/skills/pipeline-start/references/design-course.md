@@ -30,6 +30,16 @@ was needed; capability evidence is not an Advisor answer.
    verification. Check explicit machine-checkable rules; do not invent
    arithmetic from prose. Preserve the separately adopted Reader-review course
    and evidence; it is not the independent technical design review.
+   Spec acceptance criteria (shape of `templates/spec.md` §5; `submit-plan`
+   refuses otherwise with `PLR-HANDOFF-NO-CRITERION` / `PLR-HANDOFF-NO-JOURNEY`):
+   a normative table with a header row and rows like
+   `| AC-1 | WHEN <trigger>, THE system <behaviour> | <test file> |` (or numbered
+   `1` / `R-2` rows under an acceptance-criteria heading). Each user-facing
+   criterion carries `Journeys:` and `Asserts:` in its own text (a table cell or
+   an indented continuation line), e.g. `... Journeys: entry by link and by
+   form; reload mid-save; second submit after an error. Asserts: the stored
+   record holds the new title.` A criterion no user sees is tagged
+   `[not user-facing: <reason>]`; `[user-facing]` forces the duty.
 2. Obtain one independent review of the final design sources. Resolve its
    findings; if sources change, use at most one delta follow-up and bind the
    final receipt to the current sources. Do not add a separate readiness child
@@ -43,7 +53,11 @@ was needed; capability evidence is not an Advisor answer.
    as `DRR-FINDING-IDS` and the refusal names the id). It reads the
    sources and the report from disk and stamps the review time, runner and
    reviewer model itself. Never write or edit a receipt by hand: a hand-written
-   receipt is not admissible evidence.
+   receipt is not admissible evidence. Omit `--requested-route` and
+   `--observed-identity` unless a source-owned dispatch observation exists: a
+   self-asserted value is refused with `DRC-OBSERVATION-UNATTESTED` and the
+   identity is then recorded as `unknown` (only the typed fallback record,
+   `--fallback-reason-code`, may carry a route).
    Dispatching the design review: the `critic-review` skill is for implementation
    batches (diff range, batch preflight) and does not fit uncommitted design
    sources. Dispatch the agent type `pipeline-core:readiness-reviewer` instead.

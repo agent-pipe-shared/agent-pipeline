@@ -71,6 +71,10 @@ transport only. Do not `define_subagent` a Pipeline role yourself; `dispatch-bri
   uncommitted and unstaged; it refuses a path outside the briefed scope, a path with local changes and a change that no longer applies. The
   commit is then the existing recovery route (`scripts/goldfish-host-commit-recover.mjs plan|apply`). The host owns the worktree and the
   branch; do not remove them.
+- **Briefing text, not a file pointer.** The generated `promptPointer` (`pipeline-briefing-file:` line) is admitted only in a direct
+  Claude Agent call; an Antigravity call carrying it is refused `DBG-REF-CARRIER`. Pass the full generated briefing as `Prompt`,
+  copied verbatim from the `--out` file including its final newline: the marker digest covers every byte, and a retyped or
+  newline-trimmed text fails `DBG-GENERATED-DIGEST-MISMATCH`.
 - **Delivery.** The child runs in the background and its completion message arrives in the SAME parent turn, at the next model
   invocation, as a `<SYSTEM_MESSAGE>`; the parent does not need to end its turn.
 - **Hand-back and commit.** Hooks govern the child (see above): its writes, shell and commits pass the same PreToolUse guard and a denial

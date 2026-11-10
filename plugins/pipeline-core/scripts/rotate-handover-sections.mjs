@@ -228,6 +228,10 @@ function parseArgs(argv) {
 }
 
 if (isDirectInvocation(import.meta.url)) {
+  if (process.argv.slice(2).includes("--help")) {
+    console.log("Usage: rotate-handover-sections.mjs [--file <handover file>] [--retain-count <n>] [--archive-dir <dir>] [--apply]\nDry-run by default; --apply writes the rotation.");
+    process.exit(0);
+  }
   const root = DEFAULT_ROOT;
   const args = parseArgs(process.argv.slice(2));
   const fullPath = join(root, args.file);

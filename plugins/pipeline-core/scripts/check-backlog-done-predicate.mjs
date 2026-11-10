@@ -297,6 +297,10 @@ export function exitCodeFor(result) {
 }
 
 function main(argv) {
+  if (argv.includes("--help")) {
+    process.stdout.write("Usage: check-backlog-done-predicate.mjs [--json]\nEvaluates each backlog item's done_when predicate against the tree; exit 0 = no fatal finding, 1 = a fatal finding, 3 = usage/environment error.\n");
+    return 0;
+  }
   const json = argv.includes("--json");
   const result = checkBacklogDonePredicate();
   if (json) {

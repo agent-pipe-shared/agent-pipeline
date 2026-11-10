@@ -656,9 +656,9 @@ export const SCRIPTS_ANSWERING_HELP = new Map([
     "pipeline-state", "plan-runtime-projection-v2", "plan-runtime-projection-v3", "po-human-approval", "project-authority-migration", "project-onboarding-v3",
     "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
     "validate-runner-profiles-v2"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
-  ...["check-protected-delta", "close-coordinator", "codex-host-advisor-route", "critic-diagnostic-evidence", "critic-export-consent", "handover-rotate",
-    "publish-evidence-run", "reconcile-backlog-delivery", "register-feature-package", "run-codex-critic-isolation", "session-critic-finalizer",
-    "verify-evidence-producer"].map((name) => [`${name}.mjs`, LONG_HELP_FLAG]),
+  ...["check-backlog-done-predicate", "check-protected-delta", "close-coordinator", "codex-host-advisor-route", "critic-diagnostic-evidence", "critic-export-consent", "handover-rotate",
+    "publish-evidence-run", "reconcile-backlog-delivery", "register-feature-package", "repair-map", "rotate-handover-sections", "run-codex-critic-isolation",
+    "session-critic-finalizer", "verify-evidence-producer"].map((name) => [`${name}.mjs`, LONG_HELP_FLAG]),
 ]);
 // PO tile 2026-11-09: these have no help branch but refuse `--help` as an unknown argument and print their usage, with a non-zero exit and no write
 // (measured for each, and re-run by the same test). Only `--help`: `-h` was not measured for them.

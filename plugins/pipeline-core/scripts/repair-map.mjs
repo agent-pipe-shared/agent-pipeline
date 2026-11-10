@@ -324,6 +324,10 @@ function render(map) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  if (process.argv.slice(2).includes("--help")) {
+    process.stdout.write("Usage: repair-map.mjs\nRead-only: prints which refusal classes are liftable, by whom, and the exact command. Takes no arguments.\n");
+    process.exit(0);
+  }
   const rootDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const map = buildRepairMap({ rootDir, pluginRoot: PLUGIN_ROOT });
   process.stdout.write(`${render(map)}\n`);

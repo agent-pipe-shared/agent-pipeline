@@ -121,7 +121,7 @@ test("every plugin script with a help branch is admitted for its own flags and o
       assert.match(`${child.stdout}${child.stderr}`, /usage/iu, `${name} prints its usage`);
       assert.deepEqual(child.left, [], `${name} writes nothing`);
     }
-    const running = "rotate-handover-sections.mjs"; // really starts its normal run when asked `--help`
+    const running = "pipeline-start-preflight.mjs"; // on no list: no help branch of its own, so a help request is not admitted
     for (const refused of [`node ${join(scriptsDir, running)} --help`, `node ${join(root, "pipeline-state.mjs")} --help`,
       `node ${join(scriptsDir, "..", "scripts", running)} --help`]) {
       assert.equal(isSanctionedLifecycleCommand(refused, root), false, refused);
