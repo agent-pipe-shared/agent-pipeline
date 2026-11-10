@@ -73,6 +73,15 @@ export function heldDependencyRepair() {
 }
 // PO 2026-10-30 (D203): when the registry cannot be read (a producer refuses its reconcile), the refusal names the whole
 // repair route itself: inspect, then the routine heal, and when heal did not clear it and no Goldfish runs, move-aside.
+/**
+ * C27 (Claude greenfield 2026-11-09: five parallel launches, read as "dependency held" and answered with serial work): a registry lock a sibling launch still held when the admission's wait ran out says nothing about the dependency.
+ * It gets its own code and the one repair that applies. Every other unreadable registry keeps the dependency code and the full repair route.
+ */
+export function integrationReadinessRefusal(readiness) {
+  if (readiness.code !== "SDC-LOCK-HELD") return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`,repair:readinessUnavailableRepair()};
+  return { ...fail("NGHS-ITEM-INTEGRATION-LOCK-HELD"), reason: `integration readiness not observed (${readiness.code}): the session registry lock was held by another launch`,
+    repair: "another launch held the session registry lock until this admission's wait ran out; the dependency itself was not judged. Send this dispatch again, alone, with one Agent call per message; nothing else needs repair" };
+}
 export function readinessUnavailableRepair() {
   const routine = fileURLToPath(new URL("../scripts/routine-repair.mjs", import.meta.url));
   return `the session-authority registry could not be read; run node ${REPAIR_SCRIPT} inspect --root <root> to see which producer refuses, then node ${routine} run heal --root <root> --reason "<why>" and inspect again. If a producer is still reconcile-refused and no Goldfish runs, run node ${REPAIR_SCRIPT} move-aside --no-goldfish-running --root <root> --reason "<why>" (the registry is retained aside, nothing is deleted, and the next dispatch initializes it fresh), then dispatch again`;
@@ -301,7 +310,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
     if (!item || item.state !== "ready") return { ...fail("NGHS-ITEM-NOT-READY"), reason: itemNotReadyReason(named, item) };
     if(item.delivery.criterionLocator&&!binding.itemDelivery)return fail("NGHS-ITEM-ORIGINAL-BRIEFING-REQUIRED");
     if(item.dependsOn.length>0){checkpoint("integration-readiness");const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd(),admissionDeadline,publishRetry:dependencies.publishRetry});
-      if(readiness.status!=='observed')return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`,repair:readinessUnavailableRepair()};
+      if(readiness.status!=='observed')return integrationReadinessRefusal(readiness);
       const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
       if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:heldDependencyReason(held,deliveryQueue.normalized.slices),repair:heldDependencyRepair()};}
     if (item.delivery.baseCommit !== binding.candidateCommit) return fail("NGHS-ITEM-BASE-MISMATCH");

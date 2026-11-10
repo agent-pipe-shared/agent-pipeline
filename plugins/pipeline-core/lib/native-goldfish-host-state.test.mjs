@@ -18,7 +18,7 @@ import { createGovernanceScopeController } from "./governance-scope.mjs";
 import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
 import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit } from "./agy-host-commit-admission.mjs";
-import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority, retryPublishWhileLockHeld } from "./native-goldfish-host-state.mjs";
+import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority, retryPublishWhileLockHeld, integrationReadinessRefusal } from "./native-goldfish-host-state.mjs";
 import { ADMISSION_DEADLINE_MARGIN_MS, admissionDeadlineActive, assertAdmissionDeadline, clearAdmissionDeadline, setAdmissionDeadline } from "./admission-deadline.mjs";
 import { requiresGovernedItemAdmission } from "../hooks/guard-dispatch.mjs";
 import { qualifyNativeGoldfishHookDelivery } from "../hooks/native-goldfish-host.mjs";
@@ -119,6 +119,15 @@ function d177Setup(root, prepareBoth = true) {
 }
 
 const cases = [
+  { id: "C27-readiness-lock-is-not-a-held-dependency", name: "C27 a registry lock met by the readiness read is not reported as a held dependency", run: () => {
+    const lock = integrationReadinessRefusal({ status: "refused", code: "SDC-LOCK-HELD", reason: "registry-lock-held" });
+    assert.equal(lock.code, "NGHS-ITEM-INTEGRATION-LOCK-HELD");
+    assert.match(lock.repair, /Send this dispatch again, alone/u);
+    assert.doesNotMatch(lock.repair, /move-aside/u);
+    const unreadable = integrationReadinessRefusal({ status: "refused", code: "SAR-READ", reason: "unreadable" });
+    assert.equal(unreadable.code, "NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD");
+    assert.match(unreadable.repair, /move-aside/u);
+  } },
   { id: "D177-a-memo-per-admission", name: "D177 the admission memo computes once per key and boundary and does not leak across boundaries", run: async () => {
     const { memoPerAdmission } = await import("./native-goldfish-host-state.mjs");
     const first = {}, second = {}; let calls = 0;
