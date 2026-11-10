@@ -1,0 +1,296 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index b9f964183f21e418bcf96494133e4c75f9a9675e..618f55e434cc303dd2904d9caf6cb3c75a14aad7 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -389,6 +389,7 @@
+         "verify-phase:harness/scripts/verify.mjs:critic-packet-governance-tests",
+         "verify-phase:harness/scripts/verify.mjs:critic-packet-release-tests",
+         "verify-phase:harness/scripts/verify.mjs:critic-review-scope-tests",
++        "verify-phase:harness/scripts/verify.mjs:critic-round-pass-tests",
+         "verify-phase:harness/scripts/verify.mjs:critic-route-activation-tests",
+         "verify-phase:harness/scripts/verify.mjs:critic-route-v3-tests",
+         "verify-phase:harness/scripts/verify.mjs:critic-skip-coverage-check",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 4a96e226ee12f8078dd9bd595a005e92dfdc5a9e..cf75bb9ccfa0b0abbd63f32d7d9bf3089c6f9b9c 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -2340,6 +2340,12 @@
+       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
+       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs"
+     },
++    {
++      "name": "critic-round-pass-tests",
++      "file": "plugins/pipeline-core/lib/critic-round-pass.test.mjs",
++      "invariantPinned": "A round holding only minors passes on every receipt route; a blocker, major, briefing violation, unverified trajectory or partial review does not",
++      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-round-pass.test.mjs"
++    },
+     {
+       "name": "critic-generic-batch-tests",
+       "file": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index cc88d0880118fa4e271234d49ac1a9d1240a1737..b027f7d2f42865b452c1f39c37fcb8846b33a667 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -17,6 +17,7 @@ import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAd
+ import { canonicalJson, sha256, normalizePacketPath, inspectCandidatePacket,
+   inspectClaimedCandidatePacket, readConsumedSessionAdmission } from "../scripts/critic-packet-preflight.mjs";
+ import { readCriticCourseAdmission } from "./critic-course-admission.mjs";
++import { receiptMatchesVerdict } from "./critic-round-pass.mjs";
+ 
+ export const GENERIC_CRITIC_BATCH_SCHEMA = "pipeline.critic-generic-batch.v1";
+ export const GENERIC_CRITIC_BATCH_V2_SCHEMA = "pipeline.critic-generic-batch.v2";
+@@ -473,7 +474,7 @@ function consumedParent(c, r, requested) {
+   if (packetDigest(p.packet) !== r.packetDigest || p.admission.claimSha256 !== r.claimSha256
+     || p.admission.preflightSha256 !== r.preflightSha256 || p.admission.courseSourceSha256 !== r.sourceSha256
+     || p.admission.courseDecisionSha256 !== r.decisionSha256 || (requested && requested.receiptSha256 !== receiptSha256)
+-    || typeof p.result?.verdict?.pass !== "boolean" || p.receipt.reviewPass !== p.result.verdict.pass) fail("CGB-PARENT");
++    || typeof p.result?.verdict?.pass !== "boolean" || !receiptMatchesVerdict(p.receipt.reviewPass, p.result.verdict)) fail("CGB-PARENT");
+   return { ...p, parent: { packetId: r.packetId, packetDigest: r.packetDigest, receiptSha256 } };
+ }
+ function deltaSource(root, s, correction, parent, round) {
+@@ -511,7 +512,7 @@ function appendCorrection(input) {
+     const prior = retained.at(-1);
+     const parent = consumedParent(c, prior, input.parent);
+     // D199: a PASS ends the batch only for the same candidate; real commits after it continue as a diff round.
+-    if (parent.result.verdict.pass && s.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
++    if (parent.receipt.reviewPass && s.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
+     // Delivery owner ends at integration; one fresh fix owner carries this same batch.
+     if (s.target.kind !== "authored-delivery" && s.target.kind !== "orchestrator-attested-delivery") fail("CGB-CORRECTION-OWNER");
+     if (prior.ordinal === 1) {
+@@ -556,7 +557,7 @@ function admission(c, input, packet) {
+   let parent = null, ordinal = 1, mode = "full", code = "CGB-FULL-ADMITTED";
+   if (full) {
+     parent = consumedParent(c, retained.at(-1));
+-    if (parent.result.verdict.pass && m.value.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
++    if (parent.receipt.reviewPass && m.value.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
+     if (m.value.kind !== "correction" || !eq(m.value.parent, parent.parent) || !m.value.delta
+       || !eq(m.value.delta.diagnosticBundle, packet.diagnostics)) fail("CGB-DELTA");
+     const attempt = admitReviewAttempt(m.value.delta.attempt);
+@@ -1004,7 +1005,7 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
+       }
+       if(prior.length!==ordinal-1 || ordinal>MAX_BATCH_DELTA_ORDINAL)fail("CGB-BUDGET",`The course asks for round ${ordinal}, but this batch holds ${prior.length} admitted round(s) and needs ${ordinal-1} before round ${ordinal}. An earlier round was reviewed outside this batch or its reservation is missing; register the missing round or take the batch over with the session-critic-finalizer verbs. Nothing is deleted.`);
+       const parent=prior.length?consumedParent(c,prior.at(-1)):null;
+-      if(parent?.result.verdict.pass && packet.candidate.commit===parent.packet.candidate.commit)fail("CGB-PASS-STOPS");
++      if(parent?.receipt.reviewPass && packet.candidate.commit===parent.packet.candidate.commit)fail("CGB-PASS-STOPS");
+       if(parent && (projection.parent?.packetId!==parent.parent.packetId || projection.parent.receiptSha256!==sha256Canonical(parent.receipt)))fail("CGB-PARENT");
+       const member=writeMember(c,owned.batchRef,{schema:GENERIC_CRITIC_MEMBER_SCHEMA,...owned.batchRef,kind:ordinal===1?"origin":"correction",logicalWorkIds:work,
+         target:targetForPacket(packet),parent:parent?.parent??null,range:packet.candidate,delta:ordinal===1?null:projection});
+diff --git a/plugins/pipeline-core/lib/critic-round-pass.mjs b/plugins/pipeline-core/lib/critic-round-pass.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..55cae81a2a5c78a772dcc7ead0a0127aeaa2f198
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-round-pass.mjs
+@@ -0,0 +1,30 @@
++/**
++ * Whether one Critic round passed. The one rule every route that writes a Critic receipt applies (PO decision, 2026-11-10).
++ *
++ * A round with no blocker or major finding, a consistent trajectory and no briefing violation has passed, whatever the Critic set for
++ * `pass`. Its minor findings stay in the verdict and stay open. Without this, a round holding only minors asks for another correction
++ * and another review: the same Critic marked `pass: true` with four minors and `pass: false` with two.
++ *
++ * Still not a pass: `pass: false` with no finding at all (nothing says why it failed), and a partial review, which withholds its verdict
++ * because part of the range was never read (`templates/prompts/critic-review.md`, closing handover).
++ */
++const PARTIAL_REVIEW = /pass\/fail withheld|partial review/iu;
++
++function blocked(verdict) {
++  return verdict.findings.some(({ severity }) => severity === "blocker" || severity === "major")
++    || verdict.briefing_violations.length > 0
++    || verdict.trajectory_verdict !== "consistent";
++}
++
++export function criticRoundPassed(verdict) {
++  if (verdict === null || typeof verdict !== "object" || !Array.isArray(verdict.findings) || !Array.isArray(verdict.briefing_violations)) return false;
++  if (blocked(verdict)) return false;
++  if (verdict.pass === true) return true;
++  if (verdict.findings.length === 0) return false;
++  return !PARTIAL_REVIEW.test(`${verdict.trajectory_evidence ?? ""}\n${(verdict.deliberately_not_flagged ?? []).join("\n")}`);
++}
++
++/** A receipt written before this rule keeps the Critic's own flag, so a reader accepts either value for the same verdict. */
++export function receiptMatchesVerdict(reviewPass, verdict) {
++  return reviewPass === verdict.pass || reviewPass === criticRoundPassed(verdict);
++}
+diff --git a/plugins/pipeline-core/lib/critic-round-pass.test.mjs b/plugins/pipeline-core/lib/critic-round-pass.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..e603afa76b7f84694ce558fca343671c2859f4c8
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-round-pass.test.mjs
+@@ -0,0 +1,57 @@
++import assert from "node:assert/strict";
++import { test } from "node:test";
++import { criticRoundPassed, receiptMatchesVerdict } from "./critic-round-pass.mjs";
++
++const finding = (severity) => ({ severity, gap: "gap", risk: "risk", evidence: "src/a.mjs:1", spec_ref: "AC-1" });
++const verdict = (overrides = {}) => ({
++  findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent",
++  trajectory_evidence: "evidence bound to the candidate", briefing_violations: [], pass: true, ...overrides,
++});
++
++test("a round holding only minors has passed even when the Critic set pass false", () => {
++  assert.equal(criticRoundPassed(verdict({ pass: false, findings: [finding("minor"), finding("minor")] })), true);
++});
++
++test("a clean pass and a pass with minors stay passes", () => {
++  assert.equal(criticRoundPassed(verdict()), true);
++  assert.equal(criticRoundPassed(verdict({ findings: [finding("minor")] })), true);
++});
++
++for (const severity of ["blocker", "major"]) {
++  test(`a ${severity} finding fails the round whatever the pass flag says`, () => {
++    assert.equal(criticRoundPassed(verdict({ pass: false, findings: [finding(severity), finding("minor")] })), false);
++    assert.equal(criticRoundPassed(verdict({ pass: true, findings: [finding(severity)] })), false);
++  });
++}
++
++test("a briefing violation fails a round that holds only minors", () => {
++  assert.equal(criticRoundPassed(verdict({ pass: false, findings: [finding("minor")], briefing_violations: ["the range was widened"] })), false);
++});
++
++for (const trajectory of ["inconsistent", "not verifiable"]) {
++  test(`a trajectory of ${trajectory} fails a round that holds only minors`, () => {
++    assert.equal(criticRoundPassed(verdict({ pass: false, findings: [finding("minor")], trajectory_verdict: trajectory })), false);
++  });
++}
++
++test("pass false without any finding stays a failure", () => {
++  assert.equal(criticRoundPassed(verdict({ pass: false })), false);
++});
++
++test("a partial review that withheld its verdict is not a pass", () => {
++  assert.equal(criticRoundPassed(verdict({ pass: false, findings: [finding("minor")], trajectory_evidence: "pass/fail withheld — partial review; src/b.mjs not reached" })), false);
++  assert.equal(criticRoundPassed(verdict({ pass: false, findings: [finding("minor")], deliberately_not_flagged: ["partial review, categories 7-11 not reached"] })), false);
++});
++
++test("anything that is not a verdict fails closed", () => {
++  for (const value of [null, undefined, "pass", {}, { pass: true }, { pass: true, findings: [] }]) assert.equal(criticRoundPassed(value), false);
++});
++
++test("a receipt written before the rule still matches its minor-only verdict, a contradicting receipt does not", () => {
++  const minors = verdict({ pass: false, findings: [finding("minor")] });
++  assert.equal(receiptMatchesVerdict(false, minors), true);
++  assert.equal(receiptMatchesVerdict(true, minors), true);
++  const major = verdict({ pass: false, findings: [finding("major")] });
++  assert.equal(receiptMatchesVerdict(false, major), true);
++  assert.equal(receiptMatchesVerdict(true, major), false);
++});
+diff --git a/plugins/pipeline-core/scripts/codex-critic-packet-host.mjs b/plugins/pipeline-core/scripts/codex-critic-packet-host.mjs
+index 55e8e89434d79c7d4880b4735d82673abe51fef7..89698ca2034419412328615ee7a20b1e946544f7 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-packet-host.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-packet-host.mjs
+@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
++import { criticRoundPassed } from "../lib/critic-round-pass.mjs";
+ import { checkCriticExport, deriveCriticExportView } from "../lib/critic-export-policy.mjs";
+ import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+ import { diagnosticReviewerReferences } from "../lib/critic-diagnostic-packet.mjs";
+@@ -228,7 +229,7 @@ export function finalizeCodexPacketDispatch(options, deps = {}) {
+     residualRisks: [...CODEX_RESIDUAL_RISKS],
+     liveness: options.hostReturn.liveness,
+     verdict: sanitizedVerdict(options.hostReturn.verdict),
+-    reviewPass: options.hostReturn.verdict.pass,
++    reviewPass: criticRoundPassed(options.hostReturn.verdict),
+   };
+   consumeCandidatePacket({ controlRoot: options.controlRoot, packetId: packet.packetId, receipt }, deps);
+   try {
+diff --git a/plugins/pipeline-core/scripts/critic-claude-host.mjs b/plugins/pipeline-core/scripts/critic-claude-host.mjs
+index 7238aa9da3e594c90d0d81a0c677881394f63816..43abecd33091af54b6be79367146ee3fd257fe37 100644
+--- a/plugins/pipeline-core/scripts/critic-claude-host.mjs
++++ b/plugins/pipeline-core/scripts/critic-claude-host.mjs
+@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
++import { criticRoundPassed } from "../lib/critic-round-pass.mjs";
+ import { checkCriticExport, deriveCriticExportView } from "../lib/critic-export-policy.mjs";
+ import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
+ import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
+@@ -405,7 +406,7 @@ export function finalizeClaudePacketReview(options, deps = {}) {
+     },
+     assurance: result.assurance,
+     verdictSha256: sha256(canonicalJson(result.verdict)),
+-    reviewPass: result.verdict.pass === true,
++    reviewPass: criticRoundPassed(result.verdict),
+   };
+   consumeCandidatePacket({ controlRoot: options.controlRoot, packetId: prepared.packet.packetId, receipt }, deps);
+   try {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index f1258909da39731d92d33c038c163b1bcc87c405..702e2198d45966650cba6b41983660b3eee90d40 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -4,6 +4,7 @@ import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-laun
+ import { randomBytes } from "node:crypto";
+ import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
++import { criticRoundPassed } from "../lib/critic-round-pass.mjs";
+ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+@@ -595,7 +596,7 @@ function receiptFor(result) {
+     assurance: result.assurance,
+     verdictSha256: sha256(canonicalJson(result.verdict)),
+     findingCount: result.verdict.findings.length,
+-    reviewPass: result.verdict.pass,
++    reviewPass: criticRoundPassed(result.verdict),
+     ...(Object.hasOwn(result, "independence") ? { independence: result.independence } : {}),
+     ...(Object.hasOwn(result, "splitSha256") ? { splitSha256: result.splitSha256 } : {}),
+   });
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 66391264a16737ffb5e1a1db1ce118fc973dd6d1..aa69aae5e20c054ce96a0c0a321626985f485501 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -2381,15 +2381,29 @@ test("PF94 export (1) the export result names the lineage registration before th
+   } finally { cleanup(fx); }
+ });
+ 
++test("a round holding only minors is recorded as passed, whatever the Critic set for pass, and the minor stays in the verdict", () => {
++  const fx = fixture();
++  try {
++    const packetId = "3".repeat(32);
++    const finding = { gap: "missing edge", risk: "small", severity: "minor", evidence: "specs/spec.md:1", spec_ref: "AC-1" };
++    const given = verdict({ findings: [finding], pass: false });
++    const done = finalizeSessionCriticReview(preadmitted(fx, { packetId, verdict: given }));
++    assert.equal(done.status, "completed");
++    assert.equal(done.receipt.reviewPass, true);
++    assert.equal(done.receipt.findingCount, 1);
++    assert.equal(given.pass, false, "the Critic's own verdict is not rewritten");
++  } finally { cleanup(fx); }
++});
++
+ test("a failing review exports too, with reviewPass false and its finding count", () => {
+   const fx = fixture();
+   try {
+     const packetId = "2".repeat(32);
+-    const finding = { gap: "missing edge", risk: "failure", severity: "minor", evidence: "specs/spec.md:1", spec_ref: "AC-1" };
++    const finding = { gap: "missing edge", risk: "failure", severity: "major", evidence: "specs/spec.md:1", spec_ref: "AC-1" };
+     const done = finalizeSessionCriticReview(preadmitted(fx, { packetId, verdict: verdict({ findings: [finding], pass: false }) }));
+     assert.equal(done.status, "completed");
+     assert.equal(done.receipt.reviewPass, false);
+-    criticNotes(fx, "# Critic notes\n\nOne minor finding.\n");
++    criticNotes(fx, "# Critic notes\n\nOne major finding.\n");
+     const options = exportOptions(fx, packetId);
+     exportSessionCriticEvidence(options);
+     const index = JSON.parse(readFileSync(join(fx.root, options.outDir, "index.json"), "utf8"));
+@@ -2400,7 +2414,7 @@ test("a failing review exports too, with reviewPass false and its finding count"
+     assert.equal(sha(readFileSync(join(fx.root, options.outDir, "receipt.json"))), index.receiptSha256);
+     // C24: the close coordinator's read-only verb reports the same standing with the counts the one-shot close needs.
+     const standing = (packet) => JSON.parse(spawnSync(process.execPath, [fileURLToPath(new URL("./close-coordinator.mjs", import.meta.url)), "critic-standing", "--root", fx.root, "--packet", packet], { encoding: "utf8" }).stdout);
+-    assert.deepEqual([standing(packetId).status, standing(packetId).blockers, standing(packetId).majors, standing(packetId).minors], ["failed", 0, 0, 1]);
++    assert.deepEqual([standing(packetId).status, standing(packetId).blockers, standing(packetId).majors, standing(packetId).minors], ["failed", 0, 1, 0]);
+     assert.equal(standing("9".repeat(32)).status, "unknown");
+   } finally { cleanup(fx); }
+ });
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index b7e2324527c2540caa19e32d40b166ef4052f947..610b70f1085f9f04b8089686a1eedd6cd27c5b00 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -107,6 +107,7 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
+    Codex: both projected Critic roles, `critic` and `critic-high-risk` (a higher effort, from the `critic_high_risk` duty), carry a read-only sandbox, which a host may not be able to run. Run the preflight once on this machine (no model call): `node <plugin-root>/scripts/codex-sandbox-preflight.mjs --run --kind intermediate --codex <absolute codex path> --receipt <absolute path of a new file under scratch/>`. Then `node <plugin-root>/scripts/codex-critic-launch-route.mjs --role critic --receipt <that path>` (`--role critic-high-risk` for a higher effort; the receipt is optional; it always exits 0) prints one JSON object. Call `spawn_agent` with exactly the `agentType` it prints, which is the role itself (sandboxed) or `default`. With `default`, set the model and `reasoning_effort` on the call, record the round as `caller-authored-fallback` (it needs its one human acknowledgement at the close) and name the round in your final message as protected by instruction only. If a sandboxed Critic still fails on `EPERM` at run time, launch it once more through `default` with the same labelling.
+ 3. `session-critic-finalizer.mjs finalize --root "$PWD" --request scratch/session-critic-finalization-request.json`, then `... export --root "$PWD" --request scratch/session-critic-export-request.json`.
+    `finalize --help` prints the closed request keys. A split review: `critic-split-merge.mjs --root <root> --packet <packetId>` once every child returned, before `finalize`.
++   A round with no blocker or major finding, a consistent trajectory and no briefing violation has passed, whatever the Critic set for `pass`. Its minors stay open and need no further round; name them in your report.
+ 4. Findings: `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` or `--add-delta-request <input.json>`; every later round reuses the first `taskId`.
+    After fixing findings: `critic-correction-input-bindings.mjs derive --root <root> --base <commit> --head <commit> --out scratch/<file>` gives the file a delta preflight names with `--correction-input-bindings`.
+ 5. Recovery only: a stale or conflicting round is read with `session-critic-finalizer.mjs inspect-course-takeover` and retired with `supersede-course-takeover`; nothing is deleted. Several units reviewed in one round: `register-batch`. All three take `--root` and `--request`.

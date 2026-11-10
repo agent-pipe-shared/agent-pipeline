@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 25: 2 held patches exported from the build clone chain ed926ea11..bd9a0f458
+# PO apply script for candidate 25: 4 held patches exported from the build clone chain ed926ea11..7e9504e67
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -16,6 +16,8 @@ step() {
 }
 step 01-3296a67bb 'test(dispatch): tolerate the routing source note in the background Goldfish fixture'
 step 02-bd9a0f458 'fix(dispatch): wait in the same turn until a background Goldfish stop has finished'
+step 03-4dfedc6ba 'feat(critic): count a round holding only minor findings as passed'
+step 04-7e9504e67 'fix(inventory): sort the dispatch preparation suite and list the hand-back hook surface'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

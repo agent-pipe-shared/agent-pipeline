@@ -1,0 +1,28 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 618f55e434cc303dd2904d9caf6cb3c75a14aad7..a632bb8d769a41656d69bf9fcdf326efdc09bfeb 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -43,6 +43,7 @@
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-onboarding-consent-lock.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
++        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:SubagentHandback:node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow|TodoWrite:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-slicing.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:advisor:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-advisor-prohibition.mjs\"",
+@@ -475,7 +476,6 @@
+         "verify-phase:harness/scripts/verify.mjs:feature-close-audit-receipt-tests",
+         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
+         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+-        "verify-phase:harness/scripts/verify.mjs:prepare-dispatch-tests",
+         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
+         "verify-phase:harness/scripts/verify.mjs:full-verify-wrapper-tests",
+         "verify-phase:harness/scripts/verify.mjs:g17-publication-observation-tests",
+@@ -972,6 +972,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-trust-anchor-bootstrap-tests",
+         "verify-phase:harness/scripts/verify.mjs:pre-gate-tests",
+         "verify-phase:harness/scripts/verify.mjs:pre-push-hook-install-tests",
++        "verify-phase:harness/scripts/verify.mjs:prepare-dispatch-tests",
+         "verify-phase:harness/scripts/verify.mjs:print-verify-failures-tests",
+         "verify-phase:harness/scripts/verify.mjs:private-document-binding-tests",
+         "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-cli-tests",
