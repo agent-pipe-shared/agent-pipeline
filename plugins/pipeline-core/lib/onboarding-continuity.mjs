@@ -10339,6 +10339,32 @@ export function readOnboardingContinuityMemberBoundStateSha256({repository, bind
   return null;
 }
 
+/**
+ * The State image a released onboarding-continuity member left settled, or null when it cannot be shown. Pure; the registry and the owner side
+ * decide through this one function. D231 option (a) admitted only a member that never wrote. C23 (Codex greenfield F25, PO decision 2026-11-09)
+ * admits a writer too, because the Close's own route writes twice in a row (bind the Result, then the close block) and the second step was refused for good:
+ * a normally released member whose own selected-state facts and release evidence all name ONE image has its writes witnessed, since its facts
+ * move only through the owned refresh of its write. An image changed behind it leaves its facts and its release evidence apart. A recovered
+ * binding proves nothing about a write that was cut short, so lost-binding-recovered stays limited to a member that never wrote.
+ */
+export function onboardingContinuityReleasedSettledImage({terminal, boundStateSha256, memberFacts, releaseFacts} = {}) {
+  if (!['continuity-released','lost-binding-recovered'].includes(terminal) || typeof boundStateSha256 !== 'string') return null;
+  const own = (Array.isArray(memberFacts) ? memberFacts : []).filter(fact=>fact?.namespaceId==='selected-state');
+  const released = (Array.isArray(releaseFacts) ? releaseFacts : []).filter(fact=>fact?.namespaceId==='selected-state');
+  if (!own.length || !released.length) return null;
+  const image = released[0].sha256;
+  if (typeof image !== 'string' || !released.every(fact=>fact.sha256===image) || !own.every(fact=>fact.sha256===image)) return null;
+  return terminal === 'lost-binding-recovered' && image !== boundStateSha256 ? null : image;
+}
+/** The settled image of one released member record, read against its immutable execution journal; null on anything unreadable. */
+export function readOnboardingContinuityReleasedSettledImage({repository, record, releaseRecord} = {}) {
+  try {
+    return onboardingContinuityReleasedSettledImage({terminal:releaseRecord?.terminal,
+      boundStateSha256:readOnboardingContinuityMemberBoundStateSha256({repository,bindingSha256:record?.bindingSha256}),
+      memberFacts:record?.sourceFacts, releaseFacts:releaseRecord?.sourceFacts});
+  } catch { return null; }
+}
+
 // D231 (PO decision 2026-11-01, option A): the one closed list of State entries a plain-terminal OWNER ROUTE process may run for
 // the process's own direct binding. close-feature is NOT on it (it needs the owner-descriptor retirement and the retired terminal
 // for physical-readback, a separate slice): it keeps its present refusal here as well as in scripts/continuity-owner-route.mjs.
@@ -11252,18 +11278,9 @@ function continuityRefreshCompanionKnownOwnerAlias(data,snapshot) {
     fail('SDC-AUTHORITY-UNAVAILABLE','continuity companion lifetime bound');
   data.legacy.set(key,value.operation.operationHandle);
 }
-// D231 option (a): the owner-side twin of the registry's exemption. A released member is no historical writer only when its terminal is
-// continuity-released or lost-binding-recovered AND the State sha it was bound at (its immutable execution journal) equals every
-// selected-state fact of the member and of its release evidence. A member that wrote moved its facts to the postimage and never matches.
-function continuityReleasedMemberNeverChangedState(data,item) {
-  try {
-    if (!['continuity-released','lost-binding-recovered'].includes(item.releaseRecord?.terminal)) return false;
-    const bound=readOnboardingContinuityMemberBoundStateSha256({repository:data.repository,bindingSha256:item.record.bindingSha256});
-    if (typeof bound!=='string') return false;
-    const released=item.releaseRecord.sourceFacts.filter(fact=>fact.namespaceId==='selected-state');
-    return released.length>0 && released.every(fact=>fact.sha256===bound)
-      && item.record.sourceFacts.filter(fact=>fact.namespaceId==='selected-state').every(fact=>fact.sha256===bound);
-  } catch { return false; }
+// The owner-side twin of the registry's check: the same predicate, onboardingContinuityReleasedSettledImage.
+function continuityReleasedMemberLeftStateSettled(data,item) {
+  return typeof readOnboardingContinuityReleasedSettledImage({repository:data.repository,record:item.record,releaseRecord:item.releaseRecord})==='string';
 }
 function continuityObserveCompanionStateWrite(data,port,methods,handle,context) {
   if (!exactKeys(context,new Set(['boundary','producerRecord','memberRecords','releaseRecords']))
@@ -11292,7 +11309,7 @@ function continuityObserveCompanionStateWrite(data,port,methods,handle,context) 
       || !continuityAuthorityEqual(members.filter(item=>item.releaseRecord!==null).map(item=>item.releaseRecord),context.releaseRecords)
       || members.some(item=>item.record.phase==='terminal-observed'
         || (item.record.phase==='released'&&item.record.sourceFacts.some(fact=>continuityCompanionFactMatched(fact,plan.effects,'preimage'))
-          &&!continuityReleasedMemberNeverChangedState(data,item))))
+          &&!continuityReleasedMemberLeftStateSettled(data,item))))
     fail('SDC-AUTHORITY-CAS','continuity companion record authentication failed');
   const snapshot=continuityAuthoritySnapshot(data.repository);
   if (!continuityAuthorityEqual(snapshot.memberships,producer.record.baseline))

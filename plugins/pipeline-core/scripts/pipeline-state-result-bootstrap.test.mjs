@@ -858,15 +858,18 @@ test("D231 owner route: the four Close-route entries run through the spawned CLI
   assertReleased(p, "bootstrap-apply");
   const bound = JSON.parse(readFileSync(p.statePath));
   assert.notEqual(bound.continuity.authority.result, null, "the Result is bound exactly as on the direct route");
-  // Registry side "not exempt" (PO decision option a): the member of bootstrap-apply WROTE the State, so its released record is a
-  // historical writer for the image it left. The next owner is refused with the registry's code, writes nothing and still releases.
-  const stateAfterWrite = readFileSync(p.statePath);
-  const blockedAfterWriter = ownerRun(p, ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", String(bound.continuity.revision),
+  // C23 (Codex greenfield F25, PO decision 2026-11-09): the Close's own route is this chain. The member of bootstrap-apply wrote the State and
+  // left it settled, so the close block runs next in the same project, plan and apply, each under its own member.
+  const chainPlanned = ownerRun(p, ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", String(bound.continuity.revision),
     "--result-path", bound.continuity.authority.result.path, "--result-sha256", bound.continuity.authority.result.sha256]);
-  assert.notEqual(blockedAfterWriter.status, 0);
-  assert.match(blockedAfterWriter.stderr, /companion-historical-owner-witness-missing/, "a released member that wrote is never exempt");
-  assert.deepEqual(readFileSync(p.statePath), stateAfterWrite);
-  assertReleased(p, "refused after a writer");
+  assert.equal(chainPlanned.status, 0, chainPlanned.stderr);
+  assertReleased(p, "close-plan after the writer");
+  const chainApplied = ownerRun(p, JSON.parse(chainPlanned.stdout).applyAction.argv.slice(1));
+  assert.equal(chainApplied.status, 0, chainApplied.stderr);
+  assertReleased(p, "close-apply after the writer");
+  const chainEnd = JSON.parse(readFileSync(p.statePath));
+  assert.equal(chainEnd.continuity.queueHead.nextAction, "close", "the chain ends where the close continues");
+  assert.equal(chainEnd.continuity.revision, bound.continuity.revision + 1);
   // The close entries on a project whose Result is still unbound (the direct-route close fixture): plan, then apply under a second member.
   const c = ownerRouteProject("cor-close");
   const closePlanned = ownerRun(c, ["continuity-result-close-plan", "--feature-id", "feature", "--expected-revision", "7",
@@ -882,6 +885,25 @@ test("D231 owner route: the four Close-route entries run through the spawned CLI
   assert.equal(after.continuity.queueHead.nextAction, "close");
   assert.equal(after.continuity.revision, 8);
   assertReleased(c, "close-apply");
+});
+
+test("C23 F25: a released member counts as settled only when its facts and its release evidence name one image, and a recovered binding only when it never wrote", () => {
+  const { onboardingContinuityReleasedSettledImage: settled } = continuityApi;
+  const facts = (...shas) => shas.map((sha256) => ({ namespaceId: "selected-state", sha256 }));
+  const [S0, S1, S2] = ["a", "b", "c"].map((c) => c.repeat(64));
+  const released = { terminal: "continuity-released", boundStateSha256: S0, memberFacts: facts(S1), releaseFacts: facts(S1) };
+  assert.equal(settled(released), S1, "a writer that released at the image it left");
+  assert.equal(settled({ ...released, boundStateSha256: S1 }), S1, "a member that never wrote");
+  assert.equal(settled({ ...released, memberFacts: facts(S0) }), null, "the image moved behind the member: its facts stayed at the old image");
+  assert.equal(settled({ ...released, releaseFacts: facts(S2) }), null, "the release evidence names another image");
+  assert.equal(settled({ ...released, memberFacts: facts(S1, S2) }), null, "the member's facts disagree");
+  assert.equal(settled({ ...released, releaseFacts: facts(S1, S2) }), null, "the release evidence disagrees");
+  assert.equal(settled({ ...released, boundStateSha256: null }), null, "no journal, no proof");
+  assert.equal(settled({ ...released, memberFacts: [] }), null, "no facts, no proof");
+  assert.equal(settled({ ...released, releaseFacts: [{ namespaceId: "other", sha256: S1 }] }), null, "only the selected-state evidence counts");
+  for (const terminal of ["completed", "cancelled", "revoked", undefined]) assert.equal(settled({ ...released, terminal }), null, String(terminal));
+  assert.equal(settled({ ...released, terminal: "lost-binding-recovered" }), null, "a recovered binding proves nothing about a write cut short");
+  assert.equal(settled({ ...released, terminal: "lost-binding-recovered", boundStateSha256: S1 }), S1, "a recovered binding that never wrote");
 });
 
 test("D231 owner route: close-feature, entries outside the allowlist, foreign flags and a State before the Close lifecycle are refused with a typed code and write nothing", () => {
