@@ -73,6 +73,24 @@ export function observeEffectiveEffort({ configuredEffort, stopInput } = {}) {
 }
 
 /**
+ * C23: the reader `compareRecordedModel` is given, so a record on a route the project's configuration names is bound at the host commit
+ * too; refusing it there would throw away finished work the briefing and the guard admitted. Same breadth as the guard: any available
+ * Claude duty route counts, not only the agent type's own (a differing one is the warned escalation shape). Null when nothing is readable,
+ * and for anything but a v4 Claude record: a v3 record is hand-typed, and the comparison with the agent definition is what catches a mistyped one.
+ */
+export function configuredRecordRoute(root, { routeSource } = {}) {
+  return (record) => {
+    if (record?.schema !== "pipeline.dispatch-record.v4" || record.runner !== "claude") return null;
+    if (routeSource === undefined && (typeof root !== "string" || root === "")) return null;
+    const source = routeSource ?? projectFunctionalTaskRoutes(root, { warn: () => {} });
+    if (!source?.ok || !Array.isArray(source.taskRoutes)) return null;
+    const routes = source.taskRoutes.filter((route) => route.runner === "claude" && route.state !== "unavailable" && route.taskRoute.startsWith("duty."));
+    return { model: typeof record?.model === "string" && record.model.trim() !== "" && routes.some((route) => selectorMatches(route.selector, record.model)),
+      effort: routes.some((route) => route.effort === record?.effort) };
+  };
+}
+
+/**
  * The route source is the project's own routing for `root` unless a caller injects one (draft ADR "a project's pipeline.user.yaml
  * owns its routing"). A fallback to the registry is reported through `warn`, else as a warning on the returned evaluation.
  */

@@ -2,7 +2,7 @@
 // D84: a dispatch takes its model from the configured routing, never from inheritance or the Elephant's choice.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluateDispatchModel, dispatchModelRefusalText, dispatchModelWarningText } from "./dispatch-model-enforcement.mjs";
+import { configuredRecordRoute, evaluateDispatchModel, dispatchModelRefusalText, dispatchModelWarningText } from "./dispatch-model-enforcement.mjs";
 import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
 
 const claudeSelectors = {
@@ -234,6 +234,23 @@ test("DME-C23c a call that carries the configured effort is admitted, a differen
   const noModel = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-deep", model: undefined, effort: "high", routeSource: source });
   assert.equal(noModel.ok, false);
   assert.equal(noModel.findings[0].code, "DISPATCH-MODEL-MISSING", "naming an effort never replaces naming a model");
+});
+
+test("DME-C23f the record reader answers per half whether the project's Claude duty routes name a recorded model and effort", () => {
+  const route = (taskRoute, runner, value, effort, state = "default") => ({ taskRoute, runner, role: "worker", effort, state, selector: { kind: value.startsWith("claude-") ? "model-id" : "alias", value } });
+  const routeSource = { ok: true, taskRoutes: [route("duty.deep", "claude", "sonnet", "high"), route("duty.implement", "claude", "claude-haiku-5-5", "medium"),
+    route("duty.read", "claude", "fable", "max", "unavailable"), route("duty.deep", "codex", "gpt-6-luna", "low"), route("profile.epic.design_phase", "claude", "opus", "xhigh")] };
+  const read = configuredRecordRoute("/fixture-root", { routeSource });
+  const v4 = (model, effort) => ({ schema: "pipeline.dispatch-record.v4", runner: "claude", model, effort });
+  assert.deepEqual(read(v4("claude-sonnet-5-5", "medium")), { model: true, effort: true }, "an alias selector admits its family's ids; any duty route counts, as at the guard");
+  assert.deepEqual(read(v4("haiku", "high")), { model: true, effort: true }, "a model-id selector is reached as its family alias");
+  assert.deepEqual(read(v4("fable", "max")), { model: false, effort: false }, "an unavailable route names nothing");
+  assert.deepEqual(read(v4("gpt-6-luna", "low")), { model: false, effort: false }, "another runner's route names nothing on Claude");
+  assert.deepEqual(read(v4("opus", "xhigh")), { model: false, effort: false }, "a main-session profile route is not a dispatch route");
+  assert.equal(read({ ...v4("sonnet", "high"), schema: "pipeline.dispatch-record.v3" }), null, "a hand-typed v3 record stays on the agent definition");
+  assert.equal(read({ ...v4("sonnet", "high"), runner: "codex" }), null);
+  assert.equal(configuredRecordRoute("/fixture-root", { routeSource: { ok: false } })(v4("sonnet", "high")), null);
+  assert.equal(configuredRecordRoute(undefined)(v4("sonnet", "high")), null, "no root, no project to read");
 });
 
 test("DME-C23e the Claude SubagentStop hook names the effort that really ran, or says it is unobserved, beside a recorded Goldfish commit", async () => {

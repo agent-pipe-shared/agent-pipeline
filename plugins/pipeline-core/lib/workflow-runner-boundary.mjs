@@ -83,7 +83,7 @@ function validReturnAuthorship(value) {
     || typeof value.reason !== "string" || value.reason.length === 0
     || typeof value.taskId !== "string" || !SAFE_ID.test(value.taskId)
     || !exactKeyCount(value.modelCheck, new Set(["classification", "reason"]))
-    || value.modelCheck.classification !== "model-matches"
+    || !["model-matches", "model-route-configured"].includes(value.modelCheck.classification)
     || typeof value.modelCheck.reason !== "string" || value.modelCheck.reason.length === 0) return false;
   if (!Object.hasOwn(value, "orchestratorAddedFiles")) return true;
   const paths = value.orchestratorAddedFiles;

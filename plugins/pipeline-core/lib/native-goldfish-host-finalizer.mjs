@@ -399,7 +399,7 @@ function draftRecord({ state, observation, commitReadback, testFirstEvidence = "
     dispatcher: "Elephant", candidateCommit: commitReadback.commit,
     resultSha256: observation.final.reportSha256, outcome: "completed", commits: [commitReadback.commit],
     log: observedNativeHostProgress({ state, observation }).map((entry) => entry.phase === "host-return-observed"
-      ? { ...entry, note: `${entry.note} ${testFirstNote(testFirstEvidence)}` } : entry), report,
+      ? { ...entry, note: `${entry.note} ${testFirstNote(testFirstEvidence)}${observation.resolvedModelDiffers ? ` resolvedModel: ${observation.resolvedModelDiffers} (the record names the configured ${binding.model}; the tool layer carries only the family alias).` : ""}` } : entry), report,
     outcomeClassification: { schema: OUTCOME_CLASSIFICATION_SCHEMA, kind: "authored-commit" },
     ...(decision.schema === CRITIC_REQUIRED_SCHEMA ? { criticRequired: decision } : { criticSkip: decision }),
   };

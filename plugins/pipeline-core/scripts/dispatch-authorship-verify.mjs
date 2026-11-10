@@ -114,6 +114,7 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
+import { configuredRecordRoute } from "../lib/dispatch-model-enforcement.mjs";
 import { AGY_HOST_OBSERVED_TRAILER } from "../lib/agy-host-observed-receipt.mjs";
 import { inspectAgyHostObservedLocalReadback } from "../lib/agy-host-observed-local-readback.mjs";
 import { nativeAuthoredRecordBytes, inspectNativeGoldfishHostObservation } from "../lib/native-goldfish-host-observation.mjs";
@@ -755,7 +756,8 @@ export function verifyCommit(sha, deps) {
 
   // Dimension 4: the recorded model, checked against the dispatched agent's own definition
   // (NVA-BL-78). Silent (no effect on verdict) when the record predates `agentType`.
-  const modelCheck = compareRecordedModel(record);
+  // C23: a route the project's configuration names is bound here as at the writer; a double without a repository root keeps the definition-only comparison.
+  const modelCheck = compareRecordedModel(record, { configuredRoute: configuredRecordRoute(deps.repoRoot) });
   let acceptedModelCheck = modelCheck;
   const nativeHostMarkers = parseTrailerBlock(message).filter((entry) => entry.key.toLowerCase() === "native-host-observed");
   if (isV4 && record.outcomeClassification?.kind === "authored-commit"

@@ -13,6 +13,7 @@ import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { criticAddendumBindingFinding, evaluateRepositoryCriticSkipCoverage, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
+import { configuredRecordRoute } from "../lib/dispatch-model-enforcement.mjs";
 import { agyAuthoredRecordBytes } from "../lib/agy-host-observed-receipt.mjs";
 import { agyAgentTypeForRole } from "../lib/agy-final-return.mjs";
 import { inspectAgyHostObservedLocalReadback } from "../lib/agy-host-observed-local-readback.mjs";
@@ -214,6 +215,10 @@ function verifyOrchestratorAttestedDelivery(root, record, dependencies) {
   if (JSON.stringify([...changed].sort()) !== JSON.stringify(reported)) fail("record-attestation-scope", "the files the attested commits touch differ from the files the record reports");
 }
 
+// C23: the two classifications that bind a record's model and effort: the agent definition, or a route the project's configuration names.
+const MODEL_BOUND = new Set(["model-matches", "model-route-configured"]);
+const compareForProject = (root, record) => compareRecordedModel(record, { configuredRoute: configuredRecordRoute(root) });
+
 function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
   { hostObservedAgy = false, hostObservedNativeGoldfish = false, orchestratorAttestedRoute = false } = {}) {
   const record = validateDispatchRecord(inputRecord);
@@ -222,7 +227,7 @@ function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
   const orchestratorAttested = record.schema === "pipeline.dispatch-record.v4" && record.outcomeClassification.kind === "orchestrator-attested";
   if (orchestratorAttested !== orchestratorAttestedRoute) fail("record-attestation-route", "the orchestrator-attested kind is written only by the attested writer, and that writer accepts nothing else");
   if (orchestratorAttested) verifyOrchestratorAttestedDelivery(root, record, dependencies);
-  const modelCheck = compareRecordedModel(record);
+  const modelCheck = compareForProject(root, record);
   if (record.schema === DISPATCH_RECORD_SCHEMA && !isTerminalOutcome(record.outcome)) {
     if (hostObservedAgy || hostObservedNativeGoldfish) fail("attempt-host-route", "terminal host route cannot publish an opening");
     return publishOpening(root, targetPath, record, modelCheck, dependencies);
@@ -264,7 +269,7 @@ function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
   } else if (!hostObservedNativeGoldfish && !agyUndelivered && !agyInterrupted
     && !(orchestratorAttested && record.attestation.modelAssurance === MODEL_ASSURANCE_DECLARED_UNOBSERVED
       && modelCheck.classification === "runner-model-authority-required")
-    && modelCheck.classification !== "model-matches"
+    && !MODEL_BOUND.has(modelCheck.classification)
     && !(record.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA
       && modelCheck.classification === "model-override-declared")) {
     // v3 already admits a closed, rationale-bearing declared override. It is
@@ -337,7 +342,7 @@ export function writeDispatchAttemptCheckpoint({ repoRoot, taskId, openingSha256
 }
 function publishOpening(root, targetPath, record, modelCheck, dependencies) {
   openingRecord(record);
-  if (modelCheck.classification !== "model-matches") fail("record-model", "opening requires configured model/effort binding; it does not observe a host model");
+  if (!MODEL_BOUND.has(modelCheck.classification)) fail("record-model", "opening requires configured model/effort binding; it does not observe a host model");
   const normalized = normalizeDispatchRecordPath(targetPath, "opening target");
   if (![attemptPath(record.taskId), `evidence/dispatch-record-${record.taskId}.json`].includes(normalized)) fail("target-path", "opening target does not match task");
   const target = attemptPath(record.taskId);
@@ -374,9 +379,9 @@ function nativeDispatchAttempt({ repoRoot, runner, input, expectedPendingSha256 
   if(configured&&(configured.model!==expected.model||configured.effort!==expected.effort||configured.role!==state.binding.role||configured.candidateCommit!==expected.candidateCommit))fail("record-model","native configured route differs from original opening");
   if (!present && publish) {
     if(configured){const envelope={schema:"pipeline.dispatch-attempt.v1",opening:expected};publishExclusiveBytes(root,target,binding.dispatchId,jsonBytes(envelope),{},"dispatch-attempt");}
-    else publishOpening(root,target,expected,compareRecordedModel(expected),{});
+    else publishOpening(root,target,expected,compareForProject(root,expected),{});
   }
-  if (!configured&&compareRecordedModel(expected).classification !== "model-matches") fail("record-model", "native opening model configuration mismatch");
+  if (!configured&&!MODEL_BOUND.has(compareForProject(root,expected).classification)) fail("record-model", "native opening model configuration mismatch");
   const bytes = !present && !publish ? jsonBytes({ schema: "pipeline.dispatch-attempt.v1", opening: expected }) : readPhysicalRequest(root,target,{});
   const envelope = decodeJson(bytes);
   exactKeys(envelope,["schema","opening"],"attempt");

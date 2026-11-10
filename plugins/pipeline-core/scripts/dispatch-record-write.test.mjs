@@ -63,6 +63,20 @@ check("writer persists no-delivery without manufacturing a commit or delivery pa
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+check("C23: a Claude record on a route the configuration names is written, also when the Goldfish stopped without a commit; one nothing names is not", () => {
+  const report = { text: "Read-only inspection completed.", changedFiles: [] };
+  const value = (taskId, overrides) => record({ schema: "pipeline.dispatch-record.v4", runner: "claude", taskId, agentType: "goldfish-deep", resultSha256: reportSha256(report.text),
+    outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" }, commits: [], report, ...overrides });
+  const named = value("NVA-C23-NAMED", { model: "opus", effort: "medium" });
+  const namedRoot = fixture(named);
+  try { assert.equal(writeDispatchRecordObject({ repoRoot: namedRoot, target: `evidence/dispatch-record-${named.taskId}.json`, record: named }).taskId, named.taskId); }
+  finally { rmSync(namedRoot, { recursive: true, force: true }); }
+  const unnamed = value("NVA-C23-UNNAMED", { model: "no-route-names-this", effort: "medium" });
+  const unnamedRoot = fixture(unnamed);
+  try { assert.throws(() => writeDispatchRecordObject({ repoRoot: unnamedRoot, target: `evidence/dispatch-record-${unnamed.taskId}.json`, record: unnamed }), (error) => error.code === "record-model"); }
+  finally { rmSync(unnamedRoot, { recursive: true, force: true }); }
+});
+
 check("writer publishes a closed v4 read-only receipt without commit authorship", () => {
   const report = { text: "Read-only inspection completed.", changedFiles: [] };
   const value = record({ schema: "pipeline.dispatch-record.v4", taskId: "NVA-V4-READONLY", resultSha256: reportSha256(report.text), outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" }, commits: [], report });
@@ -916,7 +930,8 @@ check("the attempt-terminal parent binding accepts the original parent and a typ
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 46, "the complete dispatch-record writer corpus must be registered before execution begins");
+// QG-04: 46 -> 47, one new C23 case (a Claude record on a configured route); the corpus is otherwise unchanged.
+assert.equal(cases.length, 47, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

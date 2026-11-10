@@ -117,6 +117,10 @@ export function modelBelongsToFamily(concreteModel, tierAlias) {
  *
  *   "model-matches"           family + effort both agree with the agent definition.
  *   "model-mismatch"          family or effort disagrees, and no override was declared.
+ *   "model-route-configured"  C23: each half agrees with the agent definition or with a route the project's
+ *                              own configuration names (the injected `configuredRoute` reader, see
+ *                              `configuredRecordRoute`); reported as such so it stays distinct from a
+ *                              frontmatter match. Without a reader this classification does not occur.
  *   "model-override-declared" the record carries a well-formed `modelOverride` (see below);
  *                              honoured rather than flagged, and reported AS an override so it
  *                              stays visibly distinct from an accidental mismatch.
@@ -137,7 +141,7 @@ export function modelBelongsToFamily(concreteModel, tierAlias) {
  * precedent `declaredCommits()`/`declaredPaths()` already set in `dispatch-authorship-verify.mjs`
  * ("most existing records predate the convention").
  */
-export function compareRecordedModel(record, { agentsDir = DEFAULT_AGENTS_DIR } = {}) {
+export function compareRecordedModel(record, { agentsDir = DEFAULT_AGENTS_DIR, configuredRoute = null } = {}) {
   // Claude agent frontmatter is not an authority for a different runtime.
   // Until the v4 record carries a verifier-readable host observation and
   // consent binding, a non-Claude authored return must remain unverified.
@@ -194,6 +198,15 @@ export function compareRecordedModel(record, { agentsDir = DEFAULT_AGENTS_DIR } 
     return {
       classification: "model-matches",
       reason: `recorded \`${recordedModel}\`/\`${recordedEffort}\` agrees with \`${agentType}\` definition (\`${resolved.model}\`/\`${resolved.effort}\`)`,
+    };
+  }
+  // C23: the project's configuration owns its routing, and the briefing and the guard admit what it names. The reader is injected so
+  // this module stays free of the routing sources, and is asked only when the agent definition does not already bind the record.
+  const configured = typeof configuredRoute === "function" ? configuredRoute(record) : null;
+  if (configured && (familyMatches || configured.model === true) && (effortMatches || configured.effort === true)) {
+    return {
+      classification: "model-route-configured",
+      reason: `recorded \`${recordedModel}\`/\`${recordedEffort}\` differs from \`${agentType}\` definition (\`${resolved.model}\`/\`${resolved.effort}\`) and is named by the project's routing configuration`,
     };
   }
   return {

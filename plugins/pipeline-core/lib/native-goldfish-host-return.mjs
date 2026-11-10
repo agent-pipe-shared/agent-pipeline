@@ -215,6 +215,12 @@ function oneTextBlock(value) {
   return content[0].text;
 }
 
+// C23: the Agent tool's `model` parameter carries only a family alias, so the host may resolve a configured alias or id to another
+// model of that family. Another family, or a configured value with no recognisable family, keeps the exact comparison.
+const claudeFamily = (model) => /^(?:claude-)?(opus|sonnet|haiku|fable)(?=$|[-_.:[])/u.exec(String(model).trim().toLowerCase())?.[1] ?? null;
+const satisfiesClaudeBinding = (model, configured) => model === configured
+  || (claudeFamily(configured) !== null && claudeFamily(model) === claudeFamily(configured));
+
 /** Bind Claude's foreground Task/Agent PostToolUse result to its exact call and resolved model. */
 export function observeClaudeGoldfishReturn(input, pending) {
   if (!input || input.hook_event_name !== "PostToolUse" || !["Agent", "Task"].includes(input.tool_name)
@@ -223,15 +229,16 @@ export function observeClaudeGoldfishReturn(input, pending) {
     || pending?.runner !== "claude" || pending.binding?.runner !== "claude") return fail("NGHR-CLAUDE-CORRELATION");
   const response = input.tool_response;
   if (!response || response.status !== "completed" || typeof response.resolvedModel !== "string"
-    || response.resolvedModel !== pending.binding.model) return fail("NGHR-CLAUDE-RETURN-MODEL");
+    || !satisfiesClaudeBinding(response.resolvedModel, pending.binding.model)) return fail("NGHR-CLAUDE-RETURN-MODEL");
   if (Array.isArray(response.modelsUsed)
-    && (response.modelsUsed.length === 0 || response.modelsUsed.some((model) => model !== pending.binding.model))) {
+    && (response.modelsUsed.length === 0 || response.modelsUsed.some((model) => !satisfiesClaudeBinding(model, pending.binding.model)))) {
     return fail("NGHR-CLAUDE-MODEL-SWITCH");
   }
   const text = oneTextBlock(response);
   if (text === null) return fail("NGHR-CLAUDE-RETURN-SHAPE");
   const final = validateNativeGoldfishFinal(text, { binding: pending.binding });
-  return final.ok ? { ...final, runner: "claude", assurance: "host-observed-tool-use-and-resolved-model" } : final;
+  return final.ok ? { ...final, runner: "claude", assurance: "host-observed-tool-use-and-resolved-model",
+    ...(response.resolvedModel === pending.binding.model ? {} : { resolvedModelDiffers: response.resolvedModel }) } : final;
 }
 
 /**

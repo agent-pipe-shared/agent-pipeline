@@ -250,6 +250,20 @@ const cases = [
     assert.deepEqual(validateNativeGoldfishFinal("[1]", { binding }).detail, { condition: "fields" });
     assert.deepEqual(validateNativeGoldfishFinal(JSON.stringify({ ...final, dispatchId: "OTHER" }), { binding }).detail, { condition: "dispatch-id" });
   }],
+  ["NGHR14 C23: the Agent tool carries only a family alias, so a model of the configured family satisfies the binding and another family does not", () => {
+    const familyBinding = (model) => ({ ...claudePending, binding: { ...claudePending.binding, model } });
+    const input = (resolvedModel, modelsUsed = [resolvedModel]) => ({ hook_event_name: "PostToolUse", tool_name: "Agent", tool_use_id: "tool-use-1",
+      session_id: "session-1", tool_response: { status: "completed", resolvedModel, modelsUsed, content: [{ type: "text", text: finalText }] } });
+    const aliasBound = observeClaudeGoldfishReturn(input("claude-sonnet-5-5"), familyBinding("sonnet"));
+    assert.equal(aliasBound.ok, true, aliasBound.code);
+    assert.equal(aliasBound.resolvedModelDiffers, "claude-sonnet-5-5", "what really ran is reported, never overwritten by the configured value");
+    const idBound = observeClaudeGoldfishReturn(input("claude-sonnet-5-5"), familyBinding("claude-sonnet-5-0"));
+    assert.equal(idBound.ok, true, idBound.code);
+    assert.equal(Object.hasOwn(observeClaudeGoldfishReturn(input("claude-sonnet-5-5"), familyBinding("claude-sonnet-5-5")), "resolvedModelDiffers"), false);
+    assert.equal(observeClaudeGoldfishReturn(input("claude-opus-5-5"), familyBinding("sonnet")).code, "NGHR-CLAUDE-RETURN-MODEL");
+    assert.equal(observeClaudeGoldfishReturn(input("claude-sonnet-5-5", ["claude-sonnet-5-5", "claude-opus-5-5"]), familyBinding("sonnet")).code, "NGHR-CLAUDE-MODEL-SWITCH");
+    assert.equal(observeClaudeGoldfishReturn(input("claude-sonnet-5-5"), familyBinding("no-family-model")).code, "NGHR-CLAUDE-RETURN-MODEL", "a value with no family has only the exact comparison");
+  }],
 ];
 
 const temp = mkdtempSync(join(tmpdir(), "native-goldfish-host-return-"));

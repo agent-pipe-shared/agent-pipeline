@@ -87,6 +87,22 @@ test("compareRecordedModel: recorded model reproduces the exact 2026-08-08 incid
   assert.match(outcome.reason, /goldfish-deep/u);
 });
 
+test("compareRecordedModel C23: a route the project's configuration names is bound, and stays visibly distinct from a frontmatter match", () => {
+  const deviating = { agentType: "goldfish-deep", model: "claude-opus-5", effort: "medium" };
+  const named = compareRecordedModel(deviating, { configuredRoute: () => ({ model: true, effort: true }) });
+  assert.equal(named.classification, "model-route-configured");
+  assert.match(named.reason, /configuration/u);
+  // Each half has to be covered: by the agent definition or by the configuration.
+  assert.equal(compareRecordedModel(deviating, { configuredRoute: () => ({ model: true, effort: false }) }).classification, "model-mismatch");
+  assert.equal(compareRecordedModel(deviating, { configuredRoute: () => ({ model: false, effort: true }) }).classification, "model-mismatch");
+  assert.equal(compareRecordedModel({ ...deviating, model: "claude-sonnet-5" }, { configuredRoute: () => ({ model: false, effort: true }) }).classification, "model-route-configured");
+  assert.equal(compareRecordedModel(deviating, { configuredRoute: () => null }).classification, "model-mismatch", "an unreadable configuration binds nothing");
+  assert.equal(compareRecordedModel(deviating).classification, "model-mismatch", "no reader, no configured route");
+  let asked = 0;
+  compareRecordedModel({ agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium" }, { configuredRoute: () => { asked += 1; return null; } });
+  assert.equal(asked, 0, "the configuration is read only when the agent definition does not already bind the record");
+});
+
 test("compareRecordedModel: v4 Antigravity model cannot be judged by Claude agent frontmatter", () => {
   const record = { schema: "pipeline.dispatch-record.v4", runner: "antigravity", agentType: "goldfish-implementor", model: "gemini-3.8-flash-high", effort: "high" };
   const outcome = compareRecordedModel(record);

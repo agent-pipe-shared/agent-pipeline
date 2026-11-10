@@ -132,7 +132,7 @@ function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfi
     return runtime.run(()=> {
       const binding={schema:adapterVersion===2?"pipeline.native-goldfish-host-briefing.v2":"pipeline.native-goldfish-host-briefing.v1",dispatchId:`NGHF-${runner.toUpperCase()}-1`,
         candidateCommit:git("rev-parse","HEAD"),candidateTree:git("rev-parse","HEAD^{tree}"),runner,role:`pipeline-core:${agentName}`,
-        ...(adapterVersion===2?{nativeAgentType:"worker"}:{agentType:agentName}),model:runner==="claude"?"sonnet":"gpt-6-luna",effort:runner==="claude"?(agentName==="goldfish-deep"?"high":"medium"):"high",rulesetSha,allowedPaths:["src/change.mjs"],criticDecision};
+        ...(adapterVersion===2?{nativeAgentType:"worker"}:{agentType:agentName}),model:options.model??(runner==="claude"?"sonnet":"gpt-6-luna"),effort:options.effort??(runner==="claude"?(agentName==="goldfish-deep"?"high":"medium"):"high"),rulesetSha,allowedPaths:["src/change.mjs"],criticDecision};
       const prompt=`Goldfish task\n<!-- pipeline-native-goldfish-host-commit:v${adapterVersion}\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}`;
       const input=runner==="claude"?{cwd:root,session_id:"session-claude",hook_event_name:"PreToolUse",tool_name:"Agent",tool_use_id:"tool-claude",tool_input:{subagent_type:binding.role,prompt,run_in_background:background}}
         :{cwd:root,session_id:"session-codex",hook_event_name:"PreToolUse",tool_name:"spawn_agent",tool_use_id:"tool-codex",tool_input:{agent_type:binding.nativeAgentType??binding.agentType,message:prompt}};
@@ -229,6 +229,27 @@ const cases = [
     assert.equal(facts.publishedRecord.agentType, "goldfish-deep");
     assert.equal(facts.commits, 1);
   }, "claude", 1, "goldfish-deep") },
+  // C23: a route the project's configuration names is admitted at the briefing and the guard, so the host commit at the END of the work may not refuse it either.
+  ...[
+    { id: "NGHF01-DEEP-C23A", name: "a configured Claude effort differing from the agent definition reaches the host commit", options: { effort: "medium" }, resolved: "sonnet" },
+    { id: "NGHF01-DEEP-C23B", name: "a configured Claude model of another family than the agent definition reaches the host commit, and the record names what really ran", options: { model: "opus" }, resolved: "claude-opus-5-5", note: /claude-opus-5-5/u },
+  ].map(({ id, name, options, resolved, note }) => ({ id, name, run: () => fixture(({ root, binding, dependencies, facts }) => {
+    const input = { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude", tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
+      tool_response: { status: "completed", resolvedModel: resolved, modelsUsed: [resolved], content: [{ type: "text", text: finalText(binding) }] } };
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+    assert.equal(result.status, "authored-commit-recorded", `${result.code} ${JSON.stringify(result).slice(0, 300)}`);
+    assert.equal(facts.commits, 1);
+    assert.equal(facts.publishedRecord.model, binding.model);
+    assert.equal(facts.publishedRecord.effort, binding.effort);
+    if (note) assert.match(facts.publishedRecord.log.find((entry) => entry.phase === "host-return-observed").note, note);
+  }, "claude", 1, "goldfish-deep", options) })),
+  { id: "NGHF01-DEEP-C23C", name: "a model that neither the agent definition nor any configured route names still gets no host commit", run: () => fixture(({ root, binding, dependencies, facts }) => {
+    const input = { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude", tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
+      tool_response: { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model], content: [{ type: "text", text: finalText(binding) }] } };
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+    assert.notEqual(result.status, "authored-commit-recorded");
+    assert.equal(facts.commits, 0);
+  }, "claude", 1, "goldfish-deep", { model: "no-route-names-this" }) },
   { id: "NGHF01-P3", name: "Claude PostToolUse without pending state names the exact reason and the orchestrator route, not the bare code", run: () => fixture(({ root, binding, dependencies, facts }) => {
     const marked = `x\n<!-- pipeline-native-goldfish-host-commit:v1\n${JSON.stringify(binding)}\n-->`;
     const launch = (tool_response, run_in_background) => ({ hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",
