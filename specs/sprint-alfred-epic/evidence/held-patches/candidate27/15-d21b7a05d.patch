@@ -1,0 +1,996 @@
+diff --git a/plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs b/plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs
+index b0439112fc715e095b70f4fdc681dca341aedaac..fe3b811bd8972bed803e4513adff56a39642b0c5 100644
+--- a/plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-push-release-tag-ancestry.test.mjs
+@@ -27,7 +27,8 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "nod
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { authorizeAuditProofFollowUp, writeCriticalApproval } from "../lib/critical-action-authorization.mjs";
++import { authorizeAuditProofFollowUp, authorizeReleaseIncludedPush, writeCriticalApproval } from "../lib/critical-action-authorization.mjs";
++import { applyInstall } from "../scripts/pre-push-hook-install.mjs";
+ import { canonical } from "../lib/critical-action-authorization-read.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ 
+@@ -97,7 +98,7 @@ const failures = [];
+ // so the exit code alone would pass for a broken fixture). The case id names the typed code `authorizeAuditProofFollowUp` has to return for its fixture.
+ const FOLLOWUP_REFUSALS = Object.freeze({
+   "C20E-AP2": "AUDIT-FOLLOWUP-PATH", "C20E-AP3": "AUDIT-FOLLOWUP-NOT-ADD-ONLY", "C20E-AP4": "AUDIT-FOLLOWUP-NO-RELEASE-APPROVAL", "C20E-AP5": "AUDIT-FOLLOWUP-RELEASE-TAG",
+-  "C20E-AP6": "AUDIT-FOLLOWUP-NO-RELEASE-APPROVAL", "C20E-AP7": "AUDIT-FOLLOWUP-CONTENT", "C20E-AP8": "AUDIT-FOLLOWUP-PARENT-NOT-PUBLISHED", "C20E-AP10": "AUDIT-FOLLOWUP-CONTENT",
++  "C20E-AP6": "AUDIT-FOLLOWUP-NO-APPROVAL", "C20E-AP7": "AUDIT-FOLLOWUP-CONTENT", "C20E-AP8": "AUDIT-FOLLOWUP-PARENT-NOT-PUBLISHED", "C20E-AP10": "AUDIT-FOLLOWUP-CONTENT",
+   "C20E-AP11": "AUDIT-FOLLOWUP-CONTENT", "C20E-AP12": "AUDIT-FOLLOWUP-CONTENT",
+ });
+ function check(id, command, dir, expectExit, { stderrIncludes, stderrNotIncludes } = {}) {
+@@ -409,7 +410,7 @@ function followUpProof(intentSha256) {
+   return { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: "po-key-1", publicKey: publicKey.export({ type: "spki", format: "pem" }), signatureBase64: cryptoSign(null, Buffer.from(intentSha256, "utf8"), privateKey).toString("base64") };
+ }
+ /** A consumer project at P (bundle committed, release approval + push approval recorded, annotated tag at P, origin/main = P) and the follow-up files on disk. */
+-function followUpScenario(prefix, { tag = true, releaseApproval = true, origin = "published", recordedPushIntent = "a".repeat(64), foreignKey = null } = {}) {
++function followUpScenario(prefix, { tag = true, releaseApproval = true, origin = "published", recordedPushIntent = "a".repeat(64), foreignKey = null, destination = "refs/heads/main", pushApproval = true, carry = ["push", "release-preflight"] } = {}) {
+   const { dir, head: bundleCommit } = freshRepo(prefix);
+   writeManifest(dir, manifestPush({ approval: "required" }));
+   const bundle = `audit-bundles/${FOLLOWUP_FEATURE}/${bundleCommit}`;
+@@ -423,18 +424,18 @@ function followUpScenario(prefix, { tag = true, releaseApproval = true, origin =
+   const releaseProof = followUpProof("b".repeat(64));
+   // the push approval's recorded proof: the guard admits only the very proof the private store holds for it (a proof signed by any other key is refused)
+   const recorded = recordedPushIntent === "a".repeat(64) ? pushProof : followUpProof(recordedPushIntent);
+-  if (writeCriticalApproval({ gitCommonDir: common, kind: "push", approval: { forCommit: approved, remote: "origin", destination: "refs/heads/main", approvedAt, criticalProof: { proofSha256: sha256Hex(canonical(recorded)), proof: recorded } } }).ok !== true) throw new Error("fixture push approval was not recorded");
++  if (pushApproval && writeCriticalApproval({ gitCommonDir: common, kind: "push", approval: { forCommit: approved, remote: "origin", destination, approvedAt, criticalProof: { proofSha256: sha256Hex(canonical(recorded)), proof: recorded } } }).ok !== true) throw new Error("fixture push approval was not recorded");
+   if (releaseApproval) {
+     // the digest the private store really holds: sha256 over the canonical proof object (release-preflight-cli.mjs, verified.proofSha256)
+     const proofSha256 = sha256Hex(canonical(releaseProof));
+     if (writeCriticalApproval({ gitCommonDir: common, kind: "release-preflight", approval: { schema: "pipeline.consumer-release-approval.v1", forCommit: approved, version: "1.0.0", tag: "v1.0.0", mode: "signature", criticalProof: { proofSha256 }, approvedAt } }).ok !== true) throw new Error("fixture release approval was not recorded");
+   }
+   if (tag) gitAt(dir, "tag", "-a", "v1.0.0", "-m", "version tag", approved);
+-  if (origin === "published") gitAt(dir, "update-ref", "refs/remotes/origin/main", approved);
++  if (origin === "published") gitAt(dir, "update-ref", `refs/remotes/origin/${destination.slice("refs/heads/".length)}`, approved);
+   // foreignKey: the carried file holds the recorded intent, validly signed, but under a key the private store never saw
+   const carriedPush = foreignKey === "push" ? followUpProof(pushProof.intentSha256) : pushProof;
+   const carriedRelease = foreignKey === "release" ? followUpProof(releaseProof.intentSha256) : releaseProof;
+-  const files = [["proofs/003-push.json", carriedPush, "push"], ["proofs/004-release-preflight.json", carriedRelease, "release-preflight"]].map(([path, proof, kind]) => {
++  const files = [["proofs/003-push.json", carriedPush, "push"], ["proofs/004-release-preflight.json", carriedRelease, "release-preflight"]].filter(([, , kind]) => carry.includes(kind)).map(([path, proof, kind]) => {
+     const bytes = Buffer.from(`${JSON.stringify(proof)}\n`);
+     return { path, bytes, kind, sha256: sha256Hex(bytes), intentSha256: proof.intentSha256 };
+   });
+@@ -518,6 +519,83 @@ const FOLLOWUP_PUSH = "git push origin HEAD:refs/heads/main";
+   check("C20E-AP9 allow  the annotated release tag at the approved commit is still admitted after the follow-up commit exists", "git push origin refs/tags/v1.0.0", s.dir, ALLOW, { stderrNotIncludes: ["BLOCKED"] });
+ }
+ 
++// ---- PO tiles 2026-11-10 -- the follow-up after ANY signed push, the push a release includes, and the same three decisions in the generated pre-push hook. ----------------
++const VERIFY_SCHEMA = "pipeline.verify-evidence.v0";
++function hookOf(dir) { const installed = applyInstall({ rootDir: dir }); if (installed.status === "failed") throw new Error(JSON.stringify(installed)); return join(dir, ".git", "hooks", "pre-push"); }
++function runHook(dir, sha, remoteRef, localRef = "HEAD") {
++  return spawnSync(hookOf(dir), ["origin", "file:///not-used"], { cwd: dir, encoding: "utf8", timeout: 60_000, input: `${localRef} ${sha} ${remoteRef} ${"0".repeat(40)}\n`, env: { ...process.env, CLAUDE_PROJECT_DIR: dir } });
++}
++function checkHook(id, result, expectExit, { includes = [], notIncludes = [] } = {}) {
++  const problems = [];
++  if (result.status !== expectExit) problems.push(`hook exit ${result.status} (expected ${expectExit}): ${String(result.stderr).slice(0, 500)}`);
++  for (const needle of includes) if (!String(result.stderr).includes(needle)) problems.push(`stderr missing "${needle}": ${String(result.stderr).slice(0, 500)}`);
++  for (const needle of notIncludes) if (String(result.stderr).includes(needle)) problems.push(`stderr unexpectedly contains "${needle}"`);
++  if (problems.length === 0) { pass++; console.log(`  ok  ${id}`); } else failures.push(`${id}: ${problems.join("; ")}`);
++}
++const headOf = (dir) => gitAt(dir, "rev-parse", "HEAD").stdout.trim();
++function branchFollowUp(prefix, overrides = {}) {
++  return followUpScenario(prefix, { destination: "refs/heads/feat-x", releaseApproval: false, tag: false, carry: ["push"], ...overrides });
++}
++{
++  const s = branchFollowUp("followup-branch"); s.write(); s.commit();
++  check("PO-F1 allow  after a signed push to a feature branch the one follow-up commit goes to the same branch with no further approval and no release", "git push origin HEAD:refs/heads/feat-x", s.dir, ALLOW, { stderrNotIncludes: ["BLOCKED"] });
++  checkHook("PO-F1h allow  the generated pre-push hook admits the same follow-up commit before its checkpoint lane", runHook(s.dir, headOf(s.dir), "refs/heads/feat-x"), 0);
++  check("PO-F2 block  the follow-up goes only to the destination the push approval names", "git push origin HEAD:refs/heads/other", s.dir, BLOCK);
++  const otherBranch = authorizeAuditProofFollowUp({ projectDir: s.dir, anchorDir: s.dir, commit: headOf(s.dir), remote: "origin", destination: "refs/heads/other" });
++  if (otherBranch.code === "AUDIT-FOLLOWUP-NO-APPROVAL") { pass++; } else failures.push(`PO-F2b: expected the typed refusal, got ${JSON.stringify(otherBranch)}`);
++}
++{
++  const s = branchFollowUp("followup-evidence");
++  const record = (commit) => ({ schema: VERIFY_SCHEMA, commit, status: "passed" });
++  const bytes = Buffer.from(`${JSON.stringify(record(s.approved))}\n`);
++  s.write({ evidence: [{ kind: "final-verify", path: "proofs/005-final-verify.json", sha256: sha256Hex(bytes) }] });
++  writeFileSync(join(s.dir, s.bundle, "proofs/005-final-verify.json"), bytes); s.commit();
++  check("PO-F3 allow  the follow-up may carry the final Verify record bound to the approved history", "git push origin HEAD:refs/heads/feat-x", s.dir, ALLOW, { stderrNotIncludes: ["BLOCKED"] });
++}
++for (const [id, mutate, why] of [
++  ["PO-F4", (record) => ({ ...record, commit: "e".repeat(40) }), "a record bound to a commit outside the approved history"],
++  ["PO-F5", (record) => ({ ...record, schema: "pipeline.something-else.v1" }), "a record of an unknown schema"],
++  ["PO-F6", (record) => ({ ...record, note: "-----BEGIN PRIVATE KEY-----" }), "a record holding a private key"],
++]) {
++  const s = branchFollowUp(`followup-evidence-${id.toLowerCase()}`);
++  const bytes = Buffer.from(`${JSON.stringify(mutate({ schema: VERIFY_SCHEMA, commit: s.approved, status: "passed" }))}\n`);
++  s.write({ evidence: [{ kind: "final-verify", path: "proofs/005-final-verify.json", sha256: sha256Hex(bytes) }] });
++  writeFileSync(join(s.dir, s.bundle, "proofs/005-final-verify.json"), bytes); s.commit();
++  const got = authorizeAuditProofFollowUp({ projectDir: s.dir, anchorDir: s.dir, commit: headOf(s.dir), remote: "origin", destination: "refs/heads/feat-x" });
++  if (got.code === "AUDIT-FOLLOWUP-CONTENT") { pass++; console.log(`  ok  ${id} block  ${why}`); } else failures.push(`${id}: ${why} returned ${JSON.stringify(got)}`);
++}
++{
++  // The release includes its push: only the release approval exists, nothing is on origin yet.
++  const s = followUpScenario("release-included", { pushApproval: false, tag: false, origin: "absent" });
++  const included = runGuard("git push origin HEAD:refs/heads/main", s.dir);
++  const lifted = !included.stderr.includes("raw Bash/Git cannot publish") && !included.stderr.includes("Push approval missing");
++  if (lifted) { pass++; console.log("  ok  PO-R1 the release approval lifts the main boundary and the push approval check for its own commit"); } else failures.push(`PO-R1: ${included.stderr.slice(0, 500)}`);
++  checkHook("PO-R1h the generated hook no longer asks for a push approval for that commit, and still demands the evidence", runHook(s.dir, s.approved, "refs/heads/main"), 1, { notIncludes: ["push approval missing or stale"] });
++  writeEvidence(s.dir, "src/other.js", "x\n"); s.commit("a later commit the release did not approve");
++  check("PO-R2 block  a commit the release approval does not name is outside the included push", "git push origin HEAD:refs/heads/main", s.dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
++  checkHook("PO-R2h the generated hook still asks for a push approval for that commit", runHook(s.dir, headOf(s.dir), "refs/heads/main"), 1, { includes: ["push approval"] });
++}
++{
++  const s = followUpScenario("release-diverged", { pushApproval: false, tag: false, origin: "absent" });
++  gitAt(s.dir, "update-ref", "refs/remotes/origin/main", gitAt(s.dir, "rev-parse", "HEAD~1").stdout.trim());
++  gitAt(s.dir, "checkout", "-q", "-b", "side", "HEAD~1"); writeEvidence(s.dir, "src/side.js", "x\n"); gitAt(s.dir, "add", "-A"); gitAt(s.dir, "commit", "-q", "-m", "elsewhere");
++  gitAt(s.dir, "update-ref", "refs/remotes/origin/main", headOf(s.dir));
++  const got = authorizeReleaseIncludedPush({ projectDir: s.dir, anchorDir: s.dir, commit: s.approved, remote: "origin", destination: "refs/heads/main" });
++  if (got.code === "RELEASE-PUSH-NOT-FAST-FORWARD") { pass++; console.log("  ok  PO-R3 the included push is a fast-forward or nothing"); } else failures.push(`PO-R3: ${JSON.stringify(got)}`);
++}
++{
++  const s = followUpScenario("hook-chain");
++  s.write(); s.commit();
++  checkHook("PO-H1 allow  the generated hook admits the follow-up commit of a release", runHook(s.dir, headOf(s.dir), "refs/heads/main"), 0);
++  const tagObject = gitAt(s.dir, "rev-parse", "refs/tags/v1.0.0").stdout.trim();
++  checkHook("PO-H2 allow  the generated hook admits the annotated release tag, reading the tag object git really passes it", runHook(s.dir, tagObject, "refs/tags/v1.0.0", "refs/tags/v1.0.0"), 0);
++}
++{
++  const s = followUpScenario("hook-other-path");
++  s.write(); writeEvidence(s.dir, "src/app.js", "console.log(1);\n"); s.commit();
++  checkHook("PO-H3 block  a follow-up that touches anything else meets the hook's full gate", runHook(s.dir, headOf(s.dir), "refs/heads/main"), 1, { includes: ["push approval"] });
++}
++
+ console.log(`\n${pass}/${pass + failures.length} cases passed.`);
+ if (failures.length > 0) {
+   console.log("\nFAILURES:");
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index 3254329610c2caec0799c86e5099787e0d078f3f..d49f16da49cd51ee8d2dbfe180c553e1a7c891c7 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -136,7 +136,7 @@ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+ 
+ import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
+-import { authorizeAuditProofFollowUp, authorizeRecordedDeploy, authorizeRecordedPush, authorizeRecordedReleaseTag, isConsumerReleaseProject, withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
++import { authorizeAuditProofFollowUp, authorizeRecordedDeploy, authorizeRecordedPush, authorizeRecordedReleaseTag, authorizeReleaseIncludedPush, isConsumerReleaseProject, withPrivateCriticalApprovals } from "../lib/critical-action-authorization.mjs";
+ import { USER_SOURCE_PATH, criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+ import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+ import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+@@ -1120,14 +1120,18 @@ const mainPublicationAttempt = pushBinding.ok
+     || (pushBinding.destination === null && new Set(["main", "refs/heads/main"]).has(pushBinding.source)));
+ // Only evaluated when actually needed (attestedMainPublication does real git/fs work).
+ const mainAttestation = mainPublicationAttempt ? attestedMainPublication(pushBinding) : null;
+-// C20E-AP (AC-108): the ONE evidence-only follow-up commit of a consumer release (the PO's approval proofs added to the audit bundle) is not covered by the
+-// push approval of the commit it follows, so for exactly that commit the boundary above is not the deciding check; `authorizeAuditProofFollowUp` admits it only when
+-// its diff adds nothing but that bundle's proofs/ files. It does NOT allow the push: every later check (publication mode, deploy adapters, the manifest gate) still
+-// runs, and the block after the consumer release tag decides. Any other commit is `null` or refused here and meets the boundary exactly as before.
+-const auditFollowUp = mainPublicationAttempt && !mainAttestation.authorized && pushBinding.destination === "refs/heads/main" && isConsumerReleaseProject(pushBinding.projectDir)
++// C20E-AP (AC-108), widened by the PO tile of 2026-11-10: the ONE evidence-only follow-up commit of an approved push or release (the approval proofs and the final Verify
++// and Security records added to the audit bundle) is not covered by the approval of the commit it follows, so for exactly that commit the boundary above is not the deciding
++// check; `authorizeAuditProofFollowUp` admits it, on any branch, only when its diff adds nothing but that bundle's proofs/ files. It does NOT allow the push: every later check
++// (publication mode, deploy adapters, the manifest gate) still runs, and the block after the consumer release tag decides. Any other commit meets the boundary exactly as before.
++const auditFollowUp = pushBinding.ok && typeof pushBinding.destination === "string" && pushBinding.destination.startsWith("refs/heads/") && !(mainPublicationAttempt && mainAttestation.authorized) && isConsumerReleaseProject(pushBinding.projectDir)
+   ? authorizeAuditProofFollowUp({ projectDir: pushBinding.projectDir, anchorDir: fallbackProjectDir(), commit: resolveSourceCommit(pushBinding), remote: pushBinding.remote, destination: pushBinding.destination })
+   : null;
+-if (mainPublicationAttempt && !mainAttestation.authorized && auditFollowUp?.ok !== true) {
++// PO tile 2026-11-10: a consumer release includes its push. The release approval stands in for the push approval of exactly its own commit to origin's main; Verify, Security and every other gate below still apply.
++const releaseIncludedPush = mainPublicationAttempt && !mainAttestation.authorized && auditFollowUp?.ok !== true && pushBinding.destination === "refs/heads/main" && isConsumerReleaseProject(pushBinding.projectDir)
++  ? authorizeReleaseIncludedPush({ projectDir: pushBinding.projectDir, anchorDir: fallbackProjectDir(), commit: resolveSourceCommit(pushBinding), remote: pushBinding.remote, destination: pushBinding.destination })
++  : null;
++if (mainPublicationAttempt && !mainAttestation.authorized && auditFollowUp?.ok !== true && releaseIncludedPush?.ok !== true) {
+   // NVA-N-PUSHDIAG: the refusal names WHICH predicate refused, never just that one did.
+   // `mainAttestation.code` is always a typed identifier (PUSH-PROOF-*), never free text --
+   // it names the predicate that refused, not how to satisfy it, so it carries nothing an
+@@ -2019,7 +2023,7 @@ if (manifestResult.status !== "ok" && declaresPushDestinationPolicy) {
+   }
+ }
+ 
+-// C20E-AP (AC-108): the admitted evidence-only follow-up commit publishes only the public approval proofs of a commit that was already approved, pushed and tagged.
++// C20E-AP (AC-108): the admitted evidence-only follow-up commit publishes only the public approval proofs and final evidence records of a commit that was already approved and pushed.
+ // Its Verify evidence and push approval are bound to that earlier commit and cannot be met by a commit that adds no code, so they are the only checks it skips; what
+ // stays is every check above this block and the two that concern the pushed range itself: uncommitted evidence files and the anonymous-public identity range.
+ if (auditFollowUp?.ok === true) {
+@@ -2695,6 +2699,8 @@ try {
+   // (c) approval.
+   if (pushGate.approval === "standing-approved") {
+     // auto-pass, no state needed at all.
++  } else if (releaseIncludedPush?.ok === true) {
++    // PO tile 2026-11-10: the recorded release approval of exactly this commit is the human approval of this push; no second record is needed.
+   } else {
+     // "required", or the field absent entirely -- treated as the safer default (a push
+     // gate that is active at all, with no explicit standing-approval, should not
+diff --git a/plugins/pipeline-core/lib/audit-bundle.mjs b/plugins/pipeline-core/lib/audit-bundle.mjs
+index 3ec4262a3e4552ecf892e482d78685cd6224e3b4..3e892332b71b6618a65bb5f1f7973c78f3bea65b 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /** Candidate-bound, offline-verifiable audit bundle service. */
+ import { createHash, verify as cryptoVerify } from "node:crypto";
+-import { readFileSync } from "node:fs";
++import { readFileSync, readdirSync } from "node:fs";
+ import { copyFile, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+ import { isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { canonicalSha256, canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
+@@ -164,13 +164,30 @@ export const AUDIT_BUNDLE_FOLLOWUP_PATH = "proofs/follow-up.json"; export const
+ export const auditBundleProofBytes = (proof) => proofBytes(proof);
+ const FOLLOWUP_KEYS = ["schema", "candidate", "approvedCommit", "proofs", "attributions"]; const ATTRIBUTION_MODE = /^[a-z-]{1,64}$/u;
+ export const followUpAttributionShape = (entry) => exact(entry, ["kind", "mode", "approvedAt"]) && PROOF_KIND.test(entry.kind) && ATTRIBUTION_MODE.test(entry.mode) && (entry.approvedAt === null || (typeof entry.approvedAt === "string" && entry.approvedAt.length <= 40));
++// PO tile 2026-11-10: a bundle can have one list per approved commit (`follow-up.json`, then `follow-up-NNN.json`), and a list can carry the final Verify and Security records.
++export const AUDIT_BUNDLE_FOLLOWUP_NUMBERED = /^follow-up-[0-9]{3}\.json$/u;
++function followUpListNames(root) {
++  let names; try { names = readdirSync(join(root, "proofs")); } catch { return ["follow-up.json"]; }
++  return ["follow-up.json", ...names.filter((name) => AUDIT_BUNDLE_FOLLOWUP_NUMBERED.test(name)).sort()];
++}
+ function followUpFindings(root, manifest) {
+-  let bytes; try { bytes = readFileSync(join(root, AUDIT_BUNDLE_FOLLOWUP_PATH)); } catch (error) { return error?.code === "ENOENT" ? [] : ["AB-FOLLOWUP"]; }
+-  const list = jsonOrNull(bytes); const taken = new Set((manifest.proofs ?? []).map((entry) => entry?.path));
+-  const proofsOk = Array.isArray(list?.proofs) && list.proofs.length <= 16 && list.proofs.every((entry) => exact(entry, ["kind", "path", "sha256", "intentSha256"]) && PROOF_KIND.test(entry.kind) && PROOF_PATH.test(entry.path) && SHA.test(entry.sha256) && SHA.test(entry.intentSha256) && !taken.has(entry.path)) && new Set(list.proofs.map((entry) => entry.path)).size === list.proofs.length;
+-  const attributionsOk = Array.isArray(list?.attributions) && list.attributions.length <= 8 && list.attributions.every(followUpAttributionShape);
+-  if (!exact(list, FOLLOWUP_KEYS) || list.schema !== AUDIT_BUNDLE_FOLLOWUP_SCHEMA || !sameCandidate(list.candidate, manifest.candidate ?? {}) || !OID.test(list.approvedCommit) || !proofsOk || !attributionsOk || list.proofs.length + list.attributions.length === 0) return ["AB-FOLLOWUP"];
+-  return proofFindings(root, list.proofs);
++  const findings = []; const taken = new Set((manifest.proofs ?? []).map((entry) => entry?.path));
++  for (const name of followUpListNames(root)) {
++    let bytes; try { bytes = readFileSync(join(root, "proofs", name)); } catch (error) { if (error?.code !== "ENOENT") findings.push("AB-FOLLOWUP"); continue; }
++    const list = jsonOrNull(bytes);
++    const fresh = (path) => { if (taken.has(path)) return false; taken.add(path); return true; };
++    const proofsOk = Array.isArray(list?.proofs) && list.proofs.length <= 16 && list.proofs.every((entry) => exact(entry, ["kind", "path", "sha256", "intentSha256"]) && PROOF_KIND.test(entry.kind) && PROOF_PATH.test(entry.path) && SHA.test(entry.sha256) && SHA.test(entry.intentSha256) && fresh(entry.path));
++    const attributionsOk = Array.isArray(list?.attributions) && list.attributions.length <= 8 && list.attributions.every(followUpAttributionShape);
++    const evidence = Object.hasOwn(list ?? {}, "evidence") ? list.evidence : [];
++    const evidenceOk = Array.isArray(evidence) && evidence.length <= 8 && evidence.every((entry) => exact(entry, ["kind", "path", "sha256"]) && PROOF_KIND.test(entry.kind) && PROOF_PATH.test(entry.path) && SHA.test(entry.sha256) && fresh(entry.path));
++    if (!exact(list, Object.hasOwn(list ?? {}, "evidence") ? [...FOLLOWUP_KEYS, "evidence"] : FOLLOWUP_KEYS) || list.schema !== AUDIT_BUNDLE_FOLLOWUP_SCHEMA || !sameCandidate(list.candidate, manifest.candidate ?? {}) || !OID.test(list.approvedCommit) || !proofsOk || !attributionsOk || !evidenceOk || list.proofs.length + list.attributions.length + evidence.length === 0) { findings.push("AB-FOLLOWUP"); continue; }
++    findings.push(...proofFindings(root, list.proofs));
++    for (const entry of evidence) {
++      let record; try { record = readFileSync(join(root, entry.path)); } catch { findings.push(`AB-MISSING ${entry.path}`); continue; }
++      if (digest(record) !== entry.sha256) findings.push(`AB-DIGEST ${entry.path}`);
++    }
++  }
++  return findings;
+ }
+ function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
+ const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report"]);
+diff --git a/plugins/pipeline-core/lib/audit-bundle.test.mjs b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+index c0d6e43a9828b700d28214c35975cf5e08f1d206..169fda04e3bbf19a7a1cc192a6b7f049dab35bac 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.test.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { createHash, generateKeyPairSync, sign as cryptoSign } from "node:crypto";
+-import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
++import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+ import { execFileSync } from "node:child_process";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+@@ -327,6 +327,26 @@ async function followUpBundle(proofs = [{ kind: "plan-approval", proof: signedPr
+   const input = fixture(); const plan = planWith(input, { candidate: CANDIDATE, proofs }); mkdirSync(join(input.root, "audit-bundles", "release-evidence"), { recursive: true }); await buildAuditBundle({ repositoryRoot: input.root, outputPath: `audit-bundles/release-evidence/${CANDIDATE.commit}`, plan });
+   return { ...input, bundleDir: `audit-bundles/release-evidence/${CANDIDATE.commit}`, bundle: join(input.root, "audit-bundles", "release-evidence", CANDIDATE.commit) };
+ }
++test("a later approved commit gets its own numbered list, numbering continues, nothing is carried twice, and a tampered evidence record is found", async () => {
++  const { writeAuditProofFollowUp } = await import("./audit-proof-collection.mjs");
++  const input = await followUpBundle();
++  const first = "a".repeat(40); const second = "b".repeat(40);
++  const record = { kind: "final-verify", bytes: Buffer.from(`${JSON.stringify({ schema: "pipeline.verify-evidence.v0", commit: first })}\n`) };
++  assert.equal(writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: first, proofs: [{ kind: "push", proof: signedProof("2".repeat(64)) }], evidence: [record] }).status, "written");
++  assert.equal(writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: first, proofs: [{ kind: "push", proof: signedProof("2".repeat(64)) }] }).status, "already-followed-up", "the same commit gets no second list");
++  const later = writeAuditProofFollowUp({ root: input.root, bundleDir: input.bundleDir, approvedCommit: second, proofs: [{ kind: "release-preflight", proof: signedProof("3".repeat(64)) }], evidence: [record] });
++  assert.equal(later.status, "written");
++  const names = readdirSync(join(input.bundle, "proofs")).sort();
++  assert.ok(names.includes("follow-up.json") && names.includes("follow-up-002.json"), names.join());
++  const list = JSON.parse(readFileSync(join(input.bundle, "proofs", "follow-up-002.json"), "utf8"));
++  assert.equal(Object.hasOwn(list, "evidence"), false, "the same record is not carried twice");
++  assert.deepEqual(list.proofs.map((entry) => entry.path), ["proofs/004-release-preflight.json"]);
++  assert.equal((await verifyAuditBundle({ bundleRoot: input.bundle })).status, "verified");
++  const carried = JSON.parse(readFileSync(join(input.bundle, "proofs", "follow-up.json"), "utf8")).evidence[0].path;
++  writeFileSync(join(input.bundle, carried), "{}\n");
++  assert.match(JSON.stringify(await verifyAuditBundle({ bundleRoot: input.bundle })), /AB-DIGEST/u);
++});
++
+ test("C20E-AP the follow-up adds the push and release proofs as new files, leaves the manifest and README bytes alone, and the bundle verifies before and after", async () => {
+   const { writeAuditProofFollowUp } = await import("./audit-proof-collection.mjs");
+   const input = await followUpBundle(); const manifestBefore = readFileSync(join(input.bundle, "manifest.json")); const readmeBefore = readFileSync(join(input.bundle, "README.md"));
+diff --git a/plugins/pipeline-core/lib/audit-proof-collection.mjs b/plugins/pipeline-core/lib/audit-proof-collection.mjs
+index cf337f723190c854c6cea4f09cab6db45626760a..68af0896a706b1f3cb988cc5e7a83982e02eb908 100644
+--- a/plugins/pipeline-core/lib/audit-proof-collection.mjs
++++ b/plugins/pipeline-core/lib/audit-proof-collection.mjs
+@@ -17,8 +17,8 @@ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
+-import { AUDIT_BUNDLE_FOLLOWUP_PATH, AUDIT_BUNDLE_FOLLOWUP_SCHEMA, auditBundleProofBytes, followUpAttributionShape, isCarriableProof } from "./audit-bundle.mjs";
+-import { CRITICAL_APPROVAL_STORE_SCHEMA, criticalApprovalStoreRoot, readLastPrivateApproval } from "./critical-action-authorization.mjs";
++import { AUDIT_BUNDLE_FOLLOWUP_NUMBERED, AUDIT_BUNDLE_FOLLOWUP_PATH, AUDIT_BUNDLE_FOLLOWUP_SCHEMA, auditBundleProofBytes, followUpAttributionShape, isCarriableProof } from "./audit-bundle.mjs";
++import { CRITICAL_APPROVAL_STORE_SCHEMA, FOLLOWUP_EVIDENCE, FOLLOWUP_EVIDENCE_MAX_BYTES, criticalApprovalStoreRoot, followUpEvidenceCommit, readLastPrivateApproval } from "./critical-action-authorization.mjs";
+ import { canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
+ 
+ const STORE_KINDS = Object.freeze(["push", "feature-package-reconcile"]);
+@@ -58,29 +58,63 @@ const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u; const KIND = /^[a-z-]{1,40}$/u;
+ const sha256Hex = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ function followUpError(code, message) { const error = new Error(message); error.code = code; return error; }
+ 
++/** The follow-up lists already in a bundle, oldest first. */
++function existingFollowUpLists(root, bundleDir) {
++  let names = []; try { names = readdirSync(join(root, bundleDir, "proofs")); } catch { names = []; }
++  const ordered = [...names.filter((name) => name === "follow-up.json"), ...names.filter((name) => AUDIT_BUNDLE_FOLLOWUP_NUMBERED.test(name)).sort()];
++  return ordered.map((name) => ({ name, list: readJson(join(root, bundleDir, "proofs", name)) })).filter((entry) => object(entry.list));
++}
++
+ /**
+- * Adds the approved commit's proofs to an EXISTING bundle as new files: `proofs/NNN-<kind>.json` (numbering continues after the manifest's own proofs) and the one
+- * list `proofs/follow-up.json`. manifest.json and README.md are never touched, every file is written create-only (`wx`), and a bundle that already has a
+- * follow-up gets none (`already-followed-up`). `attributions` carry a chat-mode approval as kind, mode and time only: an attribution record, never a proof.
++ * Adds the approved commit's proofs and the final evidence records to an EXISTING bundle as new files: `proofs/NNN-<kind>.json` (numbering continues after everything
++ * already in the bundle) and one new list, `proofs/follow-up.json` or, when a list exists, `proofs/follow-up-NNN.json`. manifest.json and README.md are never touched,
++ * every file is written create-only (`wx`), and a commit that already has a list gets none (`already-followed-up`). `attributions` carry a chat-mode approval as kind,
++ * mode and time only: an attribution record, never a proof. What an earlier list carried is not carried again.
+  * @returns {{status: "written", bundleDir: string, files: Array<{path: string, sha256: string}>} | {status: "already-followed-up"|"nothing-to-carry", bundleDir: string}}
+  */
+-export function writeAuditProofFollowUp({ root, bundleDir, approvedCommit, proofs = [], attributions = [] } = {}) {
+-  if (typeof root !== "string" || !BUNDLE_DIR.test(bundleDir ?? "") || !OID.test(approvedCommit ?? "") || !Array.isArray(proofs) || !Array.isArray(attributions)) throw followUpError("AB-FOLLOWUP-INPUT", "The follow-up needs a repository, an existing bundle directory, the approved commit, proofs and attributions.");
++export function writeAuditProofFollowUp({ root, bundleDir, approvedCommit, proofs = [], attributions = [], evidence = [] } = {}) {
++  if (typeof root !== "string" || !BUNDLE_DIR.test(bundleDir ?? "") || !OID.test(approvedCommit ?? "") || !Array.isArray(proofs) || !Array.isArray(attributions) || !Array.isArray(evidence)) throw followUpError("AB-FOLLOWUP-INPUT", "The follow-up needs a repository, an existing bundle directory, the approved commit, proofs, attributions and evidence.");
+   if (!proofs.every((entry) => object(entry) && KIND.test(entry.kind ?? "") && isCarriableProof(entry.proof))) throw followUpError("AB-PROOF-INVALID", "A signed proof envelope is not a verifiable public proof object.");
+   if (!attributions.every(followUpAttributionShape)) throw followUpError("AB-FOLLOWUP-INPUT", "An attribution record is kind, mode and time only.");
++  if (!evidence.every((entry) => object(entry) && Object.hasOwn(FOLLOWUP_EVIDENCE, entry.kind ?? "") && Buffer.isBuffer(entry.bytes))) throw followUpError("AB-FOLLOWUP-INPUT", "An evidence entry is one known record kind and its bytes.");
+   let manifest; try { manifest = parseStrictJson(readFileSync(join(root, bundleDir, "manifest.json"))); } catch { throw followUpError("AB-MANIFEST", "The bundle has no readable manifest.json."); }
+-  if (existsSync(join(root, bundleDir, AUDIT_BUNDLE_FOLLOWUP_PATH))) return { status: "already-followed-up", bundleDir };
+-  const carried = new Set((Array.isArray(manifest.proofs) ? manifest.proofs : []).map((entry) => entry?.intentSha256));
++  const earlier = existingFollowUpLists(root, bundleDir);
++  if (earlier.some((entry) => entry.list.approvedCommit === approvedCommit)) return { status: "already-followed-up", bundleDir };
++  const manifestProofs = Array.isArray(manifest.proofs) ? manifest.proofs : [];
++  const earlierProofs = earlier.flatMap((entry) => (Array.isArray(entry.list.proofs) ? entry.list.proofs : []));
++  const earlierEvidence = earlier.flatMap((entry) => (Array.isArray(entry.list.evidence) ? entry.list.evidence : []));
++  const carried = new Set([...manifestProofs, ...earlierProofs].map((entry) => entry?.intentSha256));
++  const carriedEvidence = new Set(earlierEvidence.map((entry) => entry?.sha256));
+   const fresh = proofs.filter((entry) => !carried.has(entry.proof.intentSha256));
+-  if (fresh.length + attributions.length === 0) return { status: "nothing-to-carry", bundleDir };
+-  const first = (Array.isArray(manifest.proofs) ? manifest.proofs.length : 0) + 1;
+-  const written = fresh.map((entry, index) => { const path = `proofs/${String(first + index).padStart(3, "0")}-${entry.kind}.json`; const bytes = auditBundleProofBytes(entry.proof); return { kind: entry.kind, path, bytes, sha256: sha256Hex(bytes), intentSha256: entry.proof.intentSha256 }; });
+-  const list = { schema: AUDIT_BUNDLE_FOLLOWUP_SCHEMA, candidate: manifest.candidate, approvedCommit, proofs: written.map(({ kind, path, sha256, intentSha256 }) => ({ kind, path, sha256, intentSha256 })), attributions: attributions.map((entry) => ({ kind: entry.kind, mode: entry.mode, approvedAt: entry.approvedAt })) };
++  const freshEvidence = evidence.filter((entry) => !carriedEvidence.has(sha256Hex(entry.bytes)));
++  if (fresh.length + attributions.length + freshEvidence.length === 0) return { status: "nothing-to-carry", bundleDir };
++  const taken = [...manifestProofs, ...earlierProofs, ...earlierEvidence].map((entry) => Number(/^proofs\/([0-9]{3})-/u.exec(entry?.path ?? "")?.[1])).filter(Number.isFinite);
++  let number = Math.max(manifestProofs.length, 0, ...taken);
++  const nextPath = (kind) => { number += 1; return `proofs/${String(number).padStart(3, "0")}-${kind}.json`; };
++  const written = fresh.map((entry) => { const path = nextPath(entry.kind); const bytes = auditBundleProofBytes(entry.proof); return { kind: entry.kind, path, bytes, sha256: sha256Hex(bytes), intentSha256: entry.proof.intentSha256 }; });
++  const writtenEvidence = freshEvidence.map((entry) => ({ kind: entry.kind, path: nextPath(entry.kind), bytes: entry.bytes, sha256: sha256Hex(entry.bytes) }));
++  const listPath = earlier.length === 0 ? AUDIT_BUNDLE_FOLLOWUP_PATH : `proofs/follow-up-${String(earlier.length + 1).padStart(3, "0")}.json`;
++  const list = { schema: AUDIT_BUNDLE_FOLLOWUP_SCHEMA, candidate: manifest.candidate, approvedCommit, proofs: written.map(({ kind, path, sha256, intentSha256 }) => ({ kind, path, sha256, intentSha256 })), attributions: attributions.map((entry) => ({ kind: entry.kind, mode: entry.mode, approvedAt: entry.approvedAt })), ...(writtenEvidence.length === 0 ? {} : { evidence: writtenEvidence.map(({ kind, path, sha256 }) => ({ kind, path, sha256 })) }) };
+   const listBytes = Buffer.from(`${canonicalizeJson(list)}\n`, "utf8");
+   mkdirSync(join(root, bundleDir, "proofs"), { recursive: true });
+-  for (const entry of written) writeFileSync(join(root, bundleDir, entry.path), entry.bytes, { flag: "wx", mode: 0o644 });
+-  writeFileSync(join(root, bundleDir, AUDIT_BUNDLE_FOLLOWUP_PATH), listBytes, { flag: "wx", mode: 0o644 });
+-  return { status: "written", bundleDir, files: [...written.map((entry) => ({ path: `${bundleDir}/${entry.path}`, sha256: entry.sha256 })), { path: `${bundleDir}/${AUDIT_BUNDLE_FOLLOWUP_PATH}`, sha256: sha256Hex(listBytes) }] };
++  for (const entry of [...written, ...writtenEvidence]) writeFileSync(join(root, bundleDir, entry.path), entry.bytes, { flag: "wx", mode: 0o644 });
++  writeFileSync(join(root, bundleDir, listPath), listBytes, { flag: "wx", mode: 0o644 });
++  return { status: "written", bundleDir, files: [...[...written, ...writtenEvidence].map((entry) => ({ path: `${bundleDir}/${entry.path}`, sha256: entry.sha256 })), { path: `${bundleDir}/${listPath}`, sha256: sha256Hex(listBytes) }] };
++}
++
++/** The final Verify and Security records this commit's history stands on, as the guard will accept them. A missing, oversized, foreign or unbound record is simply not carried. */
++function collectFollowUpEvidence(root, approvedCommit) {
++  const found = [];
++  for (const [kind, { source, schemas }] of Object.entries(FOLLOWUP_EVIDENCE)) {
++    let bytes; try { bytes = readFileSync(join(root, source)); } catch { continue; }
++    if (bytes.length === 0 || bytes.length > FOLLOWUP_EVIDENCE_MAX_BYTES || /PRIVATE KEY/u.test(bytes.toString("utf8"))) continue;
++    let record; try { record = JSON.parse(bytes.toString("utf8")); } catch { continue; }
++    if (!object(record) || !schemas.includes(record.schema)) continue;
++    const boundTo = followUpEvidenceCommit(kind, record);
++    if (boundTo === null || (boundTo !== "" && spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", boundTo, approvedCommit], { timeout: 10_000 }).status !== 0)) continue;
++    found.push({ kind, bytes });
++  }
++  return found.some((entry) => entry.kind === "final-security") ? found : found.filter((entry) => entry.kind !== "security-verdict");
+ }
+ 
+ function gitOut(root, args) { const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10_000 }); return result.status === 0 ? String(result.stdout).trim() : null; }
+@@ -119,5 +153,5 @@ export function prepareAuditProofFollowUp({ root, featureId, approvedCommit, com
+   }
+   if (isCarriableProof(releaseProof)) proofs.push({ kind: "release-preflight", proof: { ...releaseProof } });
+   else if (object(releaseApproval)) attributions.push({ kind: "release-preflight", mode: attributionMode(releaseApproval.mode), approvedAt: attributionTime(releaseApproval.approvedAt) });
+-  return writeAuditProofFollowUp({ root, bundleDir, approvedCommit, proofs, attributions });
++  return writeAuditProofFollowUp({ root, bundleDir, approvedCommit, proofs, attributions, evidence: collectFollowUpEvidence(root, approvedCommit) });
+ }
+diff --git a/plugins/pipeline-core/lib/consumer-release.mjs b/plugins/pipeline-core/lib/consumer-release.mjs
+index 59bf91688ad4c89c3f312b80883037fecfbfbd6b..9159c569e22b709386f662a09147ebf3e97cd0bc 100644
+--- a/plugins/pipeline-core/lib/consumer-release.mjs
++++ b/plugins/pipeline-core/lib/consumer-release.mjs
+@@ -12,8 +12,6 @@ import { existsSync, readFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+-import { authorizeRecordedChatPush, authorizeRecordedPush, withPrivateCriticalApprovals } from "./critical-action-authorization.mjs";
+-import { criticalProofWaiverFor } from "./critical-human-proof-policy.mjs";
+ import { resolveProjectAuthorityPaths } from "./project-authority.mjs";
+ import { securityGateNotConfiguredRefusal } from "./security-close-status.mjs";
+ 
+@@ -74,10 +72,10 @@ function readClosedFeatureIds(root) {
+ }
+ 
+ /**
+- * @param {{root: string, featureId: string, version: string, candidate: {commit: string, tree: string}, pushReport: object, now?: string}} input
+- *   `pushReport` is push-prepare's own report for origin/refs/heads/main (the SAME Verify, Critic-bound Verify and security checks the push used).
++ * @param {{root: string, featureId: string, version: string, candidate: {commit: string, tree: string}, pushReport: object}} input
++ *   `pushReport` is push-prepare's own report for origin/refs/heads/main (the SAME Verify, Critic-bound Verify and security checks the push uses).
+  */
+-export function firstConsumerReleaseBlocker({ root, featureId, version, candidate, pushReport, now = new Date().toISOString() }) {
++export function firstConsumerReleaseBlocker({ root, featureId, version, candidate, pushReport }) {
+   const push = script("push-prepare.mjs");
+   // 1 the feature is closed
+   const closed = readClosedFeatureIds(root);
+@@ -103,30 +101,13 @@ export function firstConsumerReleaseBlocker({ root, featureId, version, candidat
+   if (securityRefusal !== null) {
+     return { code: "RPC-CONSUMER-SECURITY", message: securityRefusal.split(": ")[0], repair: securityRefusal.slice(securityRefusal.indexOf("Run this command")) };
+   }
+-  // 4 the push approval for exactly this candidate exists
+-  let approvalOk = false;
+-  let approvalCode = "unavailable";
+-  try {
+-    const authority = resolveProjectAuthorityPaths({ rootDir: root });
+-    const stateRaw = authority.status === "ready" ? JSON.parse(readFileSync(join(root, authority.state), "utf8")) : {};
+-    const state = withPrivateCriticalApprovals(stateRaw, root);
+-    const waived = criticalProofWaiverFor(root, "push").waived === true;
+-    const input = { projectDir: root, anchorDir: root, state, candidate, remote: CONSUMER_RELEASE_REMOTE, destination: CONSUMER_RELEASE_DESTINATION };
+-    const decision = waived ? authorizeRecordedChatPush(input) : authorizeRecordedPush({ ...input, now });
+-    approvalOk = decision.authorized === true;
+-    approvalCode = decision.code;
+-  } catch { /* unreadable approval state reads as no approval */ }
+-  if (!approvalOk) {
+-    return { code: "RPC-CONSUMER-PUSH-APPROVAL", message: `no push approval is recorded for candidate ${candidate.commit.slice(0, 12)} (${approvalCode})`,
+-      repair: `node ${word(push)} --root ${word(root)} --by <name> --remote ${CONSUMER_RELEASE_REMOTE} --destination ${CONSUMER_RELEASE_DESTINATION}, then the approve-push line it prints` };
+-  }
+-  // 5 the candidate is on the published channel (ADR-0078 D5: origin/main)
+-  const published = spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", candidate.commit, `refs/remotes/${CONSUMER_RELEASE_REMOTE}/main`], { encoding: "utf8", timeout: 10_000 });
+-  if (published.status !== 0) {
+-    return { code: "RPC-CONSUMER-NOT-PUSHED", message: `candidate ${candidate.commit.slice(0, 12)} is not on refs/remotes/${CONSUMER_RELEASE_REMOTE}/main`,
+-      repair: `git push ${CONSUMER_RELEASE_REMOTE} HEAD:${CONSUMER_RELEASE_DESTINATION} (the approved push; the release tags what is already published)` };
++  // 4 PO tile 2026-11-10: the release approval includes the push, so no separate push approval is demanded. What the release needs from origin's main is only that its push is a fast-forward.
++  const publishedTip = gitOut(root, ["rev-parse", "--verify", "--quiet", `refs/remotes/${CONSUMER_RELEASE_REMOTE}/main`]);
++  if (publishedTip !== null && publishedTip !== "" && spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", publishedTip, candidate.commit], { encoding: "utf8", timeout: 10_000 }).status !== 0) {
++    return { code: "RPC-CONSUMER-NOT-FAST-FORWARD", message: `candidate ${candidate.commit.slice(0, 12)} does not build on refs/remotes/${CONSUMER_RELEASE_REMOTE}/main`,
++      repair: `bring the feature onto ${CONSUMER_RELEASE_REMOTE}'s main first (git fetch ${CONSUMER_RELEASE_REMOTE}, then integrate and close again); a release never rewrites what is published` };
+   }
+-  // 6 the version tag is free or already names this commit
++  // 5 the version tag is free or already names this commit
+   const tagged = gitOut(root, ["rev-parse", "--verify", "--quiet", `refs/tags/v${version}^{commit}`]);
+   if (tagged !== null && tagged !== "" && tagged !== candidate.commit) {
+     return { code: "RPC-CONSUMER-TAG-EXISTS", message: `tag v${version} already names ${tagged.slice(0, 12)}, not this candidate`, repair: "raise VERSION to the next version, commit it and release that" };
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization.mjs b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+index fc6e25f82fe65cfeb5895e9d4767cb51c91548a8..bc32b45774387f5fb813bc8ac4d53468074d9a46 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+@@ -552,48 +552,96 @@ export function authorizeRecordedReleaseTag({ projectDir, anchorDir = projectDir
+   if (approval.forCommit !== commit || approval.tag !== name || name !== `v${approval.version}`) {
+     return refuse("RELEASE-APPROVAL-MISMATCH", `the recorded release approval binds ${approval.tag ?? "another tag"} at ${String(approval.forCommit).slice(0, 12)}, not ${name} at ${commit.slice(0, 12)}`, command);
+   }
+-  let waiver;
+-  try { waiver = criticalProofWaiverFor(anchorDir, "release-preflight"); } catch { waiver = { waived: false }; }
+-  if (waiver?.waived !== true) {
+-    const proof = object(approval.criticalProof) ? approval.criticalProof.proofSha256 : null;
+-    if (approval.mode !== "signature" || !SHA256.test(proof ?? "") || !isCriticalProofConsumedPrivately(common, proof)) {
+-      return refuse("RELEASE-APPROVAL-PROOF-MISSING", "this project demands a signed release approval and the recorded one carries no consumed proof", command);
+-    }
++  if (!releaseApprovalProofHolds({ common, anchorDir, approval })) {
++    return refuse("RELEASE-APPROVAL-PROOF-MISSING", "this project demands a signed release approval and the recorded one carries no consumed proof", command);
+   }
+   return { ok: true };
+ }
+ 
++/** The one check of a recorded release approval's proof: a waived project needs none, every other project a signature-mode record whose proof was consumed. */
++function releaseApprovalProofHolds({ common, anchorDir, approval }) {
++  let waiver;
++  try { waiver = criticalProofWaiverFor(anchorDir, "release-preflight"); } catch { waiver = { waived: false }; }
++  if (waiver?.waived === true) return true;
++  const proof = object(approval?.criticalProof) ? approval.criticalProof.proofSha256 : null;
++  return approval?.mode === "signature" && SHA256.test(proof ?? "") && isCriticalProofConsumedPrivately(common, proof);
++}
++
++/** A recorded push approval counts only with its proof: a waived project needs none, every other project a proof the store consumed. */
++function pushApprovalProofHolds({ common, anchorDir, approval }) {
++  let waiver;
++  try { waiver = criticalProofWaiverFor(anchorDir, "push"); } catch { waiver = { waived: false }; }
++  if (waiver?.waived === true) return true;
++  const proof = object(approval?.criticalProof) ? approval.criticalProof.proofSha256 : null;
++  return SHA256.test(proof ?? "") && isCriticalProofConsumedPrivately(common, proof);
++}
++
++/**
++ * PO tile 2026-11-10: a consumer release includes its push, so a release is two signatures in all (design and release). This admits the approval check of the one push
++ * the release approval names: exactly the approved commit, to origin's main, as a fast-forward of what origin holds (or the first push). It answers only the question of
++ * the approval: Verify, Security and every other check of the push gate still run.
++ * @returns {{ok: true, tag: string} | {ok: false, code: string, message: string}}
++ */
++export function authorizeReleaseIncludedPush({ projectDir, anchorDir = projectDir, commit, remote, destination } = {}) {
++  const refuse = (code, message) => ({ ok: false, code: `RELEASE-PUSH-${code}`, message });
++  if (typeof projectDir !== "string" || projectDir === "" || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(commit ?? "") || remote !== "origin" || destination !== "refs/heads/main") return refuse("INPUT-INVALID", "a release includes only the push of its commit to refs/heads/main of origin");
++  const common = resolveCriticalApprovalCommonDir(projectDir);
++  const approval = common === null ? null : readLastPrivateApproval(common, "release-preflight")?.approval ?? null;
++  if (!object(approval) || approval.forCommit !== commit) return refuse("NO-APPROVAL", "no recorded release approval names this commit");
++  if (!releaseApprovalProofHolds({ common, anchorDir, approval })) return refuse("PROOF-MISSING", "this project demands a signed release approval and the recorded one carries no consumed proof");
++  const tip = spawnSync("git", ["-C", projectDir, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/main"], { encoding: "utf8", timeout: 5000 });
++  if (tip.status === 0 && String(tip.stdout).trim() !== "" && spawnSync("git", ["-C", projectDir, "merge-base", "--is-ancestor", String(tip.stdout).trim(), commit], { timeout: 5000 }).status !== 0) return refuse("NOT-FAST-FORWARD", "the approved commit does not build on what origin's main holds");
++  return { ok: true, tag: approval.tag };
++}
++
+ /**
+- * C20E-AP (AC-108): the evidence-only follow-up commit of a consumer release. The push approval signs the commit that carries the audit bundle and the release
+- * approval comes later, so the PO's approval proofs can reach the remote only in ONE further commit that adds them to the bundle. That single commit is admitted
+- * to the same branch push WITHOUT a second approval -- and only that: it must be exactly one commit on top of the release-approved commit P, P must be the
+- * published tip of the destination, P must carry a recorded push approval for this remote and destination, the release approval and the annotated release tag at P
+- * must hold (`authorizeRecordedReleaseTag`, the tag push's own check), and the commit's diff must ADD, as regular files, nothing but `proofs/NNN-<kind>.json` files and
+- * the one `proofs/follow-up.json` list of ONE bundle that already exists at P (create-only: no existing file is modified). Every added file is size-bounded and
+- * must be exactly a public proof object (five fields, a verifying Ed25519 signature, no private key) or the list that binds those files by digest to P and to
+- * the bundle's candidate. Anything else is refused here and falls through to the full push gate, unchanged; this function relaxes no check for any other content.
++ * C20E-AP (AC-108), widened by the PO tile of 2026-11-10: the evidence-only follow-up commit of an approved push or release. The approval signs the commit that carries
++ * the audit bundle, so the PO's proofs and the final Verify and Security results can reach the remote only in ONE further commit. That single commit is admitted to the same
++ * destination WITHOUT another approval, and only that: it must be exactly one commit on top of P, P must be the published tip of the destination, P must carry either a
++ * recorded push approval for this remote and destination or a release approval for origin's main with its annotated tag, and the diff must ADD, as regular files, nothing
++ * but `proofs/NNN-<kind>.json` files and one new list (`proofs/follow-up.json` or `proofs/follow-up-NNN.json`) of ONE bundle that already exists at P (create-only). Every
++ * proof must be exactly the public proof object the store recorded; every evidence file a size-bounded Verify or Security record of a known schema, bound to an ancestor of P,
++ * with no private key. A list that carries the release approval needs that approval and its tag at P. Anything else falls through to the full push gate, unchanged.
+  * @returns {{ok: true, approvedCommit: string, bundle: string, paths: string[]} | {ok: false, code: string, message: string}}
+  */
+-const FOLLOWUP_FILE = /^audit-bundles\/([a-z][a-z0-9-]{2,63})\/([0-9a-f]{40}|[0-9a-f]{64})\/proofs\/(?:([0-9]{3}-[a-z-]{1,40})|follow-up)\.json$/u;
+-const FOLLOWUP_PROOF_SCHEMA = "pipeline.po-approval-proof.v1"; const FOLLOWUP_LIST_SCHEMA = "pipeline.audit-bundle-followup.v1"; const FOLLOWUP_MAX_BYTES = 16_384;
++const FOLLOWUP_FILE = /^audit-bundles\/([a-z][a-z0-9-]{2,63})\/([0-9a-f]{40}|[0-9a-f]{64})\/proofs\/(?:([0-9]{3}-[a-z-]{1,40})|follow-up(?:-[0-9]{3})?)\.json$/u;
++const FOLLOWUP_LIST_FILE = /\/proofs\/follow-up(?:-[0-9]{3})?\.json$/u;
++const FOLLOWUP_PROOF_SCHEMA = "pipeline.po-approval-proof.v1"; const FOLLOWUP_LIST_SCHEMA = "pipeline.audit-bundle-followup.v1"; const FOLLOWUP_MAX_BYTES = 16_384; export const FOLLOWUP_EVIDENCE_MAX_BYTES = 1_048_576;
++/** The closed set of records a follow-up may carry: where the writer finds each one and the schemas the guard accepts. */
++export const FOLLOWUP_EVIDENCE = Object.freeze({
++  "final-verify": Object.freeze({ source: "evidence/verify-candidate.json", schemas: Object.freeze(["pipeline.verify-evidence.v0"]) }),
++  "push-verify": Object.freeze({ source: "evidence/verify-latest.json", schemas: Object.freeze(["pipeline.verify-evidence.v0"]) }),
++  "final-security": Object.freeze({ source: "evidence/security-latest.json", schemas: Object.freeze(["pipeline.security-evidence.v0", "pipeline.security-evidence.v1"]) }),
++  "security-verdict": Object.freeze({ source: "evidence/security-latest.v2.verdict.json", schemas: Object.freeze(["pipeline.security-verdict.v2"]) }),
++});
++/** The commit a carried record is bound to, or null when it names none. A verdict names none of its own and stands next to the record that does. */
++export function followUpEvidenceCommit(kind, record) {
++  if (kind === "security-verdict") return "";
++  const commit = record?.commit ?? record?.candidate?.commit;
++  return typeof commit === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(commit) ? commit : null;
++}
+ const exactKeys = (value, keys) => object(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+ export function authorizeAuditProofFollowUp({ projectDir, anchorDir = projectDir, commit, remote, destination } = {}) {
+   const refuse = (code, message) => ({ ok: false, code: `AUDIT-FOLLOWUP-${code}`, message });
+   const oid = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+-  if (typeof projectDir !== "string" || projectDir === "" || !oid.test(commit ?? "") || !/^[A-Za-z0-9._-]{1,64}$/u.test(remote ?? "") || destination !== "refs/heads/main") return refuse("INPUT-INVALID", "the follow-up push is not one commit pushed to refs/heads/main of one remote");
+-  const git = (args, options = {}) => { const result = spawnSync("git", ["-C", projectDir, ...args], { encoding: "utf8", timeout: 5000, maxBuffer: 1_048_576, ...options }); return result; };
++  if (typeof projectDir !== "string" || projectDir === "" || !oid.test(commit ?? "") || !/^[A-Za-z0-9._-]{1,64}$/u.test(remote ?? "") || !/^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(destination ?? "")) return refuse("INPUT-INVALID", "the follow-up push is not one commit pushed to one branch of one remote");
++  const git = (args, options = {}) => { const result = spawnSync("git", ["-C", projectDir, ...args], { encoding: "utf8", timeout: 5000, maxBuffer: 2_097_152, ...options }); return result; };
+   const text = (args) => { const result = git(args); return result.status === 0 ? String(result.stdout) : null; };
+   const lineage = text(["rev-list", "--parents", "-n", "1", commit])?.trim().split(" ") ?? [];
+   if (lineage.length !== 2 || lineage[0] !== commit || !oid.test(lineage[1])) return refuse("NOT-ONE-PARENT", "the follow-up is exactly one commit with one parent");
+   const parent = lineage[1];
+   const common = resolveCriticalApprovalCommonDir(projectDir);
+-  const release = common === null ? null : readLastPrivateApproval(common, "release-preflight")?.approval ?? null;
+-  if (!object(release) || release.forCommit !== parent) return refuse("NO-RELEASE-APPROVAL", "the parent commit has no recorded release approval");
+-  const tag = authorizeRecordedReleaseTag({ projectDir, anchorDir, tagRef: `refs/tags/${release.tag}`, commit: parent });
+-  if (!tag.ok || text(["rev-parse", "--verify", "--quiet", `refs/tags/${release.tag}^{commit}`])?.trim() !== parent) return refuse("RELEASE-TAG", "the annotated release tag at the approved commit does not hold");
++  const lastRelease = common === null ? null : readLastPrivateApproval(common, "release-preflight")?.approval ?? null;
++  const release = object(lastRelease) && lastRelease.forCommit === parent ? lastRelease : null;
++  const releaseTagHolds = () => {
++    if (release === null || remote !== "origin" || destination !== "refs/heads/main") return false;
++    const tag = authorizeRecordedReleaseTag({ projectDir, anchorDir, tagRef: `refs/tags/${release.tag}`, commit: parent });
++    return tag.ok && text(["rev-parse", "--verify", "--quiet", `refs/tags/${release.tag}^{commit}`])?.trim() === parent;
++  };
+   const pushRecord = readPrivateApprovals(common, "push").find((entry) => entry.approval?.forCommit === parent && entry.approval.remote === remote && entry.approval.destination === destination);
+-  if (pushRecord === undefined) return refuse("NO-PUSH-APPROVAL", "the parent commit has no recorded push approval for this remote and destination");
+-  if (text(["rev-parse", "--verify", "--quiet", `refs/remotes/${remote}/main`])?.trim() !== parent) return refuse("PARENT-NOT-PUBLISHED", "the approved commit is not the published tip of the destination");
++  const pushHolds = pushRecord !== undefined && pushApprovalProofHolds({ common, anchorDir, approval: pushRecord.approval });
++  if (!pushHolds && !releaseTagHolds()) return refuse("NO-APPROVAL", "the parent commit has neither a recorded push approval for this remote and destination nor a release approval with its tag");
++  if (text(["rev-parse", "--verify", "--quiet", `refs/remotes/${remote}/${destination.slice("refs/heads/".length)}`])?.trim() !== parent) return refuse("PARENT-NOT-PUBLISHED", "the approved commit is not the published tip of the destination");
+   const raw = git(["diff-tree", "--no-commit-id", "--raw", "-r", "-z", "--no-renames", parent, commit]);
+   const tokens = raw.status === 0 ? String(raw.stdout).split("\0").filter((token) => token !== "") : [];
+   const added = [];
+@@ -606,31 +654,53 @@ export function authorizeAuditProofFollowUp({ projectDir, anchorDir = projectDir
+   const parts = added.map((file) => FOLLOWUP_FILE.exec(file.path));
+   if (parts.some((part) => part === null) || new Set(parts.map((part) => `${part[1]}/${part[2]}`)).size !== 1) return refuse("PATH", "the commit adds a path outside the proofs/ directory of one bundle");
+   const [, feature, bundleCommit] = parts[0]; const bundle = `audit-bundles/${feature}/${bundleCommit}`;
+-  const listFiles = added.filter((file) => file.path === `${bundle}/proofs/follow-up.json`);
++  const listFiles = added.filter((file) => FOLLOWUP_LIST_FILE.test(file.path));
+   if (listFiles.length !== 1) return refuse("LIST", "the commit adds no single follow-up list");
+   let manifest = null; try { manifest = JSON.parse(text(["show", `${parent}:${bundle}/manifest.json`]) ?? ""); } catch { manifest = null; }
+   if (!object(manifest) || manifest.bundleId !== feature || manifest.candidate?.commit !== bundleCommit || git(["merge-base", "--is-ancestor", bundleCommit, parent]).status !== 0) return refuse("NO-BUNDLE", "the bundle does not exist at the approved commit for this candidate");
+-  const blobs = new Map();
+-  for (const file of added) {
++  const readBlob = (file, limit) => {
+     const size = Number(text(["cat-file", "-s", file.blob])?.trim());
+-    const body = Number.isFinite(size) && size <= FOLLOWUP_MAX_BYTES ? git(["cat-file", "blob", file.blob], { encoding: "buffer" }) : null;
+-    if (body === null || body.status !== 0) return refuse("CONTENT", `${file.path} is missing or larger than ${FOLLOWUP_MAX_BYTES} bytes`);
++    const body = Number.isFinite(size) && size <= limit ? git(["cat-file", "blob", file.blob], { encoding: "buffer" }) : null;
++    if (body === null || body.status !== 0) return null;
+     let parsed = null; try { parsed = JSON.parse(body.stdout.toString("utf8")); } catch { parsed = null; }
+-    if (!object(parsed) || /PRIVATE KEY/u.test(body.stdout.toString("utf8"))) return refuse("CONTENT", `${file.path} is not a public JSON record`);
+-    blobs.set(file.path, { bytes: body.stdout, parsed });
++    return object(parsed) && !/PRIVATE KEY/u.test(body.stdout.toString("utf8")) ? { bytes: body.stdout, parsed } : null;
++  };
++  const listBlob = readBlob(listFiles[0], FOLLOWUP_MAX_BYTES);
++  if (listBlob === null) return refuse("CONTENT", `${listFiles[0].path} is not a public JSON record of at most ${FOLLOWUP_MAX_BYTES} bytes`);
++  const list = listBlob.parsed;
++  const evidenceEntries = Object.hasOwn(list, "evidence") ? (Array.isArray(list.evidence) ? list.evidence : null) : [];
++  const evidencePaths = new Set((evidenceEntries ?? []).map((entry) => `${bundle}/${entry?.path}`));
++  const blobs = new Map([[listFiles[0].path, listBlob]]);
++  for (const file of added) {
++    if (file === listFiles[0]) continue;
++    const limit = evidencePaths.has(file.path) ? FOLLOWUP_EVIDENCE_MAX_BYTES : FOLLOWUP_MAX_BYTES;
++    const blob = readBlob(file, limit);
++    if (blob === null) return refuse("CONTENT", `${file.path} is not a public JSON record of at most ${limit} bytes`);
++    blobs.set(file.path, blob);
+   }
+-  const list = blobs.get(listFiles[0].path).parsed;
+-  const proofPaths = added.filter((file) => file !== listFiles[0]).map((file) => file.path.slice(bundle.length + 1)).sort();
++  const carriedPaths = added.filter((file) => file !== listFiles[0]).map((file) => file.path.slice(bundle.length + 1)).sort();
+   const attributions = Array.isArray(list.attributions) ? list.attributions : null; const entries = Array.isArray(list.proofs) ? list.proofs : null;
+-  if (!exactKeys(list, ["schema", "candidate", "approvedCommit", "proofs", "attributions"]) || list.schema !== FOLLOWUP_LIST_SCHEMA || list.approvedCommit !== parent || list.candidate?.commit !== bundleCommit
+-    || entries === null || attributions === null || attributions.length > 8 || entries.length + attributions.length === 0
++  if (!exactKeys(list, ["schema", "candidate", "approvedCommit", "proofs", "attributions", ...(Object.hasOwn(list, "evidence") ? ["evidence"] : [])]) || list.schema !== FOLLOWUP_LIST_SCHEMA || list.approvedCommit !== parent || list.candidate?.commit !== bundleCommit
++    || entries === null || attributions === null || evidenceEntries === null || attributions.length > 8 || entries.length + attributions.length + evidenceEntries.length === 0
+     || !attributions.every((entry) => exactKeys(entry, ["kind", "mode", "approvedAt"]) && /^[a-z-]{1,40}$/u.test(entry.kind) && /^[a-z-]{1,64}$/u.test(entry.mode) && (entry.approvedAt === null || (typeof entry.approvedAt === "string" && entry.approvedAt.length <= 40)))
+-    || JSON.stringify(entries.map((entry) => entry?.path).sort()) !== JSON.stringify(proofPaths)) return refuse("LIST", "the follow-up list does not match the added files");
+-  // Only the two approvals of this release can be carried, and a signed one must be the very proof the private store recorded for it: a proof object signed by
++    || JSON.stringify([...entries, ...evidenceEntries].map((entry) => entry?.path).sort()) !== JSON.stringify(carriedPaths)) return refuse("LIST", "the follow-up list does not match the added files");
++  // Only the two approvals of this push can be carried, and a signed one must be the very proof the private store recorded for it: a proof object signed by
+   // any other key (the agent's own, for instance) is refused. Both are compared by the digest the store recorded, sha256 over the canonical proof object, which covers
+   // the public key and the signature: the signature check further down only proves the file is self-consistent, its key travels in the file. A chat or waiver approval has no proof file.
+-  const recordedProofSha256 = { push: pushRecord.approval.criticalProof?.proofSha256, "release-preflight": release.mode === "signature" ? release.criticalProof?.proofSha256 : null };
++  const recordedProofSha256 = { push: pushRecord?.approval.criticalProof?.proofSha256 ?? null, "release-preflight": release?.mode === "signature" ? release.criticalProof?.proofSha256 : null };
+   if (!attributions.every((entry) => entry.kind === "push" || entry.kind === "release-preflight")) return refuse("LIST", "the follow-up list carries an approval other than the push and the release approval");
++  if (entries.some((entry) => entry?.kind === "release-preflight") || attributions.some((entry) => entry.kind === "release-preflight")) {
++    if (release === null) return refuse("NO-RELEASE-APPROVAL", "the list carries a release approval the parent commit does not have");
++    if (!releaseTagHolds()) return refuse("RELEASE-TAG", "the annotated release tag at the approved commit does not hold");
++  }
++  if (evidenceEntries.some((entry) => entry?.kind === "security-verdict") && !evidenceEntries.some((entry) => entry?.kind === "final-security")) return refuse("LIST", "a security verdict travels only with the security record it belongs to");
++  for (const entry of evidenceEntries) {
++    if (!exactKeys(entry, ["kind", "path", "sha256"]) || !Object.hasOwn(FOLLOWUP_EVIDENCE, entry.kind)) return refuse("LIST", "the follow-up list holds a malformed evidence entry");
++    const { bytes, parsed } = blobs.get(`${bundle}/${entry.path}`) ?? {};
++    if (bytes === undefined || createHash("sha256").update(bytes).digest("hex") !== entry.sha256 || !FOLLOWUP_EVIDENCE[entry.kind].schemas.includes(parsed.schema)) return refuse("CONTENT", `${entry.path} is not a ${entry.kind} record`);
++    const boundTo = followUpEvidenceCommit(entry.kind, parsed);
++    if (boundTo === null || (boundTo !== "" && git(["merge-base", "--is-ancestor", boundTo, parent]).status !== 0)) return refuse("CONTENT", `${entry.path} is not bound to the approved history`);
++  }
+   for (const entry of entries) {
+     if (!exactKeys(entry, ["kind", "path", "sha256", "intentSha256"])) return refuse("LIST", "the follow-up list holds a malformed proof entry");
+     const { bytes, parsed } = blobs.get(`${bundle}/${entry.path}`) ?? {};
+diff --git a/plugins/pipeline-core/lib/evidence-carry-forward.mjs b/plugins/pipeline-core/lib/evidence-carry-forward.mjs
+index e33894fea9d5e5d8a85699d83bdce14b0a250cfd..65ea0a88581b82f71781f1ab2b769db8096297ce 100644
+--- a/plugins/pipeline-core/lib/evidence-carry-forward.mjs
++++ b/plugins/pipeline-core/lib/evidence-carry-forward.mjs
+@@ -22,6 +22,7 @@ export const CARRY_FORWARD_SCHEMA = "pipeline.evidence-carry-forward.v1";
+ export const EVIDENCE_PATH_PATTERNS = Object.freeze([
+   /^specs\/[^/]+\/evidence\/.+$/u,
+   /^specs\/[^/]+\/audit-bundles\/.+$/u,
++  /^audit-bundles\/[^/]+\/[^/]+\/proofs\/[^/]+\.json$/u,
+   /^specs\/[^/]+\/lifecycle\.json$/u,
+   /^specs\/[^/]+\/result\.md$/u,
+   /^project\/push-threat-model\.md$/u,
+diff --git a/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs b/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs
+index b0cc9deea2ab0c9086fcb50ca3aa7fc12f956df5..0d1fcdb9191bc0bde3c27751c1551def738d6a8a 100644
+--- a/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs
++++ b/plugins/pipeline-core/lib/evidence-carry-forward.test.mjs
+@@ -48,7 +48,7 @@ function baseRepo() {
+ }
+ 
+ test("ECF1: the evidence set is closed by record class, everything else is product-bound", () => {
+-  for (const path of ["specs/f/evidence/verify.json", "specs/f/evidence/deep/run.log", "specs/f/audit-bundles/b.json", "specs/f/lifecycle.json", "specs/f/result.md", "project/push-threat-model.md"]) {
++  for (const path of ["specs/f/evidence/verify.json", "specs/f/evidence/deep/run.log", "specs/f/audit-bundles/b.json", "audit-bundles/f/c/proofs/003-push.json", "specs/f/lifecycle.json", "specs/f/result.md", "project/push-threat-model.md"]) {
+     assert.equal(isEvidencePath(path), true, path);
+   }
+   for (const path of ["specs/f/plan.md", "specs/f/spec.md", "specs/f/prd.md", "project/guard-config.json", "project/other.md", "src/app.mjs", "specs/f/sub/evidence/x.json",
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index af9dc3958e3b3942c0045068192bc6f2fe4c5437..a96abc6b63d2d3b0fbafdfe51a6b54861310d72a 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -653,7 +653,7 @@ function sanctionedProofWaitArgs(args, root) {
+ // script's own flags, and g23-read-help.test.mjs runs every entry in an empty directory and fails when a script with a help branch is missing here.
+ const BOTH_HELP_FLAGS = ["--help", "-h"], LONG_HELP_FLAG = ["--help"];
+ export const SCRIPTS_ANSWERING_HELP = new Map([
+-  ...["antigravity-native-dispatch-prepare", "architecture-baseline", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "onboarding-init",
++  ...["antigravity-native-dispatch-prepare", "architecture-baseline", "audit-proof-followup", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "onboarding-init",
+     "pipeline-state", "prepare-dispatch", "plan-runtime-projection-v2", "plan-runtime-projection-v3", "po-human-approval", "project-authority-migration", "project-onboarding-v3",
+     "publication-readback", "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
+     "validate-runner-profiles-v2", "wait-host-commit"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
+diff --git a/plugins/pipeline-core/scripts/audit-proof-followup.mjs b/plugins/pipeline-core/scripts/audit-proof-followup.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..0264c2f5ebc0799f16195940199856089f3a5b86
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/audit-proof-followup.mjs
+@@ -0,0 +1,64 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * After a signed push of a consumer project: adds the push proof and the final Verify and Security records to the feature's audit bundle as new files, arms the commit of
++ * exactly those files and prints the commit steps and the push. PO tile 2026-11-10: every evidence reaches the repository, also without a release, with no further signature.
++ * The push guard admits exactly that one commit (`authorizeAuditProofFollowUp`). Never blocking: a project with nothing to carry gets a typed status and exit 0.
++ *
++ * Usage: audit-proof-followup.mjs --root <root> --remote <remote> --destination refs/heads/<branch>
++ */
++import { spawnSync } from "node:child_process";
++import { readFileSync, realpathSync } from "node:fs";
++import { join, resolve } from "node:path";
++import { prepareAuditProofFollowUp } from "../lib/audit-proof-collection.mjs";
++import { isConsumerReleaseProject, readPrivateApprovals, resolveCriticalApprovalCommonDir } from "../lib/critical-action-authorization.mjs";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
++import { armWriterCommitCapability, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
++
++const USAGE = "Usage: audit-proof-followup.mjs --root <root> --remote <remote> --destination refs/heads/<branch>";
++
++function latestClosedFeature(root) {
++  const authority = resolveProjectAuthorityPaths({ rootDir: root });
++  if (authority.status !== "ready") return null;
++  try {
++    const closed = JSON.parse(readFileSync(join(root, authority.state), "utf8")).closedFeatures;
++    const id = Array.isArray(closed) && closed.length > 0 ? closed[closed.length - 1]?.id : null;
++    return typeof id === "string" ? id : null;
++  } catch { return null; }
++}
++
++export function runAuditProofFollowUp({ root: rootInput, remote, destination }) {
++  const root = realpathSync(resolve(rootInput));
++  if (!isConsumerReleaseProject(root)) return { status: "not-applicable", reason: "only a consumer project carries a follow-up" };
++  if (!/^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(destination ?? "") || !/^[A-Za-z0-9._-]{1,64}$/u.test(remote ?? "")) return { status: "usage", reason: USAGE };
++  const git = (args) => { const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10_000 }); return result.status === 0 ? String(result.stdout).trim() : null; };
++  const head = git(["rev-parse", "HEAD"]);
++  if (head === null || git(["rev-parse", "--verify", "--quiet", `refs/remotes/${remote}/${destination.slice("refs/heads/".length)}`]) !== head) return { status: "not-published", reason: "HEAD is not the published tip of this destination; run this right after the push" };
++  const common = resolveCriticalApprovalCommonDir(root);
++  if (common === null || !readPrivateApprovals(common, "push").some((entry) => entry.approval?.forCommit === head && entry.approval.remote === remote && entry.approval.destination === destination)) return { status: "no-push-approval", reason: "no push approval is recorded for HEAD and this destination" };
++  const featureId = latestClosedFeature(root);
++  if (featureId === null) return { status: "no-bundle" };
++  const prepared = prepareAuditProofFollowUp({ root, featureId, approvedCommit: head, common, releaseProof: null, releaseApproval: null });
++  if (prepared.status !== "written") return { status: prepared.status };
++  const paths = prepared.files.map((file) => file.path);
++  const push = `git push ${remote} HEAD:${destination}`;
++  let armed = null;
++  try { armed = armWriterCommitCapability({ rootDir: root, writer: "audit-proof-followup.mjs", rerun: "audit-proof-followup.mjs (the same command again)", files: prepared.files }); } catch { armed = null; }
++  const message = armed?.message ?? "evidence: approval proofs and final records of the approved commit";
++  const steps = armed?.steps ?? writerCommitSteps(paths, message);
++  return { status: "written", bundleDir: prepared.bundleDir, paths, commit: { message, steps }, nextActions: [...steps, push] };
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  const argv = process.argv.slice(2);
++  if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h")) { process.stdout.write(`${USAGE}\n`); process.exit(0); }
++  const value = (flag) => { const index = argv.indexOf(flag); return index >= 0 ? argv[index + 1] : undefined; };
++  try {
++    const result = runAuditProofFollowUp({ root: value("--root") ?? process.cwd(), remote: value("--remote") ?? "origin", destination: value("--destination") });
++    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
++    if (result.status === "usage") process.exitCode = 2;
++  } catch (error) {
++    process.stdout.write(`${JSON.stringify({ status: "failed", code: error?.code ?? "AB-FOLLOWUP", message: String(error?.message ?? error).slice(0, 200) }, null, 2)}\n`);
++  }
++}
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index c51d4e5854954823399b7210ed36925c3a93dde7..0a063d23afa783add1981b5e3bbdad463b79d7bb 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -30,6 +30,7 @@ import { tmpdir } from "node:os";
+ import { basename, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import test, { after } from "node:test";
++import { applyInstall } from "./pre-push-hook-install.mjs";
+ import { runSecurityScan } from "./security-scan.mjs";
+ import { runSessionCriticFinalizerCli } from "./session-critic-finalizer.mjs";
+ import { writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+@@ -260,7 +261,7 @@ const WALKS = Object.freeze([
+ ]);
+ 
+ // C22 (CGF-04): the walk body is one function so the same fixture, Critic course and close prerequisites serve the manual coordinator walks (below) and the one-shot close walk.
+-async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false }) {
++async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false, route = "push-then-release" }) {
+   {
+     const log = [];
+     const fx = consumerFixture(log, identity);
+@@ -658,10 +659,58 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+       // G20-42: the consumer release preflight refuses until its prerequisites exist, each refusal naming the one missing step and leaving no record.
+       const releaseArgs = [script("release-preflight-cli.mjs"), "--root", fx.root, "--base", base, "--lifecycle", MANIFEST];
+       const releasePreflight = () => spawnSync(process.execPath, releaseArgs, { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 120_000 });
+-      const noApproval = releasePreflight();
+-      assert.equal(noApproval.status, 2, `${identity.runner}: ${noApproval.stdout}${noApproval.stderr}`);
+-      assert.match(noApproval.stderr, /RPC-CONSUMER-PUSH-APPROVAL.*approve-push/u, `${identity.runner}: ${noApproval.stderr}`);
+-      assert.equal(existsSync(join(fx.root, "evidence", "release-preflight.json")), false, "a refused preflight leaves no record");
++      // PO tiles 2026-11-10: the two routes with one signature after the design, each through the real generated pre-push hook and a real push to the local bare remote.
++      const hookedCommit = (paths, message) => {
++        git(log, fx.root, ["add", "--", ...paths]);
++        git(log, fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-q", "-m", message, "--", ...paths]);
++      };
++      const hookedPush = (label, ...refspec) => step(log, `${identity.runner}: ${label}`, "git", ["-C", fx.root, "push", "-q", "origin", ...refspec]);
++      const verifyBundle = (bundleDir) => JSON.parse(step(log, `${identity.runner}: audit-bundle verify`, process.execPath, [script("audit-bundle.mjs"), "verify", "--bundle", join(fx.root, bundleDir)], { cwd: fx.root }).stdout);
++      if (route === "release-only") {
++        assert.equal(applyInstall({ rootDir: fx.root }).status, "installed");
++        const version = "v0.1.0"; const approved = git(log, fx.root, ["rev-parse", "HEAD"]);
++        const released = releasePreflight();
++        assert.equal(released.status, 0, `${identity.runner}: a release needs no earlier push\n${released.stdout}${released.stderr}`);
++        const result = JSON.parse(released.stdout); const followUp = result.auditProofFollowUp;
++        assert.equal(followUp.status, "written", released.stdout);
++        const tagPushCommand = `git push origin refs/tags/${version}`;
++        assert.deepEqual(result.nextActions, [`git tag -a ${version} -m "version tag" ${approved}`, pushCommand, ...followUp.commit.steps, pushCommand, tagPushCommand]);
++        step(log, `${identity.runner}: annotated version tag`, "git", ["-C", fx.root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "tag", "-a", version, "-m", "version tag", approved]);
++        const included = guardPush(pushCommand);
++        assert.equal(included.status, 0, `${identity.runner}: the release includes the push of its own commit\n${included.stderr}`);
++        hookedPush("the push the release includes", "HEAD:refs/heads/main");
++        hookedCommit(followUp.paths, followUp.commit.message);
++        const followed = guardPush(pushCommand);
++        assert.equal(followed.status, 0, `${identity.runner}: the follow-up needs no further approval\n${followed.stderr}`);
++        hookedPush("the follow-up push", "HEAD:refs/heads/main");
++        const tagAllowed = guardPush(tagPushCommand);
++        assert.equal(tagAllowed.status, 0, tagAllowed.stderr);
++        hookedPush("the version tag push", `refs/tags/${version}`);
++        assert.equal(verifyBundle(followUp.bundleDir).status, "verified");
++        const list = JSON.parse(readFileSync(join(fx.root, followUp.bundleDir, "proofs", "follow-up.json"), "utf8"));
++        assert.ok(list.evidence.some((entry) => entry.kind === "push-verify"), JSON.stringify(list));
++        assert.match(git(log, fx.root, ["ls-remote", "origin"]), /refs\/tags\/v0\.1\.0\^\{\}/u);
++        return;
++      }
++      if (route === "branch-followup") {
++        assert.equal(applyInstall({ rootDir: fx.root }).status, "installed");
++        const branch = "refs/heads/feat-x"; const branchPush = `git push origin HEAD:${branch}`;
++        step(log, `${identity.runner}: approve-push for the feature branch`, process.execPath, [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", branch], { cwd: fx.root });
++        assert.equal(guardPush(branchPush).status, 0);
++        hookedPush("the approved branch push", `HEAD:${branch}`);
++        const followUpRun = () => JSON.parse(step(log, `${identity.runner}: audit-proof-followup`, process.execPath, [script("audit-proof-followup.mjs"), "--root", fx.root, "--remote", "origin", "--destination", branch], { cwd: fx.root }).stdout);
++        const followUp = followUpRun();
++        assert.equal(followUp.status, "written", JSON.stringify(followUp));
++        hookedCommit(followUp.paths, followUp.commit.message);
++        const admitted = guardPush(branchPush);
++        assert.equal(admitted.status, 0, `${identity.runner}: the follow-up reaches the same branch with no further approval\n${admitted.stderr}`);
++        hookedPush("the follow-up push", `HEAD:${branch}`);
++        assert.equal(verifyBundle(followUp.bundleDir).status, "verified");
++        const list = JSON.parse(readFileSync(join(fx.root, followUp.bundleDir, "proofs", "follow-up.json"), "utf8"));
++        for (const kind of ["final-verify", "push-verify", "final-security", "security-verdict"]) assert.ok(list.evidence.some((entry) => entry.kind === kind), `${kind} travels with the follow-up: ${JSON.stringify(list.evidence)}`);
++        assert.equal(followUpRun().status, "no-push-approval", "the follow-up commit itself carries no approval, so nothing can chain onto it");
++        return;
++      }
+       if (catalogue) {
+         // The close reached the push boundary. A chat approval stays refused in a catalogue project and names the signature route (K52).
+         const refusedChat = spawnSync(process.execPath, [script("pipeline-state.mjs"), "approve-push", "--by", "Fixture PO", "--remote", "origin", "--destination", "refs/heads/main"],
+@@ -678,9 +727,6 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+       assert.equal(elsewhere.status, 2, `${identity.runner}: the approval is bound to its destination\n${elsewhere.stderr}`);
+ 
+       // 5b the approved push really happens (the local bare repository is origin), which creates refs/remotes/origin/main: the published channel.
+-      const unpushed = releasePreflight();
+-      assert.equal(unpushed.status, 2, `${identity.runner}: ${unpushed.stdout}${unpushed.stderr}`);
+-      assert.match(unpushed.stderr, /RPC-CONSUMER-NOT-PUSHED.*git push origin HEAD:refs\/heads\/main/u, `${identity.runner}: ${unpushed.stderr}`);
+       step(log, `${identity.runner}: the approved push`, "git", ["-C", fx.root, "push", "-q", "origin", "HEAD:refs/heads/main"]);
+ 
+       // 6 consumer release (G20-42, PO decision 2026-11-07: a release is a version tag). w266 finding 3 measured that the release preflight was the
+@@ -703,7 +749,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+       const approvedCommit = git(log, fx.root, ["rev-parse", "HEAD"]);
+       const followUp = releaseResult.auditProofFollowUp;
+       assert.equal(followUp.status, "written", released.stdout);
+-      assert.deepEqual(followUp.paths, [`${followUp.bundleDir}/proofs/follow-up.json`], `${identity.runner}: a chat-mode approval is an attribution record, never a proof file`);
++      assert.deepEqual(followUp.paths.filter((path) => !/proofs\/[0-9]{3}-(?:final-verify|push-verify|final-security|security-verdict)\.json$/u.test(path)), [`${followUp.bundleDir}/proofs/follow-up.json`], `${identity.runner}: a chat-mode approval is an attribution record, never a proof file; next to it only the final records travel`);
+       assert.deepEqual(releaseResult.nextActions, [`git tag -a ${tag} -m "version tag" ${approvedCommit}`, ...followUp.commit.steps, pushCommand, `git push origin refs/tags/${tag}`]);
+       const bundleVerify = () => JSON.parse(step(log, `${identity.runner}: audit-bundle verify`, process.execPath, [script("audit-bundle.mjs"), "verify", "--bundle", join(fx.root, followUp.bundleDir)], { cwd: fx.root }).stdout);
+       const followUpList = JSON.parse(readFileSync(join(fx.root, followUp.bundleDir, "proofs", "follow-up.json"), "utf8"));
+@@ -743,6 +789,14 @@ test("G20-35: the close path from implementation to release preflight is walked
+   for (const walk of WALKS) await walkTheClosePath(walk);
+ });
+ 
++test("PO tile 2026-11-10: a release with no earlier push includes it, and tag, push, follow-up and tag push go through the real pre-push hook", { timeout: 600_000 }, async () => {
++  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", route: "release-only" });
++});
++
++test("PO tile 2026-11-10: a push to a feature branch is followed by the one evidence commit with the proof and the final records, through the real pre-push hook", { timeout: 600_000 }, async () => {
++  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", route: "branch-followup" });
++});
++
+ test("C22 CGF-04: the one-shot close CLI walks the whole close on the real fixture: its stops, the acceptance question, the commits the close asks for, and the resume", { timeout: 600_000 }, async () => {
+   await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true });
+ });
+diff --git a/plugins/pipeline-core/scripts/pre-push-hook-install.mjs b/plugins/pipeline-core/scripts/pre-push-hook-install.mjs
+index e076bd2c20930f6ba3da1fc656fe3edc27293483..f89b1e43a842d0aa3590d25a259aee3d42e3e5de 100644
+--- a/plugins/pipeline-core/scripts/pre-push-hook-install.mjs
++++ b/plugins/pipeline-core/scripts/pre-push-hook-install.mjs
+@@ -501,9 +501,10 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
+   const { criticalProofWaiverFor } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-human-proof-policy.mjs")).href);
+   // D206: an approval (and its consumption entry) lives in the private store under the git common directory;
+   // the tracked state record is only the legacy fallback. Reused from the shared owner, never copied.
+-  const { withPrivateCriticalApprovals } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-action-authorization.mjs")).href);
++  // PO tile 2026-11-10: the follow-up commit, the push a release includes and the release tag are decided by the same predicates the push guard uses.
++  const { withPrivateCriticalApprovals, authorizeAuditProofFollowUp, authorizeRecordedReleaseTag, authorizeReleaseIncludedPush, isConsumerReleaseProject } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-action-authorization.mjs")).href);
+   // N27a / D206: the ONE predicate guard-push.mjs also uses for "a tag on an already published commit". Reused, never copied.
+-  const { classifyPublishedTagPush } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "published-tag-push.mjs")).href);
++  const { classifyPublishedTagPush, RELEASE_TAG_REF } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "published-tag-push.mjs")).href);
+   // The repository-relative path of the pipeline state record: the one place a push approval is
+   // read from, and the one dirty entry a signature-mode checkpoint tolerates (design 3.4).
+   const stateRelPathFor = () => {
+@@ -537,6 +538,24 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
+   const securityFailures = [];
+   let securityGateMode = "blocking";
+ 
++  // PO tile 2026-11-10 (consumer projects only): the evidence-only follow-up commit and the release tag publish nothing that was not approved, and the push a release includes
++  // needs no push approval of its own. Decided before the checkpoint lane, by the guard's own predicates. Only the follow-up and the tag end here; the included push still meets the Verify and Security checks below.
++  let releaseIncludedPush = false;
++  if (typeof remoteRef === "string" && isConsumerReleaseProject(projectRoot)) {
++    const peeled = git(["-C", projectRoot, "rev-parse", "--verify", "--quiet", commit + "^{commit}"], projectRoot);
++    const target = peeled.status === 0 ? peeled.stdout.trim() : commit;
++    if (remoteRef.startsWith("refs/heads/")) {
++      const followUp = authorizeAuditProofFollowUp({ projectDir: projectRoot, anchorDir: projectRoot, commit: target, remote, destination: remoteRef });
++      if (followUp.ok === true) return { hardBlock: null, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: true, note: "evidence-only follow-up commit of an approved push" };
++      releaseIncludedPush = authorizeReleaseIncludedPush({ projectDir: projectRoot, anchorDir: projectRoot, commit: target, remote, destination: remoteRef }).ok === true;
++    } else if (RELEASE_TAG_REF.test(remoteRef)) {
++      const onMain = git(["-C", projectRoot, "merge-base", "--is-ancestor", target, "refs/remotes/" + remote + "/main"], projectRoot);
++      if (onMain.status === 0 && authorizeRecordedReleaseTag({ projectDir: projectRoot, anchorDir: projectRoot, tagRef: remoteRef, commit: target }).ok === true) {
++        return { hardBlock: null, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: true, note: "release tag of a recorded release approval" };
++      }
++    }
++  }
++
+   const checkpointClass = classifyPushDestination({
+     manifestStatus: manifestResult.status,
+     policy: manifest.pushDestinationPolicy,
+@@ -596,7 +615,7 @@ async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, rem
+   }
+ 
+   // (c) approval -- general mode only, see file header SCOPE.
+-  if (pushGate.approval !== "standing-approved") {
++  if (pushGate.approval !== "standing-approved" && !releaseIncludedPush) {
+     const authority = resolveProjectAuthorityPaths({ rootDir: projectRoot });
+     const stateRelPath = authority.status === "ready"
+       ? authority.state
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 4ba232bafcab1ce1967fc8a0d9ea36820ec9ff16..b14fa6040e6b48dfdad72de852763333e6addc6b 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -67,6 +67,7 @@ import { deriveRegisteredCourseBases } from "../lib/critic-course-admission.mjs"
+ import { describeCriticCarry, readCarriedForwardReadback } from "../lib/critic-evidence-carry.mjs";
+ import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
+ import { criticalActionAuthority } from "../lib/critical-action-authorization-read.mjs";
++import { isConsumerReleaseProject } from "../lib/critical-action-authorization.mjs";
+ import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+ 
+ export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
+@@ -944,7 +945,9 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+   if (modeNotice !== null) notices.push(modeNotice);
+   if (notices.length > 0) report.notices = notices;
+   // The step after the push: it asks the remote what it holds and records that privately, so the tracked handover's "not done by the close" is no longer the last word. No commit.
+-  report.afterPush = { command: ["node", fileURLToPath(new URL("./publication-readback.mjs", import.meta.url)), "record", "--root", dir, "--remote", remote, "--destination", destination], why: "right after the push: records what the remote really holds, needs no commit. A Stop hook tries the same at the end of the turn; running both adds no second line" };
++  report.afterPush = { command: ["node", fileURLToPath(new URL("./publication-readback.mjs", import.meta.url)), "record", "--root", dir, "--remote", remote, "--destination", destination], why: "right after the push: records what the remote really holds, needs no commit. A Stop hook tries the same at the end of the turn; running both adds no second line",
++    // PO tile 2026-11-10: the proof of this push and the final Verify and Security records reach the repository in one follow-up commit, with no further signature.
++    ...(isConsumerReleaseProject(dir) ? { followUp: { command: ["node", fileURLToPath(new URL("./audit-proof-followup.mjs", import.meta.url)), "--root", dir, "--remote", remote, "--destination", destination], why: "after the readback: prepares the one evidence commit of this push and prints its commit steps and push; a release prints its own follow-up instead" } } : {}) };
+   // Slim profile pushes the exact checked-out branch; the default profile keeps HEAD.
+   const sourceRef = slim ? checkpointSourceRef() : "HEAD";
+   const profileNote = slim
+diff --git a/plugins/pipeline-core/scripts/release-preflight-cli.mjs b/plugins/pipeline-core/scripts/release-preflight-cli.mjs
+index 975afca26f90ea65f9b0716bd78fbe1365496ca5..e9076c30266b74414ef7ada2671cfce57b12df8a 100644
+--- a/plugins/pipeline-core/scripts/release-preflight-cli.mjs
++++ b/plugins/pipeline-core/scripts/release-preflight-cli.mjs
+@@ -731,6 +731,11 @@ export function recordAuditProofFollowUp(root, built, options, approval) {
+   }
+ }
+ 
++/** Is the approved commit already on origin's main? Absent or unreadable reads as no: the included push is then named. */
++function commitIsOnPublishedMain(root, commit) {
++  return spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", commit, "refs/remotes/origin/main"], { timeout: 10_000 }).status === 0;
++}
++
+ const USAGE = "Usage: release-preflight-cli.mjs --preflight-id <id> --base <commit> (--consent <repo-path> | --proof-request <external-path> --proof <external-path>) --lifecycle <path> --retention-policy <sha256> --out <path> [--gg03 <path>] [--root <repo>]";
+ 
+ function parseArgs(argv) {
+@@ -844,9 +849,10 @@ if (isDirectInvocation(import.meta.url)) {
+       writtenTo: options.outPath,
+       ...(approval === null ? {} : {
+         tag: approval.tag,
+-        // The agent's last steps; the push guard admits exactly this annotated tag at exactly this commit. With an audit bundle (C20E-AP) the approval proofs
+-        // reach the remote first, in the ONE evidence-only follow-up commit the guard admits without a second approval; the tag still names the approved commit.
++        // The agent's last steps; the push guard admits exactly this annotated tag at exactly this commit. PO tile 2026-11-10: the release includes the push of the approved commit
++        // when it is not on main yet. With an audit bundle (C20E-AP) the proofs and final records reach the remote next, in the ONE evidence-only follow-up commit the guard admits without a further approval; the tag still names the approved commit.
+         nextActions: [`git tag -a ${approval.tag} -m "version tag" ${approval.forCommit}`,
++          ...(commitIsOnPublishedMain(resolve(options.rootDir), approval.forCommit) ? [] : ["git push origin HEAD:refs/heads/main"]),
+           ...(followUp.status === "written" ? [...followUp.commit.steps, "git push origin HEAD:refs/heads/main"] : []),
+           `git push origin refs/tags/${approval.tag}`],
+         auditProofFollowUp: followUp,
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 5bd9c9b5e45544040e06c5eeefe10998bdd1cd76..3108bce3196ca0992f110fcf9eab916d42cbd484 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -275,14 +275,15 @@ The close request is one JSON file in the repository, schema `pipeline.continuit
+ The usual choice is the combined Verify/Critic receipt of the feature. The State must also be close-ready: queue head `nextAction`
+ `close`, no dispatch, no blocker, no decision transaction.
+ 
+-## After the close and the push: the release (a consumer project's last step)
++## After the close: a push or a release (a consumer project's last step)
+ 
+-A consumer project's release is the annotated version tag `v<VERSION>` on the closed, pushed feature. Write the `RELEASE-NOTES.md` entry
++After the close a consumer project does one of two things, each with one signature. **A push to a feature branch:** after the push run the `afterPush.followUp` command `push-prepare.mjs` printed (`audit-proof-followup.mjs --root <repo> --remote <remote> --destination <ref>`). It adds the push proof and the final Verify and Security records to the audit bundle and prints the one commit and the push; no further signature.
++
++**A release** is the annotated version tag `v<VERSION>` on the closed feature, and it includes the push. Write the `RELEASE-NOTES.md` entry
+ (`## v<VERSION>`: closed feature id, title, acceptance criteria met) WITH the feature, before the Critic round, so the Critic reviews it and the
+-Critic-bound push Verify carries it; a notes commit after the review is a content change the carry refuses. After the push run
++Critic-bound push Verify carries it; a notes commit after the review is a content change the carry refuses. Run
+ `release-preflight-cli.mjs --root <repo> --base <base> --lifecycle specs/<feature>/lifecycle.json`: it stops at the first missing step with its
+-repair command, records the PO's one release approval (chat) or prints the PO's signing command (signature), and prints the tag and tag-push
+-commands. Owner: `docs/push-release-flow.md`, "Releasing a consumer project".
++repair command, records the PO's one release approval (chat) or prints the PO's signing command (signature), and prints every remaining step in order: the tag, the push of the approved commit when it is not on main yet, the follow-up commit and its push, the tag push. Owner: `docs/push-release-flow.md`, "Releasing a consumer project".
+ 
+ ## Command signatures
+ 

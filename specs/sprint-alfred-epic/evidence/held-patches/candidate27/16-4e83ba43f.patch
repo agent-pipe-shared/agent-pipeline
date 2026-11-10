@@ -1,0 +1,93 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 647268d3f772dcb7c32f26cbcf84193e0d9110f6..4de8b4307bfdf716197a49a7b9e3e5f4e066870a 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
+ import { existsSync, readFileSync, readdirSync, realpathSync, statSync, lstatSync, opendirSync } from "node:fs";
+ import { homedir } from "node:os";
+ import { readMachineOperatorLabel } from "../lib/machine-plane.mjs";
++import { inspectObservationGovernanceBootstrap, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCHEMA } from "../lib/observation-governance-bootstrap.mjs";
+ import { dirname, isAbsolute, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { loadManifestSafe, resolveHumanFacingLanguage } from "../lib/manifest.mjs";
+@@ -2498,6 +2499,7 @@ export function main(options = {}) {
+     ...(options?.subagentModelEnv === undefined ? {} : { subagentModelEnv: options.subagentModelEnv }),
+     ...(options?.operatorLabel === undefined ? {} : { operatorLabel: options.operatorLabel }),
+     ...(options?.hostSkillCatalog === undefined ? {} : { hostSkillCatalog: options.hostSkillCatalog }),
++    ...(options?.observationGovernance === undefined ? {} : { observationGovernance: options.observationGovernance }),
+   };
+   // C19-G5: the typed runbook link (start path, preflight step) is the last key, once per session, and always when the preflight is not ready.
+   process.stdout.write(`${JSON.stringify(attachRunbookLink(envelope, { pathId: "start", step: "preflight", refused: pipelineStartPreflightExitCode(result) !== 0, rootDir: process.cwd() }))}\n`);
+@@ -2552,6 +2554,8 @@ async function runEntry(argv = process.argv.slice(2)) {
+     nodeSandbox: observeNodeSandboxProbe(),
+     // D210: the host skill-catalog readback (the only writer of the sealed private record); absent outside an active governed repository.
+     hostSkillCatalog: observeHostSkillCatalogReadback(),
++    // The Claude report found the separate bootstrap step never run: the same inspection now travels on this line.
++    observationGovernance: observeObservationGovernance(),
+     // MP-04 is the Elephant's bootstrap duty (policies/model-policy.md): an absent or `elephant` role only.
+     // EL-36: the `--by` name the PO recorded once for this machine; absent means the agent asks.
+     ...(role === undefined || role === "elephant" ? { subagentModelEnv: observeSubagentModelEnv(), operatorLabel: observeOperatorLabel() } : {}),
+@@ -2560,6 +2564,11 @@ async function runEntry(argv = process.argv.slice(2)) {
+   });
+ }
+ 
++function observeObservationGovernance() {
++  try { return inspectObservationGovernanceBootstrap({ rootDir: process.cwd() }); }
++  catch { return { schema: OBSERVATION_GOVERNANCE_BOOTSTRAP_SCHEMA, status: "failed", sourceCheckout: false, checker: null, code: "OGB-INSPECT-FAILED" }; }
++}
++
+ /**
+  * `--role <elephant|goldfish|critic>` (Ruling 70 R1). Deliberately lenient: an absent flag, a missing or
+  * unknown value, or any other token yields `undefined`, which the preflight reads as the Elephant. It never
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index 9357c879d6376ea8b1353522175d874574a5e016..8ba9da056e05764f767b18374e62f2888a1bf2de 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -2547,6 +2547,12 @@ test("K139 MP-04 readback: only the one named variable is touched, no enumeratio
+   }
+ });
+ 
++test("the real preflight line carries the observation governance status, so the bootstrap needs no separate command", () => {
++  const line = runPreflightProcess({}).line;
++  assert.equal(line.observationGovernance.schema, "pipeline.observation-governance-bootstrap.v1");
++  assert.ok(["not-applicable", "required", "failed"].includes(line.observationGovernance.status), JSON.stringify(line.observationGovernance));
++});
++
+ test("K139 MP-04 readback: the real preflight line carries subagentModelEnv unset, and never the value or an unrelated variable", () => {
+   const { stdout, stderr, line } = runPreflightProcess({ [MP04_UNRELATED_VARIABLE]: MP04_UNRELATED_SENTINEL });
+   assert.deepEqual(line.subagentModelEnv, { status: "unset" });
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 4d2f7a9eb5c18677594b246d0e3c128f02b8b049..ea33ab774751a8bd46f9196a7363d8b83445e02c 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -181,11 +181,11 @@ recommendation.
+    will need a signed or chat-cleared approval before it can land —
+    `references/push-approval.md` explains the full ceremony when a push is
+    actually being constructed or discussed.
+-5. **Observation governance:** run
+-   `node "${PIPELINE_PLUGIN_ROOT}/scripts/observation-governance-bootstrap.mjs" --root "$PWD"`
+-   before confirmation. `not-applicable` is the successful Consumer result; a
+-   source checkout runs `node harness/scripts/check-observation-governance.mjs`,
+-   and a `failed` one is case **F6** → `references/failure-cases.md`.
++5. **Observation governance:** read `observationGovernance.status` on the
++   preflight line before confirmation. `not-applicable` is the successful
++   Consumer result; `required` means a source checkout, which runs
++   `node harness/scripts/check-observation-governance.mjs`, and a `failed` one
++   is case **F6** → `references/failure-cases.md`.
+ 
+ 6. **Architecture orientation, never a bootstrap prerequisite:** consume the
+    mandatory `architectureOrientation` readback in the ready preflight
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/failure-cases.md b/plugins/pipeline-core/skills/pipeline-start/references/failure-cases.md
+index 4829062bb4b7ed7057809ebe6733901b5201417b..3dcb43e87d88a2acaf9232f35c937aead2e48999 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/failure-cases.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/failure-cases.md
+@@ -7,7 +7,8 @@ action or one universal PO emergency plan; override admission is never operation
+ success. Re-run the identical operation and its normal effect/readback contract.
+ 
+ F6 observation governance is mandatory only in the Public source checkout.
+-First run `observation-governance-bootstrap.mjs`; a Consumer result of
++First read `observationGovernance` on the preflight line (the same inspection
++as `observation-governance-bootstrap.mjs`); a Consumer result of
+ `not-applicable` is successful and must never trigger a search, copy, or repair
+ of `harness/scripts/check-observation-governance.mjs`. In a source checkout,
+ that checker runs before confirmation. A failing result permits read-only

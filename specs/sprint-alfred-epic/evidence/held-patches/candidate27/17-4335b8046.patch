@@ -1,0 +1,329 @@
+diff --git a/backlog/items/2026-11-09-candidate-22-open-follow-ups.md b/backlog/items/2026-11-09-candidate-22-open-follow-ups.md
+index d473ff0dee99289d8f5fdfc29b2aa1c37f0f0d4f..f8aa7e93eece962253fc67bd83cbfe2c4c641083 100644
+--- a/backlog/items/2026-11-09-candidate-22-open-follow-ups.md
++++ b/backlog/items/2026-11-09-candidate-22-open-follow-ups.md
+@@ -24,7 +24,7 @@ Candidate 22 (40 patches, stamp `ef16e1b86`) carries the P0 to P2 findings of th
+ - **CGR-19:** one narrow command moves `repositoryMode` from `local-only` to `remote-tracked`, only with a configured remote. Every other direction stays on the guard-override route.
+ - **Read grammar:** combined short flags are admitted by checking each flag against the existing list.
+ - **Recursive grep (PO decision on measured reach):** `grep -r` is admitted through its own screen, because the existing recursive screen follows the reach of `rg` and `grep -r` also reads ignored and hidden files. The common shapes count (`-rl`, `-rE`, `--include`), since the goal is fewer wasted turns. `-R` stays refused.
+-- **Stay in 0.7.1:** CGF-16, CGF-24, CGF-25 with CGF-01, CGF-26, CGF-36, the CGR-07 queue, straight-run tests 1, 2, 3 and 5.
++- **Stay in 0.7.1:** CGF-16, CGF-24, CGF-25 with CGF-01 (its proof and final-evidence part moved into candidate 27, D238; the portable package stays), CGF-26, CGF-36, the CGR-07 queue, straight-run tests 1, 2, 3 and 5.
+ 
+ ## Built in 22b (implementation complete, PO acceptance pending)
+ 
+diff --git a/backlog/items/2026-11-10-adr-from-spec-decisions-after-0-7-0.md b/backlog/items/2026-11-10-adr-from-spec-decisions-after-0-7-0.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..f43a2c09ef0d44af935daad0aa75378f30fa530a
+--- /dev/null
++++ b/backlog/items/2026-11-10-adr-from-spec-decisions-after-0-7-0.md
+@@ -0,0 +1,25 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.adr-from-spec-decisions-after-0-7-0
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-10
++source: Greenfield report reconciliation; PO tile 2026-11-10 places it after 0.7.0
++sprint: alfred
++done_when: manual
++---
++
++# Architecture decisions made in a Spec do not become ADRs
++
++## Description
++
++A Spec records design decisions that a consumer project would want as ADRs. Nothing turns them into ADRs, so the reasoning stays inside one feature package.
++
++## Decision
++
++PO tile 2026-11-10: after 0.7.0.
++
++## Done when
++
++The PO decides whether and how Spec decisions are proposed as ADRs, and that decision is carried out.
+diff --git a/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+index bcd2a2f8f66f00fdc124476c44c2b97b43505908..db8747cfde645c2ecfae1a6221b778de836d805c 100644
+--- a/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
++++ b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+@@ -16,6 +16,8 @@ done_when: manual
+ 
+ The records name who wrote a change and state that a test failed before it passed, but the agent that did the work is the one saying so. The records already label this as self-attested, so nothing claims more than it knows. A host-observed chain from a failing test to a passing one would be a new capability.
+ 
++The Codex report adds a related gap: tests are derived by the same agent that writes the code. A test derivation by a separate agent, from the specification alone, belongs to the same decision.
++
+ ## Decision
+ 
+ PO tile 2026-11-10: after 0.7.0. It is not part of the 0.7.0 scope.
+diff --git a/backlog/items/2026-11-10-device-test-result-in-the-repository-after-0-7-0.md b/backlog/items/2026-11-10-device-test-result-in-the-repository-after-0-7-0.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..1466675ae71d2b4be5df6624e78773e446b42a37
+--- /dev/null
++++ b/backlog/items/2026-11-10-device-test-result-in-the-repository-after-0-7-0.md
+@@ -0,0 +1,25 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.device-test-result-in-the-repository-after-0-7-0
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-10
++source: Claude greenfield report, section 6.2; PO tile 2026-11-10 places it after 0.7.0
++sprint: alfred
++done_when: manual
++---
++
++# A real device test is recorded only as a chat answer
++
++## Description
++
++The acceptance record holds the open check and the literal answer of the human. A real device test has no structured result in the repository: device, version, steps, outcome.
++
++## Decision
++
++PO tile 2026-11-10: after 0.7.0.
++
++## Done when
++
++The PO decides what a device test records and where, and that decision is carried out.
+diff --git a/backlog/items/2026-11-10-measure-elephant-admin-load-next-round.md b/backlog/items/2026-11-10-measure-elephant-admin-load-next-round.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad18c5b48148831222c4f74fe226e61446abb4c8
+--- /dev/null
++++ b/backlog/items/2026-11-10-measure-elephant-admin-load-next-round.md
+@@ -0,0 +1,25 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.measure-elephant-admin-load-next-round
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-10
++source: Claude greenfield report (592 Elephant messages, 69 percent cache reads); PO tile 2026-11-10
++sprint: alfred
++done_when: manual
++---
++
++# Measure the Elephant's administrative load in the next greenfield round
++
++## Description
++
++The Claude report names 592 Elephant messages and a 69 percent share of cache reads. No later run has measured whether the one-command routes of candidates 24 to 27 reduced that load.
++
++## Decision
++
++PO tile 2026-11-10: measure it in the next greenfield round. The measurement decides whether anything is built.
++
++## Done when
++
++The next round reports messages and cache share per phase, and the PO decides from that number.
+diff --git a/docs/adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md b/docs/adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..61a3cb3a383d9ff337304959c7e6eb548aecc9be
+--- /dev/null
++++ b/docs/adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md
+@@ -0,0 +1,30 @@
++# ADR-0090: The evidence follows every push, and a release includes its push
++
++> Agent-Pipeline · Sprint Alfred · 2026-11-10
++
++**Status:** accepted (2026-11-10, PO tiles, register D237 to D239). Built in candidate 27. Not yet run on a real repository or a real signature.
++
++**Context source (verbatim PO direction, 2026-11-10):** "aus meiner Sicht option 1 aber es sind zwei weil man macht mE entweder einen push auf einen feat branch oder released aber eh nicht beides. Beim release ist der push dann doch inkludiert?"
++
++## Context
++
++The three greenfield reports found that evidence stayed outside the repository. The push signature can only exist after the commit that carries the audit bundle, so its proof, the final Verify and the Security result cannot be inside that commit. A follow-up commit existed, but only together with a release tag on main. A run that pushed a feature branch kept those records in the private store. In the Claude run all six Critic reports stayed in scratch, because exporting them was a separate hand-written step.
++
++A consumer release also demanded an earlier signed push to main, so a release took three signatures: design, push and release.
++
++## Decision
++
++1. **The close exports every Critic round itself** from the private journal (the verdict, checked against the digest in the receipt) into the feature, inside the one close commit. Working notes stay out. A round it cannot read stays named and never stops the close.
++2. **One follow-up commit after any signed push or release, to the same destination, with no further signature.** It carries the push or release proof and the final Verify and Security records as new files under the bundle's `proofs/`. The guard admits it only when it is exactly one commit on an approved and published parent and adds only public proof objects, one list and records of a known schema bound to the approved history. Nothing can chain onto it: the follow-up commit itself carries no approval.
++3. **A release includes its push.** The human approves two things in all: the design, and then either a branch push or a release. The release approval names one commit, and it stands in for the push approval of exactly that commit to origin's main as a fast-forward. Verify, Security and every other gate still run.
++4. The generated pre-push hook decides these cases through the same predicates as the push guard.
++
++This changes the decision of 2026-11-08 that the proof travels only with the version tag, and moves the proof and evidence part of CGF-25 out of 0.7.1. The portable auditor package stays in 0.7.1.
++
++## Consequences
++
++Evidence reaches the repository on both routes without a further stop. The guard relaxes one narrow shape; any other content meets the full gate unchanged. Final Verify and Security records become tracked, so what they name becomes visible to whoever reads the repository. A release can now be the first thing that reaches main, so its approval carries the weight the push approval carried before.
++
++## Affected contracts
++
++ADR-0056 stays: every push still needs a human approval. The release approval is that approval for its own push. `docs/push-release-flow.md` describes both routes.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index a832b34b211f2e2a1233f837c2e839f17611b08e..c19f5425152f916c056fc01a1eaef40068c28525 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -96,6 +96,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0087](0087-owning-verification-authenticated-controller-test-channel.md) | Owning verification through an authenticated controller test channel | accepted | 2026-10-11 |
+ | [0088](0088-test-economy.md) | Test economy: a fast gate, a fresh full run, and a test surface that shrinks with the product | accepted | 2026-10-20 |
+ | [0089](0089-project-routing-is-user-owned.md) | A project's `pipeline.user.yaml` owns its model and effort routing | accepted | 2026-11-10 |
++| [0090](0090-evidence-follows-every-push-and-a-release-includes-its-push.md) | The evidence follows every push, and a release includes its push | accepted | 2026-11-10 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index 7e7e3be59728d3f46e9c72e8ff847a5edbf3529e..4dad17a732ec8f4f03b81b3f7c90db421363021f 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -396,36 +396,35 @@ uses.
+ 
+ ### Releasing a consumer project: a version tag (G20-42)
+ 
+-For a **consumer** project a release is a version tag `v<VERSION>` on a closed feature that is already pushed. The consumer mode of
++For a **consumer** project a release is a version tag `v<VERSION>` on a closed feature, and it includes the push (ADR-0090): the PO signs the design and then either a branch push or a release, so two signatures in all. The consumer mode of
+ `release-preflight-cli.mjs` is chosen from the project's shape (no Pipeline plugin manifests under `plugins/pipeline-core/`), never by a flag;
+-the Pipeline's own source release above is unchanged. It is the LAST step of the happy path, after the feature close and its push:
++the Pipeline's own source release above is unchanged. It is the LAST step of the happy path, after the feature close:
+ 
+ 1. `VERSION` is tracked (onboarding creates it as `0.1.0`; an older project runs `release-preflight-cli.mjs --init-version --root <root>`
+    and commits the file). `RELEASE-NOTES.md` carries a `## v<VERSION>` entry naming the closed feature id, its title and the acceptance
+    criteria met; the agent writes it with the feature, so the Critic reviews it and the Critic-bound push Verify carries it.
+ 2. `node ${PIPELINE_PLUGIN_ROOT}/scripts/release-preflight-cli.mjs --root <root> --base <registered base commit> --lifecycle specs/<feature>/lifecycle.json`
+    writes `evidence/release-preflight.json` only when the feature is in `closedFeatures`, the notes entry is committed, push-prepare's own
+-   Verify / Critic-bound Verify / security checks are green, the push approval for this candidate exists, and the candidate is reachable from
+-   `refs/remotes/origin/main`. Otherwise it exits 2 at the first missing step and prints `repair:` with the command that supplies it.
++   Verify / Critic-bound Verify / security checks are green, and the candidate builds on `refs/remotes/origin/main` (a fast-forward, or the first push). Otherwise it exits 2 at the first missing step and prints `repair:` with the command that supplies it.
+ 3. The PO approves the release once, through the `release-preflight` critical kind in the configured approval mode. In `chat` mode the run itself
+    records the approval; in `signature` mode the command stops with `RPC-CONSUMER-PO-APPROVAL` and prints the PO's exact signing command for
+    this subject, then runs again with `--proof-request`/`--proof`.
+-4. The agent runs the `nextActions` the command prints: `git tag -a v<VERSION> -m "version tag" <commit>` and
+-   `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
+-   (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above.
+-   **The approval proofs reach the remote audit bundle (C20E-AP).** The push approval signs the commit that carries
+-   `audit-bundles/<feature>/<candidate>/`, and the release approval comes later, so neither proof can sit inside that commit. When the feature has a
+-   bundle, the same command therefore also adds, as NEW files only, the public proof objects of the push approval and of the release approval to that
+-   bundle's `proofs/` directory (numbering continues after the bundle's own proofs) plus one list, `proofs/follow-up.json`, that binds them by digest to the
+-   approved commit and to the bundle's candidate. `manifest.json` and `README.md` stay byte for byte, so the bundle's own `audit-bundle.mjs verify` still
+-   passes and now also checks the follow-up (`AB-FOLLOWUP`, `AB-DIGEST`, `AB-PROOF-INTENT`, `AB-PROOF-SIGNATURE`). Never a private key: a `chat` or waiver
+-   approval is carried as an attribution record (kind, mode, time) and never as a proof. The command arms the commit of exactly those files (G20-66) and
+-   prints it between the tag and the pushes: `nextActions` becomes the tag, the commit step, `git push origin HEAD:refs/heads/main`, then the tag push.
+-   `hooks/guard-push.mjs` admits that branch push without a second approval ONLY for exactly one commit on top of the release-approved commit
+-   (`authorizeAuditProofFollowUp`): the approved commit is the published tip of the destination, carries its recorded push approval and the annotated release
+-   tag, and the commit's diff only ADDS regular files under that one bundle's `proofs/` (each a public proof object or the list). Any other path, a changed
+-   existing file, a second commit, a merge or an unpublished parent falls through to the full gate unchanged. A project without a bundle sees the `auditProofFollowUp`
+-   status `no-bundle` and the tag steps alone.
++4. The agent runs the `nextActions` the command prints, in order: `git tag -a v<VERSION> -m "version tag" <commit>`; `git push origin HEAD:refs/heads/main` when the
++   commit is not on origin's main yet (the release approval stands in for the push approval of exactly this commit, `authorizeReleaseIncludedPush`; Verify, Security and the other gates still run);
++   the follow-up commit and its push, when the feature has a bundle; `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
++   (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above. The generated pre-push hook decides all three through the same predicates.
++
++**The follow-up commit: the evidence reaches the repository after every signed push (C20E-AP, ADR-0090).** The approval signs the commit that carries
++`audit-bundles/<feature>/<candidate>/`, so its proof cannot sit inside that commit, and the final Verify and Security records are produced after it. A release command adds them itself; after a push to a feature branch run the
++`afterPush.followUp` command `push-prepare` printed (`scripts/audit-proof-followup.mjs --root <root> --remote <remote> --destination <ref>`). Either way the step adds, as NEW files only, the public proof objects of the approvals and the final records
++(`final-verify`, `push-verify`, `final-security`, `security-verdict`) to the bundle's `proofs/` directory (numbering continues after everything already there) plus one list, `proofs/follow-up.json` or, for a later approved commit, `proofs/follow-up-NNN.json`, that binds them by digest to the
++approved commit and to the bundle's candidate. `manifest.json` and `README.md` stay byte for byte, so the bundle's own `audit-bundle.mjs verify` still
++passes and also checks the follow-up (`AB-FOLLOWUP`, `AB-DIGEST`, `AB-PROOF-INTENT`, `AB-PROOF-SIGNATURE`). Never a private key: a `chat` or waiver
++approval is carried as an attribution record (kind, mode, time) and never as a proof. The step arms the commit of exactly those files (G20-66) and prints it with the push.
++`hooks/guard-push.mjs` admits that push to the same destination without another approval ONLY for exactly one commit on top of the approved commit
++(`authorizeAuditProofFollowUp`): the approved commit is the published tip of the destination, carries its recorded push approval for this remote and destination or a release approval with its annotated
++tag, and the commit's diff only ADDS regular files under that one bundle's `proofs/`: the recorded public proofs, one list and records of a known schema bound to the approved history. Any other path, a changed
++existing file, a second commit, a merge or an unpublished parent falls through to the full gate unchanged, and the follow-up commit itself carries no approval, so nothing can chain onto it. A project without a bundle sees the status `no-bundle` and no follow-up step.
+ 
+ ### Source reader binding (Agent Pipeline source checkout only)
+ 
+@@ -634,7 +633,7 @@ chained line to a private record under the Git directory, so it needs no commit
+ A Stop hook (`hooks/publication-readback-stop.mjs`) also tries this at the end of the turn, from Git's reflog of the
+ remote-tracking ref, for pushes of the last 24 hours; running both adds no second line. The hook is silent and cannot see a
+ remote without a fetch refspec, a repository with `core.logAllRefUpdates=false`, or a push whose reflog line a later
+-fetch has already covered, so the command stays the step to run.
++fetch has already covered, so the command stays the step to run. In a consumer project the next step is `afterPush.followUp`, the one evidence commit described under "Releasing a consumer project".
+ The record's `handoverLine` goes into the next handover you write anyway; never make a commit only for it.
+ `scripts/publication-readback.mjs inspect --root <repo>` reads the latest record in a later session.
+ 
+diff --git a/docs/state.md b/docs/state.md
+index d620f2368259e631f539dcaa9f3523867d34d092..f4e3982fc1f49dd4bfcbb1e74fd72c9f8261bc37 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -24,6 +24,7 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **Candidates 21f and 21g installed 2026-11-09** (stamps `18fcaf244`, `3f5c51843`; 21e2 travels with them). 21f: first Codex report findings, and a coordinator-bound `close-feature` may run in a catalogue project (extends PF-54 / D51 (1) to that entry, chosen without a tile because the Claude greenfield was blocked; the PO applied it). 21g removes a 21f regression at the commit boundary. Full Verify, Critic, greenfields, native Windows proof and PO acceptance pending. PO tile decisions 2026-11-09: [Codex report item](../backlog/items/2026-11-09-codex-greenfield-report-findings.md), "Scope decided by the PO"; Codex second Critic role `critic-high-risk`; rewind plus hardening; 21b relaxations stay; Live-Critic after the happy path on all three runners. Close findings: [item](../backlog/items/2026-11-09-close-feature-refused-in-a-catalogue-project.md).
+ **Candidate 22 installed 2026-11-09** (40 patches, stamp `ef16e1b86`); 22b installed (stamp `b92ff8a46`). No 22c: live findings and the three reports go into 23. Full Verify, Critic, native Windows proof, acceptance pending. [Open follow-ups](../backlog/items/2026-11-09-candidate-22-open-follow-ups.md).
+ **[ADR-0089](adr/0089-project-routing-is-user-owned.md) accepted 2026-11-10 (PO tile, D234):** a project's `pipeline.user.yaml` owns its model and effort routing. Built in candidate 23; a live dispatch on a changed route is still unobserved.
++**[ADR-0090](adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md) accepted 2026-11-10 (PO tiles, D237 to D239):** the close exports the Critic reports, one follow-up commit carries the proof and the final records after any signed push, and a release includes its push. Built in candidate 27; never run on a real repository or a real signature.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index 7e7e3be59728d3f46e9c72e8ff847a5edbf3529e..4dad17a732ec8f4f03b81b3f7c90db421363021f 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -396,36 +396,35 @@ uses.
+ 
+ ### Releasing a consumer project: a version tag (G20-42)
+ 
+-For a **consumer** project a release is a version tag `v<VERSION>` on a closed feature that is already pushed. The consumer mode of
++For a **consumer** project a release is a version tag `v<VERSION>` on a closed feature, and it includes the push (ADR-0090): the PO signs the design and then either a branch push or a release, so two signatures in all. The consumer mode of
+ `release-preflight-cli.mjs` is chosen from the project's shape (no Pipeline plugin manifests under `plugins/pipeline-core/`), never by a flag;
+-the Pipeline's own source release above is unchanged. It is the LAST step of the happy path, after the feature close and its push:
++the Pipeline's own source release above is unchanged. It is the LAST step of the happy path, after the feature close:
+ 
+ 1. `VERSION` is tracked (onboarding creates it as `0.1.0`; an older project runs `release-preflight-cli.mjs --init-version --root <root>`
+    and commits the file). `RELEASE-NOTES.md` carries a `## v<VERSION>` entry naming the closed feature id, its title and the acceptance
+    criteria met; the agent writes it with the feature, so the Critic reviews it and the Critic-bound push Verify carries it.
+ 2. `node ${PIPELINE_PLUGIN_ROOT}/scripts/release-preflight-cli.mjs --root <root> --base <registered base commit> --lifecycle specs/<feature>/lifecycle.json`
+    writes `evidence/release-preflight.json` only when the feature is in `closedFeatures`, the notes entry is committed, push-prepare's own
+-   Verify / Critic-bound Verify / security checks are green, the push approval for this candidate exists, and the candidate is reachable from
+-   `refs/remotes/origin/main`. Otherwise it exits 2 at the first missing step and prints `repair:` with the command that supplies it.
++   Verify / Critic-bound Verify / security checks are green, and the candidate builds on `refs/remotes/origin/main` (a fast-forward, or the first push). Otherwise it exits 2 at the first missing step and prints `repair:` with the command that supplies it.
+ 3. The PO approves the release once, through the `release-preflight` critical kind in the configured approval mode. In `chat` mode the run itself
+    records the approval; in `signature` mode the command stops with `RPC-CONSUMER-PO-APPROVAL` and prints the PO's exact signing command for
+    this subject, then runs again with `--proof-request`/`--proof`.
+-4. The agent runs the `nextActions` the command prints: `git tag -a v<VERSION> -m "version tag" <commit>` and
+-   `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
+-   (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above.
+-   **The approval proofs reach the remote audit bundle (C20E-AP).** The push approval signs the commit that carries
+-   `audit-bundles/<feature>/<candidate>/`, and the release approval comes later, so neither proof can sit inside that commit. When the feature has a
+-   bundle, the same command therefore also adds, as NEW files only, the public proof objects of the push approval and of the release approval to that
+-   bundle's `proofs/` directory (numbering continues after the bundle's own proofs) plus one list, `proofs/follow-up.json`, that binds them by digest to the
+-   approved commit and to the bundle's candidate. `manifest.json` and `README.md` stay byte for byte, so the bundle's own `audit-bundle.mjs verify` still
+-   passes and now also checks the follow-up (`AB-FOLLOWUP`, `AB-DIGEST`, `AB-PROOF-INTENT`, `AB-PROOF-SIGNATURE`). Never a private key: a `chat` or waiver
+-   approval is carried as an attribution record (kind, mode, time) and never as a proof. The command arms the commit of exactly those files (G20-66) and
+-   prints it between the tag and the pushes: `nextActions` becomes the tag, the commit step, `git push origin HEAD:refs/heads/main`, then the tag push.
+-   `hooks/guard-push.mjs` admits that branch push without a second approval ONLY for exactly one commit on top of the release-approved commit
+-   (`authorizeAuditProofFollowUp`): the approved commit is the published tip of the destination, carries its recorded push approval and the annotated release
+-   tag, and the commit's diff only ADDS regular files under that one bundle's `proofs/` (each a public proof object or the list). Any other path, a changed
+-   existing file, a second commit, a merge or an unpublished parent falls through to the full gate unchanged. A project without a bundle sees the `auditProofFollowUp`
+-   status `no-bundle` and the tag steps alone.
++4. The agent runs the `nextActions` the command prints, in order: `git tag -a v<VERSION> -m "version tag" <commit>`; `git push origin HEAD:refs/heads/main` when the
++   commit is not on origin's main yet (the release approval stands in for the push approval of exactly this commit, `authorizeReleaseIncludedPush`; Verify, Security and the other gates still run);
++   the follow-up commit and its push, when the feature has a bundle; `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
++   (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above. The generated pre-push hook decides all three through the same predicates.
++
++**The follow-up commit: the evidence reaches the repository after every signed push (C20E-AP, ADR-0090).** The approval signs the commit that carries
++`audit-bundles/<feature>/<candidate>/`, so its proof cannot sit inside that commit, and the final Verify and Security records are produced after it. A release command adds them itself; after a push to a feature branch run the
++`afterPush.followUp` command `push-prepare` printed (`scripts/audit-proof-followup.mjs --root <root> --remote <remote> --destination <ref>`). Either way the step adds, as NEW files only, the public proof objects of the approvals and the final records
++(`final-verify`, `push-verify`, `final-security`, `security-verdict`) to the bundle's `proofs/` directory (numbering continues after everything already there) plus one list, `proofs/follow-up.json` or, for a later approved commit, `proofs/follow-up-NNN.json`, that binds them by digest to the
++approved commit and to the bundle's candidate. `manifest.json` and `README.md` stay byte for byte, so the bundle's own `audit-bundle.mjs verify` still
++passes and also checks the follow-up (`AB-FOLLOWUP`, `AB-DIGEST`, `AB-PROOF-INTENT`, `AB-PROOF-SIGNATURE`). Never a private key: a `chat` or waiver
++approval is carried as an attribution record (kind, mode, time) and never as a proof. The step arms the commit of exactly those files (G20-66) and prints it with the push.
++`hooks/guard-push.mjs` admits that push to the same destination without another approval ONLY for exactly one commit on top of the approved commit
++(`authorizeAuditProofFollowUp`): the approved commit is the published tip of the destination, carries its recorded push approval for this remote and destination or a release approval with its annotated
++tag, and the commit's diff only ADDS regular files under that one bundle's `proofs/`: the recorded public proofs, one list and records of a known schema bound to the approved history. Any other path, a changed
++existing file, a second commit, a merge or an unpublished parent falls through to the full gate unchanged, and the follow-up commit itself carries no approval, so nothing can chain onto it. A project without a bundle sees the status `no-bundle` and no follow-up step.
+ 
+ ### Source reader binding (Agent Pipeline source checkout only)
+ 
+@@ -634,7 +633,7 @@ chained line to a private record under the Git directory, so it needs no commit
+ A Stop hook (`hooks/publication-readback-stop.mjs`) also tries this at the end of the turn, from Git's reflog of the
+ remote-tracking ref, for pushes of the last 24 hours; running both adds no second line. The hook is silent and cannot see a
+ remote without a fetch refspec, a repository with `core.logAllRefUpdates=false`, or a push whose reflog line a later
+-fetch has already covered, so the command stays the step to run.
++fetch has already covered, so the command stays the step to run. In a consumer project the next step is `afterPush.followUp`, the one evidence commit described under "Releasing a consumer project".
+ The record's `handoverLine` goes into the next handover you write anyway; never make a commit only for it.
+ `scripts/publication-readback.mjs inspect --root <repo>` reads the latest record in a later session.
+ 
+diff --git a/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md b/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md
+index 2ffbf6762f197fa830c3cb1f59211fcb10101985..09d655c93fa8732f19f60c328d3318fb5db5cc44 100644
+--- a/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md
++++ b/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md
+@@ -56,4 +56,7 @@ Recorded by the Elephant right after the PO answered four tiles in chat. Each de
+ | D234 | Accept the draft ADR on project-owned routing (PO tile, 2026-11-10) | **Accepted now as [ADR-0089](../../../docs/adr/0089-project-routing-is-user-owned.md).** A project's `pipeline.user.yaml` owns its model and effort routing; the dispatch admits what it names. | Built in candidate 23. Register line in `docs/state.md`. |
+ | D235 | Critic preimage drift of three files (PO tile, 2026-11-10) | **One-time re-pin in candidate 27** of `harness/review-protocol.md`, `skills/critic-review/SKILL.md` and `templates/prompts/critic-review.md`, which changed through applied candidates after the pin of 2026-11-04. No Critic has reviewed those changes. The rule that the preimage is not re-pinned stays in force; any further change needs a new PO decision. | Alternatives were leaving the suite red until the batch Critic and restoring the old bytes (would undo delivered flows). |
+ | D236 | A caller-authored Critic round in the review lineage (PO tile, 2026-11-10) | **The lineage carries `lane.origin: caller-authored-fallback` for such a round.** `lane.independent` keeps meaning an own round lane. Records without the key stay valid and the flow does not change. | Alternatives were deferring it after 0.7.0 and refusing such rounds (breaks a runner with no Source return). |
++| D237 | Critic reports stay in scratch unless exported by hand (PO tile, 2026-11-10) | **The close exports every round itself** from the private journal: verdict and findings, checked against the receipt digest, without working notes, in the one close commit. A round it cannot read stays named and never stops the close. | Alternatives were a new close stop and keeping the hand export. |
++| D238 | Proof and final evidence reach the repository only with a release (PO tile, 2026-11-10) | **One follow-up commit after any signed push, to the same destination, with no further signature**, carrying the proof and the final Verify and Security records under the bundle's `proofs/`. Changes the decision of 2026-11-08 (only with the version tag) and moves that part of CGF-25 out of 0.7.1. [ADR-0090](../../../docs/adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md). | Alternatives were a third signature and leaving the records in the private store. |
++| D239 | A release needs its own earlier push (PO tile, 2026-11-10) | **A release includes its push: two signatures in all**, design and then either a branch push or a release. The release approval stands in for the push approval of exactly its commit to origin's main as a fast-forward; Verify, Security and the other gates still run. ADR-0090. | The alternative was keeping three signatures. |
+ | D186 | Patch 28, stamp and install | **One go when the PO is back:** the PO applies patch 28 (`w7-hgo-denial-digest-mismatch-names-drift-r2`) under a Guard Maintenance Window, the Elephant stamps once (carrying N11 `6c72f7408`, the briefing commits `4259bf656` and `dd1fd7373`, the pin fix `6ce9ec70f` and the reader sync `a00bb6418`), the PO installs, the Elephant reads the preflight back. | No install before then. |

@@ -1,0 +1,199 @@
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 33d75b9381c7291cfc5ae0aad3caf2df862a0139..b8b48254d6703afaf41706a0e064b7ad3670bb32 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -22,6 +22,7 @@ import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit
+ import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
+ import { closeSecurityScope, describeCloseSecurityScope } from "../lib/security-close-status.mjs";
+ import { declaredRepositoryMode } from "./repository-freshness.mjs";
++import { exportCriticRoundFromJournal } from "./session-critic-finalizer.mjs";
+ 
+ const HERE = new URL(".", import.meta.url);
+ const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
+@@ -449,6 +450,12 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+         for (const match of text.matchAll(/"packetId"\s*:\s*"([a-f0-9]{32})"/gu)) if (!rounds.has(match[1])) rounds.set(match[1], null);
+       }
+       if (!rounds.has(packet)) rounds.set(packet, null);
++      // PO tile 2026-11-10: the close fetches what is missing from the private journal itself, inside the one close commit. A round that cannot be exported stays named with a null path; this never stops the close.
++      for (const [packetId, reportPath] of [...rounds]) {
++        if (reportPath !== null) continue;
++        const outDir = `${evidenceDir}/critic/${packetId}`;
++        try { (deps.exportCriticRoundFn ?? exportCriticRoundFromJournal)({ root, packetId, outDir }); rounds.set(packetId, `${outDir}/report.md`); } catch { /* named in the bundle README as not exported */ }
++      }
+       const criticReports = [...rounds].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([packetId, path]) => ({ packetId, path }));
+       stages.push("audit-request");
+       writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports } });
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 3089dc427e348834e9ca2729e7cb78e8b1afb12e..56452b84352f0fc50648896d26c153623966f5b6 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -796,6 +796,24 @@ test("C22 CGR-12: the audit request carries every Critic round report of the fea
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++test("the close fetches a missing Critic report itself, inside its own evidence directory, and a failing export only leaves the round named", () => {
++  const f = oneShotFixture();
++  try {
++    const evidence = join(f.root, "specs/feature-abc/evidence"); const seen = [];
++    const exportCriticRoundFn = ({ root, packetId, outDir }) => {
++      seen.push(packetId);
++      if (packetId === f.packetId) throw new Error("no journal for this round");
++      mkdirSync(join(root, outDir), { recursive: true }); writeFileSync(join(root, outDir, "report.md"), "# from the journal\n");
++    };
++    const fetched = "c".repeat(32);
++    writeFileSync(join(evidence, `critic-lineage-${"1".repeat(64)}.json`), `${JSON.stringify({ rounds: [{ packetId: fetched }] })}\n`);
++    assert.equal(oneShotClose(f.input, { runCommand: f.runner, exportCriticRoundFn }).status, "commit-required");
++    assert.deepEqual(seen.sort(), [f.packetId, fetched].sort());
++    const request = JSON.parse(readFileSync(join(evidence, "audit-request.json"), "utf8"));
++    assert.deepEqual(request.evidence.criticReports, [{ packetId: f.packetId, path: null }, { packetId: fetched, path: `specs/feature-abc/evidence/critic/${fetched}/report.md` }]);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
+ test("C22 CGR-22: the minors of the bound Critic round are listed in the handover inside the close commit, the result names them, and an unreadable packet never blocks", () => {
+   const verdict = { verdict: { findings: [{ severity: "minor", gap: "a small gap" }, { severity: "major", gap: "not a minor" }] } };
+   const withHandover = () => { const fixture = oneShotFixture(); mkdirSync(join(fixture.root, "docs"), { recursive: true }); writeFileSync(join(fixture.root, "docs/state.md"), "# State\n"); return fixture; };
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index 702e2198d45966650cba6b41983660b3eee90d40..950b1bfa15deb22fe00e218738efde6626f51192 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -1,6 +1,7 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
++import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
+ import { randomBytes } from "node:crypto";
+ import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
+@@ -849,11 +850,11 @@ function exportReportBytes(root, value) {
+  * stays read-only: this reads the private journal and the report, then creates `outDir`
+  * exclusively with receipt.json, report.md and index.json. It stages and commits nothing.
+  */
+-export function exportSessionCriticEvidence({ root: rootInput, packetId, reportPath, outDir }, deps = {}) {
++export function exportSessionCriticEvidence({ root: rootInput, packetId, reportPath, reportBytes, skipLineage = false, outDir }, deps = {}) {
+   const root = realpathSync(resolve(rootInput));
+   if (!PACKET_ID.test(packetId ?? "")) fail("SCF-EXPORT-REQUEST");
+   const target = exportOutDir(root, packetId, outDir);
+-  const report = exportReportBytes(root, reportPath);
++  const report = reportBytes ?? exportReportBytes(root, reportPath);
+   const common = commonDirWithoutGit(root);
+   if (common === null) fail("SCF-EXPORT-UNCONSUMED");
+   let consumedReview;
+@@ -891,6 +892,8 @@ export function exportSessionCriticEvidence({ root: rootInput, packetId, reportP
+     try { rmSync(target, { recursive: true, force: true }); } catch { /* the directory is ours alone; best effort */ }
+     fail("SCF-EXPORT-WRITE");
+   }
++  // The close exports a round after the package moved; its lineage was settled long before, and the close commit is the only commit that follows.
++  if (skipLineage) return Object.freeze({ schema: SESSION_CRITIC_EXPORT_RESULT_SCHEMA, status: "exported", packetId, outDir, paths: files.map(([name]) => `${outDir}/${name}`), receiptSha256: index.receiptSha256, reportSha256: index.reportSha256, indexSha256: sha256(indexBytes) });
+   // D223: the exported evidence is on disk first; the lineage write after it can only add to the result, never undo or alter the export.
+   const lineage = writeCriticRoundLineage({ root, packetId }, deps);
+   const next = lineage.status === "not-written"
+@@ -912,6 +915,43 @@ export function exportSessionCriticEvidence({ root: rootInput, packetId, reportP
+   });
+ }
+ 
++/** The report of a round nobody exported by hand: the verdict the journal holds, and nothing else. The Critic's working notes never enter it. */
++function renderJournalCriticReport(packetId, receipt, verdict) {
++  const text = (value) => String(value ?? "").replace(/\s+/gu, " ").trim();
++  const findings = Array.isArray(verdict.findings) ? verdict.findings : [];
++  const lines = [
++    `# Critic round ${packetId}`, "",
++    "Generated by the close from the private Critic journal. The verdict matches the digest in `receipt.json`. The Critic's working notes are not part of this report.", "",
++    `- Candidate: \`${receipt.candidate.commit}\``,
++    `- Reviewed range: \`${receipt.reviewRange.base}..${receipt.reviewRange.commit}\``,
++    `- Review passed: ${receipt.reviewPass ? "yes" : "no"}`,
++    `- Trajectory: ${text(verdict.trajectory_verdict)}${text(verdict.trajectory_evidence) === "" ? "" : ` (${text(verdict.trajectory_evidence)})`}`,
++    `- Findings: ${findings.length}`,
++  ];
++  findings.forEach((finding, position) => {
++    lines.push("", `## Finding ${position + 1} (${text(finding.severity)})`, "", text(finding.gap), "", `- Risk: ${text(finding.risk)}`, `- Evidence: ${text(finding.evidence)}`, `- Spec reference: ${text(finding.spec_ref)}`);
++  });
++  return Buffer.from(`${lines.join("\n")}\n`, "utf8");
++}
++
++/**
++ * The close's own export of one consumed round (PO tile 2026-11-10): the verdict comes from the private journal, is checked
++ * against the digest the receipt binds, and lands as tracked evidence. The caller keeps the round named with no report when this throws.
++ */
++export function exportCriticRoundFromJournal({ root: rootInput, packetId, outDir }, deps = {}) {
++  const root = realpathSync(resolve(rootInput));
++  if (!PACKET_ID.test(packetId ?? "")) fail("SCF-EXPORT-REQUEST");
++  const common = commonDirWithoutGit(root);
++  if (common === null) fail("SCF-EXPORT-UNCONSUMED");
++  let consumed;
++  try {
++    consumed = (deps.readConsumedCandidateResultFn ?? readConsumedCandidateResult)({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId });
++  } catch { fail("SCF-EXPORT-UNCONSUMED"); }
++  const verdict = consumed?.result?.verdict;
++  if (!record(verdict) || !record(consumed?.receipt) || sha256(canonicalJson(verdict)) !== consumed.receipt.verdictSha256) fail("SCF-EXPORT-UNCONSUMED");
++  return exportSessionCriticEvidence({ root, packetId, outDir, reportBytes: renderJournalCriticReport(packetId, consumed.receipt, verdict), skipLineage: true }, deps);
++}
++
+ /** The additive `export` verb: its own usage and request vocabulary, so the other verbs' dispatch stays untouched. */
+ function runSessionCriticExportCli(argv, deps) {
+   if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-EXPORT-USAGE");
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 986c3a7da8512105d6b0984b9fb00362bc560cdd..27f7134d76e9d68ad6930ec856f9071f5e62397c 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -39,7 +39,7 @@ import {
+   SessionCriticFinalizerError,
+   admitSessionCriticReview,
+   describeCliError,
+-  exportSessionCriticEvidence,
++  exportSessionCriticEvidence, exportCriticRoundFromJournal,
+   finalizeSessionCriticReview as finalizeRaw,
+   runSessionCriticFinalizerCli,
+   validateSessionCriticReceipt,
+@@ -2338,6 +2338,26 @@ function journalReceiptBody(fx, packetId) {
+   return JSON.parse(readFileSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", packetId, "receipt.json"), "utf8")).body;
+ }
+ 
++test("the close's journal export writes the verdict, not the notes, checks the bound digest, and leaves the lineage alone", () => {
++  const fx = fixture();
++  try {
++    const packetId = "1".repeat(32); const outDir = `specs/alpha/evidence/critic/${packetId}`;
++    const finding = { gap: "a named gap", risk: "a named risk", severity: "minor", evidence: "a:1", spec_ref: "AC-1" };
++    assert.equal(finalizeSessionCriticReview(preadmitted(fx, { packetId, verdict: verdict({ findings: [finding] }) })).status, "completed");
++    criticNotes(fx, "SECRET WORKING NOTE\n");
++    const tampered = (reader) => (args) => { const real = reader(args); return { ...real, result: { ...real.result, verdict: { ...real.result.verdict, pass: false } } }; };
++    refused(() => exportCriticRoundFromJournal({ root: fx.root, packetId, outDir }, { readConsumedCandidateResultFn: tampered(readConsumedCandidateResult) }), "SCF-EXPORT-UNCONSUMED");
++    assert.equal(existsSync(join(fx.root, outDir)), false, "a digest mismatch writes nothing");
++    const result = exportCriticRoundFromJournal({ root: fx.root, packetId, outDir });
++    assert.equal(result.status, "exported"); assert.equal(result.lineage, undefined, "the close does not touch the lineage");
++    assert.deepEqual(readdirSync(join(fx.root, outDir)).sort(), [...EXPORT_FILES].sort());
++    const report = readFileSync(join(fx.root, outDir, "report.md"), "utf8");
++    assert.ok(report.includes("a named gap") && report.includes("a named risk") && report.includes("Findings: 1"), report);
++    assert.ok(!report.includes("SECRET WORKING NOTE"), "working notes stay out");
++    assert.equal(JSON.parse(readFileSync(join(fx.root, outDir, "index.json"), "utf8")).reportSha256, sha(Buffer.from(report, "utf8")));
++  } finally { cleanup(fx); }
++});
++
+ test("export publishes a consumed review as receipt, report and index with matching hashes", () => {
+   const fx = fixture();
+   try {
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 0d9709c785ee93ccd931d80a0b81257e4e0f2a7b..5bd9c9b5e45544040e06c5eeefe10998bdd1cd76 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -27,7 +27,7 @@ The command stops at `commit-required` and prints the paths and the commit messa
+ 
+ **The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. In the same message say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why (never a gate; a result you could not run also goes into `--open-checks`). Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. Rerun the identical command with `--human-acceptance "<the human's literal answer>"` (pass it only when the human accepted; a decline means the close does not run). The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
+ 
+-**What the close touches.** The tracked-effects digests hash what exists: the calibrated handover (`project/pipeline.json` `handover`, first brought to the closed state by `pipeline-state.mjs update-public-handover`, the existing writer: closed-local, the verified candidate, and technical close, product acceptance and push as three separate facts) and `telemetry/costs.md`; backlog, history and retrospective have no defined project file and keep the marked empty digest. The audit request names every Critic round of the feature (`evidence.criticReports`); the bundle under `audit-bundles/<feature>/<commit>/` carries each exported round report (`specs/<feature>/evidence/critic/<packet>/report.md`) and its README section "Critic round reports" names a round whose report was never exported instead of omitting it: export it with `session-critic-finalizer.mjs export` before the close. The minors of the Critic round this close is bound to go into the handover under "Open minor findings", and the result's `openMinors` line says how many are open and where: put that line in the close report.
++**What the close touches.** The tracked-effects digests hash what exists: the calibrated handover (`project/pipeline.json` `handover`, first brought to the closed state by `pipeline-state.mjs update-public-handover`, the existing writer: closed-local, the verified candidate, and technical close, product acceptance and push as three separate facts) and `telemetry/costs.md`; backlog, history and retrospective have no defined project file and keep the marked empty digest. The audit request names every Critic round of the feature (`evidence.criticReports`); the bundle under `audit-bundles/<feature>/<commit>/` carries each exported round report (`specs/<feature>/evidence/critic/<packet>/report.md`) and its README section "Critic round reports" names a round whose report could not be exported instead of omitting it. The close fetches every missing report itself from the private Critic journal (the verdict and its findings, checked against the digest in the receipt; working notes stay out) and carries it in the one close commit; a hand export with `session-critic-finalizer.mjs export` is only needed to publish richer notes, and a round it cannot read never stops the close. The minors of the Critic round this close is bound to go into the handover under "Open minor findings", and the result's `openMinors` line says how many are open and where: put that line in the close report.
+ 
+ Everything below is the per-stage recovery reference: use it when the one command stops and the repair needs a single stage by hand.
+ 
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 610b70f1085f9f04b8089686a1eedd6cd27c5b00..02799cbe6cffa76cdb938c23cfbf2296005a3684 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -105,7 +105,7 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
+ 2. `session-critic-finalizer.mjs admit --root "$PWD" --request scratch/session-critic-finalization-request.json`, then dispatch one fresh read-only Critic
+    (Antigravity: no external process; refs-only packets per `references/antigravity-native-dispatch.md`).
+    Codex: both projected Critic roles, `critic` and `critic-high-risk` (a higher effort, from the `critic_high_risk` duty), carry a read-only sandbox, which a host may not be able to run. Run the preflight once on this machine (no model call): `node <plugin-root>/scripts/codex-sandbox-preflight.mjs --run --kind intermediate --codex <absolute codex path> --receipt <absolute path of a new file under scratch/>`. Then `node <plugin-root>/scripts/codex-critic-launch-route.mjs --role critic --receipt <that path>` (`--role critic-high-risk` for a higher effort; the receipt is optional; it always exits 0) prints one JSON object. Call `spawn_agent` with exactly the `agentType` it prints, which is the role itself (sandboxed) or `default`. With `default`, set the model and `reasoning_effort` on the call, record the round as `caller-authored-fallback` (it needs its one human acknowledgement at the close) and name the round in your final message as protected by instruction only. If a sandboxed Critic still fails on `EPERM` at run time, launch it once more through `default` with the same labelling.
+-3. `session-critic-finalizer.mjs finalize --root "$PWD" --request scratch/session-critic-finalization-request.json`, then `... export --root "$PWD" --request scratch/session-critic-export-request.json`.
++3. `session-critic-finalizer.mjs finalize --root "$PWD" --request scratch/session-critic-finalization-request.json`. The close later exports each round's verdict into the feature by itself; `... export --root "$PWD" --request scratch/session-critic-export-request.json` is only for publishing fuller notes.
+    `finalize --help` prints the closed request keys. A split review: `critic-split-merge.mjs --root <root> --packet <packetId>` once every child returned, before `finalize`.
+    A round with no blocker or major finding, a consistent trajectory and no briefing violation has passed, whatever the Critic set for `pass`. Its minors stay open and need no further round; name them in your report.
+ 4. Findings: `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` or `--add-delta-request <input.json>`; every later round reuses the first `taskId`.
