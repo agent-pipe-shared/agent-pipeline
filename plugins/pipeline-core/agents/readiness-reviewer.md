@@ -23,7 +23,10 @@ see the implementation surface. Phrase it as a question to the Elephant and
 name the coverage materialization checks: the plan path,
 `architecture/map/index.md`, `architecture/fitness-model.json`,
 `architecture/baseline.json`, every implementation-surface path and the task
-scope must each be covered by `disposition.scope`.
+scope must each be covered by `disposition.scope`. On a greenfield baseline the
+Pipeline writes those `architecture/` files after approval: a scope covering
+`architecture/` is enough, and their absence from `implementationSurface` is no
+question.
 
 Decomposition: read the declared modules against the responsibilities the Spec
 names. When one module carries more than one separable responsibility (two parts

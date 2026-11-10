@@ -583,6 +583,34 @@ test("U2-12: unchanged is judged on canonical sources, so companion input order 
   assert.deepStrictEqual(create({ previous, sources: reordered, report: clone(REPORT_2) }), refuse("DRR-DELTA-UNCHANGED"));
 });
 
+test("PO 2026-11-09: a delta over unchanged sources may withdraw findings and names them on the receipt", () => {
+  const previous = previousOf(initialObject({ verdict: "open-findings", openFindingIds: ["F-1", "F-2"] }));
+  const result = create({ previous, sources: clone(SOURCES_1), report: clone(REPORT_2), openFindingIds: ["F-2"] });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.receipt.kind, "delta");
+  assert.equal(result.receipt.verdict, "open-findings");
+  assert.deepStrictEqual(result.receipt.withdrawnFindingIds, ["F-1"]);
+  const summary = summarizeDesignReviewReceipt({ path: RECEIPT2_PATH, bytes: result.bytes });
+  assert.deepStrictEqual(summary.summary.withdrawnFindingIds, ["F-1"]);
+  const all = create({ previous, sources: clone(SOURCES_1), report: clone(REPORT_2), openFindingIds: [] });
+  assert.equal(all.receipt.verdict, "pass");
+  assert.deepStrictEqual(all.receipt.withdrawnFindingIds, ["F-1", "F-2"]);
+});
+
+test("PO 2026-11-09: unchanged sources stay refused when nothing is withdrawn or a new finding appears", () => {
+  const previous = previousOf(initialObject({ verdict: "open-findings", openFindingIds: ["F-1", "F-2"] }));
+  assert.deepStrictEqual(create({ previous, sources: clone(SOURCES_1), report: clone(REPORT_2), openFindingIds: ["F-1", "F-2"] }), refuse("DRR-DELTA-UNCHANGED"));
+  assert.deepStrictEqual(create({ previous, sources: clone(SOURCES_1), report: clone(REPORT_2), openFindingIds: ["F-1", "F-9"] }), refuse("DRR-DELTA-UNCHANGED"));
+});
+
+test("PO 2026-11-09: a delta over changed sources carries no withdrawal field", () => {
+  const previous = previousOf(initialObject({ verdict: "open-findings", openFindingIds: ["F-1"] }));
+  const changed = sourcesWith((s) => { s.spec.sha256 = "b".repeat(64); });
+  const result = create({ previous, sources: changed, report: clone(REPORT_2), openFindingIds: [] });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(Object.hasOwn(result.receipt, "withdrawnFindingIds"), false);
+});
+
 // ------------------------------------------------------------------ U2-13
 
 test("U2-13: a delta on a delta is DRR-ROUND-EXCEEDED, even when the sources changed", () => {

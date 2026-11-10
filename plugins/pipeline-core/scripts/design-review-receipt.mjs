@@ -268,6 +268,9 @@ export function createReceiptFromDisk(input, deps = {}) {
       const why = describeDesignReviewFindingIdRefusal(openFindingIds);
       if (why !== null) return refuse(created.code, `design review receipt refused: DRR-FINDING-IDS: ${why}`);
     }
+    if (created.code === "DRR-DELTA-UNCHANGED") {
+      return refuse(created.code, "design review receipt refused: DRR-DELTA-UNCHANGED: the documents did not change, so a second receipt may only withdraw findings of the first (fewer open ids, no new id, the reviewer's report says so). Otherwise change a document and review again.");
+    }
     return refuse(created.code, `design review receipt refused: ${created.code}`);
   }
 

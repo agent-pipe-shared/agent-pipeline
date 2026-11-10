@@ -46,6 +46,9 @@ const RECEIPT_KEYS = [
 // fallback-self-dispatch route instead of the native one, so a presented plan never passes a single-review route off as an
 // independent review. Names come from records that already exist: `route`/`reasonCode` (canonical fallback result) and
 // `requestedRoute`/`observedIdentity` (this receipt's producer). A receipt without it is valid and byte-unchanged.
+// PO decision 2026-11-09: one OPTIONAL, closed field. A delta over unchanged documents is admitted only when it withdraws findings of the
+// earlier round and adds none; the ids it closed stay on the receipt, so an approver sees that nothing in the documents changed.
+const WITHDRAWN_KEY = "withdrawnFindingIds";
 const FALLBACK_ROUTE = "fallback-self-dispatch";
 const FALLBACK_KEYS = ["observedIdentity", "reasonCode", "requestedRoute", "route"];
 const FALLBACK_REASON_CODE = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7}$/u;
@@ -173,8 +176,10 @@ export function describeDesignReviewFindingIdRefusal(ids) {
 /** First failing code of a decoded receipt value, in the contract order, or null. */
 function receiptRefusal(receipt) {
   const hasFallback = isObject(receipt) && Object.hasOwn(receipt, "fallback");
-  if (!isObject(receipt) || !hasExactKeys(receipt, hasFallback ? [...RECEIPT_KEYS, "fallback"] : RECEIPT_KEYS)) return "DRR-SHAPE";
+  const hasWithdrawn = isObject(receipt) && Object.hasOwn(receipt, WITHDRAWN_KEY);
+  if (!isObject(receipt) || !hasExactKeys(receipt, [...RECEIPT_KEYS, ...(hasFallback ? ["fallback"] : []), ...(hasWithdrawn ? [WITHDRAWN_KEY] : [])])) return "DRR-SHAPE";
   const { sources, report, previousReceiptPath, previousReceiptSha256 } = receipt;
+  if (hasWithdrawn && (receipt.kind !== "delta" || !isStringList(receipt[WITHDRAWN_KEY]) || receipt[WITHDRAWN_KEY].length === 0)) return "DRR-SHAPE";
   const shapeOk = receipt.schema === DESIGN_REVIEW_RECEIPT_SCHEMA
     && (!hasFallback || isDesignReviewFallback(receipt.fallback))
     && isFeatureId(receipt.featureId)
@@ -194,6 +199,7 @@ function receiptRefusal(receipt) {
   if (!pathsAreAcceptable(report.path, sources.prd.path, sources.spec.path, companionPaths, previousReceiptPath)) return "DRR-PATH";
   if (!sourcesAreAcceptable(sources.prd.path, sources.spec.path, companionPaths)) return "DRR-SOURCES";
   if (!findingIdsAreAcceptable(receipt.openFindingIds)) return "DRR-FINDING-IDS";
+  if (hasWithdrawn && (!findingIdsAreAcceptable(receipt[WITHDRAWN_KEY]) || receipt[WITHDRAWN_KEY].some((id) => receipt.openFindingIds.includes(id)))) return "DRR-FINDING-IDS";
   if ((receipt.verdict === "pass") !== (receipt.openFindingIds.length === 0)) return "DRR-VERDICT";
   if (receipt.round > DESIGN_REVIEW_MAX_ROUNDS) return "DRR-ROUND-EXCEEDED";
   const withoutPrevious = previousReceiptPath === null && previousReceiptSha256 === null;
@@ -365,13 +371,18 @@ export function createDesignReviewReceipt(input) {
   let round = 1;
   let previousReceiptPath = null;
   let previousReceiptSha256 = null;
+  let withdrawnFindingIds = null;
   if (previous !== null) {
     const parsed = parseDesignReviewReceipt(previous.bytes);
     if (!parsed.ok) return refuse("DRR-DELTA-CHAIN");
     const earlier = parsed.receipt;
     if (earlier.round >= DESIGN_REVIEW_MAX_ROUNDS) return refuse("DRR-ROUND-EXCEEDED");
     if (earlier.featureId !== featureId || earlier.sources.prd.path !== normalized.prd.path || earlier.sources.spec.path !== normalized.spec.path) return refuse("DRR-DELTA-CHAIN");
-    if (sameSources(earlier.sources, normalized)) return refuse("DRR-DELTA-UNCHANGED");
+    if (sameSources(earlier.sources, normalized)) {
+      const withdrawn = earlier.openFindingIds.filter((id) => !ids.includes(id));
+      if (withdrawn.length === 0 || !ids.every((id) => earlier.openFindingIds.includes(id))) return refuse("DRR-DELTA-UNCHANGED");
+      withdrawnFindingIds = withdrawn;
+    }
     kind = "delta";
     round = DELTA_ROUND;
     previousReceiptPath = previous.path;
@@ -402,6 +413,7 @@ export function createDesignReviewReceipt(input) {
     verdict: ids.length === 0 ? "pass" : "open-findings",
     openFindingIds: ids,
     reviewedAt,
+    ...(withdrawnFindingIds === null ? {} : { [WITHDRAWN_KEY]: withdrawnFindingIds }),
     ...(hasFallback ? { fallback: Object.fromEntries(FALLBACK_KEYS.map((key) => [key, input.fallback[key]])) } : {}),
   };
   const bytes = ENCODER.encode(`${canonical(receipt)}\n`);
@@ -437,6 +449,7 @@ export function summarizeDesignReviewReceipt(input) {
       report: receipt.report,
       verdict: receipt.verdict,
       openFindingIds: receipt.openFindingIds,
+      ...(Object.hasOwn(receipt, WITHDRAWN_KEY) ? { [WITHDRAWN_KEY]: receipt[WITHDRAWN_KEY] } : {}),
       // K128: present only when the review ran on the typed fallback route; a native receipt's summary is unchanged.
       ...(Object.hasOwn(receipt, "fallback") ? { fallback: receipt.fallback } : {}),
     },
