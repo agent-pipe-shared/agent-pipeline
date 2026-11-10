@@ -55,7 +55,7 @@ export function greenfieldMaterializationPending(rootDir, deps = {}) {
 
 /** Codex greenfield report: a map updated on purpose after the design must not read as "this repository has no architecture". */
 export function adoptionRequiredRationale(closedCode) {
-  if (closedCode === "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT") return "The architecture map no longer matches the closed feature's approved design, so that design no longer stands as this repository's baseline. A deliberate map update after the design ends up here too. The closed feature, its close and its push are not affected. The next feature needs its own approved design in force; compare architecture/design-materialization.json with the map when writing it.";
+  if (closedCode === "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT") return "The architecture map no longer matches the closed feature's approved design, so that design no longer stands as this repository's baseline. A deliberate map update after the design ends up here too. This finding stops neither the closed feature's close nor its push. The next feature needs its own approved design in force; compare architecture/design-materialization.json with the map when writing it.";
   return "No architecture baseline or adoption decision exists for this repository";
 }
 
