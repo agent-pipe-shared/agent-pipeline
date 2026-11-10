@@ -2251,7 +2251,7 @@ const g2072Input = (fx) => ({ root: fx.root, base: fx.base, candidate: fx.candid
 const g2072Changed = (fx) => git(fx.root, ["diff", "--name-only", fx.base, fx.candidate]).split("\n").filter((line) => line !== "");
 test("G20-72 above SPLIT_MAX_CHANGED_FILES the printed result carries one split entry per module plus a shared entry, disjoint and covering every changed path; the library result is unchanged", async () => {
   const { CRITIC_SPLIT_SCHEMA, SPLIT_MAX_CHANGED_FILES, SPLIT_SHARED_ENTRY_ID } = await import("../lib/critic-split.mjs");
-  const fx = g2072Fixture();
+  const fx = g2072Fixture({ core: 13, api: 13, loose: 13 }); // QG-04 (PO decision 2026-11-09, small groups are packed): no two of these fit one Critic
   try {
     const changed = g2072Changed(fx);
     assert.ok(changed.length > SPLIT_MAX_CHANGED_FILES, `${changed.length} changed files`);
@@ -2324,7 +2324,8 @@ test("G20-72 without an approved architecture plan the shared paths are cut alon
 
 test("G20-72 a module above the bound is cut into parts, one flat directory included, while a module that fits keeps its entry", async () => {
   const { SPLIT_MAX_CHANGED_FILES, criticSplitProblem } = await import("../lib/critic-split.mjs");
-  const fx = g2072Fixture({ core: 40, api: 3, loose: 1 });
+  // QG-04 (PO decision 2026-11-09, small groups are packed): api and the shared group are too large to fit with each other or with core-part-2, so every entry stays.
+  const fx = g2072Fixture({ core: 40, api: 13, loose: 13 });
   try {
     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
     assert.deepEqual(split.entries.map((entry) => entry.id), ["api", "core-part-1", "core-part-2", "shared"]);
@@ -2334,6 +2335,28 @@ test("G20-72 a module above the bound is cut into parts, one flat directory incl
     assert.deepEqual(split.entries.flatMap((entry) => entry.paths).sort(), g2072Changed(fx).sort());
     assert.match(split.entries.find((entry) => entry.id === "core-part-2").batchScopeLine, /^Batch scope \(MP-07\): path group core-part-2 of module core /u);
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("C23 PO decision 2026-11-09: small groups share one Critic up to the bound, the packed entry names its members and covers every path, and a group that stays alone keeps its module", async () => {
+  const { SPLIT_MAX_CHANGED_FILES, attributeVerdict, criticSplitProblem } = await import("../lib/critic-split.mjs");
+  const fx = g2072Fixture({ core: 40, api: 3, loose: 1 });
+  try {
+    const first = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} }).split;
+    assert.deepEqual(first.entries.map((entry) => entry.id), ["group-1", "core-part-1"], "the small module, the rest of core and the shared group take one Critic");
+    assert.equal(criticSplitProblem(first), null);
+    const packed = first.entries.find((entry) => entry.id === "group-1");
+    assert.equal(packed.moduleId, null);
+    assert.ok(packed.paths.length <= SPLIT_MAX_CHANGED_FILES);
+    for (const member of ["module api", "core-part-2", "the shared entry"]) assert.ok(packed.batchScopeLine.includes(member), `${member}: ${packed.batchScopeLine}`);
+    assert.deepEqual(first.entries.flatMap((entry) => entry.paths).sort(), g2072Changed(fx).sort());
+    assert.equal(attributeVerdict(first, { trajectory_evidence: `${packed.scopeMarker} reviewed` }), "group-1");
+    assert.deepEqual(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} }).split, first, "admit rebuilds the identical object");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+  const alone = g2072Fixture({ core: 14, api: 14, loose: 14 });
+  try {
+    const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(alone), { env: {} });
+    assert.equal(split.entries.find((entry) => entry.id === "api").moduleId, "api", "a group nothing fits with stays alone and keeps its module");
+  } finally { rmSync(alone.root, { recursive: true, force: true }); }
 });
 
 test("G20-72 outside the delivery-record folders a split leaves out exactly the bound exclusions: another evidence file stays review source", async () => {

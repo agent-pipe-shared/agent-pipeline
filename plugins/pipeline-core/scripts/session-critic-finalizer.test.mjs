@@ -2705,7 +2705,8 @@ const MERGE_SCRIPT = fileURLToPath(new URL("./critic-split-merge.mjs", import.me
 const NATIVE_HOOK = fileURLToPath(new URL("../hooks/native-goldfish-host.mjs", import.meta.url));
 function g2072Fixture() {
   const fx = fixture();
-  // The fixture leaves its diagnostic untracked; the split candidate carries 28 module files, a PRD with the approved architecture design and its own diagnostic.
+  // The fixture leaves its diagnostic untracked; the split candidate carries 48 module files, a PRD with the approved architecture design and its own diagnostic.
+  // QG-04 (PO decision 2026-11-09, small groups are packed): 24 files per module keep api, core and shared three entries, so this walk stays one Critic per entry.
   rmSync(join(fx.root, "evidence", "verify.json"), { force: true });
   rmSync(join(fx.root, "evidence", "targeted.log"), { force: true });
   const design = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield", disposition: { decision: "approved-scoped", scope: ["specs/", "src/"], rationale: "fixture" },
@@ -2716,7 +2717,7 @@ function g2072Fixture() {
   writeFileSync(join(fx.root, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
   for (const dir of ["core", "api"]) {
     mkdirSync(join(fx.root, "src", dir), { recursive: true });
-    for (let index = 0; index < 14; index += 1) writeFileSync(join(fx.root, "src", dir, `m${index}.mjs`), `export const m${index} = ${index};\n`);
+    for (let index = 0; index < 24; index += 1) writeFileSync(join(fx.root, "src", dir, `m${index}.mjs`), `export const m${index} = ${index};\n`);
   }
   fx.candidate = commit(fx.root, "split candidate");
   fx.tree = git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`]);

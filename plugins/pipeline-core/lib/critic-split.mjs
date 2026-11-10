@@ -133,6 +133,27 @@ function cutByDirectory(paths, max) {
 }
 
 /**
+ * PO decision 2026-11-09 (greenfield runs: one small module per Critic meant many Critics that each read a handful of files): groups are packed together up to the bound, largest
+ * first and into the first one with room, so the round needs as few Critics as the bound allows. A group that stays alone keeps its id and module; a packed one becomes `group-<n>`,
+ * names its members in its scope line and has no single module. A leftover smaller than the bound stays alone: nothing is left to pack it with. Deterministic.
+ */
+function packSmallGroups(parts, max, taken) {
+  const bins = [];
+  const position = new Map(parts.map((part, index) => [part.id, index]));
+  for (const part of [...parts].sort((left, right) => right.paths.length - left.paths.length || position.get(left.id) - position.get(right.id))) {
+    const bin = bins.find((candidate) => candidate.size + part.paths.length <= max);
+    if (bin === undefined) bins.push({ size: part.paths.length, first: position.get(part.id), members: [part] });
+    else { bin.size += part.paths.length; bin.first = Math.min(bin.first, position.get(part.id)); bin.members.push(part); }
+  }
+  let suffix = 0;
+  return bins.sort((left, right) => left.first - right.first).map(({ members }) => {
+    if (members.length === 1) return members[0];
+    do suffix += 1; while (taken.has(`group-${suffix}`));
+    return { id: `group-${suffix}`, moduleId: null, paths: members.flatMap((member) => member.paths).sort(), label: `path group group-${suffix} (${members.map((member) => member.label).join(", ")})` };
+  });
+}
+
+/**
  * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES changed files after the bound exclusions) or holds nothing but
  * delivery records. Delivery records count towards that bound, because an unsplit Critic would have them in its range, and are then left out of the parts.
  * One entry per module of the approved architecture plan that owns a changed path (disjoint scopes: a path goes to the module whose owned-path pattern matches it most
@@ -166,7 +187,7 @@ export function buildCriticSplit({ root, result }) {
   const groups = [...plan.modules.map((module) => module.id).sort().map((id) => ({ id, moduleId: id, paths: owned.get(id), label: `module ${id}` })),
     { id: SPLIT_SHARED_ENTRY_ID, moduleId: null, paths: shared, label: "the shared entry (every changed path no module owns)" }].filter((group) => group.paths.length > 0);
   const moduleIds = new Set(plan.modules.map((module) => module.id));
-  const parts = groups.flatMap((group) => {
+  const cut = groups.flatMap((group) => {
     if (group.paths.length <= SPLIT_MAX_CHANGED_FILES) return [group];
     let suffix = 0;
     return cutByDirectory(group.paths, SPLIT_MAX_CHANGED_FILES).map((paths) => {
@@ -175,6 +196,7 @@ export function buildCriticSplit({ root, result }) {
       return { id, moduleId: null, paths, label: `path group ${id} of ${group.label}` };
     });
   });
+  const parts = packSmallGroups(cut, SPLIT_MAX_CHANGED_FILES, moduleIds);
   const range = `${base.slice(0, 12)}..${candidate.slice(0, 12)}`;
   return {
     schema: CRITIC_SPLIT_SCHEMA, base, candidate, maxChangedFiles: SPLIT_MAX_CHANGED_FILES, changedFileCount: changed.length,
