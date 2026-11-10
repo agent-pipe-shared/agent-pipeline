@@ -808,7 +808,7 @@ if (isDirectInvocation(import.meta.url)) {
     const modelRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
     const modelCheck = Array.isArray(toolInput.Subagents)
       ? toolInput.Subagents.map((entry) => evaluateDispatchModel({ runner: "antigravity", subagentType: entry?.TypeName, model: entry?.Model, root: modelRoot }))
-      : [evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model, root: modelRoot })];
+      : [evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model, effort: toolInput.effort, root: modelRoot })];
     for (const check of modelCheck) {
       const modelWarnings = dispatchModelWarningText(check);
       if (modelWarnings !== "") process.stderr.write(modelWarnings);

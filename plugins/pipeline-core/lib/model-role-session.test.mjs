@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { openSync } from "node:fs";
+import { mkdtempSync, openSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { evaluateDispatchModel } from "./dispatch-model-enforcement.mjs";
+import { modelRoleRouteSourceSha256, readModelRoleApprovedPolicy } from "./model-role-approved-policy.mjs";
 import { EventEmitter } from "node:events";
 import { admitModelRoleBootstrap, antigravityAvailableModelIds, claudeApiAvailableModelIds, claudeCodeObservedModelIds, codexAvailableModelIds, modelRoleBootstrapReadback, resolveModelRoleBootstrap, resolveModelRoleSession, validateModelRoleSessionReceipt, validateModelRoleDispatchBinding } from "./model-role-session.mjs";
 import { observeClaudeModelAlias } from "./claude-model-host-observation.mjs";
 import { observeAntigravityModels } from "./antigravity-model-host-observation.mjs";
 import { observeCodexModels } from "./codex-model-host-observation.mjs";
 import { observeAnthropicApiModels } from "./anthropic-model-catalogue-host.mjs";
-import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
-import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
+import { projectFunctionalTaskRoutes, registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
+import { RUNNER_PROFILES_V3_REGISTRY_SHA256, loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { devNull } from "node:os";
 
@@ -636,6 +640,76 @@ test("functional route source fails closed on a conflicting or extra route cell"
   assert.equal(registeredFunctionalTaskRoutes(extra).code, "MODEL-ROLE-ROUTE-SOURCE-INCOMPLETE");
 });
 
+// C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decisions 5 and 6, AC-108): a project may name two different selectors
+// for two cells of one runner, role and effort. That is valid configuration, so a dispatch must not meet MODEL-ROLE-ROUTE-SOURCE-CONFLICT;
+// the shipped registry and the seed readers keep the refusal (the case above).
+const renderUserYaml = (value, indent = "") => Object.keys(value).map((key) => {
+  const item = value[key];
+  if (Array.isArray(item)) return item.length === 0 ? `${indent}${key}: []\n` : `${indent}${key}:\n${item.map((entry) => (entry !== null && typeof entry === "object"
+    ? `${indent}  -\n${renderUserYaml(entry, `${indent}    `)}` : `${indent}  - ${JSON.stringify(entry)}\n`)).join("")}`;
+  return item !== null && typeof item === "object" ? `${indent}${key}:\n${renderUserYaml(item, `${indent}  `)}` : `${indent}${key}: ${JSON.stringify(item)}\n`;
+}).join("");
+function projectRoot(mutate) {
+  const registry = loadRunnerProfilesV3Registry();
+  const intent = {
+    schema: "pipeline.user.v3", core_registry_sha256: RUNNER_PROFILES_V3_REGISTRY_SHA256,
+    language: { human_facing: "en", agent_facing: "en" }, agent_runtime: "other", runners: { enabled: ["claude"], default: "claude" },
+    routing: { profiles: structuredClone(registry.profiles), duties: structuredClone(registry.duties) },
+    usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
+    autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
+    gates: { dev_plan: "blocking", push: "blocking", security: "warn", claude_md_max_lines: 300 }, critic_export: registry.criticExportPolicy,
+  };
+  mutate(intent);
+  const root = mkdtempSync(join(tmpdir(), "c23-route-"));
+  writeFileSync(join(root, "pipeline.user.yaml"), renderUserYaml(intent));
+  return root;
+}
+
+test("C23 two cells of one runner, role and effort with different selectors dispatch with a warning, each route keeping its own selector", () => {
+  const root = projectRoot((intent) => {
+    const implement = intent.routing.duties.implement.claude;
+    intent.routing.duties.deep.claude.effort = implement.effort;
+    intent.routing.duties.deep.claude.selector = { kind: "alias", value: implement.selector.value === "opus" ? "sonnet" : "opus" };
+  });
+  try {
+    const notes = [];
+    const source = projectFunctionalTaskRoutes(root, { warn: (text) => notes.push(text) });
+    assert.equal(source.ok, true, JSON.stringify(source));
+    const claude = (taskRoute) => source.taskRoutes.find((route) => route.runner === "claude" && route.taskRoute === taskRoute);
+    assert.notEqual(claude("duty.deep").selector.value, claude("duty.implement").selector.value, "each task route keeps its own selector");
+    assert.equal(source.warnings?.[0]?.code, "MODEL-ROLE-ROUTE-SOURCE-CONFLICT", JSON.stringify(source.warnings));
+    assert.match(source.warnings[0].message, /claude:worker:/u);
+    // The dispatch guard's own reader: the dispatch is admitted and names the conflict as a warning.
+    const deepSelector = claude("duty.deep").selector.value;
+    const decided = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-deep", model: deepSelector, root });
+    assert.equal(decided.ok, true, JSON.stringify(decided));
+    assert.ok((decided.warnings ?? []).some((warning) => warning.code === "MODEL-ROLE-ROUTE-SOURCE-CONFLICT"), JSON.stringify(decided.warnings));
+    // The shipped registry still refuses the same shape.
+    const seed = completeRoleRegistry();
+    seed.duties.deep.claude.effort = seed.duties.implement.claude.effort;
+    seed.duties.deep.claude.selector = { kind: "alias", value: claude("duty.deep").selector.value };
+    seed.duties.implement.claude.selector = { kind: "alias", value: claude("duty.implement").selector.value };
+    assert.equal(registeredFunctionalTaskRoutes(seed).code, "MODEL-ROLE-ROUTE-SOURCE-CONFLICT");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("C23 the bootstrap and approved-policy readers stay on the seed: a project whose route differs from the registry is not refused by them", () => {
+  const root = projectRoot((intent) => { intent.routing.duties.mechanic.claude.selector = { kind: "model-id", value: "my-local-model" }; });
+  const bare = mkdtempSync(join(tmpdir(), "c23-bare-"));
+  try {
+    assert.notEqual(projectFunctionalTaskRoutes(root).taskRoutes.find((route) => route.runner === "claude" && route.taskRoute === "duty.mechanic").selector.value,
+      registeredFunctionalTaskRoutes().taskRoutes.find((route) => route.runner === "claude" && route.taskRoute === "duty.mechanic").selector.value, "the fixture project really differs from the registry");
+    // The seed readers take the registry, never the project's file: with and without the project configuration their answers are identical.
+    assert.deepEqual(registeredFunctionalTaskRoutes(), registeredFunctionalTaskRoutes(loadRunnerProfilesV3Registry()));
+    assert.equal(registeredFunctionalTaskRoutes().ok, true);
+    assert.equal(modelRoleRouteSourceSha256(), modelRoleRouteSourceSha256(registeredFunctionalTaskRoutes(loadRunnerProfilesV3Registry())));
+    const withProject = readModelRoleApprovedPolicy({ rootDir: realpathSync(root) });
+    const withoutProject = readModelRoleApprovedPolicy({ rootDir: realpathSync(bare) });
+    assert.equal(withProject.code, withoutProject.code, "the project's route changes neither the code nor the refusal of the approved-policy reader");
+    assert.notEqual(withProject.code, "MODEL-ROLE-ROUTE-SOURCE-CONFLICT");
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(bare, { recursive: true, force: true }); }
+});
+
 test("Agy host catalogue executes only the installed models command", () => {
   let invocation;
   const result = observeAntigravityModels({ executableResult: { ok: true, path: "/usr/bin/agy" },
@@ -724,7 +798,8 @@ test("Codex catalogue tolerates a future effort without promoting it to a govern
     supportedReasoningEfforts: [{ reasoningEffort: "unsafe effort" }] }], nextCursor: null }, "high").ok, false);
 });
 
-assert.equal(cases.length, 39, "the complete model-role session corpus must be registered before execution begins");
+// C23 (QG-04, restated in place): 39 -> 41, the two cases above for the project's route and the seed readers.
+assert.equal(cases.length, 41, "the complete model-role session corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

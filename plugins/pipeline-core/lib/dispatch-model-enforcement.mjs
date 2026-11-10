@@ -39,12 +39,37 @@ const AGENT_TYPE_DUTIES = Object.freeze({
 
 const normalized = (value) => String(value).trim().toLowerCase();
 
+/** The Claude family aliases the Agent tool's `model` parameter accepts (it takes no full model id). */
+const CLAUDE_FAMILY_ALIASES = Object.freeze(["opus", "sonnet", "haiku", "fable"]);
+
 function selectorMatches(selector, model) {
   const wanted = normalized(selector.value);
   const given = normalized(model);
   if (given === wanted) return true;
   // An alias selector also admits the family's full model ids (`sonnet` admits `claude-sonnet-5-5`).
-  return selector.kind === "alias" && new RegExp(`^claude-${wanted}(?:-|$)`, "u").test(given);
+  if (selector.kind === "alias" && new RegExp(`^claude-${wanted}(?:-|$)`, "u").test(given)) return true;
+  // C23: the tool layer carries only the family alias, so a configured full Claude model id reaches the guard as its family alias.
+  return selector.kind === "model-id" && CLAUDE_FAMILY_ALIASES.includes(given) && new RegExp(`^claude-${given}(?:-|$)`, "u").test(wanted);
+}
+
+/**
+ * C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 6): where the configured effort cannot take effect the
+ * dispatch warns and records the effort that really runs. The Claude host reports `effort.level` on SubagentStop where it supports the
+ * field; absent, the effective effort is recorded as unobserved and no effort is claimed that was not observed. Never a refusal.
+ */
+export function observeEffectiveEffort({ configuredEffort, stopInput } = {}) {
+  const level = stopInput?.effort?.level;
+  const observed = typeof level === "string" && level.trim() !== "" ? level.trim() : null;
+  const configured = typeof configuredEffort === "string" && configuredEffort.trim() !== "" ? configuredEffort.trim() : null;
+  if (observed === null) {
+    return { status: "unobserved", observed: null, configured, warning: { code: "DISPATCH-EFFORT-UNOBSERVED",
+      message: `the effective effort of this run is unobserved: the stop carried no effort.level (the Agent tool's effort parameter needs Claude Code v2.1.292 or later, and CLAUDE_CODE_EFFORT_LEVEL beats it); the configured effort ${configured ?? "(none)"} is a request, not an observation.` } };
+  }
+  if (configured !== null && observed !== configured) {
+    return { status: "observed", observed, configured, warning: { code: "DISPATCH-EFFORT-NOT-EFFECTIVE",
+      message: `the configured effort ${configured} did not take effect: the host reports effort ${observed} for this run, which is the effort that really ran.` } };
+  }
+  return { status: "observed", observed, configured, warning: null };
 }
 
 /**
@@ -55,11 +80,13 @@ export function evaluateDispatchModel({ root, warn, routeSource, ...rest } = {})
   const notes = [];
   const source = routeSource ?? projectFunctionalTaskRoutes(root, { warn: warn ?? ((text) => notes.push(text)) });
   const result = decideDispatchModel({ ...rest, routeSource: source });
-  return notes.length === 0 ? result
-    : { ...result, warnings: [...(result.warnings ?? []), ...notes.map((message) => ({ code: "DISPATCH-ROUTING-SOURCE-FALLBACK", message }))] };
+  // A tolerated conflict between two cells of one project (C23) is named beside a fallback; both are warnings, never refusals.
+  const extra = [...notes.map((message) => ({ code: "DISPATCH-ROUTING-SOURCE-FALLBACK", message })),
+    ...(source?.ok && Array.isArray(source.warnings) ? source.warnings.map(({ code, message }) => ({ code, message })) : [])];
+  return extra.length === 0 ? result : { ...result, warnings: [...(result.warnings ?? []), ...extra] };
 }
 
-function decideDispatchModel({ runner, subagentType, model, routeSource } = {}) {
+function decideDispatchModel({ runner, subagentType, model, effort, routeSource } = {}) {
   if (runner === "antigravity") {
     // Antigravity's enum is routed through the explicit PO-approved nativeTier projection
     // in model-role-route-source. Concrete V3 model IDs remain a separate CLI route.
@@ -141,17 +168,27 @@ function decideDispatchModel({ runner, subagentType, model, routeSource } = {}) 
     }] };
   }
   const routes = ownRoutes;
+  const warnings = [];
   if (routes.length > 0 && !routes.some((route) => selectorMatches(route.selector, model))) {
     const expected = [...new Set(routes.map((route) => `"${route.selector.value}"`))].join(" or ");
     // A configured but different selector is the MP-05/MP-07 escalation shape (a stated tier change), so it
     // warns instead of refusing; a model no route selects, or none at all, still refuses.
-    return { ok: true, skipped: null, findings: [], warnings: [{
+    warnings.push({
       code: "DISPATCH-MODEL-DUTY-MISMATCH",
       message: `agent type ${subagentType} serves ${routes.map((route) => route.taskRoute).join(" / ")}, which the configuration routes to ${expected}, but the dispatch names "${model}". `
         + `Keep it only as a stated MP-05/MP-07 escalation; otherwise re-issue the dispatch with \`model\` set to ${expected}.`,
-    }] };
+    });
   }
-  return { ok: true, findings: [], skipped: null };
+  // C23: the Agent tool's per-invocation `effort` is admitted. One the configuration does not name for the duty is a warning, never a refusal.
+  if (typeof effort === "string" && effort.trim() !== "" && routes.length > 0 && !routes.some((route) => route.effort === effort)) {
+    const configured = [...new Set(routes.map((route) => `"${route.effort}"`))].join(" or ");
+    warnings.push({
+      code: "DISPATCH-EFFORT-DUTY-MISMATCH",
+      message: `agent type ${subagentType} serves ${routes.map((route) => route.taskRoute).join(" / ")}, which the configuration runs at effort ${configured}, but the dispatch names effort "${effort}". `
+        + `Keep it only as a stated MP-05/MP-07 escalation; otherwise re-issue the dispatch with \`effort\` set to ${configured}.`,
+    });
+  }
+  return warnings.length === 0 ? { ok: true, findings: [], skipped: null } : { ok: true, skipped: null, findings: [], warnings };
 }
 
 export function dispatchModelRefusalText(evaluation) {

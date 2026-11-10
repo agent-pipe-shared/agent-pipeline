@@ -269,6 +269,8 @@ function defaultClaudeRoute(taskRoute, root) {
 }
 
 const EFFORT_RANK = Object.freeze({ low: 1, medium: 2, high: 3, xhigh: 4, max: 5 });
+/** A model id of another provider's family: on the Claude runner that is a wrong runner, never a configuration choice (C23). */
+const OTHER_PROVIDER_MODEL = /^(?:gpt|chatgpt|codex|gemini|o[0-9])/iu;
 const EFFORT_ESCALATION_ACTS = Object.freeze(["MP-05", "MP-07"]);
 
 /**
@@ -965,15 +967,19 @@ export function generateDispatchBinding(options, deps = {}) {
     if (modelId !== expected) {
       refuse("DBG-MODEL-FAMILY", `model id ${modelId} is not the Antigravity native model alias the route ${taskRoute} selects for ${agentType} (${expected}); the accepted Antigravity aliases are ${ANTIGRAVITY_NATIVE_MODELS.join(", ")} (a Claude or Codex model id belongs to --runner claude or --runner codex); repair: pass --model-id ${expected} together with --runner antigravity, or omit --runner for a Claude dispatch`);
     }
-  } else if (!modelBelongsToFamily(modelId, resolved.model)) {
+  } else if (OTHER_PROVIDER_MODEL.test(modelId)) {
+    // C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 5): the Claude runner takes any model the project
+    // configures, so only a model of another provider's family is refused: that is a wrong runner, not a configuration choice.
     const forms = acceptedFamilyForms(resolved.model);
-    const accepted = forms === null ? "" : ` (accepted prefixes ${forms.prefixes.map((prefix) => `\`${prefix}\``).join(", ")}; for example \`${forms.example}\`)`;
-    refuse("DBG-MODEL-FAMILY", `model id ${modelId} does not belong to the ${resolved.model} family that agent definition ${agentType} declares; repair: pass a --model-id of the ${resolved.model} family${accepted} (the id the dispatch will really run: the tool-layer \`model\` parameter of the dispatch call selects it, MP-29), or pass the --agent-type whose definition declares the family you mean (${AGENT_TYPES.join(", ")}); a bare alias of another family (for example \`opus\` for a Goldfish agent definition that declares ${resolved.model}) belongs to a different agent type, not to this one; or pass --runner codex for a Codex dispatch (its model is then checked against the Codex route)${/^gemini/iu.test(modelId) ? `; a Gemini id belongs to an Antigravity dispatch: pass --runner antigravity with an alias of its route (${ANTIGRAVITY_NATIVE_MODELS.join(", ")}; the generated briefing is then the packet Prompt of the prepare request, references/antigravity-native-dispatch.md)` : ""}`);
+    const accepted = forms === null ? "" : ` (for the ${resolved.model} family: accepted prefixes ${forms.prefixes.map((prefix) => `\`${prefix}\``).join(", ")}; for example \`${forms.example}\`)`;
+    refuse("DBG-MODEL-FAMILY", `model id ${modelId} is a model of another provider's family, not a Claude model id or alias, and agent definition ${agentType} declares the ${resolved.model} family; repair: pass a Claude --model-id${accepted} (the id the dispatch will really run: the tool-layer \`model\` parameter of the dispatch call selects it, MP-29), or pass the --agent-type whose definition declares the family you mean (${AGENT_TYPES.join(", ")}); or pass --runner codex for a Codex dispatch (its model is then checked against the Codex route)${/^gemini/iu.test(modelId) ? `; a Gemini id belongs to an Antigravity dispatch: pass --runner antigravity with an alias of its route (${ANTIGRAVITY_NATIVE_MODELS.join(", ")}; the generated briefing is then the packet Prompt of the prepare request, references/antigravity-native-dispatch.md)` : ""}`);
+  } else if (!modelBelongsToFamily(modelId, resolved.model)) {
+    warnings.push({ code: "DBG-MODEL-DIFFERS-FROM-AGENT", message: `model id ${modelId} is not of the ${resolved.model} family that agent definition ${agentType} declares; it is admitted because the configuration names it, and the tool-layer \`model\` parameter of the dispatch call selects it (MP-29)` });
   }
   // The effort the run is briefed with: the Codex route's own effort for a Codex dispatch (the agent definition's effort is the Claude one).
-  // Claude (W2-R2): the Claude Agent tool cannot pass an effort (MP-29), so the agent definition's frontmatter effort is what the run
-  // really gets. It must therefore EQUAL the configured route's effort for the duty; a contradiction is refused before launch, unless
-  // an explicit MP-05/MP-07 escalation admits an above-route pin. An unreadable route keeps the frontmatter effort and says so.
+  // Claude (C23): the configured route's effort for the duty is the briefed effort and the dispatch call carries it as the Agent tool's
+  // per-invocation `effort` (it overrides the frontmatter field). A frontmatter effort that differs is a warning, not a refusal; an explicit
+  // MP-05/MP-07 escalation above the route still records the frontmatter pin. An unreadable route keeps the frontmatter effort and says so.
   let effort = typeof codexRoute?.effort === "string" && codexRoute.effort !== "" ? codexRoute.effort : resolved.effort;
   let claudeRouteDuty = null;
   if (effortEscalation !== undefined && !EFFORT_ESCALATION_ACTS.includes(effortEscalation)) {
@@ -992,7 +998,11 @@ export function generateDispatchBinding(options, deps = {}) {
       claudeRouteDuty = taskRoute;
       warnings.push({ code: "DBG-EFFORT-ESCALATION", message: `${effortEscalation} escalation: agent definition ${agentType} pins effort ${resolved.effort}, above the ${routeEffort} the configured Claude route ${taskRoute} selects; the binding records ${resolved.effort}, the effort the run will really get` });
     } else {
-      refuse("DBG-EFFORT-ROUTE-CONTRADICTION", `agent definition ${agentType} pins effort ${resolved.effort} but the configured Claude route ${taskRoute} selects effort ${routeEffort}; the Claude Agent tool cannot pass an effort (MP-29), so the frontmatter pin would silently win; repair: align the effort of agents/${agentType}.md with the route, or change the route in pipeline.user.yaml, or (a deliberate above-route escalation) pass --effort-escalation MP-05 or MP-07 (MP-05/MP-07; in a briefing package the key "effortEscalation"), or pass the --agent-type whose definition matches the route`);
+      // C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 6): the configured effort is admitted, never refused.
+      // The generated dispatch call carries it as the Agent tool's per-invocation `effort`, which overrides the frontmatter field.
+      claudeRouteDuty = taskRoute;
+      effort = routeEffort;
+      warnings.push({ code: "DBG-EFFORT-ROUTE-DIFFERS", message: `agent definition ${agentType} pins effort ${resolved.effort} but the configured Claude route ${taskRoute} selects effort ${routeEffort}; the binding records ${routeEffort} and the dispatch call carries it as the Agent tool's effort parameter (MP-29). A host older than Claude Code v2.1.292, or one with CLAUDE_CODE_EFFORT_LEVEL set, runs another effort (the frontmatter ${resolved.effort} at most): the SubagentStop observation reports the effort that really ran, and unobserved when the host reports none. To make the agent definition agree, align the effort of agents/${agentType}.md with the route` });
     }
   }
   let maxTurns;
@@ -1273,9 +1283,24 @@ function packageBindingOptions(root, pkg, agentType) {
 }
 
 /** The tool-layer parameters of the Claude Agent call (tool, subagent_type, model family), or null for a Codex dispatch or an unbound tier. */
-function dispatchCallBase(pkg, boundTier) {
-  const family = ["opus", "sonnet", "haiku", "fable"].find((name) => String(pkg.modelId).toLowerCase().includes(name)) ?? null;
-  return pkg.runner === "codex" || pkg.runner === "antigravity" || typeof boundTier !== "string" ? null : { tool: "Agent", subagent_type: `pipeline-core:${boundTier}`, model: family };
+function dispatchCallBase(pkg, boundTier, effort) {
+  const family = CLAUDE_FAMILIES.find((name) => String(pkg.modelId).toLowerCase().includes(name)) ?? null;
+  // C23: the Agent tool's `model` accepts only a family alias; an id with no recognisable family is named as configured (and warned about,
+  // claudeCallWarnings). The configured `effort` rides next to it (it overrides the frontmatter field, Claude Code v2.1.292 or later).
+  return pkg.runner === "codex" || pkg.runner === "antigravity" || typeof boundTier !== "string" ? null
+    : { tool: "Agent", subagent_type: `pipeline-core:${boundTier}`, model: family ?? String(pkg.modelId), ...(typeof effort === "string" && effort !== "" ? { effort } : {}) };
+}
+
+const CLAUDE_FAMILIES = Object.freeze(["opus", "sonnet", "haiku", "fable"]);
+
+/** What a Claude Agent call cannot carry of the configured model: only the family alias reaches the tool layer. */
+function claudeCallWarnings(pkg) {
+  if (pkg.runner === "codex" || pkg.runner === "antigravity") return [];
+  const id = String(pkg.modelId);
+  const family = CLAUDE_FAMILIES.find((name) => id.toLowerCase().includes(name)) ?? null;
+  if (family === null) return [{ code: "DBG-MODEL-NO-FAMILY", message: `the configured model ${id} names no Claude family (opus, sonnet, haiku, fable), so the dispatch call carries it as configured; the Agent tool's model parameter accepts family aliases only, so the host may refuse it` }];
+  if (id.toLowerCase() === family) return [];
+  return [{ code: "DBG-MODEL-ALIAS-ONLY", message: `the configured model ${id} reaches the tool layer only as its family alias ${family}: the Agent tool's model parameter carries no full model id (MP-29), so the host runs the model that alias currently names` }];
 }
 
 /** The D196 (R4) estimate warnings of build, as a pure function of the package and the binding's tool budget. */
@@ -1329,7 +1354,7 @@ export function buildDispatchBriefing(options, deps = {}) {
   // The Claude Agent call the dispatcher makes next, so the tool-layer parameters need not be derived from the contract (MP-29):
   // the tier of the (possibly raised) binding, the model family of the package's model id, the briefing passed verbatim.
   const boundTier = generated.binding?.agentType;
-  const base = dispatchCallBase(pkg, boundTier);
+  const base = dispatchCallBase(pkg, boundTier, generated.binding?.effort);
   // G20-63: Codex runs no PreToolUse hook for spawn_agent, so its governed admission is the prepare command, run before the call.
   const codexCall = pkg.runner !== "codex" ? null : {
     tool: "spawn_agent", agent_type: "worker",
@@ -1345,7 +1370,7 @@ export function buildDispatchBriefing(options, deps = {}) {
   };
   return {
     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
-    sha256: rendered.sha256, pipelineVersion: generated.pipelineVersion ?? null, rulesetIdentitySource: generated.rulesetIdentitySource ?? null, warnings: [...moduleScope.warnings, ...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
+    sha256: rendered.sha256, pipelineVersion: generated.pipelineVersion ?? null, rulesetIdentitySource: generated.rulesetIdentitySource ?? null, warnings: [...moduleScope.warnings, ...generated.warnings, ...packageAdvisories(pkg), ...estimateWarnings, ...(base === null ? [] : claudeCallWarnings(pkg))], dispatchCall, ...(generated.preDispatch === undefined ? {} : { preDispatch: generated.preDispatch }), ...(options.out === undefined ? { text: rendered.text } : {}),
   };
 }
 
@@ -1424,7 +1449,7 @@ export function probeDispatchReadiness(options, deps = {}) {
     else {
       const budget = skeletonToolBudget(generated.skeleton);
       try { decision = budgetDecision(pkg, budget); } catch (error) { failWith("tool-budget", error); }
-      warnings = [...moduleWarnings, ...generated.warnings, ...packageAdvisories(pkg), ...estimateWarningsOf(pkg, budget)];
+      warnings = [...moduleWarnings, ...generated.warnings, ...packageAdvisories(pkg), ...estimateWarningsOf(pkg, budget), ...(typeof generated.binding?.agentType === "string" ? claudeCallWarnings(pkg) : [])];
       if (decision !== null && calibration !== null && findings.length === 0) {
         try { renderGoldfishBriefing(pkg, generated, calibration, decision); } catch (error) { failWith("render", error); }
       } else if (findings.length > 0 || decision === null || calibration === null) skipped.push("render");
@@ -1457,7 +1482,7 @@ export function probeDispatchReadiness(options, deps = {}) {
   }
 
   const ready = findings.length === 0;
-  const base = ready && pkg !== null ? dispatchCallBase(pkg, generated?.binding?.agentType) : null;
+  const base = ready && pkg !== null ? dispatchCallBase(pkg, generated?.binding?.agentType, generated?.binding?.effort) : null;
   return {
     schema: DISPATCH_PROBE_SCHEMA, ok: ready, ready, findings, warnings,
     pipelineVersion: generated?.pipelineVersion ?? null, rulesetIdentitySource: generated?.rulesetIdentitySource ?? null,

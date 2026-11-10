@@ -369,7 +369,9 @@ const REFUSALS = [
   ["a repeated single-value flag", {}, ["--check", "plugins/x/z.test.mjs"], {}, "DBG-FLAG-REPEATED", "--check"],
   ["a missing required flag", { "--model-id": null }, [], {}, "DBG-FLAG-MISSING", "--model-id"],
   ["a flag without a value", {}, ["--path"], {}, "DBG-FLAG-VALUE", "--path"],
-  ["a model outside the alias family", { "--model-id": "claude-opus-5" }, [], {}, "DBG-MODEL-FAMILY", "sonnet"],
+  // C23 (QG-04, restated in place): a Claude model of another family is configuration the Claude runner admits (see the C23 cases); the
+  // refusal now pins a model of another provider's family, which stays a wrong runner.
+  ["a model of another provider's family", { "--model-id": "gpt-5.5" }, [], {}, "DBG-MODEL-FAMILY", "sonnet"],
   ["an unavailable ruleset identity", {}, [], { observePreflight: () => ({ rulesetSource: { loadedIdentity: { status: "unavailable" } } }) }, "DBG-RULESET-UNAVAILABLE", "unavailable"],
   ["a preflight without a ruleset source", {}, [], { observePreflight: () => ({ rulesetSource: null }) }, "DBG-RULESET-UNAVAILABLE", "absent"],
   ["a dispatch id carrying the binding marker", { "--dispatch-id": `X${MARKER}3` }, [], {}, "DBG-DISPATCH-ID", ""],
@@ -1327,7 +1329,8 @@ test("K142 the Claude default path is unchanged: no --runner and --runner claude
 test("K142 the Claude family refusal names a repair and keeps naming the alias family", async () => {
   const { runDispatchBriefing } = await lib();
   const fx = makeFixture();
-  const result = runDispatchBriefing(argvOf(fx, { "--model-id": "claude-opus-5" }), depsOf(fx));
+  // C23 (QG-04, restated in place): claude-opus-5 is admitted now; the refusal and its repair are pinned with a model of another provider's family.
+  const result = runDispatchBriefing(argvOf(fx, { "--model-id": "gpt-5.5" }), depsOf(fx));
   assert.equal(result.code, "DBG-MODEL-FAMILY");
   assert.ok(result.message.includes("sonnet"), result.message);
   assert.match(result.message, /repair:/u);
@@ -1348,7 +1351,8 @@ test("17 a Gemini model id is told that an Antigravity dispatch does not use thi
   // "does not use this generator" and role-dispatch-request assertions moved to the --runner antigravity pointer.
   assert.match(gemini.message, /a Gemini id belongs to an Antigravity dispatch/u);
   assert.match(gemini.message, /--runner antigravity/u);
-  const claude = runDispatchBriefing(argvOf(fx, { "--model-id": "claude-opus-5" }), depsOf(fx));
+  // C23 (QG-04, restated in place): the "other family" probe is a gpt id now; a Claude id is admitted.
+  const claude = runDispatchBriefing(argvOf(fx, { "--model-id": "gpt-5.5" }), depsOf(fx));
   assert.equal(claude.code, "DBG-MODEL-FAMILY");
   assert.doesNotMatch(claude.message, /Antigravity/u, "the Claude-family refusal is unchanged");
 });
@@ -1396,19 +1400,17 @@ test("W2-R2 each agent type asks the Claude route of its own duty", async () => 
   assert.deepEqual(asked, ["duty.implement", "duty.mechanic", "duty.deep"]);
 });
 
-test("W2-R2 a frontmatter effort that contradicts the configured route is refused typed before launch, never run silently", async () => {
+// C23 (QG-04, restated in place): the configured effort is admitted, never refused (draft ADR "a project's pipeline.user.yaml owns its
+// routing", decision 6): the same fixture now builds, records the route's effort and names the difference as a warning.
+test("W2-R2 a frontmatter effort that differs from the configured route is admitted with a warning and the route's effort is recorded", async () => {
   const { runDispatchBriefing } = await lib();
   const fx = makeFixture();
   const result = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep" }), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
-  assert.equal(result.ok, false);
-  assert.equal(result.code, "DBG-EFFORT-ROUTE-CONTRADICTION", result.message);
-  assert.equal(result.skeleton, undefined);
-  assert.ok(result.message.includes("xhigh") && result.message.includes("medium") && result.message.includes("duty.deep"), result.message);
-  assert.match(result.message, /repair:/u);
-  assert.match(result.message, /--effort-escalation/u);
-  assert.match(result.message, /MP-05/u);
-  assert.match(result.message, /MP-07/u);
-  assert.match(result.message, /MP-29/u, "the Claude Agent tool cannot pass an effort: the message says why the pin would win");
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+  assert.equal(result.binding.effort, "medium");
+  const warning = result.warnings.find((entry) => entry.code === "DBG-EFFORT-ROUTE-DIFFERS");
+  assert.ok(warning && warning.message.includes("xhigh") && warning.message.includes("medium") && warning.message.includes("duty.deep"), JSON.stringify(result.warnings));
+  assert.match(warning.message, /MP-29/u);
 });
 
 test("W2-R2 an explicit MP-05/MP-07 escalation admits the above-route effort, records the effort the run really gets and warns", async () => {
@@ -1433,8 +1435,10 @@ test("W2-R2 an escalation flag where the route already equals the pin changes no
   const same = runDispatchBriefing(argvOf(fx, {}, ["--effort-escalation", "MP-05"]), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
   assert.equal(same.ok, true);
   assert.equal(same.warnings.some((entry) => entry.code === "DBG-EFFORT-ESCALATION"), false);
+  // C23 (QG-04, restated in place): a pin below the route is admitted too; the route's effort is the briefed one.
   const lower = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-implementor" }), depsOf(fx, { claudeRoute: claudeRouteOf("high") }));
-  assert.equal(lower.code, "DBG-EFFORT-ROUTE-CONTRADICTION");
+  assert.equal(lower.ok, true);
+  assert.equal(lower.binding.effort, "high");
 });
 
 // 2026-10-30: a package could not carry the escalation act, so a deep-tier package above the route effort had no generator route at all
@@ -1462,9 +1466,11 @@ test("a briefing package carries effortEscalation exactly like the flag: admitte
   const empty = packageFixture({ ...deep, effortEscalation: "" });
   assert.equal(runDispatchBriefing(empty.argv, depsOf(empty.fx, { claudeRoute: claudeRouteOf("medium") })).code, "DBG-PACKAGE-FIELD-TYPE");
   const absent = packageFixture(deep);
-  const contradiction = runDispatchBriefing(absent.argv, depsOf(absent.fx, { claudeRoute: claudeRouteOf("medium") }));
-  assert.equal(contradiction.code, "DBG-EFFORT-ROUTE-CONTRADICTION");
-  assert.match(contradiction.message, /"effortEscalation"/u, "the contradiction names the package key as a repair");
+  // C23 (QG-04, restated in place): without the escalation act the package now builds at the route's effort and warns.
+  const differing = runDispatchBriefing(absent.argv, depsOf(absent.fx, { claudeRoute: claudeRouteOf("medium") }));
+  assert.equal(differing.ok, true, JSON.stringify(differing).slice(0, 300));
+  assert.equal(parseNativeGoldfishBriefing(differing.text).binding.effort, "medium");
+  assert.ok(differing.warnings.some((entry) => entry.code === "DBG-EFFORT-ROUTE-DIFFERS"), JSON.stringify(differing.warnings));
 });
 
 test("W2-R2 an unreadable Claude route is announced and the agent definition's effort stays the briefed one", async () => {
@@ -1490,6 +1496,64 @@ test("W2-R2 the default Claude route reader uses the registry route of the duty,
   const codex = runDispatchBriefing(argvOf(fx, { "--model-id": "fixture-codex-model" }, CODEX), depsOf(fx, { claudeRoute: () => { throw new Error("a Codex dispatch must not read the Claude route"); }, codexRoute: (taskRoute) => ({ taskRoute, runner: "codex", role: "worker", effort: "high", state: "default", selector: { kind: "model-id", value: "fixture-codex-model" } }) }));
   assert.equal(codex.ok, true, JSON.stringify(codex).slice(0, 300));
   assert.equal(codex.binding.effort, "high");
+});
+
+// --- C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decisions 5 and 6, AC-108): the dispatch admits what the configuration names ---
+
+test("C23 a configured effort that differs from the frontmatter builds with a warning, and the dispatch call carries that effort", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture({ agentType: "goldfish-deep" });
+  const built = runDispatchBriefing(argv, depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
+  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 400));
+  assert.equal(built.dispatchCall.effort, "medium", "the call carries the configured effort next to the model");
+  assert.equal(built.dispatchCall.model, "sonnet");
+  assert.equal(parseNativeGoldfishBriefing(built.text).binding.effort, "medium", "the binding records the effort the call asks for");
+  const warning = built.warnings.find((entry) => entry.code === "DBG-EFFORT-ROUTE-DIFFERS");
+  assert.ok(warning, JSON.stringify(built.warnings));
+  for (const part of ["xhigh", "medium", "goldfish-deep", "duty.deep"]) assert.ok(warning.message.includes(part), `${part}: ${warning.message}`);
+  const same = packageFixture({ agentType: "goldfish-implementor" });
+  const sameBuilt = runDispatchBriefing(same.argv, depsOf(same.fx, { claudeRoute: claudeRouteOf("medium") }));
+  assert.equal(sameBuilt.ok, true);
+  assert.equal(sameBuilt.dispatchCall.effort, "medium", "an effort equal to the frontmatter is carried too");
+  assert.equal(sameBuilt.warnings.some((entry) => entry.code === "DBG-EFFORT-ROUTE-DIFFERS"), false);
+  // The readiness probe prints the same call.
+  const probed = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
+  assert.equal(probed.dispatchCall?.effort, "medium", JSON.stringify(probed).slice(0, 400));
+});
+
+test("C23 a configured Claude model id builds, the call names its family alias and a warning says the tool layer carries only the alias", async () => {
+  const { runDispatchBriefing } = await lib();
+  const opus = packageFixture({ modelId: "claude-opus-5" });
+  const built = runDispatchBriefing(opus.argv, depsOf(opus.fx));
+  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 400));
+  assert.equal(built.dispatchCall.model, "opus");
+  const warning = built.warnings.find((entry) => entry.code === "DBG-MODEL-ALIAS-ONLY");
+  assert.ok(warning && warning.message.includes("claude-opus-5") && warning.message.includes("opus"), JSON.stringify(built.warnings));
+  const bare = packageFixture({ modelId: "opus" });
+  const bareBuilt = runDispatchBriefing(bare.argv, depsOf(bare.fx));
+  assert.equal(bareBuilt.ok, true, JSON.stringify(bareBuilt).slice(0, 400));
+  assert.equal(bareBuilt.dispatchCall.model, "opus");
+  assert.equal(bareBuilt.warnings.some((entry) => entry.code === "DBG-MODEL-ALIAS-ONLY"), false, "an alias is exactly what the tool layer carries");
+  const local = packageFixture({ modelId: "my-local-model" });
+  const localBuilt = runDispatchBriefing(local.argv, depsOf(local.fx));
+  assert.equal(localBuilt.ok, true, JSON.stringify(localBuilt).slice(0, 400));
+  assert.equal(localBuilt.dispatchCall.model, "my-local-model", "an id with no recognisable family is named as configured");
+  const noFamily = localBuilt.warnings.find((entry) => entry.code === "DBG-MODEL-NO-FAMILY");
+  assert.ok(noFamily && noFamily.message.includes("my-local-model"), JSON.stringify(localBuilt.warnings));
+});
+
+test("C23 a model of another provider's family stays refused on the Claude, Codex and Antigravity runners alike", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const gpt = runDispatchBriefing(argvOf(fx, { "--model-id": "gpt-5.5" }), depsOf(fx));
+  assert.equal(gpt.code, "DBG-MODEL-FAMILY", gpt.message);
+  const gemini = runDispatchBriefing(argvOf(fx, { "--model-id": "gemini-3.8-flash-medium" }), depsOf(fx));
+  assert.equal(gemini.code, "DBG-MODEL-FAMILY", gemini.message);
+  // A Claude model is a wrong runner, not a configuration choice, under Codex and Antigravity.
+  const codex = runDispatchBriefing(argvOf(fx, { "--model-id": "claude-opus-5" }, CODEX), depsOf(fx));
+  assert.equal(codex.code, "DBG-MODEL-FAMILY", codex.message);
+  const agy = runDispatchBriefing(argvOf(fx, { "--model-id": "claude-opus-5" }, AGY), depsOf(fx));
+  assert.equal(agy.code, "DBG-MODEL-FAMILY", agy.message);
 });
 
 // --- PF-65 (consumer report 05, AC-142): coordinator facts and the orientation-heavy / low-estimate advisories ---
@@ -2326,11 +2390,12 @@ test("A18-M1B the Claude-family refusal prints the accepted prefixes, an example
   const { runDispatchBriefing } = await lib();
   const { MODEL_FAMILY_ALIASES } = await import("../lib/agent-model-registry.mjs");
   const fx = makeFixture();
-  const refused = runDispatchBriefing(argvOf(fx, { "--model-id": "opus" }), depsOf(fx));
+  // C23 (QG-04, restated in place): a bare `opus` is a configured Claude alias and is admitted; the refusal prints the same forms for a gpt id.
+  const refused = runDispatchBriefing(argvOf(fx, { "--model-id": "gpt-5.5" }), depsOf(fx));
   assert.equal(refused.code, "DBG-MODEL-FAMILY");
   for (const prefix of MODEL_FAMILY_ALIASES.sonnet) assert.ok(refused.message.includes(`\`${prefix}\``), prefix);
   assert.match(refused.message, /for example `claude-sonnet-/u);
-  assert.match(refused.message, /bare alias of another family/u);
+  assert.match(refused.message, /another provider's family/u);
   assert.match(refused.message, /MP-29/u);
   assert.match(refused.message, /tool-layer `model` parameter/u);
 });

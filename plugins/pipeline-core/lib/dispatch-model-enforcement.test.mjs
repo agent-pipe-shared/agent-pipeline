@@ -203,3 +203,55 @@ test("DME-C23 the dispatch model check reads the project's routing for its root,
     assert.equal(ask("my-local-model", { routeSource: routes() }).findings[0].code, "DISPATCH-MODEL-UNROUTED");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decisions 5 and 6, AC-108): the dispatch admits what the
+// configuration names. The Agent tool's `model` parameter accepts only family aliases, so a configured full Claude model id reaches the
+// guard as its family alias; an `effort` parameter is admitted and judged against the configured duty effort by a warning only.
+const effortRoutes = (selector, effort) => ({ ok: true, taskRoutes: [
+  { taskRoute: "duty.deep", runner: "claude", state: "default", selector, effort },
+  { taskRoute: "duty.implement", runner: "claude", state: "default", selector: { kind: "alias", value: "sonnet" }, effort: "medium" },
+] });
+
+test("DME-C23b a configured Claude model id admits its family alias on the call and still refuses another family", () => {
+  const source = effortRoutes({ kind: "model-id", value: "claude-opus-5" }, "high");
+  const viaAlias = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-deep", model: "opus", routeSource: source });
+  assert.equal(viaAlias.ok, true, JSON.stringify(viaAlias.findings));
+  assert.equal(viaAlias.findings.length, 0);
+  assert.equal(evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-deep", model: "claude-opus-5", routeSource: source }).ok, true, "the exact id stays admitted");
+  assert.equal(evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-deep", model: "haiku", routeSource: source }).findings[0].code, "DISPATCH-MODEL-UNROUTED");
+});
+
+test("DME-C23c a call that carries the configured effort is admitted, a different effort warns, a call without a model is still refused", () => {
+  const source = effortRoutes({ kind: "alias", value: "sonnet" }, "high");
+  const same = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-deep", model: "sonnet", effort: "high", routeSource: source });
+  assert.equal(same.ok, true);
+  assert.deepEqual(same.warnings ?? [], []);
+  const other = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-deep", model: "sonnet", effort: "low", routeSource: source });
+  assert.equal(other.ok, true, "a differing effort is never a refusal");
+  assert.equal(other.warnings?.[0]?.code, "DISPATCH-EFFORT-DUTY-MISMATCH", JSON.stringify(other));
+  assert.match(other.warnings[0].message, /low/u);
+  assert.match(other.warnings[0].message, /high/u);
+  const noModel = evaluateDispatchModel({ runner: "claude", subagentType: "pipeline-core:goldfish-deep", model: undefined, effort: "high", routeSource: source });
+  assert.equal(noModel.ok, false);
+  assert.equal(noModel.findings[0].code, "DISPATCH-MODEL-MISSING", "naming an effort never replaces naming a model");
+});
+
+test("DME-C23d the effort that really ran is the one the stop reports; absent, it is recorded as unobserved and never claimed", async () => {
+  const { observeEffectiveEffort } = await import("./dispatch-model-enforcement.mjs");
+  assert.equal(typeof observeEffectiveEffort, "function");
+  const observed = observeEffectiveEffort({ configuredEffort: "high", stopInput: { hook_event_name: "SubagentStop", effort: { level: "high" } } });
+  assert.deepEqual({ status: observed.status, observed: observed.observed, configured: observed.configured, warning: observed.warning }, { status: "observed", observed: "high", configured: "high", warning: null });
+  const differs = observeEffectiveEffort({ configuredEffort: "high", stopInput: { hook_event_name: "SubagentStop", effort: { level: "xhigh" } } });
+  assert.equal(differs.status, "observed");
+  assert.equal(differs.observed, "xhigh", "the record names the effort that really runs");
+  assert.equal(differs.warning?.code, "DISPATCH-EFFORT-NOT-EFFECTIVE");
+  assert.match(differs.warning.message, /high/u);
+  assert.match(differs.warning.message, /xhigh/u);
+  for (const stopInput of [{ hook_event_name: "SubagentStop" }, { effort: {} }, { effort: { level: "" } }, { effort: { level: 5 } }, null, undefined]) {
+    const unobserved = observeEffectiveEffort({ configuredEffort: "high", stopInput });
+    assert.equal(unobserved.status, "unobserved", JSON.stringify(stopInput));
+    assert.equal(unobserved.observed, null, "no effort is claimed that was not observed");
+    assert.equal(unobserved.warning?.code, "DISPATCH-EFFORT-UNOBSERVED");
+    assert.match(unobserved.warning.message, /unobserved/iu);
+  }
+});

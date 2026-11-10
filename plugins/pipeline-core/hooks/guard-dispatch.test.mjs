@@ -141,6 +141,25 @@ check("GD2 allow  a references-only Critic dispatch", {
   tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: CLEAN_CRITIC },
 }, ALLOW);
 
+// C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decisions 5 and 6, AC-108): a Claude Agent call may carry the configured
+// `effort` next to `model`. It is admitted; an effort the configuration does not name for the duty is a warning, never a refusal; the
+// requirement that a dispatch names its model stays.
+check("GD2-C23a allow  a Critic dispatch that carries an effort next to its model", {
+  tool_use_id: "gd2-c23a",
+  tool_name: "Task",
+  tool_input: { subagent_type: "pipeline-core:critic", model: "opus", effort: "max", prompt: CLEAN_CRITIC },
+}, ALLOW);
+check("GD2-C23b allow  an effort the configuration does not name for the duty only warns", {
+  tool_use_id: "gd2-c23b",
+  tool_name: "Task",
+  tool_input: { subagent_type: "pipeline-core:critic", model: "opus", effort: "low", prompt: CLEAN_CRITIC },
+}, ALLOW, { stderrIncludes: ["DISPATCH-EFFORT-DUTY-MISMATCH"] });
+check("GD2-C23c block  a dispatch that names an effort but no model still inherits the session model", {
+  tool_use_id: "gd2-c23c",
+  tool_name: "Task",
+  tool_input: { subagent_type: "pipeline-core:critic", effort: "max", prompt: CLEAN_CRITIC },
+}, BLOCK, { stderrIncludes: ["DISPATCH-MODEL-MISSING"] });
+
 const prohibitedToolUseId = "gd2-advisor-prohibited";
 check("GD2a allow and bind a policy-clean Critic dispatch carrying the exact Advisor prohibition", {
   tool_use_id: prohibitedToolUseId,
@@ -1339,7 +1358,8 @@ manualCheck("GD20c allow  G20-48: an item-governed generated ANTIGRAVITY Goldfis
 });
 
 // QG-04 restatement (candidate 20b, G20-47/G20-48): the corpus grew by the Antigravity bare-name and generated-briefing cases.
-assert.equal(cases.length, 85, "the complete dispatch guard corpus must register before execution");
+// C23 (QG-04, restated in place): 85 -> 88, the three GD2-C23 cases for a call that carries an effort.
+assert.equal(cases.length, 88, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

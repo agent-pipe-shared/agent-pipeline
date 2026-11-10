@@ -856,6 +856,25 @@ test("applyRuntimeProjectionV3NeutralMirrors reports not-ready for a non-ready p
   }
 });
 
+// C23 (draft ADR "a project's pipeline.user.yaml owns its routing", AC-108): a Claude selector outside the native alias catalog is valid
+// project configuration, so the plan projects it as given instead of stopping with invalid-baseline.
+test("C23 a Claude selector that is not in the native alias catalog plans a projection of the value as given", () => {
+  const root = fixtureRoot();
+  try {
+    const intent = completeIntent();
+    intent.routing.profiles.epic.design_phase.claude.selector = { kind: "model-id", value: "claude-opus-5" };
+    const plan = planRuntimeProjectionV3(intent, { baselines: readRuntimeProjectionV3Baselines(root) });
+    assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
+    const claude = target(plan, ".claude/pipeline.yaml");
+    assert.match(claude.after.bytes, /elephant_epic_design:\n    model: claude-opus-5\n/u);
+    assert.match(claude.after.bytes, /Claude aliases: haiku, opus, sonnet;/u, "the catalog comment still lists the native aliases");
+    // The catalog aliases keep projecting through the catalog.
+    assert.match(claude.after.bytes, /advisor_epic:\n    model: opus\n/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 console.log(`\n${passed}/${passed + failures.length} tests passed.`);
 if (failures.length > 0) {
   for (const failure of failures) console.error(`  - ${failure}`);

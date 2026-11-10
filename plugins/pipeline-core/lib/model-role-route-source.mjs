@@ -83,7 +83,7 @@ function routeCellValid({ cell, taskRoute, runner }) {
  * only when `ok` is true. Missing task routes are fatal to that complete set;
  * the diagnostics carry no permission to silently drop one.
  */
-export function registeredFunctionalTaskRoutes(registry = loadRunnerProfilesV3Registry()) {
+export function registeredFunctionalTaskRoutes(registry = loadRunnerProfilesV3Registry(), { tolerateConflicts = false } = {}) {
   if (!exactKeys(registry?.profiles, PROFILES)
     || !PROFILES.every((profile) => exactKeys(registry.profiles[profile], PHASES))
     || !exactKeys(registry?.duties, DUTIES)) {
@@ -139,6 +139,7 @@ export function registeredFunctionalTaskRoutes(registry = loadRunnerProfilesV3Re
     return { ok: false, code: "MODEL-ROLE-ROUTE-SOURCE-INVALID" };
   }
   const configured = new Map();
+  const warnings = [];
   for (const route of taskRoutes) {
     // A V3-unavailable route is part of the visible task inventory but is not
     // a launchable session slot. Do not force catalogue/policy admission for
@@ -148,7 +149,12 @@ export function registeredFunctionalTaskRoutes(registry = loadRunnerProfilesV3Re
     const previous = configured.get(key);
     if (previous && (previous.selector.kind !== route.cell.selector.kind
       || previous.selector.value !== route.cell.selector.value)) {
-      return { ok: false, code: "MODEL-ROLE-ROUTE-SOURCE-CONFLICT", routeKey: key };
+      // The shipped registry and the bootstrap callers keep the refusal. A project's own routing (C23) may name two selectors for one
+      // runner, role and effort: the first cell stays the bootstrap slot, every task route keeps its own selector, and this is a warning.
+      if (!tolerateConflicts) return { ok: false, code: "MODEL-ROLE-ROUTE-SOURCE-CONFLICT", routeKey: key };
+      warnings.push({ code: "MODEL-ROLE-ROUTE-SOURCE-CONFLICT", routeKey: key,
+        message: `the project's routing names different selectors for ${key} (${previous.selector.value} and ${route.cell.selector.value}, at ${route.taskRoute}); each task route keeps its own selector` });
+      continue;
     }
     configured.set(key, { runner: route.runner, role: route.role,
       effort: route.cell.effort, selector: structuredClone(route.cell.selector) });
@@ -160,6 +166,7 @@ export function registeredFunctionalTaskRoutes(registry = loadRunnerProfilesV3Re
       .map(({ taskRoute, runner, role, cell }) => ({ taskRoute, runner, role, effort: cell.effort })),
     configuredRoutes: [...configured.values()].sort((a, b) =>
       `${a.runner}:${a.role}:${a.effort}`.localeCompare(`${b.runner}:${b.role}:${b.effort}`)),
+    ...(warnings.length === 0 ? {} : { warnings }),
   };
 }
 
@@ -169,8 +176,16 @@ export function registeredFunctionalTaskRoutes(registry = loadRunnerProfilesV3Re
  * uses this; a reader that needs only the seed or the shape keeps `loadRunnerProfilesV3Registry()`.
  */
 export function projectFunctionalTaskRoutes(root, { warn } = {}) {
-  return registeredFunctionalTaskRoutes(loadProjectRoutingRegistry(root, { warn }));
+  const source = registeredFunctionalTaskRoutes(loadProjectRoutingRegistry(root, { warn }), { tolerateConflicts: true });
+  // A caller that passes `warn` reads `source.warnings` itself; any other announces a tolerated conflict once per process on stderr.
+  if (source.ok && !warn) {
+    for (const { message } of source.warnings ?? []) {
+      if (!WARNED_CONFLICTS.has(`${root}\0${message}`)) { WARNED_CONFLICTS.add(`${root}\0${message}`); process.stderr.write(`WARNING (project-routing): ${message}\n`); }
+    }
+  }
+  return source;
 }
+const WARNED_CONFLICTS = new Set();
 
 /** A session observes only its installed runner; the full source remains the approval subject. */
 export function functionalTaskRoutesForRunner(source, runner) {

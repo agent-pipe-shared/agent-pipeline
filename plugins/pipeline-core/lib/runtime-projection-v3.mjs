@@ -283,8 +283,10 @@ function renderClaudeModelRouting(target, intent, eol, placement = {}) {
     if (!cell?.selector || !cell.effort) {
       throw new Error(`V3 binding is not projectable: ${binding.targetKey}`);
     }
-    const model = target.nativeModelAliases[cell.selector.value];
-    if (!model) throw new Error(`V3 Claude selector is not natively projectable: ${cell.selector.value}`);
+    // C23 (draft ADR "a project's pipeline.user.yaml owns its routing"): any model id or alias is valid project configuration, so a
+    // selector outside the native alias catalog projects as given instead of stopping the plan.
+    const model = Object.hasOwn(target.nativeModelAliases, cell.selector.value) ? target.nativeModelAliases[cell.selector.value] : cell.selector.value;
+    if (typeof model !== "string" || model === "") throw new Error(`V3 Claude selector is not projectable: ${cell.selector.value}`);
     lines.push(`  ${binding.targetKey}:`);
     lines.push(`    model: ${model}`);
     lines.push(`    effort: ${cell.effort}`);
