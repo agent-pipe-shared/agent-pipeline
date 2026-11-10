@@ -13,6 +13,24 @@ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 import { admissionProgress } from "../lib/admission-progress.mjs";
+import { observeEffectiveEffort } from "../lib/dispatch-model-enforcement.mjs";
+
+/**
+ * C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 6): beside a recorded Claude Goldfish commit the stop names the
+ * effort that really ran (the `effort.level` the host reports) or says it is unobserved; the configured effort is read from the written
+ * dispatch record. A line for stderr, or null for any other event, runner or outcome. Never a refusal; the closed record gains no field.
+ */
+export function effortObservationNotice({ root, runner, input, result } = {}) {
+  if (runner !== "claude" || input?.hook_event_name !== "SubagentStop" || result?.status !== "authored-commit-recorded") return null;
+  let configuredEffort = null;
+  try {
+    const target = result.record?.target;
+    if (typeof target === "string") configuredEffort = JSON.parse(readFileSync(join(root, target), "utf8"))?.effort ?? null;
+  } catch { configuredEffort = null; }
+  const observation = observeEffectiveEffort({ configuredEffort, stopInput: input });
+  if (observation.warning) return `WARNING (native-goldfish-host): ${observation.warning.code}: ${observation.warning.message}`;
+  return `Effective effort observed: ${observation.observed} (configured ${observation.configured ?? "unrecorded"}).`;
+}
 // Repository admission precedes hook input hardening and all governed effects.
 if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
 // E5: the same opt-in authority trace the guard hooks write (progress marks while running, the tally line at exit); a no-op unless PIPELINE_AUTHORITY_TRACE is "1".
@@ -306,6 +324,11 @@ if (isDirectInvocation(import.meta.url)) {
     process.exit(0);
   }
   const message = nativeGoldfishHookMessage(result, { stopFailure });
+  // C23: the effective effort of the stopped Claude Goldfish, observed or unobserved; stderr only, never a decision.
+  try {
+    const effortNote = effortObservationNotice({ root: process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd(), runner, input, result });
+    if (effortNote) process.stderr.write(`${effortNote}\n`);
+  } catch { /* an unreadable observation never changes the stop */ }
   if (!message) process.exit(0);
   if (runner === "claude" && input.hook_event_name === "PostToolUse") {
     process.stdout.write(`${JSON.stringify({ hookSpecificOutput: {

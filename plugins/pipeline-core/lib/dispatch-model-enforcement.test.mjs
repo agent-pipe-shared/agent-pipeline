@@ -236,6 +236,28 @@ test("DME-C23c a call that carries the configured effort is admitted, a differen
   assert.equal(noModel.findings[0].code, "DISPATCH-MODEL-MISSING", "naming an effort never replaces naming a model");
 });
 
+test("DME-C23e the Claude SubagentStop hook names the effort that really ran, or says it is unobserved, beside a recorded Goldfish commit", async () => {
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { effortObservationNotice } = await import("../hooks/native-goldfish-host.mjs");
+  assert.equal(typeof effortObservationNotice, "function");
+  const root = mkdtempSync(join(tmpdir(), "c23-effort-"));
+  try {
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(join(root, "evidence", "dispatch-record-X1.json"), JSON.stringify({ taskId: "X1", effort: "high" }));
+    const recorded = { status: "authored-commit-recorded", record: { target: "evidence/dispatch-record-X1.json" } };
+    const stop = (extra = {}) => ({ hook_event_name: "SubagentStop", ...extra });
+    assert.match(effortObservationNotice({ root, runner: "claude", input: stop({ effort: { level: "high" } }), result: recorded }), /observed.*high/iu);
+    assert.match(effortObservationNotice({ root, runner: "claude", input: stop({ effort: { level: "xhigh" } }), result: recorded }), /DISPATCH-EFFORT-NOT-EFFECTIVE.*xhigh/u);
+    assert.match(effortObservationNotice({ root, runner: "claude", input: stop(), result: recorded }), /DISPATCH-EFFORT-UNOBSERVED/u);
+    // Nothing is claimed for another event, another runner, or a stop that recorded no commit.
+    assert.equal(effortObservationNotice({ root, runner: "claude", input: { hook_event_name: "PostToolUse" }, result: recorded }), null);
+    assert.equal(effortObservationNotice({ root, runner: "codex", input: stop(), result: recorded }), null);
+    assert.equal(effortObservationNotice({ root, runner: "claude", input: stop(), result: { status: "recovery-required" } }), null);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("DME-C23d the effort that really ran is the one the stop reports; absent, it is recorded as unobserved and never claimed", async () => {
   const { observeEffectiveEffort } = await import("./dispatch-model-enforcement.mjs");
   assert.equal(typeof observeEffectiveEffort, "function");
