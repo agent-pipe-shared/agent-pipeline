@@ -337,8 +337,10 @@ export function finalizeNativeGoldfishHostReturn(args = {}, dependencies = {}) {
   // C19L-W250: a marked stop whose pending state could not be resolved returns not-applicable (the hook stays non-blocking) but has just left a
   // stop-failure record; the hook names that record at this very stop instead of only at a later PostToolUse that a background pair never has.
   if (diagnostic.unresolved && result?.status === "not-applicable" && typeof diagnostic.unresolved.dispatchId === "string")
-    return { ...result, unresolvedStop: { dispatchId: diagnostic.unresolved.dispatchId } };
-  return result;
+    return { ...result, unresolvedStop: { dispatchId: diagnostic.unresolved.dispatchId }, stopDispatchId: diagnostic.unresolved.dispatchId };
+  // The hook records how this stop ended under this id, as its last step, for wait-host-commit.mjs; a success result carries no id of its own.
+  const stopDispatchId = args?.input?.hook_event_name === "SubagentStop" ? diagnostic.stop?.state?.binding?.dispatchId ?? diagnostic.dispatch?.dispatchId ?? null : null;
+  return typeof stopDispatchId === "string" ? { ...result, stopDispatchId } : result;
 }
 
 // AC-164: of a thrown error only its name, a short `code` and a slug `reason` travel; never a message, stack or path.

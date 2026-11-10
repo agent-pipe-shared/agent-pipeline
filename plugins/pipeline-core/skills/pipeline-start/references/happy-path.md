@@ -85,8 +85,9 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
      `status: "prepared"` call `invoke_subagent` with the fields of the returned `invocation` unchanged (the host takes flat arguments, one child per call). A native implementation consent is not available: read
      `references/antigravity-native-dispatch.md` before the first dispatch and ask the PO when the sanctioned route does not return an authored commit.
 4. Commit what the dispatch produced under the host-commit rules of its runner; never hand-build a record the writer refuses (the refusal names its repair).
-   On Claude the host commit of a background Goldfish lands at its SubagentStop. Its hand-back message can arrive before that commit, its completion
-   task-notification arrives after it: act on that notification, read `git log -1` and dispatch the next ready slice in the same turn. While ready
+   On Claude the host commit of a background Goldfish lands at its SubagentStop. Its hand-back message can arrive before that commit, and the later
+   "Agent finished" task-notification starts no turn. So when the hand-back arrives, run the exact `wait-host-commit.mjs` command from the launch notice in that same turn,
+   run it once more on `still-waiting`, and dispatch the next ready slice from its answer (after a compaction, `--help` names what to pass instead of the launch time). While ready
    slices remain, never end a turn with a status report or to wait for the pipeline to commit; a turn that ends there waits for the PO.
 5. After the last slice and before the project's Verify, where the project has an architecture model: `architecture-fitness.mjs --root <root> --check` and `architecture-boundary-check.mjs --root <root> --json` (both read-only). A violation is fixed before the Critic reads the candidate.
 

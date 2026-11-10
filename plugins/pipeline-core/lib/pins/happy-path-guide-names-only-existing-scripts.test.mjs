@@ -26,10 +26,13 @@ test("the guide tells when to call the architecture-decision skill: at design pr
 
 // G20-61 (Claude greenfield 2026-11-08 06:03 -> 06:59 UTC): the hand-back arrived before the host commit, the session reported
 // and ended its turn, and the completion notification a minute later produced no action until the PO asked.
-test("G20-61: the guide makes the Goldfish completion notification the cue to continue and forbids a status-report turn end", () => {
+// Measured 2026-11-10: that notification started no model turn in 32 of 32 cases, so the guide must not make it the cue.
+test("G20-61: the guide makes the wait command at the hand-back the cue to continue and forbids a status-report turn end", () => {
   const guide = readFileSync(GUIDE, "utf8");
   assert.match(guide, /hand-back message can arrive before that commit/u);
-  assert.match(guide, /act on that notification, read `git log -1` and dispatch the next ready slice in the same turn/u);
+  assert.match(guide, /task-notification starts no turn/u);
+  assert.match(guide, /wait-host-commit\.mjs` command from the launch notice in that same turn/u);
+  assert.doesNotMatch(guide, /act on that notification/u);
   assert.match(guide, /never end a turn with a status report/u);
 });
 

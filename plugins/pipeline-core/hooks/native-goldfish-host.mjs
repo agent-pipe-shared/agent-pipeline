@@ -14,6 +14,7 @@ import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 import { admissionProgress } from "../lib/admission-progress.mjs";
 import { observeEffectiveEffort } from "../lib/dispatch-model-enforcement.mjs";
+import { hostCommitWaitCommand, writeNativeGoldfishStopOutcome } from "../lib/native-goldfish-stop-outcome.mjs";
 
 /**
  * C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 6): beside a recorded Claude Goldfish commit the stop names the
@@ -201,20 +202,22 @@ function stopFailureNotice(failure) {
   return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeLock(failure.lock)}${describeFailureDetail(failure.detail)}${describeOthers(failure.others)}`;
 }
 
-export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {
-  const base = nativeGoldfishHookBaseMessage(result);
+export function nativeGoldfishHookMessage(result, { stopFailure = null, waitCommand = null } = {}) {
+  const base = nativeGoldfishHookBaseMessage(result, waitCommand);
   const notice = stopFailureNotice(stopFailure);
   return base && notice ? `${base} ${notice}` : base ?? notice;
 }
 
-function nativeGoldfishHookBaseMessage(result) {
+function nativeGoldfishHookBaseMessage(result, waitCommand = null) {
   if (!result || result.status === "not-applicable" || result.status === "agent-bound") return null;
   if (result.status === "authored-commit-recorded") {
     return `Goldfish host commit verified: ${result.commit}; v4 dispatch record: ${result.record?.target ?? "written"}.${result.delivery?` Item checks ${result.delivery.checkStatus?.verdict??"unqualified"}; Main integration ${result.integration?.status??"pending"} (${result.integration?.code??"held"}).`:""}`;
   }
   if (result.status === "awaiting-subagent-stop") {
     // The SubagentStop completion route is registered and this launch is its pending state: nothing is committed yet.
-    return `Goldfish background launch observed${result.dispatchId ? ` (${result.dispatchId})` : ""}: the host commit completes when this child stops (Claude SubagentStop hook), not at this launch. No commit or authorship record is claimed until then.`;
+    const launched = `Goldfish background launch observed${result.dispatchId ? ` (${result.dispatchId})` : ""}: the host commit completes when this child stops (Claude SubagentStop hook), not at this launch. No commit or authorship record is claimed until then.`;
+    const waiting = "The hand-back arrives before that commit and the later \"Agent finished\" notice starts no turn, so never end the turn to wait for it";
+    return waitCommand ? `${launched} ${waiting}: when the hand-back arrives, run exactly this in that same turn and continue from its answer: ${waitCommand}` : `${launched} ${waiting}: when the hand-back arrives, run scripts/wait-host-commit.mjs in that same turn and continue from its answer.`;
   }
   if (result.code === "NGHF-PENDING-UNAVAILABLE") {
     const why = result.reason === "async-launch"
@@ -323,7 +326,14 @@ if (isDirectInvocation(import.meta.url)) {
     process.stdout.write(`${JSON.stringify(block)}\n`);
     process.exit(0);
   }
-  const message = nativeGoldfishHookMessage(result, { stopFailure });
+  const projectRoot = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
+  const waitCommand = result?.status === "awaiting-subagent-stop" ? hostCommitWaitCommand({ root: projectRoot, dispatchId: result.dispatchId, after: new Date().toISOString() }) : null;
+  const message = nativeGoldfishHookMessage(result, { stopFailure, waitCommand });
+  // Last step of a Goldfish stop: the commit, the record and the integration are done, so whoever waits for this may start the next step.
+  if (input.hook_event_name === "SubagentStop" && typeof result?.stopDispatchId === "string") {
+    try { writeNativeGoldfishStopOutcome({ commonDir: resolveGitCommonDir(projectRoot), dispatchId: result.stopDispatchId, result, message }); }
+    catch { /* a stop never depends on this record */ }
+  }
   // C23: the effective effort of the stopped Claude Goldfish, observed or unobserved; stderr only, never a decision.
   try {
     const effortNote = effortObservationNotice({ root: process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd(), runner, input, result });

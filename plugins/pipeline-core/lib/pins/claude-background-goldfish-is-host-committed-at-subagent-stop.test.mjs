@@ -356,8 +356,17 @@ test("(i) a launch with NO run_in_background key takes the SubagentStop route an
   assert.match(context(posted), new RegExp(`Goldfish background launch observed \\(${fx.dispatchId}\\)`, "u"), posted.stdout);
   assert.match(context(posted), /No commit or authorship record is claimed until then/u);
   assert.equal(fx.gitOk("rev-parse", "HEAD"), fx.candidate, "the async launch acknowledgement commits nothing");
+  // The notice carries the whole wait command, and that command answers only once the real stop has finished.
+  const printed = context(posted).match(/--dispatch (\S+) --after (\S+)/u);
+  assert.ok(printed, context(posted));
+  assert.equal(printed[1], fx.dispatchId);
+  const wait = () => JSON.parse(spawnSync(process.execPath, [fileURLToPath(new URL("../../scripts/wait-host-commit.mjs", import.meta.url)), "--root", fx.root, "--dispatch", printed[1], "--after", printed[2], "--timeout-seconds", "1"], { encoding: "utf8" }).stdout);
+  assert.equal(wait().status, "still-waiting");
   childWork(fx);
   assertCommittedOnceAtStop(fx, "toolu_pf26b_keyless");
+  const answered = wait();
+  assert.equal(answered.status, "committed", JSON.stringify(answered));
+  assert.equal(answered.commit, hostCommits(fx)[0]);
 });
 
 test("(ii) an explicit run_in_background: true takes the same route in the item-governed course shape of this repository", () => {

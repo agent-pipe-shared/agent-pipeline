@@ -4819,6 +4819,12 @@
       "file": "plugins/pipeline-core/scripts/publication-readback.test.mjs",
       "invariantPinned": "The publication readback records what the remote really holds in a private append-only chain without touching the working tree or writing a URL; a repeat appends nothing, a local commit ahead and a differing remote are told apart, and a changed or removed line is detected",
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/publication-readback.test.mjs"
+    },
+    {
+      "name": "wait-host-commit-tests",
+      "file": "plugins/pipeline-core/scripts/wait-host-commit.test.mjs",
+      "invariantPinned": "The wait for a background Goldfish's stop answers from the stop's own last record: committed, checkpoint, stop-failed with the stop's recovery, or still-waiting; another dispatch or an earlier attempt under the same id never answers for this one, and it changes nothing",
+      "nonOverlapNote": "Unique cases: the waiter and the launch notice command; claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs pins it once against the real stop hook"
     }
   ]
 }
