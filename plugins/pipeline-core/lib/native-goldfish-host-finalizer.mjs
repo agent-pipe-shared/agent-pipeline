@@ -236,7 +236,7 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
       let entries = [];
       try { entries = stopReaddir(directory); } catch { /* none to remove */ }
       for (const entry of entries) {
-        if (!/^stop-failure-.+\.json$/u.test(entry)) continue;
+        if (!/^(?:stop-failure|handback-refusals)-.+\.json$/u.test(entry)) continue;
         try {
           const recorded = JSON.parse(stopRead(join(directory, entry), "utf8"));
           if (typeof recorded?.dispatchId === "string" && recorded.dispatchId === dispatchId) stopUnlink(join(directory, entry));

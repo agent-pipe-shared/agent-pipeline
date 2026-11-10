@@ -971,6 +971,12 @@ const cases = [
     const shown = nativeGoldfishHookMessage(failed, { stopFailure: readNativeGoldfishStopFailure({ commonDir }) });
     assert.match(shown, new RegExp(`position ${cut.length} of ${cut.length} characters`, "u"));
     assert.match(shown, /condition json-truncated/u);
+    // The repaired return completes the dispatch; the success removes the stop-failure record and the refusal count of that dispatch.
+    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding) } }] } })}\n`);
+    const done = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, dependencies);
+    assert.equal(done.status, "authored-commit-recorded", done.code);
+    assert.deepEqual(diagEntries(commonDir), [], "no diagnostic of the completed dispatch is left");
   }, "claude", 1, "goldfish-implementor", { background: true }) },
   { id: "NGHF49", name: "C23: the stop-failure detail admits the key lists as bounded slugs and drops everything else", run: () => {
     assert.deepEqual(sanitizeStopFailureDetail({ condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "has space", "a/b", "k3", "k4", "k5", "k6", "k7"] }),
