@@ -181,10 +181,10 @@ export function firstUnadmittedFlag(command, root) {
     // pattern itself vanish and be mistaken for a flag fault, so a bad value flag is simply not diagnosed (null).
     const rest = argv.filter((_, position) => position !== index);
     if (isReadOnlyDiagnosticCommand([executable, ...rest.map(quote)].join(" "), root)) return token;
-    // R6: an option taking a value, given twice (`-A 3 -A 5`). Only the repeat and the word after it go, so the earlier occurrence still proves the flag is admitted and no operand can vanish unnoticed.
+    // R6: an option taking a value, given twice (`-A 3 -A 5`). Removing either occurrence with the word after it must admit the command: that the two probes agree is what shows the repeat is the whole fault and no second fault vanished with the dropped word.
     if (argv.slice(0, index).includes(token) && index + 1 < limit) {
-      const withoutRepeat = argv.filter((_, position) => position !== index && position !== index + 1);
-      if (isReadOnlyDiagnosticCommand([executable, ...withoutRepeat.map(quote)].join(" "), root)) return token;
+      const without = (at) => argv.filter((_, position) => position !== at && position !== at + 1);
+      if ([argv.indexOf(token), index].every((at) => isReadOnlyDiagnosticCommand([executable, ...without(at).map(quote)].join(" "), root))) return token;
     }
     // C22B: a short-flag cluster that holds a value-taking flag (`-nA 5`) is refused although its flags spelled out are admitted. Removing the token cannot
     // show that (the value would be left behind), so replacing it by its single flags is the one extra probe; clusterSpellingHint then prints the spelling.

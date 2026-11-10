@@ -126,6 +126,7 @@ test("RCD-R6: a repeated option is named, with or without a value, and only when
     assert.equal(repeatedFlagHint(command, flag, root), `this option is given more than once and is admitted once here; keep one ${flag}`, command);
   }
   assert.equal(firstUnadmittedFlag("rg -n -A 3 -A 5 --hidden needle docs", root), null, "two faults: no single token explains it");
+  assert.equal(firstUnadmittedFlag("rg -n -n --hidden needle README.md", root), null, "a repeat beside a second fault: dropping the word after the repeat must not hide it");
   assert.equal(repeatedFlagHint("rg --hidden needle README.md", "--hidden", root), null, "a flag given once is no repeat");
   assert.equal(repeatedFlagHint(undefined, "-n", root), null);
   const result = await refusal("rg -n -A 3 -A 5 needle README.md");
