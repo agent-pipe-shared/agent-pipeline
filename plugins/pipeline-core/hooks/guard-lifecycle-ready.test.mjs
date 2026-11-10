@@ -13458,3 +13458,91 @@ test("C21 a shell listing or rg --files of a project directory that does not exi
     });
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
+
+// C23-SHELL-READ-TOIL (AC-108). A read needs no human ceremony: the refusal of a read that lies outside the project root names what is
+// admitted and offers no override. A mutating command outside the root keeps its override text. Measured with the signature-mode
+// fixture, where the planner would otherwise print a plan command for the read.
+test("C23 AC-108: a read-only command refused as outside the project root offers no human override; a mutating command keeps its override text", () => {
+  const sigRoot = hgoGitFixture("signature");
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-c23-outside-"));
+  try {
+    mkdirSync(join(outside, "vault"), { recursive: true });
+    writeFileSync(join(outside, "vault", "id_rsa"), "fake-value\n");
+    const secret = join(outside, "vault", "id_rsa").replaceAll("\\", "/");
+    for (const command of [
+      `cat ${secret}`,
+      `rg -n x ${secret}`,
+      // A piped, chained or stderr-suppressed read of a credential-named outside file is not classified as an outside-root read at all (the
+      // classifiers lift the target path but the secret-name screen still refuses it, so it keeps the operator/redirect/parse codes): not asserted.
+      // A dot-dot spelling is the one outside-root refusal that does not depend on a secret name.
+      `cat ${HGO_PLUGIN_ROOT.replaceAll("\\", "/")}/skills/../lib/guard/constants.mjs`,
+    ]) {
+      const refused = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot, ...hgoReadyDeps() });
+      assert.equal(refused.exitCode, 2, command);
+      assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+      assert.doesNotMatch(refused.stderr, /Human override available|Step: plan|human-held Ed25519|No human override route/u, command);
+      assert.match(refused.stderr, /A read needs no human override/u, command);
+    }
+    const mutation = evaluateLifecycleReadyGuard(bash("cp /etc/hosts /tmp/elsewhere/hosts"), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(mutation.exitCode, 2);
+    assert.match(mutation.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.match(mutation.stderr, /Human override available for this exact command/u);
+  } finally {
+    rmSync(sigRoot, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// C23-SHELL-READ-TOIL (AC-108), part 2, characterization only (green on the base, so it is no red examiner): a shell read of a file under the
+// plugin root this guard runs from is admitted for cat, rg, head and an rg-to-head pipeline, exactly as the native Read tool admits the same
+// file, while a path that escapes the plugin root through `..` is refused. The reproduction the briefing described did not fail on the base.
+test("C23 AC-108: cat, rg and head on a plugin reference file are admitted; a plugin path escaping through .. is refused", () => {
+  const path = qp4Fixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      const reference = join(HGO_PLUGIN_ROOT, "skills", "pipeline-start", "references", "roles.md").replaceAll("\\", "/");
+      for (const command of [`cat ${reference}`, `rg -n x ${reference}`, `head -n 5 ${reference}`, `rg -n x ${reference} | head -5`]) {
+        const verdict = qp4Verdict(bash(command), path);
+        assert.equal(verdict.exitCode, 0, `${command}\n${verdict.text}`);
+      }
+      const read = evaluateLifecycleReadyGuard({ tool_name: "Read", tool_input: { file_path: reference } }, { projectDir: path });
+      assert.equal(read.exitCode, 0, "the native Read tool admits the same file");
+      // A dot-dot segment is refused inside the plugin root too (it names a file that exists there), so no spelling can walk out of it.
+      const escaping = `${HGO_PLUGIN_ROOT.replaceAll("\\", "/")}/skills/../lib/guard/constants.mjs`;
+      qp4RefuseOutside(`cat ${escaping}`, path);
+    });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// C23 part 2, Codex-shaped cache (coordinator evidence: live refusals for plugin files under <home>/.codex/plugins/cache/...). Characterization, green on
+// the base: with a fake home holding that cache layout, a shell read of its files is admitted like any ordinary outside file (D96). The live refusal
+// could therefore not be reproduced through the lifecycle guard; its cause is not a missing bounded root of the shell lane.
+test("C23 AC-108: cat and rg on files under a Codex-shaped <home>/.codex/plugins/cache plugin copy are admitted", () => {
+  const path = qp4Fixture();
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "guard-lifecycle-c23-codex-home-")));
+  const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
+  try {
+    const cache = join(home, ".codex", "plugins", "cache", "agent-pipeline-local", "pipeline-core", "0.0.0");
+    for (const [rel, body] of [["scripts/lib/session-critic-finalization.mjs", "export const x = 1;\n"], ["schemas/a.json", "{}\n"], ["templates/prompts/critic-review.md", "x\n"]]) {
+      mkdirSync(dirname(join(cache, rel)), { recursive: true });
+      writeFileSync(join(cache, rel), body);
+    }
+    process.env.HOME = home;
+    process.env.USERPROFILE = home;
+    qp4WithoutAppDataRoots(() => {
+      const base = cache.replaceAll("\\", "/");
+      for (const command of [
+        `rg -n 'x' ${base}/scripts/lib/session-critic-finalization.mjs`,
+        `rg -n 'x' ${base}/schemas/a.json`,
+        `cat ${base}/templates/prompts/critic-review.md`,
+      ]) {
+        const verdict = qp4Verdict(bash(command), path);
+        assert.equal(verdict.exitCode, 0, `${command}\n${verdict.text}`);
+      }
+    });
+  } finally {
+    for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});

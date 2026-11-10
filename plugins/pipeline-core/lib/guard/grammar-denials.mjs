@@ -216,6 +216,8 @@ export const READ_SCOPE_DENIAL_REMEDY = [
   "Re-target the read inside the project root: the identical bounded pipeline AND the identical single, un-piped read are both admitted once every read target resolves inside the project root.",
   // Q2 (candidate 19): the refusal is intended; say so and name the one alternative that exists besides re-targeting.
   "This refusal is intended, not a fault of the command: shell reads are kept inside the project root. For one exact file outside the root, the native Read tool with that file path is the alternative; it applies its own read-scope rules.",
+  // C23 (AC-108): a read is never offered a human override, so the text names what is admitted instead of a ceremony.
+  "A read needs no human override and none is offered. Admitted instead: shell reads of files inside the project root and of the Pipeline plugin's own files, and the native Read tool for one exact file elsewhere.",
 ];
 
 // NVA-B-DENIALTRIM: the trimmed rendering for the SECOND-OR-LATER denial of the SAME

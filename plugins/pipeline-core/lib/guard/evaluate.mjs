@@ -35,6 +35,16 @@ import { isSourceOwnedContinuityVerificationCommand, isFixedOwningVerificationCo
 import { evaluateAfterGrammarAdmission } from "./lifecycle-gate.mjs";
 import { powerShellScopeVerdict, sanctionedPowerShellNodeCall } from "./powershell-dialect.mjs";
 import { envDumpClassifierErrorRefusal, envDumpShellRefusal } from "./env-dump-lane.mjs";
+
+// C23-SHELL-READ-TOIL (AC-108): GUARD-READ-SCOPE-OUTSIDE-ROOT is printed only for a read-only command (the three isOutsideRoot* classifiers). A read
+// needs no human ceremony, so that refusal asks the override planner for nothing: it names what is admitted instead (READ_SCOPE_DENIAL_REMEDY) and
+// offers no plan command. Every other code of this file, a mutation among them, keeps its route.
+const NO_OVERRIDE_FOR_A_READ = Object.freeze({ admitted: null, overrideGuidance: "", repeatOverrideGuidance: "" });
+function overrideRouteUnlessRead(code, reason, root, toolName, toolInput, dependencies) {
+  return code === READ_SCOPE_DENIAL_CODE
+    ? NO_OVERRIDE_FOR_A_READ
+    : humanOverrideRoute(code, reason, "command", root, toolName, toolInput, dependencies);
+}
 import { isCurrentSessionArtifactExport } from "../current-session-artifact-export.mjs";
 
 // G2 / EL-36: READY permits agent work, but cannot authorize the human's
@@ -588,8 +598,8 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       const reason = andChainReadScope
         ? `${code}: ${READ_SCOPE_DENIAL_GUIDANCE}`
         : `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`;
-      const route = humanOverrideRoute(
-        code, reason, "command", root, toolName, input.tool_input, dependencies,
+      const route = overrideRouteUnlessRead(
+        code, reason, root, toolName, input.tool_input, dependencies,
       );
       if (!route.admitted) {
         // NVA-B-DENIALTRIM: consulted (and marked seen) ONLY on an actual denial, never on
@@ -632,8 +642,8 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       const reason = readScope
         ? `${code}: ${READ_SCOPE_DENIAL_GUIDANCE}`
         : `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`;
-      const route = humanOverrideRoute(
-        code, reason, "command", root, toolName, input.tool_input, dependencies,
+      const route = overrideRouteUnlessRead(
+        code, reason, root, toolName, input.tool_input, dependencies,
       );
       if (!route.admitted) {
         // Intentional `[]`, not the GUARD-PARSE-UNSUPPORTED omission (backlog:
@@ -659,7 +669,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       // isReadOnlyDiagnosticCommand() fast path above and never reaches this branch.
       const code = READ_SCOPE_DENIAL_CODE;
       const reason = `${code}: ${READ_SCOPE_DENIAL_GUIDANCE}`;
-      const route = humanOverrideRoute(code, reason, "command", root, toolName, input.tool_input, dependencies);
+      const route = overrideRouteUnlessRead(code, reason, root, toolName, input.tool_input, dependencies);
       if (!route.admitted) {
         const firstOccurrence = isFirstDenialThisScope(input, root, code, dependencies);
         return withLifts(lifts, blocked(code, null, [], route.overrideGuidance, null, null, null, false, firstOccurrence));

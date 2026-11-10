@@ -131,7 +131,7 @@
  */
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -148,6 +148,10 @@ import { classifyPublishedTagPush, RELEASE_TAG_REF } from "../lib/published-tag-
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "../lib/git-cmd.mjs";
 import { classifyGhCommand } from "../lib/gh-cmd.mjs";
+// C23-SHELL-READ-TOIL: the shared closed shell grammar decides what a read-only search is; this guard adds no parser of its own.
+import { parseGuardCommand } from "./guard-command-grammar.mjs";
+import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM } from "../lib/guard/constants.mjs";
+import { isReadOnlyDiagnosticCommand, splitTopLevelAndChain } from "../lib/guard/shell-grammar.mjs";
 import { CHECKPOINT_LANE, classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -463,9 +467,33 @@ function provenNonPushMarkerCandidate(text) {
   return bodies.every(substitutionBodyIsPlain);
 }
 
+// C23-SHELL-READ-TOIL (AC-108): a read-only search such as `rg -n "(git -C|worktree)" docs` names git next to a marker only inside its pattern,
+// and was refused as a possible hidden push with advice ("use rg") that was exactly what had been run. The proof below is the second stage
+// for that one shape and is made of the shared closed shell grammar alone: the whole command must be admitted by `isReadOnlyDiagnosticCommand`,
+// every `&&` part must parse (`parseGuardCommand` refuses an active `$` or backtick, even inside double quotes, and a `;`, `&`, parenthesis or
+// unterminated quote) into segments whose executable is rg or grep (a pipeline may end in head or tail, which take no pattern), and the first
+// segment of every part is the searcher. Then no word of the command is an executable other than those four, so a `git` word anywhere in it is
+// an argument -- data -- and no push can run. Anything not proven keeps the refusal below; nothing here reads a pattern for meaning.
+const SEARCH_EXECUTABLES = new Set(["rg", "grep"]);
+const SEARCH_SINK_EXECUTABLES = new Set(["head", "tail"]);
+const searchExecutableName = (executable) => basename(String(executable)).toLowerCase().replace(/\.exe$/u, "");
+
+function provenReadOnlySearch(text, root) {
+  if (typeof text !== "string" || text === "" || text.length > 4096 || typeof root !== "string" || root === "") return false;
+  if (!isReadOnlyDiagnosticCommand(text, root)) return false;
+  const parts = splitTopLevelAndChain(text) ?? [text];
+  return parts.every((part) => {
+    const parsed = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+    if (parsed.parseStatus !== "accepted" || parsed.segments.length === 0) return false;
+    const names = parsed.segments.map((segment) => searchExecutableName(segment.executable));
+    return SEARCH_EXECUTABLES.has(names[0]) && names.every((name) => SEARCH_EXECUTABLES.has(name) || SEARCH_SINK_EXECUTABLES.has(name));
+  });
+}
+
 const isPush = commandIsGitPush(cmd);
 if (!isPush) process.exit(0); // fast path: not a push at all
 if (provenNonPushMarkerCandidate(cmd)) process.exit(0); // marker-only candidate proven to be a plain non-push read or commit
+if (provenReadOnlySearch(cmd, process.env.CLAUDE_PROJECT_DIR || process.cwd())) process.exit(0); // C23: a read-only rg/grep search that only names git inside its pattern
 
 /**
  * `detectionTokens` below is a SEPARATE concern from push detection above:
