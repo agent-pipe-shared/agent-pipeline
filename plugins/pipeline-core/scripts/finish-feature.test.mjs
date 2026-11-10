@@ -679,6 +679,7 @@ test("C22 CGR-06: the one-shot stops once, before anything is written, with the 
     assert.equal(stopped.stage, "acceptance"); assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
     assert.match(stopped.stop.reason, /counts as the human acceptance of this feature package/u); assert.match(stopped.stop.reason, /real device check/u); assert.ok(stopped.stop.reason.includes("feature-abc"));
     assert.match(stopped.stop.repair, /--human-acceptance/u); assert.match(stopped.stop.repair, /--open-checks/u);
+    assert.match(stopped.stop.repair, /how you really started or opened the delivered result[\s\S]*or say plainly that you could not and why/u, "the human decides knowing whether the result was really run");
     assert.deepEqual(f.calls, [], "no Verify, package or close stage ran"); assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false); assert.equal(f.git("status", "--porcelain").trim(), "");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });

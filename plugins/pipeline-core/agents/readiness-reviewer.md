@@ -37,6 +37,14 @@ that a single module leaves no slice that can run in parallel. This is a
 question in the review, never a block, and a justified single module (one
 responsibility, small scope) is not a finding.
 
+First path: read the order of work the design or plan declares. When it builds
+layer by layer and names no complete path that runs first, raise it as a question
+to the Elephant: which one path from a real input to a real result is built and
+run first, and which slices can then run in parallel on disjoint write scopes.
+Every kind of deliverable has such a path (a command, a library call, a screen).
+This is a question in the review, never a block, and a feature that is one path
+is not a finding.
+
 Journeys: read each user-facing acceptance criterion of the Spec for the journeys
 and state transitions that prove it (every entry path, a reload in the middle of a
 transition, a second action after an error, a concurrent import, every dynamic text
