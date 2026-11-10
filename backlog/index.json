@@ -3,14 +3,14 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "34bfd30ce6d5874736e662f5c3c903bd440e8d5c99bcffae61aa9f809bc85f1f"
+    "transitionHead": "bfe2a48d0f21b68a022de38a9fa05e249870f73c540a309448b18c9c6b735e45"
   },
   "counts": {
     "open": 384,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
-    "deferred": 11
+    "deferred": 12
   },
   "items": [
     {
@@ -3049,6 +3049,16 @@
       "closureRepository": "self",
       "closureCommit": "62dddced0df1cfe46b6e72239e46bf7d3ba72cde",
       "closureEvidence": "backlog/evidence/2026-09-11-adr-governs-coverage-closure.md"
+    },
+    {
+      "id": "pipeline.complete-forensic-export-of-a-run",
+      "status": "deferred",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-11-10",
+      "source": "Codex greenfield forensic report, finding R1 (rated P0 there); PO tile 2026-11-10: after 0.7.0",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.completion-fd-suites-cannot-run-as-single-files",

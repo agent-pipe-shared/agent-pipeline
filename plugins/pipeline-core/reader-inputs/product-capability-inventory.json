@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "eb4b0417fb1ef30c1befb7cdb5e17faf46507406",
-    "tree": "6727423066c8b55d50e813b981b611238ce7f4fa"
+    "commit": "221b63e796d969232735bf8240ea8a056eb443f2",
+    "tree": "8c9adfa799a86e8639418ce6abb1d04670d2cc73"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -474,6 +474,7 @@
         "verify-phase:harness/scripts/verify.mjs:feature-close-audit-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+        "verify-phase:harness/scripts/verify.mjs:prepare-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
         "verify-phase:harness/scripts/verify.mjs:full-verify-wrapper-tests",
         "verify-phase:harness/scripts/verify.mjs:g17-publication-observation-tests",
@@ -1014,6 +1015,7 @@
         "verify-phase:harness/scripts/verify.mjs:publication-executor-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:publication-guard-candidate-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-readback-tests",
         "verify-phase:harness/scripts/verify.mjs:publication-review-requirement-tests",
         "verify-phase:harness/scripts/verify.mjs:publication-state-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:publish-evidence-run-tests",
