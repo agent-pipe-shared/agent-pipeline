@@ -288,6 +288,7 @@
           "docs/adr/0087-owning-verification-authenticated-controller-test-channel.md",
           "docs/adr/0088-test-economy.md",
           "docs/adr/0089-project-routing-is-user-owned.md",
+          "docs/adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md",
           "docs/adr/README.md"
         ]
       },
