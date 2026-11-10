@@ -148,6 +148,28 @@ index 0000000000000000000000000000000000000000..72143b1348772b8452ab0946d63e1275
 +  if (typeof root !== "string" || root === "" || `${script}${root}`.includes("'") || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(dispatchId ?? "")) return null;
 +  return `node '${script}' --root '${root}' --dispatch ${dispatchId} --after ${after}`;
 +}
+diff --git a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+index aef4e1ed1a192657e7bd85e4e773101efeba7b06..bbccfbcea9b36057dfbf3d41676c200494b9b180 100644
+--- a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+@@ -356,8 +356,17 @@ test("(i) a launch with NO run_in_background key takes the SubagentStop route an
+   assert.match(context(posted), new RegExp(`Goldfish background launch observed \\(${fx.dispatchId}\\)`, "u"), posted.stdout);
+   assert.match(context(posted), /No commit or authorship record is claimed until then/u);
+   assert.equal(fx.gitOk("rev-parse", "HEAD"), fx.candidate, "the async launch acknowledgement commits nothing");
++  // The notice carries the whole wait command, and that command answers only once the real stop has finished.
++  const printed = context(posted).match(/--dispatch (\S+) --after (\S+)/u);
++  assert.ok(printed, context(posted));
++  assert.equal(printed[1], fx.dispatchId);
++  const wait = () => JSON.parse(spawnSync(process.execPath, [fileURLToPath(new URL("../../scripts/wait-host-commit.mjs", import.meta.url)), "--root", fx.root, "--dispatch", printed[1], "--after", printed[2], "--timeout-seconds", "1"], { encoding: "utf8" }).stdout);
++  assert.equal(wait().status, "still-waiting");
+   childWork(fx);
+   assertCommittedOnceAtStop(fx, "toolu_pf26b_keyless");
++  const answered = wait();
++  assert.equal(answered.status, "committed", JSON.stringify(answered));
++  assert.equal(answered.commit, hostCommits(fx)[0]);
+ });
+ 
+ test("(ii) an explicit run_in_background: true takes the same route in the item-governed course shape of this repository", () => {
 diff --git a/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs b/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
 index 0e3eb617329126430831842cbde0ef576243ea9c..90629466fce084e7f9f543d79361538accc62be7 100644
 --- a/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
@@ -168,12 +190,25 @@ index 0e3eb617329126430831842cbde0ef576243ea9c..90629466fce084e7f9f543d79361538a
    assert.match(guide, /never end a turn with a status report/u);
  });
  
+diff --git a/plugins/pipeline-core/roles/elephant.md b/plugins/pipeline-core/roles/elephant.md
+index 51138695d041852e466e1a15f6368c533a8ee70f..3ca1923779b698e19e3e38419bb500fd77333c09 100644
+--- a/plugins/pipeline-core/roles/elephant.md
++++ b/plugins/pipeline-core/roles/elephant.md
+@@ -126,7 +126,7 @@ protected policy/signature changes remain outside this lane.
+ 
+ PO target: at most 10 % of the Elephant's main-thread context is pipeline administration (wake-up replies, guard refusals, briefing and persistence authoring). It is measured, not estimated: `node plugins/pipeline-core/scripts/elephant-context-measure.mjs <claude-transcript.jsonl>` reports each cause below under `causes.<key>`, and `--compare <before.jsonl> <after.jsonl>` reports the per-cause before/after. A measure is judged by its own cause key falling, never by the total alone, and a share that falls only because the rest of the transcript grew is not a fall: `--compare` reports a cause `improved` only when its share and its absolute bytes both fall, with `shareFell`, `unitsFell` and `eventsFell` reported beside it. These are guidance-layer measures with a telemetry check each; a hook-level refusal for any cause is a separate guard change, not part of this section.
+ 
+-- **`wakeUpLoops` — answer a wake-up in one line or not at all.** A stop-hook, goal or task-notification wake-up that carries no new result or decision gets at most one short line and no tool call; never re-read state, re-run checks or restate the plan to answer it. Waiting for a background dispatch is waiting: do not poll its output. Check: `causes.wakeUpLoops.share` and `.longestRun`.
++- **`wakeUpLoops` — answer a wake-up in one line or not at all.** A stop-hook, goal or task-notification wake-up that carries no new result or decision gets at most one short line and no tool call; never re-read state, re-run checks or restate the plan to answer it. Waiting for a background dispatch is waiting: do not poll its output. Its hand-back is a new result, not such a wake-up: when a Claude Goldfish hands back, run the `wait-host-commit.mjs` command from its launch notice in that same turn, because the later "Agent finished" notice starts no turn. Check: `causes.wakeUpLoops.share` and `.longestRun`.
+ - **`delegationCost` — delegate only what is cheaper than doing it.** A single read, search or git query is done inline; a dispatch must replace more inline actions than its briefing and returned report cost, and all pre-known recon questions go into ONE dispatch (*One-turn recon*, §4). Check: `causes.delegationCost.costRatio` (main-context units per dispatch over units per inline action) read against the number of actions each dispatch replaced.
+ - **`exploreOrPlanRefused` — a refused `Explore`/`Plan` dispatch is never retried unchanged.** In the same turn take the next admitted read-only route (one bundled plugin-agent dispatch, or one bounded inline read) and record the refusal as a backlog finding. Check: `causes.exploreOrPlanRefused.events` is 0 or 1 per session.
+ - **`guardRefusals` — read a refusal once.** Use the typed retry action or the admitted spelling it names (`templates/prompts/agent-obligations.md` §1, §5) instead of re-submitting variants. A refusal that an admitted respelling then passes is a false-positive candidate, not a confirmed false positive (the transcript cannot tell a false refusal from a true one, because a true refusal is also followed by an admitted respelling): file it with both spellings rather than working around it again. Check: `causes.guardRefusals.events` (every guard refusal except Explore/Plan recon dispatch refusals, which are counted under `exploreOrPlanRefused`), `.retriedAdmittedEvents` (refusals later followed by an admitted call of the same tool: the candidate subset) and `.share`.
 diff --git a/plugins/pipeline-core/scripts/wait-host-commit.mjs b/plugins/pipeline-core/scripts/wait-host-commit.mjs
 new file mode 100644
-index 0000000000000000000000000000000000000000..0157f3648ba3be4351a23760e8fdf52f47bfa989
+index 0000000000000000000000000000000000000000..55e4db0c00b1da8f64ed68488429a0ebe6d82ee9
 --- /dev/null
 +++ b/plugins/pipeline-core/scripts/wait-host-commit.mjs
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,78 @@
 +#!/usr/bin/env node
 +// SPDX-License-Identifier: SUL-1.0
 +/**
@@ -183,7 +218,8 @@ index 0000000000000000000000000000000000000000..0157f3648ba3be4351a23760e8fdf52f
 + *
 + * The launch notice of a background Goldfish prints this command complete. Run it when the child's hand-back arrives: the host commit lands 20 to 45 seconds after the hand-back,
 + * and Claude Code's "Agent finished" notice starts no turn, so a turn that ends to wait for it stalls until a human writes. The default of 100 seconds fits the shell tool's
-+ * default time limit; run it a second time on `still-waiting`.
++ * default time limit; run it a second time on `still-waiting`. After a compaction the launch notice is gone: the dispatch id is in the hand-back, and any time before the child's
++ * stop serves as --after, such as the time the hand-back arrived.
 + *
 + * Status: `committed`, `checkpoint` (a budget checkpoint, nothing committed), `stop-failed` (the stop ended without a commit), `still-waiting`, `refused`.
 + * Output: ONE JSON line. Exit 0 committed, checkpoint or still-waiting; 1 stop-failed or refused; 2 usage. It reads one private record and changes nothing.
@@ -194,7 +230,7 @@ index 0000000000000000000000000000000000000000..0157f3648ba3be4351a23760e8fdf52f
 +import { readNativeGoldfishStopOutcome } from "../lib/native-goldfish-stop-outcome.mjs";
 +
 +const RESULT_SCHEMA = "pipeline.wait-host-commit-result.v1";
-+const USAGE = "usage: wait-host-commit.mjs --root <project-root> --dispatch <dispatch id> --after <ISO time of the launch> [--timeout-seconds <1..170>]";
++const USAGE = "usage: wait-host-commit.mjs --root <project-root> --dispatch <dispatch id> --after <ISO time of the launch> [--timeout-seconds <1..170>]\nAfter a compaction the launch notice is gone: any time before the child's stop serves as --after, such as the time the hand-back arrived.";
 +const DISPATCH = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 +const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/u;
 +const DEFAULT_SECONDS = 100, MAX_SECONDS = 170, POLL_MS = 1_500;
@@ -204,7 +240,11 @@ index 0000000000000000000000000000000000000000..0157f3648ba3be4351a23760e8fdf52f
 +function fromOutcome(outcome, waitedSeconds) {
 +  const common = { schema: RESULT_SCHEMA, dispatch: outcome.dispatchId, code: outcome.code, waitedSeconds };
 +  if (outcome.status === "authored-commit-recorded") return { exitCode: 0, result: { ...common, status: "committed", commit: outcome.commit, integration: outcome.integration, message: `The host commit is in and the stop has finished. ${CONTINUE}` } };
-+  if (outcome.status === "checkpoint-recorded") return { exitCode: 0, result: { ...common, status: "checkpoint", message: `The child stopped at a budget checkpoint and nothing was committed. Follow the checkpoint route of its hand-back, in this same turn. ${outcome.message}`.trim() } };
++  // A continued child gets no new launch notice, and this record stays on disk: the next wait must start after it or it would answer "checkpoint" again before the real stop.
++  if (outcome.status === "checkpoint-recorded") {
++    const nextAfter = new Date(Date.parse(outcome.observedAt) + 1).toISOString();
++    return { exitCode: 0, result: { ...common, status: "checkpoint", nextAfter, message: `The child stopped at a budget checkpoint and nothing was committed. Follow the checkpoint route of its hand-back, in this same turn. If you continue this same child, wait for its next stop with --after ${nextAfter}. ${outcome.message}`.trim() } };
++  }
 +  return { exitCode: 1, result: { ...common, status: "stop-failed", commit: outcome.commit, message: `The stop finished without a recorded host commit. Follow this recovery before committing anything by hand: ${outcome.message}`.trim() } };
 +}
 +
@@ -249,10 +289,10 @@ index 0000000000000000000000000000000000000000..0157f3648ba3be4351a23760e8fdf52f
 +}
 diff --git a/plugins/pipeline-core/scripts/wait-host-commit.test.mjs b/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
 new file mode 100644
-index 0000000000000000000000000000000000000000..cf292f569fc87cd237dea42613a0735e53abc386
+index 0000000000000000000000000000000000000000..c568ded6819649b02bf91c6e282fe85a84f1adbc
 --- /dev/null
 +++ b/plugins/pipeline-core/scripts/wait-host-commit.test.mjs
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,85 @@
 +// SPDX-License-Identifier: SUL-1.0
 +import assert from "node:assert/strict";
 +import { spawnSync } from "node:child_process";
@@ -314,6 +354,11 @@ index 0000000000000000000000000000000000000000..cf292f569fc87cd237dea42613a0735e
 +  assert.equal(exitCode, 0);
 +  assert.equal(result.status, "checkpoint");
 +  assert.equal(result.commit, undefined);
++  // The record stays on disk and a continued child gets no new notice: the printed time must step past it.
++  assert.equal(result.nextAfter, "2026-11-10T08:00:30.001Z");
++  assert.match(result.message, /--after 2026-11-10T08:00:30\.001Z/u);
++  const next = waitForHostCommit({ root: "unused", dispatch: "fix-1", after: result.nextAfter, timeoutSeconds: 1 }, { commonDir, ...clock() });
++  assert.equal(next.result.status, "still-waiting");
 +}));
 +
 +test("the launch notice command carries the exact flags and refuses what it cannot quote", () => {
@@ -334,7 +379,7 @@ index 0000000000000000000000000000000000000000..cf292f569fc87cd237dea42613a0735e
 +  assert.equal(JSON.parse(unreadable.stdout).code, "WHC-REPOSITORY-UNREADABLE");
 +}));
 diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
-index c66571870b44f82471ac8f15ed1cd59d1872a1d3..5aaeecd13365865ae9634c9dcf4d51d0db8d6f3f 100644
+index c66571870b44f82471ac8f15ed1cd59d1872a1d3..b7e2324527c2540caa19e32d40b166ef4052f947 100644
 --- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
 +++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
 @@ -85,8 +85,9 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
@@ -345,7 +390,20 @@ index c66571870b44f82471ac8f15ed1cd59d1872a1d3..5aaeecd13365865ae9634c9dcf4d51d0
 -   task-notification arrives after it: act on that notification, read `git log -1` and dispatch the next ready slice in the same turn. While ready
 +   On Claude the host commit of a background Goldfish lands at its SubagentStop. Its hand-back message can arrive before that commit, and the later
 +   "Agent finished" task-notification starts no turn. So when the hand-back arrives, run the exact `wait-host-commit.mjs` command from the launch notice in that same turn,
-+   run it once more on `still-waiting`, and dispatch the next ready slice from its answer. While ready
++   run it once more on `still-waiting`, and dispatch the next ready slice from its answer (after a compaction, `--help` names what to pass instead of the launch time). While ready
     slices remain, never end a turn with a status report or to wait for the pipeline to commit; a turn that ends there waits for the PO.
  5. After the last slice and before the project's Verify, where the project has an architecture model: `architecture-fitness.mjs --root <root> --check` and `architecture-boundary-check.mjs --root <root> --json` (both read-only). A violation is fixed before the Critic reads the candidate.
  
+diff --git a/roles/elephant.md b/roles/elephant.md
+index 51138695d041852e466e1a15f6368c533a8ee70f..3ca1923779b698e19e3e38419bb500fd77333c09 100644
+--- a/roles/elephant.md
++++ b/roles/elephant.md
+@@ -126,7 +126,7 @@ protected policy/signature changes remain outside this lane.
+ 
+ PO target: at most 10 % of the Elephant's main-thread context is pipeline administration (wake-up replies, guard refusals, briefing and persistence authoring). It is measured, not estimated: `node plugins/pipeline-core/scripts/elephant-context-measure.mjs <claude-transcript.jsonl>` reports each cause below under `causes.<key>`, and `--compare <before.jsonl> <after.jsonl>` reports the per-cause before/after. A measure is judged by its own cause key falling, never by the total alone, and a share that falls only because the rest of the transcript grew is not a fall: `--compare` reports a cause `improved` only when its share and its absolute bytes both fall, with `shareFell`, `unitsFell` and `eventsFell` reported beside it. These are guidance-layer measures with a telemetry check each; a hook-level refusal for any cause is a separate guard change, not part of this section.
+ 
+-- **`wakeUpLoops` — answer a wake-up in one line or not at all.** A stop-hook, goal or task-notification wake-up that carries no new result or decision gets at most one short line and no tool call; never re-read state, re-run checks or restate the plan to answer it. Waiting for a background dispatch is waiting: do not poll its output. Check: `causes.wakeUpLoops.share` and `.longestRun`.
++- **`wakeUpLoops` — answer a wake-up in one line or not at all.** A stop-hook, goal or task-notification wake-up that carries no new result or decision gets at most one short line and no tool call; never re-read state, re-run checks or restate the plan to answer it. Waiting for a background dispatch is waiting: do not poll its output. Its hand-back is a new result, not such a wake-up: when a Claude Goldfish hands back, run the `wait-host-commit.mjs` command from its launch notice in that same turn, because the later "Agent finished" notice starts no turn. Check: `causes.wakeUpLoops.share` and `.longestRun`.
+ - **`delegationCost` — delegate only what is cheaper than doing it.** A single read, search or git query is done inline; a dispatch must replace more inline actions than its briefing and returned report cost, and all pre-known recon questions go into ONE dispatch (*One-turn recon*, §4). Check: `causes.delegationCost.costRatio` (main-context units per dispatch over units per inline action) read against the number of actions each dispatch replaced.
+ - **`exploreOrPlanRefused` — a refused `Explore`/`Plan` dispatch is never retried unchanged.** In the same turn take the next admitted read-only route (one bundled plugin-agent dispatch, or one bounded inline read) and record the refusal as a backlog finding. Check: `causes.exploreOrPlanRefused.events` is 0 or 1 per session.
+ - **`guardRefusals` — read a refusal once.** Use the typed retry action or the admitted spelling it names (`templates/prompts/agent-obligations.md` §1, §5) instead of re-submitting variants. A refusal that an admitted respelling then passes is a false-positive candidate, not a confirmed false positive (the transcript cannot tell a false refusal from a true one, because a true refusal is also followed by an admitted respelling): file it with both spellings rather than working around it again. Check: `causes.guardRefusals.events` (every guard refusal except Explore/Plan recon dispatch refusals, which are counted under `exploreOrPlanRefused`), `.retriedAdmittedEvents` (refusals later followed by an admitted call of the same tool: the candidate subset) and `.share`.
