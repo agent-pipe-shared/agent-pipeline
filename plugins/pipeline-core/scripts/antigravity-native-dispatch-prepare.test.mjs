@@ -53,6 +53,17 @@ function flatRequest(root, extra = {}) {
   return { packets: [packet], ...native };
 }
 
+test("C23: --help and -h print the usage with the request shape and exit 0", () => {
+  for (const flag of ["--help", "-h"]) {
+    const res = spawnSync(process.execPath, [prepareScript, flag], { encoding: "utf8" });
+    assert.equal(res.status, 0, res.stderr);
+    for (const needle of ["prepare --root", "--request", "packets", "Subagents", "resultDestination", "antigravity-native-dispatch.md"]) assert.ok(res.stdout.includes(needle), needle);
+  }
+  const combined = spawnSync(process.execPath, [prepareScript, "--help", "extra"], { encoding: "utf8" });
+  assert.equal(combined.status, 2, "help combines with nothing");
+  assert.match(combined.stdout, /AGY-NATIVE-REQUEST-JSON/u);
+});
+
 test("A4: a branch workspace with untracked files is prepared, names the files and the step, and does not refuse", () => withRepository((root) => {
   mkdirSync(join(root, "scratch"));
   writeFileSync(join(root, "scratch", "notes.txt"), "n\n");

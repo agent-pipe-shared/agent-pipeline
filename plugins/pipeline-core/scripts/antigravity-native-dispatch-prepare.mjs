@@ -77,7 +77,23 @@ function requestFromArgv(argv) {
   catch { return null; }
 }
 
+const USAGE = `Usage: antigravity-native-dispatch-prepare.mjs prepare --root <repository root> --request <scratch/ or evidence/ relative .json file>
+
+Checks one native Antigravity dispatch and records its single-use preparation before invoke_subagent is called. Starts no child.
+
+The request file holds one JSON object: "packets" (one per child), optional "root", and either "Subagents" (a batch of children)
+or the flat fields "TypeName", "Role", "Prompt" and optional "Model" and "Workspace". The two shapes cannot be mixed.
+Each packet: "schema" (pipeline.role-dispatch-request.v1), "dispatchId", "transport" ("antigravity"), "role", "prompt",
+"candidate" {"commit","tree"}, "requiredPaths", "requiredPathSha256", "resultDestination" ({"kind":"return"}).
+
+The whole route, with an example packet: skills/pipeline-start/references/antigravity-native-dispatch.md
+`;
+
 if (isDirectInvocation(import.meta.url)) {
+  if (process.argv.length === 3 && ["--help", "-h"].includes(process.argv[2])) {
+    process.stdout.write(USAGE);
+    process.exit(0);
+  }
   const selected = requestFromArgv(process.argv.slice(2));
   if (selected === null) {
     process.stdout.write(`${JSON.stringify({ status: "rejected", code: "AGY-NATIVE-REQUEST-JSON", modelCalls: 0, launcherCalls: 0 })}\n`);

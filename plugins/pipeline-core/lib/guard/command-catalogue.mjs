@@ -653,7 +653,7 @@ function sanctionedProofWaitArgs(args, root) {
 // script's own flags, and g23-read-help.test.mjs runs every entry in an empty directory and fails when a script with a help branch is missing here.
 const BOTH_HELP_FLAGS = ["--help", "-h"], LONG_HELP_FLAG = ["--help"];
 export const SCRIPTS_ANSWERING_HELP = new Map([
-  ...["architecture-baseline", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "onboarding-init",
+  ...["antigravity-native-dispatch-prepare", "architecture-baseline", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "onboarding-init",
     "pipeline-state", "plan-runtime-projection-v2", "plan-runtime-projection-v3", "po-human-approval", "project-authority-migration", "project-onboarding-v3",
     "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
     "validate-runner-profiles-v2"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
