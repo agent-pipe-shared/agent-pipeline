@@ -100,8 +100,9 @@ function captureHostCommitBaseline({ root, candidateCommit, resultPath } = {}, c
 export function captureAgyHostCommitBaseline(input={}){return captureHostCommitBaseline(input);}
 export function captureSourceOwnedNativeHostCommitBaseline(input={}){
   const concurrent=inspectSourceOwnedNativeConcurrentAuthority(input.authority,{root:input.root});
-  if(concurrent.baseCommit!==input.candidateCommit||concurrent.parentCommit!==input.candidateCommit)return fail('NATIVE-HOST-BASELINE-HEAD');
-  const captured=captureHostCommitBaseline(input,concurrent);return captured.ok?{...captured,baseline:{...captured.baseline,schema:NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA,nativeRef:concurrent.reference}}:captured;
+  // Candidate 23 (PO tile 2026-11-09): the authority's plan already proved that base..HEAD is a disjoint advance, so the dirty check runs against HEAD and the baseline keeps the briefing's base.
+  if(concurrent.baseCommit!==input.candidateCommit)return fail('NATIVE-HOST-BASELINE-HEAD');
+  const captured=captureHostCommitBaseline({...input,candidateCommit:concurrent.parentCommit},concurrent);return captured.ok?{...captured,baseline:{...captured.baseline,candidateCommit:input.candidateCommit,schema:NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA,nativeRef:concurrent.reference}}:captured;
 }
 const nativeConcurrentAdmissions=new WeakMap();
 export function inspectSourceOwnedNativeConcurrentAdmission(admission){

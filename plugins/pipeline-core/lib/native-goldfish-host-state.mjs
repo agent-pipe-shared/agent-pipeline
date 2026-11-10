@@ -321,7 +321,14 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
   const readGit = dependencies.git ?? git;
   const head = readGit(physicalRoot, ["rev-parse", "--verify", "HEAD^{commit}"]);
   const tree = readGit(physicalRoot, ["rev-parse", "--verify", "HEAD^{tree}"]);
-  if (head !== binding.candidateCommit || tree !== binding.candidateTree) return fail("NGHS-CANDIDATE-MISMATCH");
+  if (head !== binding.candidateCommit || tree !== binding.candidateTree) {
+    // Candidate 23 (PO tile 2026-11-09): the same rule the queue admission applies above. An item briefing stays valid while the checkout only
+    // advanced through commits outside its paths; the host commit already lands on such an advance. Any other drift, and a briefing without an item, stays refused.
+    const advancedDisjointly = head !== binding.candidateCommit && Boolean(binding.itemDelivery)
+      && candidateAdvancedDisjointly(physicalRoot, { commit: binding.candidateCommit }, { candidate: { commit: head } },
+        [...binding.allowedPaths, ...binding.itemDelivery.checks.flatMap(check => [check.path, ...check.dependencies])]);
+    if (!advancedDisjointly) return fail("NGHS-CANDIDATE-MISMATCH");
+  }
   const resultPath = `scratch/.native-host-return-${binding.dispatchId}.json`;
   checkpoint("agy-baseline");
   const captured =(dependencies.captureBaseline ?? captureAgyHostCommitBaseline)({ root: physicalRoot,
@@ -1161,7 +1168,7 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
     // refused dispatch leaves no orphaned reserved member behind.
     if(state.binding.itemDelivery){
       checkpoint('mint');
-      const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:state.binding.allowedPaths,baseCommit:state.binding.candidateCommit,ownPendingSha256:null});
+      const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:state.binding.allowedPaths,scopePaths:[...state.binding.allowedPaths,...(state.binding.itemDelivery?.checks??[]).flatMap(check=>[check.path,...check.dependencies])],baseCommit:state.binding.candidateCommit,ownPendingSha256:null});
       try {checkpoint('baseline-capture');const captured=captureSourceOwnedNativeHostCommitBaseline({root:state.root,candidateCommit:state.binding.candidateCommit,resultPath:state.resultPath,authority});if(!captured.ok)throw baselineFault(captured);state.baseline=captured.baseline;}
       finally{nativeConcurrentAuthorities.delete(authority);}
     }

@@ -170,15 +170,16 @@ manualCheck("GD15n prepare a native pending binding for a complete dispatched Co
   assert.equal(pending.binding.nativeAgentType, "worker");
   assert.equal(pending.binding.candidateCommit, candidateCommit);
 
-  // The candidate moves after the briefing is generated: the binding no longer matches the fixture HEAD.
+  // The candidate moves after the briefing is generated, on the briefing's own path. QG-04, candidate 23 (PO tile 2026-11-09): a move outside
+  // the briefing's paths now admits, so the refusal this case pins comes from the queue admission; failure still blocks launch and publishes nothing.
   const stale = generatedCodexFixture("negative");
-  writeFileSync(join(stale.root, "src", "moved.txt"), "head moved after the briefing was generated\n");
-  execFileSync("git", ["add", "--", "src/moved.txt"], { cwd: stale.root });
+  writeFileSync(join(stale.root, "src", "change.mjs"), "export const moved = 'head moved after the briefing was generated';\n");
+  execFileSync("git", ["add", "--", "src/change.mjs"], { cwd: stale.root });
   execFileSync("git", ["-c", "user.name=Pipeline Fixture", "-c", "user.email=pipeline-fixture@example.invalid", "commit", "-q", "-m", "move the candidate"], { cwd: stale.root });
   const failed = run({ tool_name: "spawn_agent", tool_use_id: "gd15n-negative", session_id: sessionId, cwd: stale.root,
     tool_input: { agent_type: "worker", message: stale.text } }, stale.root);
   assert.equal(failed.code, BLOCK, `failed native preparation must block launch: ${failed.stderr}`);
-  assert.ok(failed.stderr.includes("NGHS-CANDIDATE-MISMATCH"), `typed preparation failure missing: ${failed.stderr}`);
+  assert.ok(failed.stderr.includes("SQ-ITEM-CANDIDATE-DRIFT"), `typed preparation failure missing: ${failed.stderr}`);
   assert.equal(pendingCodexFiles(stale.root).length, 0, "failed preparation must not publish a pending state");
 });
 check("GD15k block a marked Codex worker when its native type differs from the binding", {
