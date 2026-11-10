@@ -585,6 +585,7 @@ test("P3: every stop that needs a human is one typed reason with its exact repai
     const stopped = oneShotClose(refused.input, { runCommand: runner });
     assert.equal(stopped.status, "stopped"); assert.equal(stopped.stop.code, "CLOSE-CRITIC-CALLER-AUTHORED"); assert.match(stopped.stop.repair, /approve-critic-acknowledgement/u);
     assert.match(stopped.next, /--resume-lifecycle-id /u, "the rerun resumes the started lifecycle and skips the evidence stages");
+    assert.match(stopped.next, new RegExp(`--critic-packet-id ${refused.input.criticPacketId} `, "u"), "the printed resume keeps the packet: with two rounds on record it would stop at ONESHOT-CRITIC-PACKET-MISSING");
   } finally { rmSync(refused.root, { recursive: true, force: true }); }
 });
 

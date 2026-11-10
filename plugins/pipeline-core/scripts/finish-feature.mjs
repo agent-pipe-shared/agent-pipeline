@@ -240,7 +240,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   const evidenceDir = featureId === undefined ? null : `specs/${featureId}/evidence`;
   const rerunBase = `node ${fileURLToPath(import.meta.url)} --one-shot --root ${root} --by ${JSON.stringify(actor)} --architecture-impact ${architectureImpact}`;
   let packetForRerun = criticPacketId;
-  const rerun = (id) => `${rerunBase}${id || packetForRerun === null ? "" : ` --critic-packet-id ${packetForRerun}`}${id ? ` --resume-lifecycle-id ${id}` : ""}`;
+  // C24 (Claude greenfield): a resume dropped the packet, and with two Critic rounds on record the printed command stopped at ONESHOT-CRITIC-PACKET-MISSING.
+  const rerun = (id) => `${rerunBase}${packetForRerun === null ? "" : ` --critic-packet-id ${packetForRerun}`}${id ? ` --resume-lifecycle-id ${id}` : ""}`;
   const repairFor = (error, id) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command: ${rerun(id)}`;
   const stages = [];
   // The calibrated handover file (project/pipeline.json `handover`), the same resolution the coordinator's quality readback uses.
