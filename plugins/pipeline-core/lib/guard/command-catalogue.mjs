@@ -668,6 +668,18 @@ function isAnsweredScriptHelp(script, args, options) {
   return name !== null && SCRIPTS_ANSWERING_HELP.get(name)?.includes(args[0]) === true;
 }
 
+/** PO tile 2026-11-09: what a refusal owes a usage question on a plugin script that cannot answer it, instead of a sentence about the lifecycle; null for every other command. */
+export function scriptHelpRefusalHint(command, root, options = {}) {
+  const resolved = resolveSanctionedScriptInvocation(command, root, options);
+  if (resolved === null || resolved.args.length !== 1 || !["--help", "-h"].includes(resolved.args[0])) return null;
+  const name = relativeUnderRoot(resolved.script, PLUGIN_SCRIPTS_DIR, { platform: options.platform ?? process.platform, lstatFn: options.lstatFn });
+  if (name === null || name === "" || name.includes("/") || !name.endsWith(".mjs")) return null;
+  try { if (!lstatSync(join(PLUGIN_SCRIPTS_DIR, name)).isFile()) return null; } catch { return null; }
+  const flags = SCRIPTS_ANSWERING_HELP.get(name);
+  if (flags !== undefined) return `${name} answers ${flags.join(" and ")}, not ${resolved.args[0]}: ask with that flag. This refusal is about the flag, not about the feature's lifecycle.`;
+  return `${name} has no help: ${resolved.args[0]} would run the script itself, so it is refused here. This refusal is about that, not about the feature's lifecycle. Read the comment at the top of ${resolved.script} for its usage.`;
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (isAnsweredScriptHelp(script, args, options)) return true;
   if (script === PROOF_WAIT_SCRIPT) return sanctionedProofWaitArgs(args, root);

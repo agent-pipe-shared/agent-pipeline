@@ -12,7 +12,7 @@ import { PIPELINE_STATE_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT } from "./consta
 import { isReadOnlyDiagnosticCommand, simpleWords } from "./shell-grammar.mjs";
 import { verdict } from "./verdict.mjs";
 import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
-import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand, observedOnboardingCommandMatch, resolveBoundArtifactPublicationInvocation, sameNodeInterpreter } from "./command-catalogue.mjs";
+import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand, observedOnboardingCommandMatch, resolveBoundArtifactPublicationInvocation, sameNodeInterpreter, scriptHelpRefusalHint } from "./command-catalogue.mjs";
 
 /**
  * GUARD-DEVPLAN-SHELL -- the `Bash|PowerShell` lane of the Dev-Plan-Gate (`guard-devplan.mjs`),
@@ -182,7 +182,8 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
         const reason = absoluteNode && typeof named === "string"
           ? `${named}\nUse the bare \`node\` (not an absolute path to it): \`node scratch/<name>.mjs\` is the admitted draft-phase scratch-script shape.`
           : named;
-        return { ...result, ...(reason === undefined ? {} : { reason }), candidate, lane };
+        const helpHint = lane === "opaque-script-execution" && toolName === "Bash" ? scriptHelpRefusalHint(command, root, lifecycleOptions) : null;
+        return { ...result, ...(reason === undefined ? {} : { reason }), candidate, lane, ...(helpHint === null ? {} : { helpHint }) };
       }
       // D117 / BI: the first advisory is remembered, a later block still wins, and one command yields ONE advisory.
       if (advisory === null && typeof result.advisory === "string") {
@@ -308,6 +309,9 @@ function powerShellDevPlanWriteTargets(command, root, extracted) {
  * one-owner discipline `lib/guard-devplan-policy.mjs`'s own header describes.
  */
 export function devPlanShellBlocked(hit, overrideGuidance) {
+  if (typeof hit.helpHint === "string") {
+    return verdict(2, `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${DEVPLAN_SHELL_DENIAL_CODE}: ${hit.helpHint}\n${overrideGuidance ?? ""}`);
+  }
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "

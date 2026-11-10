@@ -13,7 +13,7 @@ import { blocked, externalRestartOnly } from "./denial-route.mjs";
 import { isBootstrapBindingScratchWrite, isIntakeLifecycleScratchMkdir, isIntakeLifecycleScratchWrite, isPartialLifecycleIncidentReportWrite, isPartialLifecycleScratchDirCreate, isRestartResumeHintCapture, isRestartResumeHintInputWrite, isRestartResumeHintInspect, restartResumeHintNearMissWrite, isHalfMovedRepairCommand, w04IsNonAuthorityRecordWrite } from "./write-scope.mjs";
 import { architectureAdoptionAuthorityVerdict, architectureFitnessAuthorityVerdict, fitnessModelQualificationObservation, minimumRigorObservation } from "./entry-gates.mjs";
 import { rootIdentityMismatch } from "./sanctioned-args-onboarding.mjs";
-import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand, scriptHelpRefusalHint } from "./command-catalogue.mjs";
 import { isSanctionedGovernanceScopeDiagnosticInvocation } from "./sanctioned-args-scripts.mjs";
 import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice } from "./rebase-lane.mjs";
 
@@ -360,7 +360,8 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
         "",
         null,
         null,
-        restartResumeHintNearMissHint ?? rootIdentityMismatchHint,
+        restartResumeHintNearMissHint ?? rootIdentityMismatchHint
+          ?? (toolName === "Bash" ? scriptHelpRefusalHint((input.tool_input.command ?? input.tool_input.CommandLine), root) : null),
         invalidObservation,
         true,
         sessionCapabilityFailurePhase,

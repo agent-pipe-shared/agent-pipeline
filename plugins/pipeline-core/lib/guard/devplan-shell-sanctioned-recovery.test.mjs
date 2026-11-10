@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-const { devPlanShellRefusalHit } = await import(new URL('./devplan-shell-lane.mjs', import.meta.url));
+const { devPlanShellBlocked, devPlanShellRefusalHit } = await import(new URL('./devplan-shell-lane.mjs', import.meta.url));
 const { parseGuardCommand } = await import(new URL('../../hooks/guard-command-grammar.mjs', import.meta.url));
 const { isExactObservedOnboardingNextAction, isSanctionedLifecycleCommand } = await import(new URL('./command-catalogue.mjs', import.meta.url));
 import { registerTestCaseCompletion } from '../test-case-completion.mjs';
@@ -78,6 +78,18 @@ for (const [name, metadata] of [
   const hit = devPlanShellRefusalHit(commandFor(published), root, deps);
   assert.equal(hit?.verdict, 'block', 'the draft recovery corridor is read-only and confirmation-free');
   assert.equal(hit?.lane, 'opaque-script-execution');
+});
+// PO 2026-11-09: in draft a usage question passes when the script answers it, and otherwise the refusal says why instead of talking about implementation writes.
+check('draft shell admits a help question the script answers and explains the one it cannot', () => {
+  const reset = fileURLToPath(new URL('../../scripts/project-reset.mjs', import.meta.url));
+  assert.equal(devPlanShellRefusalHit(`node ${script} --help`, root, dependencies()), null);
+  const hit = devPlanShellRefusalHit(`node ${reset} --help`, root, dependencies());
+  assert.equal(hit?.verdict, 'block');
+  assert.match(hit?.helpHint ?? '', /project-reset\.mjs has no help: --help would run the script itself/u);
+  const rendered = devPlanShellBlocked(hit, '').stderr;
+  assert.match(rendered, /GUARD-DEVPLAN-SHELL: project-reset\.mjs has no help/u);
+  assert.doesNotMatch(rendered, /shell write to a dev-plan-gated path/u);
+  assert.equal(devPlanShellRefusalHit(`node ${reset} --root x`, root, dependencies())?.helpHint, undefined);
 });
 
 

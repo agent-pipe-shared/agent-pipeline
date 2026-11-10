@@ -362,6 +362,7 @@ test("a not-ready session admits the help flag of a script that answers it and r
       const refused = evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${rest.join(" ")}`), dependencies);
       assert.equal(refused.exitCode, 2, tail);
       assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u, tail);
+      assert.match(refused.stderr, { "project-reset.mjs --help": /project-reset\.mjs has no help: --help would run the script itself/u, "close-coordinator.mjs -h": /close-coordinator\.mjs answers --help, not -h/u }[tail] ?? /^(?![\s\S]*has no help:)/u, tail);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
