@@ -552,6 +552,7 @@
         "verify-phase:harness/scripts/verify.mjs:guard-push-external-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-gitleaks-prefix-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-promotion-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-read-search-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-release-tag-ancestry-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-scratch-advisory-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
