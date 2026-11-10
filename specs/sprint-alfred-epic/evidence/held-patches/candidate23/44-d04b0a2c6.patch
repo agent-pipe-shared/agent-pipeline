@@ -1,0 +1,73 @@
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 94a6669c5cb6cedeb677a546d1362c94da1ca0f3..e2155c0f751b5b43219d791f21b0d4fbe4bc99d6 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -201,7 +201,8 @@ function readEvidenceInput(path, deps) {
+  * it never invents a command and never falls back to a source-only path.
+  */
+ export function resolveVerifyRemedyPlan(dir, relPath, deps = {}) {
+-  if (relPath !== "evidence/verify-latest.json") return { kind: "manual", reason: "Use the configured security evidence producer; Verify preparation does not regenerate security evidence." };
++  // C23 (Claude greenfield): "the configured producer" named nothing the run could find, so it reported the producer as not configured and stopped.
++  if (relPath !== "evidence/verify-latest.json") return { kind: "manual", reason: `Run node ${JSON.stringify(fileURLToPath(new URL("./security-scan.mjs", import.meta.url)))} --root ${JSON.stringify(dir)} once HEAD is final: it writes ${relPath} for the current HEAD. Verify preparation does not regenerate security evidence, and a feature close writes it on its own.` };
+   const script = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
+   const base = typeof deps.verifyBase === "string" && deps.verifyBase.trim() && !deps.verifyBase.startsWith("-") ? deps.verifyBase : null;
+   return {
+@@ -220,7 +221,7 @@ export function resolveVerifyRemedy(dir, relPath, deps = {}) {
+   const plan = resolveVerifyRemedyPlan(dir, relPath, deps);
+   if (plan.kind === "manual") return plan.reason;
+   const render = action => [action.executable, ...action.argv.map(value => JSON.stringify(value))].join(" ");
+-  return `${render(plan.prepare)}\n${plan.prerequisite}\n${plan.produce.executableNow ? render(plan.produce) : "Production is not executable until an explicit verified base is supplied. Then invoke verify-evidence-producer.mjs with --root, --mode push, --base and --out; never invoke the product verify command as an evidence writer."}\n${CRITIC_BOUND_VERIFY_RELEASE_ROUTE}`;
++  return `${render(plan.prepare)}\n${plan.prerequisite}\n${plan.produce.executableNow ? render(plan.produce) : "No verified base is known here. A project that was never pushed has none: do not guess one and do not stop for it. Finish the feature close first; its closed-local result names the exact Critic-bound command in its pushEvidence field. Only a push without a Critic-bound Verify invokes verify-evidence-producer.mjs with --root, --mode push, --base and --out; never invoke the product verify command as an evidence writer."}\n${CRITIC_BOUND_VERIFY_RELEASE_ROUTE}`;
+ }
+ 
+ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) {
+@@ -375,7 +376,7 @@ export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
+     message: `the calibration (${file}) declares repositoryMode "local-only" (written once at onboarding), but this push targets the configured remote "${remote}" (${destination}). `
+       + `Correct the calibration: set "repositoryMode" to "remote-tracked" in ${file}${mirror} with the one narrow command node <plugin-root>/scripts/repository-mode-promote.mjs --root <project-root> --to remote-tracked `
+       + "(it changes only that one value, needs a configured remote and prints the paths to commit; the pre-commit hook admits exactly that change without a signature). "
+-      + "It is a commit, so make it before the candidate is fixed and run push-prepare again. Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
++      + "It is routine agent work and needs no separate PO decision; the push itself stays behind its signature. It is a commit, so make it before the feature close and before the candidate is fixed, and run push-prepare again. Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
+       + "Nothing was written now and nothing is refused; if \"local-only\" is the truth, the push target is what is wrong.",
+   };
+ }
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index 4de4b53dd4eb5466d298e52f3cec7bcf6e1050f6..a6f8993d292912d29e797663749998bb9124e726 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -281,7 +281,8 @@ test("resolveVerifyRemedy (D1): resolves from the project's own calibration veri
+   });
+   assert.match(remedy, /verify-evidence-producer\.mjs.*--prepare/u);
+   assert.doesNotMatch(remedy, /node custom\/verify/u);
+-  assert.match(remedy, /not executable until an explicit verified base/u);
++  assert.match(remedy, /never pushed has none: do not guess one[\s\S]*pushEvidence field/u);
++  assert.match(resolveVerifyRemedyPlan(FIXTURE_DIR, "evidence/security-latest.json", {}).reason, /security-scan\.mjs.*--root/u, "C23: the security remedy names the command");
+   // N24: the Critic-bound route is named (push mode refuses the carry input), including what to do with an existing output file.
+   assert.match(remedy, /VEP-CRITIC-CARRY-INPUT/u);
+   assert.match(remedy, /--mode release/u);
+@@ -296,7 +297,7 @@ test("resolveVerifyRemedy (D2): no calibration resolves -> honest degradation, n
+   const remedy = resolveVerifyRemedy(FIXTURE_DIR, "evidence/verify-latest.json", {
+     resolveAuthorityArtifactPath: () => ({ exists: false }),
+   });
+-  assert.match(remedy, /not executable until an explicit verified base/);
++  assert.match(remedy, /No verified base is known here/);
+   assert.doesNotMatch(remedy, /harness\//);
+ });
+ 
+@@ -305,7 +306,7 @@ test("resolveVerifyRemedy (D2): calibration present but no verify key -> honest
+     resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
+     readFile: () => JSON.stringify({ project: "consumer-project" }),
+   });
+-  assert.match(remedy, /not executable until an explicit verified base/);
++  assert.match(remedy, /No verified base is known here/);
+   assert.doesNotMatch(remedy, /harness\//);
+ });
+ 
+@@ -314,7 +315,7 @@ test("resolveVerifyRemedy (D2): unreadable calibration -> honest degradation, ne
+     resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
+     readFile: () => { throw new Error("ENOENT"); },
+   });
+-  assert.match(remedy, /not executable until an explicit verified base/);
++  assert.match(remedy, /No verified base is known here/);
+   assert.doesNotMatch(remedy, /harness\//);
+ });
+ 
