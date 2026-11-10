@@ -770,10 +770,21 @@ function isChainEligibleMkdirTarget(target, root) {
  * argv beginning with `-C` or `-c` simply fails every subcommand match below and is
  * refused.
  */
+/** C27: true only for an absolute operand that is physically the project root, so a `cd` to it changes nothing the other segments are judged against. */
+function isProjectRootOperand(value, root) {
+  if (typeof value !== "string" || !isAbsolute(value)) return false;
+  try {
+    const [target, project] = [realpathSync(value), realpathSync(root)];
+    return process.platform === "win32" ? target.toLowerCase() === project.toLowerCase() : target === project;
+  } catch { return false; }
+}
+
 function isChainEligibleSegment(segment, root) {
   const executable = basename(segment.executable).toLowerCase();
   const argv = segment.argv;
   if (executable === "echo") return true;
+  // C27 (Claude greenfield): `cd <project root> && <admitted read>` is the most common shape dispatched agents reach for. Every other segment is judged against that root anyway.
+  if (executable === "cd") return argv.length === 1 && isProjectRootOperand(argv[0], root);
   if (executable === "ls") return true;
   if (executable === "mkdir") {
     return argv.length === 2 && argv[0] === "-p" && isChainEligibleMkdirTarget(argv[1], root);
@@ -1510,6 +1521,8 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
   if (["status", "diff", "log", "show", "rev-parse", "ls-files", "ls-tree", "for-each-ref", "describe"].includes(subcommand)) {
     return true;
   }
+  // C27 (Claude greenfield: every Critic's first chain stopped on this): the closed form the `git -C` pipeline lane already admits, exactly one mode and one revision. `git show` of the same object is admitted.
+  if (subcommand === "cat-file") return subargs.length === 2 && GIT_CAT_FILE_MODES.has(subargs[0]) && isStrictGitRevision(subargs[1]);
   // Closed stash readers only: no options, output, extra refs or mutating verbs.
   if (subcommand === "stash") {
     if (subargs.length === 1 && subargs[0] === "list") return true;

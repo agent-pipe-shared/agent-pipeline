@@ -29,7 +29,7 @@ spends a tool use from the budget that is also the stop condition.
 No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining
 with `&&` is admitted only as up to 6 segments, and only when every segment is
 itself an admitted read-only shape (or the small always-safe-write allowlist:
-`echo`, `mkdir -p` under `scratch/`). The only admitted piping is the bounded
+`echo`, `mkdir -p` under `scratch/`, `cd` to the absolute project root). The only admitted piping is the bounded
 read-only diagnostic pipelines (a read command into `head` or `tail`, or `rg`/`grep` into
 `rg`/`grep`); every grammar refusal prints the complete current list with its
 bounds, so read that list instead of guessing.

@@ -388,6 +388,14 @@ function validateRg(argv, root, windows, additionalRoots = []) {
   const booleans = filesMode ? FILE_BOOLEAN : SEARCH_BOOLEAN;
   // C22B: a cluster of flags this command admits on their own is judged flag by flag below (a repeated member is refused like a repeated flag).
   args = expandBooleanShortClusters(args, booleans);
+  // C27 (Claude greenfield): the attached context spelling rg itself accepts (-A3), read as -A 3; grep already took it. Nothing after `--` is a flag.
+  if (!filesMode) {
+    const end = args.indexOf("--");
+    args = args.flatMap((arg, index) => {
+      const attached = (end === -1 || index < end) ? /^(-[ABC])([0-9]{1,3})$/u.exec(arg) : null;
+      return attached === null ? [arg] : [attached[1], attached[2]];
+    });
+  }
   const values = filesMode ? FILE_VALUE : SEARCH_VALUE;
   const seen = new Set();
   const paths = [];

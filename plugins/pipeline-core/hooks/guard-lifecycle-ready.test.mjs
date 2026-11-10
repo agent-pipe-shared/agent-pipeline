@@ -2273,6 +2273,41 @@ test("NVA-CF-GITPIPEALLOWLIST: the admitted grammar shapes include the git-to-he
 });
 
 // backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
+test("C27: git cat-file in its closed form, a cd to the exact project root inside a read chain, and attached rg context are admitted; nothing wider is", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-c27-outside-"));
+  const oid = "e3a27578fcb3d70f47d96e2aca83d3e4fe8680bf";
+  try {
+    mkdirSync(join(path, "backlog/items"), { recursive: true });
+    writeFileSync(join(path, "backlog/items/passive-probe.txt"), "pattern fixture\n");
+    const file = "backlog/items/passive-probe.txt";
+    for (const command of [
+      `git cat-file -t ${oid}`,
+      `git cat-file -e ${oid}`,
+      `git rev-parse HEAD && git cat-file -t ${oid} && git diff --stat ${oid}..${oid}`,
+      `cd ${path} && rg -n pattern ${file}`,
+      `cd ${path} && git status --short`,
+      `rg -n -A3 pattern ${file}`,
+      `rg -n -C12 -B2 pattern ${file}`,
+    ]) assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+    for (const command of [
+      "git cat-file --batch",
+      `git cat-file -t`,
+      `git cat-file -t ${oid} ${oid}`,
+      `git cat-file --textconv ${oid}`,
+      `cd ${outside} && rg -n pattern ${file}`,
+      `cd .. && rg -n pattern ${file}`,
+      `cd backlog && rg -n pattern items/passive-probe.txt`,
+      `cd ${path} && git push origin HEAD`,
+      `cd ${path} && node --test ${file}`,
+      `rg -n -A501 pattern ${file}`,
+      `rg -n -A3x pattern ${file}`,
+      `rg -n -nA3 pattern ${file}`,
+    ]) assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    assert.equal(isReadOnlyDiagnosticCommand(`rg -n pattern -- -A3`, path), false, "after -- it is a path, and that path is judged as one");
+  } finally { rmSync(path, { recursive: true, force: true }); rmSync(outside, { recursive: true, force: true }); }
+});
+
 test("the &&-chain union (read-only classifier plus the small always-safe-write allowlist) and trailing 2>/dev/null admit exactly the backlog's triggering shapes, widened per NVA-I-GRAMMAR, and nothing more", () => {
   const path = root();
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-and-chain-outside-"));
