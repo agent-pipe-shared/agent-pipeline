@@ -545,7 +545,10 @@ not the intended RED. Do not split test authoring from the fix by default. Do
 not bundle incidental cleanup or unrelated refactors. If the batch Critic later
 requires changes, the Elephant assigns one fresh Correction Goldfish to the
 whole coherent frozen batch; that owner carries findings through tests, fixes
-and targeted GREEN in one context. Preserve the batch's original review budget
+and targeted GREEN in one context. Each finding is an example of its failure
+class, not a single case: the owner repairs and tests the other inputs and state
+transitions of that class in the code it touches, and reports which cases each
+class covered. Preserve the batch's original review budget
 and exact candidate lineage. Existing acceptance examiner changes remain
 bounded and independently scrutinized under QG-04.
 

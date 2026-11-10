@@ -125,7 +125,9 @@ test("J4 the Spec template, the Critic template and the Goldfish test-authorship
     has(text, /Journey coverage/u, `${rel} names journey coverage`);
     has(text, /actual effect/u, `${rel} demands an assertion on the actual effect`);
     has(text, /not only "text changed"/u, `${rel} rules out "text changed" alone`);
+    has(text, /Each finding is an example of its failure class/u, `${rel} makes a correction repair the failure class (PO tile 2026-11-09)`);
   }
+  has(flat(read("plugins/pipeline-core/lib/dispatch-briefing-build.mjs")), /Failure classes: when this assignment repairs a review finding or a reported defect/u, "the generated briefing carries the failure-class duty on every runner");
   for (const name of ["critic-review", "goldfish-task"]) {
     assert.equal(read(`templates/prompts/${name}.md`), read(`plugins/pipeline-core/templates/prompts/${name}.md`), `${name}: root and vendored copy are byte-identical`);
   }

@@ -358,6 +358,7 @@ ${verify}
   3. Run exactly those cases GREEN, correct the implementation until they pass, then run the targeted checks below.
   A case written in step 1 is changed after step 2 only with a written justification in the report that ties it to the criterion; never weaken it to make the implementation pass. Update only the cases the owned outcome needs.
 - Journey coverage: for a user-facing criterion, examine whole user journeys and state transitions, not only the unit - every entry path, a reload in the middle of a transition, a second action after an error, a concurrent import, every dynamic text context the Spec names - and assert the actual effect (stored state or produced output), not only that text changed. Report journey coverage per criterion as covered / not covered.
+- Failure classes: when this assignment repairs a review finding or a reported defect, treat each one as an example of its failure class, not as a single case. Find the other inputs and state transitions of that class in the code you touch, repair and test them in this dispatch, and name in the report which cases each class covered. A case outside the write scope is reported, not repaired.
 - Test fixtures mirror the real input, absolute paths included where a hook receives them.
 - A new test FILE is not run by Verify until it is registered in the project's Verify suite list; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.${visualCheckBlock(pkg)}
 
