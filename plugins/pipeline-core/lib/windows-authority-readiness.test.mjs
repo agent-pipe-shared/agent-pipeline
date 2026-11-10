@@ -158,6 +158,35 @@ test('D168-S7b an insecure private-state root yields one WIN-AUTH-PRIVATE-ROOT c
   assert.match(preview.afterwards, /next preflight reads the folder back/u);
 });
 
+test('PO 2026-11-09: the driver narrows its own new folder by SID, grant first, without a shell', () => {
+  const calls = [];
+  const spawn = (path, args, options) => {
+    calls.push({ path, args, shell: options.shell });
+    return path === 'whoami' ? { status: 0, stdout: '"host\\owner","S-1-5-21-1-2-3-1001"\r\n' } : { status: 0, stdout: '' };
+  };
+  const resolveExecutable = (name) => ({ ok: true, path: name.replace('.exe', '') });
+  const result = readiness.narrowOwnNewPrivateState({ projectRoot: 'D:\\work\\repo', spawn, resolveExecutable });
+  assert.deepEqual(result, { status: 'narrowed' });
+  assert.deepEqual(calls.slice(1).map((call) => call.args), [
+    ['D:\\work\\repo\\project', '/grant:r', '*S-1-5-21-1-2-3-1001:(OI)(CI)F'],
+    ['D:\\work\\repo\\project', '/inheritance:r'],
+  ]);
+  assert.ok(calls.every((call) => call.shell === false));
+});
+
+test('PO 2026-11-09: a failed grant never removes the inherited rights, and a missing tool reports unavailable', () => {
+  const calls = [];
+  const spawn = (path, args) => {
+    calls.push(args);
+    return path === 'whoami' ? { status: 0, stdout: '"host\\owner","S-1-5-21-1-2-3-1001"' } : { status: 5, stdout: '' };
+  };
+  const resolveExecutable = (name) => ({ ok: true, path: name.replace('.exe', '') });
+  assert.deepEqual(readiness.narrowOwnNewPrivateState({ projectRoot: 'D:\\work\\repo', spawn, resolveExecutable }), { status: 'failed', step: 'grant' });
+  assert.equal(calls.some((args) => args.includes('/inheritance:r')), false);
+  assert.deepEqual(readiness.narrowOwnNewPrivateState({ projectRoot: 'D:\\work\\repo', spawn, resolveExecutable: () => ({ ok: false }) }), { status: 'unavailable' });
+  assert.deepEqual(readiness.narrowOwnNewPrivateState({ projectRoot: 'D:\\work\\repo', spawn: () => { throw new Error('boom'); }, resolveExecutable }), { status: 'failed', step: 'internal' });
+});
+
 test('D168-S7b an unobservable private-state root fails closed without offering an icacls command', () => {
   const { result } = withVerdict({ status: 'unavailable', reason: 'no observation' });
   assert.equal(result.status, 'unavailable');

@@ -116,7 +116,7 @@ import { printOnboardingInitResult } from "../lib/onboarding-driver-output.mjs";
 import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
 import { existsSync as actorExistsSync } from "node:fs";
 import { heldIdentityChoice, normalizePipelineActorAssignment, writePipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
-import { windowsPrivateStateCause } from "../lib/windows-authority-readiness.mjs";
+import { narrowOwnNewPrivateState, windowsPrivateStateCause } from "../lib/windows-authority-readiness.mjs";
 import { beginInitialAnswersJournal, completeInitialAnswersJournal } from "../lib/onboarding-initial-answers-transaction.mjs";
 import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
 import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -1463,11 +1463,16 @@ function withWindowsRightsAsk(result, root, platform, privateStateCause) {
 }
 
 export function driveOnboardingInit(options = {}) {
-  const { exists = actorExistsSync, platform = process.platform, privateStateCause = windowsPrivateStateCause } = options;
+  const { exists = actorExistsSync, platform = process.platform, privateStateCause = windowsPrivateStateCause, narrowNewPrivateState = narrowOwnNewPrivateState } = options;
   const hadRepository = options?.rootDir ? exists(join(resolve(options.rootDir), ".git")) : true;
+  const hadStateFolder = options?.rootDir ? exists(join(resolve(options.rootDir), "project")) : true;
   const core = driveOnboardingInitCore(options);
   if (!core || typeof core !== "object" || !options?.rootDir) return core;
   const root = resolve(options.rootDir);
+  // PO decision 2026-11-09: only a folder this very run created; an existing one stays the human's. The check below reads the result back.
+  if (platform === "win32" && !hadStateFolder && exists(join(root, "project"))) {
+    try { narrowNewPrivateState({ projectRoot: root }); } catch { /* the readback below still names the human step */ }
+  }
   const restart = antigravityRestartStop(core, root, hadRepository, exists);
   if (restart !== null) return restart;
   const result = withWindowsRightsAsk(core, root, platform, privateStateCause);

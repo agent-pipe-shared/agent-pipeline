@@ -36,8 +36,8 @@ const STATE = "pipeline-state.mjs";
 export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
   Object.freeze({
     id: "install",
-    en: "install the Pipeline into this project (portable authority seed, runtime initialization and readbacks)",
-    de: "die Pipeline in dieses Projekt installieren (portable Authority-Seed, Runtime-Initialisierung und Readbacks)",
+    en: "install the Pipeline into this project (portable authority seed, runtime initialization and readbacks; on Windows the new project folder gets rights for you alone)",
+    de: "die Pipeline in dieses Projekt installieren (portable Authority-Seed, Runtime-Initialisierung und Readbacks; unter Windows bekommt der neue Projektordner nur für Sie Rechte)",
     routes: Object.freeze([
       { script: ONBOARDING, verbs: ["plan", "apply-portable-seed", "initialize-runtime", "apply-readback"] },
       { script: "onboarding-init.mjs", verbs: null },

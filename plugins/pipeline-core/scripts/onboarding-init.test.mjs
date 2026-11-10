@@ -381,6 +381,30 @@ test("Antigravity: the driver call that creates the repository names the restart
   }
 });
 
+test("Windows rights: the driver narrows only a project folder this run created, and an existing one or another platform stays untouched", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "claude");
+    const state = join(root, "project");
+    const calls = [];
+    const narrow = (input) => { calls.push(input.projectRoot); return { status: "narrowed" }; };
+    let created = false;
+    const exists = (path) => (path === state ? created : existsSync(path));
+    const appearsDuringRun = (path) => { const seen = exists(path); if (path === state) created = true; return seen; };
+    driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "win32", privateStateCause: () => null, exists: appearsDuringRun, narrowNewPrivateState: narrow });
+    assert.deepEqual(calls, [root], "the folder was absent before the run and present after it");
+    calls.length = 0;
+    driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "win32", privateStateCause: () => null, exists: () => true, narrowNewPrivateState: narrow });
+    assert.deepEqual(calls, [], "a folder that existed before the run is the human's");
+    created = false;
+    driveOnboardingInit({ rootDir: root, runner: "claude", env, platform: "linux", privateStateCause: () => null, exists: appearsDuringRun, narrowNewPrivateState: narrow });
+    assert.deepEqual(calls, [], "other platforms never narrow");
+  } finally {
+    for (const dir of [root, home]) rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("Windows rights step: an insecure state folder stands beside the first-round questions, a secure one and other platforms add nothing", () => {
   const root = freshRoot();
   const home = freshHome();

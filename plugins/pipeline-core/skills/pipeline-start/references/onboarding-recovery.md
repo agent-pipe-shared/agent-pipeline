@@ -87,10 +87,12 @@ operator may instead relocate the project into a private user profile path.
 No action in this diagnostic writes an ACL. Rerun preflight after a reviewed
 repair; a WSL fixture cannot certify native Windows custody.
 
-The onboarding driver checks the `project/` folder already in the first question
-round. When its rights are inherited from above the repository, `pendingAsks`
-carries a `windowsPrivateStateRights` step with the commands. Show it with the
-other questions. The human runs it, the agent never does.
+The onboarding driver narrows the rights of a `project/` folder it has just
+created itself. A folder that existed before it stays untouched. The driver
+then checks the folder in the first question round. When its rights are still
+inherited from above the repository, `pendingAsks` carries a
+`windowsPrivateStateRights` step with the commands. Show it with the other
+questions. The human runs it, the agent never does.
 
 ## Antigravity restart after the repository was created
 

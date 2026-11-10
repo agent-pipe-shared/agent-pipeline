@@ -2,7 +2,9 @@
 // Read-only Windows custody diagnosis. The native authority backend remains the sole policy oracle.
 import { win32 } from 'node:path';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { resolveTrustedSystemExecutable } from './trusted-tool-resolution.mjs';
 import { inspectWindowsOwnedAuthorityPath, observeWindowsAuthorityAncestor } from './windows-owned-authority-backend.mjs';
 import { assessWindowsPrivateRoot } from './windows-private-state.mjs';
 
@@ -164,6 +166,29 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
   const stateCause = windowsPrivateStateCause({ projectRoot, exists, assessPrivateRoot });
   if (stateCause !== null) causes.push(stateCause);
   return { schema: WINDOWS_AUTHORITY_READINESS_SCHEMA, status: causes.length ? 'unavailable' : 'ready', causes };
+}
+
+/**
+ * PO decision 2026-11-09, the narrow exception to "the agent never changes folder rights": the onboarding driver narrows the `project` folder it has
+ * just created itself, and no other folder. The grant runs first, so a failure can never leave the owner without access; the readiness check reads the
+ * result back and a folder that is still not secure falls back to the human step. Never throws.
+ */
+export function narrowOwnNewPrivateState({ projectRoot, spawn = spawnSync, resolveExecutable = resolveTrustedSystemExecutable } = {}) {
+  try {
+    const stateRoot = win32.join(projectRoot, 'project');
+    const whoami = resolveExecutable('whoami.exe');
+    const icacls = resolveExecutable('icacls.exe');
+    if (!whoami?.ok || !icacls?.ok) return { status: 'unavailable' };
+    const run = (path, args) => spawn(path, args, { encoding: 'utf8', shell: false, windowsHide: true, timeout: 15_000 });
+    const identity = run(whoami.path, ['/user', '/fo', 'csv', '/nh']);
+    const sid = identity?.status === 0 ? /"(S-1-5-[0-9-]+)"/u.exec(identity.stdout ?? '')?.[1] : null;
+    if (!sid) return { status: 'unavailable' };
+    if (run(icacls.path, [stateRoot, '/grant:r', `*${sid}:(OI)(CI)F`])?.status !== 0) return { status: 'failed', step: 'grant' };
+    if (run(icacls.path, [stateRoot, '/inheritance:r'])?.status !== 0) return { status: 'failed', step: 'inheritance' };
+    return { status: 'narrowed' };
+  } catch {
+    return { status: 'failed', step: 'internal' };
+  }
 }
 
 /**
