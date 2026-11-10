@@ -33,7 +33,7 @@ import { verifyFinalDesignWorkflowApproval } from "./architecture-design.mjs";
 import { ensurePrivateDirectory, writePrivateFileNoReplaceAtomic } from "./private-boundary.mjs";
 import { poGateProfileProjectionPaths, validatePoGateAuthorityForRepository, validatePoGateProfileForRepository } from "./po-gate-authority.mjs";
 import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
-import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_SOURCE_REBIND_FIELDS, profileSourceChangedKeys,
+import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_ROUTING_REBIND_FIELDS, profileRuntimeChangedKeys, profileSourceChangedKeys,
   withOriginDeviceValues, writePlanApprovalDeviceRebindReceipt } from "./plan-approval-device-rebind.mjs";
 import { observeCurrentPlanApprovalForCalibration, readAcceptedDeliveryContract } from "../scripts/pipeline-state.mjs";
 
@@ -68,6 +68,8 @@ const REPAIR = Object.freeze({
   "DWP-REBIND-AUTHORITY-CHANGED": "The approval binds authority values that differ here beyond the device-local fields and the PO profile's model routing (changedFields names them). Restore the approved values, or submit the plan again for the PO's approval.",
   "DWP-REBIND-PROFILE-SOURCE-CHANGED": "The PO profile source differs from the approved bytes outside the model routing (changedKeys names the top-level keys). Restore the approved values of those keys, or submit the plan again for the PO's approval.",
   "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE": "The approved PO profile source bytes are not in this checkout's history, or this checkout's profile source is not the one the authority reads. Run rebind-approval from the primary checkout with the full history, or submit the plan again for the PO's approval.",
+  "DWP-REBIND-PROFILE-RUNTIME-CHANGED": "The generated runtime manifest differs from the approved bytes outside modelRouting (changedKeys names the top-level keys). Regenerate it from the approved profile, or submit the plan again for the PO's approval.",
+  "DWP-REBIND-PROFILE-RUNTIME-UNAVAILABLE": "The approved runtime manifest bytes are not in this checkout's history, or this checkout's runtime manifest is not the one the authority reads. Run rebind-approval from the primary checkout with the full history, or submit the plan again for the PO's approval.",
   "DWP-REBIND-PROFILE-CHANGED": "The PO profile on this checkout differs from the one the approval binds beyond the device-local fields. Restore the approved profile files, or re-approve.",
   "DWP-REBIND-CONTRACT-UNVERIFIED": "The retained accepted contract or the calibration observer does not verify with the rebound device values; nothing was accepted.",
 });
@@ -167,16 +169,24 @@ const MAX_PROFILE_SOURCE_HISTORY = 200;
  * the current bytes must hash to the digest the authority reads. Returns {ok:true} or a typed refusal.
  */
 export function routingOnlyProfileSourceChange({ root, approvedSha256, currentSha256 }) {
-  const sourcePath = poGateProfileProjectionPaths(root).source;
-  const currentFile = inspectFile(root, sourcePath, true);
-  if (currentFile.state !== "present" || sha256(currentFile.bytes) !== currentSha256) {
-    return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE" };
-  }
-  const log = git(root, ["log", `--max-count=${MAX_PROFILE_SOURCE_HISTORY}`, "--format=%H", "--", sourcePath]);
-  if (log.status !== 0) return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE" };
+  return routingOnlyChange({ root, path: poGateProfileProjectionPaths(root).source, approvedSha256, currentSha256,
+    changedKeysOf: profileSourceChangedKeys, unavailable: "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE", changed: "DWP-REBIND-PROFILE-SOURCE-CHANGED" });
+}
+
+/** F36: the same verification for the generated runtime manifest, where only `modelRouting` may differ. */
+export function routingOnlyProfileRuntimeChange({ root, approvedSha256, currentSha256 }) {
+  return routingOnlyChange({ root, path: poGateProfileProjectionPaths(root).manifest, approvedSha256, currentSha256,
+    changedKeysOf: profileRuntimeChangedKeys, unavailable: "DWP-REBIND-PROFILE-RUNTIME-UNAVAILABLE", changed: "DWP-REBIND-PROFILE-RUNTIME-CHANGED" });
+}
+
+function routingOnlyChange({ root, path, approvedSha256, currentSha256, changedKeysOf, unavailable, changed }) {
+  const currentFile = inspectFile(root, path, true);
+  if (currentFile.state !== "present" || sha256(currentFile.bytes) !== currentSha256) return { ok: false, code: unavailable };
+  const log = git(root, ["log", `--max-count=${MAX_PROFILE_SOURCE_HISTORY}`, "--format=%H", "--", path]);
+  if (log.status !== 0) return { ok: false, code: unavailable };
   let approvedText = null;
   for (const commit of log.stdout.split("\n").map((line) => line.trim()).filter((line) => COMMIT.test(line))) {
-    const shown = git(root, ["show", `${commit}:${sourcePath}`]);
+    const shown = git(root, ["show", `${commit}:${path}`]);
     if (shown.status !== 0) continue;
     const lf = shown.stdout;
     const crlf = lf.replace(/\r?\n/gu, "\r\n");
@@ -185,9 +195,9 @@ export function routingOnlyProfileSourceChange({ root, approvedSha256, currentSh
       break;
     }
   }
-  if (approvedText === null) return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-UNAVAILABLE" };
-  const changedKeys = profileSourceChangedKeys(approvedText, currentFile.bytes.toString("utf8"));
-  if (changedKeys.length > 0) return { ok: false, code: "DWP-REBIND-PROFILE-SOURCE-CHANGED", extra: { changedKeys } };
+  if (approvedText === null) return { ok: false, code: unavailable };
+  const changedKeys = changedKeysOf(approvedText, currentFile.bytes.toString("utf8"));
+  if (changedKeys.length > 0) return { ok: false, code: changed, extra: { changedKeys } };
   return { ok: true };
 }
 
@@ -215,6 +225,7 @@ function rebindAcceptedContractApproval({ root, state, stateSha256, now }) {
   const current = authority.value;
   if (JSON.stringify(stored) === JSON.stringify(current)) return refuse("DWP-REBIND-DEVICE-CURRENT");
   let profileSourceRebound = false;
+  let profileRuntimeRebound = false;
   if (!differsOnlyInDeviceFields(stored, current)) {
     const changed = ["planSha256", "specSha256"].filter((key) => stored?.[key] !== current?.[key]);
     if (changed.length > 0) {
@@ -222,7 +233,7 @@ function rebindAcceptedContractApproval({ root, state, stateSha256, now }) {
       return { exit: 2, payload: { schema: REBIND_APPROVAL_SCHEMA, status: "digest-set-changed", changedPaths: paths,
         signaturesRequested: 0, attendedPrerequisite: changedDigestPrerequisite(paths) } };
     }
-    if (!differsOnlyInDeviceFields(stored, current, PROFILE_SOURCE_REBIND_FIELDS)) {
+    if (!differsOnlyInDeviceFields(stored, current, PROFILE_ROUTING_REBIND_FIELDS)) {
       const changedFields = Object.keys({ ...stored, ...current }).sort()
         .filter((key) => JSON.stringify(stored?.[key]) !== JSON.stringify(current?.[key]));
       return refuse("DWP-REBIND-AUTHORITY-CHANGED", { changedFields });
@@ -232,9 +243,15 @@ function rebindAcceptedContractApproval({ root, state, stateSha256, now }) {
     const source = routingOnlyProfileSourceChange({ root, approvedSha256: stored.sourceSha256, currentSha256: current.sourceSha256 });
     if (!source.ok) return refuse(source.code, source.extra ?? {});
     profileSourceRebound = true;
+    // F36: a routing change is projected into the runtime manifest; its digest moves too, and nothing else in it may.
+    if (stored.runtimeSha256 !== current.runtimeSha256) {
+      const runtime = routingOnlyProfileRuntimeChange({ root, approvedSha256: stored.runtimeSha256, currentSha256: current.runtimeSha256 });
+      if (!runtime.ok) return refuse(runtime.code, runtime.extra ?? {});
+      profileRuntimeRebound = true;
+    }
   }
   const receipt = createPlanApprovalDeviceRebindReceipt({ planApproval: approval, current,
-    envelopeSha256: approval.acceptedContract?.sha256, verifiedAt: now(), profileSourceRebound });
+    envelopeSha256: approval.acceptedContract?.sha256, verifiedAt: now(), profileSourceRebound, profileRuntimeRebound });
   if (!receipt) return refuse("DWP-REBIND-AUTHORITY-CHANGED");
   if (sha256CanonicalJson(withOriginDeviceValues(profile.value, receipt)) !== state.planSubmission?.profileSha256) {
     return refuse("DWP-REBIND-PROFILE-CHANGED");

@@ -24,7 +24,11 @@ export const DEVICE_LOCAL_AUTHORITY_FIELDS = Object.freeze(["receiptSha256", "re
 // device-local fields or exactly these three; every reader accepts nothing else.
 export const PROFILE_SOURCE_REBIND_FIELD = "sourceSha256";
 export const PROFILE_SOURCE_REBIND_FIELDS = Object.freeze([...DEVICE_LOCAL_AUTHORITY_FIELDS, PROFILE_SOURCE_REBIND_FIELD]);
-const REBIND_FIELD_SETS = [DEVICE_LOCAL_AUTHORITY_FIELDS, PROFILE_SOURCE_REBIND_FIELDS];
+// F36: a routing change in the source is projected into the runtime manifest, so that digest moves with it. A receipt
+// may also carry it, but only after rebind-approval verified that the two runtime manifests differ in `modelRouting` alone.
+export const PROFILE_RUNTIME_REBIND_FIELD = "runtimeSha256";
+export const PROFILE_ROUTING_REBIND_FIELDS = Object.freeze([...PROFILE_SOURCE_REBIND_FIELDS, PROFILE_RUNTIME_REBIND_FIELD]);
+const REBIND_FIELD_SETS = [DEVICE_LOCAL_AUTHORITY_FIELDS, PROFILE_SOURCE_REBIND_FIELDS, PROFILE_ROUTING_REBIND_FIELDS];
 const RECEIPT_DIRECTORY = ["agent-pipeline", "rebind-approval"];
 const SHA256 = /^[a-f0-9]{64}$/u;
 const RECEIPT_KEYS = ["schema", "approvalSha256", "origin", "device", "envelopeSha256", "verifiedAt"];
@@ -45,6 +49,18 @@ export const REBINDABLE_PROFILE_SOURCE_KEYS = Object.freeze(["core_registry_sha2
  * the current text, ignoring only the model routing. Unparseable text or a non-mapping root is a change of everything.
  */
 export function profileSourceChangedKeys(approvedText, currentText) {
+  return changedKeysOutside(REBINDABLE_PROFILE_SOURCE_KEYS, approvedText, currentText);
+}
+
+/** F36: the only key of the generated runtime manifest a plan approval may outlive. Its gates, export policy and phases stay bound. */
+export const REBINDABLE_PROFILE_RUNTIME_KEYS = Object.freeze(["modelRouting"]);
+
+/** F36: the top-level keys of the runtime manifest that differ between the approved and current text, ignoring only `modelRouting`. */
+export function profileRuntimeChangedKeys(approvedText, currentText) {
+  return changedKeysOutside(REBINDABLE_PROFILE_RUNTIME_KEYS, approvedText, currentText);
+}
+
+function changedKeysOutside(rebindable, approvedText, currentText) {
   let approved;
   let current;
   try {
@@ -53,7 +69,7 @@ export function profileSourceChangedKeys(approvedText, currentText) {
   } catch { return ["<unparseable>"]; }
   if (!isObject(approved) || !isObject(current)) return ["<root>"];
   const keys = [...new Set([...Object.keys(approved), ...Object.keys(current)])].sort();
-  return keys.filter((key) => !REBINDABLE_PROFILE_SOURCE_KEYS.includes(key)
+  return keys.filter((key) => !rebindable.includes(key)
     && (Object.hasOwn(approved, key) !== Object.hasOwn(current, key)
       || sha256CanonicalJson(approved[key] ?? null) !== sha256CanonicalJson(current[key] ?? null)));
 }
@@ -79,16 +95,19 @@ export function planApprovalDeviceRebindPath(gitCommonDir, approvalSha256, devic
 
 /**
  * Build the receipt for the caller's verified facts; the caller decides when they are verified.
- * `profileSourceRebound` is set only by rebind-approval after its routing-only check of the profile source.
+ * `profileSourceRebound` is set only by rebind-approval after its routing-only check of the profile source, and
+ * `profileRuntimeRebound` only after the same check of the runtime manifest; it never stands without the source flag.
  */
-export function createPlanApprovalDeviceRebindReceipt({ planApproval, current, envelopeSha256, verifiedAt, profileSourceRebound = false }) {
+export function createPlanApprovalDeviceRebindReceipt({ planApproval, current, envelopeSha256, verifiedAt, profileSourceRebound = false, profileRuntimeRebound = false }) {
   const stored = planApproval?.poGateAuthority;
-  const fields = profileSourceRebound === true ? PROFILE_SOURCE_REBIND_FIELDS : DEVICE_LOCAL_AUTHORITY_FIELDS;
+  if (profileRuntimeRebound === true && profileSourceRebound !== true) return null;
+  const fields = profileRuntimeRebound === true ? PROFILE_ROUTING_REBIND_FIELDS : profileSourceRebound === true ? PROFILE_SOURCE_REBIND_FIELDS : DEVICE_LOCAL_AUTHORITY_FIELDS;
   if (!differsOnlyInDeviceFields(stored, current, fields) || !SHA256.test(envelopeSha256 ?? "")) return null;
   const origin = deviceValues(stored, fields), device = deviceValues(current, fields);
   if (!validDeviceValues(origin, fields) || !validDeviceValues(device, fields)) return null;
   if (fields.every((key) => origin[key] === device[key])) return null;
   if (profileSourceRebound === true && origin[PROFILE_SOURCE_REBIND_FIELD] === device[PROFILE_SOURCE_REBIND_FIELD]) return null;
+  if (profileRuntimeRebound === true && origin[PROFILE_RUNTIME_REBIND_FIELD] === device[PROFILE_RUNTIME_REBIND_FIELD]) return null;
   return { schema: PLAN_APPROVAL_DEVICE_REBIND_SCHEMA, approvalSha256: sha256CanonicalJson(planApproval),
     origin, device, envelopeSha256, verifiedAt: String(verifiedAt) };
 }
@@ -107,7 +126,7 @@ export function writePlanApprovalDeviceRebindReceipt(gitCommonDir, receipt) {
 export function readPlanApprovalDeviceRebind({ gitCommonDir, planApproval, current }) {
   try {
     const stored = planApproval?.poGateAuthority;
-    if (!differsOnlyInDeviceFields(stored, current, PROFILE_SOURCE_REBIND_FIELDS)) return null;
+    if (!differsOnlyInDeviceFields(stored, current, PROFILE_ROUTING_REBIND_FIELDS)) return null;
     const approvalSha256 = sha256CanonicalJson(planApproval);
     if (!SHA256.test(current?.repositoryFingerprint ?? "")) return null;
     const receipt = readPrivateJson(planApprovalDeviceRebindPath(gitCommonDir, approvalSha256, current.repositoryFingerprint),

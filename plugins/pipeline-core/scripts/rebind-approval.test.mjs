@@ -85,7 +85,8 @@ import { run, SCHEMA_ID, statePath } from "./pipeline-state.mjs";
 import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, PROFILE_SOURCE_REBIND_FIELDS, profileSourceChangedKeys, readPlanApprovalDeviceRebind,
   withOriginDeviceValues, writePlanApprovalDeviceRebindReceipt } from "../lib/plan-approval-device-rebind.mjs";
 import { readPlanApprovalDeviceRebind as readKernelPlanApprovalDeviceRebind } from "../lib/po-gate-authority-read.mjs";
-import { routingOnlyProfileSourceChange } from "../lib/rebind-approval.mjs";
+import { routingOnlyProfileRuntimeChange, routingOnlyProfileSourceChange } from "../lib/rebind-approval.mjs";
+import { PROFILE_ROUTING_REBIND_FIELDS } from "../lib/plan-approval-device-rebind.mjs";
 
 const ONBOARDING = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 const REBIND_SCHEMA = "pipeline.rebind-approval.v1";
@@ -622,6 +623,49 @@ test("G20-64: the shared profile-source rule ignores only the model routing, for
   assert.deepEqual(profileSourceChangedKeys(APPROVED_PROFILE, APPROVED_PROFILE.replace("\"signature\"", "\"chat\"")), ["gates"]);
   assert.deepEqual(profileSourceChangedKeys(APPROVED_PROFILE, "gates: [unclosed"), ["<unparseable>"]);
   assert.deepEqual(profileSourceChangedKeys(APPROVED_PROFILE, "- a\n- b\n"), ["<root>"]);
+});
+
+// F36 (measured live 2026-11-10 after candidate 23): one routing line projected into the runtime manifest left the
+// approval unrebindable, DWP-REBIND-AUTHORITY-CHANGED with runtimeSha256, and every dispatch stayed refused.
+const DR_ROUTING_CURRENT = Object.freeze({ ...DR_SOURCE_CURRENT, runtimeSha256: h("a") });
+
+test("F36a: a routing receipt maps source and runtime digests back, only when both were verified, and both readers honour it", () => {
+  assert.deepEqual([...PROFILE_ROUTING_REBIND_FIELDS], ["receiptSha256", "repositoryFingerprint", "sourceSha256", "runtimeSha256"]);
+  const input = { planApproval: drApproval(), current: DR_ROUTING_CURRENT, envelopeSha256: h("9"), verifiedAt: "t" };
+  assert.equal(createPlanApprovalDeviceRebindReceipt(input), null, "no flag, no receipt");
+  assert.equal(createPlanApprovalDeviceRebindReceipt({ ...input, profileSourceRebound: true }), null, "a verified source does not cover the runtime manifest");
+  assert.equal(createPlanApprovalDeviceRebindReceipt({ ...input, profileRuntimeRebound: true }), null, "the runtime flag never stands alone");
+  assert.equal(createPlanApprovalDeviceRebindReceipt({ ...input, current: { ...DR_CURRENT, runtimeSha256: h("a") }, profileSourceRebound: true, profileRuntimeRebound: true }), null,
+    "a runtime manifest that moved without its source is not a routing change");
+  const common = drCommon();
+  const receipt = createPlanApprovalDeviceRebindReceipt({ ...input, profileSourceRebound: true, profileRuntimeRebound: true });
+  assert.equal(receipt.origin.runtimeSha256, DR_STORED.runtimeSha256);
+  writePlanApprovalDeviceRebindReceipt(common, receipt);
+  for (const reader of [readPlanApprovalDeviceRebind, readKernelPlanApprovalDeviceRebind]) {
+    const rebind = reader({ gitCommonDir: common, planApproval: drApproval(), current: DR_ROUTING_CURRENT });
+    assert.ok(rebind, "both readers honour the receipt");
+    assert.deepEqual(withOriginDeviceValues(DR_ROUTING_CURRENT, rebind), DR_STORED, "consumers see the approved values again");
+    assert.equal(reader({ gitCommonDir: common, planApproval: drApproval(), current: { ...DR_ROUTING_CURRENT, runtimeSha256: h("0") } }), null, "a further runtime change is not covered");
+    assert.equal(reader({ gitCommonDir: common, planApproval: drApproval(), current: { ...DR_ROUTING_CURRENT, humanFacing: "de" } }), null, "the operator language stays bound");
+  }
+});
+
+const APPROVED_RUNTIME = ["schema: pipeline.manifest.v0", "gates:", "  push:", "    mode: blocking", "modelRouting:", "  goldfish_deep:", "    effort: medium", ""].join("\n");
+
+test("F36b: a runtime manifest that changed in modelRouting alone passes; a gate, a new key or unknown bytes never do", () => {
+  const dir = profileSourceRepo(APPROVED_PROFILE);
+  const git = (...args) => assert.equal(spawnSync("git", args, { cwd: dir, encoding: "utf8" }).status, 0);
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "project/pipeline.yaml"), APPROVED_RUNTIME);
+  git("add", "project/pipeline.yaml");
+  git("commit", "-q", "-m", "approved runtime");
+  const approvedSha256 = hash(APPROVED_RUNTIME);
+  const check = (text) => { writeFileSync(join(dir, "project/pipeline.yaml"), text); return routingOnlyProfileRuntimeChange({ root: dir, approvedSha256, currentSha256: hash(text) }); };
+  assert.deepEqual(check(APPROVED_RUNTIME.replace("effort: medium", "effort: high")), { ok: true });
+  assert.deepEqual(check(APPROVED_RUNTIME.replace("mode: blocking", "mode: advisory").replace("effort: medium", "effort: high")),
+    { ok: false, code: "DWP-REBIND-PROFILE-RUNTIME-CHANGED", extra: { changedKeys: ["gates"] } });
+  assert.deepEqual(check(`${APPROVED_RUNTIME}flags:\n  has_ui: true\n`).extra, { changedKeys: ["flags"] });
+  assert.equal(routingOnlyProfileRuntimeChange({ root: dir, approvedSha256: h("e"), currentSha256: hash(readFileSync(join(dir, "project/pipeline.yaml"))) }).code, "DWP-REBIND-PROFILE-RUNTIME-UNAVAILABLE");
 });
 
 test("R7-5g: rebind-approval --help and -h answer the question and run nothing; an argument is refused", () => {

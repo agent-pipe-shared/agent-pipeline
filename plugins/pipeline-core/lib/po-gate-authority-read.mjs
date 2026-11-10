@@ -1033,7 +1033,9 @@ export const DEVICE_LOCAL_AUTHORITY_FIELDS = Object.freeze(["receiptSha256", "re
 // carries either exactly the device-local fields or these plus the profile source digest, which only rebind-approval
 // writes after verifying that the approved and current profile source differ in nothing but the model routing.
 export const PROFILE_SOURCE_REBIND_FIELDS = Object.freeze([...DEVICE_LOCAL_AUTHORITY_FIELDS, "sourceSha256"]);
-const REBIND_FIELD_SETS = [DEVICE_LOCAL_AUTHORITY_FIELDS, PROFILE_SOURCE_REBIND_FIELDS];
+// F36: plus the runtime manifest digest, written only after rebind-approval verified the manifests differ in modelRouting alone.
+export const PROFILE_ROUTING_REBIND_FIELDS = Object.freeze([...PROFILE_SOURCE_REBIND_FIELDS, "runtimeSha256"]);
+const REBIND_FIELD_SETS = [DEVICE_LOCAL_AUTHORITY_FIELDS, PROFILE_SOURCE_REBIND_FIELDS, PROFILE_ROUTING_REBIND_FIELDS];
 const RECEIPT_DIRECTORY = ["agent-pipeline", "rebind-approval"];
 export const DEVICE_REBIND_SHA256 = /^[a-f0-9]{64}$/u;
 const DEVICE_REBIND_RECEIPT_KEYS = ["schema", "approvalSha256", "origin", "device", "envelopeSha256", "verifiedAt"];
@@ -1072,7 +1074,7 @@ export function planApprovalDeviceRebindPath(gitCommonDir, approvalSha256, devic
 export function readPlanApprovalDeviceRebind({ gitCommonDir, planApproval, current }) {
   try {
     const stored = planApproval?.poGateAuthority;
-    if (!differsOnlyInDeviceFields(stored, current, PROFILE_SOURCE_REBIND_FIELDS)) return null;
+    if (!differsOnlyInDeviceFields(stored, current, PROFILE_ROUTING_REBIND_FIELDS)) return null;
     const approvalSha256 = sha256CanonicalJson(planApproval);
     if (!DEVICE_REBIND_SHA256.test(current?.repositoryFingerprint ?? "")) return null;
     const receipt = readPrivateJson(planApprovalDeviceRebindPath(gitCommonDir, approvalSha256, current.repositoryFingerprint),
