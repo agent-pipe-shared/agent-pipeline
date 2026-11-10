@@ -326,12 +326,20 @@ export function inspectClosedFeatureArchitecture(rootDir) {
     const targets = architectureDesignTargets(input);
     requireValue(hash(json(input)) === receipt.designSha256
       && JSON.stringify(targets.map(target => ({ path: target.path, sha256: hash(target.bytes) }))) === JSON.stringify(receipt.targets), "ARCHITECTURE-DESIGN-RECEIPT-STALE");
-    requireValue(targets.every(target => bytes(root, target.path) === target.bytes), "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
+    const drifted = targets.filter((target) => bytes(root, target.path) !== target.bytes);
+    if (drifted.length > 0) return { ok: false, status: "unavailable", code: "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT", driftedTargets: drifted.map((target) => ({ path: target.path, change: committedOrWorkingTree(root, target.path) })) };
     return { ok: true, status: "closed-feature-design", featureId: receipt.featureId, designSha256: receipt.designSha256,
       scope: input.disposition.scope, rationale: input.disposition.rationale };
   } catch (error) {
     return { ok: false, status: "unavailable", code: architectureDesignFailureCode(error) };
   }
+}
+
+/** R11: a drifted map file that equals HEAD was committed after the design (a deliberate update reads like this); one that differs from HEAD exists only in the working tree. "unknown" when Git cannot say. */
+function committedOrWorkingTree(root, path) {
+  const status = spawnSync("git", ["-C", root, "status", "--porcelain", "--", path], { encoding: "utf8", shell: false, timeout: 4_000 });
+  if (status.error || status.status !== 0) return "unknown";
+  return String(status.stdout).trim() === "" ? "committed" : "working-tree-only";
 }
 
 /** Read-only authority projection: no adoption record or second PO decision is fabricated. */

@@ -146,6 +146,7 @@ test('CGF-30 a drifted target or an unclosed receipt keeps adoption-required aft
   closeFeatureInState(drifted);
   writeFileSync(join(drifted.dir, receipt.targets[0].path), Buffer.concat([readFileSync(join(drifted.dir, receipt.targets[0].path)), Buffer.from('\ndrift\n')]));
   assert.equal(inspectClosedFeatureArchitecture(drifted.dir).code, 'ARCHITECTURE-DESIGN-ARTIFACT-DRIFT');
+  assert.deepEqual(inspectClosedFeatureArchitecture(drifted.dir).driftedTargets.map((target) => target.path), [receipt.targets[0].path], 'only the file that really drifted is named');
   assert.equal(resolveAdoptionState(drifted.dir).state, 'adoption-required');
   assert.match(resolveAdoptionState(drifted.dir).rationale, /no longer matches the closed feature's approved design/u, 'a drifted map must not read as no architecture at all');
 

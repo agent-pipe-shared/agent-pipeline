@@ -60,6 +60,9 @@ describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
       assert.match(drift, /stops neither the closed feature's close nor its push/u);
       assert.doesNotMatch(drift, /No architecture baseline/u);
       assert.match(adoptionRequiredRationale(undefined), /No architecture baseline/u);
+      const named = adoptionRequiredRationale("ARCHITECTURE-DESIGN-ARTIFACT-DRIFT", [{ path: "architecture/a.md", change: "committed" }, { path: "architecture/b.md", change: "working-tree-only" }, { path: "architecture/c.md", change: "unknown" }]);
+      assert.match(named, /Committed after the design: architecture\/a\.md\. Changed only in the working tree: architecture\/b\.md\./u);
+      assert.doesNotMatch(named, /c\.md/u, "a change Git could not classify is not claimed either way");
     });
 
     it("applies and resolves approved-scoped adoption decision", () => {
