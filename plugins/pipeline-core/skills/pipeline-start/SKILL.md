@@ -28,7 +28,7 @@ conflicting or unknown carriers stop — Critic is closed, never Elephant.
 
 For `pipeline-governance-inactive`, ask the human once whether this project
 should use the Pipeline. That question lists in short what agreeing
-installs and activates, git hooks included, by relaying `consentQuestion.text` verbatim (or its `textByLanguage` entry for the user's language), never paraphrased, with no question of your own before it. Only after an affirmative answer, execute the exact
+installs and activates, git hooks included, by relaying `consentQuestion.text` verbatim, never paraphrased, no question of your own first. Only after an affirmative answer, execute the exact
 read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
 mutations; then run `consentRecordAction`. When an escalation review asks why a
 covered action runs, give its `escalationJustification` line verbatim; the
