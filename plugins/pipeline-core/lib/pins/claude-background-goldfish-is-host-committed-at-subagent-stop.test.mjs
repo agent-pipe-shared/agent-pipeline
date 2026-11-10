@@ -336,7 +336,8 @@ function launchedPending(fx, toolUseId, extra) {
   assert.equal(pre.status, 0, `PreToolUse must admit the launch -- ${pre.stderr.slice(0, 600)}`);
   // D78: the fixture's hand-written briefing draws the generated-briefing WARNING (QG-06 warn state until 0.7.1);
   // it is not what this pin is about, so only that one warning is tolerated -- any other warning or block still fails.
-  const stderr = pre.stderr.split("\n").filter((line) => !/^WARNING \(guard-dispatch\): DBG-GENERATED-BRIEFING-REQUIRED:/u.test(line)).join("\n");
+  // The fixture's pipeline.user.yaml is still a v1 file, so the routing-source note of candidate 23 is tolerated the same way.
+  const stderr = pre.stderr.split("\n").filter((line) => !/^WARNING \(guard-dispatch\): (?:DBG-GENERATED-BRIEFING-REQUIRED|DISPATCH-ROUTING-SOURCE-FALLBACK):/u.test(line)).join("\n");
   assert.doesNotMatch(stderr, /WARNING|BLOCKED/u, `no warning or block expected -- ${stderr.slice(0, 600)}`);
   const files = pendingFiles(fx);
   assert.equal(files.length, 1, "the launch wrote exactly one pending state");
