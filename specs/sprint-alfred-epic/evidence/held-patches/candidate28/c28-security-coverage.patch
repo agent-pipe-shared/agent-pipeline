@@ -1,0 +1,823 @@
+diff --git a/harness/scripts/validate-manifest.test.mjs b/harness/scripts/validate-manifest.test.mjs
+index b6b9d4a85..cda4c844a 100644
+--- a/harness/scripts/validate-manifest.test.mjs
++++ b/harness/scripts/validate-manifest.test.mjs
+@@ -232,6 +232,26 @@ checkCli(
+   { stdoutIncludes: "Manifest valid" },
+ );
+ 
++// ---- C28 (AC-108): security.required_capabilities, the project's declared mandatory security capabilities -------------
++checkCli(
++  "SECURITY required_capabilities ACCEPT  a list of the four known capabilities is valid",
++  fixture("security-required-valid.yaml", "schema: pipeline.manifest.v0\nsecurity:\n  required_capabilities:\n    - secrets\n    - sast\n    - sca\n    - license\n"),
++  0,
++  { stdoutIncludes: "Manifest valid" },
++);
++checkCli(
++  "SECURITY required_capabilities REJECT unknown  a capability outside secrets|sast|sca|license is rejected, naming the field",
++  fixture("security-required-unknown.yaml", "schema: pipeline.manifest.v0\nsecurity:\n  required_capabilities:\n    - secrets\n    - dast\n"),
++  2,
++  { stderrIncludes: "security.required_capabilities" },
++);
++checkCli(
++  "SECURITY required_capabilities REJECT string  a plain string instead of a list is rejected",
++  fixture("security-required-string.yaml", "schema: pipeline.manifest.v0\nsecurity:\n  required_capabilities: sast\n"),
++  2,
++  { stderrIncludes: "security.required_capabilities" },
++);
++
+ // ---- ENUM VIOLATION (gate type: human|automated) ----------------------------------------------------
+ checkCli(
+   "ENUM gate type  an out-of-enum gates.<name>.type value is rejected (human|automated)",
+diff --git a/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs b/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
+index f7b0cd807..27bb6a75b 100644
+--- a/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
++++ b/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
+@@ -13,7 +13,7 @@
+  * Run:   node plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
+  * Exit:  0 = every case passed or was honestly skipped, 1 = a real semgrep run disagreed.
+  */
+-import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import { spawnSync } from "node:child_process";
+@@ -36,8 +36,59 @@ function findSemgrep() {
+   return probe.error ? null : "semgrep";
+ }
+ 
++// C28 (AC-108): the default web/Node rule pack. Positive and negative fixtures per rule; secret-shaped values are assembled here.
++const AWS_KEY = ["AKIA", "IOSFODNN7EXAMPLE"].join("");
++const GH_TOKEN = `ghp_${"a1B2c3D4e5".repeat(3)}a1B2c3`;
++const CREDENTIAL = ["Tr0ub4dor", "Xk29qLm"].join("");
++const NEW_RULES = [
++  "pipeline-default-dom-injection-sink", "pipeline-default-eval-like-call", "pipeline-default-unsafe-url-scheme", "pipeline-default-unvalidated-redirect",
++  "pipeline-default-postmessage-no-origin-check", "pipeline-default-prototype-pollution", "pipeline-default-child-process-shell-string",
++  "pipeline-default-hardcoded-secret", "pipeline-default-hardcoded-credential-assignment",
++];
++const FIXTURES = [
++  { rule: "pipeline-default-dom-injection-sink", name: "innerHTML from a variable", fires: true, code: "el.innerHTML = userInput;" },
++  { rule: "pipeline-default-dom-injection-sink", name: "outerHTML from a variable", fires: true, code: "el.outerHTML = userInput;" },
++  { rule: "pipeline-default-dom-injection-sink", name: "insertAdjacentHTML from a variable", fires: true, code: "el.insertAdjacentHTML('beforeend', userInput);" },
++  { rule: "pipeline-default-dom-injection-sink", name: "document.write from a variable", fires: true, code: "document.write(userInput);" },
++  { rule: "pipeline-default-dom-injection-sink", name: "textContent and literal HTML", fires: false, code: "el.textContent = userInput;\nel.innerHTML = '<b>static</b>';\nel.insertAdjacentHTML('beforeend', '<i>x</i>');" },
++  { rule: "pipeline-default-eval-like-call", name: "new Function", fires: true, code: "const f = new Function('a', body);" },
++  { rule: "pipeline-default-eval-like-call", name: "string timer", fires: true, code: "setTimeout('tick()', 100);" },
++  { rule: "pipeline-default-eval-like-call", name: "window.eval", fires: true, code: "window.eval(src);" },
++  { rule: "pipeline-default-eval-like-call", name: "function timer", fires: false, code: "setTimeout(() => tick(), 100);\nsetInterval(tick, 100);" },
++  { rule: "pipeline-default-unsafe-url-scheme", name: "javascript: href", fires: true, code: "link.href = 'javascript:alert(1)';" },
++  { rule: "pipeline-default-unsafe-url-scheme", name: "javascript: location", fires: true, code: "window.location.href = \"javascript:void(0)\";" },
++  { rule: "pipeline-default-unsafe-url-scheme", name: "https href", fires: false, code: "link.href = 'https://example.com/';" },
++  { rule: "pipeline-default-unvalidated-redirect", name: "location from a variable", fires: true, code: "window.location.href = target;" },
++  { rule: "pipeline-default-unvalidated-redirect", name: "location.assign from a variable", fires: true, code: "location.assign(target);" },
++  { rule: "pipeline-default-unvalidated-redirect", name: "res.redirect from the query", fires: true, code: "res.redirect(req.query.next);" },
++  { rule: "pipeline-default-unvalidated-redirect", name: "literal targets", fires: false, code: "window.location.href = '/home';\nres.redirect('/login');" },
++  { rule: "pipeline-default-postmessage-no-origin-check", name: "arrow handler without an origin check", fires: true, code: "window.addEventListener('message', (e) => { render(e.data); });" },
++  { rule: "pipeline-default-postmessage-no-origin-check", name: "function handler without an origin check", fires: true, code: "window.addEventListener('message', function (e) { render(e.data); });" },
++  { rule: "pipeline-default-postmessage-no-origin-check", name: "handler that checks the origin", fires: false, code: "window.addEventListener('message', (e) => {\n  if (e.origin !== 'https://app.example') return;\n  render(e.data);\n});" },
++  { rule: "pipeline-default-prototype-pollution", name: "__proto__ assignment", fires: true, code: "target.__proto__ = payload;" },
++  { rule: "pipeline-default-prototype-pollution", name: "constructor.prototype write", fires: true, code: "target.constructor.prototype.admin = true;" },
++  { rule: "pipeline-default-prototype-pollution", name: "nested dynamic write inside for-in", fires: true, code: "function merge(t, s) { for (const k in s) { t[k][s[k]] = s; } }" },
++  { rule: "pipeline-default-prototype-pollution", name: "plain property writes and a numeric grid loop", fires: false, code: "target.name = source.name;\nfor (let i = 0; i < n; i++) { grid[i][i] = 0; }" },
++  { rule: "pipeline-default-child-process-shell-string", name: "exec with a built string", fires: true, code: "const cp = require('child_process');\ncp.exec('ls ' + dir);" },
++  { rule: "pipeline-default-child-process-shell-string", name: "imported execSync with a variable", fires: true, code: "import { execSync } from 'child_process';\nexecSync(cmd);" },
++  { rule: "pipeline-default-child-process-shell-string", name: "spawn with shell true", fires: true, code: "const cp = require('child_process');\ncp.spawn(cmd, args, { shell: true });" },
++  { rule: "pipeline-default-child-process-shell-string", name: "execFile, a literal command and a regex exec", fires: false, code: "const cp = require('child_process');\ncp.execFile('ls', [dir]);\ncp.exec('ls -la');\n/a+/.exec(text);" },
++  { rule: "pipeline-default-hardcoded-secret", name: "an AWS-shaped access key id", fires: true, code: `const id = "${AWS_KEY}";` },
++  { rule: "pipeline-default-hardcoded-secret", name: "a GitHub-token-shaped value", fires: true, code: `const t = "${GH_TOKEN}";` },
++  { rule: "pipeline-default-hardcoded-secret", name: "values read from the environment", fires: false, code: "const id = process.env.AWS_ACCESS_KEY_ID;" },
++  { rule: "pipeline-default-hardcoded-credential-assignment", name: "a literal password", fires: true, code: `const password = "${CREDENTIAL}";` },
++  { rule: "pipeline-default-hardcoded-credential-assignment", name: "an api key property", fires: true, code: `const cfg = { apiKey: "${CREDENTIAL}" };` },
++  { rule: "pipeline-default-hardcoded-credential-assignment", name: "environment reads and placeholders", fires: false, code: "const password = process.env.DB_PASSWORD;\nconst apiKey = '<your-api-key>';\nconst token = '';" },
++];
++
+ const binary = findSemgrep();
+ record("semgrep-default-rules.yml exists on disk", existsSync(RULES_PATH), RULES_PATH);
++{
++  const rulesText = existsSync(RULES_PATH) ? readFileSync(RULES_PATH, "utf8") : "";
++  const listed = new Set([...rulesText.matchAll(/^\s*-\s+id:\s*(\S+)/gmu)].map((m) => m[1]));
++  record("default pack lists both original rules and every new rule id (no semgrep binary needed)", ["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval", ...NEW_RULES].every((id) => listed.has(id)), `missing: ${JSON.stringify(["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval", ...NEW_RULES].filter((id) => !listed.has(id)))}`);
++  record("default pack: every new rule has at least one positive and one negative fixture", NEW_RULES.every((id) => FIXTURES.some((f) => f.rule === id && f.fires) && FIXTURES.some((f) => f.rule === id && !f.fires)), "fixture table incomplete");
++}
+ 
+ if (!binary) {
+   console.log("SKIP  no real semgrep binary on PATH -- ruleset syntax is not independently verifiable in this environment (not verifiable, not faked)");
+@@ -93,6 +144,21 @@ if (!binary) {
+   record("shipped ruleset reports zero findings on a clean fixture", Array.isArray(cleanParsed?.results) && cleanParsed.results.length === 0, JSON.stringify(cleanParsed?.results));
+   record("shipped ruleset carries no error payload on a clean fixture", !Array.isArray(cleanParsed?.errors) || cleanParsed.errors.length === 0, JSON.stringify(cleanParsed?.errors));
+ 
++  // Case 3 (C28, AC-108): the default web/Node pack. Every new rule has at least one positive and one negative fixture; all fixtures are
++  // scanned in ONE semgrep spawn and read back per file. Secret-shaped values are assembled at run time, so no literal token is committed.
++  const packDir = join(scratch, "pack");
++  mkdirSync(packDir, { recursive: true });
++  FIXTURES.forEach((fixture, index) => writeFileSync(join(packDir, `f${index}.js`), `${fixture.code}\n`));
++  const packRun = spawnSync(binary, ["scan", "--json", "--config", RULES_PATH, packDir], { encoding: "utf8", env, shell: false });
++  let packParsed = null;
++  try { packParsed = JSON.parse(packRun.stdout ?? ""); } catch { /* asserted below */ }
++  record("default pack: the whole fixture directory scans to parseable JSON with no error payload", packParsed !== null && (packParsed.errors ?? []).length === 0, `${packRun.stderr?.slice(0, 300)} ${JSON.stringify(packParsed?.errors)?.slice(0, 300)}`);
++  const firedIn = (index) => new Set((packParsed?.results ?? []).filter((r) => r.path.endsWith(`f${index}.js`)).map((r) => r.check_id.split(".").pop()));
++  FIXTURES.forEach((fixture, index) => {
++    const fired = firedIn(index).has(fixture.rule);
++    record(`default pack: ${fixture.rule} ${fixture.fires ? "fires on" : "stays quiet on"} ${fixture.name}`, fired === fixture.fires, `fired: ${JSON.stringify([...firedIn(index)])}`);
++  });
++
+   try { rmSync(scratch, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+index 59587ba46..09e5b255a 100644
+--- a/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
++++ b/plugins/pipeline-core/lib/pins/security-close-chain-is-hard-per-calibration.test.mjs
+@@ -28,6 +28,7 @@ import { tmpdir } from "node:os";
+ import { dirname, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
++import * as statusLib from "../security-close-status.mjs"; // C28 cases read the new exports through the namespace, so a missing export fails only those cases
+ import { checkSecurityCompleteness } from "../security-completeness-gate.mjs";
+ import { gateConfig, loadManifest } from "../manifest.mjs";
+ import {
+@@ -617,3 +618,182 @@ test("C19 the close quality readback names an applied exception in its security
+   assert.match(noException.evidence, /license-check: not executed/u);
+   assert.ok(!noException.evidence.includes("named exception"));
+ });
++
++// C28 (AC-108, PO decisions 2026-11-10 on the greenfield reports): honest not-run states, warnings with a next step, and the declared
++// requirement. Acceptance, written from the criterion and the PO decision, not from the code:
++//   C22 a scan that ran on a dirty worktree or with zero loaded rules is never counted as a result: it reads "not executed" with its reason,
++//       in the elements, in the scan verdict, and in the scope the close prints; a finding is never hidden by it;
++//   C23 a skipped (also a not-configured license check) or partial capability is a WARNING that names what would run it; a passed one,
++//       "no package sources" and an excepted one raise none; the close entry prints it and never prints GREEN;
++//   C24 a capability the project declared in security.required_capabilities that has no scanner, loaded zero rules or did not run is
++//       refused with a typed code naming the capability, the scanner and the install or run step; the same state without a declaration
++//       stays a warning; a gate that is off or absent does not hide the declaration;
++//   C25 the Verify security check applies the same declared reading.
++const gateManifest = (required = null, mode = "blocking") => `schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: ${mode}\n    type: automated\n${required ? `security:\n  required_capabilities:\n${required.map((c) => `    - ${c}\n`).join("")}` : ""}`;
++function declaredClose({ required = null, mode = "blocking", scannerList, stakes = "standard" }) {
++  const fixture = closeFixture({ gate: "blocking", stakes });
++  writeFileSync(join(fixture.dir, ".claude/pipeline.yaml"), gateManifest(required, mode));
++  evidence(fixture.dir, { status: "PASS", classification: "success", outcome: "pass" });
++  const envelopePath = join(fixture.dir, "evidence/security-latest.v2.json");
++  const envelope = JSON.parse(readFileSync(envelopePath, "utf8"));
++  envelope.input.commit = fixture.commit;
++  envelope.input.tree = fixture.tree;
++  writeFileSync(envelopePath, JSON.stringify(envelope));
++  writeJson(fixture.dir, "evidence/security-latest.json", { scanners: scannerList });
++  return fixture.dir;
++}
++const pass = (tool) => ({ tool, status: "PASS", classification: "success" });
++const skippedLicenseEntry = { tool: "license-check", status: "SKIPPED", classification: "success", reason: "no license policy or declaration is configured" };
++// A real scan lists every scanner the project enables, so the close fixtures do too (a missing entry then reads "not executed").
++const fullScan = (over = {}) => ["gitleaks", "osv-scanner", "semgrep", "license-check"].map((tool) => over[tool] ?? pass(tool));
++const noSourcesEntry = { tool: "osv-scanner", status: "SKIPPED", classification: "success", reason: "no package sources in project" };
++const notRunSemgrep = { tool: "semgrep", status: "PASS", classification: "success", reportStatus: "not-run", notRun: "zero-rules", reason: "semgrep loaded zero rules from the configured rule set; a scan without rules is not a result" };
++
++test("C22 a PASS on a dirty worktree or with zero loaded rules is marked not-run with its reason; findings, skips and real scans are untouched", () => {
++  assert.equal(typeof statusLib.markNotRunScans, "function");
++  const rules = (ruleCount) => ({ ruleCount, ruleIds: [] });
++  const list = [
++    { tool: "gitleaks", status: "PASS", classification: "success" },
++    { tool: "osv-scanner", status: "FINDINGS", classification: "findings" },
++    { tool: "license-check", status: "SKIPPED", classification: "success" },
++    { tool: "semgrep", status: "PASS", classification: "success", ruleSet: rules(0) },
++  ];
++  const dirty = statusLib.markNotRunScans(structuredClone(list), { candidateUncertain: true });
++  assert.deepEqual(dirty.map((e) => e.reportStatus), ["not-run", undefined, undefined, "not-run"]);
++  assert.match(dirty[0].reason, /dirty|unbound/u);
++  assert.equal(dirty[0].notRun, "dirty-worktree");
++  assert.equal(dirty[3].notRun, "dirty-worktree"); // the worktree reason is named first; both are honest
++  const clean = statusLib.markNotRunScans(structuredClone(list), { candidateUncertain: false });
++  assert.deepEqual(clean.map((e) => e.reportStatus), [undefined, undefined, undefined, "not-run"]);
++  assert.equal(clean[3].notRun, "zero-rules");
++  assert.match(clean[3].reason, /zero rules/u);
++  const real = statusLib.markNotRunScans([{ tool: "semgrep", status: "PASS", classification: "success", ruleSet: rules(9) }], { candidateUncertain: false });
++  assert.equal(real[0].reportStatus, undefined);
++  const elements = securityCloseElements({ scanners: clean });
++  const state = Object.fromEntries(elements.map((e) => [e.element, e.state]));
++  assert.equal(state.semgrep, "not executed");
++  assert.match(elements.find((e) => e.element === "semgrep").reason, /zero rules/u);
++  assert.equal(state["osv-scanner"], "failed");
++});
++
++test("C22b the scan verdict and the close scope never read a not-run scan as clean or as having run", async () => {
++  const { deriveSummaryVerdict } = await import("../../scripts/security-scan.mjs");
++  const evidenceOf = (scannerList) => ({ exitCode: 0, scanners: scannerList });
++  assert.equal(deriveSummaryVerdict(evidenceOf([pass("gitleaks"), { ...pass("semgrep"), reportStatus: "not-run" }])), "PARTIAL");
++  assert.equal(deriveSummaryVerdict(evidenceOf([{ ...pass("semgrep"), reportStatus: "not-run" }])), "INCOMPLETE");
++  assert.equal(deriveSummaryVerdict(evidenceOf([pass("gitleaks"), pass("semgrep")])), "CLEAN");
++});
++
++test("C23 warnings: a skipped, not-configured or partial capability is a WARNING naming what would run it; passed, no-package-sources and excepted raise none", () => {
++  assert.equal(typeof statusLib.securityCloseWarnings, "function");
++  const elements = securityCloseElements({
++    scanners: [
++      pass("gitleaks"),
++      { tool: "osv-scanner", status: "SKIPPED", classification: "binary_missing", reason: "osv-scanner not found on PATH" },
++      { tool: "semgrep", status: "PASS", classification: "success", coverage: { status: "degraded", reason: "partial-parsing", files: ["a.js", "b.js"] } },
++      skippedLicenseEntry,
++    ],
++  });
++  const warnings = statusLib.securityCloseWarnings(elements);
++  assert.equal(warnings.length, 3, warnings.join("\n"));
++  for (const line of warnings) assert.match(line, /^WARNING: /u);
++  assert.ok(warnings.some((l) => /osv-scanner/u.test(l) && /toolchain-preflight\.mjs/u.test(l) && /security-scan\.mjs/u.test(l)), warnings.join("\n"));
++  assert.ok(warnings.some((l) => /semgrep/u.test(l) && /partial/u.test(l) && /2 file/u.test(l)), warnings.join("\n"));
++  assert.ok(warnings.some((l) => /license-check/u.test(l) && /third-party-licenses\.json/u.test(l)), warnings.join("\n"));
++  assert.ok(!warnings.some((l) => /gitleaks/u.test(l)));
++  const noSources = statusLib.elementsOfCompletedScan([pass("gitleaks"), { tool: "osv-scanner", status: "SKIPPED", classification: "success", reason: "no package sources in project" }]);
++  assert.deepEqual(statusLib.securityCloseWarnings(noSources), []);
++  const excepted = securityCloseElements({ scanners: [skippedLicenseEntry], critical: true, exceptions: { valid: [{ scanner: "license-check", reason: "r", expires: "2999-01-01", confirmedBy: "c" }], rejected: [] } });
++  assert.ok(!statusLib.securityCloseWarnings(excepted).some((l) => /license-check/u.test(l)));
++  const dirty = securityCloseElements({ scanners: [{ tool: "gitleaks", status: "PASS", classification: "success", reportStatus: "not-run", notRun: "dirty-worktree", reason: "the scan ran on a dirty or unbound worktree" }] });
++  assert.ok(statusLib.securityCloseWarnings(dirty).some((l) => /gitleaks/u.test(l) && /commit or stash/u.test(l)));
++});
++
++test("C22c the scan summary itself prints a WARNING with the next step for every scanner that did not run (no scanner on PATH)", () => {
++  const root = project("standard");
++  mkdirSync(join(root, "scratch"), { recursive: true });
++  const run = spawnSync(process.execPath, [scanScript, "--root", root, "--out-dir", "scratch/analysis"], { encoding: "utf8", timeout: 50_000, env: { PATH: "", Path: "", HOME: root } });
++  // The fixture's license-check is the one scanner without a binary: it is skipped on every machine, whatever scanners are installed there.
++  assert.match(run.stdout, /WARNING: license-check was skipped/u, `${run.stdout}\n${run.stderr}`);
++  assert.match(run.stdout, /Next step: .*third-party-licenses\.json.*security-scan\.mjs/u);
++  assert.doesNotMatch(run.stdout, /Verdict: CLEAN/u);
++});
++
++test("C23b the close entry prints each warning and never GREEN: a skipped license check reads ADMITTED WITH WARNINGS, not complete", () => {
++  const dir = declaredClose({ scannerList: fullScan({ "license-check": skippedLicenseEntry, "osv-scanner": noSourcesEntry }) });
++  const run = runClose(dir);
++  assert.equal(run.status, 0, run.stderr);
++  assert.match(run.stdout, /WARNING: license-check/u);
++  assert.match(run.stdout, /third-party-licenses\.json/u);
++  assert.doesNotMatch(run.stdout, /GREEN/u);
++  assert.match(run.stdout, /ADMITTED WITH WARNINGS/u);
++  const clean = runClose(declaredClose({ scannerList: fullScan() }));
++  assert.equal(clean.status, 0, clean.stderr);
++  assert.match(clean.stdout, /GREEN/u);
++  assert.doesNotMatch(clean.stdout, /WARNING/u);
++});
++
++test("C24 a declared capability that has no scanner, loaded zero rules or did not run is refused with a typed code; undeclared stays a warning", () => {
++  assert.equal(typeof statusLib.declaredSecurityCapabilities, "function");
++  assert.deepEqual(statusLib.declaredSecurityCapabilities({ security: { required_capabilities: ["secrets", "sast", "sast", "bogus"] } }), ["secrets", "sast"]);
++  assert.deepEqual(statusLib.declaredSecurityCapabilities(null), []);
++  const declared = ["secrets", "license"];
++  const refused = runClose(declaredClose({ required: declared, scannerList: fullScan({ "license-check": skippedLicenseEntry }) }));
++  assert.equal(refused.status, 2);
++  assert.match(refused.stderr, /SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN/u);
++  assert.match(refused.stderr, /license/u);
++  assert.match(refused.stderr, /license-check/u);
++  assert.match(refused.stderr, /security-scan\.mjs/u);
++  assert.doesNotMatch(refused.stderr, /secrets/u);
++  const missing = runClose(declaredClose({ required: ["sast"], scannerList: fullScan().filter((entry) => entry.tool !== "semgrep") })); // no semgrep entry at all
++  assert.equal(missing.status, 2);
++  assert.match(missing.stderr, /SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN.*sast|sast.*semgrep/su);
++  const zero = runClose(declaredClose({ required: ["sast"], scannerList: fullScan({ semgrep: notRunSemgrep }) }));
++  assert.equal(zero.status, 2);
++  assert.match(zero.stderr, /zero rules/u);
++  const sca = runClose(declaredClose({ required: ["sca"], scannerList: fullScan({ "osv-scanner": noSourcesEntry }) }));
++  assert.equal(sca.status, 0, sca.stderr); // nothing to scan is the honest reading of "no package sources"
++  const met = runClose(declaredClose({ required: ["secrets", "sast"], scannerList: fullScan() }));
++  assert.equal(met.status, 0, met.stderr);
++  assert.match(met.stdout, /GREEN/u);
++  const undeclared = runClose(declaredClose({ scannerList: fullScan({ semgrep: notRunSemgrep }) }));
++  assert.equal(undeclared.status, 0, undeclared.stderr);
++  assert.match(undeclared.stdout, /WARNING: semgrep/u);
++  assert.doesNotMatch(undeclared.stdout, /GREEN/u);
++});
++
++test("C24b a declared capability is not hidden by a gate that is off or absent from the manifest", () => {
++  for (const mode of ["off"]) {
++    const run = runClose(declaredClose({ required: ["secrets"], mode, scannerList: [pass("gitleaks")] }));
++    assert.equal(run.status, 2, `${mode}: ${run.stdout}${run.stderr}`);
++    assert.match(run.stderr, /SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN/u);
++    assert.match(run.stderr, /gates\.security/u);
++  }
++  const noGate = closeFixture({ gate: "blocking", stakes: "standard" });
++  writeFileSync(join(noGate.dir, ".claude/pipeline.yaml"), "schema: pipeline.manifest.v0\nsecurity:\n  required_capabilities:\n    - sast\n");
++  const run = runClose(noGate.dir);
++  assert.equal(run.status, 2, `${run.stdout}${run.stderr}`);
++  assert.match(run.stderr, /SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN/u);
++});
++
++test("C25 the Verify security check applies the declared reading: a declared capability without a scanner refuses with the typed code; undeclared stays admitted", async () => {
++  const { runSecurityCloseCheck } = await import("../../scripts/security-close-check.mjs");
++  const run = (root) => {
++    const lines = [];
++    const log = console.log; const error = console.error;
++    console.log = (...a) => lines.push(a.join(" ")); console.error = (...a) => lines.push(a.join(" "));
++    try { return { code: runSecurityCloseCheck(root, { PATH: "", Path: "", HOME: root }), text: lines.join("\n") }; } finally { console.log = log; console.error = error; }
++  };
++  const make = (required) => {
++    const root = project("standard");
++    mkdirSync(join(root, ".claude"), { recursive: true });
++    writeFileSync(join(root, ".claude/pipeline.yaml"), gateManifest(required));
++    return root;
++  };
++  const declared = run(make(["license"])); // license-check has no binary, so it is skipped on every machine
++  assert.equal(declared.code, 1, declared.text);
++  assert.match(declared.text, /SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN/u);
++  assert.match(declared.text, /license-check/u);
++  const undeclared = run(make(null));
++  assert.equal(undeclared.code, 0, undeclared.text); // its warnings are printed by the scan child process itself (security-scan.mjs, C22c)
++});
+diff --git a/plugins/pipeline-core/lib/security-close-status.mjs b/plugins/pipeline-core/lib/security-close-status.mjs
+index cfc8506a9..c6daf781c 100644
+--- a/plugins/pipeline-core/lib/security-close-status.mjs
++++ b/plugins/pipeline-core/lib/security-close-status.mjs
+@@ -56,7 +56,8 @@ export function securityScannerState(entry, { critical = false } = {}) {
+   if (label === "findings") return "failed";
+   if (label === "not-configured") return critical ? "not executed" : "not applicable";
+   if (label === "not-applicable") return "not applicable";
+-  return "not executed"; // tool-unavailable, error, or an unrecognised status: the scanner did not complete a scan
++  // "not-run" (C28, markNotRunScans): a scan that ran on a dirty worktree or loaded zero rules is not a result; it reads like a scanner that did not run.
++  return "not executed"; // not-run, tool-unavailable, error, or an unrecognised status: the scanner did not complete a scan
+ }
+ 
+ /** True for a critical calibration: the first word of `stakes` is critical/high/kritisch/hoch. Absent or unknown is not critical. */
+@@ -159,7 +160,7 @@ export function ruleSetSummary(ruleSet) {
+ 
+ /** One line per scanner entry for the scan output: the rule set of a scanner that ran, else the plain statement that no rules ran. */
+ export function formatRuleSetLine(entry) {
+-  const ran = entry?.status === "PASS" || entry?.status === "FINDINGS";
++  const ran = (entry?.status === "PASS" || entry?.status === "FINDINGS") && entry?.reportStatus !== "not-run"; // C28: a not-run scan is not a result
+   const summary = ran ? ruleSetSummary(entry.ruleSet) : null;
+   return `${entry?.tool ?? "unknown"}: ${ran ? (summary ?? "ran, rule set not recorded") : "no rules ran (scanner did not execute)"}`;
+ }
+@@ -183,7 +184,14 @@ export function securityCloseElements({ scanners = null, enabled = {}, critical
+     if (entry) {
+       const state = securityScannerState(entry, { critical });
+       const rules = state === "passed" || state === "failed" ? ruleSetSummary(entry.ruleSet) : null;
+-      return excepted({ element, state, reason: entry.reason ?? null, ...(rules === null ? {} : { rules }) });
++      // C28: additive facts for the warnings -- why a scan is not a result (`notRun`), a partial scan (`coverage`), a skipped not-configured check (`skipped`).
++      const label = entry.reportStatus ?? deriveReportStatus(entry);
++      return excepted({
++        element, state, reason: entry.reason ?? null, ...(rules === null ? {} : { rules }),
++        ...(typeof entry.notRun === "string" ? { notRun: entry.notRun } : {}),
++        ...(entry.coverage?.status === "degraded" ? { coverage: { reason: String(entry.coverage.reason), files: Array.isArray(entry.coverage.files) ? entry.coverage.files.length : 0 } } : {}),
++        ...(label === "not-configured" && state === "not applicable" ? { skipped: true } : {}),
++      });
+     }
+     if (enabled?.[element] === false) return { element, state: "not applicable", reason: "not configured for this project" };
+     return excepted({ element, state: "not executed", reason: "no scan evidence for this scanner" });
+@@ -200,6 +208,82 @@ export function elementsOfCompletedScan(scanners, options = {}) {
+ /** The elements that did not execute and no named exception covers: these are what a critical calibration refuses. */
+ export const unexcusedNotExecuted = (elements) => elements.filter((e) => e.state === "not executed" && !e.exception);
+ 
++/**
++ * C28 (AC-108, honest states): a scan that PASSED but ran on a dirty or unbound worktree (`candidateUncertain`), or that loaded zero rules, is never counted
++ * as a result. Marks such an entry `reportStatus: "not-run"` with `notRun` (dirty-worktree | zero-rules) and the reason, so every reader (state lines, scan
++ * verdict, warnings, the declared requirement) sees a scanner that did not run. `status` and the scan's exit decision are untouched, so no gate becomes
++ * newly blocking by this; a scan that reported findings is never hidden, and SKIPPED/ERROR entries already read as not executed. Mutates and returns `scanners`.
++ */
++export function markNotRunScans(scanners, { candidateUncertain = false } = {}) {
++  for (const entry of Array.isArray(scanners) ? scanners : []) {
++    if (entry?.status !== "PASS") continue;
++    const dirty = candidateUncertain === true;
++    const zeroRules = entry.tool === "semgrep" && Number.isInteger(entry.ruleSet?.ruleCount) && entry.ruleSet.ruleCount === 0;
++    if (!dirty && !zeroRules) continue;
++    entry.reportStatus = "not-run";
++    entry.notRun = dirty ? "dirty-worktree" : "zero-rules";
++    entry.reason = dirty
++      ? "the scan ran on a dirty or unbound worktree and is not counted as a result"
++      : "semgrep loaded zero rules from the configured rule set; a scan without rules is not a result";
++  }
++  return scanners;
++}
++
++// C28: a project may declare mandatory security capabilities in its manifest (security.required_capabilities); each maps to the scanner that provides it.
++export const REQUIRED_CAPABILITY_CODE = "SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN";
++export const SECURITY_CAPABILITY_ELEMENT = Object.freeze({ secrets: "gitleaks", sast: "semgrep", sca: "osv-scanner", license: "license-check" });
++
++/** The known capabilities the manifest declares mandatory (de-duplicated, in declared order); anything else is ignored here (the manifest validator rejects it). */
++export function declaredSecurityCapabilities(manifest) {
++  const list = manifest?.security?.required_capabilities;
++  return Array.isArray(list) ? [...new Set(list.filter((c) => typeof c === "string" && Object.hasOwn(SECURITY_CAPABILITY_ELEMENT, c)))] : [];
++}
++
++/**
++ * One typed refusal per declared capability whose scanner has no installed binary, loaded zero rules, errored, did not run or left no evidence (the critical
++ * reading: a skipped license-check did not run). Without a declaration nothing here applies, so the same state stays a warning. `gateActive: false` (the manifest
++ * configures no security gate, or mode off) means no scan runs at all, so every declared capability is refused. A valid named exception (`exceptions`, critical
++ * calibrations only) answers it as everywhere else. "No package sources" is nothing to scan, not a missing capability.
++ */
++export function requiredCapabilityRefusals({ scanners = null, declared = [], exceptions = null, gateActive = true } = {}) {
++  if (declared.length === 0) return [];
++  const elements = gateActive ? securityCloseElements({ scanners, enabled: {}, critical: true, exceptions }) : [];
++  return declared.flatMap((capability) => {
++    const element = SECURITY_CAPABILITY_ELEMENT[capability];
++    const found = elements.find((e) => e.element === element);
++    if (gateActive && !(found?.state === "not executed" && !found.exception)) return [];
++    const why = gateActive ? (found?.reason ?? "it did not run") : "the security gate is not configured (no gates.security, or mode off), so no scan runs";
++    const step = gateActive
++      ? `Install or configure ${element} (platform guidance: ${SECURITY_PREFLIGHT_COMMAND}), then run: ${SECURITY_RUN_COMMAND}`
++      : `Set gates.security (mode blocking or warn, type automated) in the project manifest, then run: ${SECURITY_RUN_COMMAND}`;
++    return [`${REQUIRED_CAPABILITY_CODE}: the project declared the ${capability} capability mandatory (security.required_capabilities in its manifest) and ${element} did not run (${oneLine(why)}). ${step}.`];
++  });
++}
++
++const RUN_STEP = `then run: ${SECURITY_RUN_COMMAND}`;
++function warningNextStep(entry) {
++  if (entry.notRun === "dirty-worktree") return `commit or stash the working-tree changes (a scan needs a clean candidate), ${RUN_STEP}`;
++  if (entry.notRun === "zero-rules") return `point security.scanners.semgrep.rules_dir at a directory that holds rule files, or remove it to use the plugin's default rule pack, ${RUN_STEP}`;
++  if (entry.element === "license-check") return `provide the licence declaration third-party-licenses.json (or a policy under governance/policies/), ${RUN_STEP}`;
++  return `install or configure ${entry.element} (platform guidance: ${SECURITY_PREFLIGHT_COMMAND}), ${RUN_STEP}`;
++}
++
++/**
++ * C28: one `WARNING: ...` line per element that did not run, was skipped as not configured, or covered only part of the tree, each with the next step that would
++ * run it. Passed, failed, "no package sources" and excepted elements raise none. Never blocking: only a declared capability refuses (requiredCapabilityRefusals).
++ */
++export function securityCloseWarnings(elements) {
++  const lines = [];
++  for (const entry of Array.isArray(elements) ? elements : []) {
++    if (entry.exception) continue;
++    const reason = entry.reason ? ` (${oneLine(entry.reason)})` : "";
++    if (entry.state === "not executed") lines.push(`WARNING: ${entry.element} did not run${reason}. Next step: ${warningNextStep(entry)}.`);
++    else if (entry.skipped) lines.push(`WARNING: ${entry.element} was skipped${reason}. Next step: ${warningNextStep(entry)}.`);
++    else if (entry.coverage) lines.push(`WARNING: ${entry.element} covered only part of the tree (${oneLine(entry.coverage.reason)}, ${entry.coverage.files} file(s) only partly read). Next step: fix the syntax the scanner could not parse, ${RUN_STEP}.`);
++  }
++  return lines;
++}
++
+ // One line per exception: never contains a newline, and the " -- " that separates the reason from the label stays unique.
+ const oneLine = (value) => String(value).replace(/\s+/gu, " ").replace(/ -- /gu, " - ").trim();
+ export function formatSecurityCloseStatus(elements) {
+diff --git a/plugins/pipeline-core/scripts/check-close-security-completeness.mjs b/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
+index 7e8b332f9..d7879d5c5 100644
+--- a/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
++++ b/plugins/pipeline-core/scripts/check-close-security-completeness.mjs
+@@ -39,8 +39,8 @@ import { readFileSync } from "node:fs";
+ import { join } from "node:path";
+ 
+ import {
+-  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions, securityCloseElements,
+-  securityGateNotConfiguredRefusal, unexcusedNotExecuted,
++  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, declaredSecurityCapabilities, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions,
++  requiredCapabilityRefusals, securityCloseElements, securityCloseWarnings, securityGateNotConfiguredRefusal, unexcusedNotExecuted,
+ } from "../lib/security-close-status.mjs";
+ 
+ import { loadManifest, gateConfig } from "../lib/manifest.mjs";
+@@ -58,7 +58,10 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ export function checkCloseSecurityCompleteness(root) {
+   const manifestResult = loadManifest(root);
+   const securityGate = gateConfig(manifestResult.manifest, "security");
++  const declared = declaredSecurityCapabilities(manifestResult.manifest);
+   if (manifestResult.status === "absent" || !securityGate || securityGate.mode === "off") {
++    // C28: a project that declared mandatory capabilities does not skip the check because its gate is absent or off: no scan runs, so each one is refused.
++    if (declared.length > 0) return { skipped: false, commit: null, failures: requiredCapabilityRefusals({ declared, gateActive: false }), elements: [], warnings: [] };
+     return { skipped: true };
+   }
+ 
+@@ -78,7 +81,11 @@ export function checkCloseSecurityCompleteness(root) {
+   const enabled = Object.fromEntries(SECURITY_ELEMENTS.map((key) => [key, manifestResult.manifest?.security?.scanners?.[key]?.enabled ?? true]));
+   // Candidate 21h: the critical reading and the named exceptions, so the printed lines match what the completeness check above decided.
+   const critical = isCriticalStakes(readCalibrationStakes(root));
+-  return { skipped: false, commit, failures, elements: securityCloseElements({ scanners, enabled, critical, exceptions: critical ? readScannerExceptions(root) : null }) };
++  const exceptions = critical ? readScannerExceptions(root) : null;
++  // C28: a declared mandatory capability that did not run is a typed refusal; every other skipped or partial scanner is a warning with its next step.
++  failures.push(...requiredCapabilityRefusals({ scanners, declared, exceptions }));
++  const elements = securityCloseElements({ scanners, enabled, critical, exceptions });
++  return { skipped: false, commit, failures, elements, warnings: securityCloseWarnings(elements) };
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) {
+@@ -93,6 +100,7 @@ if (isDirectInvocation(import.meta.url)) {
+     process.exit(0);
+   }
+   for (const line of formatSecurityCloseStatus(result.elements)) console.log(`  ${line}`);
++  for (const warning of result.warnings) console.log(`  ${warning}`);
+   if (result.failures.length > 0) {
+     for (const failure of result.failures) console.error(`CLOSE SECURITY COMPLETENESS FAILED: ${failure}`);
+     process.exit(2);
+@@ -104,6 +112,11 @@ if (isDirectInvocation(import.meta.url)) {
+     console.log(`CLOSE SECURITY COMPLETENESS ADMITTED BY NAMED EXCEPTION: HEAD ${result.commit} is bound; not executed but excepted: ${excepted.join(", ")} (see the lines above for reason, expiry and confirmer).`);
+     process.exit(0);
+   }
++  // C28: a skipped or partial scanner is a warning, never a clean close.
++  if (notExecuted.length === 0 && result.warnings.length > 0) {
++    console.log(`CLOSE SECURITY COMPLETENESS ADMITTED WITH WARNINGS: HEAD ${result.commit} is bound; ${result.warnings.length} warning(s) above name what would run each skipped or partial scanner (the project did not declare them mandatory, so they do not block).`);
++    process.exit(0);
++  }
+   console.log(notExecuted.length === 0
+     ? `CLOSE SECURITY COMPLETENESS GREEN: HEAD ${result.commit} is bound and complete.`
+     : `CLOSE SECURITY COMPLETENESS ADMITTED, NOT COMPLETE: HEAD ${result.commit} is bound; not executed: ${notExecuted.join(", ")} (this calibration is not critical, so it does not block). Run: ${SECURITY_RUN_COMMAND}`);
+diff --git a/plugins/pipeline-core/scripts/pipeline-manifest.schema.json b/plugins/pipeline-core/scripts/pipeline-manifest.schema.json
+index b247bf8bd..d31a2944a 100644
+--- a/plugins/pipeline-core/scripts/pipeline-manifest.schema.json
++++ b/plugins/pipeline-core/scripts/pipeline-manifest.schema.json
+@@ -90,6 +90,11 @@
+             "block_on": { "type": "array", "items": { "type": "string" } }
+           }
+         },
++        "required_capabilities": {
++          "type": "array",
++          "description": "OPTIONAL. Security capabilities this project declares mandatory at the close: secrets (gitleaks), sast (semgrep), sca (osv-scanner), license (license-check). A declared capability whose scanner is not installed, loaded zero rules or did not run is refused at the close (SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN); without a declaration the same state is a warning.",
++          "items": { "type": "string", "enum": ["secrets", "sast", "sca", "license"] }
++        },
+         "scanners": {
+           "type": "object",
+           "description": "Keys are arbitrary scanner names (gitleaks, osv-scanner, semgrep, ...).",
+diff --git a/plugins/pipeline-core/scripts/security-close-check.mjs b/plugins/pipeline-core/scripts/security-close-check.mjs
+index 5f69832b0..b7d22eac2 100644
+--- a/plugins/pipeline-core/scripts/security-close-check.mjs
++++ b/plugins/pipeline-core/scripts/security-close-check.mjs
+@@ -13,7 +13,8 @@ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+ import {
+-  elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, readScannerExceptions, scannerNotExecutedRefusal, securityGateNotConfiguredRefusal, unexcusedNotExecuted,
++  SECURITY_CAPABILITY_ELEMENT, declaredSecurityCapabilities, elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, readScannerExceptions, requiredCapabilityRefusals,
++  scannerNotExecutedRefusal, securityGateNotConfiguredRefusal, unexcusedNotExecuted,
+ } from "../lib/security-close-status.mjs";
+ import { gateConfig, loadManifest } from "../lib/manifest.mjs";
+ 
+@@ -22,7 +23,10 @@ export const SECURITY_SCAN_SCRIPT = fileURLToPath(new URL("./security-scan.mjs",
+ export function runSecurityCloseCheck(root, env = process.env) {
+   const loaded = loadManifest(root);
+   const gate = gateConfig(loaded.manifest, "security");
++  // C28: the capabilities the project declared mandatory (security.required_capabilities); without a declaration a skipped scanner stays a warning in the scan output.
++  const declared = declaredSecurityCapabilities(loaded.manifest);
+   if (loaded.status === "absent" || !gate || gate.mode === "off") {
++    if (declared.length > 0) { for (const line of requiredCapabilityRefusals({ declared, gateActive: false })) console.error(line); return 1; }
+     const refusal = securityGateNotConfiguredRefusal(root, "this Verify run");
+     if (refusal) { console.error(refusal); return 1; }
+     console.log("security close chain: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off)");
+@@ -30,15 +34,19 @@ export function runSecurityCloseCheck(root, env = process.env) {
+   }
+   const scan = spawnSync(process.execPath, [SECURITY_SCAN_SCRIPT, "--root", root, "--scan-mode", "snapshot"], { cwd: root, stdio: "inherit", env });
+   if (scan.status !== 0 && scan.status !== 1) return 1; // 1 is the scan's own warn-mode exit, which the gate mode already decided
+-  if (!isCriticalStakes(readCalibrationStakes(root))) return 0;
++  const critical = isCriticalStakes(readCalibrationStakes(root));
++  if (!critical && declared.length === 0) return 0;
+   let scanners = null;
+   try { scanners = JSON.parse(readFileSync(join(root, "evidence", "security-latest.json"), "utf8")).scanners; } catch { /* unreadable evidence: every configured element is not executed */ }
+   // Candidate 21h: the critical reading (a skipped license-check did not run) and the named exceptions, the same as the close gate. The scan
+   // above already printed each applied exception in its "Security close status" lines.
+-  const exceptions = readScannerExceptions(root);
+-  const notExecuted = unexcusedNotExecuted(elementsOfCompletedScan(scanners, { critical: true, exceptions }));
++  const exceptions = critical ? readScannerExceptions(root) : null;
++  const refused = requiredCapabilityRefusals({ scanners, declared, exceptions });
++  const declaredElements = new Set(declared.map((capability) => SECURITY_CAPABILITY_ELEMENT[capability])); // already refused above, by the declaration's own code
++  const notExecuted = critical ? unexcusedNotExecuted(elementsOfCompletedScan(scanners, { critical: true, exceptions })).filter((entry) => !declaredElements.has(entry.element)) : [];
++  for (const line of refused) console.error(line);
+   for (const entry of notExecuted) console.error(scannerNotExecutedRefusal(entry.element, "this Verify run", { rejected: exceptions.rejected }));
+-  return notExecuted.length === 0 ? 0 : 1;
++  return refused.length + notExecuted.length === 0 ? 0 : 1;
+ }
+ 
+ // The consumer adapter contract (lib/consumer-verify.mjs CONSUMER_VERIFY_ADAPTER): `runConsumerVerifyCheck(check, ...args)`.
+diff --git a/plugins/pipeline-core/scripts/security-scan.mjs b/plugins/pipeline-core/scripts/security-scan.mjs
+index eb803b201..825df3502 100644
+--- a/plugins/pipeline-core/scripts/security-scan.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.mjs
+@@ -112,7 +112,8 @@ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ // why "blocking" was chosen and why it moved rather than staying duplicated here.
+ import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
+ import {
+-  deriveReportStatus, elementsOfCompletedScan, formatRuleSetLine, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions,
++  deriveReportStatus, elementsOfCompletedScan, formatRuleSetLine, formatSecurityCloseStatus, isCriticalStakes, markNotRunScans, readCalibrationStakes, readScannerExceptions,
++  securityCloseWarnings,
+ } from "../lib/security-close-status.mjs";
+ import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
+ import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
+@@ -1094,6 +1095,8 @@ export async function runSecurityScan({
+   const candidateBound = snapshot.ok && sameCandidate(candidateBefore, candidateAfter)
+     && sameCandidate(candidateBefore, snapshotAfter);
+   const candidateUncertain = candidateBefore.status !== "unavailable" && !candidateBound;
++  // C28: a PASS on an unbound/dirty candidate, or from semgrep with zero loaded rules, is not a result (reportStatus "not-run"); status and the exit decision stay as they are.
++  markNotRunScans(scanners, { candidateUncertain });
+   const blockingClass = hasErrorClass || hasBlockingFinding || candidateUncertain;
+ 
+   let exitCode;
+@@ -1224,9 +1227,12 @@ export function deriveSummaryVerdict(evidence, { critical = false } = {}) {
+   const scanners = Array.isArray(evidence?.scanners) ? evidence.scanners : [];
+   if (scanners.length === 0) return "NO SCANNERS ENABLED";
+ 
+-  const successful = scanners.filter((scanner) => scanner.status === "PASS" || scanner.status === "FINDINGS");
++  // C28: a PASS marked "not-run" (dirty worktree, zero loaded rules) is not a result: it neither counts as successful nor resolves its scanner.
++  const notRun = (scanner) => scanner.status === "PASS" && scanner.reportStatus === "not-run";
++  const successful = scanners.filter((scanner) => (scanner.status === "PASS" || scanner.status === "FINDINGS") && !notRun(scanner));
+   // Candidate 21h (CGF-05): in a critical calibration a skipped license-check ("not-configured") did not run, so it is not resolved.
+   const unresolved = scanners.some((scanner) => {
++    if (notRun(scanner)) return true;
+     if (scanner.status === "PASS" || scanner.status === "FINDINGS") return false;
+     if (scanner.status === "SKIPPED"
+       && (scanner.reportStatus === "not-applicable" || (scanner.reportStatus === "not-configured" && !critical))) return false;
+@@ -1254,7 +1260,10 @@ function printSummary(evidence, critical = false, exceptions = null) {
+   // reads like a passed scan next to a "policy exit 0". Candidate 21h: a critical calibration reads a skipped license-check as not
+   // executed and shows every applied named exception on its line.
+   console.log("Security close status:");
+-  for (const line of formatSecurityCloseStatus(elementsOfCompletedScan(evidence.scanners, { critical, exceptions }))) console.log(`  ${line}`);
++  const elements = elementsOfCompletedScan(evidence.scanners, { critical, exceptions });
++  for (const line of formatSecurityCloseStatus(elements)) console.log(`  ${line}`);
++  // C28: a skipped or partial capability is a WARNING that names the step that would run it; the close refuses only what the project declared mandatory.
++  for (const line of securityCloseWarnings(elements)) console.log(`  ${line}`);
+   const verdict = deriveSummaryVerdict(evidence, { critical });
+   const policyNote = evidence.exitCode === 0 && verdict !== "CLEAN" ? ` (policy exit ${evidence.exitCode})` : "";
+   if (evidence.candidate?.destination === "local-only") {
+diff --git a/plugins/pipeline-core/scripts/security-scan.test.mjs b/plugins/pipeline-core/scripts/security-scan.test.mjs
+index 0d084f924..4c19af563 100644
+--- a/plugins/pipeline-core/scripts/security-scan.test.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.test.mjs
+@@ -2193,7 +2193,14 @@ security:
+   const byTool = (tool) => evidence.scanners.find((s) => s.tool === tool);
+   const semgrep = byTool("semgrep")?.ruleSet;
+   assertEqual("rule provenance: semgrep names the plugin default rule file it really passed to --config", [semgrep?.source, semgrep?.ref], ["plugin-default", "plugin:security/semgrep/pipeline.yml"]);
+-  assertEqual("rule provenance: semgrep lists the rule ids of that file", semgrep?.ruleIds, ["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval"]);
++  // QG-04 restated in place (C28, AC-108): the file listed two ids; it now also carries the default web/Node pack. The original two stay first and unchanged,
++  // and the provenance still lists exactly the ids of the file, in file order.
++  assertEqual("rule provenance: semgrep lists the rule ids of that file", semgrep?.ruleIds, [
++    "pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval",
++    "pipeline-default-dom-injection-sink", "pipeline-default-eval-like-call", "pipeline-default-unsafe-url-scheme", "pipeline-default-unvalidated-redirect",
++    "pipeline-default-postmessage-no-origin-check", "pipeline-default-prototype-pollution", "pipeline-default-child-process-shell-string",
++    "pipeline-default-hardcoded-secret", "pipeline-default-hardcoded-credential-assignment",
++  ]);
+   assertTrue("rule provenance: semgrep binds the rule file bytes by digest", /^[0-9a-f]{64}$/u.test(semgrep?.sha256 ?? ""), JSON.stringify(semgrep));
+   assertEqual("rule provenance: gitleaks names its config and says it extends the built-in default ruleset", [byTool("gitleaks")?.ruleSet?.ref?.endsWith("gitleaks-default.toml") || byTool("gitleaks")?.ruleSet?.ref === ".gitleaks.toml", /built-in default/u.test(byTool("gitleaks")?.ruleSet?.description ?? "")], [true, true]);
+   assertEqual("rule provenance: osv-scanner says it uses the advisory database of the detected package sources, not a rule file", byTool("osv-scanner")?.ruleSet?.source, "builtin");
+diff --git a/plugins/pipeline-core/security/semgrep/pipeline.yml b/plugins/pipeline-core/security/semgrep/pipeline.yml
+index ba71ba4fa..202127192 100644
+--- a/plugins/pipeline-core/security/semgrep/pipeline.yml
++++ b/plugins/pipeline-core/security/semgrep/pipeline.yml
+@@ -48,3 +48,182 @@ rules:
+       - pattern-either:
+           - pattern: eval(...)
+           - pattern: exec(...)
++
++  # ---------------------------------------------------------------------------
++  # C28 (AC-108, PO decision 2026-11-10): the default web/Node pack -- the common OWASP classes for browser and Node code. Plain Semgrep rules, no new
++  # tool. Every heuristic rule is WARNING (medium, non-blocking under the default block_on): a default pack must never newly block a project that did not
++  # choose it. Only a provider-shaped hard-coded secret is ERROR, like the private-key rule above. Each rule has a positive and a negative fixture in
++  # config/security/semgrep-default-rules.test.mjs.
++  # ---------------------------------------------------------------------------
++  - id: pipeline-default-dom-injection-sink
++    languages: [javascript, typescript]
++    severity: WARNING
++    message: >-
++      A non-literal value reaches a DOM injection sink (innerHTML, outerHTML, insertAdjacentHTML, document.write). Use textContent or build nodes
++      explicitly, or sanitise the value first.
++    metadata:
++      category: security
++      cwe: "CWE-79: Cross-site Scripting"
++      confidence: MEDIUM
++    patterns:
++      - pattern-either:
++          - pattern: $EL.innerHTML = $X
++          - pattern: $EL.outerHTML = $X
++          - pattern: $EL.insertAdjacentHTML($POS, $X)
++          - pattern: document.write($X)
++          - pattern: document.writeln($X)
++      - metavariable-regex:
++          metavariable: $X
++          regex: '^(?!\s*["''][^"'']*["'']\s*$)'
++  - id: pipeline-default-eval-like-call
++    languages: [javascript, typescript]
++    severity: WARNING
++    message: >-
++      Dynamic code from a string (new Function, a string passed to setTimeout/setInterval, window.eval) is an injection vector. Pass a function instead.
++    metadata:
++      category: security
++      cwe: "CWE-95: Eval Injection"
++      confidence: MEDIUM
++    patterns:
++      - pattern-either:
++          - pattern: new Function(...)
++          - pattern: setTimeout("...", ...)
++          - pattern: setInterval("...", ...)
++          - pattern: $G.eval(...)
++  - id: pipeline-default-unsafe-url-scheme
++    languages: [javascript, typescript]
++    severity: WARNING
++    message: >-
++      A javascript: or vbscript: URL is assigned to a link, source or location. Such a scheme runs script when followed; use an https or relative URL.
++    metadata:
++      category: security
++      cwe: "CWE-79: Cross-site Scripting"
++      confidence: HIGH
++    patterns:
++      - pattern-either:
++          - pattern: $EL.href = $V
++          - pattern: $EL.src = $V
++          - pattern: window.location = $V
++          - pattern: location = $V
++          - pattern: location.assign($V)
++          - pattern: location.replace($V)
++          - pattern: window.open($V, ...)
++      - metavariable-regex:
++          metavariable: $V
++          regex: '(?i)^\s*["''`]\s*(javascript|vbscript):'
++  - id: pipeline-default-unvalidated-redirect
++    languages: [javascript, typescript]
++    severity: WARNING
++    message: >-
++      A non-literal value decides where the browser or the server redirects. Validate it against an allowlist of paths or origins, so that neither an
++      open redirect nor a javascript: URL can be injected.
++    metadata:
++      category: security
++      cwe: "CWE-601: Open Redirect"
++      confidence: LOW
++    patterns:
++      - pattern-either:
++          - pattern: location.href = $U
++          - pattern: window.location.href = $U
++          - pattern: window.location = $U
++          - pattern: location.assign($U)
++          - pattern: location.replace($U)
++          - pattern: $RES.redirect($U)
++      - metavariable-regex:
++          metavariable: $U
++          regex: '^(?!\s*["''][^"'']*["'']\s*$)'
++  - id: pipeline-default-postmessage-no-origin-check
++    languages: [javascript, typescript]
++    severity: WARNING
++    message: >-
++      A message handler never reads the sender's origin. Check event.origin against the exact expected origin before trusting event.data.
++    metadata:
++      category: security
++      cwe: "CWE-345: Insufficient Verification of Data Authenticity"
++      confidence: MEDIUM
++    patterns:
++      - pattern-either:
++          - pattern: $W.addEventListener("message", $HANDLER, ...)
++          - pattern: $W.onmessage = $HANDLER
++      - metavariable-pattern:
++          metavariable: $HANDLER
++          pattern-either:
++            - pattern: ($E) => ...
++            - pattern: async ($E) => ...
++            - pattern: function ($E) { ... }
++            - pattern: async function ($E) { ... }
++      - metavariable-regex:
++          metavariable: $HANDLER
++          regex: '(?s)^(?!.*\.origin\b)'
++  - id: pipeline-default-prototype-pollution
++    languages: [javascript, typescript]
++    severity: WARNING
++    message: >-
++      A write to __proto__ or constructor.prototype, or a dynamic nested key written while iterating over an object's keys, can pollute Object.prototype.
++      Reject the keys __proto__, constructor and prototype, or build the target with Object.create(null).
++    metadata:
++      category: security
++      cwe: "CWE-1321: Prototype Pollution"
++      confidence: MEDIUM
++    pattern-either:
++      - pattern: $O.__proto__ = $V
++      - pattern: $O["__proto__"] = $V
++      - pattern: $O.constructor.prototype.$P = $V
++      - pattern: $O.constructor.prototype[$P] = $V
++      - patterns:
++          - pattern: $T[$K][$K2] = $V
++          - pattern-either:
++              - pattern-inside: |
++                  for ($K in $S) { ... }
++              - pattern-inside: |
++                  for (const $K in $S) { ... }
++              - pattern-inside: |
++                  for (let $K in $S) { ... }
++              - pattern-inside: |
++                  for (var $K in $S) { ... }
++  - id: pipeline-default-child-process-shell-string
++    languages: [javascript, typescript]
++    severity: WARNING
++    message: >-
++      A command built from a runtime string runs through a shell (child_process exec/execSync, or spawn with shell: true), so input in it becomes a
++      command. Use execFile or spawn with an argument array and no shell.
++    metadata:
++      category: security
++      cwe: "CWE-78: OS Command Injection"
++      confidence: MEDIUM
++    pattern-either:
++      - patterns:
++          - pattern-either:
++              - pattern: child_process.exec($CMD, ...)
++              - pattern: child_process.execSync($CMD, ...)
++          - metavariable-regex:
++              metavariable: $CMD
++              regex: '^(?!\s*["''][^"'']*["'']\s*$)'
++      - pattern: |
++          child_process.spawn($CMD, $ARGS, { ..., shell: true, ... })
++      - pattern: |
++          child_process.spawnSync($CMD, $ARGS, { ..., shell: true, ... })
++  - id: pipeline-default-hardcoded-secret
++    languages: [generic]
++    severity: ERROR
++    message: >-
++      A provider-shaped credential (cloud access key id, source-host token, chat token, payment key) appears to be committed. Revoke it, remove it from
++      history and read it from the environment or a secret store.
++    metadata:
++      category: security
++      cwe: "CWE-798: Use of Hard-coded Credentials"
++      confidence: HIGH
++    pattern-regex: '\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{36}|xox[baprs]-[A-Za-z0-9-]{10,}|sk_live_[A-Za-z0-9]{24,}|AIza[0-9A-Za-z_-]{35})\b'
++  - id: pipeline-default-hardcoded-credential-assignment
++    languages: [generic]
++    severity: WARNING
++    message: >-
++      A literal value is assigned to a name that reads like a credential (password, secret, api key, access or auth token). Read it from the environment
++      or a secret store instead.
++    metadata:
++      category: security
++      cwe: "CWE-798: Use of Hard-coded Credentials"
++      confidence: LOW
++    patterns:
++      - pattern-regex: '(?i)\b(?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["'']?\s*[:=]\s*["''][^"''\s$<>{}]{8,}["'']'
++      - pattern-not-regex: '(?i)(changeme|example|placeholder|your[_-]|dummy|xxxx|process\.env|\*{3,})'
