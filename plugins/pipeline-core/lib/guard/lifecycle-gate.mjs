@@ -13,7 +13,8 @@ import { blocked, externalRestartOnly } from "./denial-route.mjs";
 import { isBootstrapBindingScratchWrite, isIntakeLifecycleScratchMkdir, isIntakeLifecycleScratchWrite, isPartialLifecycleIncidentReportWrite, isPartialLifecycleScratchDirCreate, isRestartResumeHintCapture, isRestartResumeHintInputWrite, isRestartResumeHintInspect, restartResumeHintNearMissWrite, isHalfMovedRepairCommand, w04IsNonAuthorityRecordWrite } from "./write-scope.mjs";
 import { architectureAdoptionAuthorityVerdict, architectureFitnessAuthorityVerdict, fitnessModelQualificationObservation, minimumRigorObservation } from "./entry-gates.mjs";
 import { rootIdentityMismatch } from "./sanctioned-args-onboarding.mjs";
-import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand, scriptHelpRefusalHint } from "./command-catalogue.mjs";
+import { LIFECYCLE_NEXT_ACTION_LINE_PREFIX } from "../human-guard-override.mjs";
+import { isAuthorIdentityConfigCommand, observedRuntimeInitializationCommand, isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand, scriptHelpRefusalHint } from "./command-catalogue.mjs";
 import { isSanctionedGovernanceScopeDiagnosticInvocation } from "./sanctioned-args-scripts.mjs";
 import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice } from "./rebase-lane.mjs";
 
@@ -221,6 +222,16 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
       && !restartResumeHintNearMissWrite(input, root)
       && isBootstrapBindingScratchWrite(input, root, dependencies);
     if (bootstrapBindingScratchWrite) return verdict(0);
+    // C23 (AC-108): the onboarding asks for the commit author at exactly this status and its guidance says to apply it with
+    // `git config user.name|user.email <value>` (local config); refusing that very command left the agent no way to follow it.
+    // Admitted by shape only (isAuthorIdentityConfigCommand), Bash only, this one status only; every other status keeps refusing.
+    const bootstrapBindingAuthorIdentity = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "bootstrap-binding-required"
+      && toolName === "Bash"
+      && isAuthorIdentityConfigCommand((input.tool_input.command ?? input.tool_input.CommandLine), root);
+    if (bootstrapBindingAuthorIdentity) return verdict(0);
     // ALFRED-W0-4 (backlog 2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes):
     // an invalid OBSERVATION says nothing about the lifecycle, so it must not strand a session
     // that only wants to record a defect, a decision or a scratch note. Never keyed on a typed
@@ -345,6 +356,15 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
         + `the same project root as this guard's own root (${rootMismatch.root}) -- the `
         + "refusal is a root-identity mismatch, not an unadmitted command shape."
       : null;
+    // C23 (AC-108): at runtime-initialization-required the refusal named no action. Print the onboarding's own observed nextAction
+    // (observedRuntimeInitializationCommand), on one line; nothing is printed when it cannot be observed.
+    const runtimeInitializationCommand = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "runtime-initialization-required"
+      ? observedRuntimeInitializationCommand(root, dependencies)
+      : null;
+    const nextActionLine = runtimeInitializationCommand === null ? null : `${LIFECYCLE_NEXT_ACTION_LINE_PREFIX}${runtimeInitializationCommand}`;
     return toolName === "Bash"
       && (isSanctionedLifecycleCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)
         || isSanctionedGhReadOnlyDiagnostic((input.tool_input.command ?? input.tool_input.CommandLine), root))
@@ -360,8 +380,9 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
         "",
         null,
         null,
-        restartResumeHintNearMissHint ?? rootIdentityMismatchHint
+        [restartResumeHintNearMissHint ?? rootIdentityMismatchHint
           ?? (toolName === "Bash" ? scriptHelpRefusalHint((input.tool_input.command ?? input.tool_input.CommandLine), root) : null),
+        nextActionLine].filter((line) => line !== null && line !== undefined).join("\n") || null,
         invalidObservation,
         true,
         sessionCapabilityFailurePhase,

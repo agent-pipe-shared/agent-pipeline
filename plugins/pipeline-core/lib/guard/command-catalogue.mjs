@@ -8,7 +8,8 @@ import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep, win
 import { inspectSourceOwnedContinuityVerificationGuardContext, inspectSourceOwnedApprovedControllerCourse } from "../session-requester-bridge.mjs";
 import { readOwnedVerificationPhysicalFile, recheckOwnedVerificationPhysicalRefs, readOwnedVerificationRegistration } from "../owned-continuity-verification.mjs";
 import { inspectOwningVerificationControllerTaskSource } from "../../scripts/owning-verification-controller.mjs";
-import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+import { inspectProjectOnboardingV3, renderProjectOnboardingAction } from "../project-onboarding-v3.mjs";
+import { AUTHOR_IDENTITY_FIELD_MAX_BYTES } from "../project-onboarding-v3-author-identity.mjs";
 import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
 import { RUNNER_CAPABILITIES_SCRIPT, CHECK_PRIVATE_IDENTIFIERS_SCRIPT, CHECK_PO_GATE_AUTHORITY_SCRIPT, ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, BIND_ADR_PROPOSALS_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
@@ -1105,6 +1106,53 @@ export function isExactObservedOnboardingNextAction(command, root, dependencies 
     && args.length === 1 && args[0] === "po-authority-rebind-plan";
   return typeof script === "string"
     && (observedOnlyPlanner || sanctionedLifecycleScriptArgs(script, args, root, dependencies));
+}
+
+/**
+ * C23 (AC-108): `bootstrap-binding-required` is the status where the onboarding asks the PO for the commit author, and the skill and the
+ * ask's own guidance then say to run `git config user.name "<name>"` / `git config user.email "<email>"`. This is exactly that shape and
+ * nothing wider: `git config <user.name|user.email> <one value>` in the repository's own local config. No flag, no other key, no read, no
+ * second value, and a value the shell would expand (`$`, a backtick, `\`, a glob character, a leading `~`) is refused. The value bound is
+ * the one the onboarding itself applies to the answer (AUTHOR_IDENTITY_FIELD_MAX_BYTES). The caller gates this on the status.
+ */
+export function isAuthorIdentityConfigCommand(command, root) {
+  const words = simpleWords(command, root);
+  if (!words || words.length !== 4 || words[0] !== "git" || words[1] !== "config") return false;
+  if (words[2] !== "user.name" && words[2] !== "user.email") return false;
+  const value = words[3];
+  return value.trim().length > 0 && value.length <= AUTHOR_IDENTITY_FIELD_MAX_BYTES
+    && !value.startsWith("-") && !value.startsWith("~") && !/[\r\n\0$`\\*?[]/u.test(value);
+}
+
+/**
+ * C23 (AC-108): at `runtime-initialization-required` the refusal told the agent to re-run the inspection and name no action. The action is
+ * the onboarding's own `nextAction` (the same object the producer returns, rendered by the same renderer), re-observed here exactly as
+ * observedOnboardingCommandMatch() does, never composed in text. Returns the rendered one-line command, or null when the observation is
+ * unavailable, disagrees on status/root/intent, or carries no well-formed command action: then the refusal stands without it.
+ */
+export function observedRuntimeInitializationCommand(root, dependencies = {}) {
+  let observed;
+  try {
+    observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
+      rootDir: root,
+      intent: "session",
+      runner: dependencies.runner,
+    });
+  } catch {
+    return null;
+  }
+  const action = observed?.nextAction;
+  if (observed?.schema !== "pipeline.project-onboarding.v4"
+    || observed?.status !== "runtime-initialization-required"
+    || observed?.root !== root
+    || observed?.intent !== "session"
+    || action?.kind !== "command"
+    || action.mutation !== false) return null;
+  try {
+    return renderProjectOnboardingAction(action);
+  } catch {
+    return null;
+  }
 }
 
 /**

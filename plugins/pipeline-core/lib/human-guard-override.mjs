@@ -1510,6 +1510,19 @@ function lifecycleCoDenialSummary(denials, lifecycleDenial) {
   return `Additional active guard denials: ${summaries.join(", ")}${additional > 0 ? `; ${additional} more` : ""}.`;
 }
 
+// C23 (AC-108): the ONE dynamic line the transport below carries. At runtime-initialization-required the guard prints the onboarding's own
+// observed nextAction (lib/guard/lifecycle-gate.mjs); Codex and Antigravity print this transported guidance instead of the guard's text, so
+// without it they would still say "technical repair is required" and name no action. It is admitted only for that status, only once, only
+// within the byte bound, and only in the exact shape the producer renders for it (`node <...>/project-onboarding-v3.mjs plan-runtime --root
+// <root>` with its optional --runner/--intent, every word plain or single-quoted as shellWord() renders it): it is a line to read, never
+// telemetry and never an admission (the guard's own exact-observed-action check is what admits running it).
+export const LIFECYCLE_NEXT_ACTION_LINE_PREFIX = "Next onboarding action (run exactly this): ";
+const LIFECYCLE_NEXT_ACTION_WORD = "(?:[A-Za-z0-9_@%+=:,./-]+|'[^'\\r\\n]*')";
+const LIFECYCLE_NEXT_ACTION_LINE = new RegExp(
+  `^${LIFECYCLE_NEXT_ACTION_LINE_PREFIX.replace(/[()]/gu, "\\$&")}node (?:[A-Za-z0-9_@%+=:,./-]*project-onboarding-v3\\.mjs|'[^'\\r\\n]*project-onboarding-v3\\.mjs') plan-runtime --root ${LIFECYCLE_NEXT_ACTION_WORD}(?: --runner (?:claude|codex|antigravity))?(?: --intent session)?$`,
+  "u",
+);
+
 // Transport only existing fixed guidance. Unknown text, dynamic paths and
 // command/action payloads never become recovery telemetry or new admission.
 function lifecycleRecoveryGuidance(denial) {
@@ -1523,8 +1536,11 @@ function lifecycleRecoveryGuidance(denial) {
   if (status === "intake-required" || status === "intake-design-questions-required") allowed.add("A scratch write stays admitted during intake: creating the repository's own scratch directory (mkdir or mkdir -p, including a nested path inside it) and any Edit/Write/NotebookEdit write whose resolved path is inside it.");
   const guidance = [];
   let bytes = 0;
+  const nextActionAdmitted = (line) => status === "runtime-initialization-required"
+    && Buffer.byteLength(line, "utf8") <= 2048 && LIFECYCLE_NEXT_ACTION_LINE.test(line)
+    && !guidance.some((kept) => kept.startsWith(LIFECYCLE_NEXT_ACTION_LINE_PREFIX));
   for (const line of lines) {
-    if (!allowed.has(line) || guidance.includes(line)) continue;
+    if (!(allowed.has(line) || nextActionAdmitted(line)) || guidance.includes(line)) continue;
     const size = Buffer.byteLength(line, "utf8");
     if (guidance.length === 4 || bytes + size > 2048) break;
     guidance.push(line); bytes += size;

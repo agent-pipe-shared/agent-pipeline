@@ -30,6 +30,7 @@ import {
 // NVA-INTAKEARGV-1: the guidance renderer comes from the lib module that now owns the shape
 // table; the table and argv emitter keep arriving through the CLI seam below, unchanged.
 import { mutatingApplyCommandHint } from "../lib/onboarding-argv-shapes.mjs";
+import { renderProjectOnboardingAction } from "../lib/project-onboarding-v3.mjs";
 import {
   EVIDENCE_HOST_PATH_DENIAL_CODE,
   checkDispatchRecordCollision,
@@ -13320,6 +13321,115 @@ test("C21 Glob <directory>/**/* and a <directory>/**/* pattern are admitted unde
     rmSync(path, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
+});
+
+// C23 (AC-108): the onboarding asks for the commit author at bootstrap-binding-required and its own guidance says to run
+// `git config user.name` / `user.email` there; the guard refused that very command (GUARD-LIFECYCLE-NOT-READY).
+function c23Guard(path, status, command, toolName = "Bash", extra = {}) {
+  return evaluateLifecycleReadyGuard({ tool_name: toolName, tool_input: { command } }, {
+    projectDir: path, runner: "claude", requireProjectOnboardingReadyFn() { deny(status); }, ...extra,
+  });
+}
+
+test("C23 bootstrap-binding-required admits exactly the two local author-identity writes the onboarding asks for", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const admitted = [
+      "git config user.name Ada", 'git config user.name "Ada Lovelace"', "git config user.name 'Ada Lovelace'",
+      "git config user.email ada@example.invalid", 'git config user.email "ada@example.invalid"', "git config user.email 'ada@example.invalid'",
+    ];
+    for (const command of admitted) {
+      const result = c23Guard(path, "bootstrap-binding-required", command);
+      assert.equal(result.exitCode, 0, `${command}\n${result.stderr}`);
+    }
+    const refused = [
+      "git config --global user.name x", "git config --system user.name x", "git config --local user.name x", "git config core.hooksPath x",
+      "git config user.name x ; git push", "git config --file f user.name x", "git config credential.helper x",
+      // (`git config --get user.name` is a read-only diagnostic that every status already admits before this change; it is not a write and is not part of this admission.)
+      "git config user.signingkey x", "git config user.name",
+      "git config user.name x y", "git config user.name --global", "git config user.name -x", "git config user.name ''",
+      'git config user.name "$(id)"', "git config user.name `id`", "git config user.name $HOME", "git config user.name x && git push",
+      "git config user.name x > out.txt", "git config user.email x | cat", "git config --unset user.name", "git config user.nam x", "git config USER.NAME x",
+      "git -c core.hooksPath=x config user.name x", "git config user.name x user.email y",
+    ];
+    for (const command of refused) {
+      const result = c23Guard(path, "bootstrap-binding-required", command);
+      assert.equal(result.exitCode, 2, command);
+    }
+    // Every other not-ready status keeps refusing exactly as before.
+    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.filter((value) => value !== "bootstrap-binding-required")) {
+      for (const command of admitted) {
+        const result = c23Guard(path, status, command);
+        assert.equal(result.exitCode, 2, `${status}/${command}`);
+        assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${status}/${command}`);
+      }
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("C23 the author commands the start skill spells out are the ones bootstrap-binding-required admits (every entry path)", () => {
+  const skill = readFileSync(new URL("../skills/pipeline-start/SKILL.md", import.meta.url), "utf8");
+  const spelled = [...skill.matchAll(/git config (user\.(?:name|email)) "<(name|email)>"/gu)];
+  assert.deepEqual(spelled.map((match) => match[1]), ["user.name", "user.email"], "the skill names both forms");
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const [, key, placeholder] of spelled) {
+      const value = placeholder === "name" ? "Ada Lovelace" : "ada@example.invalid";
+      // Bash only: a PowerShell call never reaches the readiness gate (evaluate.mjs returns powerShellScopeVerdict() first), so it is not
+      // refused by readiness in the first place and this slice leaves that pre-existing asymmetry as it is.
+      const result = c23Guard(path, "bootstrap-binding-required", `git config ${key} "${value}"`);
+      assert.equal(result.exitCode, 0, `${key}\n${result.stderr}`);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("C23 runtime-initialization-required names the one exact command the onboarding returns as its nextAction; no other status and no unobserved action does", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const physical = realpathSync(path);
+    const script = join(HGO_PLUGIN_ROOT, "scripts", "project-onboarding-v3.mjs");
+    const action = {
+      kind: "command", executable: "node", argv: [script, "plan-runtime", "--root", physical, "--runner", "claude", "--intent", "session"],
+      mutation: false, requiresConfirmation: false,
+      expected: { schema: "pipeline.project-onboarding.v4", statuses: ["runtime-initialization-required"] },
+    };
+    const observe = (status, nextAction = action) => () => ({ schema: "pipeline.project-onboarding.v4", status, root: physical, intent: "session", runner: "claude", nextAction });
+    const named = c23Guard(path, "runtime-initialization-required", "touch scratch-note.txt", "Bash", { inspectProjectOnboardingV3Fn: observe("runtime-initialization-required") });
+    assert.equal(named.exitCode, 2);
+    assert.match(named.stderr, /GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is runtime-initialization-required\./u);
+    const line = `Next onboarding action (run exactly this): ${renderProjectOnboardingAction(action)}`;
+    assert.ok(named.stderr.split("\n").includes(line), `the refusal prints the observed action on one line\n${named.stderr}`);
+    // The same refusal through a Write names it too (the status, not the tool, decides).
+    const viaWrite = evaluateLifecycleReadyGuard({ tool_name: "Write", tool_input: { file_path: "src/a.mjs", content: "x\n" } }, {
+      projectDir: path, runner: "claude", requireProjectOnboardingReadyFn() { deny("runtime-initialization-required"); },
+      inspectProjectOnboardingV3Fn: observe("runtime-initialization-required"),
+    });
+    assert.equal(viaWrite.exitCode, 2);
+    assert.ok(viaWrite.stderr.split("\n").includes(line));
+    // Another status prints no such line, even when an observation carries an action.
+    const other = c23Guard(path, "partial", "touch scratch-note.txt", "Bash", { inspectProjectOnboardingV3Fn: observe("partial"), sleepSyncFn() {} });
+    assert.equal(other.exitCode, 2);
+    assert.doesNotMatch(other.stderr, /Next onboarding action/u);
+    // A disagreeing, malformed or unavailable observation prints nothing and the refusal itself stands unchanged.
+    for (const inspectProjectOnboardingV3Fn of [
+      observe("ready"), observe("runtime-initialization-required", null), observe("runtime-initialization-required", { ...action, kind: "advisory" }),
+      observe("runtime-initialization-required", { ...action, argv: [script, 42] }), () => { throw new Error("unavailable"); },
+    ]) {
+      const refusal = c23Guard(path, "runtime-initialization-required", "touch scratch-note.txt", "Bash", { inspectProjectOnboardingV3Fn });
+      assert.equal(refusal.exitCode, 2);
+      assert.match(refusal.stderr, /readiness is runtime-initialization-required\./u);
+      assert.doesNotMatch(refusal.stderr, /Next onboarding action/u);
+    }
+    // The printed command is itself admitted by the guard as the observed nextAction (it is the one thing the agent may run).
+    const run = c23Guard(path, "runtime-initialization-required", renderProjectOnboardingAction(action), "Bash", { inspectProjectOnboardingV3Fn: observe("runtime-initialization-required") });
+    assert.equal(run.exitCode, 0, run.stderr);
+  } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
 test("C21 a shell listing or rg --files of a project directory that does not exist yet is an existence probe; credentials, hidden and outside paths keep refusing", () => {
