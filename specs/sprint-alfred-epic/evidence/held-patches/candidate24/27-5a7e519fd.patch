@@ -1,0 +1,12 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 0fce6a031b61c9b3061ecca372d5d0450a9e4337..f22d4c758f0579ff6264e95e29e0919b30b8cd03 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1015,6 +1015,7 @@
+         "verify-phase:harness/scripts/verify.mjs:publication-executor-v2-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-guard-candidate-tests",
++        "verify-phase:harness/scripts/verify.mjs:publication-readback-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-review-requirement-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-state-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:publish-evidence-run-tests",
