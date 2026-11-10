@@ -166,8 +166,9 @@ still exempts exactly the tracked state path, for a repository that carries an
 older tracked record.
 A missing key directory is repaired once with `po-human-approval.mjs
 set-po-key-directory --directory <the PO's key directory>` (agent-executable, no
-signature). The `--by` name is asked once per machine and user:
-`po-human-approval.mjs set-operator-label --label <the name the PO states>`
+signature). The `--by` name is stored once per machine and user by the PO, in
+their own terminal:
+`po-human-approval.mjs set-operator-label --label <name>`
 keeps it in the machine-local configuration, never in a tracked file, and the
 Pipeline start preflight shows it. It is attribution only (EL-36).
 

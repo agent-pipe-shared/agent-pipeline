@@ -9,6 +9,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { isolateFromStoredOperatorLabel } from "../test-tmpdir.mjs";
+isolateFromStoredOperatorLabel();
 // Host fact (measured; first-enrollment-enters-retirement-before-consent.test.mjs): the State authority route
 // fails WT-GIT-FAILED on a Git root with no HEAD commit. The adjacent fixture() never commits, so on this
 // host every case below stops inside fixture() at submit-plan. See the report: a born-HEAD fixture is needed.

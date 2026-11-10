@@ -18,6 +18,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { isolateFromStoredOperatorLabel } from "../lib/test-tmpdir.mjs";
+isolateFromStoredOperatorLabel();
 import { main as onboardingCli, summarizeOnboardingIntakeGeneratePlan } from "./project-onboarding-v3.mjs";
 import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
 import { main as migrationCli } from "./runner-profile-migration-v3.mjs";

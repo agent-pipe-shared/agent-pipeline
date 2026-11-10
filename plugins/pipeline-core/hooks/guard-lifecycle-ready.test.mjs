@@ -12368,6 +12368,7 @@ test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G
         // The screen covers every file below the directory before the glob applies, so a filter can only narrow it.
         { pattern: "x", path: join(path, "scratch"), glob: "*.pem" },
         { pattern: "x", path: join(path, "scratch"), glob: "*" },
+        { pattern: "apply", path: join(path, "plugins", "pipeline-core"), glob: "**/*.mjs" },
       ]) assert.equal(tool("Grep", input).exitCode, 0, JSON.stringify(input));
       for (const input of [
         { pattern: "x", glob: "*.md" },
@@ -13054,6 +13055,17 @@ test("TR-B T77 rg -g lane: bounded basename-extension filters, including *.test.
         qp4RefuseUnsupported(`rg -n -g ${glob} apply scratch/notes.md`, path);
       }
     });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("C27 an agent in draft cannot store the operator label: the PO runs that command once in their own terminal (EL-36)", () => {
+  const path = devPlanShellFixture();
+  try {
+    const script = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
+    const verdict = devPlanShellRun(path, `node "${script}" set-operator-label --label Alex`);
+    assert.equal(verdict.exitCode, 2, verdict.stderr);
   } finally {
     rmSync(path, { recursive: true, force: true });
   }

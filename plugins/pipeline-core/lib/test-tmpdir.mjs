@@ -46,9 +46,24 @@
  * Unset, empty, relative, missing or non-directory values fall back to the
  * repo root, silently and without throwing at import.
  */
-import { mkdirSync, mkdtempSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readMachineOperatorLabel } from "./machine-plane.mjs";
+
+/**
+ * A suite that asserts the Git-derived actor name must not see the label the operator stored on this
+ * machine. Only then does this move HOME for the test process, keeping the operator's Git identity.
+ */
+export function isolateFromStoredOperatorLabel() {
+  if (readMachineOperatorLabel() === null) return;
+  process.env.GIT_CONFIG_GLOBAL ??= join(homedir(), ".gitconfig");
+  const home = mkdtempSync(join(tmpdir(), "no-operator-label-"));
+  process.once("exit", () => rmSync(home, { recursive: true, force: true }));
+  process.env.HOME = home;
+  process.env.USERPROFILE = home;
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 /** plugins/pipeline-core/lib -> repository root is three levels up. */

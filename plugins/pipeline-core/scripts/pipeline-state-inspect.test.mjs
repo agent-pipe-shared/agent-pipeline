@@ -27,7 +27,8 @@ import { fileURLToPath } from "node:url";
 
 import { run, SCHEMA_ID, statePath as resolveStatePath } from "./pipeline-state.mjs";
 import { applyOnboardingIntakeConsent, nextActionSection } from "../lib/onboarding-continuity.mjs";
-import { mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
+import { isolateFromStoredOperatorLabel, mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
+isolateFromStoredOperatorLabel();
 import { MACHINE_PLANE_SCHEMA, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { fixtureAdoption } from "./architecture-adoption-test-fixture.mjs";

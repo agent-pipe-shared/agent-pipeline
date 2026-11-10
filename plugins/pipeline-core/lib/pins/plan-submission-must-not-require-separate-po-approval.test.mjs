@@ -13,6 +13,8 @@
  */
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
+import { isolateFromStoredOperatorLabel } from "../test-tmpdir.mjs";
+isolateFromStoredOperatorLabel();
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
