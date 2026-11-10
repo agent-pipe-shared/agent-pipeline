@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 24: 25 held patches exported from the build clone chain 31f3b1816..d3a1009ae
+# PO apply script for candidate 24: 26 held patches exported from the build clone chain 31f3b1816..c73427a3e
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -39,6 +39,7 @@ step 22-c11947fbb 'fix(guard): name a repeated option only when the repeat is th
 step 23-96b150a40 'fix(close): read the security scope from the capability outcomes a real scan writes'
 step 24-cdd45e375 'fix(push): tell one story about when the repository mode commit belongs, and accept the second Antigravity marker'
 step 25-d3a1009ae 'feat(push): record what the remote holds after a push, append-only and without a commit'
+step 26-c73427a3e 'test(push): register the publication readback suite for Verify'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

@@ -1,0 +1,17 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index c95696a10f8e121545bef4359ad4f3117f8692d4..41c36b2081388a7affaab547d4d37910589da7f2 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4813,6 +4813,12 @@
+       "file": "plugins/pipeline-core/scripts/prepare-dispatch.test.mjs",
+       "invariantPinned": "One command prepares a Goldfish or Critic dispatch; every step keeps its own refusal; it never commits or starts a child",
+       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/prepare-dispatch.test.mjs"
++    },
++    {
++      "name": "publication-readback-tests",
++      "file": "plugins/pipeline-core/scripts/publication-readback.test.mjs",
++      "invariantPinned": "The publication readback records what the remote really holds in a private append-only chain without touching the working tree or writing a URL; a repeat appends nothing, a local commit ahead and a differing remote are told apart, and a changed or removed line is detected",
++      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/publication-readback.test.mjs"
+     }
+   ]
+ }
