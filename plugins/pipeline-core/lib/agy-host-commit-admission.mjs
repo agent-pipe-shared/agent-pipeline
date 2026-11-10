@@ -156,9 +156,13 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
       conflicts.length !== 0 ? "unmerged-paths" : null, staged.length !== 0 ? "index-staged" : null].filter(Boolean);
     return { ...fail("AGY-HOST-COMMIT-DRIFT"), detail: { conditions, ...(staged.length !== 0 ? { stagedPaths: boundedPaths(staged) } : {}) } };
   }
-  const preserved = untrackedDigests(baseline.root, baseline.untracked.map((entry) => entry.path));
-  if (preserved === null || !same(preserved.map((entry) => `${entry.path}:${entry.sha256}`), baseline.untracked.map((entry) => `${entry.path}:${entry.sha256}`))) return fail("AGY-HOST-COMMIT-BASELINE-CHANGED");
-  const newUntracked = untracked.filter((path) => !baseline.untracked.some((entry) => entry.path === path) && path !== baseline.resultPath);
+  // A re-dispatch inherits the untracked files of its stopped predecessor, so they are in the baseline. A child that claims such a path, inside its consent, owns it: it counts
+  // as this child's change and leaves the preserved set. Any other baseline file stays preserved byte for byte.
+  const reclaimed = baseline.untracked.map((entry) => entry.path).filter((path) => final.changedPaths.includes(path) && allowedPaths.includes(path));
+  const kept = baseline.untracked.filter((entry) => !reclaimed.includes(entry.path));
+  const preserved = untrackedDigests(baseline.root, kept.map((entry) => entry.path));
+  if (preserved === null || !same(preserved.map((entry) => `${entry.path}:${entry.sha256}`), kept.map((entry) => `${entry.path}:${entry.sha256}`))) return fail("AGY-HOST-COMMIT-BASELINE-CHANGED");
+  const newUntracked = untracked.filter((path) => (reclaimed.includes(path) || !baseline.untracked.some((entry) => entry.path === path)) && path !== baseline.resultPath);
   const actual = [...new Set([...tracked, ...newUntracked])].filter(path=>!concurrent?.foreignPaths.includes(path)).sort();
   if (!same(actual, final.changedPaths)) {
     // pipeline.owned-gitignore-without-evidence-breaks-every-item-governed-host-commit: when the claim is exactly the actual change

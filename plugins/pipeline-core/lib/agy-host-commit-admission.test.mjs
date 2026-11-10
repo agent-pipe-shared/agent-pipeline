@@ -226,7 +226,28 @@ test("AHC16 AC-108: a moved HEAD plus a staged change still drifts, naming both 
   assert.deepEqual(result.detail.conditions, ["head-moved", "index-staged"]);
 }));
 
-assert.equal(cases.length, 16,"the complete Agy Host Commit Admission corpus must be registered before execution begins");
+test("AHC17 a re-dispatch may claim the untracked file its stopped predecessor left, inside its consent only; every other baseline file stays preserved", () => fixture((context) => {
+  const left = "src/left.mjs";
+  writeFileSync(join(context.root, left), "export const left = 1;\n");
+  writeFileSync(join(context.root, "request.json"), "original\n");
+  const baseline = capture(context);
+  writeFileSync(join(context.root, left), "export const left = 2;\n");
+  const admitted = assessAgyHostCommit({ baseline, final: { changedPaths: [left] }, allowedPaths: [left] });
+  assert.equal(admitted.code, "AGY-HOST-COMMIT-ADMITTED");
+  assert.deepEqual(admitted.paths, [left]);
+  // Not claimed: the changed baseline file stays a refusal. Claimed outside the consent: not reclaimed, so it stays a refusal too.
+  assert.equal(assessAgyHostCommit({ baseline, final: { changedPaths: ["src/one.mjs"] }, allowedPaths: ["src/one.mjs", left] }).code, "AGY-HOST-COMMIT-BASELINE-CHANGED");
+  assert.equal(assessAgyHostCommit({ baseline, final: { changedPaths: [left] }, allowedPaths: ["src/one.mjs"] }).code, "AGY-HOST-COMMIT-BASELINE-CHANGED");
+  // Another baseline file changed beside the claimed one: refused.
+  writeFileSync(join(context.root, "request.json"), "changed\n");
+  assert.equal(assessAgyHostCommit({ baseline, final: { changedPaths: [left] }, allowedPaths: [left] }).code, "AGY-HOST-COMMIT-BASELINE-CHANGED");
+  // A claimed file the child deleted is not an actual change of an untracked file: the claim is unbacked.
+  writeFileSync(join(context.root, "request.json"), "original\n");
+  rmSync(join(context.root, left));
+  assert.equal(assessAgyHostCommit({ baseline, final: { changedPaths: [left] }, allowedPaths: [left] }).code, "AGY-HOST-COMMIT-PATH-MISMATCH");
+}));
+
+assert.equal(cases.length, 17,"the complete Agy Host Commit Admission corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
