@@ -1612,6 +1612,26 @@ test("PF-61 reader the warning names the recorded stage and reason, the detail's
   assert.ok(hostile.length < 700, `the cause text is bounded (${hostile.length})`);
 });
 
+test("C23 reader the warning names the validator detail of a refused return, so a broken handback no longer reads as no reason recorded", async () => {
+  const { runDispatchBriefing } = await lib();
+  const messageOf = async (over) => {
+    const fx = makeFixture();
+    const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { stopFailures: () => [stopFailure({ code: "NGHR-FINAL-JSON", ...over })] }));
+    assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+    return stopWarnings(result)[0].message;
+  };
+  const truncated = await messageOf({ detail: { condition: "json-truncated", errorMessage: "parse failed at position 312 of 312 characters" } });
+  assert.match(truncated, /condition json-truncated, message "parse failed at position 312 of 312 characters"\); verify/u);
+  assert.doesNotMatch(truncated, /no reason recorded/u);
+  const fields = await messageOf({ detail: { condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath"] } });
+  assert.match(fields, /condition fields, missing keys changedPaths, unexpected keys changedPath\); verify/u);
+  // The stage and reason still come first, and a hostile detail stays one bounded line.
+  assert.match(await messageOf({ stage: "pending-read", detail: { condition: "json-syntax" } }), /stage pending-read, condition json-syntax\); verify/u);
+  const hostile = await messageOf({ detail: { condition: `line one\nline two ${"x".repeat(400)}`, errorMessage: "y".repeat(400), missingKeys: Array.from({ length: 40 }, (_, i) => `key${i}`) } });
+  assert.equal(hostile.includes("\n"), false, "one warning stays one line");
+  assert.ok(hostile.length < 900, `the cause text is bounded (${hostile.length})`);
+});
+
 test("PF-61 reader no diagnostic yields no stop-failure warning", async () => {
   const { runDispatchBriefing } = await lib();
   const fx = makeFixture();

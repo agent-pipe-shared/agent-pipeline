@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync
 import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
-import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureLock } from "./native-goldfish-host-finalizer.mjs";
+import { finalizeNativeGoldfishHostReturn, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "./native-goldfish-host-finalizer.mjs";
 import { sessionAuthorityLockFacts } from "./native-goldfish-host-state.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
 import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState, prepareNativeGoldfishAuthorityTerminal } from "./native-goldfish-host-state.mjs";
@@ -99,6 +99,19 @@ function spawnStopHook({ root, commonDir, binding, writeMeta, stopInput }, { out
     env: { ...process.env, CLAUDE_PROJECT_DIR: root }, encoding: "utf8" });
   return { status: run.status, stdout: run.stdout, stderr: run.stderr };
 }
+// C23 (AC-108): the PreToolUse hook entry for the child's own SubagentHandback call. The input mirrors a subagent PreToolUse payload: the
+// PARENT session id and transcript path, plus the child's agent_id and agent_type (the shape guard-dispatch-budget measured).
+const handbackPre = ({ root, binding, stopInput }, message, over = {}) => ({ hook_event_name: "PreToolUse", session_id: "session-claude",
+  transcript_path: stopInput(binding, "x").transcript_path, cwd: root, agent_id: "agent-bg", agent_type: binding.role,
+  tool_name: "SubagentHandback", tool_use_id: "toolu-handback-1", tool_input: { message }, ...over });
+function spawnHandbackHook(root, input, { raw = null, env = {} } = {}) {
+  const run = spawnSync(process.execPath, [hookScript, "--runner", "claude"], { input: raw ?? JSON.stringify(input),
+    env: { ...process.env, CLAUDE_PROJECT_DIR: root, ...env }, encoding: "utf8" });
+  return { status: run.status, stdout: run.stdout, stderr: run.stderr };
+}
+const cutReturn = (binding, over = {}) => { const full = finalText(binding, over); return full.slice(0, full.indexOf(",\"changedPaths\"")); };
+const handbackWriteMeta = (ctx, agentType = "goldfish-implementor") => ctx.writeMeta("agent-bg", { spawnDepth: 1, agentType, toolUseId: "tool-claude" });
+const refusalFiles = (commonDir) => diagEntries(commonDir).filter((name) => name.startsWith("handback-refusals-"));
 const diagRecord = (dispatchId, toolUseId) => `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId, toolUseId,
   status: "not-finalized", code: "NGHR-FINAL-JSON", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`;
 function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfish-implementor", options = {}) {
@@ -849,6 +862,122 @@ const cases = [
       assert.match(text, /admissionProgress\(`?"?hook-entry/u, `${name} marks its entry`);
       assert.match(text, /process\.once\("exit", \(\) => admissionProgress\("exit"\)\)/u, `${name} marks its exit`);
     }
+  } },
+  // NGHF43-NGHF49 -- C23 (AC-108): a marked Goldfish's own SubagentHandback is checked while the worker is alive; a broken return is refused with
+  // the cause and a repair sentence, every doubt allows, and the stop-failure record keeps the validator's detail.
+  { id: "NGHF43", name: "C23: a return cut off after the report value is refused at PreToolUse with the code, the position and the repair sentence, and consumes nothing", run: () => fixture((ctx) => {
+    handbackWriteMeta(ctx);
+    const cut = cutReturn(ctx.binding);
+    const before = snapshot(ctx.commonDir);
+    const run = spawnHandbackHook(ctx.root, handbackPre(ctx, cut));
+    assert.equal(run.status, 2, `${run.stderr}${run.stdout}`);
+    assert.equal(run.stdout, "");
+    assert.match(run.stderr, /NGHR-FINAL-JSON/u);
+    assert.match(run.stderr, new RegExp(`position ${cut.length} of ${cut.length} characters`, "u"));
+    assert.match(run.stderr, /json-truncated/u);
+    assert.match(run.stderr, /send the complete JSON object again/iu);
+    assert.match(run.stderr, /shorten report/iu);
+    assert.equal(run.stderr.includes(ctx.root), false, "no host path in the refusal");
+    assert.equal(run.stderr.includes("Implemented and verified"), false, "the return text is not echoed back");
+    assert.equal(snapshot(ctx.commonDir), before, "the host-commit private state is untouched");
+    assert.equal(refusalFiles(ctx.commonDir).length, 1, "the refusal count is kept beside the stop-failure diagnostics");
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF44", name: "C23: a misspelled or missing key is named, and a wrong candidate is refused by the same validator the stop uses", run: () => fixture((ctx) => {
+    handbackWriteMeta(ctx);
+    const { binding } = ctx;
+    const full = JSON.parse(finalText(binding));
+    const { changedPaths, ...rest } = full;
+    const misspelled = spawnHandbackHook(ctx.root, handbackPre(ctx, JSON.stringify({ ...rest, changedPath: changedPaths })));
+    assert.equal(misspelled.status, 2, misspelled.stderr);
+    assert.match(misspelled.stderr, /NGHR-FINAL-SHAPE/u);
+    assert.match(misspelled.stderr, /missing keys changedPaths/u);
+    assert.match(misspelled.stderr, /unexpected keys changedPath\b/u);
+    const foreign = spawnHandbackHook(ctx.root, handbackPre(ctx, finalText(binding, { candidateCommit: "f".repeat(40) })));
+    assert.equal(foreign.status, 2, foreign.stderr);
+    assert.match(foreign.stderr, /condition candidate-commit/u);
+    // A checkpoint outcome is a valid handback here, exactly as at the stop.
+    const checkpoint = spawnHandbackHook(ctx.root, handbackPre(ctx, finalText(binding, { outcome: "checkpoint", report: "Budget stop; continuation card follows." })));
+    assert.equal(checkpoint.status, 0, checkpoint.stderr);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF45", name: "C23: a well-formed return passes PreToolUse silently and the later SubagentStop still commits it once", run: () => fixture((ctx) => {
+    handbackWriteMeta(ctx);
+    const { root, commonDir, binding, dependencies, facts, stopInput } = ctx;
+    const message = finalText(binding);
+    const run = spawnHandbackHook(root, handbackPre(ctx, message));
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(run.stdout, ""); assert.equal(run.stderr, "");
+    assert.deepEqual(refusalFiles(commonDir), []);
+    const transcript = stopInput(binding, "x").transcript_path;
+    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message } }] } })}\n`);
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, dependencies);
+    assert.equal(result.status, "authored-commit-recorded", result.code);
+    assert.equal(facts.commits, 1);
+    assert.equal(readReceipt(commonDir).assurance, STOP_ASSURANCE);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF46", name: "C23: every doubt allows the call (unmarked child, Critic, other tool, no meta, no or unreadable pending state, foreground state, bad input, unusable root)", run: () => fixture((ctx) => {
+    handbackWriteMeta(ctx);
+    const { root, commonDir, binding } = ctx;
+    const cut = cutReturn(binding);
+    const allowed = (label, input, options) => { const run = spawnHandbackHook(root, input, options); assert.equal(run.status, 0, `${label}: ${run.stderr}`); assert.equal(run.stdout, "", label); assert.equal(run.stderr, "", label); };
+    // The control: the same broken return of a marked child is refused.
+    assert.equal(spawnHandbackHook(root, handbackPre(ctx, cut, { tool_use_id: "toolu-control" })).status, 2);
+    for (const file of refusalFiles(commonDir)) rmSync(join(diagDir(commonDir), file));
+    allowed("unmarked child", handbackPre(ctx, cut, { agent_type: "general-purpose" }));
+    allowed("critic", handbackPre(ctx, cut, { agent_type: "pipeline-core:critic" }));
+    allowed("another tool", handbackPre(ctx, cut, { tool_name: "Read" }));
+    allowed("no message string", handbackPre(ctx, cut, { tool_input: {} }));
+    allowed("message not a string", handbackPre(ctx, cut, { tool_input: { message: 7 } }));
+    allowed("no meta file", handbackPre(ctx, cut, { agent_id: "agent-nometa" }));
+    allowed("foreign session", handbackPre(ctx, cut, { session_id: "session-other" }));
+    allowed("no transcript path", handbackPre(ctx, cut, { transcript_path: undefined }));
+    allowed("orchestrator payload", handbackPre(ctx, cut, { agent_id: undefined, agent_type: undefined }));
+    allowed("stdin is not JSON", null, { raw: "{not json" });
+    allowed("project root does not exist", handbackPre(ctx, cut), { env: { CLAUDE_PROJECT_DIR: join(root, "does-not-exist") } });
+    ctx.writeMeta("agent-orphan", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-never-prepared" });
+    allowed("no pending state", handbackPre(ctx, cut, { agent_id: "agent-orphan" }));
+    const [pendingName] = privateEntries(commonDir, "pending-claude-");
+    writeFileSync(join(privateDir(commonDir), pendingName), "{unreadable");
+    allowed("unreadable pending state", handbackPre(ctx, cut));
+    assert.deepEqual(refusalFiles(commonDir), [], "an allowed call counts nothing");
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF47", name: "C23: a foreground pending state is never touched by the handback check", run: () => fixture((ctx) => {
+    handbackWriteMeta(ctx);
+    const run = spawnHandbackHook(ctx.root, handbackPre(ctx, cutReturn(ctx.binding)));
+    assert.equal(run.status, 0, run.stderr); assert.equal(run.stderr, "");
+    assert.deepEqual(refusalFiles(ctx.commonDir), []);
+  }, "claude", 1, "goldfish-implementor", { background: false }) },
+  { id: "NGHF48", name: "C23: after three refusals the fourth attempt is allowed, and the failure stays visible through the stop path with the validator's detail", run: () => fixture((ctx) => {
+    handbackWriteMeta(ctx);
+    const { root, commonDir, binding, dependencies, facts, stopInput } = ctx;
+    const cut = cutReturn(binding);
+    const statuses = [1, 2, 3, 4, 5].map(() => spawnHandbackHook(root, handbackPre(ctx, cut)).status);
+    assert.deepEqual(statuses, [2, 2, 2, 0, 0]);
+    assert.equal(refusalFiles(commonDir).length, 1);
+    assert.equal(JSON.parse(readFileSync(join(diagDir(commonDir), refusalFiles(commonDir)[0]), "utf8")).refusals, 3);
+    // The allowed fourth message is what the stop reads: today's stop path fails with NGHR-FINAL-JSON, and the record keeps WHY.
+    const transcript = stopInput(binding, "x").transcript_path;
+    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: cut } }] } })}\n`);
+    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, dependencies);
+    assert.equal(failed.code, "NGHR-FINAL-JSON", JSON.stringify(failed));
+    assert.equal(facts.commits, 0);
+    assert.equal(failed.detail.condition, "json-truncated");
+    const recordName = diagEntries(commonDir).find((name) => name.startsWith("stop-failure-"));
+    const recorded = JSON.parse(readFileSync(join(diagDir(commonDir), recordName), "utf8"));
+    assert.equal(recorded.code, "NGHR-FINAL-JSON");
+    assert.deepEqual(recorded.detail, { condition: "json-truncated", errorMessage: `parse failed at position ${cut.length} of ${cut.length} characters` });
+    assert.equal(JSON.stringify(recorded).includes(root), false);
+    const shown = nativeGoldfishHookMessage(failed, { stopFailure: readNativeGoldfishStopFailure({ commonDir }) });
+    assert.match(shown, new RegExp(`position ${cut.length} of ${cut.length} characters`, "u"));
+    assert.match(shown, /condition json-truncated/u);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF49", name: "C23: the stop-failure detail admits the key lists as bounded slugs and drops everything else", run: () => {
+    assert.deepEqual(sanitizeStopFailureDetail({ condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "has space", "a/b", "k3", "k4", "k5", "k6"] }),
+      { condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "k3", "k4", "k5"] });
+    assert.deepEqual(sanitizeStopFailureDetail({ condition: "json-truncated", errorMessage: "parse failed at position 5 of 5 characters" }), { condition: "json-truncated", errorMessage: "parse failed at position 5 of 5 characters" });
+    assert.deepEqual(sanitizeStopFailureDetail({ errorMessage: "at /home/x/y" }), null, "a message holding a path separator never travels");
+    assert.deepEqual(sanitizeStopFailureDetail({ missingKeys: "changedPaths" }), null);
   } },
 ];
 

@@ -205,6 +205,51 @@ const cases = [
       assert.equal(result.detail?.condition, condition, JSON.stringify(result));
     }
   }],
+  ["NGHR12 C23 (AC-108): a return that is not JSON keeps NGHR-FINAL-JSON and names where the text stopped being JSON, never echoing the text", () => {
+    // A valid return cut directly after the report value: no changedPaths, no closing brace (the live failure shape).
+    const cut = finalText.slice(0, finalText.indexOf(",\"changedPaths\""));
+    const truncated = validateNativeGoldfishFinal(cut, { binding, allowCheckpoint: true });
+    assert.equal(truncated.ok, false);
+    assert.equal(truncated.code, "NGHR-FINAL-JSON");
+    assert.equal(truncated.detail?.condition, "json-truncated", JSON.stringify(truncated));
+    assert.equal(truncated.detail.errorMessage, `parse failed at position ${cut.length} of ${cut.length} characters`);
+    assert.equal(JSON.stringify(truncated).includes(final.report), false, "the message text never travels in the detail");
+    // The same cut inside one whole-message fence: the position is that of the unwrapped text, which is what was parsed.
+    const fenced = validateNativeGoldfishFinal(`\`\`\`json\n${cut}\n\`\`\``, { binding });
+    assert.equal(fenced.detail?.condition, "json-truncated");
+    assert.equal(fenced.detail.errorMessage, `parse failed at position ${cut.length} of ${cut.length} characters`);
+    // A syntax error before the end is a syntax error, with its own position; prose has no usable position and says only that.
+    const broken = finalText.replace("\"outcome\":", "\"outcome\" ");
+    const syntax = validateNativeGoldfishFinal(broken, { binding });
+    assert.equal(syntax.code, "NGHR-FINAL-JSON");
+    assert.equal(syntax.detail?.condition, "json-syntax", JSON.stringify(syntax));
+    assert.match(syntax.detail.errorMessage, new RegExp(`^parse failed at position \\d+ of ${broken.length} characters$`, "u"));
+    const prose = validateNativeGoldfishFinal("All done, no JSON here.", { binding });
+    assert.equal(prose.code, "NGHR-FINAL-JSON");
+    assert.equal(prose.detail?.condition, "json-syntax");
+    assert.equal(JSON.stringify(prose).includes("All done"), false);
+    // A duplicate key and a text the strict parser refuses although native JSON accepts it are told apart.
+    assert.equal(validateNativeGoldfishFinal(`{"schema":"${final.schema}","schema":"forged"}`, { binding }).detail?.condition, "json-duplicate-key");
+    assert.equal(validateNativeGoldfishFinal(finalText.replace("Implemented and verified.", "lone\\ud800surrogate"), { binding }).detail?.condition, "json-not-strict");
+    // A return that parses never carries a JSON detail, and an empty text is still the input refusal.
+    assert.equal(validateNativeGoldfishFinal(finalText, { binding }).ok, true);
+    assert.equal(validateNativeGoldfishFinal("", { binding }).code, "NGHR-FINAL-INPUT");
+  }],
+  ["NGHR13 C23 (AC-108): a wrong field set names the missing and the unexpected keys, bounded; every other shape condition is unchanged", () => {
+    const { changedPaths, ...withoutPaths } = final;
+    const misspelled = validateNativeGoldfishFinal(JSON.stringify({ ...withoutPaths, changedPath: changedPaths }), { binding });
+    assert.equal(misspelled.code, "NGHR-FINAL-SHAPE");
+    assert.equal(misspelled.detail.condition, "fields");
+    assert.deepEqual(misspelled.detail.missingKeys, ["changedPaths"]);
+    assert.deepEqual(misspelled.detail.unexpectedKeys, ["changedPath"]);
+    const cutKeys = validateNativeGoldfishFinal(JSON.stringify(withoutPaths), { binding });
+    assert.deepEqual(cutKeys.detail, { condition: "fields", missingKeys: ["changedPaths"] });
+    const many = validateNativeGoldfishFinal(JSON.stringify({ ...final, k1: 1, k2: 2, k3: 3, k4: 4, k5: 5, k6: 6, k7: 7 }), { binding });
+    assert.equal(many.detail.unexpectedKeys.length, 5, "at most 5 keys are named");
+    // A JSON value that is no object has no keys to name.
+    assert.deepEqual(validateNativeGoldfishFinal("[1]", { binding }).detail, { condition: "fields" });
+    assert.deepEqual(validateNativeGoldfishFinal(JSON.stringify({ ...final, dispatchId: "OTHER" }), { binding }).detail, { condition: "dispatch-id" });
+  }],
 ];
 
 const temp = mkdtempSync(join(tmpdir(), "native-goldfish-host-return-"));

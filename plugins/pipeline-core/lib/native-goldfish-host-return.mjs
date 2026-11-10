@@ -101,6 +101,16 @@ export function parseNativeGoldfishBriefing(prompt, { runners = ["claude", "code
     allowedPaths: [...binding.allowedPaths] } };
 }
 
+/** C23 (AC-108): the wrong-field-set condition names the keys that are missing and the keys that are not part of the contract (a misspelling
+ * shows as one of each), at most 5 each. Only keys of a JSON object can be named; any other JSON value says just `fields`. */
+function fieldsCondition(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return { condition: "fields" };
+  const keys = Object.keys(value);
+  const missingKeys = FINAL_FIELDS.filter((key) => !keys.includes(key)).slice(0, 5);
+  const unexpectedKeys = keys.filter((key) => !FINAL_FIELDS.includes(key) && key !== "testFirst").slice(0, 5);
+  return { condition: "fields", ...(missingKeys.length > 0 ? { missingKeys } : {}), ...(unexpectedKeys.length > 0 ? { unexpectedKeys } : {}) };
+}
+
 /** AC-164: the first sub-condition of NGHR-FINAL-SHAPE that fires, as a bounded detail, or null when the shape is valid.
  * The slugs are closed; a path is echoed only after it passed `normalizedPath` (repository-relative), at most 5, so a
  * host path or arbitrary text from the contract never travels. The checks and their order are those of the former
@@ -108,7 +118,7 @@ export function parseNativeGoldfishBriefing(prompt, { runners = ["claude", "code
 function finalShapeCondition(value, binding, allowCheckpoint) {
   const named = (condition, paths) => (paths === undefined ? { condition } : { condition, paths: paths.slice(0, 5) });
   const hasTestFirst = value !== null && typeof value === "object" && !Array.isArray(value) && Object.hasOwn(value, "testFirst");
-  if (!exact(hasTestFirst ? (({ testFirst: _t, ...rest }) => rest)(value) : value, FINAL_FIELDS)) return named("fields");
+  if (!exact(hasTestFirst ? (({ testFirst: _t, ...rest }) => rest)(value) : value, FINAL_FIELDS)) return fieldsCondition(value);
   if (value.schema !== NATIVE_GOLDFISH_RETURN_SCHEMA) return named("schema");
   if (value.dispatchId !== binding.dispatchId) return named("dispatch-id");
   if (value.candidateCommit !== binding.candidateCommit) return named("candidate-commit");
@@ -156,6 +166,22 @@ function withoutWholeMessageFence(text) {
   return match === null ? text : match[1];
 }
 
+/** C23 (AC-108): where the text of a refused return stopped being JSON, as a closed, bounded detail that never echoes the text. The strict
+ * parser reports no offset, so the position is read from the engine's own message by a second, diagnostic-only parse: nothing it accepts is
+ * ever admitted. `json-truncated` = the text ends inside the value (a cut-off return); `json-syntax` = it breaks earlier; `json-duplicate-key`;
+ * `json-not-strict` = the engine accepts what the strict parser refuses (for example a lone surrogate escape). */
+function jsonFailureDetail(text, error) {
+  if (/GE-JSON-DUPLICATE-KEY/u.test(String(error?.message))) return { condition: "json-duplicate-key" };
+  let engine = null;
+  try { JSON.parse(text); } catch (caught) { engine = caught; }
+  if (engine === null) return { condition: "json-not-strict" };
+  const message = String(engine?.message);
+  const found = /\bposition (\d+)/u.exec(message);
+  const position = found ? Number(found[1]) : /end of JSON input/u.test(message) ? text.length : null;
+  if (!Number.isSafeInteger(position) || position > text.length) return { condition: "json-syntax" };
+  return { condition: position >= text.length ? "json-truncated" : "json-syntax", errorMessage: `parse failed at position ${position} of ${text.length} characters` };
+}
+
 /** Validate one JSON final result (plain, or in one fence around the whole message); prose, any other fencing and duplicate keys fail closed. */
 // D31: `allowCheckpoint` is opt-in. Only the SubagentStop route passes it, because a budget stop settles there without
 // a commit; every other route (foreground PostToolUse, Codex) keeps admitting a success only.
@@ -163,7 +189,8 @@ export function validateNativeGoldfishFinal(text, { binding, allowCheckpoint = f
   if (typeof text !== "string" || text.length === 0 || Buffer.byteLength(text, "utf8") > 2 * 1024 * 1024
     || !binding || !ID.test(binding.dispatchId ?? "") || !OID.test(binding.candidateCommit ?? "")) return fail("NGHR-FINAL-INPUT");
   let value;
-  try { value = parseStrictJson(withoutWholeMessageFence(text)); } catch { return fail("NGHR-FINAL-JSON"); }
+  const inner = withoutWholeMessageFence(text);
+  try { value = parseStrictJson(inner); } catch (error) { return { ...fail("NGHR-FINAL-JSON"), detail: jsonFailureDetail(inner, error) }; }
   const shapeCondition = finalShapeCondition(value, binding, allowCheckpoint);
   if (shapeCondition !== null) return { ...fail("NGHR-FINAL-SHAPE"), detail: shapeCondition };
   try { validateDurableDispatchReportText(value.report); } catch { return fail("NGHR-FINAL-REPORT-UNSAFE"); }
