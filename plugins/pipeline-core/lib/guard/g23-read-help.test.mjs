@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerTestCaseCompletion } from "../test-case-completion.mjs";
 import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
-import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+import { isSanctionedLifecycleCommand, SCRIPTS_ANSWERING_HELP } from "./command-catalogue.mjs";
 import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
 import { isReadOnlyDiagnosticCommand } from "./shell-grammar.mjs";
 import * as denials from "./grammar-denials.mjs";
@@ -75,6 +75,39 @@ test("G23 exact source-owned PO help is a pure CLI route", () => {
     assert.equal(isSanctionedLifecycleCommand(`node ${script} --help --directory /tmp`, root), false);
     assert.equal(isSanctionedLifecycleCommand(`node ${script} approve`, root), false);
     assert.equal(isSanctionedLifecycleCommand(`node ${join(root, "foreign.mjs")} --help`, root), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// PO 2026-11-09: `--help` on a plugin script is admitted in every lifecycle state, but only for a script that really answers it.
+test("every plugin script with a help branch is admitted for its own flags and only prints its usage", () => {
+  mkdirSync(fixtureBase, { recursive: true });
+  const scriptsDir = fileURLToPath(new URL("../../scripts/", import.meta.url));
+  // These two hand the flag to the Codex binary; they have no help branch of their own.
+  const passesFlagOn = new Set(["codex-critic-isolation.mjs", "codex-isolation-control-decomposition.mjs"]);
+  const withHelpBranch = readdirSync(scriptsDir).filter((name) => name.endsWith(".mjs") && !name.endsWith(".test.mjs") && !passesFlagOn.has(name)
+    && /["']--help["']/u.test(readFileSync(join(scriptsDir, name), "utf8")));
+  assert.deepEqual(withHelpBranch.filter((name) => !SCRIPTS_ANSWERING_HELP.has(name)), [], "a script with a help branch belongs on the admitted list");
+  assert.deepEqual([...SCRIPTS_ANSWERING_HELP.keys()].filter((name) => !withHelpBranch.includes(name)), [], "the admitted list names only scripts with a help branch");
+  const root = mkdtempSync(join(fixtureBase, "g23-help-all-"));
+  try {
+    for (const [name, flags] of SCRIPTS_ANSWERING_HELP) {
+      const path = join(scriptsDir, name);
+      assert.equal(isSanctionedLifecycleCommand(`node ${path} --help --root x`, root), false, `${name} extra argument`);
+      assert.equal(isSanctionedLifecycleCommand(`node ${path} -h`, root), flags.includes("-h"), `${name} short flag`);
+      for (const flag of flags) {
+        assert.equal(isSanctionedLifecycleCommand(`node ${path} ${flag}`, root), true, `${name} ${flag}`);
+        const dir = mkdtempSync(join(root, "run-"));
+        const child = spawnSync(process.execPath, [path, flag], { cwd: dir, encoding: "utf8", timeout: 60000,
+          env: { ...process.env, HOME: dir, USERPROFILE: dir, TMPDIR: dir, TEMP: dir, TMP: dir } });
+        assert.equal(child.status, 0, `${name} ${flag}: ${child.stderr}`);
+        assert.ok(child.stdout.trim().length > 0, `${name} ${flag} prints its usage`);
+        assert.deepEqual(readdirSync(dir), [], `${name} ${flag} writes nothing`);
+      }
+    }
+    for (const refused of [`node ${join(scriptsDir, "project-reset.mjs")} --help`, `node ${join(scriptsDir, "resume-hint.mjs")} --help`,
+      `node ${join(root, "pipeline-state.mjs")} --help`, `node ${join(scriptsDir, "..", "scripts", "project-reset.mjs")} --help`]) {
+      assert.equal(isSanctionedLifecycleCommand(refused, root), false, refused);
+    }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -149,5 +182,5 @@ test("C18-8 refusal texts carry one working example per refused shape, each admi
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-if (cases.length !== 4) throw new Error("G23 read/help case count drift");
+if (cases.length !== 5) throw new Error("G23 read/help case count drift");
 registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

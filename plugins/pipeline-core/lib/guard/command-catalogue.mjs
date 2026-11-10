@@ -14,7 +14,7 @@ import { readState as readDesignCourseState } from "../../scripts/pipeline-state
 import { RUNNER_CAPABILITIES_SCRIPT, CHECK_PRIVATE_IDENTIFIERS_SCRIPT, CHECK_PO_GATE_AUTHORITY_SCRIPT, ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, BIND_ADR_PROPOSALS_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
 import { MODULE_SLICE_PROPOSAL_SCRIPT } from "./constants.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
-import { isNodeInterpreterWord, samePathSpelling } from "../path-spelling.mjs";
+import { isNodeInterpreterWord, relativeUnderRoot, samePathSpelling } from "../path-spelling.mjs";
 import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
 import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
 
@@ -647,7 +647,29 @@ function sanctionedProofWaitArgs(args, root) {
   return args.length === at;
 }
 
+// PO 2026-11-09: asking a plugin script for its usage is admitted in every lifecycle state, before onboarding too. Only a script that really answers
+// the flag is listed: one without a help branch would simply run its main, so a wildcard over scripts/ would execute mutating code. The list holds each
+// script's own flags, and g23-read-help.test.mjs runs every entry in an empty directory and fails when a script with a help branch is missing here.
+const BOTH_HELP_FLAGS = ["--help", "-h"], LONG_HELP_FLAG = ["--help"];
+export const SCRIPTS_ANSWERING_HELP = new Map([
+  ...["architecture-baseline", "check-evidence-drift", "critic-bare", "design-review-receipt", "dispatch-briefing", "dispatch-budget-grant", "onboarding-init",
+    "pipeline-state", "plan-runtime-projection-v2", "plan-runtime-projection-v3", "po-human-approval", "project-authority-migration", "project-onboarding-v3",
+    "push-init", "report-interruptions", "runner-profile-migration-v2", "runner-profile-migration-v3", "settings-allowlist-merge", "v3-bootstrap-authority",
+    "validate-runner-profiles-v2"].map((name) => [`${name}.mjs`, BOTH_HELP_FLAGS]),
+  ...["check-protected-delta", "close-coordinator", "codex-host-advisor-route", "critic-diagnostic-evidence", "critic-export-consent", "handover-rotate",
+    "publish-evidence-run", "reconcile-backlog-delivery", "register-feature-package", "run-codex-critic-isolation", "session-critic-finalizer",
+    "verify-evidence-producer"].map((name) => [`${name}.mjs`, LONG_HELP_FLAG]),
+]);
+const PLUGIN_SCRIPTS_DIR = fileURLToPath(new URL("../../scripts", import.meta.url));
+
+function isAnsweredScriptHelp(script, args, options) {
+  if (args.length !== 1 || typeof script !== "string") return false;
+  const name = relativeUnderRoot(script, PLUGIN_SCRIPTS_DIR, { platform: options.platform ?? process.platform, lstatFn: options.lstatFn });
+  return name !== null && SCRIPTS_ANSWERING_HELP.get(name)?.includes(args[0]) === true;
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+  if (isAnsweredScriptHelp(script, args, options)) return true;
   if (script === PROOF_WAIT_SCRIPT) return sanctionedProofWaitArgs(args, root);
   if (script === SESSION_AUTHORITY_REPAIR_SCRIPT) return sanctionedSessionAuthorityRepairReadArgs(args, root);
   if (script === HOST_COMMIT_RECOVER_SCRIPT) return sanctionedHostCommitRecoverArgs(args, root);

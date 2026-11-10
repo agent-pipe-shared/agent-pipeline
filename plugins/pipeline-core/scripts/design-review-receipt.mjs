@@ -332,6 +332,11 @@ export function main(argv = process.argv.slice(2), env = process.env, deps = {})
     writeError(`${result.code}: ${result.message}\n`);
     return 2;
   };
+  // Asking for the usage is a question, never a refusal; the first argument is the only place the flag means that.
+  if (argv.length === 1 && ["--help", "-h"].includes(argv[0])) {
+    write(`${USAGE}\n`);
+    return 0;
+  }
   try {
     const parsed = parseArgv(argv);
     if (!parsed.ok) return refused(parsed);
