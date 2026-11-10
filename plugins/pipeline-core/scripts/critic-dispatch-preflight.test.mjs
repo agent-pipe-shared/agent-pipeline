@@ -2144,7 +2144,8 @@ test("AGY report: an Antigravity Critic gets one generated line naming the repos
     assert.ok(printed.criticRunnerPromptLines[0].startsWith(`Repository root: ${fs.realpathSync(fx.root)}. `), printed.criticRunnerPromptLines[0]);
     assert.match(printed.criticRunnerPromptLines[0], /absolute paths only/u);
     assert.match(printed.nextStep, /criticRunnerPromptLines/u);
-    assert.deepEqual(dispatchFindings({ subagentType: "critic", prompt: [`Ruleset SHA: ${fx.candidate}`, ...printed.criticRunnerPromptLines].join("\n") }).findings.filter(({ code }) => code.startsWith("DISPATCH-CONTAMINATION")), []);
+    const findings = (extra) => dispatchFindings({ subagentType: "critic", prompt: [`Ruleset SHA: ${fx.candidate}`, ...extra].join("\n") }).findings.map(({ code }) => code).sort();
+    assert.deepEqual(findings(printed.criticRunnerPromptLines), findings([]), "the whole dispatch policy reads the prompt the same with and without the line");
     for (const env of [{ CLAUDE_CODE_SESSION_ID: "s" }, { CODEX_SESSION_ID: "s" }, {}]) {
       assert.equal(Object.hasOwn(g2069Printed(fx, {}, { env }), "criticRunnerPromptLines"), false, JSON.stringify(env));
     }

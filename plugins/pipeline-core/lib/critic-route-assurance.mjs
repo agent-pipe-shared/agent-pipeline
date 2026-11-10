@@ -20,7 +20,7 @@ export const CRITIC_ROUTE_ASSURANCE_SCHEMA = "pipeline.critic-route-assurance.v1
 export function criticRunnerFromEnv(env) {
   const source = env !== null && typeof env === "object" ? env : {};
   if (source.CODEX_SESSION_ID !== undefined || source.CODEX_THREAD_ID !== undefined) return "codex";
-  if (source.ANTIGRAVITY_AGENT !== undefined) return "antigravity";
+  if (source.ANTIGRAVITY_AGENT !== undefined || source.AI_AGENT === "antigravity") return "antigravity";
   if (source.CLAUDECODE !== undefined || source.CLAUDE_CODE_SESSION_ID !== undefined) return "claude";
   return "unknown";
 }

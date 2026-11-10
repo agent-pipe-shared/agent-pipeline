@@ -376,7 +376,7 @@ export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
     message: `the calibration (${file}) declares repositoryMode "local-only" (written once at onboarding), but this push targets the configured remote "${remote}" (${destination}). `
       + `Correct the calibration: set "repositoryMode" to "remote-tracked" in ${file}${mirror} with the one narrow command node <plugin-root>/scripts/repository-mode-promote.mjs --root <project-root> --to remote-tracked `
       + "(it changes only that one value, needs a configured remote and prints the paths to commit; the pre-commit hook admits exactly that change without a signature). "
-      + "It is routine agent work and needs no separate PO decision; the push itself stays behind its signature. It is a commit, so make it before the feature close and before the candidate is fixed, and run push-prepare again. Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
+      + "It is routine agent work and needs no separate PO decision; the push itself stays behind its signature. It is a commit, so it belongs before the last Critic round; then run push-prepare again. If that round has already passed, leave it for this push (a calibration commit would end the Critic carry, CVL-CARRY-CONTENT-CHANGED) and make it the first commit of the next feature. Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
       + "Nothing was written now and nothing is refused; if \"local-only\" is the truth, the push target is what is wrong.",
   };
 }

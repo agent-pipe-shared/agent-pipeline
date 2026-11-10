@@ -63,6 +63,7 @@ test("wording is never upgraded: only a source-issued, fresh-context expectation
   assert.equal(criticRunnerFromEnv({ CODEX_THREAD_ID: "x" }), "codex");
   assert.equal(criticRunnerFromEnv({ CODEX_SESSION_ID: "x" }), "codex");
   assert.equal(criticRunnerFromEnv({ ANTIGRAVITY_AGENT: "1" }), "antigravity");
+  assert.equal(criticRunnerFromEnv({ AI_AGENT: "antigravity" }), "antigravity", "the second marker every other runner reader accepts");
   assert.equal(criticRunnerFromEnv({ CLAUDE_CODE_SESSION_ID: "x" }), "claude");
   assert.equal(criticRunnerFromEnv({}), "unknown");
   const unknown = describe({ runner: "unknown" });
