@@ -1,12 +1,12 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.read-allowlist-for-neighbour-folders
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-11-10
-source: Claude greenfield report 070_6 (F-READONLY-WIN) and the PO tile of 2026-11-10
-sprint: after-0.7.0
+source: Claude greenfield report 070_6 (F-READONLY-WIN) and the PO tile of 2026-11-10 placing it after 0.7.0
+sprint: alfred
 done_when: manual
 ---
 

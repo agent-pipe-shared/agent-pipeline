@@ -1,12 +1,12 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.personal-routing-override
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-11-10
-source: PO tile of 2026-11-10 on project-owned routing (ADR-0089)
-sprint: after-0.7.0
+source: PO tile of 2026-11-10 on project-owned routing (ADR-0089), placing it after 0.7.0
+sprint: alfred
 done_when: manual
 ---
 
