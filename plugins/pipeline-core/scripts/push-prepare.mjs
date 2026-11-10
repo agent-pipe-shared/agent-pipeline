@@ -201,7 +201,8 @@ function readEvidenceInput(path, deps) {
  * it never invents a command and never falls back to a source-only path.
  */
 export function resolveVerifyRemedyPlan(dir, relPath, deps = {}) {
-  if (relPath !== "evidence/verify-latest.json") return { kind: "manual", reason: "Use the configured security evidence producer; Verify preparation does not regenerate security evidence." };
+  // C23 (Claude greenfield): "the configured producer" named nothing the run could find, so it reported the producer as not configured and stopped.
+  if (relPath !== "evidence/verify-latest.json") return { kind: "manual", reason: `Run node ${JSON.stringify(fileURLToPath(new URL("./security-scan.mjs", import.meta.url)))} --root ${JSON.stringify(dir)} once HEAD is final: it writes ${relPath} for the current HEAD. Verify preparation does not regenerate security evidence, and a feature close writes it on its own.` };
   const script = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
   const base = typeof deps.verifyBase === "string" && deps.verifyBase.trim() && !deps.verifyBase.startsWith("-") ? deps.verifyBase : null;
   return {
@@ -220,7 +221,7 @@ export function resolveVerifyRemedy(dir, relPath, deps = {}) {
   const plan = resolveVerifyRemedyPlan(dir, relPath, deps);
   if (plan.kind === "manual") return plan.reason;
   const render = action => [action.executable, ...action.argv.map(value => JSON.stringify(value))].join(" ");
-  return `${render(plan.prepare)}\n${plan.prerequisite}\n${plan.produce.executableNow ? render(plan.produce) : "Production is not executable until an explicit verified base is supplied. Then invoke verify-evidence-producer.mjs with --root, --mode push, --base and --out; never invoke the product verify command as an evidence writer."}\n${CRITIC_BOUND_VERIFY_RELEASE_ROUTE}`;
+  return `${render(plan.prepare)}\n${plan.prerequisite}\n${plan.produce.executableNow ? render(plan.produce) : "No verified base is known here. A project that was never pushed has none: do not guess one and do not stop for it. Finish the feature close first; its closed-local result names the exact Critic-bound command in its pushEvidence field. Only a push without a Critic-bound Verify invokes verify-evidence-producer.mjs with --root, --mode push, --base and --out; never invoke the product verify command as an evidence writer."}\n${CRITIC_BOUND_VERIFY_RELEASE_ROUTE}`;
 }
 
 export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) {
@@ -375,7 +376,7 @@ export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
     message: `the calibration (${file}) declares repositoryMode "local-only" (written once at onboarding), but this push targets the configured remote "${remote}" (${destination}). `
       + `Correct the calibration: set "repositoryMode" to "remote-tracked" in ${file}${mirror} with the one narrow command node <plugin-root>/scripts/repository-mode-promote.mjs --root <project-root> --to remote-tracked `
       + "(it changes only that one value, needs a configured remote and prints the paths to commit; the pre-commit hook admits exactly that change without a signature). "
-      + "It is a commit, so make it before the candidate is fixed and run push-prepare again. Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
+      + "It is routine agent work and needs no separate PO decision; the push itself stays behind its signature. It is a commit, so make it before the feature close and before the candidate is fixed, and run push-prepare again. Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
       + "Nothing was written now and nothing is refused; if \"local-only\" is the truth, the push target is what is wrong.",
   };
 }

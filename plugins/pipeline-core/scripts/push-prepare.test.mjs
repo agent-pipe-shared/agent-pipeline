@@ -281,7 +281,8 @@ test("resolveVerifyRemedy (D1): resolves from the project's own calibration veri
   });
   assert.match(remedy, /verify-evidence-producer\.mjs.*--prepare/u);
   assert.doesNotMatch(remedy, /node custom\/verify/u);
-  assert.match(remedy, /not executable until an explicit verified base/u);
+  assert.match(remedy, /never pushed has none: do not guess one[\s\S]*pushEvidence field/u);
+  assert.match(resolveVerifyRemedyPlan(FIXTURE_DIR, "evidence/security-latest.json", {}).reason, /security-scan\.mjs.*--root/u, "C23: the security remedy names the command");
   // N24: the Critic-bound route is named (push mode refuses the carry input), including what to do with an existing output file.
   assert.match(remedy, /VEP-CRITIC-CARRY-INPUT/u);
   assert.match(remedy, /--mode release/u);
@@ -296,7 +297,7 @@ test("resolveVerifyRemedy (D2): no calibration resolves -> honest degradation, n
   const remedy = resolveVerifyRemedy(FIXTURE_DIR, "evidence/verify-latest.json", {
     resolveAuthorityArtifactPath: () => ({ exists: false }),
   });
-  assert.match(remedy, /not executable until an explicit verified base/);
+  assert.match(remedy, /No verified base is known here/);
   assert.doesNotMatch(remedy, /harness\//);
 });
 
@@ -305,7 +306,7 @@ test("resolveVerifyRemedy (D2): calibration present but no verify key -> honest 
     resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
     readFile: () => JSON.stringify({ project: "consumer-project" }),
   });
-  assert.match(remedy, /not executable until an explicit verified base/);
+  assert.match(remedy, /No verified base is known here/);
   assert.doesNotMatch(remedy, /harness\//);
 });
 
@@ -314,7 +315,7 @@ test("resolveVerifyRemedy (D2): unreadable calibration -> honest degradation, ne
     resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
     readFile: () => { throw new Error("ENOENT"); },
   });
-  assert.match(remedy, /not executable until an explicit verified base/);
+  assert.match(remedy, /No verified base is known here/);
   assert.doesNotMatch(remedy, /harness\//);
 });
 
