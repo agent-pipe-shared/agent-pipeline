@@ -660,12 +660,34 @@ export const SCRIPTS_ANSWERING_HELP = new Map([
     "publish-evidence-run", "reconcile-backlog-delivery", "register-feature-package", "run-codex-critic-isolation", "session-critic-finalizer",
     "verify-evidence-producer"].map((name) => [`${name}.mjs`, LONG_HELP_FLAG]),
 ]);
+// PO tile 2026-11-09: these have no help branch but refuse `--help` as an unknown argument and print their usage, with a non-zero exit and no write
+// (measured for each, and re-run by the same test). Only `--help`: `-h` was not measured for them.
+export const SCRIPTS_PRINTING_USAGE_ON_HELP = new Set(["advisor-capability-preflight", "advisory-host-bridge", "agy-native-integrate", "agy-session-consent",
+  "architecture-boundary-check", "audit-bundle", "audit-pack", "authority-restore", "bootstrap-trust-recovery", "capture-evidence", "change-control",
+  "check-backlog-state", "check-completeness-vocabulary-doclint", "check-critic-bound-verify", "check-critic-skip-coverage", "check-po-gate-authority",
+  "check-private-identifiers", "check-protected-path-integrity", "check-resume-consumption", "clean-candidate-run", "clone-hook-readiness",
+  "codex-advisory-bootstrap", "codex-app-server-health", "codex-private-overlay-activation", "commit-msg-hook-install", "commit-pipeline-owned",
+  "critic-correction-input-bindings", "critic-notes-write", "critic-t1-po-override", "dispatch-authorship-verify", "dispatch-record-liveness",
+  "dispatch-record-write", "document-adapter", "document-binding", "durable-evidence", "evidence-viewer", "external-reference", "finish-feature",
+  "generate-architecture-overview", "generate-runbook", "github-issue-operations", "gitlab-forge-adapter", "goldfish-antigravity-host",
+  "goldfish-host-commit-recover", "governance-authority", "governance-event", "governance-export", "governance-replay", "governance-replay-viewer",
+  "guard-human-override", "guard-maintenance-window", "human-approval-trace", "human-authority-grant", "human-terminal-action",
+  "model-family-approval-request", "model-role-bootstrap", "model-role-dispatch-select", "module-slice-proposal", "observation-governance-bootstrap",
+  "onboarding-consent", "onboarding-consent-mark", "organization-policy", "phoenix-authority-approval", "po-approval-gate", "po-approval-request",
+  "po-gate-profile-repair", "pre-commit-hook-install", "pre-push-hook-install", "private-overlay-activation", "project-reset", "public-baseline-diagnose",
+  "publication-gate-evidence", "push-batch-executor", "push-gate-satisfiability", "push-prepare", "reconcile-backlog-ledger", "recover-sentinel-backlog",
+  "refresh-mandatory-hooks", "release-preflight-cli", "remote-provisional-approval", "repository-freshness", "repository-mode-promote", "resume-hint",
+  "routine-repair", "ruleset-freshness", "ruleset-freshness-host", "runner-capabilities", "sbom-discovery", "scratch-custody-check",
+  "security-gate-configure", "session-authority-repair", "session-capability-diagnose", "session-cleanup", "session-power", "session-power-address-repair",
+  "signing-ceremony", "toolchain-preflight", "worktree-create"].map((name) => `${name}.mjs`));
 const PLUGIN_SCRIPTS_DIR = fileURLToPath(new URL("../../scripts", import.meta.url));
+
+const flagsAnsweredBy = (name) => SCRIPTS_ANSWERING_HELP.get(name) ?? (SCRIPTS_PRINTING_USAGE_ON_HELP.has(name) ? LONG_HELP_FLAG : undefined);
 
 function isAnsweredScriptHelp(script, args, options) {
   if (args.length !== 1 || typeof script !== "string") return false;
   const name = relativeUnderRoot(script, PLUGIN_SCRIPTS_DIR, { platform: options.platform ?? process.platform, lstatFn: options.lstatFn });
-  return name !== null && SCRIPTS_ANSWERING_HELP.get(name)?.includes(args[0]) === true;
+  return name !== null && flagsAnsweredBy(name)?.includes(args[0]) === true;
 }
 
 /** PO tile 2026-11-09: what a refusal owes a usage question on a plugin script that cannot answer it, instead of a sentence about the lifecycle; null for every other command. */
@@ -675,9 +697,9 @@ export function scriptHelpRefusalHint(command, root, options = {}) {
   const name = relativeUnderRoot(resolved.script, PLUGIN_SCRIPTS_DIR, { platform: options.platform ?? process.platform, lstatFn: options.lstatFn });
   if (name === null || name === "" || name.includes("/") || !name.endsWith(".mjs")) return null;
   try { if (!lstatSync(join(PLUGIN_SCRIPTS_DIR, name)).isFile()) return null; } catch { return null; }
-  const flags = SCRIPTS_ANSWERING_HELP.get(name);
+  const flags = flagsAnsweredBy(name);
   if (flags !== undefined) return `${name} answers ${flags.join(" and ")}, not ${resolved.args[0]}: ask with that flag. This refusal is about the flag, not about the feature's lifecycle.`;
-  return `${name} has no help: ${resolved.args[0]} would run the script itself, so it is refused here. This refusal is about that, not about the feature's lifecycle. Read the comment at the top of ${resolved.script} for its usage.`;
+  return `${name} has no usable help: ${resolved.args[0]} would start the script or be refused by it without a usage text, so it is refused here. This refusal is about that, not about the feature's lifecycle. Read the comment at the top of ${resolved.script} for its usage.`;
 }
 
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
@@ -753,7 +775,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
     if (args[0] === "inspect") return exactRoot(args, root, 1) && args.length === 3;
     // 17: the bootstrap skill (pipeline-start step 7) tells an agent to capture the material input BEFORE a restart, in a session that is
     // not ready, and names exactly one argv shape for it: the card at the fixed path, consumed, no other flag. That shape is admitted in
-    // every lifecycle state, nothing wider (no other card path, no `--help`, no other flag).
+    // every lifecycle state, nothing wider (no other card path, no other flag). `--help` is decided above, at the head of this function.
     return args[0] === "capture" && exactRoot(args, root, 1) && args.length === 6
       && args[3] === "--card-file" && args[4] === join(root, "project", ".resume-hint-input.json") && args[5] === "--consume-card";
   }

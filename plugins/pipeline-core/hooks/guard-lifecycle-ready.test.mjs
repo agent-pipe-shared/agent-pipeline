@@ -353,16 +353,16 @@ test("a not-ready session admits the help flag of a script that answers it and r
     markGovernedFixture(path);
     const dependencies = { projectDir: path, requireProjectOnboardingReadyFn() { deny(NON_PARTIAL_DENIAL_STATUS); } };
     const scriptPath = (name) => fileURLToPath(new URL(`../scripts/${name}`, import.meta.url));
-    for (const tail of ["onboarding-init.mjs --help", "onboarding-init.mjs -h", "design-review-receipt.mjs --help", "dispatch-briefing.mjs --help"]) {
+    for (const tail of ["onboarding-init.mjs --help", "onboarding-init.mjs -h", "design-review-receipt.mjs --help", "dispatch-briefing.mjs --help", "project-reset.mjs --help"]) {
       const [name, flag] = tail.split(" ");
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${flag}`), dependencies), { exitCode: 0, stderr: "" }, tail);
     }
-    for (const tail of ["project-reset.mjs --help", "close-coordinator.mjs -h", "dispatch-briefing.mjs --help --root x"]) {
+    for (const tail of ["rotate-handover-sections.mjs --help", "close-coordinator.mjs -h", "dispatch-briefing.mjs --help --root x"]) {
       const [name, ...rest] = tail.split(" ");
       const refused = evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${rest.join(" ")}`), dependencies);
       assert.equal(refused.exitCode, 2, tail);
       assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u, tail);
-      assert.match(refused.stderr, { "project-reset.mjs --help": /project-reset\.mjs has no help: --help would run the script itself/u, "close-coordinator.mjs -h": /close-coordinator\.mjs answers --help, not -h/u }[tail] ?? /^(?![\s\S]*has no help:)/u, tail);
+      assert.match(refused.stderr, { "rotate-handover-sections.mjs --help": /rotate-handover-sections\.mjs has no usable help: --help would start the script/u, "close-coordinator.mjs -h": /close-coordinator\.mjs answers --help, not -h/u }[tail] ?? /^(?![\s\S]*has no usable help:)/u, tail);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

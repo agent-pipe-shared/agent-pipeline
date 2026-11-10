@@ -201,8 +201,8 @@ recommendation.
    distil that input into a bounded, closed context card and capture it; do not
    reduce it to a new short kickoff goal or merely promise to remember it.
    **Before a restart the session is not ready, and then exactly one argv shape
-   is admitted** — card at the fixed path, no other flags, `--help` included in
-   what is refused:
+   is admitted** — card at the fixed path, no other flags (its `--help` only
+   prints the usage):
    `node <plugin-root>/scripts/resume-hint.mjs capture --root <root> --card-file <root>/project/.resume-hint-input.json --consume-card`.
    Write the card to that exact path first. Elsewhere (a ready session) any
    `--card-file <json>` works. Read back `resume-hint.mjs inspect` after a

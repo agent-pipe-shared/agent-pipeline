@@ -2,11 +2,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerTestCaseCompletion } from "../test-case-completion.mjs";
 import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
-import { isSanctionedLifecycleCommand, SCRIPTS_ANSWERING_HELP } from "./command-catalogue.mjs";
+import { isSanctionedLifecycleCommand, SCRIPTS_ANSWERING_HELP, SCRIPTS_PRINTING_USAGE_ON_HELP } from "./command-catalogue.mjs";
 import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
 import { isReadOnlyDiagnosticCommand } from "./shell-grammar.mjs";
 import * as denials from "./grammar-denials.mjs";
@@ -78,6 +78,14 @@ test("G23 exact source-owned PO help is a pure CLI route", () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// One help question in its own empty directory, with a private home and only Node's own directory on PATH.
+function askHelp(path, flag, root) {
+  const dir = mkdtempSync(join(root, "run-"));
+  const child = spawnSync(process.execPath, [path, flag], { cwd: dir, encoding: "utf8", timeout: 60000,
+    env: { PATH: dirname(process.execPath), HOME: dir, USERPROFILE: dir, TMPDIR: dir, TEMP: dir, TMP: dir, ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}) } });
+  return { status: child.status, stdout: child.stdout ?? "", stderr: child.stderr ?? "", left: readdirSync(dir) };
+}
+
 // PO 2026-11-09: `--help` on a plugin script is admitted in every lifecycle state, but only for a script that really answers it.
 test("every plugin script with a help branch is admitted for its own flags and only prints its usage", () => {
   mkdirSync(fixtureBase, { recursive: true });
@@ -96,16 +104,26 @@ test("every plugin script with a help branch is admitted for its own flags and o
       assert.equal(isSanctionedLifecycleCommand(`node ${path} -h`, root), flags.includes("-h"), `${name} short flag`);
       for (const flag of flags) {
         assert.equal(isSanctionedLifecycleCommand(`node ${path} ${flag}`, root), true, `${name} ${flag}`);
-        const dir = mkdtempSync(join(root, "run-"));
-        const child = spawnSync(process.execPath, [path, flag], { cwd: dir, encoding: "utf8", timeout: 60000,
-          env: { ...process.env, HOME: dir, USERPROFILE: dir, TMPDIR: dir, TEMP: dir, TMP: dir } });
+        const child = askHelp(path, flag, root);
         assert.equal(child.status, 0, `${name} ${flag}: ${child.stderr}`);
         assert.ok(child.stdout.trim().length > 0, `${name} ${flag} prints its usage`);
-        assert.deepEqual(readdirSync(dir), [], `${name} ${flag} writes nothing`);
+        assert.deepEqual(child.left, [], `${name} ${flag} writes nothing`);
       }
     }
-    for (const refused of [`node ${join(scriptsDir, "project-reset.mjs")} --help`, `node ${join(scriptsDir, "resume-hint.mjs")} --help`,
-      `node ${join(root, "pipeline-state.mjs")} --help`, `node ${join(scriptsDir, "..", "scripts", "project-reset.mjs")} --help`]) {
+    // No help branch, but `--help` is refused as an unknown argument and the refusal carries the usage: admitted for exactly that flag, proven here.
+    for (const name of SCRIPTS_PRINTING_USAGE_ON_HELP) {
+      assert.equal(SCRIPTS_ANSWERING_HELP.has(name), false, `${name} is on one list only`);
+      const path = join(scriptsDir, name);
+      assert.equal(isSanctionedLifecycleCommand(`node ${path} --help`, root), true, name);
+      assert.equal(isSanctionedLifecycleCommand(`node ${path} -h`, root), false, `${name} short flag`);
+      const child = askHelp(path, "--help", root);
+      assert.ok(child.status !== 0 && child.status !== null, `${name}: exit ${child.status}`);
+      assert.match(`${child.stdout}${child.stderr}`, /usage/iu, `${name} prints its usage`);
+      assert.deepEqual(child.left, [], `${name} writes nothing`);
+    }
+    const running = "rotate-handover-sections.mjs"; // really starts its normal run when asked `--help`
+    for (const refused of [`node ${join(scriptsDir, running)} --help`, `node ${join(root, "pipeline-state.mjs")} --help`,
+      `node ${join(scriptsDir, "..", "scripts", running)} --help`]) {
       assert.equal(isSanctionedLifecycleCommand(refused, root), false, refused);
     }
   } finally { rmSync(root, { recursive: true, force: true }); }

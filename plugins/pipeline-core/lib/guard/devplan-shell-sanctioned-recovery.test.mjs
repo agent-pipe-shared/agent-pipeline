@@ -81,15 +81,15 @@ for (const [name, metadata] of [
 });
 // PO 2026-11-09: in draft a usage question passes when the script answers it, and otherwise the refusal says why instead of talking about implementation writes.
 check('draft shell admits a help question the script answers and explains the one it cannot', () => {
-  const reset = fileURLToPath(new URL('../../scripts/project-reset.mjs', import.meta.url));
+  const running = fileURLToPath(new URL('../../scripts/rotate-handover-sections.mjs', import.meta.url));
   assert.equal(devPlanShellRefusalHit(`node ${script} --help`, root, dependencies()), null);
-  const hit = devPlanShellRefusalHit(`node ${reset} --help`, root, dependencies());
+  const hit = devPlanShellRefusalHit(`node ${running} --help`, root, dependencies());
   assert.equal(hit?.verdict, 'block');
-  assert.match(hit?.helpHint ?? '', /project-reset\.mjs has no help: --help would run the script itself/u);
+  assert.match(hit?.helpHint ?? '', /rotate-handover-sections\.mjs has no usable help: --help would start the script/u);
   const rendered = devPlanShellBlocked(hit, '').stderr;
-  assert.match(rendered, /GUARD-DEVPLAN-SHELL: project-reset\.mjs has no help/u);
+  assert.match(rendered, /GUARD-DEVPLAN-SHELL: rotate-handover-sections\.mjs has no usable help/u);
   assert.doesNotMatch(rendered, /shell write to a dev-plan-gated path/u);
-  assert.equal(devPlanShellRefusalHit(`node ${reset} --root x`, root, dependencies())?.helpHint, undefined);
+  assert.equal(devPlanShellRefusalHit(`node ${running} --root x`, root, dependencies())?.helpHint, undefined);
 });
 
 
