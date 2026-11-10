@@ -379,8 +379,11 @@ export function evaluateBriefingRoute({ prompt, root } = {}) {
     }
     const observed = briefingSha256(prompt);
     const provenance = admission ? { origin: BRIEFING_ROUTE_ORIGIN_ADMISSION } : {};
-    return observed === record.briefingSha256
-      ? { status: "match", sliceId, digest: observed, ...provenance }
+    // C23 (Antigravity greenfield, F15): a native tool call drops the final newline of a long retyped text. Same single tolerance as verifyGeneratedBriefing; an ADDED newline stays a different briefing.
+    const canonical = canonicalBriefing(prompt);
+    const lostFinalNewline = !canonical.endsWith("\n") && briefingSha256(`${canonical}\n`) === record.briefingSha256;
+    return observed === record.briefingSha256 || lostFinalNewline
+      ? { status: "match", sliceId, digest: record.briefingSha256, ...provenance }
       : { status: "mismatch", sliceId, path: shown, expected: record.briefingSha256, observed, ...provenance };
   } catch {
     return { status: "invalid", sliceId: null, path: "evidence/dispatch-route-*.json", reason: "the route check itself faulted" };
@@ -394,7 +397,7 @@ function briefingRouteRefusal(route) {
         `  expected: ${route.expected}`,
         `  observed: ${route.observed}`,
         `  route record: ${route.path}`,
-        "The digest binds the text actually sent (CRLF normalised to LF, nothing else). Dispatch the briefing the route names, or issue a new route record for the briefing you intend to send.",
+        "The digest binds the text actually sent (CRLF normalised to LF; only a lost final newline is tolerated). Dispatch the briefing the route names, or issue a new route record for the briefing you intend to send.",
         "",
       ].join("\n")
     : [

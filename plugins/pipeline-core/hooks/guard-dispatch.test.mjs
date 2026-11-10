@@ -751,6 +751,14 @@ manualCheck("GD23 allow  a CRLF copy of the routed briefing (the canonical form 
   const trailing = run(routeDispatch("gd23b", `${prompt}\n`)); // a trailing newline IS a different briefing
   assert.equal(trailing.code, BLOCK, trailing.stderr.slice(0, 300));
   assert.ok(trailing.stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH"));
+  // C23 F15: a routed briefing that lost only its final newline passes; losing anything more is still refused.
+  const ending = `${routePrompt("GD-ROUTE-NL").replace(/\n+$/u, "")}\nlast line\n`;
+  writeRoute("GD-ROUTE-NL", routeRecord("GD-ROUTE-NL", ending));
+  const lost = run(routeDispatch("gd23c", ending.slice(0, -1)));
+  assert.equal(lost.code, ALLOW, lost.stderr.slice(0, 300));
+  const shortened = run(routeDispatch("gd23d", ending.slice(0, -2)));
+  assert.equal(shortened.code, BLOCK, shortened.stderr.slice(0, 300));
+  assert.ok(shortened.stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH"));
 });
 
 manualCheck("GD24 allow  no route digest: a slice without a record, or a briefing without a Slice line, is unchanged", () => {
