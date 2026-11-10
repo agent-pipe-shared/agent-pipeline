@@ -122,5 +122,5 @@ export function closedHandoverLines(root, featureId, entry = null) {
     technicalCloseLine(entry),
     record === null ? "**Product acceptance:** not recorded in this feature's acceptance record; the human has not answered the acceptance question through the close."
       : `**Product acceptance:** recorded in \`${record.path}\` for candidate \`${record.candidate}\` (an attribution record of the human's answer, not a signature); open checks: ${record.openChecks.join("; ")}.`,
-    "**Push:** not done by the close. Publication and push are separate human-gated steps."];
+    "**Push:** not done by the close. Publication and push are separate human-gated steps. This sentence is written before any push and is not updated by one: what a remote holds is read with `<plugin-root>/scripts/publication-readback.mjs inspect --root <repo>`."];
 }

@@ -624,6 +624,12 @@ returned `PUSH-PROOF-*` code. The push must write out its destination ref
 (`HEAD:refs/heads/<branch>` or `<sha>:refs/heads/<branch>`); a `--force` or
 `+refspec` push also matches `GG-01`/`GG-02` and still blocks, approval or not.
 
+**Right after the push, record what the remote holds.** `push-prepare` prints the command as
+`afterPush.command` (`scripts/publication-readback.mjs record`). It asks the remote itself and appends one
+chained line to a private record under the Git directory, so it needs no commit and is safe after the freeze.
+Its `handoverLine` goes into the next handover you write anyway; never make a commit only for it.
+`scripts/publication-readback.mjs inspect --root <repo>` reads the latest record in a later session.
+
 **The Git transport credential is not the PO approval proof.** The proof
 consumed in Layer 4 says the PO approved this candidate; whatever lets
 `git push` reach the remote (an SSH key, a credential helper, a token) is the
