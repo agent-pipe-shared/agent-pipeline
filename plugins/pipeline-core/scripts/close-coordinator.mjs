@@ -412,7 +412,8 @@ function privateEvidence(common, lifecycle, path, label) {
     sha256: sha256(readFileSync(requested)),
   };
 }
-function evidence(root, common, lifecycle, path, schema, keys, { privateOnly = false } = {}) {
+const EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+function evidence(root, common, lifecycle, path, schema, keys, { privateOnly = false, optionalKeys = [] } = {}) {
   if (!path) fail("CLOSE-EVIDENCE", `${schema} evidence is required`);
   const file = privateOnly
     ? privateEvidence(common, lifecycle, path, schema)
@@ -423,7 +424,7 @@ function evidence(root, common, lifecycle, path, schema, keys, { privateOnly = f
     fail("CLOSE-JSON", `${schema} is not one JSON object`);
   }
   const observed = { ...file, value };
-  if (observed.value.schema !== schema || Object.keys(observed.value).sort().join("\0") !== [...keys].sort().join("\0")) {
+  if (observed.value.schema !== schema || Object.keys(observed.value).filter((key) => !optionalKeys.includes(key)).sort().join("\0") !== [...keys].sort().join("\0")) {
     fail("CLOSE-EVIDENCE", `${schema} evidence shape is invalid`);
   }
   return observed;
@@ -820,8 +821,11 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
     const tracked = evidence(root, common, values.lifecycle, values.evidence, "pipeline.close-tracked-effects.v1", [
       "schema", "resultSha256", "backlogSha256", "handoverSha256", "historySha256",
       "telemetrySha256", "retrospectiveSha256", "pipelineStateSha256",
-    ]);
-    for (const [key, value] of Object.entries(tracked.value)) if (key !== "schema" && !SHA256.test(value ?? "")) fail("CLOSE-EVIDENCE", "tracked effect digest is invalid");
+    ], { optionalKeys: ["emptyInputs"] });
+    for (const [key, value] of Object.entries(tracked.value)) if (key !== "schema" && key !== "emptyInputs" && !SHA256.test(value ?? "")) fail("CLOSE-EVIDENCE", "tracked effect digest is invalid");
+    // PO rule 2026-11-01: an empty input is marked, never passed off as a hash of something. The label is optional for evidence written before it existed; a label that is present must be true.
+    const emptyLabels = tracked.value.emptyInputs;
+    if (emptyLabels !== undefined && (!Array.isArray(emptyLabels) || emptyLabels.some((key) => key === "schema" || key === "emptyInputs" || tracked.value[key] !== EMPTY_SHA256))) fail("CLOSE-EVIDENCE", "tracked effect emptyInputs names a digest that is not the empty digest");
     const closed = snapshot.state.closedFeatures?.at(-1);
     if (snapshot.state.activeFeature !== undefined
       || closed?.id !== stored.coordinator.featureId

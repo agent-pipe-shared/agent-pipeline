@@ -20,6 +20,8 @@ import { acceptanceQuestion, acceptanceTarget, openChecksOf, readAcceptanceRecor
 import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
 import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
 import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
+import { closeSecurityScope, describeCloseSecurityScope } from "../lib/security-close-status.mjs";
+import { declaredRepositoryMode } from "./repository-freshness.mjs";
 
 const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
@@ -540,7 +542,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     // C22 (CGR-05): hash what exists. Measured, the project-defined files are the calibrated handover and the telemetry ledger the close-feature skill names (telemetry/costs.md); a project has no defined
     // file for backlog, history or retrospective (the backlog is a directory), so those keep the marked empty digest (PO rule 2026-11-01). Only resultSha256 and pipelineStateSha256 are compared by the coordinator.
     const digestOf = (relative) => { try { return sha256Hex(readFileSync(resolve(root, relative))); } catch { return EMPTY_SHA256; } };
-    writeRepoJson(root, trackedPath, { schema: "pipeline.close-tracked-effects.v1", resultSha256: sha256Hex(resultBytes), backlogSha256: EMPTY_SHA256, handoverSha256: digestOf(handoverPath), historySha256: EMPTY_SHA256, telemetrySha256: digestOf("telemetry/costs.md"), retrospectiveSha256: EMPTY_SHA256, pipelineStateSha256: sha256Hex(readFileSync(resolve(root, statePath))) });
+    const trackedDigests = { resultSha256: sha256Hex(resultBytes), backlogSha256: EMPTY_SHA256, handoverSha256: digestOf(handoverPath), historySha256: EMPTY_SHA256, telemetrySha256: digestOf("telemetry/costs.md"), retrospectiveSha256: EMPTY_SHA256, pipelineStateSha256: sha256Hex(readFileSync(resolve(root, statePath))) };
+    writeRepoJson(root, trackedPath, { schema: "pipeline.close-tracked-effects.v1", ...trackedDigests, emptyInputs: Object.keys(trackedDigests).filter((key) => trackedDigests[key] === EMPTY_SHA256).sort() });
     const tracked = step("tracked-close-finalized", () => transition("tracked-close-finalized", { evidence: trackedPath })); if (tracked.stop) return tracked.stop;
     const commit = commitFacts();
     return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "commit-required", featureId: closedFeatureId, lifecycleId: id, resumeLifecycleId: id, stages, commit, ...(handover === null ? {} : { handover }), ...(openMinors === null ? {} : { openMinors }),
@@ -589,8 +592,15 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     const closeStatus = { technicalClose: { status: phase, source: "close coordinator phase" },
       productAcceptance: acceptance === null ? { status: "not-recorded", source: "the feature's acceptance record" } : { status: "recorded", candidate: acceptance.candidate, openChecks: acceptance.openChecks, source: acceptance.path },
       push: { status: "not-done-by-the-close", source: "the close never pushes; publication and push are separate human-gated steps" } };
-    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, commits, ...pushEvidenceStep(closedFeatureId),
-      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. ${describeCommitSplit(commits)} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
+    let securityDocument = null; try { securityDocument = JSON.parse(readFileSync(resolve(root, "evidence/security-latest.v2.verdict.json"), "utf8")); } catch { securityDocument = null; }
+    const securityScope = closeSecurityScope(securityDocument);
+    const securitySentence = describeCloseSecurityScope(securityScope);
+    // R9: a project with a remote whose calibration still says local-only. Named here, never fixed here: a calibration commit after the last Critic round ends the push's Critic carry (CVL-CARRY-CONTENT-CHANGED).
+    let declaredMode = null; try { declaredMode = declaredRepositoryMode(root)?.mode ?? null; } catch { declaredMode = null; }
+    const remotes = declaredMode === "local-only" ? String(rawGit(["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
+    const repositoryMode = remotes.length === 0 ? null : { declared: "local-only", remotes, status: "calibration-behind-the-remote", next: "Leave it for this close: a calibration commit now ends the Critic carry of the push. Correct it as the first commit of the next feature with repository-mode-promote.mjs." };
+    return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, securityScope, commits, ...(repositoryMode === null ? {} : { repositoryMode }), ...pushEvidenceStep(closedFeatureId),
+      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. ${describeCommitSplit(commits)}${securitySentence === "" ? "" : ` ${securitySentence}`}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
   }
   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
 }

@@ -431,6 +431,7 @@ function processFixture(name, options = {}) {
     telemetrySha256: h("4"),
     retrospectiveSha256: h("5"),
     pipelineStateSha256: closedStateSha256,
+    ...(options.trackedExtra ?? {}),
   });
   transition("tracked-close-finalized", ["--evidence", paths.tracked]);
   git(root, ["add", "."]);
@@ -463,6 +464,13 @@ function processFixture(name, options = {}) {
     trackedPath: join(root, paths.tracked),
   };
 }
+
+test("process: tracked effects may mark an empty digest by name; a mark on a real digest is refused", () => {
+  const empty = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  const marked = processFixture("empty-mark", { stopAfterFreeze: true, trackedExtra: { backlogSha256: empty, emptyInputs: ["backlogSha256"] } });
+  assert.equal(typeof marked.root, "string");
+  assert.throws(() => processFixture("empty-mark-false", { stopAfterFreeze: true, trackedExtra: { emptyInputs: ["backlogSha256"] } }));
+});
 
 // Candidate 16a (consumer blocker): fixes found after the freeze (security remediation) need a new candidate. A freeze can be renewed to a
 // successor commit; the close artefacts earlier phases bound must stay unchanged, and the renewal is one more recorded effect.

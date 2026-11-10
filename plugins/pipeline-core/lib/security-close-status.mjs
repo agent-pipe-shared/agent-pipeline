@@ -211,6 +211,37 @@ export function formatSecurityCloseStatus(elements) {
   });
 }
 
+export const CLOSE_SECURITY_SCOPE_SCHEMA = "pipeline.close-security-scope.v1";
+const SCANNER_RAN = new Set(["pass", "findings"]);
+
+/**
+ * R8 (2026-11 greenfield report): the close said "green" with nothing about what that covers. Reads the v2 verdict the scan wrote: which authority decides the close's exit, whether the v2 verdict is only
+ * reporting, how large the capability plan is and which scanners really ran. Pure; a verdict it cannot read is typed unavailable, so this can never block the close.
+ */
+export function closeSecurityScope(doc) {
+  if (doc?.schema !== "pipeline.security-verdict.v2" || !Array.isArray(doc.controls) || !Array.isArray(doc.plan?.required) || !Array.isArray(doc.plan?.optional)) {
+    return { schema: CLOSE_SECURITY_SCOPE_SCHEMA, status: "unavailable", reason: "the v2 security verdict could not be read" };
+  }
+  const name = (control) => String(control.tool ?? control.control);
+  return {
+    schema: CLOSE_SECURITY_SCOPE_SCHEMA, status: "read",
+    exitAuthority: String(doc.exitAuthority),
+    v2VerdictReportingOnly: doc.exitAuthority === "v1-blocking-logic",
+    v2VerdictBlocking: doc.verdict?.blocking === true,
+    capabilityPlan: { required: doc.plan.required.length, optional: doc.plan.optional.length, empty: doc.plan.required.length + doc.plan.optional.length === 0 },
+    scannersRan: doc.controls.filter((control) => SCANNER_RAN.has(control.runOutcome)).map(name),
+    scannersNotRun: doc.controls.filter((control) => !SCANNER_RAN.has(control.runOutcome)).map((control) => ({ scanner: name(control), outcome: String(control.runOutcome), required: control.required === true })),
+  };
+}
+
+/** One sentence for a close report; "" when the scope is unavailable (the structured field then says why). */
+export function describeCloseSecurityScope(scope) {
+  if (scope?.status !== "read") return "";
+  const plan = scope.capabilityPlan.empty ? "empty" : `${scope.capabilityPlan.required} required, ${scope.capabilityPlan.optional} optional`;
+  const notRun = scope.scannersNotRun.length === 0 ? "none" : scope.scannersNotRun.map(({ scanner, outcome }) => `${scanner} (${outcome})`).join(", ");
+  return `Security scope: the exit is decided by ${scope.exitAuthority}${scope.v2VerdictReportingOnly ? ", the v2 policy verdict is reporting only" : ""}${scope.v2VerdictBlocking ? " and names a blocking capability" : ""}; capability plan: ${plan}; scanners that ran: ${scope.scannersRan.length === 0 ? "none" : scope.scannersRan.join(", ")}; did not run: ${notRun}.`;
+}
+
 /**
  * The typed refusal of a critical calibration whose manifest configures no security gate (no manifest, no gates.security, or mode off),
  * or null for any other calibration (those keep reading "not applicable"). It names the exact repair argv: the physical plugin script

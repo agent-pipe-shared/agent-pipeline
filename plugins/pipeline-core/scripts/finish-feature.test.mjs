@@ -748,7 +748,8 @@ test("C22 CGR-05: the tracked effects hash what exists (the calibrated handover,
     assert.equal(tracked.handoverSha256, sha256Of(readFileSync(join(f.root, "docs/state.md"))), "the bytes after the writer ran"); assert.match(readFileSync(join(f.root, "docs/state.md"), "utf8"), /closed locally/u);
     assert.equal(tracked.telemetrySha256, sha256Of(readFileSync(join(f.root, "telemetry/costs.md"))));
     for (const key of ["backlogSha256", "historySha256", "retrospectiveSha256"]) assert.equal(tracked[key], EMPTY_DIGEST, key);
-    assert.deepEqual(Object.keys(tracked).sort(), ["backlogSha256", "handoverSha256", "historySha256", "pipelineStateSha256", "resultSha256", "retrospectiveSha256", "schema", "telemetrySha256"]);
+    assert.deepEqual(Object.keys(tracked).sort(), ["backlogSha256", "emptyInputs", "handoverSha256", "historySha256", "pipelineStateSha256", "resultSha256", "retrospectiveSha256", "schema", "telemetrySha256"]);
+    assert.deepEqual(tracked.emptyInputs, ["backlogSha256", "historySha256", "retrospectiveSha256"], "an empty input is marked by name");
     assert.ok(f.calls.indexOf("pipeline-state update-public-handover") > f.calls.indexOf("pipeline-state close-feature"), f.calls.join());
     assert.ok(result.commit.paths.includes("docs/state.md"), result.commit.paths.join());
   } finally { rmSync(f.root, { recursive: true, force: true }); }
@@ -896,6 +897,44 @@ test("C22B CGR-13: closed-local counts the product commits and the evidence comm
     assert.deepEqual([done.commits.product, done.commits.evidence, done.commits.total], [3, 5, 8], JSON.stringify(done.commits));
     assert.equal(typeof done.commits.rangeSource, "string", "the range names where its base came from");
     assert.match(done.message, /3 product commit\(s\) and 5 evidence commit\(s\)/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("R8: closed-local states what the security result covers, read from the v2 verdict; a missing verdict is typed unavailable and never blocks", () => {
+  const f = closedLocalFixture();
+  try {
+    const none = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(none.status, "closed-local", JSON.stringify(none).slice(0, 400));
+    assert.equal(none.securityScope.status, "unavailable");
+    assert.doesNotMatch(none.message, /Security scope:/u);
+    mkdirSync(join(f.root, "evidence"), { recursive: true });
+    writeFileSync(join(f.root, "evidence/security-latest.v2.verdict.json"), JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan: { required: [], optional: [] }, verdict: { blocking: false, offendingCapabilities: [] },
+      controls: [{ tool: "gitleaks", runOutcome: "pass", required: true }, { tool: "semgrep", runOutcome: "not-applicable", required: false }] }));
+    const done = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
+    assert.equal(done.securityScope.v2VerdictReportingOnly, true);
+    assert.equal(done.securityScope.capabilityPlan.empty, true);
+    assert.deepEqual(done.securityScope.scannersRan, ["gitleaks"]);
+    assert.deepEqual(done.securityScope.scannersNotRun, [{ scanner: "semgrep", outcome: "not-applicable", required: false }]);
+    assert.match(done.message, /Security scope: the exit is decided by v1-blocking-logic, the v2 policy verdict is reporting only; capability plan: empty; scanners that ran: gitleaks; did not run: semgrep \(not-applicable\)\./u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("R9: closed-local names a calibration that still says local-only beside a real remote and says to leave it for this close", () => {
+  const f = closedLocalFixture();
+  try {
+    assert.equal(Object.hasOwn(oneShotClose(f.resumed, { runCommand: f.runner }), "repositoryMode"), false, "no remote: nothing to say");
+    f.git("remote", "add", "publish", "https://example.invalid/x.git");
+    assert.equal(Object.hasOwn(oneShotClose(f.resumed, { runCommand: f.runner }), "repositoryMode"), false, "a remote but no local-only calibration: nothing to say");
+    const calibration = join(f.root, ".claude", "pipeline.json");
+    const before = existsSync(calibration) ? JSON.parse(readFileSync(calibration, "utf8")) : {};
+    mkdirSync(join(f.root, ".claude"), { recursive: true });
+    writeFileSync(calibration, JSON.stringify({ ...before, repositoryMode: "local-only" }));
+    const done = oneShotClose(f.resumed, { runCommand: f.runner });
+    assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
+    assert.deepEqual(done.repositoryMode.remotes, ["publish"]);
+    assert.match(done.message, /still says local-only although a remote exists \(publish\)/u);
+    assert.match(done.message, /ends the Critic carry/u);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
