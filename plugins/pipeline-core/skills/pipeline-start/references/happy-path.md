@@ -58,6 +58,8 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
 
 ## 2. Implementation (one dispatch per task, from the template)
 
+**One command:** once the package names its model from step 1, `prepare-dispatch.mjs goldfish --root <root> --package <package.json> [--no-goldfish-running]` probes it (all failures at once), builds the briefing, runs the Codex preparation where the runner needs it, and prints the exact next call in `next`. Pass `--no-goldfish-running` only when no Goldfish is running: then a pending registry heal runs once; otherwise the heal command comes back in `beforeDispatch`. The steps below explain it and remain the fallback. `prepare-dispatch.mjs --help` lists every flag.
+
 1. Select the model route: `model-role-dispatch-select.mjs --repo-root <absolute-repo> --runner <claude|codex|antigravity> --task-route <registered-route>` (a Goldfish implementation uses `duty.implement`, deep work `duty.deep`; a refusal lists all routes);
    Antigravity adds `--host-session-id <id from this session's native hook>`.
 2. Generate the binding: `dispatch-briefing.mjs binding --root <root> --dispatch-id <id> --item <slug> --criterion AC-<n> --agent-type <type> --model-id <model> --check <node test> --path <...>`
@@ -89,6 +91,8 @@ escalated), give that line verbatim. Without a record nothing is marked covered.
 5. After the last slice and before the project's Verify, where the project has an architecture model: `architecture-fitness.mjs --root <root> --check` and `architecture-boundary-check.mjs --root <root> --json` (both read-only). A violation is fixed before the Critic reads the candidate.
 
 ## 3. Critic
+
+**One command:** `prepare-dispatch.mjs critic --root <root> --spec <spec> --base <ref> --candidate <full commit id> [--guardrail <path>]... [--evidence <path>]... [--label <name> -- <command> <args>]` runs steps 0 and 1 and writes the admit request. With `--label` it stops once with `commit-required`: commit exactly its `commitPaths` in one evidence-only commit and run the identical command again. Its `next` names the placeholders only you can fill and the admit command. A refusal keeps the failed step's own code and repair. The steps below explain it and remain the fallback. `prepare-dispatch.mjs --help` lists every flag.
 
 0. Collect the evidence the Critic reads, once per check, while the candidate is fixed: `critic-diagnostic-evidence.mjs --root <root> --spec <spec> --log specs/<feature>/evidence/<name>.log --out specs/<feature>/evidence/<name>.json [--candidate <ref>] -- <command> <args>`,
    then `register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>` BEFORE committing (registration reads the working tree), then one evidence-only commit of artifact, log and manifest. The preflight in step 1 then takes `--registration-commit <that commit>`.

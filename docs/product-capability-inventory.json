@@ -474,6 +474,7 @@
         "verify-phase:harness/scripts/verify.mjs:feature-close-audit-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+        "verify-phase:harness/scripts/verify.mjs:prepare-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
         "verify-phase:harness/scripts/verify.mjs:full-verify-wrapper-tests",
         "verify-phase:harness/scripts/verify.mjs:g17-publication-observation-tests",

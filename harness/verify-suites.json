@@ -4807,6 +4807,12 @@
       "file": "plugins/pipeline-core/scripts/session-authority-repair-aside.test.mjs",
       "invariantPinned": "session-authority-repair inspect-aside lists every file of one retained aside with size, mtime, schema and whether the aside's own catalogue indexes it and writes nothing; wait rebinds the repository on every iteration and inspect once, so a host commit during a wait no longer reads the lock as unreadable (C19j w243, AC-108)",
       "nonOverlapNote": "Unique cases: the inspect-aside verb and the rebinding wait; session-authority-repair tests pin the other verbs"
+    },
+    {
+      "name": "prepare-dispatch-tests",
+      "file": "plugins/pipeline-core/scripts/prepare-dispatch.test.mjs",
+      "invariantPinned": "One command prepares a Goldfish or Critic dispatch; every step keeps its own refusal; it never commits or starts a child",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/prepare-dispatch.test.mjs"
     }
   ]
 }
