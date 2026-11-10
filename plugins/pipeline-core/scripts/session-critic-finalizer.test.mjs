@@ -1889,6 +1889,22 @@ test("G20-39 (b) a record in the control area that does not bind the returned ve
   }
 });
 
+test("C27 F26: a report quoting a tagged code snippet before its verdict still issues the record, also from a hand-back", async () => {
+  const { extractCriticVerdict, issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
+  const quoted = (value) => `# Critic review\n\n- F1 evidence:\n  \`\`\`js\n  if (!st.pending) { save(); }\n  \`\`\`\n- more prose\n\n\`\`\`json\n${JSON.stringify(value)}\n\`\`\`\n`;
+  assert.deepEqual(extractCriticVerdict(quoted(verdict())), verdict(), "the snippet's closing line must not open a block");
+  assert.deepEqual(extractCriticVerdict(`${quoted(verdict())}\nClosing remark.\n`), verdict(), "text after the verdict block changes nothing");
+  assert.deepEqual(extractCriticVerdict(`${quoted(verdict())}\n\`\`\`js\nafter();\n\`\`\`\n`), verdict(), "a later tagged snippet is not the verdict");
+  assert.equal(extractCriticVerdict("```js\nconst x = 1;\n```\n"), null, "a tagged snippet alone holds no verdict");
+  assert.equal(extractCriticVerdict("```json\n{\"pass\":true}\n```\n"), null, "the schema still decides");
+  const fx = fixture();
+  try {
+    admitViaCli(fx);
+    const issued = issueCriticSourceReturn({ commonDir: join(fx.root, ".git"), runner: "codex", input: stopInput("", {}), readHandbackFn: () => ({ ok: true, message: quoted(verdict()) }) });
+    assert.equal(issued.status, "issued", JSON.stringify(issued));
+  } finally { cleanup(fx); }
+});
+
 test("G20-39 (c) the Critic stop hook issues the record bound to the claimed packet and to the returned verdict; finalize then reads it", async () => {
   const { issueCriticSourceReturn } = await import("../lib/critic-source-return.mjs");
   const fx = fixture();

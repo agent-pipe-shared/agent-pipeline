@@ -35,13 +35,26 @@ const CRITIC_AGENT_TYPES = new Set(["critic", "critic-high-risk"]);
 
 const normalizedAgentType = (value) => typeof value !== "string" ? null : value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
 
-const VERDICT_FENCE = /```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```/gu;
-/** The verdict a Critic returned: its whole message, else the content of the LAST fenced block, as a schema-shaped object; otherwise null. */
+const FENCE_LINE = /^[ \t]*`{3,}([A-Za-z0-9_-]*)[ \t]*$/u;
+/**
+ * C27 (Claude greenfield 2026-11-09, F26): the body of the last JSON or plain fenced block of a message, or null. Fence lines are paired from the END. Pairing from the start, as a
+ * single regular expression, let the closing line of an earlier ```js snippet in the report open a block that ran up to the verdict's own ```json line, so the verdict was never seen and
+ * every re-issue of the same report failed alike. A fence line cannot occur inside a JSON verdict, because JSON has no raw newline inside a string, so the last two fence lines delimit it.
+ */
+function lastJsonFenceBody(text) {
+  const lines = text.split(/\r?\n/u);
+  const fences = lines.flatMap((line, index) => { const match = FENCE_LINE.exec(line); return match === null ? [] : [{ index, language: match[1] }]; });
+  for (let close = fences.length - 1; close >= 1; close -= 2) {
+    if (fences[close].language === "" && (fences[close - 1].language === "" || fences[close - 1].language.toLowerCase() === "json")) return lines.slice(fences[close - 1].index + 1, fences[close].index).join("\n");
+  }
+  return null;
+}
+/** The verdict a Critic returned: its whole message, else the content of the LAST JSON or plain fenced block, as a schema-shaped object; otherwise null. */
 export function extractCriticVerdict(text) {
   if (typeof text !== "string" || text.length === 0 || text.length > 4 * 1024 * 1024) return null;
   const candidates = [text.trim()];
-  const blocks = [...text.matchAll(VERDICT_FENCE)];
-  if (blocks.length > 0) candidates.push(blocks.at(-1)[1]);
+  const body = lastJsonFenceBody(text);
+  if (body !== null) candidates.push(body);
   for (const candidate of candidates) {
     let value;
     try { value = JSON.parse(candidate); } catch { continue; }
@@ -88,13 +101,15 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
     if (!RUNNERS.has(runner) || input?.hook_event_name !== "SubagentStop" || !CRITIC_AGENT_TYPES.has(normalizedAgentType(input.agent_type))) return { status: "not-applicable" };
     if (typeof commonDir !== "string" || commonDir === "") return { status: "unavailable" };
     let verdict = extractCriticVerdict(input.last_assistant_message);
+    // C27: the text the verdict was looked for in is the text a problem is reported about. A child that ended with a hand-back has no useful last message of its own.
+    let returned = input.last_assistant_message;
     if (verdict === null && typeof readHandbackFn === "function") {
       const handback = readHandbackFn(input);
-      if (handback?.ok === true) verdict = extractCriticVerdict(handback.message);
+      if (handback?.ok === true) { verdict = extractCriticVerdict(handback.message); returned = handback.message; }
     }
     const child = childDigest(input.agent_id);
     const result = issueForVerdict({ commonDir, runner, verdict, nowMs, child });
-    noteReturnProblem({ commonDir, runner, nowMs, child, result, text: input.last_assistant_message });
+    noteReturnProblem({ commonDir, runner, nowMs, child, result, text: returned });
     return result;
   } catch { return { status: "unavailable" }; }
 }
@@ -102,10 +117,10 @@ export function issueCriticSourceReturn({ commonDir, runner, input, nowMs = Date
 /** In words, why a Critic's final message holds no verdict that can be recorded. */
 function verdictProblemText(text) {
   if (typeof text !== "string" || text.trim() === "") return "its final message was empty";
-  const blocks = [...text.matchAll(VERDICT_FENCE)];
+  const body = lastJsonFenceBody(text);
   let value;
-  try { value = JSON.parse(blocks.length > 0 ? blocks.at(-1)[1] : text.trim()); }
-  catch { return blocks.length > 0 ? "the last fenced block of its final message is not valid JSON" : "its final message does not end in a fenced JSON verdict"; }
+  try { value = JSON.parse(body ?? text.trim()); }
+  catch { return body !== null ? "the last fenced JSON block of its final message is not valid JSON" : "its final message does not end in a fenced JSON verdict"; }
   const { errors } = validateAgainstSchema(value, VERDICT_SCHEMA);
   return errors.length > 0 ? `its verdict does not match the verdict schema (${errors.slice(0, 3).join("; ")})` : "its final message holds no verdict";
 }
