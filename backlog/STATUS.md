@@ -66,6 +66,7 @@
 | pipeline.adr-0047-renumber-left-live-references-behind | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | — | 2026-08-05 | — | — |
 | pipeline.adr-0056-conflict-scope-text-narrower-than-code | closed | defect | pipeline | — | 2026-08-18 | — | — |
+| pipeline.adr-from-spec-decisions-after-0-7-0 | open | workflow-improvement | pipeline | alfred | 2026-11-10 | — | — |
 | pipeline.advertised-git-to-head-pipeline-is-refused | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.advisor-consent-is-requested-before-the-readiness-preflight | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.advisor-demand-reuse-has-no-design-course-bound | open | workflow-improvement | pipeline | none | 2026-09-28 | — | — |
@@ -329,6 +330,7 @@
 | pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows | open | defect | pipeline | alfred | 2026-10-07 | 2026-11-04 | — |
 | pipeline.design-workflow-signing-request-schema-drift | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.desktop-app-support-is-unverified | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
+| pipeline.device-test-result-in-the-repository-after-0-7-0 | open | workflow-improvement | pipeline | alfred | 2026-11-10 | — | — |
 | pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.disjoint-signed-hgo-actions-invalidate-one-another | open | defect | pipeline | alfred | 2026-09-29 | — | — |
@@ -623,6 +625,7 @@
 | pipeline.marketplace-install-topology-unattested | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.material-intake-bootstrap-bind-has-no-sanctioned-path-to-a-passing-plan-gate | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.materialize-architecture-leaves-inventory-json-as-the-empty-scaffold | open | defect | pipeline | none | 2026-10-18 | — | — |
+| pipeline.measure-elephant-admin-load-next-round | open | workflow-improvement | pipeline | alfred | 2026-11-10 | — | — |
 | pipeline.mechanical-proof-of-complete-prior-input-consumption-across-restart | closed | requirement | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.merged-into-frontmatter-key-documented-but-unsupported | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.missing-docs-adr-directory-blocks-implementation-entry | open | defect | pipeline | alfred | 2026-10-26 | — | — |
@@ -705,6 +708,7 @@
 | pipeline.path-bound-repository-fingerprints-break-between-windows-and-wsl | rejected | defect | pipeline | — | 2026-08-27 | — | — |
 | pipeline.per-phase-progress-message-budget | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
+| pipeline.personal-routing-override | open | workflow-improvement | pipeline | alfred | 2026-11-10 | — | — |
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.phoenix-merge-re-critic-minor-findings | closed | workflow-improvement | pipeline | nova | 2026-08-27 | — | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.pin-location-and-generator-for-user-repositories | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
@@ -810,6 +814,7 @@
 | pipeline.push-review-waiver-has-no-committed-approval-evidence | open | defect | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.quote-style-fragility-in-shell-command-admission | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate | closed | defect | pipeline | — | 2026-08-09 | 2026-08-23 | — |
+| pipeline.read-allowlist-for-neighbour-folders | open | workflow-improvement | pipeline | alfred | 2026-11-10 | — | — |
 | pipeline.read-blocks-and-misleading-denial-texts-across-runners | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.read-containment-removed-with-no-recorded-decision | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — the project-root containment check on read-only shell commands was added on 2026-08-29 to close a hole and removed wholesale on 2026-08-30. The removal is deliberate and undocumented outside its own commit message, and it silently invalidates a closed item's recorded remedy. |
 | pipeline.read-only-guard-admits-execution-and-output-options | open | defect | pipeline | alfred | 2026-09-30 | — | — |
@@ -949,6 +954,7 @@
 | pipeline.standing-critic-consent-reprompts-host-approval | closed | requirement | pipeline | none | 2026-09-09 | — | — |
 | pipeline.state-routes-refused-once-a-registry-catalogue-exists | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.stateful-design-contract-template | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
+| pipeline.stop-nudge-after-refused-push | open | workflow-improvement | pipeline | alfred | 2026-11-10 | — | — |
 | pipeline.strip-for-dispatch-misses-resolution-heading | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — discovered while assembling the T1 Critic dispatch for NVA-B-TILDEFIX-1. The backlog item being cited as spec had accumulated a '## Resolution' section (implementor narrative: which commit fixed it, how, and why the fix is believed correct) after its originating dispatch landed. backlog-item-strip-for-dispatch.mjs's output still carried that section verbatim — it only strips known Triage/Closure verdict-shaped headings, and 'Resolution' is not one of the patterns it recognizes. |
 | pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.suites-red-on-this-checkout-before-pf55 | open | defect | pipeline | none | 2026-10-19 | — | — |
@@ -1083,7 +1089,7 @@
 
 ## Counts
 
-- open: 386
+- open: 392
 - in_progress: 0
 - closed: 674
 - rejected: 3
