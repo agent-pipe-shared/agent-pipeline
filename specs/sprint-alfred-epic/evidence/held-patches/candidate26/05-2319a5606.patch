@@ -1,0 +1,209 @@
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index 27f9b0a78ffbffb75f8c69fb423e30aa3f54289d..5ec89100c06c406b7c8ff43bcaa8d0a00eaacfc8 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -624,12 +624,13 @@ returned `PUSH-PROOF-*` code. The push must write out its destination ref
+ (`HEAD:refs/heads/<branch>` or `<sha>:refs/heads/<branch>`); a `--force` or
+ `+refspec` push also matches `GG-01`/`GG-02` and still blocks, approval or not.
+ 
+-**What the remote holds is recorded at the end of the turn.** A Stop hook (`hooks/publication-readback-stop.mjs`)
+-recognises the push from Git's reflog of the remote-tracking ref and runs the readback. It asks the remote itself and
+-appends one chained line to a private record under the Git directory, so it needs no commit and is safe after the
+-freeze. It cannot see a remote without a fetch refspec, a repository with `core.logAllRefUpdates=false`, or a push whose
+-reflog line a later fetch has already covered; for those, run `afterPush.command` from `push-prepare` by hand
+-(`scripts/publication-readback.mjs record`).
++**Right after the push, record what the remote holds.** `push-prepare` prints the command as
++`afterPush.command` (`scripts/publication-readback.mjs record`). It asks the remote itself and appends one
++chained line to a private record under the Git directory, so it needs no commit and is safe after the freeze.
++A Stop hook (`hooks/publication-readback-stop.mjs`) also tries this at the end of the turn, from Git's reflog of the
++remote-tracking ref, for pushes of the last 24 hours; running both adds no second line. The hook is silent and cannot see a
++remote without a fetch refspec, a repository with `core.logAllRefUpdates=false`, or a push whose reflog line a later
++fetch has already covered, so the command stays the step to run.
+ The record's `handoverLine` goes into the next handover you write anyway; never make a commit only for it.
+ `scripts/publication-readback.mjs inspect --root <repo>` reads the latest record in a later session.
+ 
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index 27f9b0a78ffbffb75f8c69fb423e30aa3f54289d..5ec89100c06c406b7c8ff43bcaa8d0a00eaacfc8 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -624,12 +624,13 @@ returned `PUSH-PROOF-*` code. The push must write out its destination ref
+ (`HEAD:refs/heads/<branch>` or `<sha>:refs/heads/<branch>`); a `--force` or
+ `+refspec` push also matches `GG-01`/`GG-02` and still blocks, approval or not.
+ 
+-**What the remote holds is recorded at the end of the turn.** A Stop hook (`hooks/publication-readback-stop.mjs`)
+-recognises the push from Git's reflog of the remote-tracking ref and runs the readback. It asks the remote itself and
+-appends one chained line to a private record under the Git directory, so it needs no commit and is safe after the
+-freeze. It cannot see a remote without a fetch refspec, a repository with `core.logAllRefUpdates=false`, or a push whose
+-reflog line a later fetch has already covered; for those, run `afterPush.command` from `push-prepare` by hand
+-(`scripts/publication-readback.mjs record`).
++**Right after the push, record what the remote holds.** `push-prepare` prints the command as
++`afterPush.command` (`scripts/publication-readback.mjs record`). It asks the remote itself and appends one
++chained line to a private record under the Git directory, so it needs no commit and is safe after the freeze.
++A Stop hook (`hooks/publication-readback-stop.mjs`) also tries this at the end of the turn, from Git's reflog of the
++remote-tracking ref, for pushes of the last 24 hours; running both adds no second line. The hook is silent and cannot see a
++remote without a fetch refspec, a repository with `core.logAllRefUpdates=false`, or a push whose reflog line a later
++fetch has already covered, so the command stays the step to run.
+ The record's `handoverLine` goes into the next handover you write anyway; never make a commit only for it.
+ `scripts/publication-readback.mjs inspect --root <repo>` reads the latest record in a later session.
+ 
+diff --git a/plugins/pipeline-core/lib/publication-readback-stop.mjs b/plugins/pipeline-core/lib/publication-readback-stop.mjs
+index 893c5f9ce8021a01844f3eaebec8fee34035a2f3..88c5605c76588087e650e1f04d16fe867277ac8d 100644
+--- a/plugins/pipeline-core/lib/publication-readback-stop.mjs
++++ b/plugins/pipeline-core/lib/publication-readback-stop.mjs
+@@ -8,21 +8,24 @@
+  * What this cannot see: a remote without a fetch refspec (no tracking ref exists), `core.logAllRefUpdates=false`, and a push whose reflog line a later fetch has
+  * already covered. `publication-readback.mjs record` stays the manual route for those.
+  *
+- * Cost on an ordinary Stop is one git call and a few small reads. The heavy module is imported only when a push is really there to record. An attempt that did not
+- * produce a matching record is remembered for 15 minutes, so an unreachable remote does not cost a network timeout on every Stop.
++ * Cost on an ordinary Stop is one git call and a few small reads. The heavy module is imported only when a push is really there to record. Only a push of the last
++ * 24 hours counts, so installing this does not send every old branch to the network. Each attempt is written down before the network call, because a hanging remote
++ * can get the hook killed by its runner: an unreadable remote is left alone for 15 minutes and ends this Stop's attempts, and a remote that answers with another
++ * commit is not asked again about that push.
+  */
+ import { spawnSync } from "node:child_process";
+ import { existsSync, lstatSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+ import { dirname, join } from "node:path";
+ import { ensurePrivateDirectory } from "./private-boundary.mjs";
+ 
+-const PUSH_LINE = /^[0-9a-f]{40,64} ([0-9a-f]{40,64}) .*\tupdate by push$/u;
++const PUSH_LINE = /^[0-9a-f]{40,64} ([0-9a-f]{40,64}) .* ([0-9]{9,12}) [+-][0-9]{4}\tupdate by push$/u;
+ const ZERO_OID = /^0+$/u;
+ const BRANCH = /^[A-Za-z0-9._/-]{1,200}$/u;
+ const MAX_REFS = 200;
+ const MAX_LOG_BYTES = 1024 * 1024;
+ const MAX_RECORDS_PER_STOP = 3;
+ const RETRY_AFTER_MS = 15 * 60 * 1000;
++const MAX_PUSH_AGE_MS = 24 * 60 * 60 * 1000;
+ 
+ function git(cwd, args) {
+   const run = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8", shell: false, timeout: 5_000, maxBuffer: 1024 * 1024 });
+@@ -41,12 +44,13 @@ function trackingLogs(directory, prefix = "", found = []) {
+   return found;
+ }
+ 
+-function pushedCommit(path) {
++function pushedCommit(path, nowMs) {
+   try {
+     if (lstatSync(path).size > MAX_LOG_BYTES) return null;
+     const last = readFileSync(path, "utf8").split("\n").filter((line) => line !== "").at(-1);
+-    const commit = last === undefined ? null : PUSH_LINE.exec(last)?.[1] ?? null;
+-    return commit === null || ZERO_OID.test(commit) ? null : commit;
++    const match = last === undefined ? null : PUSH_LINE.exec(last);
++    if (match === null || ZERO_OID.test(match[1]) || nowMs - Number(match[2]) * 1000 > MAX_PUSH_AGE_MS) return null;
++    return match[1];
+   } catch { return null; }
+ }
+ 
+@@ -69,9 +73,10 @@ function recordedKeys(path) {
+   return keys;
+ }
+ 
++/** Each value is the time from which that push may be asked about again. */
+ function readAttempts(path, nowMs) {
+   try {
+-    return Object.fromEntries(Object.entries(JSON.parse(readFileSync(path, "utf8"))).filter(([, at]) => typeof at === "number" && nowMs - at < RETRY_AFTER_MS));
++    return Object.fromEntries(Object.entries(JSON.parse(readFileSync(path, "utf8"))).filter(([, askAgainAt]) => typeof askAgainAt === "number" && askAgainAt > nowMs));
+   } catch { return {}; }
+ }
+ 
+@@ -91,13 +96,13 @@ export async function recordPushesAtStop({ cwd }, deps = {}) {
+   if (located === null) return { recorded: [], skipped: "no-repository" };
+   const [common, root] = located.split(/\r?\n/u).filter(Boolean);
+   if (common === undefined || root === undefined) return { recorded: [], skipped: "no-repository" };
++  const nowMs = (deps.now ?? (() => new Date()))().getTime();
+   const logs = trackingLogs(join(common, "logs", "refs", "remotes"));
+-  const pushes = logs.flatMap(({ ref, path }) => { const commit = pushedCommit(path); return commit === null ? [] : [{ ref, commit }]; });
++  const pushes = logs.flatMap(({ ref, path }) => { const commit = pushedCommit(path, nowMs); return commit === null ? [] : [{ ref, commit }]; });
+   if (pushes.length === 0) return { recorded: [], skipped: "no-push" };
+   const remotes = String(git(root, ["remote"]) ?? "").split(/\r?\n/u).map((name) => name.trim()).filter(Boolean);
+   const directory = join(common, "agent-pipeline", "publication-readback");
+   const attemptsPath = join(directory, "stop-attempts.json");
+-  const nowMs = (deps.now ?? (() => new Date()))().getTime();
+   const attempts = readAttempts(attemptsPath, nowMs);
+   const known = recordedKeys(join(directory, "records.jsonl"));
+   const open = pushes.flatMap(({ ref, commit }) => {
+@@ -109,12 +114,14 @@ export async function recordPushesAtStop({ cwd }, deps = {}) {
+   if (open.length === 0) return { recorded: [], skipped: "nothing-new" };
+   const recordReadback = deps.recordReadback ?? (await import("../scripts/publication-readback.mjs")).recordPublicationReadback;
+   const recorded = [];
+-  let attemptsChanged = false;
+   for (const { remote, destination, commit, key } of open) {
++    attempts[key] = nowMs + RETRY_AFTER_MS;
++    writeAttempts(attemptsPath, attempts);
+     const { result } = recordReadback({ root, remote, destination }, deps);
+-    if (result.record?.remoteCommit === commit) recorded.push({ remote, destination, commit, status: result.status });
+-    else { attempts[key] = nowMs; attemptsChanged = true; }
++    if (result.record?.remoteCommit === commit) { recorded.push({ remote, destination, commit, status: result.status }); continue; }
++    if (result.record === undefined) break; // Unreadable: the next remote may hang the same way, and the runner's hook timeout is short.
++    attempts[key] = nowMs + MAX_PUSH_AGE_MS + RETRY_AFTER_MS;
++    writeAttempts(attemptsPath, attempts);
+   }
+-  if (attemptsChanged) writeAttempts(attemptsPath, attempts);
+   return { recorded };
+ }
+diff --git a/plugins/pipeline-core/lib/publication-readback-stop.test.mjs b/plugins/pipeline-core/lib/publication-readback-stop.test.mjs
+index c7410f7fd4c77730eea407cb08fc8eab7929159a..78cbd4e096f2f610626066323193097e4314f8e9 100644
+--- a/plugins/pipeline-core/lib/publication-readback-stop.test.mjs
++++ b/plugins/pipeline-core/lib/publication-readback-stop.test.mjs
+@@ -70,7 +70,7 @@ test("outside a repository nothing happens and nothing throws", async () => {
+ test("an unreachable remote writes no record and is not asked again for 15 minutes", () => fixture(async ({ root, bare, git, directory, lines }) => {
+   git("push", "-q", "publish", "HEAD:refs/heads/main");
+   rmSync(bare, { recursive: true, force: true });
+-  const start = new Date("2026-11-10T10:00:00.000Z");
++  const start = new Date();
+   let calls = 0;
+   const failing = () => { calls += 1; return { result: { status: "refused", code: "PRB-REMOTE-UNREADABLE" } }; };
+   assert.deepEqual((await recordPushesAtStop({ cwd: root }, { now: () => start, recordReadback: failing })).recorded, []);
+@@ -83,6 +83,38 @@ test("an unreachable remote writes no record and is not asked again for 15 minut
+   assert.equal(calls, 2);
+ }));
+ 
++test("the attempt is on file before the network call, so a killed hook does not ask again", () => fixture(async ({ root, git, directory }) => {
++  git("push", "-q", "publish", "HEAD:refs/heads/main");
++  let onFile = null;
++  const observing = () => { onFile = Object.keys(JSON.parse(readFileSync(join(directory, "stop-attempts.json"), "utf8"))).length; return { result: { status: "refused" } }; };
++  await recordPushesAtStop({ cwd: root }, { recordReadback: observing });
++  assert.equal(onFile, 1);
++}));
++
++test("an unreadable remote ends this Stop's attempts", () => fixture(async ({ root, git }) => {
++  for (const branch of ["a", "b", "c"]) git("push", "-q", "publish", `HEAD:refs/heads/${branch}`);
++  let calls = 0;
++  await recordPushesAtStop({ cwd: root }, { recordReadback: () => { calls += 1; return { result: { status: "refused" } }; } });
++  assert.equal(calls, 1);
++}));
++
++test("a remote that answers with another commit is not asked again about that push", () => fixture(async ({ root, git }) => {
++  git("push", "-q", "publish", "HEAD:refs/heads/main");
++  const start = new Date();
++  let calls = 0;
++  const other = () => { calls += 1; return { result: { status: "differs", record: { remoteCommit: "a".repeat(40) } } }; };
++  await recordPushesAtStop({ cwd: root }, { now: () => start, recordReadback: other });
++  await recordPushesAtStop({ cwd: root }, { now: () => new Date(start.getTime() + 16 * 60_000), recordReadback: other });
++  assert.equal(calls, 1);
++}));
++
++test("a push older than a day is left alone", () => fixture(async ({ root, git, lines }) => {
++  git("push", "-q", "publish", "HEAD:refs/heads/main");
++  const later = new Date(Date.now() + 25 * 60 * 60 * 1000);
++  assert.equal((await recordPushesAtStop({ cwd: root }, { now: () => later })).skipped, "no-push");
++  assert.equal(lines().length, 0);
++}));
++
+ test("a second branch and a second remote resolve to the right destination", () => fixture(async ({ root, base, git, head }) => {
+   execFileSync("git", ["init", "-q", "--bare", join(base, "second.git")]);
+   git("remote", "add", "publish.two", join(base, "second.git"));
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index 7c68bef657cd9bf717e0255875a8fc8b4f01e560..4ba232bafcab1ce1967fc8a0d9ea36820ec9ff16 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -944,7 +944,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+   if (modeNotice !== null) notices.push(modeNotice);
+   if (notices.length > 0) report.notices = notices;
+   // The step after the push: it asks the remote what it holds and records that privately, so the tracked handover's "not done by the close" is no longer the last word. No commit.
+-  report.afterPush = { command: ["node", fileURLToPath(new URL("./publication-readback.mjs", import.meta.url)), "record", "--root", dir, "--remote", remote, "--destination", destination], why: "recorded automatically at the end of the turn in which the push happened; run this only if `publication-readback.mjs inspect` shows no record for it (for example a remote without a fetch refspec). It asks the remote what it holds and needs no commit" };
++  report.afterPush = { command: ["node", fileURLToPath(new URL("./publication-readback.mjs", import.meta.url)), "record", "--root", dir, "--remote", remote, "--destination", destination], why: "right after the push: records what the remote really holds, needs no commit. A Stop hook tries the same at the end of the turn; running both adds no second line" };
+   // Slim profile pushes the exact checked-out branch; the default profile keeps HEAD.
+   const sourceRef = slim ? checkpointSourceRef() : "HEAD";
+   const profileNote = slim
