@@ -734,6 +734,21 @@ test("C20 w257 security-gate-configure: exactly `--root <this root>` is admitted
   });
 });
 
+test("repository-mode-promote: exactly `--root <this root> --to remote-tracked` is admitted, every near-miss is not", () => {
+  withFixture("feature", f => {
+    const script = join(scriptsDir, "repository-mode-promote.mjs");
+    bothAdmit(scriptAction(script, "--root", f.root, "--to", "remote-tracked"), f, "exact shape");
+    for (const [label, action] of [
+      ["foreign root", scriptAction(script, "--root", join(f.root, ".."), "--to", "remote-tracked")],
+      ["relative root", scriptAction(script, "--root", ".", "--to", "remote-tracked")],
+      ["another target", scriptAction(script, "--root", f.root, "--to", "local-only")],
+      ["no target", scriptAction(script, "--root", f.root)],
+      ["extra flag", scriptAction(script, "--root", f.root, "--to", "remote-tracked", "--force")],
+      ["target before root", scriptAction(script, "--to", "remote-tracked", "--root", f.root)],
+    ]) bothRefuse(action, f, label);
+  });
+});
+
 test("C20j the three read-only diagnostics are admitted in their closed shapes, every near-miss is not", () => {
   withFixture("feature", f => {
     const capabilities = join(scriptsDir, "runner-capabilities.mjs");

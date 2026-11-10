@@ -394,7 +394,7 @@ function sanctionedDispatchRecoveryArgs(args, root) {
     && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
 }
 
-import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, CODEX_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT, PROOF_WAIT_SCRIPT } from "./constants.mjs";
+import { DURABLE_EVIDENCE_SCRIPT, MODEL_ROLE_BOOTSTRAP_SCRIPT, ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT, CODEX_NATIVE_DISPATCH_PREPARE_SCRIPT, AGY_NATIVE_INTEGRATE_SCRIPT, HOST_COMMIT_RECOVER_SCRIPT, ROUTINE_REPAIR_SCRIPT, SECURITY_GATE_CONFIGURE_SCRIPT, REPOSITORY_MODE_PROMOTE_SCRIPT, SESSION_AUTHORITY_REPAIR_SCRIPT, PROOF_WAIT_SCRIPT } from "./constants.mjs";
 
 // K152 (G7): scripts/model-role-bootstrap.mjs mirrors its own parser (model-role-bootstrap.mjs main): exactly
 // `--repo-root <this root> --runner <runner>` and, with the runner's native session, a final `--host-session-id <id>`.
@@ -760,6 +760,8 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   // C20 w257 (G20-25): exactly `--root <this root>`; the script validates the manifest itself and refuses without writing.
   if (script === SECURITY_GATE_CONFIGURE_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
+  // The one narrow calibration change the push and close notices name; the script needs a configured remote and writes only that value, the commit stays at the hook.
+  if (script === REPOSITORY_MODE_PROMOTE_SCRIPT) return exactRoot(args, root, 0) && args[2] === "--to" && args[3] === "remote-tracked" && args.length === 4;
   // C20 w260 (G20-29): exactly `sync|check --root <this root>`; sync writes only under audit/ and never overwrites an entry.
   if (script === DURABLE_EVIDENCE_SCRIPT) return ["sync", "check"].includes(args[0]) && exactRoot(args, root, 1) && args.length === 3;
   if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
