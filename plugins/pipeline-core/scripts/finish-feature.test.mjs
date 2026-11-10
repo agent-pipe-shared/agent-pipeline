@@ -908,15 +908,16 @@ test("R8: closed-local states what the security result covers, read from the v2 
     assert.equal(none.securityScope.status, "unavailable");
     assert.doesNotMatch(none.message, /Security scope:/u);
     mkdirSync(join(f.root, "evidence"), { recursive: true });
-    writeFileSync(join(f.root, "evidence/security-latest.v2.verdict.json"), JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan: { required: [], optional: [] }, verdict: { blocking: false, offendingCapabilities: [] },
-      controls: [{ tool: "gitleaks", runOutcome: "pass", required: true }, { tool: "semgrep", runOutcome: "not-applicable", required: false }] }));
+    // The shape a real scan writes: scanners under capabilityOutcomes, only the checks without a capability under controls.
+    writeFileSync(join(f.root, "evidence/security-latest.v2.verdict.json"), JSON.stringify({ schema: "pipeline.security-verdict.v2", exitAuthority: "v1-blocking-logic", plan: { required: ["cap.sast", "cap.secrets"], optional: [] }, verdict: { blocking: false, offendingCapabilities: [] },
+      capabilityOutcomes: { "cap.secrets": "pass", "cap.sca": "not-applicable", "cap.sast": "pass" }, controls: [{ control: "license-check", tool: "license-check", capabilityId: null, required: false, runOutcome: "pass" }] }));
     const done = oneShotClose(f.resumed, { runCommand: f.runner });
     assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
     assert.equal(done.securityScope.v2VerdictReportingOnly, true);
-    assert.equal(done.securityScope.capabilityPlan.empty, true);
-    assert.deepEqual(done.securityScope.scannersRan, ["gitleaks"]);
-    assert.deepEqual(done.securityScope.scannersNotRun, [{ scanner: "semgrep", outcome: "not-applicable", required: false }]);
-    assert.match(done.message, /Security scope: the exit is decided by v1-blocking-logic, the v2 policy verdict is reporting only; capability plan: empty; scanners that ran: gitleaks; did not run: semgrep \(not-applicable\)\./u);
+    assert.equal(done.securityScope.capabilityPlan.empty, false);
+    assert.deepEqual(done.securityScope.checksRan, ["cap.secrets", "cap.sast", "license-check"]);
+    assert.deepEqual(done.securityScope.checksNotRun, [{ check: "cap.sca", outcome: "not-applicable", required: false }]);
+    assert.match(done.message, /Security scope: the exit is decided by v1-blocking-logic, the v2 policy verdict is reporting only; capability plan: 2 required, 0 optional; checks that ran: cap\.secrets, cap\.sast, license-check; did not run: cap\.sca \(not-applicable\)\./u);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

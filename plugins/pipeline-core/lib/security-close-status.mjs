@@ -212,25 +212,29 @@ export function formatSecurityCloseStatus(elements) {
 }
 
 export const CLOSE_SECURITY_SCOPE_SCHEMA = "pipeline.close-security-scope.v1";
-const SCANNER_RAN = new Set(["pass", "findings"]);
+const CHECK_RAN = new Set(["pass", "findings"]);
 
 /**
  * R8 (2026-11 greenfield report): the close said "green" with nothing about what that covers. Reads the v2 verdict the scan wrote: which authority decides the close's exit, whether the v2 verdict is only
- * reporting, how large the capability plan is and which scanners really ran. Pure; a verdict it cannot read is typed unavailable, so this can never block the close.
+ * reporting, how large the capability plan is and which checks really ran. A scanner is reported by its capability (`capabilityOutcomes`); `controls` holds only the checks without one, such as license-check.
+ * Pure; a verdict it cannot read is typed unavailable, so this can never block the close.
  */
 export function closeSecurityScope(doc) {
-  if (doc?.schema !== "pipeline.security-verdict.v2" || !Array.isArray(doc.controls) || !Array.isArray(doc.plan?.required) || !Array.isArray(doc.plan?.optional)) {
+  if (doc?.schema !== "pipeline.security-verdict.v2" || !Array.isArray(doc.controls) || doc.capabilityOutcomes === null || typeof doc.capabilityOutcomes !== "object" || !Array.isArray(doc.plan?.required) || !Array.isArray(doc.plan?.optional)) {
     return { schema: CLOSE_SECURITY_SCOPE_SCHEMA, status: "unavailable", reason: "the v2 security verdict could not be read" };
   }
-  const name = (control) => String(control.tool ?? control.control);
+  const checks = [
+    ...Object.entries(doc.capabilityOutcomes).map(([check, outcome]) => ({ check, outcome: String(outcome), required: doc.plan.required.includes(check) })),
+    ...doc.controls.map((control) => ({ check: String(control.tool ?? control.control), outcome: String(control.runOutcome), required: control.required === true })),
+  ];
   return {
     schema: CLOSE_SECURITY_SCOPE_SCHEMA, status: "read",
     exitAuthority: String(doc.exitAuthority),
     v2VerdictReportingOnly: doc.exitAuthority === "v1-blocking-logic",
     v2VerdictBlocking: doc.verdict?.blocking === true,
     capabilityPlan: { required: doc.plan.required.length, optional: doc.plan.optional.length, empty: doc.plan.required.length + doc.plan.optional.length === 0 },
-    scannersRan: doc.controls.filter((control) => SCANNER_RAN.has(control.runOutcome)).map(name),
-    scannersNotRun: doc.controls.filter((control) => !SCANNER_RAN.has(control.runOutcome)).map((control) => ({ scanner: name(control), outcome: String(control.runOutcome), required: control.required === true })),
+    checksRan: checks.filter(({ outcome }) => CHECK_RAN.has(outcome)).map(({ check }) => check),
+    checksNotRun: checks.filter(({ outcome }) => !CHECK_RAN.has(outcome)),
   };
 }
 
@@ -238,8 +242,8 @@ export function closeSecurityScope(doc) {
 export function describeCloseSecurityScope(scope) {
   if (scope?.status !== "read") return "";
   const plan = scope.capabilityPlan.empty ? "empty" : `${scope.capabilityPlan.required} required, ${scope.capabilityPlan.optional} optional`;
-  const notRun = scope.scannersNotRun.length === 0 ? "none" : scope.scannersNotRun.map(({ scanner, outcome }) => `${scanner} (${outcome})`).join(", ");
-  return `Security scope: the exit is decided by ${scope.exitAuthority}${scope.v2VerdictReportingOnly ? ", the v2 policy verdict is reporting only" : ""}${scope.v2VerdictBlocking ? " and names a blocking capability" : ""}; capability plan: ${plan}; scanners that ran: ${scope.scannersRan.length === 0 ? "none" : scope.scannersRan.join(", ")}; did not run: ${notRun}.`;
+  const notRun = scope.checksNotRun.length === 0 ? "none" : scope.checksNotRun.map(({ check, outcome }) => `${check} (${outcome})`).join(", ");
+  return `Security scope: the exit is decided by ${scope.exitAuthority}${scope.v2VerdictReportingOnly ? ", the v2 policy verdict is reporting only" : ""}${scope.v2VerdictBlocking ? " and names a blocking capability" : ""}; capability plan: ${plan}; checks that ran: ${scope.checksRan.length === 0 ? "none" : scope.checksRan.join(", ")}; did not run: ${notRun}.`;
 }
 
 /**
