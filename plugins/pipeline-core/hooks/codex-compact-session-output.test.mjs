@@ -175,7 +175,8 @@ test("direct hook subprocess emits one supported JSON object for stopped and rea
     assert.equal(result.error, undefined);
     assert.equal(result.signal, null);
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stderr, "");
+    // The routing fallback is announced on stderr by contract (loadProjectRoutingRegistry); this fixture has no pipeline.user.yaml. Nothing else may appear there.
+    assert.equal(result.stderr.replace(/^WARNING \(project-routing\): [^\n]*\n/gmu, ""), "");
     assert.equal(result.stdout.trim().split("\n").length, 1);
     exactProjection(JSON.parse(result.stdout), local);
     assert.deepEqual(tree(root), before);
