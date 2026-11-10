@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint } from "./read-command-diagnosis.mjs";
+import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, repeatedFlagHint } from "./read-command-diagnosis.mjs";
 import * as diagnosis from "./read-command-diagnosis.mjs";
 import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
 
@@ -118,6 +118,18 @@ test("RCD14: the refusal of an attached value prints the spelling to use, and bo
   const result = await refusal(attached);
   assert.equal(result.exitCode, 2);
   assert.match(String(result.stderr), /Rejected element: the flag "-A8" \(an attached value is not admitted; give it as a separate argument: -A 8\)\./u);
+});
+
+test("RCD-R6: a repeated option is named, with or without a value, and only when the repeat is the whole fault", async () => {
+  for (const [command, flag] of [["rg -n -A 3 -A 5 needle docs", "-A"], ["rg -n -m 3 -m 5 needle docs", "-m"], ["head -n 3 -n 5 README.md", "-n"], ["rg -n -n needle README.md", "-n"]]) {
+    assert.equal(firstUnadmittedFlag(command, root), flag, command);
+    assert.equal(repeatedFlagHint(command, flag, root), `this option is given more than once and is admitted once here; keep one ${flag}`, command);
+  }
+  assert.equal(firstUnadmittedFlag("rg -n -A 3 -A 5 --hidden needle docs", root), null, "two faults: no single token explains it");
+  assert.equal(repeatedFlagHint("rg --hidden needle README.md", "--hidden", root), null, "a flag given once is no repeat");
+  assert.equal(repeatedFlagHint(undefined, "-n", root), null);
+  const result = await refusal("rg -n -A 3 -A 5 needle README.md");
+  assert.match(String(result.stderr), /Rejected element: the flag "-A" \(this option is given more than once and is admitted once here; keep one -A\)\./u);
 });
 
 test("RCD15: a refused ls flag gets the names-only listing spellings, a names-only flag and other commands get none", () => {

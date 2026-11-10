@@ -148,6 +148,21 @@ export function lsListingHint(command, flag, root) {
     + "`find <dir> -maxdepth 1` lists the same names; this is an intended read limit, not a fault of the directory";
 }
 
+/**
+ * R6 (2026-11 greenfield report): the refusal said "a repeated option" without naming it. One sentence when the flag firstUnadmittedFlag named occurs more than once before `--`, else null. Prose only.
+ * @returns {string|null}
+ */
+export function repeatedFlagHint(command, flag, root) {
+  if (typeof command !== "string" || typeof flag !== "string") return null;
+  let parsed;
+  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
+  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1) return null;
+  const { argv } = parsed.segments[0];
+  const endOfOptions = argv.indexOf("--");
+  const options = endOfOptions === -1 ? argv : argv.slice(0, endOfOptions);
+  return options.filter((word) => word === flag).length > 1 ? `this option is given more than once and is admitted once here; keep one ${flag}` : null;
+}
+
 /** @returns {string|null} the flag token (as written) whose removal makes the command admitted, else null. */
 export function firstUnadmittedFlag(command, root) {
   if (typeof command !== "string" || command.trim() === "") return null;
@@ -166,6 +181,11 @@ export function firstUnadmittedFlag(command, root) {
     // pattern itself vanish and be mistaken for a flag fault, so a bad value flag is simply not diagnosed (null).
     const rest = argv.filter((_, position) => position !== index);
     if (isReadOnlyDiagnosticCommand([executable, ...rest.map(quote)].join(" "), root)) return token;
+    // R6: an option taking a value, given twice (`-A 3 -A 5`). Only the repeat and the word after it go, so the earlier occurrence still proves the flag is admitted and no operand can vanish unnoticed.
+    if (argv.slice(0, index).includes(token) && index + 1 < limit) {
+      const withoutRepeat = argv.filter((_, position) => position !== index && position !== index + 1);
+      if (isReadOnlyDiagnosticCommand([executable, ...withoutRepeat.map(quote)].join(" "), root)) return token;
+    }
     // C22B: a short-flag cluster that holds a value-taking flag (`-nA 5`) is refused although its flags spelled out are admitted. Removing the token cannot
     // show that (the value would be left behind), so replacing it by its single flags is the one extra probe; clusterSpellingHint then prints the spelling.
     if (/^-[A-Za-z]{2,}$/u.test(token)) {

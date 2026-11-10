@@ -15,7 +15,7 @@ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { observeGovernanceScope } from "../governance-scope.mjs";
 import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
 import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
-import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, recursiveGrepHint } from "../read-command-diagnosis.mjs";
+import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, recursiveGrepHint, repeatedFlagHint } from "../read-command-diagnosis.mjs";
 import { isProjectWritePath } from "./path-containment.mjs";
 import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
 import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
@@ -555,7 +555,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
           if (flag === null) { try { recursiveSearch = recursiveGrepHint(readCommand, root); } catch { recursiveSearch = null; } }
           // Q2: a rejected `ls` flag on a protected directory says which listing spellings are admitted.
           if (flag !== null) {
-            try { listing = clusterSpellingHint(readCommand, flag, root) ?? lsListingHint(readCommand, flag, root); } catch { listing = null; }
+            try { listing = clusterSpellingHint(readCommand, flag, root) ?? lsListingHint(readCommand, flag, root) ?? repeatedFlagHint(readCommand, flag, root); } catch { listing = null; }
           }
         }
       }
