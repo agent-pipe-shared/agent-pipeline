@@ -1,0 +1,853 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
+index 46592f65a..af374e0e7 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
+@@ -16,7 +16,7 @@ import { join } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ 
+ import { GRANT_USAGE, grantDispatchBudget } from "../scripts/dispatch-budget-grant.mjs";
+-import { checkpointNoticeText, grantCommandLine } from "../lib/dispatch-budget-notice.mjs";
++import { checkpointNoticeText, criticResumeText, grantCommandLine } from "../lib/dispatch-budget-notice.mjs";
+ import { persistPendingDispatchBudgetBindings, readAgentMaxTurns } from "../lib/dispatch-budget-binding.mjs";
+ import { dispatchBudgetBinding, dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
+ import { applyGovernanceScopeDecision, planGovernanceScopeDecision } from "../lib/governance-scope.mjs";
+@@ -556,4 +556,65 @@ assert.equal(cases.length, 17, "the complete dispatch-budget checkpoint corpus m
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
++// C28-CRITIC-TOIL (AC-108): a resumed Critic got a free-text message that carried the earlier round's verdict and then returned no schema verdict. A message to a Critic is now
++// admitted only as the one generated text of its recorded grant (the grant digest and nothing else). The guard sees a Claude SendMessage call only where hooks.json matches the tool
++// name (not yet: hooks/hooks.json is a protected file, so these cases drive the hook with the payload a wired matcher would hand it; the shape of that payload is NOT proven live).
++register("GDBC18", "hook: a message to a running Critic is refused unless it is the generated resume text of its recorded grant; other agents and unknown ids are untouched", () => {
++  const root = activeRoot("resume");
++  seed(root, { agentId: "rc1", agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 40, count: 32 });
++  seed(root, { agentId: "gf1", agentType: GOLDFISH, count: 20 });
++  const send = (to, message) => callGuard(root, { session_id: "s", transcript_path: join(root, "top.jsonl"), tool_name: "SendMessage", tool_input: { to, message } });
++  const none = send("rc1", "Continue the review.");
++  assert.equal(none.status, 2, "no grant is recorded: nothing to resume on");
++  assert.match(none.stderr, /DISPATCH-BUDGET-CRITIC-RESUME-NOT-GENERATED/u);
++  assert.match(none.stderr, /grant/u);
++  const granted = grantDispatchBudget(["--agent-id", "rc1", "--extra", "10", "--reason", "finish the remaining files", "--root", root]);
++  assert.equal(granted.status, "granted", JSON.stringify(granted));
++  const generated = criticResumeText({ digest: granted.result.digest });
++  assert.equal(generated, granted.result.continuationMessage, "the grant script and the guard hold one text");
++  assert.ok(generated.includes(granted.result.digest));
++  assert.doesNotMatch(generated, /finding|verdict|round|pass/iu, "the generated text carries the digest and nothing about earlier work");
++  for (const text of ["Round 1 said pass: false with two minors; please continue.", `${generated} Round 1 said pass: false.`, generated.toLowerCase(), ""]) {
++    const refused = send("rc1", text);
++    assert.equal(refused.status, 2, JSON.stringify(text));
++    assert.match(refused.stderr, /DISPATCH-BUDGET-CRITIC-RESUME-NOT-GENERATED/u);
++    assert.ok(refused.stderr.includes(generated), "the refusal hands over the exact text to send");
++    assert.equal(refused.stderr.includes("Round 1"), false, "the refusal never repeats the refused message");
++  }
++  assert.deepEqual([send("rc1", generated).status, send("rc1", generated).stderr], [0, ""]);
++  assert.equal(send("gf1", "any free text a Goldfish resume carries").status, 0, "only a Critic's resume is generated text");
++  assert.equal(send("not-an-agent", "hello").status, 0, "an id with no counter is no running Critic");
++});
++
++register("GDBC19", "hook: a Critic's read of a path its correction-input bindings exclude is refused with a code naming the binding; sources and other agents are untouched", () => {
++  const root = activeRoot("readbind");
++  mkdirSync(join(root, "project"), { recursive: true });
++  writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({ handover: "docs/state.md", criticFindingRecordPaths: ["docs/findings.md"] })}\n`);
++  const critic = (toolName, toolInput, agentId = "rb1") => {
++    seed(root, { agentId, agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 40, count: 3 });
++    return callGuard(root, subagentCall(root, agentId, CRITIC, toolName, toolInput));
++  };
++  const excluded = [
++    ["docs/state.md", /project-state record/u], ["docs/HISTORY.md", /project-state record/u], ["docs/state-archive/old.md", /project-state record/u],
++    ["evidence/critic/p1/verdict.json", /retained prior result/u], [`specs/f/evidence/critic-lineage-${"a".repeat(64)}.json`, /retained prior result/u],
++    ["specs/f/evidence/reader-review/spec/1.md", /retained prior result/u], ["docs/findings.md", /finding-disposition record/u],
++  ];
++  for (const [rel, role] of excluded) {
++    const absolute = join(root, ...rel.split("/"));
++    for (const [toolName, input] of [["Read", { file_path: absolute }], ["Grep", { pattern: "x", path: absolute }], ["Bash", { command: `cat ${rel}` }], ["Bash", { command: `git show abcdef0:${rel}` }]]) {
++      const refused = critic(toolName, input);
++      assert.equal(refused.status, 2, `${toolName} ${rel}`);
++      assert.match(refused.stderr, /CRITIC-READ-EXCLUDED-BY-BINDING/u);
++      assert.match(refused.stderr, role);
++      assert.match(refused.stderr, /correction-input-bindings/u, "the code names the binding");
++      assert.ok(refused.stderr.includes(rel), "the refusal names the path");
++    }
++  }
++  for (const [toolName, input] of [["Read", { file_path: join(root, "src", "a.mjs") }], ["Read", { file_path: join(root, "specs", "f", "spec.md") }], ["Bash", { command: "git diff abcdef0 1234567 -- src/a.mjs" }], ["Grep", { pattern: "x", path: join(root, "src") }]]) {
++    assert.equal(critic(toolName, input).status, 0, `${toolName} ${JSON.stringify(input)}`);
++  }
++  seed(root, { agentId: "gf2", agentType: GOLDFISH, count: 3 });
++  assert.equal(callGuard(root, subagentCall(root, "gf2", GOLDFISH, "Read", { file_path: join(root, "docs", "state.md") })).status, 0, "only a Critic is confined");
++});
++
+ registerTestCaseCompletion({ cases: cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+index 20e3334f9..1cbd136e8 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+@@ -223,7 +223,8 @@ import { writeTargetPath } from "../lib/tool-write-target.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { bindDispatchBudget, consumePendingDispatchBudgetBinding, persistPendingDispatchBudgetBindings, readAgentMaxTurns, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
+ import { dispatchBudgetContractForRole } from "../lib/dispatch-policy.mjs";
+-import { allowContextStdout, checkpointNoticeText, grantCommandLine, grantNoticeText, grantStateSentence, nativeHostBlockedContinuation } from "../lib/dispatch-budget-notice.mjs";
++import { criticExcludedRole } from "../lib/critic-correction-input-bindings.mjs";
++import { allowContextStdout, checkpointNoticeText, criticResumeRefusalText, criticResumeText, grantCommandLine, grantNoticeText, grantStateSentence, nativeHostBlockedContinuation } from "../lib/dispatch-budget-notice.mjs";
+ import {
+   CLOSING_ALLOWANCE,
+   DENIAL_CODE,
+@@ -1466,6 +1467,10 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
+     // CRITIC-CKPT-F2 (Rulings 157/159/161): behind the budget decision on purpose. A write after the allowance is already
+     // answered by the budget's own exhaustion refusal (CRITIC-CKPT-T2 (d2)-(d4)); only a call the budget admits reaches
+     // this line, and a Critic write to anything but its notes file is then refused with a typed code (CRITIC-CKPT-T3).
++    if (isCriticAgentType(identity.agentType) && ["Read", "Grep", "Glob", "Bash"].includes(String(input?.tool_name ?? ""))) {
++      const excludedRead = criticReadRefusal(input, rootDir, dependencies);
++      if (excludedRead !== null) return excludedRead;
++    }
+     if (isCriticAgentType(identity.agentType) && WRITE_TOOLS.includes(String(input?.tool_name ?? ""))) {
+       if (writesOutsideCriticNotes(input, rootDir, identity, dependencies)) {
+         return criticWriteConfined({ agentId: identity.agentId, agentType: identity.agentType });
+@@ -1651,6 +1656,62 @@ function dispatchBudgetCallerIdentity(input) {
+   });
+ }
+ 
++/**
++ * C28-CRITIC-TOIL (AC-108): a message to a running Critic is admitted only as the one generated resume text of its recorded grant. A free-text resume carried the prior round's verdict
++ * to a stopped Critic (live, Codex and Claude greenfield runs) and the Critic then returned no schema verdict. Returns null (not a Critic's resume, or the exact generated text) or
++ * the refusal. The recipient is a Critic only when its own counter says so; an unknown id is untouched. It runs BEFORE the orchestrator exemption, because a resume is sent by the
++ * orchestrator. Claude fires this only where hooks.json matches the SendMessage tool name (the payload shape tool_input.to and message is assumed, not proven live).
++ */
++function criticResumeRefusal(input, commonDir, dependencies) {
++  const toolInput = input?.tool_input;
++  const target = [toolInput?.to, toolInput?.agent_id, toolInput?.agentId, toolInput?.recipient].find((value) => typeof value === "string" && value !== "");
++  if (!isValidGrantAgentId(target)) return null;
++  const path = counterPath(commonDir, target);
++  let counter;
++  try {
++    if (!(dependencies.existsSyncFn ?? existsSync)(path)) return null;
++    counter = JSON.parse((dependencies.readFileSyncFn ?? readFileSync)(path, "utf8"));
++  } catch { return null; }
++  if (counter?.agentId !== target || !isCriticAgentType(counter?.agentType)) return null;
++  const grant = readGrantedCalls(path, target, dependencies);
++  const expected = grant.summary === null ? null : criticResumeText({ digest: grant.summary.digest });
++  const message = toolInput.message ?? toolInput.content ?? toolInput.text;
++  if (expected !== null && message === expected) return null;
++  return verdict(2, `BLOCKED (guard-dispatch-budget, plugin pipeline-core): ${criticResumeRefusalText({ agentId: target, expected })}\n`);
++}
++
++/**
++ * C28-CRITIC-TOIL (AC-108): a Critic never reads a path the correction-input bindings exclude (retained prior results, the project-state record, finding-disposition records; review
++ * protocol 2.2). Live (Codex): a fresh Critic ran the range diff, the diff held an earlier review the bindings excluded, the Critic read it and had to abort. The refusal names the role
++ * and the bindings file. Read, Grep and Glob are judged by their path, Bash by every word of the command (a `rev:path` word by its path part). Classification is the derivation's own
++ * (lib/critic-correction-input-bindings.mjs), so no range lookup is needed. A command that names no excluded path is untouched: a range diff without pathspecs is a briefing matter
++ * (the generated briefing carries a diff command with literal source paths).
++ */
++function criticReadRefusal(input, rootDir, dependencies) {
++  const toolInput = input?.tool_input ?? {};
++  const toolName = String(input?.tool_name ?? "");
++  const words = toolName === "Bash" ? String(toolInput.command ?? toolInput.CommandLine ?? "").split(/\s+/u)
++    : [toolInput.file_path, toolInput.path, toolInput.pattern].filter((value) => typeof value === "string");
++  const root = String(rootDir ?? "").replaceAll("\\", "/").replace(/\/+$/u, "");
++  let calibration = null;
++  for (const name of ["project/pipeline.json", ".claude/pipeline.json"]) {
++    try { calibration = JSON.parse((dependencies.readFileSyncFn ?? readFileSync)(join(rootDir, ...name.split("/")), "utf8")); break; } catch { /* the next calibration location, or none */ }
++  }
++  for (const word of words) {
++    let rel = word.replace(/^["']|["']$/gu, "").replaceAll("\\", "/");
++    const revision = /^[0-9A-Za-z._~^@{}-]{2,}:(?!\/)(.+)$/u.exec(rel);
++    if (revision !== null) rel = revision[1];
++    if (root !== "" && rel.toLowerCase().startsWith(`${root.toLowerCase()}/`)) rel = rel.slice(root.length + 1);
++    rel = rel.replace(/^(?:\.\/)+/u, "");
++    if (rel === "" || rel.startsWith("-") || rel.startsWith("/") || rel.split("/").includes("..")) continue;
++    const role = criticExcludedRole(rel, calibration) ?? criticExcludedRole(`${rel}/`, calibration);
++    if (role !== null) {
++      return verdict(2, `BLOCKED (guard-dispatch-budget, plugin pipeline-core): CRITIC-READ-EXCLUDED-BY-BINDING: ${rel} is a ${role}, a path the correction-input-bindings file of a Critic range excludes. Never read it: verify its blob SHA-256 and mode from the correction-input-bindings file instead, and review only the literal source paths of your briefing.\n`);
++    }
++  }
++  return null;
++}
++
+ function normalizedAgentType(value) {
+   if (typeof value !== "string") return null;
+   return value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
+@@ -1699,6 +1760,11 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
+     }));
+   }
+ 
++  if (String(input?.tool_name ?? "") === "SendMessage") {
++    const resumeRefusal = criticResumeRefusal(input, commonDir, options);
++    if (resumeRefusal !== null) return resumeRefusal;
++  }
++
+   if (identity.kind === "orchestrator") {
+     recordOrchestratorObservation(commonDir, {
+       branch: "orchestrator", root: rootDir, commonDir, transcriptPath: rawTranscriptPath, at: nowFn(),
+diff --git a/plugins/pipeline-core/lib/critic-briefing-build.mjs b/plugins/pipeline-core/lib/critic-briefing-build.mjs
+index cc6df8055..b11e2cced 100644
+--- a/plugins/pipeline-core/lib/critic-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/critic-briefing-build.mjs
+@@ -14,6 +14,7 @@
+  * - Antigravity gets the template's paths-only envelope with absolute paths (PO tile 2026-11-10), never the body.
+  */
+ import { posix } from "node:path";
++import { criticToolBudget } from "./critic-split.mjs";
+ 
+ export const CRITIC_BRIEFING_SCHEMA = "pipeline.critic-briefing.v1";
+ const COPY_MARKER = "COPY EVERYTHING BELOW THIS LINE\n-->\n";
+@@ -76,7 +77,7 @@ const ordinalOf = (preflight) => {
+  * - projectName: the project name for the confirmation line
+  * Returns { schema, briefings: [{ entryId, text, placeholders }] }.
+  */
+-export function renderCriticBriefings({ preflight, templateText, commits, bindingsPath = null, runner = "claude", root = null, projectName }) {
++export function renderCriticBriefings({ preflight, templateText, commits, bindingsPath = null, runner = "claude", root = null, projectName, reviewPaths = null }) {
+   if (preflight?.status !== "packet-ready") refuse("CBB-PREFLIGHT-SHAPE", "a briefing is built only from a packet-ready preflight result");
+   if (!Array.isArray(commits) || commits.length === 0 || commits.some((sha) => !/^[a-f0-9]{40,64}$/u.test(sha))) refuse("CBB-COMMITS", "the enumerated commit list is empty or malformed");
+   const entries = Array.isArray(preflight.split?.entries) && preflight.split.entries.length > 0 ? preflight.split.entries : [null];
+@@ -86,19 +87,30 @@ export function renderCriticBriefings({ preflight, templateText, commits, bindin
+   const briefings = entries.map((entry) => {
+     const facts = reviewFacts(preflight, entry);
+     if (facts.candidate !== commits[commits.length - 1]) refuse("CBB-COMMITS", "the enumerated commits do not end at the reviewed candidate");
+-    return runner === "antigravity"
++    const rendered = runner === "antigravity"
+       ? renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, root, entry })
+-      : renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner });
++      : renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner, reviewPaths });
++    // C28-CRITIC-TOIL: a range whose preflight bound correction input bindings (retained results, state or history files are in it) never gets a briefing that says "not applicable":
++    // that Critic stops on missing bindings and a fresh one is spent. The caller derives them (prepare-dispatch.mjs does) or the briefing is refused here, after the template checks.
++    if (bindingsPath === null && preflight.correctionInputBindings !== undefined && preflight.correctionInputBindings !== null) {
++      refuse("CBB-BINDINGS-MISSING", "the preflight bound correction input bindings for this range (excluded paths are in it), but no bindings path was given; derive them (prepare-dispatch.mjs critic does) and pass the path");
++    }
++    return rendered;
+   });
+   return { schema: CRITIC_BRIEFING_SCHEMA, briefings };
+ }
+ 
+-function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner }) {
++function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner, reviewPaths }) {
+   const placeholders = [];
+   const open = (name, hint) => { placeholders.push(name); return fill(name, hint); };
+   const scope = entry?.batchScopeLine ?? promptLines?.[0] ?? `Batch scope (MP-07): the reviewed range ${facts.base.slice(0, 12)}..${facts.candidate.slice(0, 12)}, one batch.`;
++  // C28-CRITIC-TOIL: the paths this Critic reads are the part's own, or the range's reviewable ones the preflight printed; both come without any path the bindings exclude, and the diff
++  // command names them as literal pathspecs (critic-review.md: exact literal source pathspecs, external diff and text conversion off), so the range diff never carries an excluded file.
++  const paths = entry ? (entry.reviewerInput?.changedPaths ?? entry.paths ?? []) : (Array.isArray(reviewPaths) && reviewPaths.length > 0 ? reviewPaths : null);
++  const diffCommand = paths === null || paths.length === 0 ? "" : `\n- Diff command: \`git diff --no-textconv --no-ext-diff ${facts.base} ${facts.candidate} -- ${paths.join(" ")}\``;
+   const scopeValue = scope.replace(/^Batch scope \(MP-07\):\s*/u, "")
+-    + (entry ? ` Paths of this part: ${(entry.reviewerInput?.changedPaths ?? entry.paths ?? []).map((path) => `\`${path}\``).join(", ")}. Begin trajectory_evidence with "${entry.scopeMarker} ".` : "");
++    + (entry ? ` Paths of this part: ${paths.map((path) => `\`${path}\``).join(", ")}. Begin trajectory_evidence with "${entry.scopeMarker} ".` : (paths === null ? "" : ` Paths of this range: ${paths.map((path) => `\`${path}\``).join(", ")}.`))
++    + diffCommand;
+   const rationale = promptLines?.[1] ?? null;
+   const list = (paths, none) => (paths.length === 0 ? none : paths.map((path) => `\`${path}\``).join(", "));
+   const values = {
+@@ -118,7 +130,8 @@ function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promp
+     MODEL_ID: open("MODEL_ID", "the concrete model id the dispatch call passes as model"),
+     EFFORT: open("EFFORT", "the effort the dispatch call requests"),
+     T1_ASSURANCE: runner === "codex" ? open("T1_ASSURANCE", "the Codex Critic lane and its assurance") : "functional-equivalent-read-only; OS isolation not asserted",
+-    TOOL_BUDGET: "≤30 tool uses",
++    // The base cap follows the path count (PO decision 2026-11-10), never above the working cap of the shipped Critic definition; without a count the template default stays.
++    TOOL_BUDGET: paths === null ? "≤30 tool uses" : `≤${criticToolBudget(paths.length)} tool uses`,
+     PROJECT_NAME: projectName,
+     CALIBRATION_FILE: "n/a",
+     AC_IDS: "all in the spec",
+diff --git a/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+index af8a084d0..0e4a874fe 100644
+--- a/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
++++ b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+@@ -97,6 +97,20 @@ function classify(path, handover, findingRecords = []) {
+   return "source";
+ }
+ 
++/**
++ * C28-CRITIC-TOIL (AC-108): the role of a repository-relative path in any Critic range's bindings, or null for a source path. The same classification the derivation applies, so a
++ * Critic's read guard needs no range lookup: a path classed here is excluded from every range's source diff and is never read by a Critic. `calibration` is the parsed project
++ * calibration or null; an unusable handover or finding-record list excludes nothing beyond the built-in conventions (the derivation itself refuses those, the guard never throws).
++ */
++export function criticExcludedRole(path, calibration = null) {
++  let handover = null;
++  let findingRecords = [];
++  try { handover = handoverOf(calibration); } catch { handover = null; }
++  try { findingRecords = findingRecordsOf(calibration); } catch { findingRecords = []; }
++  const role = classify(path, handover, findingRecords);
++  return role === "source" ? null : role;
++}
++
+ function parseRaw(output) {
+   const parts = output.split("\0");
+   const entries = [];
+diff --git a/plugins/pipeline-core/lib/critic-round-pass.mjs b/plugins/pipeline-core/lib/critic-round-pass.mjs
+index 01a2987b9..015381c13 100644
+--- a/plugins/pipeline-core/lib/critic-round-pass.mjs
++++ b/plugins/pipeline-core/lib/critic-round-pass.mjs
+@@ -25,6 +25,36 @@ export function criticRoundPassed(verdict) {
+   return !PARTIAL_REVIEW.test(`${verdict.trajectory_evidence ?? ""}\n${(verdict.deliberately_not_flagged ?? []).join("\n")}`);
+ }
+ 
++const isVerdict = (verdict) => verdict !== null && typeof verdict === "object" && Array.isArray(verdict.findings) && Array.isArray(verdict.briefing_violations);
++const count = (verdict, severity) => verdict.findings.filter((finding) => finding.severity === severity).length;
++
++/**
++ * C28-CRITIC-TOIL (AC-108): the three separate things a reader of a round's result is shown (live, Codex round 4: the model said pass false, the
++ * receipt said reviewPass true with one minor, which is correct, and the Elephant ran an extra round). The verdict schema gets no field: this is a
++ * projection of a verdict already in hand. A reader that holds only a receipt has `reviewPass` and `findingCount`, not the model's own `pass`.
++ * `nextStep` follows the policy decision, never the model's flag.
++ */
++export function criticRoundDisplay(verdict) {
++  if (!isVerdict(verdict)) {
++    return { modelVerdict: { pass: null }, policyDecision: { reviewPass: false, reason: "no verdict is available" }, remainingFindings: { total: 0, blocker: 0, major: 0, minor: 0 },
++      nextStep: "No verdict is available, so the round did not pass by policy; return the Critic's verdict as written and finalize it before deciding anything." };
++  }
++  const remainingFindings = { total: verdict.findings.length, blocker: count(verdict, "blocker"), major: count(verdict, "major"), minor: count(verdict, "minor") };
++  const reviewPass = criticRoundPassed(verdict);
++  const reasons = [];
++  if (remainingFindings.blocker + remainingFindings.major > 0) reasons.push(`${remainingFindings.blocker + remainingFindings.major} blocker or major finding(s)`);
++  if (verdict.briefing_violations.length > 0) reasons.push("a briefing violation");
++  if (verdict.trajectory_verdict !== "consistent") reasons.push(`trajectory ${JSON.stringify(verdict.trajectory_verdict)}`);
++  if (reasons.length === 0 && !reviewPass) reasons.push(verdict.findings.length === 0 ? "pass false without any finding" : "a partial review that withheld its verdict");
++  const reason = reviewPass
++    ? (remainingFindings.minor > 0 ? "no blocker, major finding, briefing violation or trajectory problem; a round holding only minor findings passes (PO rule)" : "no finding, briefing violation or trajectory problem")
++    : reasons.join(" and ");
++  const nextStep = reviewPass
++    ? `The round passed by policy (${reason}). ${remainingFindings.total === 0 ? "No finding remains." : `${remainingFindings.total} finding(s) remain open in the record.`} No further Critic round is needed for them; the model's own pass flag (${verdict.pass}) does not change that.`
++    : `The round did not pass by policy (${reason}); correct what the findings name and open the next round with a new packet id.`;
++  return { modelVerdict: { pass: typeof verdict.pass === "boolean" ? verdict.pass : null }, policyDecision: { reviewPass, reason }, remainingFindings, nextStep };
++}
++
+ /** A receipt written before this rule keeps the Critic's own flag, so a reader accepts either value for the same verdict. */
+ export function receiptMatchesVerdict(reviewPass, verdict) {
+   return reviewPass === verdict.pass || reviewPass === criticRoundPassed(verdict);
+diff --git a/plugins/pipeline-core/lib/critic-round-pass.test.mjs b/plugins/pipeline-core/lib/critic-round-pass.test.mjs
+index 02c7aa278..26e43df24 100644
+--- a/plugins/pipeline-core/lib/critic-round-pass.test.mjs
++++ b/plugins/pipeline-core/lib/critic-round-pass.test.mjs
+@@ -48,6 +48,38 @@ test("anything that is not a verdict fails closed", () => {
+   for (const value of [null, undefined, "pass", {}, { pass: true }, { pass: true, findings: [] }]) assert.equal(criticRoundPassed(value), false);
+ });
+ 
++// C28-CRITIC-TOIL (AC-108): a round's result is shown as three separate things, so a model pass:false with a passing policy decision cannot read as a failed round
++// (live, Codex round 4: the Elephant ran an extra round). Imported inside the cases so the cases above keep running whatever this export does.
++test("the display of a minor-only round with pass false keeps the model verdict, the policy decision and the remaining findings apart, and its next step follows the policy", async () => {
++  const { criticRoundDisplay } = await import("./critic-round-pass.mjs");
++  const display = criticRoundDisplay(verdict({ pass: false, findings: [finding("minor")] }));
++  assert.deepEqual(display.modelVerdict, { pass: false });
++  assert.equal(display.policyDecision.reviewPass, true);
++  assert.match(display.policyDecision.reason, /minor/iu);
++  assert.deepEqual(display.remainingFindings, { total: 1, blocker: 0, major: 0, minor: 1 });
++  assert.match(display.nextStep, /passed by policy/u);
++  assert.match(display.nextStep, /no further (?:Critic )?round/iu);
++  assert.doesNotMatch(display.nextStep, /open the next round/u);
++});
++
++test("the display of a round with a major finding fails by policy and sends the next step to a correction round", async () => {
++  const { criticRoundDisplay } = await import("./critic-round-pass.mjs");
++  const display = criticRoundDisplay(verdict({ pass: true, findings: [finding("major"), finding("minor")] }));
++  assert.deepEqual(display.modelVerdict, { pass: true });
++  assert.equal(display.policyDecision.reviewPass, false);
++  assert.deepEqual(display.remainingFindings, { total: 2, blocker: 0, major: 1, minor: 1 });
++  assert.match(display.nextStep, /did not pass by policy/u);
++  assert.match(display.nextStep, /open the next round/u);
++});
++
++test("the display of anything that is not a verdict fails closed and claims no model verdict", async () => {
++  const { criticRoundDisplay } = await import("./critic-round-pass.mjs");
++  for (const value of [null, undefined, "pass", {}]) {
++    const display = criticRoundDisplay(value);
++    assert.deepEqual([display.modelVerdict.pass, display.policyDecision.reviewPass, display.remainingFindings.total], [null, false, 0]);
++  }
++});
++
+ test("a receipt written before the rule still matches its minor-only verdict, a contradicting receipt does not", () => {
+   const minors = verdict({ pass: false, findings: [finding("minor")] });
+   assert.equal(receiptMatchesVerdict(false, minors), true);
+diff --git a/plugins/pipeline-core/lib/critic-split.mjs b/plugins/pipeline-core/lib/critic-split.mjs
+index de2a3c8dc..7627338eb 100644
+--- a/plugins/pipeline-core/lib/critic-split.mjs
++++ b/plugins/pipeline-core/lib/critic-split.mjs
+@@ -16,16 +16,45 @@
+ import { spawnSync } from "node:child_process";
+ import { readFileSync } from "node:fs";
+ import { deriveCriticCorrectionInputBindings } from "./critic-correction-input-bindings.mjs";
++import { dispatchCheckpointThreshold, dispatchWorkingCap } from "./dispatch-budget-core.mjs";
+ import { sha256Canonical } from "./review-economy.mjs";
+ import { validateAgainstSchema } from "./schema-lite.mjs";
+ 
+ export const CRITIC_SPLIT_SCHEMA = "pipeline.critic-review-split.v1";
+ /**
+- * The ONE size bound. A Critic has `dispatchWorkingCap(65) = 65 - (CLOSING_ALLOWANCE 5 + SAFETY_MARGIN 10) = 50` working calls (lib/dispatch-budget-core.mjs), of which about half
+- * are left for reading before the verdict is composed; at one read per changed file that is 25 files. FIRST ESTIMATE, to be calibrated: it comes from one measured run (about 10
+- * modules, 287 tests, call 40 of 50 still in Phase 1), not from a distribution of reviews. Change it here and nowhere else.
++ * C28-CRITIC-TOIL (PO decision 2026-11-10): the part size follows the Critic budget. The agent definition (`agents/critic.md`, maxTurns 65) is preimage-pinned, so one Critic's budget
++ * cannot grow; a budget of 80 or more per Critic needs that pinned file and is a PO decision. A Critic has `dispatchWorkingCap(65) = 50` working calls (lib/dispatch-budget-core.mjs)
++ * and is told to hand back at the checkpoint, call 40. The review must be read AND its verdict composed before that call, so the figures below fix the one bound.
++ *
++ * MEASURED: the greenfield Critic parts of 17 to 25 changed files reached the checkpoint at call 40 of 50 while still reading. With about 8 fixed calls (spec criterion,
++ * guardrails, evidence, bindings, notes) that is (40 - 8) / 17 = 1.9 reads per file, so 2 (the file's diff and the source or test beside it). The verdict needs about 4 more.
++ * Still a small sample, not a distribution of reviews: change the figures here and nowhere else.
+  */
+-export const SPLIT_MAX_CHANGED_FILES = 25;
++export const CRITIC_MAX_TURNS = 65;
++export const CRITIC_FIXED_CALLS = 8;
++export const CRITIC_READS_PER_FILE = 2;
++export const CRITIC_VERDICT_RESERVE = 4;
++const CRITIC_WORKING_CAP = dispatchWorkingCap(CRITIC_MAX_TURNS);
++const criticReviewNeed = (files) => CRITIC_FIXED_CALLS + CRITIC_READS_PER_FILE * files + CRITIC_VERDICT_RESERVE;
++/** The ONE size bound: the largest part whose estimated calls end before the checkpoint of the full working cap (14 for the figures above). */
++export const SPLIT_MAX_CHANGED_FILES = Math.floor((dispatchCheckpointThreshold(CRITIC_WORKING_CAP) - CRITIC_FIXED_CALLS - CRITIC_VERDICT_RESERVE) / CRITIC_READS_PER_FILE);
++
++/** The base tool budget a Critic part of `files` paths is briefed with: the smallest base cap whose checkpoint comes after the estimated review, never above the working cap. */
++export function criticToolBudget(files) {
++  const need = criticReviewNeed(Math.max(0, Number.isSafeInteger(files) ? files : 0));
++  for (let budget = 1; budget < CRITIC_WORKING_CAP; budget += 1) if (dispatchCheckpointThreshold(budget) >= need) return budget;
++  return CRITIC_WORKING_CAP;
++}
++
++/**
++ * What the preflight prints for one part (or for a whole range one Critic reads): its path count, the budget it is briefed with and whether it is above the bound. A part above
++ * the bound (a current-artifact review scope is never split) says so here, with the figures, instead of leaving it to a budget checkpoint in the middle of the review.
++ */
++export function criticSizing(files) {
++  const sizing = { files, toolBudget: criticToolBudget(files), workingCap: CRITIC_WORKING_CAP, aboveBound: files > SPLIT_MAX_CHANGED_FILES };
++  if (!sizing.aboveBound) return sizing;
++  return { ...sizing, notice: `${files} files are above the ${SPLIT_MAX_CHANGED_FILES} one Critic reads within its budget (estimated ${criticReviewNeed(files)} calls against the budget checkpoint at call ${dispatchCheckpointThreshold(CRITIC_WORKING_CAP)} of ${CRITIC_WORKING_CAP}): expect a budget checkpoint and a grant, or review a smaller range. A budget of 80 or more per Critic needs the pinned agent file (agents/critic.md, maxTurns ${CRITIC_MAX_TURNS}; a PO decision), so the part size is the lever.` };
++}
+ export const SPLIT_SHARED_ENTRY_ID = "shared";
+ export const SPLIT_SCOPE_PREFIX = "scope:";
+ export const splitScopeMarker = (id) => `${SPLIT_SCOPE_PREFIX}${id}`;
+@@ -153,6 +182,26 @@ function packSmallGroups(parts, max, taken) {
+   });
+ }
+ 
++/**
++ * The changed paths of a packet-ready exact-range result and the ones left once the bound exclusions are removed, or null (a review scope, no range, git unreadable).
++ * `remaining` is what a Critic is given as its path list and its diff command: no history path, prior review, verdict or receipt the bindings exclude (C28-CRITIC-TOIL).
++ */
++function rangePaths(root, result) {
++  if (result?.status !== "packet-ready" || result.reviewScope !== undefined || typeof result.candidate?.commit !== "string") return null;
++  const base = result.base?.commit ?? result.base?.tree;
++  const candidate = result.candidate.commit;
++  const changed = typeof base === "string" ? gitLines(root, ["diff", "--name-only", "--no-renames", "-z", base, candidate]) : null;
++  if (changed === null) return null;
++  const excluded = boundExclusions(root, base, candidate);
++  return { base, candidate, changed, remaining: changed.filter((file) => !excluded.has(file)) };
++}
++
++/** The reviewable paths of a packet-ready exact-range result (the bound exclusions left out), or null. Printed beside the result; the library result is unchanged. */
++export function criticReviewPaths({ root, result }) {
++  const range = rangePaths(root, result);
++  return range === null ? null : [...range.remaining].sort();
++}
++
+ /**
+  * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES changed files after the bound exclusions) or holds nothing but
+  * delivery records. Delivery records count towards that bound, because an unsplit Critic would have them in its range, and are then left out of the parts.
+@@ -163,13 +212,9 @@ function packSmallGroups(parts, max, taken) {
+  * @param {{ root: string, result: object }} input `result` is the library preflight result (status packet-ready, exact range).
+  */
+ export function buildCriticSplit({ root, result }) {
+-  if (result?.status !== "packet-ready" || result.reviewScope !== undefined || typeof result.candidate?.commit !== "string") return null;
+-  const base = result.base?.commit ?? result.base?.tree;
+-  const candidate = result.candidate.commit;
+-  const changed = typeof base === "string" ? gitLines(root, ["diff", "--name-only", "--no-renames", "-z", base, candidate]) : null;
+-  if (changed === null) return null;
+-  const excluded = boundExclusions(root, base, candidate);
+-  const remaining = changed.filter((file) => !excluded.has(file));
++  const paths = rangePaths(root, result);
++  if (paths === null) return null;
++  const { base, candidate, changed, remaining } = paths;
+   if (remaining.length <= SPLIT_MAX_CHANGED_FILES) return null;
+   const reviewable = remaining.filter((file) => !isDeliveryRecord(file));
+   if (reviewable.length === 0) return null;
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-notice.mjs b/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
+index 61c9be0a0..87702ea04 100644
+--- a/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
++++ b/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
+@@ -45,6 +45,22 @@ export function grantNoticeText({ agentId, summary, count, workingCap, baseWorki
+     + (nativeHost ? NATIVE_HOST_FINAL_CONTRACT : "");
+ }
+ 
++/**
++ * C28-CRITIC-TOIL: the one text a Critic is resumed with at its budget checkpoint: the grant digest and the probe-first rule, nothing about findings, verdicts or earlier rounds.
++ * Byte-equal to the `continuationMessage` of the grant result (a test compares them), and the only message the budget hook admits to a running Critic.
++ */
++export function criticResumeText({ digest }) {
++  return `Grant digest ${digest} is recorded (a grant is repeatable; resume this same agent with SendMessage). When you receive this message, make exactly one read-only tool call first; continue from your continuation card only after the budget hook's DISPATCH-BUDGET-GRANT notice in that call's result names this digest, otherwise do not act and report that no grant was found.`;
++}
++
++/** The refusal of a message to a running Critic that is not its generated resume text. It hands over the exact text to send and never repeats the refused message. */
++export function criticResumeRefusalText({ agentId, expected }) {
++  return `DISPATCH-BUDGET-CRITIC-RESUME-NOT-GENERATED: the message to the running Critic ${agentId} is not the generated resume text of its recorded grant. A Critic is resumed only with that text, which carries the grant digest and nothing about findings, verdicts or earlier rounds. `
++    + (expected === null
++      ? "No grant is recorded for this Critic: record one first (the grant line of its checkpoint notice), then send the generated text."
++      : `Send exactly this text, unchanged: ${expected}`);
++}
++
+ // Every hand-back ends with a continuation card, and a budget grant is only ever what the hook announces.
+ const CONTINUATION_CARD = "CONTINUATION CARD -- done: ...; remaining: ...; next step: ...";
+ // A continued child has made no tool call when the continuation message arrives and the hook announces a grant only on the
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 72f3cfa0c..aa192c4a4 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -26,7 +26,7 @@ import { evaluateReviewAdmission } from "../lib/review-admission-read.mjs";
+ import { criticCoverageAdvisory, listUncoveredCriticRecords, terminalAuthoredDelivery, walkDispatchRecordsForReview } from "../lib/review-admission-read.mjs";
+ import { criticDisposition } from "../lib/critic-skip-decision.mjs";
+ import { SAFE_ID, admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
+-import { SPLIT_MAX_ENTRIES, buildCriticSplit } from "../lib/critic-split.mjs";
++import { SPLIT_MAX_ENTRIES, buildCriticSplit, criticReviewPaths, criticSizing } from "../lib/critic-split.mjs";
+ import { loadProjectRoutingRegistry } from "../lib/runner-profiles-v3.mjs";
+ import {
+   CriticGuardrailDerivationError,
+@@ -742,6 +742,12 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
+     const reason = `This range needs ${split.entries.length} split entries, above the bound of ${SPLIT_MAX_ENTRIES} for one review round (${split.changedFileCount} changed files).`;
+     fail("CDP-SPLIT-TOO-LARGE", reason, { reason, repair: "Review a narrower exact range (a later --base), or review the range in several delivery units." });
+   }
++  // C28-CRITIC-TOIL: what one Critic can read within its budget, said before the dispatch. Every part of a split is at or below the bound by construction; a range one Critic reads and
++  // a current-artifact review scope (never split) can be above it, and then the notice names the figures instead of leaving the finding to a checkpoint in the middle of the review.
++  const reviewPaths = split === null ? criticReviewPaths({ root, result }) : null;
++  const sizingParts = split !== null ? split.entries.map((entry) => ({ id: entry.id, ...criticSizing(entry.paths.length) }))
++    : result.reviewScope !== undefined ? [{ id: null, ...criticSizing(result.reviewScope.paths?.length ?? 0) }]
++      : reviewPaths !== null ? [{ id: null, ...criticSizing(reviewPaths.length) }] : [];
+   // 2026-11 greenfield reports: Antigravity Critics lost their first read to "path is not absolute". A prose line naming the root contradicted the
+   // template's paths-only envelope and was dropped by the run; PO tile 2026-11-10: the envelope carries absolute paths instead (prepare-dispatch.mjs critic).
+   const antigravity = criticRunnerFromEnv(deps.env ?? process.env) === "antigravity";
+@@ -756,9 +762,11 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
+     ...(course ? [] : ["This review is no feature package, so it needs a registered generic batch: run session-critic-finalizer.mjs register-batch first and copy its batchRef and memberSha256 into review.genericBatchRef."]),
+     ...(promptLines === null ? [] : ["The Critic route is Opus: the Critic dispatch prompt carries criticDispatchPromptLines (MP-07), or the dispatch policy refuses it; the briefing files of prepare-dispatch.mjs critic already hold them."]),
+     ...(split === null ? [] : [`SPLIT: this range has ${split.changedFileCount} changed files, above the bound of ${split.maxChangedFiles} one Critic can read, so it is split (split.entries, ${split.entries.length} entries, plan ${split.plan.status}; bound exclusions and the delivery records named in the review protocol §2.2 are in no entry). Dispatch one Critic per split entry from the template, each with its entry's reviewerInput, its entry's batchScopeLine as the Batch scope (MP-07) line${promptLines === null ? "" : " (in place of criticDispatchPromptLines[0]; keep the rationale line)"} and the instruction to begin trajectory_evidence with its scopeMarker; run each entry's Critic once (a second run for an entry makes finalize refuse the round). When every child has returned, merge them without copying any verdict: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-split-merge.mjs --root <repo> --packet <packetId> --out <merged verdict file>; only for a child without a Source return, save split as a JSON file under scratch/ and pass --split <split file> and --child <entryId>=<verdict file> (one per entry) instead of --packet; admit binds the split, finalize takes the merged verdict as verdictPath and labels it source-issued only when every child returned through the Critic stop.`]),
++    ...sizingParts.filter((part) => part.aboveBound).map((part) => `SIZE: ${part.notice}`),
+   ].join(" ");
+   return { ...result, admitRequest: request, admitCommand: ["node", ADMIT_SCRIPT, "admit", "--root", input.root, "--request", ADMIT_REQUEST_FILE], nextStep,
+     ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(split === null ? {} : { split }),
++    criticSizing: { parts: sizingParts }, ...(reviewPaths === null ? {} : { criticReviewPaths: reviewPaths }),
+     routeAssurance };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 5907a49a5..7c0093820 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -699,7 +699,10 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
+   // G20-72 (same criterion, same strictness): a range above the split bound also prints the additive `split`; it is stripped like the other additive fields, and this fixture's
+   // one-file range is below the bound so the printed line is compared byte for byte without it.
+   // C22 (CGF-03, QG-04 restated in place): the printed-only `routeAssurance` is one more additive field next to the admit fields; every other key still equals the library result.
+-  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, split: _printedSplit, routeAssurance: _printedAssurance, ...printedRest } = JSON.parse(printedRun.stdout);
++  // C28-CRITIC-TOIL (QG-04 restated in place): the printed-only `criticSizing` and `criticReviewPaths` are two more additive fields; every other key still equals the library result.
++  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, split: _printedSplit, routeAssurance: _printedAssurance, criticSizing: _printedSizing, criticReviewPaths: _printedPaths, ...printedRest } = JSON.parse(printedRun.stdout);
++  assert.deepEqual(_printedSizing.parts, [{ id: null, files: 1, toolBudget: 17, workingCap: 50, aboveBound: false }], "the one-file range prints the sizing of its one part");
++  assert.deepEqual(_printedPaths, ["specs/spec.md"]);
+   assert.equal(_printedSplit, undefined, "a one-file range carries no split");
+   assert.equal(JSON.stringify(printedRest) + "\n", JSON.stringify(expected) + "\n");
+   assert.equal(printedAdmitRequest.schema, "pipeline.session-critic-finalization-request.v3");
+@@ -2074,7 +2077,8 @@ test("G20-69 the printed packet-ready result carries the complete admit request,
+     assert.equal(Object.hasOwn(preflightCriticDispatch(input(fx)), "admitRequest"), false, "the library result is digest-bound by the session finalizer");
+     const printed = g2069Printed(fx);
+     // C22 (CGF-03, QG-04 restated in place): the printed-only `routeAssurance` joins the admit fields; the other keys are still exactly the coverage result.
+-    const { admitRequest, admitCommand, nextStep, criticDispatchPromptLines: _lines, routeAssurance: _assurance, ...rest } = printed;
++    // C28-CRITIC-TOIL (QG-04 restated in place): the printed-only `criticSizing` and `criticReviewPaths` join the admit fields too.
++    const { admitRequest, admitCommand, nextStep, criticDispatchPromptLines: _lines, routeAssurance: _assurance, criticSizing: _sizing, criticReviewPaths: _paths, ...rest } = printed;
+     assert.deepEqual(rest, covered, "the admit fields are the only difference");
+     assert.deepEqual(Object.keys(admitRequest), G2069_KEYS);
+     assert.equal(admitRequest.schema, "pipeline.session-critic-finalization-request.v3", "a review that is no feature package is a generic batch request");
+@@ -2308,7 +2312,9 @@ const g2072Input = (fx) => ({ root: fx.root, base: fx.base, candidate: fx.candid
+ const g2072Changed = (fx) => git(fx.root, ["diff", "--name-only", fx.base, fx.candidate]).split("\n").filter((line) => line !== "");
+ test("G20-72 above SPLIT_MAX_CHANGED_FILES the printed result carries one split entry per module plus a shared entry, disjoint and covering every changed path; the library result is unchanged", async () => {
+   const { CRITIC_SPLIT_SCHEMA, SPLIT_MAX_CHANGED_FILES, SPLIT_SHARED_ENTRY_ID } = await import("../lib/critic-split.mjs");
+-  const fx = g2072Fixture({ core: 13, api: 13, loose: 13 }); // QG-04 (PO decision 2026-11-09, small groups are packed): no two of these fit one Critic
++  // QG-04 (PO decision 2026-11-09, small groups are packed): no two of these fit one Critic. Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the bound is derived from the Critic budget
++  // now, so the fixture scales with it (same shape at 25: 24, 24 and 22 loose files; the shared entry holds the loose files plus the spec and the plan).
++  const fx = g2072Fixture({ core: SPLIT_MAX_CHANGED_FILES - 1, api: SPLIT_MAX_CHANGED_FILES - 1, loose: SPLIT_MAX_CHANGED_FILES - 3 });
+   try {
+     const changed = g2072Changed(fx);
+     assert.ok(changed.length > SPLIT_MAX_CHANGED_FILES, `${changed.length} changed files`);
+@@ -2336,15 +2342,17 @@ test("G20-72 above SPLIT_MAX_CHANGED_FILES the printed result carries one split
+     assert.match(printed.nextStep, /one Critic per split entry/u);
+     assert.match(printed.nextStep, /critic-split-merge\.mjs --root <repo> --packet <packetId>/u);
+     // C22 (CGF-03, QG-04 restated in place): `routeAssurance` is printed-only like the other admit fields and is set aside before the library comparison.
+-    const { admitRequest: _a, admitCommand: _c, nextStep: _n, criticDispatchPromptLines: _l, taskIdResolution: _t, split: _s, routeAssurance: _r, ...rest } = printed;
++    // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the printed sizing of each part and the printed review paths are two more printed-only additions, set aside like the others.
++    const { admitRequest: _a, admitCommand: _c, nextStep: _n, criticDispatchPromptLines: _l, taskIdResolution: _t, split: _s, routeAssurance: _r, criticSizing: _z, criticReviewPaths: _p, ...rest } = printed;
+     assert.deepEqual(rest, preflightModule.preflightCriticDispatchWithCoverage(g2072Input(fx)), "the admit fields and the split are the only additions");
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
+ test("G20-72 a range at the bound prints no split and a next step without a merge; one file more prints it", async () => {
+   const { SPLIT_MAX_CHANGED_FILES } = await import("../lib/critic-split.mjs");
+-  const small = g2072Fixture({ core: 10, api: 9, loose: 4 });
+-  const big = g2072Fixture({ core: 10, api: 10, loose: 4 });
++  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the fixture scales with the derived bound (core and api split what is left after 4 loose files, the spec and the plan; 10 and 9 at 25).
++  const small = g2072Fixture({ core: Math.ceil((SPLIT_MAX_CHANGED_FILES - 6) / 2), api: Math.floor((SPLIT_MAX_CHANGED_FILES - 6) / 2), loose: 4 });
++  const big = g2072Fixture({ core: Math.ceil((SPLIT_MAX_CHANGED_FILES - 6) / 2), api: Math.floor((SPLIT_MAX_CHANGED_FILES - 6) / 2) + 1, loose: 4 });
+   try {
+     assert.equal(g2072Changed(small).length, SPLIT_MAX_CHANGED_FILES);
+     const atBound = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(small), { env: {} });
+@@ -2362,7 +2370,8 @@ test("G20-72 a range at the bound prints no split and a next step without a merg
+ // split did nothing. The case keeps its fixture and its "flagged, never drops a path" assertions and now pins that no entry is above the bound.
+ test("G20-72 without an approved architecture plan the shared paths are cut along directories, flagged; no entry is above the bound and no path is dropped", async () => {
+   const { SPLIT_MAX_CHANGED_FILES, attributeVerdict, criticSplitProblem } = await import("../lib/critic-split.mjs");
+-  const fx = g2072Fixture({ plan: false });
++  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): src holds bound - 1 files whatever the bound is (12 and 12 at 25, the old default), plus 4 loose files and the spec.
++  const fx = g2072Fixture({ plan: false, core: Math.ceil((SPLIT_MAX_CHANGED_FILES - 1) / 2), api: Math.floor((SPLIT_MAX_CHANGED_FILES - 1) / 2) });
+   try {
+     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
+     assert.deepEqual(split.entries.map((entry) => entry.id), ["shared-part-1", "shared-part-2"]);
+@@ -2382,7 +2391,9 @@ test("G20-72 without an approved architecture plan the shared paths are cut alon
+ test("G20-72 a module above the bound is cut into parts, one flat directory included, while a module that fits keeps its entry", async () => {
+   const { SPLIT_MAX_CHANGED_FILES, criticSplitProblem } = await import("../lib/critic-split.mjs");
+   // QG-04 (PO decision 2026-11-09, small groups are packed): api and the shared group are too large to fit with each other or with core-part-2, so every entry stays.
+-  const fx = g2072Fixture({ core: 40, api: 13, loose: 13 });
++  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the sizes scale with the derived bound (40, 13 and 13 at 25): core-part-2 holds 0.6 of the bound, api 0.52, the shared group 0.6.
++  const rest = Math.ceil(SPLIT_MAX_CHANGED_FILES * 0.6);
++  const fx = g2072Fixture({ core: SPLIT_MAX_CHANGED_FILES + rest, api: Math.ceil(SPLIT_MAX_CHANGED_FILES * 0.52), loose: rest - 2 });
+   try {
+     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
+     assert.deepEqual(split.entries.map((entry) => entry.id), ["api", "core-part-1", "core-part-2", "shared"]);
+@@ -2396,7 +2407,8 @@ test("G20-72 a module above the bound is cut into parts, one flat directory incl
+ 
+ test("C23 PO decision 2026-11-09: small groups share one Critic up to the bound, the packed entry names its members and covers every path, and a group that stays alone keeps its module", async () => {
+   const { SPLIT_MAX_CHANGED_FILES, attributeVerdict, criticSplitProblem } = await import("../lib/critic-split.mjs");
+-  const fx = g2072Fixture({ core: 40, api: 3, loose: 1 });
++  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): core is 2 x bound - 10 files (40 at 25), so core-part-2 is bound - 10 and the small module, that rest and the shared group (3 + rest + 3) still fit one Critic.
++  const fx = g2072Fixture({ core: 2 * SPLIT_MAX_CHANGED_FILES - 10, api: 3, loose: 1 });
+   try {
+     const first = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} }).split;
+     assert.deepEqual(first.entries.map((entry) => entry.id), ["group-1", "core-part-1"], "the small module, the rest of core and the shared group take one Critic");
+@@ -2409,7 +2421,8 @@ test("C23 PO decision 2026-11-09: small groups share one Critic up to the bound,
+     assert.equal(attributeVerdict(first, { trajectory_evidence: `${packed.scopeMarker} reviewed` }), "group-1");
+     assert.deepEqual(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} }).split, first, "admit rebuilds the identical object");
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+-  const alone = g2072Fixture({ core: 14, api: 14, loose: 14 });
++  const size = Math.floor(SPLIT_MAX_CHANGED_FILES / 2) + 2; // restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): 14 at the old bound of 25, two of these never fit one Critic
++  const alone = g2072Fixture({ core: size, api: size, loose: size });
+   try {
+     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(alone), { env: {} });
+     assert.equal(split.entries.find((entry) => entry.id === "api").moduleId, "api", "a group nothing fits with stays alone and keeps its module");
+@@ -2452,8 +2465,9 @@ test("G20-72 a split round leaves the named delivery records out of its parts an
+ 
+ test("G20-72 delivery records count towards the size bound: a range they push over it is split, one that stays at the bound keeps them and is not split", async () => {
+   const { SPLIT_MAX_CHANGED_FILES, criticSplitProblem } = await import("../lib/critic-split.mjs");
+-  const over = g2072Fixture({ core: 5, api: 4, loose: 2, plan: false, delivery: 20 });
+-  const atBound = g2072Fixture({ core: 5, api: 4, loose: 2, plan: false, delivery: 13 });
++  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the delivery records scale with the derived bound (20 and 13 at 25; 12 reviewable files stay below any bound this test can meet).
++  const over = g2072Fixture({ core: 5, api: 4, loose: 2, plan: false, delivery: SPLIT_MAX_CHANGED_FILES - 5 });
++  const atBound = g2072Fixture({ core: 5, api: 4, loose: 2, plan: false, delivery: SPLIT_MAX_CHANGED_FILES - 12 });
+   try {
+     assert.ok(g2072Changed(over).length > SPLIT_MAX_CHANGED_FILES);
+     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(over), { env: {} });
+@@ -2482,7 +2496,8 @@ test("G20-72 a range of nothing but delivery records has no part to review and i
+ test("G20-72 the bound exclusions do not count against the size bound, and a range above the entry bound is refused before anything is reserved", async () => {
+   const { SPLIT_MAX_CHANGED_FILES, SPLIT_MAX_ENTRIES } = await import("../lib/critic-split.mjs");
+   assert.equal(SPLIT_MAX_ENTRIES, 256);
+-  const fits = g2072Fixture({ core: 10, api: 8, loose: 4, records: true });
++  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the fixture scales with the derived bound (10, 8 and 4 at 25; the spec, the plan and machine.json are reviewable too, two records are bound exclusions).
++  const fits = g2072Fixture({ core: Math.ceil((SPLIT_MAX_CHANGED_FILES - 7) / 2), api: Math.floor((SPLIT_MAX_CHANGED_FILES - 7) / 2), loose: 4, records: true });
+   const huge = g2072Fixture({ core: SPLIT_MAX_ENTRIES * SPLIT_MAX_CHANGED_FILES + 1, api: 0, loose: 0, plan: false });
+   try {
+     assert.equal(g2072Changed(fits).length, SPLIT_MAX_CHANGED_FILES + 2);
+@@ -2491,4 +2506,47 @@ test("G20-72 the bound exclusions do not count against the size bound, and a ran
+   } finally { rmSync(fits.root, { recursive: true, force: true }); rmSync(huge.root, { recursive: true, force: true }); }
+ });
+ 
++// C28-CRITIC-TOIL (AC-108, PO decision 2026-11-10): the one size bound follows the Critic budget instead of a first estimate. A part of 17 to 25 files reached its checkpoint at call 40
++// of 50 and needed a grant (live, greenfield reports). The Critic agent definition is preimage-pinned, so its 65 turns do not move: the part size does.
++test("C28 the split bound is derived from the Critic working cap and a stated reads-per-file figure, and the briefed budget of a part scales with its path count", async () => {
++  const split = await import("../lib/critic-split.mjs");
++  const { dispatchCheckpointThreshold, dispatchWorkingCap } = await import("../lib/dispatch-budget-core.mjs");
++  const definition = readFileSync(new URL("../agents/critic.md", import.meta.url), "utf8");
++  assert.equal(split.CRITIC_MAX_TURNS, Number(/^maxTurns:\s*(\d+)\s*$/mu.exec(definition)?.[1]), "the one turn figure is the pinned agent definition's own");
++  const workingCap = dispatchWorkingCap(split.CRITIC_MAX_TURNS);
++  assert.equal(workingCap, 50);
++  assert.ok(Number.isInteger(split.CRITIC_READS_PER_FILE) && split.CRITIC_READS_PER_FILE >= 2, "the stated figure is measured: 17 files used 40 calls with about 8 fixed ones");
++  const need = (files) => split.CRITIC_FIXED_CALLS + split.CRITIC_READS_PER_FILE * files + split.CRITIC_VERDICT_RESERVE;
++  assert.ok(split.SPLIT_MAX_CHANGED_FILES < 17, "a part of 17 files reached the checkpoint while still reading");
++  assert.ok(need(split.SPLIT_MAX_CHANGED_FILES) <= dispatchCheckpointThreshold(workingCap), "a part at the bound is read and its verdict composed before the checkpoint");
++  assert.ok(need(split.SPLIT_MAX_CHANGED_FILES + 1) > dispatchCheckpointThreshold(workingCap), "the bound is the largest part that fits");
++  const budgets = [1, 3, 6, split.SPLIT_MAX_CHANGED_FILES].map((files) => split.criticToolBudget(files));
++  assert.deepEqual(budgets, [...budgets].sort((left, right) => left - right), "the budget grows with the path count");
++  assert.ok(budgets[0] < budgets.at(-1) && budgets.at(-1) <= workingCap);
++  assert.equal(split.criticToolBudget(10_000), workingCap, "never above the working cap the shipped definition carries");
++  for (const files of [1, 6, split.SPLIT_MAX_CHANGED_FILES]) assert.ok(dispatchCheckpointThreshold(split.criticToolBudget(files)) >= need(files), `${files} files: the checkpoint comes after the review`);
++  assert.deepEqual(split.criticSizing(split.SPLIT_MAX_CHANGED_FILES), { files: split.SPLIT_MAX_CHANGED_FILES, toolBudget: split.criticToolBudget(split.SPLIT_MAX_CHANGED_FILES), workingCap, aboveBound: false });
++  const above = split.criticSizing(split.SPLIT_MAX_CHANGED_FILES + 1);
++  assert.equal(above.aboveBound, true);
++  assert.match(above.notice, new RegExp(`${split.SPLIT_MAX_CHANGED_FILES + 1} files`, "u"));
++  assert.match(above.notice, /budget checkpoint/u);
++  assert.match(above.notice, /80 or more/u, "the notes' sentence: a budget of 80 or more per Critic needs the pinned agent file (PO decision)");
++});
++
++test("C28 the printed split result carries the sizing of every part, and the library result stays byte-identical", async () => {
++  const { SPLIT_MAX_CHANGED_FILES, criticSizing } = await import("../lib/critic-split.mjs");
++  const fx = g2072Fixture({ core: SPLIT_MAX_CHANGED_FILES - 1, api: SPLIT_MAX_CHANGED_FILES - 1, loose: 2 });
++  try {
++    const printed = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
++    assert.deepEqual(printed.criticSizing.parts, printed.split.entries.map((entry) => ({ id: entry.id, ...criticSizing(entry.paths.length) })));
++    assert.ok(printed.criticSizing.parts.every((part) => part.aboveBound === false), "no part of a split is above the bound by construction");
++    assert.equal(Object.hasOwn(preflightCriticDispatch(g2072Input(fx)), "criticSizing"), false, "the library result is digest-bound by the session finalizer");
++    const small = g2072Fixture({ core: 2, api: 1, loose: 1 });
++    try {
++      const unsplit = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(small), { env: {} });
++      assert.deepEqual(unsplit.criticSizing.parts, [{ id: null, ...criticSizing(g2072Changed(small).length) }], "a range one Critic reads says how large its budget is");
++    } finally { rmSync(small.root, { recursive: true, force: true }); }
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+index 7f3615e8b..4cf8f1cc3 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+@@ -222,7 +222,7 @@ function buildCriticBriefingFiles({ root, value, run, step, deps }) {
+   const runner = criticRunnerFromEnv(deps.env ?? process.env);
+   let rendered;
+   try {
+-    rendered = renderCriticBriefings({ preflight: value, templateText: (deps.readTemplate ?? (() => readFileSync(TEMPLATE_PATH, "utf8")))(), commits, bindingsPath, runner, root, projectName: basename(root) });
++    rendered = renderCriticBriefings({ preflight: value, templateText: (deps.readTemplate ?? (() => readFileSync(TEMPLATE_PATH, "utf8")))(), commits, bindingsPath, runner, root, projectName: basename(root), reviewPaths: Array.isArray(value.criticReviewPaths) ? value.criticReviewPaths : null });
+   } catch (error) {
+     return { stop: { code: error?.code ?? "PREP-BRIEFING-FAILED", reason: String(error?.message ?? error), repair: "the Critic template or the preflight result changed shape; report this code, do not hand-write the briefing" } };
+   }
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+index e3cc9e84e..f671c8ee5 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+@@ -312,6 +312,53 @@ test("prepare-dispatch derives the bindings file once, writes one briefing per s
+   assert.equal(refused.stop.code, "PREP-BINDINGS-DIGEST");
+ });
+ 
++// --- C28-CRITIC-TOIL (AC-108, PO decisions 2026-11-10 on the greenfield run reports) ---
++
++const budgetOf = (text) => Number(/Tool budget \(hard cap, first-class field\):\*\* ≤(\d+) tool uses/u.exec(text)?.[1]);
++const entryOf = (id, paths) => ({ id, moduleId: null, paths, scopeMarker: `scope:${id}`, reviewerInput: reviewerInput({ changedPaths: paths }),
++  batchScopeLine: `Batch scope (MP-07): path group ${id} of the reviewed range ${PREV.slice(0, 12)}..${HEAD.slice(0, 12)} (${paths.length} of 20 changed files), part 1 of 2 of one split review round.` });
++
++test("C28 the briefed tool budget of a part scales with its path count and never passes the working cap", async () => {
++  const { criticToolBudget } = await import("../lib/critic-split.mjs");
++  const render = (preflight, extra = {}) => criticBriefingLib.renderCriticBriefings({ preflight, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "claude", root: ROOT, projectName: "p", ...extra }).briefings;
++  const paths = (count) => Array.from({ length: count }, (_, index) => `src/m${index}.mjs`);
++  const small = budgetOf(render({ ...deltaSplitPreflight(), split: { entries: [entryOf("group-1", paths(2))] } })[0].text);
++  const large = budgetOf(render({ ...deltaSplitPreflight(), split: { entries: [entryOf("group-1", paths(14))] } })[0].text);
++  assert.equal(small, criticToolBudget(2));
++  assert.equal(large, criticToolBudget(14));
++  assert.ok(small < large && large <= 50, `${small} < ${large} <= 50`);
++  const unsplit = budgetOf(render({ ...deltaSplitPreflight(), split: undefined }, { reviewPaths: paths(5) })[0].text);
++  assert.equal(unsplit, criticToolBudget(5), "an unsplit range is sized by the paths the preflight printed");
++  assert.equal(budgetOf(render({ ...deltaSplitPreflight(), split: undefined })[0].text), 30, "without a path count the template default stays");
++});
++
++test("C28 the briefing names the review paths and a diff command without any excluded path, and the bindings are required where the preflight derived them", () => {
++  const render = (preflight, extra = {}) => criticBriefingLib.renderCriticBriefings({ preflight, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "claude", root: ROOT, projectName: "p", ...extra }).briefings;
++  const split = render(deltaSplitPreflight());
++  assert.ok(split[0].text.includes(`git diff --no-textconv --no-ext-diff ${PREV} ${HEAD} -- a.mjs`), "a part reads its own paths, literal pathspecs");
++  assert.ok(split[1].text.includes(`git diff --no-textconv --no-ext-diff ${PREV} ${HEAD} -- b.mjs`));
++  assert.equal(split[0].text.includes("b.mjs"), false, "a part names nothing of another part");
++  const whole = render({ ...deltaSplitPreflight(), split: undefined }, { reviewPaths: ["src/a.mjs", "src/b.mjs"] })[0].text;
++  assert.ok(whole.includes(`git diff --no-textconv --no-ext-diff ${PREV} ${HEAD} -- src/a.mjs src/b.mjs`));
++  assert.equal(whole.includes("evidence/critic/"), false, "the retained prior result the bindings exclude is in no path the briefing gives");
++  assert.throws(() => render({ ...deltaSplitPreflight(), split: undefined }, { bindingsPath: null }), { code: "CBB-BINDINGS-MISSING" });
++  assert.doesNotThrow(() => render({ ...deltaSplitPreflight(), split: undefined, correctionInputBindings: undefined }, { bindingsPath: null }), "a range without exclusions needs no bindings");
++});
++
++test("C28 prepare-dispatch hands the preflight's review paths to the briefing, and a delta round asks for no bindings file", () => {
++  const written = [];
++  const preflight = { ...deltaSplitPreflight(), split: undefined, criticReviewPaths: ["src/a.mjs", "src/b.mjs"] };
++  const steps = stub({ "critic-dispatch-preflight.mjs": ok(preflight), "critic-correction-input-bindings.mjs derive": ok({ digestSha256: "9".repeat(64), path: BINDINGS_FILE }), "git rev-list": { status: 0, stdout: `${MID}\n${HEAD}\n`, stderr: "" } });
++  const result = prepareCriticDispatch({ root: ROOT, spec: "specs/f/spec.md", base: PREV, candidate: HEAD, evidence: ["specs/f/evidence/suite-2.json"], deltaRequest: DELTA_REQUEST },
++    { exists: () => false, mkdir: () => {}, writeFile: (path, text) => written.push([path.replace(/\\/gu, "/"), text]), env: { CLAUDE_CODE_SESSION_ID: "s" }, runCommand: steps.runCommand });
++  assert.equal(result.status, "ready", JSON.stringify(result.stop ?? null));
++  assert.equal(steps.calls.find((call) => call.key === "critic-dispatch-preflight.mjs").argv.includes("--correction-input-bindings"), false, "no route asks for a bindings file: the preflight derives them from the range");
++  assert.equal(result.next.correctionInputBindings, BINDINGS_FILE);
++  const briefing = written.find(([path]) => path.endsWith(".briefing.md"))[1];
++  assert.ok(briefing.includes(BINDINGS_FILE));
++  assert.ok(briefing.includes(`-- src/a.mjs src/b.mjs`));
++});
++
+ test("--help works in an empty directory and names both verbs", () => {
+   const empty = mkdtempSync(join(tmpdir(), "prepare-dispatch-help-"));
+   try {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index f3d99347b..a86bd2eca 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -5,7 +5,7 @@ import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read
+ import { randomBytes } from "node:crypto";
+ import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
+-import { criticRoundPassed } from "../lib/critic-round-pass.mjs";
++import { criticRoundDisplay, criticRoundPassed } from "../lib/critic-round-pass.mjs";
+ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+@@ -765,6 +765,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
+         schema: SESSION_CRITIC_FINALIZE_RESULT_SCHEMA,
+         status: "source-complete/event-unavailable",
+         receipt,
++        display: criticRoundDisplay(options.verdict),
+         ...independence,
+         code: error?.code ?? "GRA-OUTPUT-UNAVAILABLE",
+         retry: buildGovernanceReviewRetry({ eventOutPath: options.eventOutPath, event }),
+@@ -779,6 +780,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
+     schema: SESSION_CRITIC_FINALIZE_RESULT_SCHEMA,
+     status: "completed",
+     receipt,
++    display: criticRoundDisplay(options.verdict),
+     ...independence,
+     ...(event === null ? {} : { event }),
+     lineage: writeCriticRoundLineage({ root, packetId }, deps),
+@@ -923,12 +925,14 @@ export function exportSessionCriticEvidence({ root: rootInput, packetId, reportP
+ function renderJournalCriticReport(packetId, receipt, verdict) {
+   const text = (value) => String(value ?? "").replace(/\s+/gu, " ").trim();
+   const findings = Array.isArray(verdict.findings) ? verdict.findings : [];
++  const display = criticRoundDisplay(verdict);
+   const lines = [
+     `# Critic round ${packetId}`, "",
+     "Generated by the close from the private Critic journal. The verdict matches the digest in `receipt.json`. The Critic's working notes are not part of this report.", "",
+     `- Candidate: \`${receipt.candidate.commit}\``,
+     `- Reviewed range: \`${receipt.reviewRange.base}..${receipt.reviewRange.commit}\``,
+     `- Review passed: ${receipt.reviewPass ? "yes" : "no"}`,
++    `- Model verdict: pass ${display.modelVerdict.pass}; policy decision: ${display.policyDecision.reviewPass ? "passed" : "did not pass"} (${display.policyDecision.reason}); findings remaining: ${display.remainingFindings.total}`,
+     `- Trajectory: ${text(verdict.trajectory_verdict)}${text(verdict.trajectory_evidence) === "" ? "" : ` (${text(verdict.trajectory_evidence)})`}`,
+     `- Findings: ${findings.length}`,
+   ];
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 27f7134d7..ae2057294 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -876,6 +876,22 @@ test("normal fresh-session finalization consumes the prelaunch packet, reads bac
+   } finally { cleanup(fx); }
+ });
+ 
++// C28-CRITIC-TOIL (AC-108): the finalize result shows the model verdict, the policy decision and the remaining findings as three separate things, and the next step follows the policy.
++test("a minor-only round with pass false completes as passed by policy and its display says so without asking for another round", () => {
++  const fx = fixture({ targetedExitCode: 1 });
++  try {
++    const minor = { gap: "gap", risk: "risk", severity: "minor", evidence: "a:1", spec_ref: "AC-1" };
++    const result = finalizeSessionCriticReview(preadmitted(fx, { packetId: "4".repeat(32), verdict: verdict({ pass: false, findings: [minor] }) }));
++    assert.equal(result.status, "completed");
++    assert.equal(result.receipt.reviewPass, true);
++    assert.deepEqual(result.display.modelVerdict, { pass: false });
++    assert.equal(result.display.policyDecision.reviewPass, true);
++    assert.deepEqual(result.display.remainingFindings, { total: 1, blocker: 0, major: 0, minor: 1 });
++    assert.match(result.display.nextStep, /passed by policy/u);
++    assert.doesNotMatch(result.display.nextStep, /open the next round/u);
++  } finally { cleanup(fx); }
++});
++
+ test("a schema-invalid or contradictory verdict fails before packet or event publication", () => {
+   const fx = fixture();
+   try {
+@@ -2755,12 +2771,14 @@ test("G20-69 the printed feature-package admit request is a v2 request carrying
+ 
+ // G20-72 (candidate 20e, AC-108): a review range too large for one Critic is split per module. Every module Critic has its own Source return; the merged verdict is
+ // the merge of exactly those children, so a whole-feature review still ends in one SOURCE-issued verdict. Criterion-bound cases, written before the implementation existed.
++import { SPLIT_MAX_CHANGED_FILES } from "../lib/critic-split.mjs";
+ const MERGE_SCRIPT = fileURLToPath(new URL("./critic-split-merge.mjs", import.meta.url));
+ const NATIVE_HOOK = fileURLToPath(new URL("../hooks/native-goldfish-host.mjs", import.meta.url));
+ function g2072Fixture() {
+   const fx = fixture();
+   // The fixture leaves its diagnostic untracked; the split candidate carries 48 module files, a PRD with the approved architecture design and its own diagnostic.
+-  // QG-04 (PO decision 2026-11-09, small groups are packed): 24 files per module keep api, core and shared three entries, so this walk stays one Critic per entry.
++  // QG-04 (PO decision 2026-11-09, small groups are packed): bound - 1 files per module keep api, core and shared three entries, so this walk stays one Critic per entry.
++  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the bound is derived from the Critic budget now, so the per-module count scales with it (24 at the old bound of 25).
+   rmSync(join(fx.root, "evidence", "verify.json"), { force: true });
+   rmSync(join(fx.root, "evidence", "targeted.log"), { force: true });
+   const design = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield", disposition: { decision: "approved-scoped", scope: ["specs/", "src/"], rationale: "fixture" },
+@@ -2771,7 +2789,7 @@ function g2072Fixture() {
+   writeFileSync(join(fx.root, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
+   for (const dir of ["core", "api"]) {
+     mkdirSync(join(fx.root, "src", dir), { recursive: true });
+-    for (let index = 0; index < 24; index += 1) writeFileSync(join(fx.root, "src", dir, `m${index}.mjs`), `export const m${index} = ${index};\n`);
++    for (let index = 0; index < SPLIT_MAX_CHANGED_FILES - 1; index += 1) writeFileSync(join(fx.root, "src", dir, `m${index}.mjs`), `export const m${index} = ${index};\n`);
+   }
+   fx.candidate = commit(fx.root, "split candidate");
+   fx.tree = git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`]);
