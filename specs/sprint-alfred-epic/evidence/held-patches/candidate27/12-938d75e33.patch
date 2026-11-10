@@ -1,0 +1,84 @@
+diff --git a/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+index 63572d2fa9368d2a1d03594961bb74fde163b053..bcd2a2f8f66f00fdc124476c44c2b97b43505908 100644
+--- a/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
++++ b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+@@ -16,8 +16,6 @@ done_when: manual
+ 
+ The records name who wrote a change and state that a test failed before it passed, but the agent that did the work is the one saying so. The records already label this as self-attested, so nothing claims more than it knows. A host-observed chain from a failing test to a passing one would be a new capability.
+ 
+-The same limit applies to `lane.independent: true` in the Critic review lineage. The compiler writes it for every consumed session-mode round. It says that the round is its own Critic run with its own lane, derived from the hosting session and the round's packet. It does not say that the host isolated that run. An auditor index has to read it that way until isolation is observed.
+-
+ ## Decision
+ 
+ PO tile 2026-11-10: after 0.7.0. It is not part of the 0.7.0 scope.
+diff --git a/backlog/items/2026-11-10-personal-routing-override-after-0-7-0.md b/backlog/items/2026-11-10-personal-routing-override-after-0-7-0.md
+index 6e485bec59f4f3170bd49677d0448e33db7b050a..84c5a71bdc6e1f797a02f5250b96969cb463da1e 100644
+--- a/backlog/items/2026-11-10-personal-routing-override-after-0-7-0.md
++++ b/backlog/items/2026-11-10-personal-routing-override-after-0-7-0.md
+@@ -1,12 +1,12 @@
+ ---
+ schema: pipeline.backlog-item.v1
+ id: pipeline.personal-routing-override
+-type: improvement
++type: workflow-improvement
+ owner: pipeline
+ status: open
+ created: 2026-11-10
+-source: PO tile of 2026-11-10 on project-owned routing (ADR-0089)
+-sprint: after-0.7.0
++source: PO tile of 2026-11-10 on project-owned routing (ADR-0089), placing it after 0.7.0
++sprint: alfred
+ done_when: manual
+ ---
+ 
+diff --git a/backlog/items/2026-11-10-read-allowlist-for-neighbour-folders-after-0-7-0.md b/backlog/items/2026-11-10-read-allowlist-for-neighbour-folders-after-0-7-0.md
+index f82984d33b54638db8e5da689fb2fe14741bc3e4..35e134cb7541827ea0bed49623f2e2f8ba5ed2d0 100644
+--- a/backlog/items/2026-11-10-read-allowlist-for-neighbour-folders-after-0-7-0.md
++++ b/backlog/items/2026-11-10-read-allowlist-for-neighbour-folders-after-0-7-0.md
+@@ -1,12 +1,12 @@
+ ---
+ schema: pipeline.backlog-item.v1
+ id: pipeline.read-allowlist-for-neighbour-folders
+-type: improvement
++type: workflow-improvement
+ owner: pipeline
+ status: open
+ created: 2026-11-10
+-source: Claude greenfield report 070_6 (F-READONLY-WIN) and the PO tile of 2026-11-10
+-sprint: after-0.7.0
++source: Claude greenfield report 070_6 (F-READONLY-WIN) and the PO tile of 2026-11-10 placing it after 0.7.0
++sprint: alfred
+ done_when: manual
+ ---
+ 
+diff --git a/backlog/items/2026-11-10-stop-nudge-after-refused-push-after-0-7-0.md b/backlog/items/2026-11-10-stop-nudge-after-refused-push-after-0-7-0.md
+index 61cd88238b9ac499f4c194b6e0f3e143f96ea588..7e80006d9b16abfabfd6801488ebb95598ccff27 100644
+--- a/backlog/items/2026-11-10-stop-nudge-after-refused-push-after-0-7-0.md
++++ b/backlog/items/2026-11-10-stop-nudge-after-refused-push-after-0-7-0.md
+@@ -1,12 +1,12 @@
+ ---
+ schema: pipeline.backlog-item.v1
+ id: pipeline.stop-nudge-after-refused-push
+-type: improvement
++type: workflow-improvement
+ owner: pipeline
+ status: open
+ created: 2026-11-10
+-source: Greenfield finding F37 and the PO tile of 2026-11-10
+-sprint: after-0.7.0
++source: Greenfield finding F37 and the PO tile of 2026-11-10 placing it after 0.7.0
++sprint: alfred
+ done_when: manual
+ ---
+ 
+diff --git a/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md b/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md
+index b9f36a54f54cb39d687ffc6dbef6a8ea856ef832..2ffbf6762f197fa830c3cb1f59211fcb10101985 100644
+--- a/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md
++++ b/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md
+@@ -54,4 +54,6 @@ Recorded by the Elephant right after the PO answered four tiles in chat. Each de
+ | D232 | Read-only filters and listings must not be refused (PO instruction, 2026-11-01; the same word moves D230 and D231 into candidate 15c, and the PO AFK order is to build further small 0.7.x items into it until the next apply sitting) | **A negated `rg` glob filter is admitted** (`!*.ext`, `!**/*.ext`, `!name`: it only excludes, so it cannot reach a hidden, credential or parent path); positive filters stay as they are. `ls -l/-h/-lh` on an admitted directory was measured as already admitted by the source grammar, so no `ls` change; where `ls` was refused stays an open question. Held patch `w11-rg-negated-glob-filters-are-read-only-d232`; item `backlog/items/2026-11-01-negated-rg-glob-filter-is-refused-by-the-read-grammar.md`. | Alternatives were to admit every positive glob too (overrides ignore rules, reaches hidden names) and to widen the `ls` lane (a measured no-op). |
+ | D233 | Delivery records in a split Critic round (PO instruction, 2026-11-08; `harness/review-protocol.md` §2.2 forbade leaving out a folder wholesale, and the whole 0.7 range needed 495 parts, above the bound of 256) | **One narrow exception, split rounds only:** `specs/<feature>/evidence/`, `backlog/items/`, `backlog/evidence/` and `backlog/dispatch-specs/` are left out of the parts; a script file there stays review source, a file a review names as evidence stays readable input, a review that is not split keeps these paths, and these files still count towards the size bound. Measured: whole 0.7 range 151 parts, range 20d to 20e 3 parts. The Critic-preimage inventory is not re-pinned, so its suite shows one more red entry for `harness/review-protocol.md`, by design. | Alternatives were several range charges (about 530 parts over two charges) and leaving `specs/<feature>/implementation/` out too (Alfred-specific, not a pipeline convention; about 27 parts fewer). |
+ | D234 | Accept the draft ADR on project-owned routing (PO tile, 2026-11-10) | **Accepted now as [ADR-0089](../../../docs/adr/0089-project-routing-is-user-owned.md).** A project's `pipeline.user.yaml` owns its model and effort routing; the dispatch admits what it names. | Built in candidate 23. Register line in `docs/state.md`. |
++| D235 | Critic preimage drift of three files (PO tile, 2026-11-10) | **One-time re-pin in candidate 27** of `harness/review-protocol.md`, `skills/critic-review/SKILL.md` and `templates/prompts/critic-review.md`, which changed through applied candidates after the pin of 2026-11-04. No Critic has reviewed those changes. The rule that the preimage is not re-pinned stays in force; any further change needs a new PO decision. | Alternatives were leaving the suite red until the batch Critic and restoring the old bytes (would undo delivered flows). |
++| D236 | A caller-authored Critic round in the review lineage (PO tile, 2026-11-10) | **The lineage carries `lane.origin: caller-authored-fallback` for such a round.** `lane.independent` keeps meaning an own round lane. Records without the key stay valid and the flow does not change. | Alternatives were deferring it after 0.7.0 and refusing such rounds (breaks a runner with no Source return). |
+ | D186 | Patch 28, stamp and install | **One go when the PO is back:** the PO applies patch 28 (`w7-hgo-denial-digest-mismatch-names-drift-r2`) under a Guard Maintenance Window, the Elephant stamps once (carrying N11 `6c72f7408`, the briefing commits `4259bf656` and `dd1fd7373`, the pin fix `6ce9ec70f` and the reader sync `a00bb6418`), the PO installs, the Elephant reads the preflight back. | No install before then. |

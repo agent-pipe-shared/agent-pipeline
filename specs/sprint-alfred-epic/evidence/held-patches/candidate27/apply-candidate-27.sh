@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 27: 9 held patches exported from the build clone chain b87f0ddd0..c3546bfd6
+# PO apply script for candidate 27: 13 held patches exported from the build clone chain b87f0ddd0..af3002913
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -23,6 +23,10 @@ step 06-f6d5bd6f6 'feat(pipeline-state): take the recorded actor name from a lab
 step 07-d38ac0479 'fix(reground): label the compact dispatch eligibility as covering continuity only'
 step 08-8a602ba03 'docs(backlog): file the read allowlist, the personal routing override and the refused-push nudge for after 0.7.0'
 step 09-c3546bfd6 'fix(critic): re-pin the protected preimage over three changed Critic surfaces once by PO decision 2026-11-10'
+step 10-054f91f43 'feat(critic): label a caller-authored round in the review lineage'
+step 11-439ffda6f 'test(pipeline-state): keep the derived-name suites independent of a stored operator label and state who stores it'
+step 12-938d75e33 'docs(decisions): register the one-time preimage re-pin and the lineage origin label, and correct the new backlog frontmatter'
+step 13-af3002913 'test(compact): accept the announced routing fallback on stderr and nothing else'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

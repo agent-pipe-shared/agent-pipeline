@@ -1,0 +1,145 @@
+diff --git a/docs/push-release-flow.md b/docs/push-release-flow.md
+index 114264853fc974c4f115f3fd0c789065fb999daf..7e7e3be59728d3f46e9c72e8ff847a5edbf3529e 100644
+--- a/docs/push-release-flow.md
++++ b/docs/push-release-flow.md
+@@ -166,8 +166,9 @@ still exempts exactly the tracked state path, for a repository that carries an
+ older tracked record.
+ A missing key directory is repaired once with `po-human-approval.mjs
+ set-po-key-directory --directory <the PO's key directory>` (agent-executable, no
+-signature). The `--by` name is asked once per machine and user:
+-`po-human-approval.mjs set-operator-label --label <the name the PO states>`
++signature). The `--by` name is stored once per machine and user by the PO, in
++their own terminal:
++`po-human-approval.mjs set-operator-label --label <name>`
+ keeps it in the machine-local configuration, never in a tracked file, and the
+ Pipeline start preflight shows it. It is attribution only (EL-36).
+ 
+diff --git a/plugins/pipeline-core/docs/push-release-flow.md b/plugins/pipeline-core/docs/push-release-flow.md
+index 114264853fc974c4f115f3fd0c789065fb999daf..7e7e3be59728d3f46e9c72e8ff847a5edbf3529e 100644
+--- a/plugins/pipeline-core/docs/push-release-flow.md
++++ b/plugins/pipeline-core/docs/push-release-flow.md
+@@ -166,8 +166,9 @@ still exempts exactly the tracked state path, for a repository that carries an
+ older tracked record.
+ A missing key directory is repaired once with `po-human-approval.mjs
+ set-po-key-directory --directory <the PO's key directory>` (agent-executable, no
+-signature). The `--by` name is asked once per machine and user:
+-`po-human-approval.mjs set-operator-label --label <the name the PO states>`
++signature). The `--by` name is stored once per machine and user by the PO, in
++their own terminal:
++`po-human-approval.mjs set-operator-label --label <name>`
+ keeps it in the machine-local configuration, never in a tracked file, and the
+ Pipeline start preflight shows it. It is attribution only (EL-36).
+ 
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 8b38f4c4ee36dd6b9be7297b58bf51add7388628..e60563655b993c09990c5d8ba3c76ee24b32e3bd 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -12368,6 +12368,7 @@ test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G
+         // The screen covers every file below the directory before the glob applies, so a filter can only narrow it.
+         { pattern: "x", path: join(path, "scratch"), glob: "*.pem" },
+         { pattern: "x", path: join(path, "scratch"), glob: "*" },
++        { pattern: "apply", path: join(path, "plugins", "pipeline-core"), glob: "**/*.mjs" },
+       ]) assert.equal(tool("Grep", input).exitCode, 0, JSON.stringify(input));
+       for (const input of [
+         { pattern: "x", glob: "*.md" },
+@@ -13059,6 +13060,17 @@ test("TR-B T77 rg -g lane: bounded basename-extension filters, including *.test.
+   }
+ });
+ 
++test("C27 an agent in draft cannot store the operator label: the PO runs that command once in their own terminal (EL-36)", () => {
++  const path = devPlanShellFixture();
++  try {
++    const script = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
++    const verdict = devPlanShellRun(path, `node "${script}" set-operator-label --label Alex`);
++    assert.equal(verdict.exitCode, 2, verdict.stderr);
++  } finally {
++    rmSync(path, { recursive: true, force: true });
++  }
++});
++
+ test("TR-B T74 directory Grep: a named project directory is admitted, one holding a secret-named file stays refused with GUARD-READ-TARGET (SEC-11; also pinned by QP4-4)", () => {
+   const path = trbFixture();
+   try {
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 6e930f312d5fb67ea5123293bec778546448990e..46c0c885f197fdd2afe9c7b536ce9c6cada9cdaf 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -9,6 +9,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
+ import { dirname, join, resolve } from "node:path";
+ import { pathToFileURL, fileURLToPath } from "node:url";
+ import { test } from "node:test";
++import { isolateFromStoredOperatorLabel } from "../test-tmpdir.mjs";
++isolateFromStoredOperatorLabel();
+ // Host fact (measured; first-enrollment-enters-retirement-before-consent.test.mjs): the State authority route
+ // fails WT-GIT-FAILED on a Git root with no HEAD commit. The adjacent fixture() never commits, so on this
+ // host every case below stops inside fixture() at submit-plan. See the report: a born-HEAD fixture is needed.
+diff --git a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+index 135529eb1ce094e96586a7936b86ce0a836a6c70..ec1e0b17b591c3e061672e3939ccd3e9e06e578c 100644
+--- a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
++++ b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+@@ -13,6 +13,8 @@
+  */
+ import assert from "node:assert/strict";
+ import { afterEach, test } from "node:test";
++import { isolateFromStoredOperatorLabel } from "../test-tmpdir.mjs";
++isolateFromStoredOperatorLabel();
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+diff --git a/plugins/pipeline-core/lib/test-tmpdir.mjs b/plugins/pipeline-core/lib/test-tmpdir.mjs
+index 0bae745f14dfafd10144a746886e9a2bce570d9e..7d6360c5e17cdb48e6d58e5eb3424593a710b46d 100644
+--- a/plugins/pipeline-core/lib/test-tmpdir.mjs
++++ b/plugins/pipeline-core/lib/test-tmpdir.mjs
+@@ -46,9 +46,24 @@
+  * Unset, empty, relative, missing or non-directory values fall back to the
+  * repo root, silently and without throwing at import.
+  */
+-import { mkdirSync, mkdtempSync, statSync } from "node:fs";
++import { mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
++import { homedir, tmpdir } from "node:os";
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { readMachineOperatorLabel } from "./machine-plane.mjs";
++
++/**
++ * A suite that asserts the Git-derived actor name must not see the label the operator stored on this
++ * machine. Only then does this move HOME for the test process, keeping the operator's Git identity.
++ */
++export function isolateFromStoredOperatorLabel() {
++  if (readMachineOperatorLabel() === null) return;
++  process.env.GIT_CONFIG_GLOBAL ??= join(homedir(), ".gitconfig");
++  const home = mkdtempSync(join(tmpdir(), "no-operator-label-"));
++  process.once("exit", () => rmSync(home, { recursive: true, force: true }));
++  process.env.HOME = home;
++  process.env.USERPROFILE = home;
++}
+ 
+ const HERE = dirname(fileURLToPath(import.meta.url));
+ /** plugins/pipeline-core/lib -> repository root is three levels up. */
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
+index b9e46a6b060b29599e9de6e601944d603b8e59df..6b15b70c6fadb8609dff035558ac042e5fa8f68f 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
+@@ -27,7 +27,8 @@ import { fileURLToPath } from "node:url";
+ 
+ import { run, SCHEMA_ID, statePath as resolveStatePath } from "./pipeline-state.mjs";
+ import { applyOnboardingIntakeConsent, nextActionSection } from "../lib/onboarding-continuity.mjs";
+-import { mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
++import { isolateFromStoredOperatorLabel, mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
++isolateFromStoredOperatorLabel();
+ import { MACHINE_PLANE_SCHEMA, writeMachinePlane } from "../lib/machine-plane.mjs";
+ import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+ import { fixtureAdoption } from "./architecture-adoption-test-fixture.mjs";
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+index b86ac4d91d97cae0b1eabc279ac7f5dee55ce716..27a1f6b2830bd036e7a45c16669b51cc43013bd1 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+@@ -18,6 +18,8 @@ import { dirname, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+ import test from "node:test";
++import { isolateFromStoredOperatorLabel } from "../lib/test-tmpdir.mjs";
++isolateFromStoredOperatorLabel();
+ import { main as onboardingCli, summarizeOnboardingIntakeGeneratePlan } from "./project-onboarding-v3.mjs";
+ import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
+ import { main as migrationCli } from "./runner-profile-migration-v3.mjs";
