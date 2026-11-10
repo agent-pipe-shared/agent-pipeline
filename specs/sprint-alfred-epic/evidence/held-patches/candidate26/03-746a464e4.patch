@@ -1,0 +1,152 @@
+diff --git a/docs/adr/draft-project-routing-is-user-owned.md b/docs/adr/0089-project-routing-is-user-owned.md
+similarity index 92%
+rename from docs/adr/draft-project-routing-is-user-owned.md
+rename to docs/adr/0089-project-routing-is-user-owned.md
+index 2822ff5abe628718c4bc31d12205f15d60a03d6b..ff7e94a104b5d997b6baf36aabcd5972fd5a703c 100644
+--- a/docs/adr/draft-project-routing-is-user-owned.md
++++ b/docs/adr/0089-project-routing-is-user-owned.md
+@@ -1,8 +1,8 @@
+-# Draft ADR: A project's `pipeline.user.yaml` owns its model and effort routing
++# ADR-0089: A project's `pipeline.user.yaml` owns its model and effort routing
+ 
+-> Agent-Pipeline · Sprint Alfred · 2026-11-09
++> Agent-Pipeline · Sprint Alfred · 2026-11-10
+ 
+-**Status:** proposed; PO direction given, implementation pending. ADR numbering is deferred under ADR-0069 until acceptance.
++**Status:** accepted (2026-11-10, PO tile, register D234). Built in candidate 23.
+ 
+ **Context source (verbatim PO direction, 2026-11-09):** "es soll eigentlich immer alles der pipeline.user.yaml folgen! das muss konfigurierbar für jeden user sein, keine harten vorgaben sowas muss aus der config kommen und der dispatch dann alles zu lassen".
+ 
+@@ -16,7 +16,7 @@ A Claude greenfield run was refused `DBG-EFFORT-ROUTE-CONTRADICTION` on `goldfis
+ 
+ On Claude the frontmatter `effort` of an agent definition decided the effort until the Agent tool gained a per-invocation `effort` parameter. The Claude Code documentation states that this parameter overrides the frontmatter field, that `CLAUDE_CODE_EFFORT_LEVEL` beats both, that it applies to non-fork subagents, and that it needs v2.1.292 or later. This has not yet been observed on the runners.
+ 
+-## Decision proposed
++## Decision
+ 
+ 1. `routing` in `pipeline.user.yaml` is project-owned. The plugin registry is the seed for a new project and the source for cells a project does not have.
+ 2. Validation checks the shape only: the closed set of profiles, phases, duties and runners, the cell keys, the state, selector kind and effort enumerations, and a non-empty selector value. Any model id or alias and any listed effort is valid.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index c4bc080cf004cd3ae2f59bbdf9058d29710a3379..a832b34b211f2e2a1233f837c2e839f17611b08e 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -95,6 +95,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0086](0086-canonical-dab-windows-course-and-separate-legacy-api-checks.md) | Canonical DAB Windows course and separate legacy API checks | accepted | 2026-10-11 |
+ | [0087](0087-owning-verification-authenticated-controller-test-channel.md) | Owning verification through an authenticated controller test channel | accepted | 2026-10-11 |
+ | [0088](0088-test-economy.md) | Test economy: a fast gate, a fresh full run, and a test surface that shrinks with the product | accepted | 2026-10-20 |
++| [0089](0089-project-routing-is-user-owned.md) | A project's `pipeline.user.yaml` owns its model and effort routing | accepted | 2026-11-10 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+diff --git a/docs/state.md b/docs/state.md
+index 549923700b054c7468e1230609b949d86df2df59..d620f2368259e631f539dcaa9f3523867d34d092 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -23,6 +23,7 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **Candidates 17 and 18**: moved verbatim to [candidate 18 delivered](../specs/sprint-alfred-epic/plans/candidate-18-delivered-2026-11-02.md).
+ **Candidates 21f and 21g installed 2026-11-09** (stamps `18fcaf244`, `3f5c51843`; 21e2 travels with them). 21f: first Codex report findings, and a coordinator-bound `close-feature` may run in a catalogue project (extends PF-54 / D51 (1) to that entry, chosen without a tile because the Claude greenfield was blocked; the PO applied it). 21g removes a 21f regression at the commit boundary. Full Verify, Critic, greenfields, native Windows proof and PO acceptance pending. PO tile decisions 2026-11-09: [Codex report item](../backlog/items/2026-11-09-codex-greenfield-report-findings.md), "Scope decided by the PO"; Codex second Critic role `critic-high-risk`; rewind plus hardening; 21b relaxations stay; Live-Critic after the happy path on all three runners. Close findings: [item](../backlog/items/2026-11-09-close-feature-refused-in-a-catalogue-project.md).
+ **Candidate 22 installed 2026-11-09** (40 patches, stamp `ef16e1b86`); 22b installed (stamp `b92ff8a46`). No 22c: live findings and the three reports go into 23. Full Verify, Critic, native Windows proof, acceptance pending. [Open follow-ups](../backlog/items/2026-11-09-candidate-22-open-follow-ups.md).
++**[ADR-0089](adr/0089-project-routing-is-user-owned.md) accepted 2026-11-10 (PO tile, D234):** a project's `pipeline.user.yaml` owns its model and effort routing. Built in candidate 23; a live dispatch on a changed route is still unobserved.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/governance/observation-doc-governance.json b/governance/observation-doc-governance.json
+index 1cd5902e8937444a5a782ebde19d6e73dbc5fb86..dbdb61a4c3ef6da613ec354f80d121debbe60d49 100644
+--- a/governance/observation-doc-governance.json
++++ b/governance/observation-doc-governance.json
+@@ -287,6 +287,7 @@
+           "docs/adr/0087-owning-verification-authenticated-controller-test-channel.json",
+           "docs/adr/0087-owning-verification-authenticated-controller-test-channel.md",
+           "docs/adr/0088-test-economy.md",
++          "docs/adr/0089-project-routing-is-user-owned.md",
+           "docs/adr/README.md"
+         ]
+       },
+@@ -344,7 +345,6 @@
+           "docs/adr/draft-modular-design-by-default-with-size-budgets.json",
+           "docs/adr/draft-modular-design-by-default-with-size-budgets.md",
+           "docs/adr/draft-po-acceptance-points.md",
+-          "docs/adr/draft-project-routing-is-user-owned.md",
+           "docs/adr/draft-read-scope-containment-boundary.md",
+           "docs/adr/draft-repair-availability.json",
+           "docs/adr/draft-repair-availability.md",
+diff --git a/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs b/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
+index 60d1db7019f9349f2e4d96ebf716844caa534414..1d3391facaa41154a792518535ced826d4ec6594 100644
+--- a/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
++++ b/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
+@@ -27,8 +27,8 @@ export function blob(root,commit,path,limit=1048576){commitIdentity(root,commit)
+ export const sourcePaths=Object.freeze(['GEMINI.md','PIPELINE_FLOW.de.md','PIPELINE_FLOW.md','README.md','SETUP.md','docs/README.md','docs/audit-and-evidence.md','docs/audit-bundles.md','docs/cost-and-measurement.md','docs/enforcement.md','docs/overview.md','docs/parallel-work.md','docs/security-controls.md','docs/sprint-alfred-completion-report.md','docs/usage.md','docs/v3-consumer-onboarding.md']);
+ export const inputPaths=Object.freeze({capabilityInventorySha256:'docs/product-capability-inventory.json',governanceSha256:'governance/observation-doc-governance.json',readerProtocolSha256:'harness/reader-review-protocol.md'});
+ export const policySha256='e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337';
+-const inputHashes=Object.freeze({capabilityInventorySha256:'7c8dde92b29b966c2487a6713686c5e036ea2abb9f05f120ec666bedf8dd69f3',governanceSha256:'7554e269043a57babc2676d4946de71e9ea6e0bee7734c6afb05ea4934e79797',readerProtocolSha256:'9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640'});
++const inputHashes=Object.freeze({capabilityInventorySha256:'f50b1b226fb6ba848c6fa01d9b1be18aecc0d1cc04608a187279c64ca389f26e',governanceSha256:'f360d774125e2463073ff8bbf05abb7cd96e32a1d73c4988f99be5a73eb65d4b',readerProtocolSha256:'9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640'});
+ const pluginRoot=fileURLToPath(new URL('..',import.meta.url));
+ export function sourceIdentity(root){try{const tracked=p=>gitText(root,['ls-files','--error-unmatch','--',p])===p;const a=jsonBytes(physicalBytes(root,'.claude/pipeline.json')),b=jsonBytes(physicalBytes(root,'.claude-plugin/marketplace.json'));return tracked('.claude/pipeline.json')&&tracked('.claude-plugin/marketplace.json')&&a.project==='agent-pipeline'&&b.name==='agent-pipeline'&&b.owner?.name==='agent-pipeline'&&Array.isArray(b.plugins)&&b.plugins.filter(x=>x.name==='pipeline-core').length===1&&b.plugins.find(x=>x.name==='pipeline-core').source==='./plugins/pipeline-core'&&tracked('harness/reader-review-protocol.md')&&tracked('harness/scripts/check-doc-reader-binding.mjs');}catch{return false;}}
+-export function installedInputs(){const root=realpathSync.native(pluginRoot),manifestBytes=physicalBytes(root,'reader-inputs/manifest.json',65536);requireFact(hash(manifestBytes)==='6b7a4bc2e417d1c8bc8c7eb6c98dd7a47c58f5cf1733e6bbdcad4481f35028db');const manifest=jsonBytes(manifestBytes);exact(manifest,['schema','policySha256','inputs']);requireFact(manifest.schema==='pipeline.doc-reader-input-bundle.v1'&&manifest.policySha256===policySha256);exact(manifest.inputs,Object.keys(inputPaths));const inputs={};for(const [key,path] of Object.entries(inputPaths)){const entry=manifest.inputs[key];exact(entry,['canonicalSourcePath','pluginPath','sha256']);const relative=`reader-inputs/${path.split('/').at(-1)}`;requireFact(entry.canonicalSourcePath===path&&entry.pluginPath===`plugins/pipeline-core/${relative}`&&entry.sha256===inputHashes[key]);const bytes=physicalBytes(root,relative,1048576);requireFact(hash(bytes)===inputHashes[key]);inputs[key]=hash(bytes);requireFact(physicalBytes(root,relative,1048576).equals(bytes));}requireFact(hash(physicalBytes(root,'skills/reader-review/SKILL.md',1048576))===policySha256&&physicalBytes(root,'reader-inputs/manifest.json',65536).equals(manifestBytes));return inputs;}
++export function installedInputs(){const root=realpathSync.native(pluginRoot),manifestBytes=physicalBytes(root,'reader-inputs/manifest.json',65536);requireFact(hash(manifestBytes)==='14afcdb1b904161b795e1f3060548a4d7ac07dfed2590c8004a6f7e87525617a');const manifest=jsonBytes(manifestBytes);exact(manifest,['schema','policySha256','inputs']);requireFact(manifest.schema==='pipeline.doc-reader-input-bundle.v1'&&manifest.policySha256===policySha256);exact(manifest.inputs,Object.keys(inputPaths));const inputs={};for(const [key,path] of Object.entries(inputPaths)){const entry=manifest.inputs[key];exact(entry,['canonicalSourcePath','pluginPath','sha256']);const relative=`reader-inputs/${path.split('/').at(-1)}`;requireFact(entry.canonicalSourcePath===path&&entry.pluginPath===`plugins/pipeline-core/${relative}`&&entry.sha256===inputHashes[key]);const bytes=physicalBytes(root,relative,1048576);requireFact(hash(bytes)===inputHashes[key]);inputs[key]=hash(bytes);requireFact(physicalBytes(root,relative,1048576).equals(bytes));}requireFact(hash(physicalBytes(root,'skills/reader-review/SKILL.md',1048576))===policySha256&&physicalBytes(root,'reader-inputs/manifest.json',65536).equals(manifestBytes));return inputs;}
+ export function snapshotScopedReaderDocumentation({root,candidate,scope,inputBundle=null}){physicalRoot(root);const tree=commitIdentity(root,candidate);requireFact(Array.isArray(scope.documentPaths)&&scope.documentPaths.length>0&&scope.documentPaths.length<=128&&new Set(scope.documentPaths).size===scope.documentPaths.length);let total=0;const coverage=scope.documentPaths.map(path=>{const bytes=blob(root,candidate,path,524288);total+=bytes.length;requireFact(total<=4194304);return{path,sha256:hash(bytes)};});const source=sourceIdentity(root);if(source)requireFact(same(scope.documentPaths,sourcePaths));requireFact(inputBundle===null,'COURSE-REQUEST-INVALID');const inputs=source?Object.fromEntries(Object.entries(inputPaths).map(([k,p])=>[k,hash(blob(root,candidate,p))])):installedInputs();const docsetSha256=hash(`pipeline.doc-reader-docset.v1\0${canonical({coverage:[...coverage].sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0),...inputs})}`);requireFact(commitIdentity(root,candidate)===tree);return Object.freeze({commit:candidate,tree,coverage,inputs,docsetSha256});}
+diff --git a/plugins/pipeline-core/reader-inputs/manifest.json b/plugins/pipeline-core/reader-inputs/manifest.json
+index 8b763a08da6ecdf0788e6bf53ccce8cb1fbcd34e..e0fcead927107f284b64880d93f4e6a386f44811 100644
+--- a/plugins/pipeline-core/reader-inputs/manifest.json
++++ b/plugins/pipeline-core/reader-inputs/manifest.json
+@@ -1 +1 @@
+-{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"7c8dde92b29b966c2487a6713686c5e036ea2abb9f05f120ec666bedf8dd69f3"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"7554e269043a57babc2676d4946de71e9ea6e0bee7734c6afb05ea4934e79797"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640"}},"policySha256":"e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337","schema":"pipeline.doc-reader-input-bundle.v1"}
++{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"f50b1b226fb6ba848c6fa01d9b1be18aecc0d1cc04608a187279c64ca389f26e"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"f360d774125e2463073ff8bbf05abb7cd96e32a1d73c4988f99be5a73eb65d4b"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640"}},"policySha256":"e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337","schema":"pipeline.doc-reader-input-bundle.v1"}
+diff --git a/plugins/pipeline-core/reader-inputs/observation-doc-governance.json b/plugins/pipeline-core/reader-inputs/observation-doc-governance.json
+index 1cd5902e8937444a5a782ebde19d6e73dbc5fb86..dbdb61a4c3ef6da613ec354f80d121debbe60d49 100644
+--- a/plugins/pipeline-core/reader-inputs/observation-doc-governance.json
++++ b/plugins/pipeline-core/reader-inputs/observation-doc-governance.json
+@@ -287,6 +287,7 @@
+           "docs/adr/0087-owning-verification-authenticated-controller-test-channel.json",
+           "docs/adr/0087-owning-verification-authenticated-controller-test-channel.md",
+           "docs/adr/0088-test-economy.md",
++          "docs/adr/0089-project-routing-is-user-owned.md",
+           "docs/adr/README.md"
+         ]
+       },
+@@ -344,7 +345,6 @@
+           "docs/adr/draft-modular-design-by-default-with-size-budgets.json",
+           "docs/adr/draft-modular-design-by-default-with-size-budgets.md",
+           "docs/adr/draft-po-acceptance-points.md",
+-          "docs/adr/draft-project-routing-is-user-owned.md",
+           "docs/adr/draft-read-scope-containment-boundary.md",
+           "docs/adr/draft-repair-availability.json",
+           "docs/adr/draft-repair-availability.md",
+diff --git a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+index bcce19395499a9b0d0fe6266dcdb41a89a23efdf..b924511018b7b2ebcd3980ffad5a499988e46c20 100644
+--- a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
++++ b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+@@ -51,6 +51,7 @@
+         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\" --runner claude",
+         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs\"",
++        "hook:plugins/pipeline-core/hooks/hooks.json:Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/publication-readback-stop.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:SubagentStart::node \"${CLAUDE_PLUGIN_ROOT}/hooks/subagent-start-receipt.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:SubagentStop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
+@@ -139,6 +140,7 @@
+         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:spawn_agent:node \"${PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:spawn_agent|update_plan:node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse",
+         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\" --runner codex",
++        "hook:plugins/pipeline-core/hooks/codex-hooks.json:Stop::node \"${PLUGIN_ROOT}/hooks/publication-readback-stop.mjs\"",
+         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStart::node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStart",
+         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStart::node \"${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner codex",
+         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStop::node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStop",
+@@ -1017,6 +1019,7 @@
+         "verify-phase:harness/scripts/verify.mjs:publication-executor-v2-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-guard-candidate-tests",
++        "verify-phase:harness/scripts/verify.mjs:publication-readback-stop-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-readback-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-review-requirement-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-state-authority-tests",
+diff --git a/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md b/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md
+index fe30587aebcd92a730679d6bf8ce06e398b763f3..b9f36a54f54cb39d687ffc6dbef6a8ea856ef832 100644
+--- a/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md
++++ b/specs/sprint-alfred-epic/plans/po-decisions-2026-10-29.md
+@@ -53,4 +53,5 @@ Recorded by the Elephant right after the PO answered four tiles in chat. Each de
+ | D231 | The Continuity close route needs an owning context no CLI provides (PO tile, 2026-11-01) | **Option A: ship the owning route as a CLI** that arms the `onboarding-continuity` member for the session and runs exactly one named companion entry through `executeCompanionOperation` with the same gates; the close-feature skill documents it. Protected kernel files: a Goldfish slice on a later candidate, the whole close chain walked first. **Update 2026-11-01:** the slice stopped before any code: no shipped issuer gives a shell-started CLI a requester identity, so option A needs a new fixed issuer (a new root of authority) and four further PO decisions (see the item); D231 is not part of candidate 15c, a new PO decision is pending. Item `backlog/items/2026-11-01-continuity-close-route-needs-an-owning-context-no-cli-provides.md`. | Alternatives were the direct route when the PO attends the command (reopens the owner-bound State write) and no change (a consumer with a catalogue cannot close an epic). |
+ | D232 | Read-only filters and listings must not be refused (PO instruction, 2026-11-01; the same word moves D230 and D231 into candidate 15c, and the PO AFK order is to build further small 0.7.x items into it until the next apply sitting) | **A negated `rg` glob filter is admitted** (`!*.ext`, `!**/*.ext`, `!name`: it only excludes, so it cannot reach a hidden, credential or parent path); positive filters stay as they are. `ls -l/-h/-lh` on an admitted directory was measured as already admitted by the source grammar, so no `ls` change; where `ls` was refused stays an open question. Held patch `w11-rg-negated-glob-filters-are-read-only-d232`; item `backlog/items/2026-11-01-negated-rg-glob-filter-is-refused-by-the-read-grammar.md`. | Alternatives were to admit every positive glob too (overrides ignore rules, reaches hidden names) and to widen the `ls` lane (a measured no-op). |
+ | D233 | Delivery records in a split Critic round (PO instruction, 2026-11-08; `harness/review-protocol.md` §2.2 forbade leaving out a folder wholesale, and the whole 0.7 range needed 495 parts, above the bound of 256) | **One narrow exception, split rounds only:** `specs/<feature>/evidence/`, `backlog/items/`, `backlog/evidence/` and `backlog/dispatch-specs/` are left out of the parts; a script file there stays review source, a file a review names as evidence stays readable input, a review that is not split keeps these paths, and these files still count towards the size bound. Measured: whole 0.7 range 151 parts, range 20d to 20e 3 parts. The Critic-preimage inventory is not re-pinned, so its suite shows one more red entry for `harness/review-protocol.md`, by design. | Alternatives were several range charges (about 530 parts over two charges) and leaving `specs/<feature>/implementation/` out too (Alfred-specific, not a pipeline convention; about 27 parts fewer). |
++| D234 | Accept the draft ADR on project-owned routing (PO tile, 2026-11-10) | **Accepted now as [ADR-0089](../../../docs/adr/0089-project-routing-is-user-owned.md).** A project's `pipeline.user.yaml` owns its model and effort routing; the dispatch admits what it names. | Built in candidate 23. Register line in `docs/state.md`. |
+ | D186 | Patch 28, stamp and install | **One go when the PO is back:** the PO applies patch 28 (`w7-hgo-denial-digest-mismatch-names-drift-r2`) under a Guard Maintenance Window, the Elephant stamps once (carrying N11 `6c72f7408`, the briefing commits `4259bf656` and `dd1fd7373`, the pin fix `6ce9ec70f` and the reader sync `a00bb6418`), the PO installs, the Elephant reads the preflight back. | No install before then. |

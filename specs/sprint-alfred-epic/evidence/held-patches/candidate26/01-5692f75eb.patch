@@ -1,0 +1,99 @@
+diff --git a/plugins/pipeline-core/scripts/codex-critic-host.mjs b/plugins/pipeline-core/scripts/codex-critic-host.mjs
+index aab06e5bcd6a7372dc01aa183c5b7e995af5c21f..a380bc2f947a0b4d443c476860a166c18567aaee 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-host.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-host.mjs
+@@ -35,6 +35,7 @@ import {
+ } from "node:fs";
+ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
++import { criticRoundPassed } from "../lib/critic-round-pass.mjs";
+ import { createInterface } from "node:readline";
+ import { spawnSync } from "node:child_process";
+ import { fileURLToPath } from "node:url";
+@@ -1711,11 +1712,7 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
+   const verdictValidation = validateAgainstSchema(result.verdict, verdictSchema);
+   if (!verdictValidation.valid) fail(`critic verdict invalid: ${verdictValidation.errors.join("; ")}`);
+   assertSafeResultText(result);
+-  const hasBlockingFinding = result.verdict.findings.some(({ severity }) => severity === "blocker" || severity === "major");
+-  const reviewPass = result.verdict.pass === true
+-    && !hasBlockingFinding
+-    && result.verdict.briefing_violations.length === 0
+-    && result.verdict.trajectory_verdict === "consistent";
++  const reviewPass = criticRoundPassed(result.verdict);
+   if (result.verdict.pass === true && !reviewPass) fail("critic pass contradicts findings, briefing, or trajectory evidence");
+   return { execution, result, reviewPass };
+ }
+@@ -1905,10 +1902,12 @@ function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution
+     fail("receipt review-plan binding drift");
+   }
+   if (receipt.state.mutationObserved !== false) fail("receipt mutation claim drift");
+-  if (receipt.reviewPass !== sanitizedVerdict.pass || receipt.reviewPass !== (sanitizedVerdict.pass
+-    && sanitizedVerdict.findings.every(({ severity }) => !["blocker", "major"].includes(severity))
++  const verdictUnblocked = sanitizedVerdict.findings.every(({ severity }) => !["blocker", "major"].includes(severity))
+     && sanitizedVerdict.briefingViolationCount === 0
+-    && sanitizedVerdict.trajectoryVerdict === "consistent")) fail("receipt review verdict drift");
++    && sanitizedVerdict.trajectoryVerdict === "consistent";
++  if (sanitizedVerdict.pass
++    ? receipt.reviewPass !== true || !verdictUnblocked
++    : receipt.reviewPass === true && !(verdictUnblocked && sanitizedVerdict.findings.length > 0)) fail("receipt review verdict drift");
+   if (!/^[0-9a-f]{32}$/.test(receipt.dispatchId) || receipt.dispatchId !== prepared.dispatchId) fail("receipt dispatch binding invalid");
+   const hashKeys = [
+     "preparedSha256", "requestSha256", "referenceSetSha256", "resultSha256", "reviewFingerprintBefore",
+diff --git a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+index d7a08eaad57d89a22b8ed1f29422777a2daae65b..660da52487498c1794a6ac2864e9c8f2bb796fed 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+@@ -72,7 +72,7 @@ import { expectedPipelineScriptsRunnerAllowlistEntries } from "../lib/project-on
+ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+ import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+ 
+-const EXPECTED_CASE_COUNT = 137;
++const EXPECTED_CASE_COUNT = 140;
+ const caseResults = Array.from({ length: EXPECTED_CASE_COUNT }, () => {
+   let resolveCase;
+   let rejectCase;
+@@ -957,6 +957,31 @@ const validReturn = successfulReturn(prepared, preparedRecord.sha256);
+ check("valid host return passes pure validation", () => {
+   assert.equal(validateHostReturn(prepared, preparedRecord.sha256, validReturn).reviewPass, true);
+ });
++function returnWithVerdict(fields) {
++  const value = structuredClone(validReturn);
++  value.critic_result.verdict = {
++    findings: [],
++    deliberately_not_flagged: [],
++    trajectory_verdict: "consistent",
++    trajectory_evidence: "evidence/verify-latest.json matches the reviewed commit",
++    briefing_violations: [],
++    pass: false,
++    ...fields,
++  };
++  rebindCompletion(value);
++  return value;
++}
++const MINOR_FINDING = { gap: "Small gap.", risk: "Low risk.", severity: "minor", evidence: "specs/review.md:1", spec_ref: "AC-1" };
++check("a round holding only minor findings has passed, whatever the Critic set for pass", () => {
++  assert.equal(validateHostReturn(prepared, preparedRecord.sha256, returnWithVerdict({ findings: [MINOR_FINDING], pass: false })).reviewPass, true);
++  assert.equal(validateHostReturn(prepared, preparedRecord.sha256, returnWithVerdict({ findings: [MINOR_FINDING], pass: true })).reviewPass, true);
++});
++check("a pass of false with no finding at all stays a failure", () => {
++  assert.equal(validateHostReturn(prepared, preparedRecord.sha256, returnWithVerdict({})).reviewPass, false);
++});
++check("a pass claim next to a major finding is still refused as a contradiction", () => {
++  assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, returnWithVerdict({ findings: [{ ...MINOR_FINDING, severity: "major" }], pass: true })), /critic pass contradicts/);
++});
+ check("T1 rejects the normal-lane assurance claim", () => {
+   const value = structuredClone(validReturn);
+   value.critic_result.achieved_assurance = ASSURANCE;
+diff --git a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+index 22e63dc00d559815069dcc84d443a3651baf4579..f2c41ce3914a8603cc2b448625fbf928f5d0621d 100644
+--- a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
++++ b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+@@ -20,7 +20,7 @@
+     },
+     {
+       "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
+-      "rawSha256": "ebb58efeffc47a7f343e32d97ac2bc63fec9403979ac81b98fc7da8212f525d4"
++      "rawSha256": "98bb021e315fdd0a17fa9ead24bbcd2c30e150525b3863d493d418b4e1ce8bae"
+     },
+     {
+       "path": "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",

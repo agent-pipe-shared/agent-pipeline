@@ -1,0 +1,62 @@
+diff --git a/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..bcd2a2f8f66f00fdc124476c44c2b97b43505908
+--- /dev/null
++++ b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+@@ -0,0 +1,25 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.authorship-and-test-first-are-only-self-attested
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-10
++source: Codex greenfield report, point R5 (P1); PO tile 2026-11-10 places it after 0.7.0
++sprint: alfred
++done_when: manual
++---
++
++# Authorship and test-first order are only self-attested
++
++## Description
++
++The records name who wrote a change and state that a test failed before it passed, but the agent that did the work is the one saying so. The records already label this as self-attested, so nothing claims more than it knows. A host-observed chain from a failing test to a passing one would be a new capability.
++
++## Decision
++
++PO tile 2026-11-10: after 0.7.0. It is not part of the 0.7.0 scope.
++
++## Done when
++
++The PO decides whether a host-observed red-to-green chain is built and on which runners, and that decision is carried out.
+diff --git a/backlog/items/2026-11-10-residual-acceptance-has-no-printed-ceremony.md b/backlog/items/2026-11-10-residual-acceptance-has-no-printed-ceremony.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3691c1eed4302f313ada8cc4d7ee18840dc3ca42
+--- /dev/null
++++ b/backlog/items/2026-11-10-residual-acceptance-has-no-printed-ceremony.md
+@@ -0,0 +1,25 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.residual-acceptance-has-no-printed-ceremony
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-10
++source: Greenfield transcript finding F33; PO tile 2026-11-10 places it after 0.7.0
++sprint: alfred
++done_when: manual
++---
++
++# The residual acceptance has no printed, chain-tested ceremony
++
++## Description
++
++A run that accepts remaining minor findings has to put the acceptance command together from its usage text. Candidate 24 added the usage form and a clearer wording, but no step prints the exact command for the open round, and no test runs that route from the refusal through the acceptance to the next gate.
++
++## Decision
++
++PO tile 2026-11-10: after 0.7.0. It is not part of the 0.7.0 scope. Since candidate 25 a round holding only minor findings counts as passed, so this route is needed less often.
++
++## Done when
++
++The refusal or the course report prints the exact acceptance command for the open round, and a chain test runs it through to the next gate.
