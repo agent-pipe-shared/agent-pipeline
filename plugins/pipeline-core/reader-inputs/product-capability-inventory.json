@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "221b63e796d969232735bf8240ea8a056eb443f2",
-    "tree": "8c9adfa799a86e8639418ce6abb1d04670d2cc73"
+    "commit": "c81a34214be74b4c537a5d3197952b8c3d358ec9",
+    "tree": "56f1704360e3da5d6c14ba65e5972a84f3286fe8"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -43,6 +43,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-onboarding-consent-lock.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:SubagentHandback:node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow|TodoWrite:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-slicing.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:advisor:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-advisor-prohibition.mjs\"",
@@ -389,6 +390,7 @@
         "verify-phase:harness/scripts/verify.mjs:critic-packet-governance-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-packet-release-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-review-scope-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-round-pass-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-route-activation-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-route-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-skip-coverage-check",
@@ -474,7 +476,6 @@
         "verify-phase:harness/scripts/verify.mjs:feature-close-audit-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
-        "verify-phase:harness/scripts/verify.mjs:prepare-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
         "verify-phase:harness/scripts/verify.mjs:full-verify-wrapper-tests",
         "verify-phase:harness/scripts/verify.mjs:g17-publication-observation-tests",
@@ -971,6 +972,7 @@
         "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-trust-anchor-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:pre-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:pre-push-hook-install-tests",
+        "verify-phase:harness/scripts/verify.mjs:prepare-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:print-verify-failures-tests",
         "verify-phase:harness/scripts/verify.mjs:private-document-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-cli-tests",
@@ -1193,6 +1195,7 @@
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-check",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-topology-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:wait-host-commit-tests",
         "verify-phase:harness/scripts/verify.mjs:win-authority-readiness-and-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:win-authority-rest-tests",
         "verify-phase:harness/scripts/verify.mjs:windows-assurance-verify-registration-tests",
