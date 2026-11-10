@@ -2398,6 +2398,10 @@ test("a failing review exports too, with reviewPass false and its finding count"
     const receipt = JSON.parse(readFileSync(join(fx.root, options.outDir, "receipt.json"), "utf8"));
     assert.equal(receipt.reviewPass, false);
     assert.equal(sha(readFileSync(join(fx.root, options.outDir, "receipt.json"))), index.receiptSha256);
+    // C24: the close coordinator's read-only verb reports the same standing with the counts the one-shot close needs.
+    const standing = (packet) => JSON.parse(spawnSync(process.execPath, [fileURLToPath(new URL("./close-coordinator.mjs", import.meta.url)), "critic-standing", "--root", fx.root, "--packet", packet], { encoding: "utf8" }).stdout);
+    assert.deepEqual([standing(packetId).status, standing(packetId).blockers, standing(packetId).majors, standing(packetId).minors], ["failed", 0, 0, 1]);
+    assert.equal(standing("9".repeat(32)).status, "unknown");
   } finally { cleanup(fx); }
 });
 

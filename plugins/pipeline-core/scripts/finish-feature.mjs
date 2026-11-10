@@ -331,6 +331,16 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
           `finish the Critic review (it records the packet), then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <packet-id>`);
       }
       packetForRerun = packet;
+      // C24 (Claude greenfield): a round that did not pass used to surface only inside Verify, after the Result bootstrap, with no way out named, and a run took a PO's word in chat for an acceptance.
+      let standing = null;
+      try { standing = command(runner, process.execPath, [COORDINATOR, "critic-standing", "--root", root, "--packet", packet], "ONESHOT-CRITIC-STANDING"); } catch { standing = null; /* the close keeps its own check */ }
+      if (standing?.status === "failed" && !state.residualAcceptance?.lastAccepted) {
+        const acceptance = standing.blockers > 0 ? "A blocker can never be accepted."
+          : standing.majors > 0 ? `A major can be accepted only when no commit can correct it (the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet} --reason-class uncorrectable-past-authorship); a major that a commit can correct has to be corrected.`
+            : `Only minor findings are open, so the PO may instead accept them in the PO's own attended step: node ${STATE_WRITER} approve-residual-acceptance --by <name> --critic-packet ${packet}.`;
+        return stopResult("critic-standing", "ONESHOT-CRITIC-NOT-PASSED", `The Critic round ${packet} did not pass (${standing.blockers} blocker, ${standing.majors} major, ${standing.minors} minor) and no PO residual acceptance is on record, so this candidate cannot close. A statement in chat is not an acceptance.`,
+          `nothing was written; correct the findings through a dispatch, run a Critic delta round on the new candidate, then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <new-packet-id>. ${acceptance}`);
+      }
       // C21B: a Continuity feature without a bound Result cannot pass the Result close block below; stop BEFORE Verify, so no partial close evidence has to be cleaned up by hand.
       if (state.continuity !== null && typeof state.continuity === "object" && state.continuity.queueHead?.nextAction !== "close" && !state.continuity.authority?.result) {
         if (ownerRouteRequired) {

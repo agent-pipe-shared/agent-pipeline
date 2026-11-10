@@ -258,7 +258,7 @@ const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
 // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
 // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
 // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false } = {}) {
+function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false } = {}) {
   const independenceChecks = [];
   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
@@ -266,7 +266,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
   mkdirSync(join(root, ".claude")); mkdirSync(join(root, "specs/feature-abc/evidence"), { recursive: true });
   writeFileSync(join(root, "specs/feature-abc/result.md"), "# Result\n");
   const resultSha = sha256Of("# Result\n");
-  const stateValue = (nextAction) => ({ schema: "pipeline.state.v0", activeFeature: { id: "feature-abc" },
+  const stateValue = (nextAction) => ({ schema: "pipeline.state.v0", activeFeature: { id: "feature-abc" }, ...(residualOnRecord ? { residualAcceptance: { lastAccepted: { findings: [] } } } : {}),
     ...(continuity ? { continuity: { revision: 3, queueHead: { nextAction }, authority: { result: resultBound ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
   const writeState = (value) => writeFileSync(join(root, STATE_PATH), `${JSON.stringify(value)}\n`);
   writeState(closed ? { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] } : stateValue("review"));
@@ -281,6 +281,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
   const runner = (executable, argv) => {
     if (executable === "git") return spawnSync("git", argv, { cwd: root, encoding: "utf8" });
     const script = argv[0].split("/").at(-1); const sub = argv[1];
+    if (script === "close-coordinator.mjs" && sub === "critic-standing") return json(criticStanding);
     if (script === "close-coordinator.mjs" && sub === "critic-independence") { independenceChecks.push(flag(argv, "--packet")); return json(acknowledgementMissing ? { status: "acknowledgement-required", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "authored by the calling agent; record it with approve-critic-acknowledgement" } : { status: "satisfied" }); }
     if (script === "close-coordinator.mjs" && sub === "critic-addenda") return json(addendaPending ? { status: "written", commitPaths: ["specs/feature-abc/evidence/critic-addendum-r1.json"], subject: "chore(evidence): bind the Critic course to the delivery records", message: "written" } : { status: "none" });
     calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
@@ -363,6 +364,26 @@ test("C21B: a Continuity feature with no bound Result stops before Verify with t
     for (const needle of ["continuity-result-bootstrap-plan", "applyAction", "reconcileCommand", "commit-pipeline-owned.mjs", `--critic-packet-id ${f.packetId}`]) assert.ok(stopped.stop.repair.includes(needle), needle);
     for (const name of ["audit-request.json", "verify-candidate.json", "close-request.json"]) assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence", name)), false, name);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C24: a Critic round that did not pass stops before the Result bootstrap and Verify, names the delta round and says which severities can be accepted", () => {
+  const stoppedFor = (criticStanding, options = {}) => {
+    const f = oneShotFixture({ continuity: true, resultBound: false, criticStanding, ...options });
+    try {
+      const result = oneShotClose(f.input, { runCommand: f.runner });
+      return { result, calls: [...f.calls], evidence: existsSync(join(f.root, "specs/feature-abc/evidence/audit-request.json")) };
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  };
+  const major = stoppedFor({ status: "failed", blockers: 0, majors: 3, minors: 14 });
+  assert.equal(major.result.stage, "critic-standing"); assert.equal(major.result.stop.code, "ONESHOT-CRITIC-NOT-PASSED");
+  assert.match(major.result.stop.reason, /0 blocker, 3 major, 14 minor[\s\S]*A statement in chat is not an acceptance/u);
+  assert.match(major.result.stop.repair, /Critic delta round[\s\S]*--critic-packet-id <new-packet-id>[\s\S]*uncorrectable-past-authorship[\s\S]*has to be corrected/u);
+  assert.deepEqual(major.calls, [], "nothing runs before the stop"); assert.equal(major.evidence, false);
+  assert.match(stoppedFor({ status: "failed", blockers: 1, majors: 0, minors: 0 }).result.stop.repair, /A blocker can never be accepted/u);
+  const minor = stoppedFor({ status: "failed", blockers: 0, majors: 0, minors: 2 }).result.stop.repair;
+  assert.match(minor, /approve-residual-acceptance --by <name> --critic-packet/u); assert.doesNotMatch(minor, /uncorrectable/u);
+  assert.equal(stoppedFor({ status: "failed", blockers: 0, majors: 0, minors: 2 }, { residualOnRecord: true }).result.stop.code, "ONESHOT-RESULT-NOT-BOUND", "a recorded acceptance goes on to the close's own check");
+  assert.equal(stoppedFor({ status: "unknown" }).result.stop.code, "ONESHOT-RESULT-NOT-BOUND", "an unreadable standing leaves the close's own check in charge");
 });
 
 test("C21C: a missing PO acknowledgement of a caller-authored Critic stops before Verify and writes nothing", () => {

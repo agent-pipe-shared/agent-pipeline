@@ -1231,7 +1231,7 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
   }
   const failedReceipt = critic.reviewPass !== true;
   if (failedReceipt && (deps.residualAcceptance === undefined || deps.residualAcceptance === null)) {
-    cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
+    cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate. Correct them through a dispatch and run a Critic delta round on the new candidate; only minor findings, or a major no commit can correct, can instead get a PO residual acceptance (pipeline-state.mjs approve-residual-acceptance, the PO's own attended step), and a statement in chat is not one.");
   }
   if (critic.candidate.commit !== sourceCandidate.commit || critic.candidate.tree !== sourceCandidate.tree
     || critic.reviewRange.commit !== sourceCandidate.commit) cvlFail("CVL-CRITIC-STALE", "Private Critic receipt is not bound to the Verify candidate.");
@@ -1244,7 +1244,7 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
       if (deps.residualAcceptance !== undefined && deps.residualAcceptance !== null) {
         cvlFail("CVL-CRITIC-FAILED", `Critic findings remain unresolved and the recorded PO residual acceptance no longer verifies (most often it has expired, the signature window is short, or it does not match the open findings); capture it again with pipeline-state.mjs approve-residual-acceptance --by <name> --critic-packet ${criticPacketId} and approve it again, then retry`);
       }
-      cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
+      cvlFail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate. Correct them through a dispatch and run a Critic delta round on the new candidate; only minor findings, or a major no commit can correct, can instead get a PO residual acceptance (pipeline-state.mjs approve-residual-acceptance, the PO's own attended step), and a statement in chat is not one.");
     }
   }
   const roleRoute = criticRouteVerdict({ gitCommonDir: common, criticPacketId, critic, criticReceiptSha256 }, deps);

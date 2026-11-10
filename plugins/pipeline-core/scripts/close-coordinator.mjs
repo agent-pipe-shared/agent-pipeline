@@ -27,7 +27,7 @@ import { criticAddendumBindingFinding, evaluateRepositoryCriticSkipCoverage, wal
 import { writeCriticDispositionAddendumObject } from "./dispatch-record-write.mjs";
 import { CRITIC_EVIDENCE_SCHEMA } from "../lib/critic-skip-decision.mjs";
 import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
-import { canonicalJson as criticPacketCanonicalJson, readConsumedCandidateReceipt } from "../lib/critic-packet-preflight-read.mjs";
+import { canonicalJson as criticPacketCanonicalJson, readConsumedCandidateReceipt, readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
 import { findCriticAcknowledgement } from "../lib/critic-acknowledgement.mjs";
 import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
 import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
@@ -1398,6 +1398,20 @@ try {
       if (error?.code === "CLOSE-CRITIC-CALLER-AUTHORED" && /authored by the calling agent/u.test(error.message)) emit({ schema: "pipeline.close-critic-independence.v1", status: "acknowledgement-required", code: error.code, message: error.message });
       else emit({ schema: "pipeline.close-critic-independence.v1", status: "unknown" });
     }
+  } else if (command === "critic-standing") {
+    // C24 (Claude greenfield): read-only, so the one-shot close can say BEFORE anything is written that this round did not pass. The close keeps its own check.
+    const parsed = exactArgs(argv, new Set(["root", "packet"]));
+    if (!parsed || !parsed.values.root || !/^[a-f0-9]{32}$/u.test(parsed.values.packet ?? "")) fail("CLOSE-ARGS", "critic-standing arguments invalid");
+    const controlRoot = join(gitCommonDir(physicalRoot(parsed.values.root)), "agent-pipeline", "critic-packets");
+    try {
+      const { receipt } = readConsumedCandidateReceipt({ controlRoot, packetId: parsed.values.packet });
+      if (receipt?.reviewPass === true) emit({ schema: "pipeline.close-critic-standing.v1", status: "passed" });
+      else {
+        const { findings } = readConsumedCandidateResult({ controlRoot, packetId: parsed.values.packet }).result.verdict;
+        const count = (severity) => findings.filter((finding) => finding?.severity === severity).length;
+        emit({ schema: "pipeline.close-critic-standing.v1", status: "failed", blockers: count("blocker"), majors: count("major"), minors: count("minor") });
+      }
+    } catch { emit({ schema: "pipeline.close-critic-standing.v1", status: "unknown" }); }
   } else if (command === "critic-addenda") {
     // C21E: the Critic addenda a close derives anyway, written BEFORE the one-shot close spends a Verify: their commit moves HEAD, so writing them inside the close made the candidate stale.
     const parsed = exactArgs(argv, new Set(["root"]));
