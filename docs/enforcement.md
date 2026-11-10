@@ -46,6 +46,7 @@ no hand-maintained guard count or command list.
 | Claude Code | PreToolUse | Edit&#124;Write&#124;NotebookEdit | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs" --runner claude |
 | Claude Code | PreToolUse | Edit&#124;Write&#124;NotebookEdit | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-onboarding-consent-lock.mjs" |
 | Claude Code | PreToolUse | Edit&#124;Write&#124;NotebookEdit | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs" |
+| Claude Code | PreToolUse | SubagentHandback | node "${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner claude |
 | Claude Code | PreToolUse | Task&#124;Agent&#124;Workflow | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs" |
 | Claude Code | PreToolUse | Task&#124;Agent&#124;Workflow&#124;TodoWrite | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-slicing.mjs" |
 | Claude Code | PreToolUse | advisor | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-advisor-prohibition.mjs" |
@@ -83,6 +84,6 @@ The hashes bind this generated page to the exact manifest bytes it read.
 
 | Runner | Manifest | SHA-256 |
 | --- | --- | --- |
-| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `b50798c8f187d483f23a537e425606d3ea90883ecf9e986a1652a289780d586c` |
+| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `02450dcd399b16f1a9d23f988ef024cb9ac48fed7c669d9206fde79da1f2bc98` |
 | Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `6ea0eba1803ea886a6da30328d1618873d39e03759822acd479b066fa56d1e34` |
 | Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `356c5819743976907a35322902f6a48083cda1aec3e25ea5ffb7cf35e77ab900` |

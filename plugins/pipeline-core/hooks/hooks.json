@@ -25,6 +25,17 @@
         ]
       },
       {
+        "$comment": "Goldfish return check while the worker still exists (candidate 23). A marked Goldfish's own SubagentHandback is validated against its binding before the child is gone, because SubagentStop has no channel back to the worker or the Coordinator; live, a return cut off after its report lost the host commit silently. Allows every unmarked child and every fault, and stops refusing after three attempts. Whether Claude fires PreToolUse for this host tool is proven only by a live run.",
+        "matcher": "SubagentHandback",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
+            "timeout": 120
+          }
+        ]
+      },
+      {
         "$comment": "Dispatch budget (NVA-BUDGETGUARD-1, 2026-08-27). Counts a dispatched subagent's tool calls externally instead of trusting its self-report, and once the working cap is reached permits only closing acts -- so the dispatch stops BEFORE the harness cliff, at the one point where a handover is still possible. Measured motivation: three dispatches ran 62, 53 and 50 tool calls against a stated ~40-45 allowance, and one reported \"34 logged\" while the runtime recorded 62. The matcher is MATCH-ALL ON PURPOSE -- the budget is a count of ALL tool calls, so a matcher naming individual tools would undercount silently, the same failure class this file already paid for with NotebookEdit; the installed runtime treats an absent matcher, \"*\" and \".*\" as match-all, and that was verified against the running binary rather than assumed, because a matcher the runtime does not recognise is a SILENT no-op that looks exactly like success. The orchestrating session is identified and exempted INSIDE the guard (subagent detection on transcript_path), never by the matcher, so this hook never limits the Elephant. CORRECTION (2026-08-27, same day): this registration first carried a match-all matcher, and it matched NOTHING -- a live dispatch made 34 tool calls without moving the counter once. The runtime binary does contain a match-all predicate accepting an absent matcher and the two wildcard literals, which is why the choice was believed proven; that predicate simply does not govern plugin PreToolUse matchers. Hooks DO reach subagents -- the same dispatch was refused mid-run by guard-lifecycle-ready on its Bash|PowerShell matcher, which is the control separating \"hooks do not fire in subagents\" from \"this matcher is not honoured\". The matcher now enumerates, using the identical alternation construction every other working matcher here already uses, deliberately wider than any single agent's toolset because undercounting is the failure this guard exists to prevent. Wired by harness/scripts/wire-dispatch-budget-hook.mjs; see hooks/guard-dispatch-budget.mjs.",
         "matcher": "Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write",
         "hooks": [
