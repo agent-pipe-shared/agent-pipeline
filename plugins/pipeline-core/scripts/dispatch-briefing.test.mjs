@@ -657,6 +657,11 @@ test("a one-byte edit or a removed marker fails the generated-briefing verificat
   const unmarked = text.split("\n").filter((line) => !line.startsWith("<!-- pipeline-briefing-generator:")).join("\n");
   assert.equal(verifyGeneratedBriefing(unmarked).code, "DBG-GENERATED-MARKER-MISSING");
   assert.equal(verifyGeneratedBriefing(`${text}${text}`).code, "DBG-GENERATED-MARKER-MISSING");
+  // C23 (F15): only the final newline may be missing; anything else still fails, a second newline and an edit without the newline included.
+  assert.equal(text.endsWith("\n"), true);
+  assert.deepEqual(verifyGeneratedBriefing(text.slice(0, -1)), { ok: true, code: "DBG-GENERATED-VERIFIED" });
+  assert.equal(verifyGeneratedBriefing(`${text}\n`).code, "DBG-GENERATED-DIGEST-MISMATCH");
+  assert.equal(verifyGeneratedBriefing(edited.slice(0, -1)).code, "DBG-GENERATED-DIGEST-MISMATCH");
 });
 
 test("build refuses a named path that does not exist unless the package declares it new", async () => {
