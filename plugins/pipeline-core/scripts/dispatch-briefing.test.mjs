@@ -1593,7 +1593,11 @@ test("PF-61 reader one persisted diagnostic yields exactly one warning naming di
   assert.ok(found[0].message.includes("ALF-BG"));
   assert.ok(found[0].message.includes("NGHF-HANDBACK-INVALID"));
   assert.ok(found[0].message.includes(COMMIT));
-  assert.match(found[0].message, /commit it yourself with the Dispatch trailer, then rebuild/u);
+  assert.match(found[0].message, /run the recovery plan command, apply with --expect-sha256, then rebuild/u);
+  assert.doesNotMatch(found[0].message, /commit it yourself/u);
+  assert.match(found[0].recovery[1], /goldfish-host-commit-recover\.mjs$/u);
+  assert.deepEqual(found[0].recovery.slice(2, 3), ["plan"]);
+  assert.deepEqual(found[0].recovery.slice(-2), ["--dispatch-id", "ALF-BG"]);
 });
 
 test("PF-61 reader the warning names the recorded stage and reason, the detail's reason when the record has none, and says so when there is none", async () => {
