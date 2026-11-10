@@ -87,7 +87,7 @@ function applyBound(runner, plan, values, code, subcommand) {
 export function finishFeature({ rootDir = process.cwd(), by, architectureImpact, auditRequest, criticVerifyLifecycle, continuityCloseRequest = null, lifecycleId = null, resumeLifecycleId = null } = {}, deps = {}) {
   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
-  if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", "Feature close requires a known architecture impact.");
+  if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", `Feature close requires a known architecture impact; allowed --architecture-impact values: ${[...IMPACT].join(", ")}.`);
   if (typeof auditRequest !== "string" || auditRequest.length === 0 || auditRequest.startsWith("/") || auditRequest.includes("\\") || auditRequest.split("/").some(part => part === "" || part === "." || part === "..")) fail("FINISH-AUDIT-REQUEST", "Feature close requires one safe repository-relative audit request.");
   if (!/^[a-f0-9]{64}$/u.test(criticVerifyLifecycle ?? "")) fail("FINISH-CRITIC-VERIFY", "Feature close requires the exact private Critic/Verify lifecycle receipt ID.");
   if (continuityCloseRequest !== null && (typeof continuityCloseRequest !== "string" || continuityCloseRequest.length === 0 || continuityCloseRequest.startsWith("/") || continuityCloseRequest.includes("\\") || continuityCloseRequest.split("/").some(part => part === "" || part === "." || part === ".."))) fail("FINISH-CONTINUITY", "Continuity close request must be safe and repository-relative.");
@@ -224,7 +224,7 @@ function writeRepoJson(root, path, value) { const target = resolve(root, path); 
 export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, openChecks = null } = {}, deps = {}) {
   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
-  if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", "Feature close requires a known architecture impact.");
+  if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", `Feature close requires a known architecture impact; allowed --architecture-impact values: ${[...IMPACT].join(", ")}.`);
   if (criticPacketId !== null && !HEX32.test(criticPacketId)) fail("FINISH-CRITIC-PACKET", "The Critic packet id must be 32 lowercase hex characters.");
   if (resumeLifecycleId !== null && !/^[A-Za-z0-9._-]{1,100}$/u.test(resumeLifecycleId)) fail("FINISH-LIFECYCLE", "Lifecycle ID is invalid.");
   // C22 (CGR-06): the human's literal answer to the acceptance question is recorded as given, so only its presence and size are checked.

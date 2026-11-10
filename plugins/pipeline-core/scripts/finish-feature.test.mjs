@@ -106,6 +106,9 @@ test("resume rejects a different feature or changed close binding before mutatio
     readFileSyncFn: () => JSON.stringify({ activeFeature: { id: "feature-abc" } }),
     runCommand: runner,
   }), error => error.code === "FINISH-RESUME-STATE");
+  // C23 (Antigravity greenfield C): the refusal names what it would accept.
+  assert.throws(() => finishFeature({ rootDir: "/repo", by: "PO", architectureImpact: "none", auditRequest: "specs/feature/audit-request.json", criticVerifyLifecycle: f.criticVerifyLifecycle }, { realpathSyncFn: value => value, runCommand: runner }),
+    error => error.code === "FINISH-IMPACT" && /no-architecture-impact/u.test(error.message) && /architecture-conforms/u.test(error.message));
   assert.deepEqual(calls.map(argv => argv[1]), ["inspect"]);
 });
 
