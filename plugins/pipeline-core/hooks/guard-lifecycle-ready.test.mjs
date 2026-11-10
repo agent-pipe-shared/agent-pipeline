@@ -358,12 +358,12 @@ test("a not-ready session admits the help flag of a script that answers it and r
       const [name, flag] = tail.split(" ");
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${flag}`), dependencies), { exitCode: 0, stderr: "" }, tail);
     }
-    for (const tail of ["rotate-handover-sections.mjs --help", "close-coordinator.mjs -h", "dispatch-briefing.mjs --help --root x"]) {
+    for (const tail of ["critic-split-merge.mjs --help", "close-coordinator.mjs -h", "dispatch-briefing.mjs --help --root x"]) {
       const [name, ...rest] = tail.split(" ");
       const refused = evaluateLifecycleReadyGuard(bash(`node ${scriptPath(name)} ${rest.join(" ")}`), dependencies);
       assert.equal(refused.exitCode, 2, tail);
       assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u, tail);
-      assert.match(refused.stderr, { "rotate-handover-sections.mjs --help": /rotate-handover-sections\.mjs has no usable help: --help would start the script/u, "close-coordinator.mjs -h": /close-coordinator\.mjs answers --help, not -h/u }[tail] ?? /^(?![\s\S]*has no usable help:)/u, tail);
+      assert.match(refused.stderr, { "critic-split-merge.mjs --help": /critic-split-merge\.mjs has no usable help: --help would start the script/u, "close-coordinator.mjs -h": /close-coordinator\.mjs answers --help, not -h/u }[tail] ?? /^(?![\s\S]*has no usable help:)/u, tail);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
@@ -4977,8 +4977,15 @@ test("restart-required admits bounded resume-hint capture and required readback"
         projectDir: path,
         requireProjectOnboardingReadyFn() { deny("restart-required"); },
       }).exitCode, 0, input.tool_name);
+      // C23: the first restart of a new project happens at this status, and the same fixed card route is open there.
+      assert.equal(evaluateLifecycleReadyGuard(input, {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-initialization-required"); },
+      }).exitCode, 0, `runtime-initialization-required/${input.tool_name}`);
     }
     for (const [input, status] of [
+      [bash(`${capture} --bypass`), "runtime-initialization-required"],
+      [edit("project/resume-hint.json"), "runtime-initialization-required"],
       [bash(`${capture} --bypass`), "restart-required"],
       [bash(`node '${RESUME_HINT_SCRIPT}' capture --root '${path}' --card-file '${inputPath}'`), "restart-required"],
       [bash(`node '${RESUME_HINT_SCRIPT}' capture --root '${path}' --card-file '${join(path, "resume-card.json")}' --consume-card`), "restart-required"],

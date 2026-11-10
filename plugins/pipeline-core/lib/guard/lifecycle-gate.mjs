@@ -176,7 +176,13 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"
       && error.lifecycleStatus === "restart-required";
-    if (restartRequired && (isRestartResumeHintInputWrite(input, root)
+    // C23 (Antigravity greenfield D): the skill demands the card before ANY restart, and the first restart of a new project happens while the
+    // lifecycle still reads runtime-initialization-required; material input was refused its one durable route there.
+    const resumeCardStatus = restartRequired || (error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "runtime-initialization-required");
+    if (resumeCardStatus && (isRestartResumeHintInputWrite(input, root)
       || (toolName === "Bash" && (isRestartResumeHintCapture((input.tool_input.command ?? input.tool_input.CommandLine), root)
         || isRestartResumeHintInspect((input.tool_input.command ?? input.tool_input.CommandLine), root))))) {
       return verdict(0);
