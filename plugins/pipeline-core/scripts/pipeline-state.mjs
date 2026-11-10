@@ -14815,6 +14815,10 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
       "`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <ref> --proof-request <file> --proof-authority <file> --proof <file>` " +
       `from ${dir}; the step-by-step flow is docs/push-release-flow.md. To check that the registry itself is healthy: ${repairInspect}${elapsedText}`;
   }
+  // C23 (Codex greenfield F25): the registry is healthy here, inspect names nothing and the agent went looking for the route by reading scripts.
+  if (error?.reason === "companion-owning-lifecycle-context-required" && /^continuity-result-(bootstrap|close)-(plan|apply)$/u.test(String(sub))) {
+    return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported, nothing was written. Cause: this project has a session-authority catalogue, so ${sub} runs only on the owner route, under a Close lifecycle at checkpointed. Repair: when closing a feature, run finish-feature.mjs: it opens that lifecycle and names each command. By hand: node ${fileURLToPath(new URL("./continuity-owner-route.mjs", import.meta.url))} run --root ${dir} --lifecycle <id> -- ${sub} <the same flags>.${elapsedText}`;
+  }
   // A short file-access conflict on Windows leaves nothing for inspect to name (claude greenfield 2026-11-08: inspect answered next: []).
   if (error?.reason === "WIN-AUTH-OPEN") {
     return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported. Repair: run ${repairInspect}. When its next list is empty this was a short file-access conflict: repeat the same command once. If it is refused again, the windowsAuthorityReadiness.causes field of the preflight names the folder.${elapsedText}`;

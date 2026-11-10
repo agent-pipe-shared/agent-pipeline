@@ -428,6 +428,12 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
       const fileSha = (rel) => createHash("sha256").update(readFileSync(join(fx.root, rel))).digest("hex");
       const resultPath = `specs/${FEATURE_ID}/result.md`;
       const stateWriter = (label, verb, extra = []) => step(log, `${identity.runner}: ${label}`, process.execPath, [script("pipeline-state.mjs"), verb, ...extra], { cwd: fx.root });
+      // C23 (Codex greenfield F25): a project whose catalogue exists before the Result is bound (the native Goldfish route creates it) takes the owner route the stop names.
+      if (oneShot && catalogue) {
+        const repository = inspectSignedDescriptorCustodyRepository(fx.root);
+        assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
+      }
+      let ownerLifecycle = null;
       if (oneShot) {
         // C22 (CGF-04), first stop of the real CLI: a Continuity feature with no bound Result stops BEFORE any evidence is written, with the bootstrap chain as its repair.
         const treeBefore = porcelain();
@@ -436,9 +442,13 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         assert.equal(unbound.code, "ONESHOT-RESULT-NOT-BOUND", JSON.stringify(unbound.result).slice(0, 600));
         assert.match(unbound.result.stop.repair, /continuity-result-bootstrap-plan/u);
         assert.equal(porcelain(), treeBefore, `${identity.runner}: a stop that wrote nothing leaves the tree as it was`);
+        if (catalogue) ownerLifecycle = /continuity-owner-route\.mjs run --root \S+ --lifecycle (\S+) --/u.exec(unbound.result.stop.repair)?.[1] ?? assert.fail(`the stop names the owner route: ${unbound.result.stop.repair}`);
       }
-      const bootstrap = json(stateWriter("continuity-result-bootstrap-plan", "continuity-result-bootstrap-plan"));
-      const bootstrapApplied = step(log, `${identity.runner}: continuity-result-bootstrap-apply (the action the plan returned)`, bootstrap.applyAction.executable, bootstrap.applyAction.argv, { cwd: fx.root });
+      const ownerRoute = (label, entryArgv) => step(log, `${identity.runner}: owner route ${label}`, process.execPath, [script("continuity-owner-route.mjs"), "run", "--root", fx.root, "--lifecycle", ownerLifecycle, "--", ...entryArgv], { cwd: fx.root });
+      const bootstrap = ownerLifecycle === null ? json(stateWriter("continuity-result-bootstrap-plan", "continuity-result-bootstrap-plan")) : json(ownerRoute("continuity-result-bootstrap-plan", ["continuity-result-bootstrap-plan"]));
+      const bootstrapApplied = ownerLifecycle === null
+        ? step(log, `${identity.runner}: continuity-result-bootstrap-apply (the action the plan returned)`, bootstrap.applyAction.executable, bootstrap.applyAction.argv, { cwd: fx.root })
+        : ownerRoute("continuity-result-bootstrap-apply", bootstrap.applyAction.argv.slice(1));
       // Measured (w265 finding 2): a REGISTERED package lags the Result the bootstrap just bound. G20-38 (PO decision 2026-11-07), restated
       // from the w265 walk, which signed this reconcile with the fixture's own test key: the plan moves only the Result entry, so every other
       // artifact keeps the digest the approved manifest pins and the agent runs the reconcile itself, with no proof flags and no signature.
@@ -453,7 +463,9 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
       assert.ok(driftEntry, "the registered package holds a non-result, non-authority artifact to drift");
       const driftPath = join(fx.root, driftEntry.path); const driftOriginal = readFileSync(driftPath);
       writeFileSync(driftPath, Buffer.concat([driftOriginal, Buffer.from("\ndrifted after the approval\n")]));
-      const mixed = json(stateWriter("continuity-result-bootstrap-plan (a non-result entry also drifted)", "continuity-result-bootstrap-plan"));
+      const mixed = ownerLifecycle === null
+        ? json(stateWriter("continuity-result-bootstrap-plan (a non-result entry also drifted)", "continuity-result-bootstrap-plan"))
+        : json(ownerRoute("continuity-result-bootstrap-plan (a non-result entry also drifted)", ["continuity-result-bootstrap-plan"]));
       assert.equal(mixed.preview.requiredAuthority, "po");
       assert.equal(mixed.signatureCommand.kind, "feature-package-reconcile", "the PO-signed route still prints its signing command");
       const unsigned = step(log, `${identity.runner}: feature-package-reconcile without a proof is refused when a non-result entry drifted`, process.execPath,
@@ -733,4 +745,8 @@ test("G20-35: the close path from implementation to release preflight is walked 
 
 test("C22 CGF-04: the one-shot close CLI walks the whole close on the real fixture: its stops, the acceptance question, the commits the close asks for, and the resume", { timeout: 600_000 }, async () => {
   await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true });
+});
+
+test("C23 F25: in a project with a catalogue from the start the one-shot close binds the Result on the owner route and closes without a detour", { timeout: 600_000 }, async () => {
+  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, catalogue: true });
 });

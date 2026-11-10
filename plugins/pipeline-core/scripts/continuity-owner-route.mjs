@@ -20,7 +20,7 @@ import { normalizeRootArgument } from '../lib/root-argument.mjs';
 import { inspectSignedDescriptorCustodyRepository } from '../lib/worktree-lifecycle.mjs';
 import { createSourceOwnedContinuityOwnerRouteRequesterRuntime, inspectSourceOwnedContinuityOwnerRouteCourse } from '../lib/session-requester-bridge.mjs';
 import { bindOnboardingSessionCleanup, observeSessionCleanupState, releaseOnboardingSessionCleanup,
-  executeOnboardingContinuityOwnerRouteEntry, releaseDeadContinuityOwnerRouteBinding } from '../lib/onboarding-continuity.mjs';
+  executeOnboardingContinuityOwnerRouteEntry, releaseDeadContinuityOwnerRouteBinding, retireFinishedContinuityOwnerRouteDescriptors } from '../lib/onboarding-continuity.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const ROUTINE_REPAIR = fileURLToPath(new URL('./routine-repair.mjs', import.meta.url));
@@ -88,6 +88,7 @@ async function run(argv) {
   catch (error) {
     refuse('COR-REQUESTER-UNAVAILABLE', ownerRouteRequesterRefusal(error, root));
   }
+  let released = false;
   try {
     return await runtime.run(async () => {
       try {
@@ -114,19 +115,25 @@ async function run(argv) {
         releaseOnboardingSessionCleanup({ rootDir: root, sessionCleanup: runtime.sessionCleanup, expectedStateSha256: before.stateSha256, expectedRevision: before.revision });
         const after = observeSessionCleanupState(root);
         if (after.sessionCleanup !== null || after.orphanBinding) throw new Error('binding still held');
+        released = true;
       } catch (error) {
         refuse('COR-RELEASE-HELD', `the entry ran but its owner-route binding could not be released (${error?.code ?? 'error'}). Release it with: ${healCommand(root)}`, { held: true });
       }
       if (result.status !== 'completed') refuse(result.code ?? 'COR-ENTRY-REFUSED', `the entry was refused before it wrote anything (${result.code ?? 'refused'}); the binding is released`);
       return { status: result.exitCode === 0 ? 'completed' : 'refused', code: result.exitCode === 0 ? null : 'COR-ENTRY-EXIT', entry, exitCode: result.exitCode, released: true };
     });
-  } finally { await runtime.dispose(); }
+  } finally {
+    await runtime.dispose();
+    // C23 (F25): the per-call descriptor is finished once its binding is released; left behind it blocks the closing cleanup receipt.
+    if (released) retireFinishedContinuityOwnerRouteDescriptors({ rootDir: root, finishedSessionId: runtime.sessionCleanup.sessionId });
+  }
 }
 
 function releaseOrphan(argv) {
   const orphanRoot = normalizeRootArgument(argv[2]);
   if (argv.length !== 3 || argv[1] !== '--root' || !isAbsolute(orphanRoot) || resolve(orphanRoot) !== orphanRoot) refuse('COR-USAGE', `node ${SELF} release-orphan --root <root>`);
-  return { schema: OWNER_ROUTE_ORPHAN_SCHEMA, ...releaseDeadContinuityOwnerRouteBinding({ rootDir: orphanRoot }) };
+  const orphan = releaseDeadContinuityOwnerRouteBinding({ rootDir: orphanRoot });
+  return { schema: OWNER_ROUTE_ORPHAN_SCHEMA, ...orphan, finishedDescriptorsRetired: retireFinishedContinuityOwnerRouteDescriptors({ rootDir: orphanRoot }).retired };
 }
 
 const entry = process.argv[1] && resolve(process.argv[1]);

@@ -45,6 +45,7 @@ import { buildAuditIndex, closeQualityReadback } from "../lib/close-quality-read
 import { loadMapBundle } from "./module-inventory.mjs";
 import { pushApprovalActive, pushThreatModelRefusalText, pushThreatModelVerdict } from "../lib/push-threat-model-gate.mjs";
 import { listActiveSessionDescriptors, inspectSessionOwnerRuntime } from "../lib/worktree-lifecycle.mjs";
+import { retireFinishedContinuityOwnerRouteDescriptors } from "../lib/onboarding-continuity.mjs";
 import { invokingRunnerFromEnv, resolveOwnSessionDescriptor } from "../lib/own-session-descriptor.mjs";
 import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 import {
@@ -992,7 +993,7 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
 // Candidate 16d: the producer for `pipeline.close-cleanup-receipt.v1`. Read-only toward the repository and the descriptors; it writes
 // exactly two private files into the lifecycle's own evidence directory. The closing session's own descriptor (derived from the runtime
 // environment, never typed) is excluded and named; every other active descriptor counts (lib/close-cleanup-receipt.mjs).
-function writeCleanupReceipt(values, { env = process.env, listDescriptors = listActiveSessionDescriptors, inspectOwner = inspectSessionOwnerRuntime } = {}) {
+function writeCleanupReceipt(values, { env = process.env, listDescriptors = listActiveSessionDescriptors, inspectOwner = inspectSessionOwnerRuntime, retireFinishedOwnerRoute = retireFinishedContinuityOwnerRouteDescriptors } = {}) {
   const root = physicalRoot(values.root);
   const common = gitCommonDir(root);
   const stored = readCloseCoordinator(common, values.lifecycle);
@@ -1007,6 +1008,8 @@ function writeCleanupReceipt(values, { env = process.env, listDescriptors = list
   // on Codex the own `codex-<id>` descriptor counted as foreign and the receipt could never be complete).
   const ownSession = resolveOwnSessionDescriptor({ runner: invokingRunnerFromEnv(env), env, commonDir: common });
   const ownSessionId = ownSession.descriptorSessionId;
+  // C23 (F25): an owner-route call of an earlier version, or one that was killed, left its finished per-call descriptor behind. It is no session, so it does not count here.
+  retireFinishedOwnerRoute({ rootDir: root });
   const descriptors = listDescriptors(root).map((descriptor) => {
     const observed = inspectOwner(root, descriptor.sessionId, { expectedDescriptorSha256: descriptor.descriptorSha256 });
     if (!observed || observed.schema !== "pipeline.session-owner-status.v1" || observed.sessionId !== descriptor.sessionId

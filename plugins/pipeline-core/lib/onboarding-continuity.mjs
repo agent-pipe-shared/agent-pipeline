@@ -10430,6 +10430,31 @@ export function releaseDeadContinuityOwnerRouteBinding({ rootDir } = {}) {
   return {status:'released',sessionId:tuple.sessionId,descriptorRetired:loaded !== null,member:step.member,registry:step.registry};
 }
 
+/**
+ * C23 (Codex greenfield F25): every owner-route call starts its own controller-<random> descriptor, and nothing removed it after the call, so the closing cleanup receipt
+ * counted each one as another session (closed-local refused CLOSE-CLEANUP) and the onboarding steps that need an empty listing stayed shut. Retires exactly those descriptors: an owner-route
+ * invocation record names it, the State does not hold it as a binding, and its process is proven dead or is the caller that just released it (finishedSessionId). Everything else
+ * stays listed. Never throws: a descriptor it could not retire stays visible to the receipt, which then says so.
+ */
+export function retireFinishedContinuityOwnerRouteDescriptors({ rootDir, finishedSessionId = null } = {}) {
+  const retired = [];
+  try {
+    const repository = continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(rootDir));
+    const held = observeSessionCleanupState(rootDir).sessionCleanup?.sessionId ?? null;
+    for (const { sessionId, descriptorSha256 } of listActiveSessionDescriptors(repository.primaryRoot)) {
+      if (!/^controller-[a-f0-9]{24}$/u.test(sessionId) || sessionId === held) continue;
+      const invocation = inspectSourceOwnedContinuityOwnerRouteInvocation({rootDir:repository.primaryRoot,sessionId});
+      if (invocation.status !== 'found' || (invocation.ownerStatus !== 'dead' && sessionId !== finishedSessionId)) continue;
+      try {
+        const {ownerNonce} = loadSessionDescriptor(repository.primaryRoot,sessionId,{expectedDescriptorSha256:descriptorSha256});
+        retireSessionDescriptor(repository.primaryRoot,{sessionId,descriptorSha256,ownerNonce});
+        retired.push(sessionId);
+      } catch { /* stays listed, so the receipt names it */ }
+    }
+    return {status:'swept',retired};
+  } catch (error) { return {status:'unverifiable',retired,reason:String(error?.code ?? error?.message ?? error).slice(0,200)}; }
+}
+
 // Source-owned selected-State bookkeeping. No public constructor mints a witness.
 const continuitySharedStateWitnesses = new WeakMap();
 const continuityAuthorityPortCache = new Map();

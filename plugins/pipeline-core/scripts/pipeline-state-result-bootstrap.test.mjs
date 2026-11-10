@@ -12,9 +12,9 @@ import { observeNativePlatformProcess } from "../lib/native-platform-process-obs
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { run } from "./pipeline-state.mjs";
+import { describeStateAuthorityRefusal, run } from "./pipeline-state.mjs";
 import { planFeaturePackageReconcile, reconcileNoDriftOk, validateFeaturePackage } from "../lib/feature-package-topology.mjs";
-import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+import { inspectSignedDescriptorCustodyRepository, listActiveSessionDescriptors, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
 import { observeSessionCleanupState } from "../lib/onboarding-continuity.mjs";
@@ -1054,6 +1054,52 @@ test("D231 owner route (E): heal leaves the binding of an owner whose recorded p
   assert.equal(released.status, 0, released.stdout + released.stderr);
   assert.equal(JSON.parse(released.stdout).ownerRoute.status, "released", "once the recorded process is gone the same heal releases the binding");
   assertReleased(p, "after the stand-in is gone");
+});
+
+test("C23 F25: the refusal of a Result entry outside the owner route names that route, not an inspect that finds nothing; other commands keep the inspect repair", () => {
+  const error = { code: "SDC-AUTHORITY-UNAVAILABLE", reason: "companion-owning-lifecycle-context-required" };
+  const text = describeStateAuthorityRefusal(error, { dir: "/repo", sub: "continuity-result-bootstrap-plan" });
+  assert.match(text, /continuity-owner-route\.mjs run --root \/repo --lifecycle <id> -- continuity-result-bootstrap-plan/u);
+  assert.match(text, /finish-feature\.mjs/u);
+  assert.doesNotMatch(text, /session-authority-repair/u);
+  assert.match(describeStateAuthorityRefusal(error, { dir: "/repo", sub: "set-phase" }), /session-authority-repair\.mjs inspect/u);
+});
+
+test("C23 F25: an owner-route call removes its own per-call descriptor, and heal retires what an earlier or killed call left, but never a live owner's or a foreign one", { skip: process.platform === "win32" }, async () => {
+  const p = ownerRouteProject("cor-descriptor-sweep");
+  const active = () => listActiveSessionDescriptors(p.root).map((entry) => entry.sessionId);
+  const finished = ownerRun(p, ["continuity-result-bootstrap-plan"]);
+  assert.equal(finished.status, 0, finished.stderr);
+  assert.deepEqual(active(), [], "a finished call leaves no descriptor behind");
+  const directory = join(p.repository.commonDir, "agent-pipeline", "run", "session-requesters", "invocations");
+  const record = JSON.parse(readFileSync(join(directory, readdirSync(directory).find((name) => /^owner-route-[a-f0-9]{24}\.json$/u.test(name))), "utf8"));
+  const standIn = () => spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
+  const leftover = (id, processRecord) => {
+    const sessionId = `controller-${id.repeat(24)}`;
+    startSessionDescriptor(p.root, { sessionId });
+    writeFileSync(join(directory, `owner-route-${id.repeat(24)}.json`), JSON.stringify({ ...record, sessionId, process: processRecord }), { mode: 0o600 });
+    return sessionId;
+  };
+  const dead = standIn(); const alive = standIn();
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const deadRecord = observeNativePlatformProcess(dead.pid);
+    const gone = new Promise((resolve) => dead.once("exit", resolve));
+    dead.kill("SIGKILL");
+    await gone;
+    const stale = leftover("a", deadRecord);
+    const running = leftover("b", observeNativePlatformProcess(alive.pid));
+    const foreign = `controller-${"c".repeat(24)}`;
+    startSessionDescriptor(p.root, { sessionId: foreign });
+    const healed = spawnNode(ROUTINE_REPAIR_CLI, ["run", "heal", "--root", p.root, "--reason", "test heal"], { cwd: p.root });
+    assert.equal(healed.status, 0, healed.stdout + healed.stderr);
+    assert.deepEqual(JSON.parse(healed.stdout).ownerRoute.finishedDescriptorsRetired, [stale]);
+    assert.deepEqual(active().sort(), [running, foreign].sort(), "a live owner's descriptor and one without an owner-route record stay");
+  } finally {
+    const gone = new Promise((resolve) => alive.once("exit", resolve));
+    alive.kill("SIGKILL");
+    await gone;
+  }
 });
 
 test("N29: the reconcile plan lifts authority only on the Result entry Continuity binds, and the no-drift check admits nothing wider", () => {

@@ -24,6 +24,7 @@ import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summa
 const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
 const STATE_WRITER = fileURLToPath(new URL("./pipeline-state.mjs", HERE));
+const OWNER_ROUTE = fileURLToPath(new URL("./continuity-owner-route.mjs", HERE));
 const VERIFY_PRODUCER = fileURLToPath(new URL("./verify-evidence-producer.mjs", HERE));
 const REGISTER_PACKAGE = fileURLToPath(new URL("./register-feature-package.mjs", HERE));
 const SECURITY_SCAN = fileURLToPath(new URL("./security-scan.mjs", HERE));
@@ -290,7 +291,33 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     const coordinatorStillBeforePrepared = () => {
       try { return new Set(["active", "checkpointed"]).has(command(runner, process.execPath, [COORDINATOR, "inspect", "--root", root, "--lifecycle", resumeLifecycleId], "ONESHOT-INSPECT")?.coordinator?.phase); } catch { return false; }
     };
-    const requalify = resumeLifecycleId !== null && packageAt().moved && coordinatorStillBeforePrepared();
+    // C23 (Codex greenfield F25): in a project with a session-authority catalogue the Result entries run only on the owner route, which needs a Close lifecycle at
+    // checkpointed, so the one-shot opens that lifecycle itself and drives the entries through the route. A rerun finds the open lifecycle again, also one an agent started by hand.
+    const coordinatorOf = (lifecycle) => { try { return command(runner, process.execPath, [COORDINATOR, "inspect", "--root", root, "--lifecycle", lifecycle], "ONESHOT-INSPECT"); } catch { return null; } };
+    const ownerRouteRequired = (() => { try { return existsSync(join(common(), "agent-pipeline", "session-authority", "catalogue.json")); } catch { return false; } })();
+    const onlyOpenLifecycle = () => {
+      let names;
+      try { names = readdirSync(join(common(), "agent-pipeline", "publication-close")); } catch { return null; }
+      const open = names.filter((name) => /^[A-Za-z0-9._-]{1,100}$/u.test(name)).filter((name) => {
+        const seen = coordinatorOf(name);
+        return seen?.identity?.featureId === featureId && new Set(["active", "checkpointed"]).has(seen?.coordinator?.phase);
+      });
+      return open.length === 1 ? open[0] : null;
+    };
+    if (ownerRouteRequired && resumeLifecycleId === null) resumeLifecycleId = onlyOpenLifecycle();
+    const ensureOwnerLifecycle = () => {
+      const lifecycle = resumeLifecycleId ?? `${featureId}-close`;
+      const flags = ["--root", root, "--lifecycle", lifecycle, "--actor", actor];
+      const runAction = (planned, code) => command(runner, planned?.nextAction?.executable, planned?.nextAction?.argv, code);
+      const seen = coordinatorOf(lifecycle);
+      if (seen === null) runAction(command(runner, process.execPath, [COORDINATOR, "plan-start", ...flags, "--close-intent", "durable-stop"], "ONESHOT-OWNER-START-PLAN"), "ONESHOT-OWNER-START-APPLY");
+      if (seen === null || seen.coordinator?.phase === "active") runAction(command(runner, process.execPath, [COORDINATOR, "plan-transition", ...flags, "--phase", "checkpointed"], "ONESHOT-OWNER-CHECKPOINT-PLAN"), "ONESHOT-OWNER-CHECKPOINT-APPLY");
+      resumeLifecycleId = lifecycle;
+      return lifecycle;
+    };
+    // The first pass stopped before it wrote the requests a resume reads (an agent's hand-started lifecycle has none either): the evidence stages still have to run.
+    const firstPassUnfinished = () => !existsSync(resolve(root, auditRequestPath)) || (state.continuity !== null && typeof state.continuity === "object" && !existsSync(resolve(root, closeRequestPath)));
+    const requalify = resumeLifecycleId !== null && (packageAt().moved || (ownerRouteRequired && firstPassUnfinished())) && coordinatorStillBeforePrepared();
     const again = requalify ? resumeLifecycleId : null;
     if (resumeLifecycleId === null || requalify) {
       let accepted = null;
@@ -306,6 +333,13 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       packetForRerun = packet;
       // C21B: a Continuity feature without a bound Result cannot pass the Result close block below; stop BEFORE Verify, so no partial close evidence has to be cleaned up by hand.
       if (state.continuity !== null && typeof state.continuity === "object" && state.continuity.queueHead?.nextAction !== "close" && !state.continuity.authority?.result) {
+        if (ownerRouteRequired) {
+          let lifecycle;
+          try { lifecycle = ensureOwnerLifecycle(); } catch (error) { return stopResult("result-bootstrap", error.refusalCode ?? error.code, error.message, repairFor(error, again)); }
+          const route = `node ${OWNER_ROUTE} run --root ${root} --lifecycle ${lifecycle} --`;
+          return stopResult("result-bootstrap", "ONESHOT-RESULT-NOT-BOUND", `Continuity authority.result is null, so this feature has no bound Implementation Result. This project has a session-authority catalogue, so the State entries run on the owner route; the Close lifecycle ${lifecycle} it needs is open and nothing in the work tree was written.`,
+            `in the project root ${root}: (1) ${route} continuity-result-bootstrap-plan; (2) run the applyAction it returns on the same route, that is ${route} followed by its argv from the second element on; (3) when its completion prints a reconcileCommand, run it, and a plan that needs the PO also prints the signatureCommand for the PO; (4) node ${join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs")} --root ${root} --agent; (5) ${rerun(lifecycle)}`);
+        }
         return stopResult("result-bootstrap", "ONESHOT-RESULT-NOT-BOUND", "Continuity authority.result is null, so this feature has no bound Implementation Result; nothing was written.",
           `in the project root ${root} (the first command takes no flags and reads the working directory): (1) node ${STATE_WRITER} continuity-result-bootstrap-plan; (2) run the applyAction it returns; (3) when its completion prints a reconcileCommand, run it, and a plan that needs the PO also prints the signatureCommand for the PO; (4) node ${join(dirname(STATE_WRITER), "commit-pipeline-owned.mjs")} --root ${root} --agent; (5) ${rerun(null)}`);
       }
@@ -410,12 +444,18 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
           stages.push("result-close-block");
           const result = state.continuity.authority?.result;
           try {
-            const plan = command(runner, process.execPath, [STATE_WRITER, "continuity-result-close-plan", "--feature-id", featureId, "--expected-revision", String(state.continuity.revision), "--result-path", result?.path, "--result-sha256", result?.sha256], "ONESHOT-RESULT-CLOSE-PLAN");
-            command(runner, plan.applyAction?.executable, plan.applyAction?.argv, "ONESHOT-RESULT-CLOSE-APPLY");
+            const flags = ["--feature-id", featureId, "--expected-revision", String(state.continuity.revision), "--result-path", result?.path, "--result-sha256", result?.sha256];
+            if (ownerRouteRequired) {
+              const route = [OWNER_ROUTE, "run", "--root", root, "--lifecycle", ensureOwnerLifecycle(), "--"];
+              const plan = command(runner, process.execPath, [...route, "continuity-result-close-plan", ...flags], "ONESHOT-RESULT-CLOSE-PLAN");
+              if (!Array.isArray(plan.applyAction?.argv)) fail("ONESHOT-RESULT-CLOSE-PLAN", "The Result close plan returned no apply action.");
+              command(runner, process.execPath, [...route, ...plan.applyAction.argv.slice(1)], "ONESHOT-RESULT-CLOSE-APPLY");
+            } else {
+              const plan = command(runner, process.execPath, [STATE_WRITER, "continuity-result-close-plan", ...flags], "ONESHOT-RESULT-CLOSE-PLAN");
+              command(runner, plan.applyAction?.executable, plan.applyAction?.argv, "ONESHOT-RESULT-CLOSE-APPLY");
+            }
           } catch (error) {
-            const owner = /SDC-AUTHORITY-UNAVAILABLE/u.test(error.message);
-            return stopResult("result-close-block", owner ? "ONESHOT-OWNER-ROUTE-REQUIRED" : (error.refusalCode ?? error.code), error.message,
-              owner ? `this project has a session-authority catalogue: run the Result close entries through node ${join(dirname(STATE_WRITER), "continuity-owner-route.mjs")} run --root ${root} --lifecycle <id> -- continuity-result-close-plan <flags>, then rerun the identical command` : "repair the refusal above, then rerun the identical command");
+            return stopResult("result-close-block", error.refusalCode ?? error.code, error.message, repairFor(error, resumeLifecycleId));
           }
           current = readFeatureState(root, deps);
         }
