@@ -120,6 +120,12 @@ previous round's candidate). Earlier rounds may carry findings. The addendum is
 exclusive and cannot be replaced. Rounds are not capped (D190/D199): a further
 correction-diff Critic round is always allowed.
 
+**A product fix after a passed Critic round.** Commit it as usual. The close still accepts it, but the push's
+Critic carry does not (`CVL-CARRY-CONTENT-CHANGED`), so register a correction-DIFF round BEFORE the close
+(`register-feature-package.mjs --help`, "Critic delta request route"). That is the whole answer: there is no
+need to read the coordinator or the carry sources to find it. Details are under the carry-forward and
+`candidate-frozen` paragraphs below.
+
 The returned action has this shape (the Continuity flag is mandatory whenever
 it is present in the returned argv):
 
