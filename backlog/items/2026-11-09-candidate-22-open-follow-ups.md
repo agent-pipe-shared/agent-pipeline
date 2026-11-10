@@ -24,7 +24,7 @@ Candidate 22 (40 patches, stamp `ef16e1b86`) carries the P0 to P2 findings of th
 - **CGR-19:** one narrow command moves `repositoryMode` from `local-only` to `remote-tracked`, only with a configured remote. Every other direction stays on the guard-override route.
 - **Read grammar:** combined short flags are admitted by checking each flag against the existing list.
 - **Recursive grep (PO decision on measured reach):** `grep -r` is admitted through its own screen, because the existing recursive screen follows the reach of `rg` and `grep -r` also reads ignored and hidden files. The common shapes count (`-rl`, `-rE`, `--include`), since the goal is fewer wasted turns. `-R` stays refused.
-- **Stay in 0.7.1:** CGF-16, CGF-24, CGF-25 with CGF-01, CGF-26, CGF-36, the CGR-07 queue, straight-run tests 1, 2, 3 and 5.
+- **Stay in 0.7.1:** CGF-16, CGF-24, CGF-25 with CGF-01 (its proof and final-evidence part moved into candidate 27, D238; the portable package stays), CGF-26, CGF-36, the CGR-07 queue, straight-run tests 1, 2, 3 and 5.
 
 ## Built in 22b (implementation complete, PO acceptance pending)
 

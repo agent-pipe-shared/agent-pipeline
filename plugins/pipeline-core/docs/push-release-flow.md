@@ -396,36 +396,35 @@ uses.
 
 ### Releasing a consumer project: a version tag (G20-42)
 
-For a **consumer** project a release is a version tag `v<VERSION>` on a closed feature that is already pushed. The consumer mode of
+For a **consumer** project a release is a version tag `v<VERSION>` on a closed feature, and it includes the push (ADR-0090): the PO signs the design and then either a branch push or a release, so two signatures in all. The consumer mode of
 `release-preflight-cli.mjs` is chosen from the project's shape (no Pipeline plugin manifests under `plugins/pipeline-core/`), never by a flag;
-the Pipeline's own source release above is unchanged. It is the LAST step of the happy path, after the feature close and its push:
+the Pipeline's own source release above is unchanged. It is the LAST step of the happy path, after the feature close:
 
 1. `VERSION` is tracked (onboarding creates it as `0.1.0`; an older project runs `release-preflight-cli.mjs --init-version --root <root>`
    and commits the file). `RELEASE-NOTES.md` carries a `## v<VERSION>` entry naming the closed feature id, its title and the acceptance
    criteria met; the agent writes it with the feature, so the Critic reviews it and the Critic-bound push Verify carries it.
 2. `node ${PIPELINE_PLUGIN_ROOT}/scripts/release-preflight-cli.mjs --root <root> --base <registered base commit> --lifecycle specs/<feature>/lifecycle.json`
    writes `evidence/release-preflight.json` only when the feature is in `closedFeatures`, the notes entry is committed, push-prepare's own
-   Verify / Critic-bound Verify / security checks are green, the push approval for this candidate exists, and the candidate is reachable from
-   `refs/remotes/origin/main`. Otherwise it exits 2 at the first missing step and prints `repair:` with the command that supplies it.
+   Verify / Critic-bound Verify / security checks are green, and the candidate builds on `refs/remotes/origin/main` (a fast-forward, or the first push). Otherwise it exits 2 at the first missing step and prints `repair:` with the command that supplies it.
 3. The PO approves the release once, through the `release-preflight` critical kind in the configured approval mode. In `chat` mode the run itself
    records the approval; in `signature` mode the command stops with `RPC-CONSUMER-PO-APPROVAL` and prints the PO's exact signing command for
    this subject, then runs again with `--proof-request`/`--proof`.
-4. The agent runs the `nextActions` the command prints: `git tag -a v<VERSION> -m "version tag" <commit>` and
-   `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
-   (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above.
-   **The approval proofs reach the remote audit bundle (C20E-AP).** The push approval signs the commit that carries
-   `audit-bundles/<feature>/<candidate>/`, and the release approval comes later, so neither proof can sit inside that commit. When the feature has a
-   bundle, the same command therefore also adds, as NEW files only, the public proof objects of the push approval and of the release approval to that
-   bundle's `proofs/` directory (numbering continues after the bundle's own proofs) plus one list, `proofs/follow-up.json`, that binds them by digest to the
-   approved commit and to the bundle's candidate. `manifest.json` and `README.md` stay byte for byte, so the bundle's own `audit-bundle.mjs verify` still
-   passes and now also checks the follow-up (`AB-FOLLOWUP`, `AB-DIGEST`, `AB-PROOF-INTENT`, `AB-PROOF-SIGNATURE`). Never a private key: a `chat` or waiver
-   approval is carried as an attribution record (kind, mode, time) and never as a proof. The command arms the commit of exactly those files (G20-66) and
-   prints it between the tag and the pushes: `nextActions` becomes the tag, the commit step, `git push origin HEAD:refs/heads/main`, then the tag push.
-   `hooks/guard-push.mjs` admits that branch push without a second approval ONLY for exactly one commit on top of the release-approved commit
-   (`authorizeAuditProofFollowUp`): the approved commit is the published tip of the destination, carries its recorded push approval and the annotated release
-   tag, and the commit's diff only ADDS regular files under that one bundle's `proofs/` (each a public proof object or the list). Any other path, a changed
-   existing file, a second commit, a merge or an unpublished parent falls through to the full gate unchanged. A project without a bundle sees the `auditProofFollowUp`
-   status `no-bundle` and the tag steps alone.
+4. The agent runs the `nextActions` the command prints, in order: `git tag -a v<VERSION> -m "version tag" <commit>`; `git push origin HEAD:refs/heads/main` when the
+   commit is not on origin's main yet (the release approval stands in for the push approval of exactly this commit, `authorizeReleaseIncludedPush`; Verify, Security and the other gates still run);
+   the follow-up commit and its push, when the feature has a bundle; `git push origin refs/tags/v<VERSION>`. `hooks/guard-push.mjs` admits exactly that annotated tag at exactly that commit
+   (`authorizeRecordedReleaseTag`) and refuses any other release tag, a lightweight tag, or one without the approval, naming the command above. The generated pre-push hook decides all three through the same predicates.
+
+**The follow-up commit: the evidence reaches the repository after every signed push (C20E-AP, ADR-0090).** The approval signs the commit that carries
+`audit-bundles/<feature>/<candidate>/`, so its proof cannot sit inside that commit, and the final Verify and Security records are produced after it. A release command adds them itself; after a push to a feature branch run the
+`afterPush.followUp` command `push-prepare` printed (`scripts/audit-proof-followup.mjs --root <root> --remote <remote> --destination <ref>`). Either way the step adds, as NEW files only, the public proof objects of the approvals and the final records
+(`final-verify`, `push-verify`, `final-security`, `security-verdict`) to the bundle's `proofs/` directory (numbering continues after everything already there) plus one list, `proofs/follow-up.json` or, for a later approved commit, `proofs/follow-up-NNN.json`, that binds them by digest to the
+approved commit and to the bundle's candidate. `manifest.json` and `README.md` stay byte for byte, so the bundle's own `audit-bundle.mjs verify` still
+passes and also checks the follow-up (`AB-FOLLOWUP`, `AB-DIGEST`, `AB-PROOF-INTENT`, `AB-PROOF-SIGNATURE`). Never a private key: a `chat` or waiver
+approval is carried as an attribution record (kind, mode, time) and never as a proof. The step arms the commit of exactly those files (G20-66) and prints it with the push.
+`hooks/guard-push.mjs` admits that push to the same destination without another approval ONLY for exactly one commit on top of the approved commit
+(`authorizeAuditProofFollowUp`): the approved commit is the published tip of the destination, carries its recorded push approval for this remote and destination or a release approval with its annotated
+tag, and the commit's diff only ADDS regular files under that one bundle's `proofs/`: the recorded public proofs, one list and records of a known schema bound to the approved history. Any other path, a changed
+existing file, a second commit, a merge or an unpublished parent falls through to the full gate unchanged, and the follow-up commit itself carries no approval, so nothing can chain onto it. A project without a bundle sees the status `no-bundle` and no follow-up step.
 
 ### Source reader binding (Agent Pipeline source checkout only)
 
@@ -634,7 +633,7 @@ chained line to a private record under the Git directory, so it needs no commit 
 A Stop hook (`hooks/publication-readback-stop.mjs`) also tries this at the end of the turn, from Git's reflog of the
 remote-tracking ref, for pushes of the last 24 hours; running both adds no second line. The hook is silent and cannot see a
 remote without a fetch refspec, a repository with `core.logAllRefUpdates=false`, or a push whose reflog line a later
-fetch has already covered, so the command stays the step to run.
+fetch has already covered, so the command stays the step to run. In a consumer project the next step is `afterPush.followUp`, the one evidence commit described under "Releasing a consumer project".
 The record's `handoverLine` goes into the next handover you write anyway; never make a commit only for it.
 `scripts/publication-readback.mjs inspect --root <repo>` reads the latest record in a later session.
 
