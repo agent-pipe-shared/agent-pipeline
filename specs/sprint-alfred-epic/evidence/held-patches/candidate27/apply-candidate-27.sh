@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 27: 17 held patches exported from the build clone chain b87f0ddd0..4335b8046
+# PO apply script for candidate 27: 18 held patches exported from the build clone chain b87f0ddd0..4877f83b3
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -31,6 +31,7 @@ step 14-ffe9e7690 'feat(close): export every Critic round from the private journ
 step 15-d21b7a05d 'feat(push): carry proof and final records after any signed push and let a release include its push'
 step 16-4e83ba43f 'feat(preflight): carry the observation governance status on the start line'
 step 17-4335b8046 'docs(decisions): register ADR-0090, D237 to D239, the two-route push flow and the follow-up backlog items'
+step 18-4877f83b3 'fix(push): bind the carried records to the close digests and keep approve-push in chat mode'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
