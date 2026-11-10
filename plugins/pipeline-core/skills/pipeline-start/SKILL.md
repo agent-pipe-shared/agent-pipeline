@@ -181,11 +181,11 @@ recommendation.
    will need a signed or chat-cleared approval before it can land —
    `references/push-approval.md` explains the full ceremony when a push is
    actually being constructed or discussed.
-5. **Observation governance:** run
-   `node "${PIPELINE_PLUGIN_ROOT}/scripts/observation-governance-bootstrap.mjs" --root "$PWD"`
-   before confirmation. `not-applicable` is the successful Consumer result; a
-   source checkout runs `node harness/scripts/check-observation-governance.mjs`,
-   and a `failed` one is case **F6** → `references/failure-cases.md`.
+5. **Observation governance:** read `observationGovernance.status` on the
+   preflight line before confirmation. `not-applicable` is the successful
+   Consumer result; `required` means a source checkout, which runs
+   `node harness/scripts/check-observation-governance.mjs`, and a `failed` one
+   is case **F6** → `references/failure-cases.md`.
 
 6. **Architecture orientation, never a bootstrap prerequisite:** consume the
    mandatory `architectureOrientation` readback in the ready preflight

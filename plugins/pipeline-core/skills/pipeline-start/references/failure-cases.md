@@ -7,7 +7,8 @@ action or one universal PO emergency plan; override admission is never operation
 success. Re-run the identical operation and its normal effect/readback contract.
 
 F6 observation governance is mandatory only in the Public source checkout.
-First run `observation-governance-bootstrap.mjs`; a Consumer result of
+First read `observationGovernance` on the preflight line (the same inspection
+as `observation-governance-bootstrap.mjs`); a Consumer result of
 `not-applicable` is successful and must never trigger a search, copy, or repair
 of `harness/scripts/check-observation-governance.mjs`. In a source checkout,
 that checker runs before confirmation. A failing result permits read-only

@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync, lstatSync, opendirSync } from "node:fs";
 import { homedir } from "node:os";
 import { readMachineOperatorLabel } from "../lib/machine-plane.mjs";
+import { inspectObservationGovernanceBootstrap, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCHEMA } from "../lib/observation-governance-bootstrap.mjs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadManifestSafe, resolveHumanFacingLanguage } from "../lib/manifest.mjs";
@@ -2498,6 +2499,7 @@ export function main(options = {}) {
     ...(options?.subagentModelEnv === undefined ? {} : { subagentModelEnv: options.subagentModelEnv }),
     ...(options?.operatorLabel === undefined ? {} : { operatorLabel: options.operatorLabel }),
     ...(options?.hostSkillCatalog === undefined ? {} : { hostSkillCatalog: options.hostSkillCatalog }),
+    ...(options?.observationGovernance === undefined ? {} : { observationGovernance: options.observationGovernance }),
   };
   // C19-G5: the typed runbook link (start path, preflight step) is the last key, once per session, and always when the preflight is not ready.
   process.stdout.write(`${JSON.stringify(attachRunbookLink(envelope, { pathId: "start", step: "preflight", refused: pipelineStartPreflightExitCode(result) !== 0, rootDir: process.cwd() }))}\n`);
@@ -2552,12 +2554,19 @@ async function runEntry(argv = process.argv.slice(2)) {
     nodeSandbox: observeNodeSandboxProbe(),
     // D210: the host skill-catalog readback (the only writer of the sealed private record); absent outside an active governed repository.
     hostSkillCatalog: observeHostSkillCatalogReadback(),
+    // The Claude report found the separate bootstrap step never run: the same inspection now travels on this line.
+    observationGovernance: observeObservationGovernance(),
     // MP-04 is the Elephant's bootstrap duty (policies/model-policy.md): an absent or `elephant` role only.
     // EL-36: the `--by` name the PO recorded once for this machine; absent means the agent asks.
     ...(role === undefined || role === "elephant" ? { subagentModelEnv: observeSubagentModelEnv(), operatorLabel: observeOperatorLabel() } : {}),
     ...(role === undefined ? {} : { role }),
     ...(modelRoleBootstrap === undefined ? {} : { modelRoleBootstrap }),
   });
+}
+
+function observeObservationGovernance() {
+  try { return inspectObservationGovernanceBootstrap({ rootDir: process.cwd() }); }
+  catch { return { schema: OBSERVATION_GOVERNANCE_BOOTSTRAP_SCHEMA, status: "failed", sourceCheckout: false, checker: null, code: "OGB-INSPECT-FAILED" }; }
 }
 
 /**

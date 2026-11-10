@@ -2547,6 +2547,12 @@ test("K139 MP-04 readback: only the one named variable is touched, no enumeratio
   }
 });
 
+test("the real preflight line carries the observation governance status, so the bootstrap needs no separate command", () => {
+  const line = runPreflightProcess({}).line;
+  assert.equal(line.observationGovernance.schema, "pipeline.observation-governance-bootstrap.v1");
+  assert.ok(["not-applicable", "required", "failed"].includes(line.observationGovernance.status), JSON.stringify(line.observationGovernance));
+});
+
 test("K139 MP-04 readback: the real preflight line carries subagentModelEnv unset, and never the value or an unrelated variable", () => {
   const { stdout, stderr, line } = runPreflightProcess({ [MP04_UNRELATED_VARIABLE]: MP04_UNRELATED_SENTINEL });
   assert.deepEqual(line.subagentModelEnv, { status: "unset" });
