@@ -172,6 +172,44 @@ function observeClaudeSubagentStop(input, pending, mark) {
   return final.ok ? { ...final, runner: "claude", assurance: SUBAGENT_STOP_ASSURANCE } : final;
 }
 
+const stopDiagnosticsDirectory = (commonDir) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+
+/**
+ * C23 (AC-108): the early check of a marked Goldfish's OWN SubagentHandback call, made at PreToolUse while the worker can still repair it.
+ * At SubagentStop the Goldfish is gone and nothing reaches the Coordinator, so a return cut off or mis-keyed there is lost silently. The call
+ * is correlated exactly as the stop is (the child's meta file and its pending state, `readSubagentStopPending`), the message is validated by the
+ * SAME validator against the SAME binding (`allowCheckpoint: true`, as at the stop), and an invalid one is refused with the code and its bounded
+ * detail. It never traps a worker: anything unmarked, unresolvable or faulty allows; after HANDBACK_REFUSAL_LIMIT refusals of one dispatch
+ * (counted in a small file beside the stop-failure diagnostics, never in the host-commit private state) the next attempt is allowed and the
+ * stop path records the failure as before.
+ * @returns {{action:"allow"}|{action:"refuse",code:string,detail:object|null,refusal:number,limit:number}}
+ */
+export const HANDBACK_REFUSAL_LIMIT = 3;
+export function checkSubagentHandbackBeforeStop({ root, input } = {}) {
+  const allow = { action: "allow" };
+  try {
+    if (input?.hook_event_name !== "PreToolUse" || input.tool_name !== SUBAGENT_HANDBACK_TOOL || typeof input.tool_input?.message !== "string") return allow;
+    const physical = physicalRoot(root ?? input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
+    if (!physical) return allow;
+    const commonDir = resolveGitCommonDir(physical);
+    if (typeof commonDir !== "string") return allow;
+    const stop = readSubagentStopPending({ commonDir, input });
+    if (!stop.ok) return allow;
+    const state = stop.pending.state;
+    if (state.root !== physical || state.commonDir !== commonDir || state.runner !== "claude" || state.binding?.runner !== "claude") return allow;
+    const final = validateNativeGoldfishFinal(input.tool_input.message, { binding: state.binding, allowCheckpoint: true });
+    if (final.ok) return allow;
+    const directory = stopDiagnosticsDirectory(commonDir);
+    const file = join(directory, `handback-refusals-${stopHash("sha256").update(`${state.sessionId}\0${state.toolUseId}`).digest("hex").slice(0, 32)}.json`);
+    let refusals = 0;
+    try { refusals = JSON.parse(stopRead(file, "utf8")).refusals; } catch (error) { if (error?.code !== "ENOENT") return allow; }
+    if (!Number.isSafeInteger(refusals) || refusals < 0 || refusals >= HANDBACK_REFUSAL_LIMIT) return allow;
+    stopMkdir(directory, { recursive: true, mode: 0o700 });
+    stopWrite(file, `${JSON.stringify({ schema: "pipeline.native-goldfish-handback-refusals.v1", dispatchId: state.binding.dispatchId, refusals: refusals + 1, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+    return { action: "refuse", code: final.code, detail: sanitizeStopFailureDetail(final.detail), refusal: refusals + 1, limit: HANDBACK_REFUSAL_LIMIT };
+  } catch { return allow; }
+}
+
 // PF-61 visibility: SubagentStop has no channel the Coordinator reads, so a failed completion of a marked Goldfish also
 // leaves a small diagnostic next to its pending state, naming the exact code. A later success removes every diagnostic
 // recorded for that dispatch (whatever tool use id or route wrote it). Diagnostic only:
@@ -182,7 +220,7 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
   try {
     // D180b: a sibling no authority scan inventories; inside native-goldfish-host-commit the file drifts the registry namespace.
     const commonDir = stop ? stop.commonDir : dispatch ? dispatch.commonDir : unresolved.commonDir;
-    const directory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+    const directory = stopDiagnosticsDirectory(commonDir);
     if (!stop && !dispatch) {
       // AC-164: a marked Goldfish stop whose pending state could not be resolved still leaves its code, keyed by session and agent.
       const key = stopHash("sha256").update(`${unresolved.sessionId}\0${unresolved.agentId}`).digest("hex").slice(0, 32);
@@ -228,7 +266,8 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
 // most 5 repository-relative paths, counts are small integers; anything else is dropped, so no host path and no raw exception
 // text can travel. Exported for the hook reader, which sanitizes again on read.
 const DETAIL_SLUG_KEYS = ["condition", "errorName", "errorCode", "reason"];
-const DETAIL_LIST_KEYS = ["conditions"];
+// C23: `missingKeys` / `unexpectedKeys` name the keys of a wrong-field-set return; a key that is no slug is dropped like any other entry.
+const DETAIL_LIST_KEYS = ["conditions", "missingKeys", "unexpectedKeys"];
 // C18-1C: the error message of a commit exception travels bounded (<= 160 chars, printable) and without any token that holds a path separator.
 const detailMessage = (value) => typeof value === "string" && value.length > 0 && value.length <= 160 && !/[\\/\u0000-\u001f]/u.test(value);
 export function boundedErrorMessage(error) {

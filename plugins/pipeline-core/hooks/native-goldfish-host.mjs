@@ -7,7 +7,7 @@ import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { integrateNativeGoldfishItemDelivery, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
-import { finalizeNativeGoldfishHostReturn, readSubagentHandbackMessage, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
+import { checkSubagentHandbackBeforeStop, finalizeNativeGoldfishHostReturn, readSubagentHandbackMessage, sanitizeStopFailureDetail, sanitizeStopFailureLock } from "../lib/native-goldfish-host-finalizer.mjs";
 import { issueCriticSourceReturn } from "../lib/critic-source-return.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
@@ -104,11 +104,19 @@ export function readNativeGoldfishStopFailure({ commonDir, dispatchId = null } =
 
 /** AC-164: one short human sentence derived from a bounded failure detail, or "" when there is none. */
 function describeFailureDetail(detail) {
+  const parts = failureDetailParts(detail);
+  return parts.length > 0 ? ` Cause: ${parts.join("; ")}. Do not edit the tree during a Goldfish run.` : "";
+}
+
+/** The bounded parts of a failure detail, in reading order (empty when there is none); shared by the stop notice and the handback refusal. */
+function failureDetailParts(detail) {
   const clean = sanitizeStopFailureDetail(detail);
-  if (!clean) return "";
+  if (!clean) return [];
   const parts = [];
   if (clean.condition) parts.push(`condition ${clean.condition}`);
   if (clean.conditions) parts.push(`conditions ${clean.conditions.join(", ")}`);
+  if (clean.missingKeys) parts.push(`missing keys ${clean.missingKeys.join(", ")}`);
+  if (clean.unexpectedKeys) parts.push(`unexpected keys ${clean.unexpectedKeys.join(", ")}`);
   if (clean.stagedPaths) parts.push(`staged ${clean.stagedPaths.join(", ")}`);
   if (clean.paths) parts.push(`paths ${clean.paths.join(", ")}`);
   if (clean.outsideAllowed) parts.push(`outside the allowed paths ${clean.outsideAllowed.join(", ")}`);
@@ -117,7 +125,15 @@ function describeFailureDetail(detail) {
   if (clean.errorName) parts.push(`error ${clean.errorName}${clean.errorCode ? ` ${clean.errorCode}` : ""}`);
   if (clean.errorMessage) parts.push(`message "${clean.errorMessage}"`);
   if (clean.reason) parts.push(`reason ${clean.reason}`);
-  return parts.length > 0 ? ` Cause: ${parts.join("; ")}. Do not edit the tree during a Goldfish run.` : "";
+  return parts;
+}
+
+/** C23 (AC-108): the model-visible refusal of a broken SubagentHandback: the exact code, what is wrong, and the one repair. Never echoes the message. */
+export function handbackRefusalMessage({ code, detail, refusal, limit }) {
+  const parts = failureDetailParts(detail);
+  return `Your SubagentHandback was refused before it was delivered (${code}${parts.length > 0 ? `: ${parts.join("; ")}` : ""}). The host cannot repair a return it cannot read, and the host commit would be lost at your stop. `
+    + "Repair: send the complete JSON object again as the whole message (schema, dispatchId, candidateCommit, outcome, report, changedPaths, then the closing brace), and shorten report if it was long. "
+    + `This is refusal ${refusal} of ${limit}; the attempt after the last one is allowed and the failure is then recorded at your stop.`;
 }
 
 /** E5: one short sentence naming the registry lock holder a failed stop met, or "" when the failure was not a lock. */
@@ -231,6 +247,17 @@ if (isDirectInvocation(import.meta.url)) {
   // G20-63: the Codex SubagentStart/SubagentStop hooks bind the same hook-observed owner (the prepare command's admission bound it for the
   // pending state); without it the stop's authority boundary refused SDC-AUTHORITY-UNAVAILABLE and nothing was host-committed.
   else enterCodexHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
+  // C23 (AC-108): the PreToolUse of a marked Goldfish's own SubagentHandback. A return the stop cannot read is refused here, while the worker
+  // can still repair it (exit 2, the reason on stderr is the model-visible refusal). Every other PreToolUse, every doubt and every fault is exit 0.
+  if (runner === "claude" && input.hook_event_name === "PreToolUse") {
+    let refusal = null;
+    try {
+      const checked = checkSubagentHandbackBeforeStop({ root: process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd(), input });
+      if (checked.action === "refuse") refusal = handbackRefusalMessage(checked);
+    } catch { refusal = null; }
+    if (refusal) { process.stderr.write(`${refusal}\n`); process.exit(2); }
+    process.exit(0);
+  }
   // G20-39: the Critic subagent's stop issues the Critic Source return record (this hook, never the calling agent). Any other stop, and
   // any fault here, continues below exactly as before; this branch never blocks the stop and prints nothing on stdout.
   if (input.hook_event_name === "SubagentStop") {

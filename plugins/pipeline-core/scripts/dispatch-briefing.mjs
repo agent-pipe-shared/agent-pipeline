@@ -346,7 +346,12 @@ function stopFailureCauseText(entry) {
   const clean = (value) => (typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]/gu, " ").trim().slice(0, 160) : "");
   const reason = clean(entry?.reason) || clean(entry?.detail?.reason);
   const stage = clean(entry?.stage);
-  const parts = [stage ? `stage ${stage}` : null, reason ? `reason ${reason}` : null].filter(Boolean);
+  // C23 (AC-108): the validator's bounded detail (a cut-off return names the position, a wrong field set names the keys), so a refused return no longer reads "no reason recorded".
+  const detail = entry?.detail !== null && typeof entry?.detail === "object" ? entry.detail : {};
+  const keys = (value) => (Array.isArray(value) ? value.filter((key) => typeof key === "string").slice(0, 5).map(clean).filter(Boolean).join(", ") : "");
+  const condition = clean(detail.condition), message = clean(detail.errorMessage), missing = keys(detail.missingKeys), unexpected = keys(detail.unexpectedKeys);
+  const parts = [stage ? `stage ${stage}` : null, reason ? `reason ${reason}` : null, condition ? `condition ${condition}` : null,
+    missing ? `missing keys ${missing}` : null, unexpected ? `unexpected keys ${unexpected}` : null, message ? `message "${message}"` : null].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : "no reason recorded";
 }
 

@@ -973,8 +973,8 @@ const cases = [
     assert.match(shown, /condition json-truncated/u);
   }, "claude", 1, "goldfish-implementor", { background: true }) },
   { id: "NGHF49", name: "C23: the stop-failure detail admits the key lists as bounded slugs and drops everything else", run: () => {
-    assert.deepEqual(sanitizeStopFailureDetail({ condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "has space", "a/b", "k3", "k4", "k5", "k6"] }),
-      { condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "k3", "k4", "k5"] });
+    assert.deepEqual(sanitizeStopFailureDetail({ condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "has space", "a/b", "k3", "k4", "k5", "k6", "k7"] }),
+      { condition: "fields", missingKeys: ["changedPaths"], unexpectedKeys: ["changedPath", "k3", "k4", "k5", "k6"] });
     assert.deepEqual(sanitizeStopFailureDetail({ condition: "json-truncated", errorMessage: "parse failed at position 5 of 5 characters" }), { condition: "json-truncated", errorMessage: "parse failed at position 5 of 5 characters" });
     assert.deepEqual(sanitizeStopFailureDetail({ errorMessage: "at /home/x/y" }), null, "a message holding a path separator never travels");
     assert.deepEqual(sanitizeStopFailureDetail({ missingKeys: "changedPaths" }), null);
