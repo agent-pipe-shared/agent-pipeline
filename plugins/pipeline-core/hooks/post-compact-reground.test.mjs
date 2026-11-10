@@ -156,7 +156,7 @@ check("English runtime projects complete validated queue state", () => {
   assert.deepEqual(projection.queueHead, continuity().queueHead);
   assert.equal(projection.revision, 4);
   assert.equal(projection.nextAction, "dispatch");
-  assert.deepEqual(projection.dispatchEligibility, { allowed: true, code: "CS-DISPATCHABLE" });
+  assert.deepEqual(projection.dispatchEligibility, { allowed: true, code: "CS-DISPATCHABLE", scope: "continuity-only" });
   assert.deepEqual(projection.resume, continuity().resume);
 });
 
@@ -309,7 +309,7 @@ check("typed blocker is exact and explicitly prevents work resumption", () => {
   assert.deepEqual(projection.blocker, blocker());
   assert.equal(projection.queueHead, null);
   assert.equal(projection.nextAction, null);
-  assert.deepEqual(projection.dispatchEligibility, { allowed: false, code: "CS-BLOCKED" });
+  assert.deepEqual(projection.dispatchEligibility, { allowed: false, code: "CS-BLOCKED", scope: "continuity-only" });
 });
 
 check("pending decision transaction remains visible and non-runnable", () => {
@@ -327,7 +327,7 @@ check("pending decision transaction remains visible and non-runnable", () => {
   assert.equal(projection.code, "PCR-DECISION-PENDING");
   assert.equal(projection.workResumptionAllowed, false);
   assert.deepEqual(projection.decisionTxn, decisionTxn);
-  assert.deepEqual(projection.dispatchEligibility, { allowed: false, code: "CS-DECISION-PENDING" });
+  assert.deepEqual(projection.dispatchEligibility, { allowed: false, code: "CS-DECISION-PENDING", scope: "continuity-only" });
 });
 
 check("one-shot recovery is projected without inventing isolation assurance", () => {

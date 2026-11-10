@@ -178,7 +178,7 @@ function stoppedProjection(code, featureId = null) {
     blocker: null,
     nextAction: null,
     resume: null,
-    dispatchEligibility: { allowed: false, code: "CS-INVALID" },
+    dispatchEligibility: { allowed: false, code: "CS-INVALID", scope: "continuity-only" },
     decisionTxn: null,
     recovery: null,
   };
@@ -261,7 +261,7 @@ export function resolveRegroundProjection(state, input = null, { rootDir = null 
     blocker: structuredClone(continuity.blocker),
     nextAction: continuity.queueHead?.nextAction ?? null,
     resume: structuredClone(continuity.resume),
-    dispatchEligibility: { allowed: dispatch.allowed, code: dispatch.code },
+    dispatchEligibility: { allowed: dispatch.allowed, code: dispatch.code, scope: "continuity-only" },
     decisionTxn: structuredClone(continuity.decisionTxn),
     recovery: structuredClone(continuity.recovery),
     mainSessionRoute: mainSessionRouteProjection(input, phase, rootDir),
