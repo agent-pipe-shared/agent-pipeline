@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "bfe2a48d0f21b68a022de38a9fa05e249870f73c540a309448b18c9c6b735e45"
+    "transitionHead": "407e7084a6897a1fb0d4ecc9f4555a5245f3221cad5f1f1511e48a4dc5ee3437"
   },
   "counts": {
-    "open": 384,
+    "open": 386,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -1627,6 +1627,15 @@
       "closureRepository": "self",
       "closureCommit": "946f715f97f8dbdadca6fab701fcca19a6ebd48a",
       "closureEvidence": "backlog/items/2026-08-06-authority-signing-terminal-contract.md"
+    },
+    {
+      "id": "pipeline.authorship-and-test-first-are-only-self-attested",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-11-10",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.auto-install-pre-push-hook-with-the-plugin",
@@ -10544,6 +10553,16 @@
       "owner": "pipeline",
       "created": "2026-10-31",
       "source": "Toolbox finding N36 (2026-10-31): a PO residual acceptance given the day before was invalid at feature close and had to be signed again.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.residual-acceptance-has-no-printed-ceremony",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-11-10",
+      "source": "Greenfield transcript finding F33; PO tile 2026-11-10 places it after 0.7.0",
       "deferred": false,
       "sprint": "alfred"
     },

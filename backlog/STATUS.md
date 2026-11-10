@@ -136,6 +136,7 @@
 | pipeline.authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.authority-revision-receipt-dedup-and-recovery-integrity-gaps | closed | defect | pipeline | — | 2026-08-11 | 2026-09-10 | — |
 | pipeline.authority-signing-terminal-contract | closed | workflow-improvement | pipeline | — | 2026-08-06 | — | — |
+| pipeline.authorship-and-test-first-are-only-self-attested | open | workflow-improvement | pipeline | alfred | 2026-11-10 | — | — |
 | pipeline.auto-install-pre-push-hook-with-the-plugin | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
 | pipeline.automate-critic-course-and-gate-registrations | open | workflow-improvement | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
@@ -851,6 +852,7 @@
 | pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.residual-acceptance-cannot-close-an-uncorrectable-major | open | defect | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.residual-acceptance-expires-after-the-signature-window | open | defect | pipeline | alfred | 2026-10-31 | — | — |
+| pipeline.residual-acceptance-has-no-printed-ceremony | open | workflow-improvement | pipeline | alfred | 2026-11-10 | — | — |
 | pipeline.residual-acceptance-route-is-not-named-at-the-push-gate | open | defect | pipeline | alfred | 2026-10-30 | — | — |
 | pipeline.resolved-backlog-items-can-keep-status-open-indefinitely | closed | defect | pipeline | nova-b | 2026-08-27 | — | — |
 | pipeline.restart-barrier-can-precede-verbatim-intake-capture | closed | defect | pipeline | none | 2026-09-27 | — | — |
@@ -1081,7 +1083,7 @@
 
 ## Counts
 
-- open: 384
+- open: 386
 - in_progress: 0
 - closed: 674
 - rejected: 3
