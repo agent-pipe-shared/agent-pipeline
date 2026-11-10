@@ -4813,6 +4813,12 @@
       "file": "plugins/pipeline-core/scripts/prepare-dispatch.test.mjs",
       "invariantPinned": "One command prepares a Goldfish or Critic dispatch; every step keeps its own refusal; it never commits or starts a child",
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/prepare-dispatch.test.mjs"
+    },
+    {
+      "name": "publication-readback-tests",
+      "file": "plugins/pipeline-core/scripts/publication-readback.test.mjs",
+      "invariantPinned": "The publication readback records what the remote really holds in a private append-only chain without touching the working tree or writing a URL; a repeat appends nothing, a local commit ahead and a differing remote are told apart, and a changed or removed line is detected",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/publication-readback.test.mjs"
     }
   ]
 }
