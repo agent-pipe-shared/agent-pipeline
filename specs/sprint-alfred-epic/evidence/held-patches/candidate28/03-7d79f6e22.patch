@@ -1,0 +1,85 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 3320bc00a11f854aad33ab8f036210ed5c88fd9a..aa1ece66b66bff83ab7c929c9e208e854153e5ee 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -784,6 +784,11 @@ of an edited, bound PRD/Spec; `scripts/pipeline-state.mjs inspect` calls it to n
+ `scripts/authority-restore.mjs` command as the first repair). It reads State and git blobs, writes
+ nothing, and imports only node built-ins (no first-party module, so it adds no kernel import edge).
+ 
++Candidates 26 and 27 add two more first-party modules that kernel files import and that execute with
++kernel authority: `plugins/pipeline-core/lib/observation-governance-bootstrap.mjs` (the bootstrap
++readback of the observation governance status) and `plugins/pipeline-core/lib/critic-round-pass.mjs`
++(the one rule deciding whether a Critic round passed). Both are kernel paths now.
++
+ ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
+ and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
+ (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
+diff --git a/plugins/pipeline-core/lib/critic-round-pass.mjs b/plugins/pipeline-core/lib/critic-round-pass.mjs
+index 55cae81a2a5c78a772dcc7ead0a0127aeaa2f198..01a2987b9216f3c744ad7c5025289a9a957ea961 100644
+--- a/plugins/pipeline-core/lib/critic-round-pass.mjs
++++ b/plugins/pipeline-core/lib/critic-round-pass.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ /**
+  * Whether one Critic round passed. The one rule every route that writes a Critic receipt applies (PO decision, 2026-11-10).
+  *
+diff --git a/plugins/pipeline-core/lib/critic-round-pass.test.mjs b/plugins/pipeline-core/lib/critic-round-pass.test.mjs
+index e603afa76b7f84694ce558fca343671c2859f4c8..02c7aa278a51bd09e3aabdd8956b97ff1f0124f3 100644
+--- a/plugins/pipeline-core/lib/critic-round-pass.test.mjs
++++ b/plugins/pipeline-core/lib/critic-round-pass.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import { test } from "node:test";
+ import { criticRoundPassed, receiptMatchesVerdict } from "./critic-round-pass.mjs";
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 0bfaf5ebfcb581c74cf042d4baea665535ea9b74..560a6ae952d6fea40987bbbb5d03136bed6c23c7 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -940,6 +940,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // ALF-K39 (GMWKC01): guard-dispatch.mjs spawns the liveness script, which imports the readback module.
+   "plugins/pipeline-core/lib/dispatch-record-liveness.mjs", "plugins/pipeline-core/scripts/dispatch-record-liveness.mjs",
+   "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs", "plugins/pipeline-core/lib/project-onboarding-v3-author-identity.mjs", "plugins/pipeline-core/lib/plan-handoff-readiness.mjs", "plugins/pipeline-core/lib/authority-restore.mjs",
++  // Candidate 28 (GMWKC01): imports added by candidates 26 and 27.
++  "plugins/pipeline-core/lib/observation-governance-bootstrap.mjs", "plugins/pipeline-core/lib/critic-round-pass.mjs",
+ ]);
+ 
+ // The "plugins/pipeline-core/..." entries above are written against whatever
+diff --git a/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs b/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs
+index 5e22ce81ded2e326eeb9d24f9dcb526fd433d486..cce866fd1aff429a0f32ac061baaf203e2ce689d 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs
+@@ -163,7 +163,7 @@ const GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH = pathJoin(dirname(fileURLToPath(impor
+  */
+ export function resolveGitleaksConfigPath() {
+   // C21B: four directories above an INSTALLED plugin is the runner's own cache or marketplace folder, and a `.gitleaks.toml` found there replaced the shipped ruleset, so the
+-  // Pipeline's own artefact exemptions never applied and a consumer's close failed on its own Critic lineage. Only the Agent-Pipeline source checkout (which has harness/) uses the repo-root file.
++  // Pipeline's own artefact exemptions never applied and a consumer's close failed on its own Critic lineage. Only the Agent-Pipeline source checkout (recognised by its own Verify script) uses the repo-root file.
+   if (existsSync(GITLEAKS_CONFIG_PATH) && existsSync(pathJoin(dirname(GITLEAKS_CONFIG_PATH), "harness", "scripts", "verify.mjs"))) return GITLEAKS_CONFIG_PATH;
+   if (existsSync(GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH)) return GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH;
+   return null;
+diff --git a/policies/control-placement.v1.json b/policies/control-placement.v1.json
+index 2d27522e56e0c06fd79bbebb758f5708703aa335..916500442cf2f05c1cca67d2e0c0f3dfa1af7763 100644
+--- a/policies/control-placement.v1.json
++++ b/policies/control-placement.v1.json
+@@ -22,6 +22,7 @@
+     {"controlId":"hook:posttooluse:claude-task-output-scope-posttool","protects":["background task output association"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["A1 native enforcement evidence has not been recorded; this row is unqualified."]},
+     {"controlId":"hook:userpromptsubmit:claude-intake-prompt-capture","protects":["intake prompt capture"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["A1 native enforcement evidence has not been recorded; this row is unqualified."]},
+     {"controlId":"hook:stop:stop-suggest","protects":["lifecycle next-step advisory"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["A1 native enforcement evidence has not been recorded; this row is unqualified."]},
++    {"controlId":"hook:stop:publication-readback-stop","protects":["publication readback after a push"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["A1 native enforcement evidence has not been recorded; this row is unqualified."]},
+     {"controlId":"hook:sessionstart:staleness-check","protects":["plugin freshness signal"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["A1 native enforcement evidence has not been recorded; this row is unqualified."]},
+     {"controlId":"hook:sessionstart:setup-check","protects":["repository personalization signal"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["A1 native enforcement evidence has not been recorded; this row is unqualified."]},
+     {"controlId":"hook:sessionstart:codex-session-start-hint","protects":["codex session re-grounding"],"enforcedBy":["runner-hook"],"perRunnerStatus":[{"runner":"claude","status":"unavailable","detail":"A1 native record absent"},{"runner":"codex","status":"unavailable","detail":"A1 native record absent"},{"runner":"antigravity","status":"unavailable","detail":"A1 native record absent"}],"residualGaps":["A1 native enforcement evidence has not been recorded; this row is unqualified."]},
+diff --git a/templates/prompts/agent-obligations.md b/templates/prompts/agent-obligations.md
+index 78bda3dafdeb06415975c7c38ba268015cb07a42..5042d3d7b37c368086d7fb72ec4ce17ef34c16c6 100644
+--- a/templates/prompts/agent-obligations.md
++++ b/templates/prompts/agent-obligations.md
+@@ -29,7 +29,7 @@ spends a tool use from the budget that is also the stop condition.
+ No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining
+ with `&&` is admitted only as up to 6 segments, and only when every segment is
+ itself an admitted read-only shape (or the small always-safe-write allowlist:
+-`echo`, `mkdir -p` under `scratch/`, `cd` to the absolute project root). The only admitted piping is the bounded
++`echo`, `mkdir -p` under `scratch/`). The only admitted piping is the bounded
+ read-only diagnostic pipelines (a read command into `head` or `tail`, or `rg`/`grep` into
+ `rg`/`grep`); every grammar refusal prints the complete current list with its
+ bounds, so read that list instead of guessing.

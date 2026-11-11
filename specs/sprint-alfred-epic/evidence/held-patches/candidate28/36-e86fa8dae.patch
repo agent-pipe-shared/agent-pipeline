@@ -1,0 +1,216 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 5dedc36469b252b0fca6f791762b3ebafcf018c0..174febef8e650db4f024c65bc463312c93760950 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -28,13 +28,54 @@ const exact = (value, keys) => object(value)
+   && keys.every((key) => Object.hasOwn(value, key));
+ 
+ export class CriticCourseAdmissionError extends Error {
+-  constructor(code) {
++  constructor(code, detail = null) {
+     super("Critic course admission is invalid.");
+     this.name = "CriticCourseAdmissionError";
+     this.code = code;
++    // Where an evidence read failed ({ commit, path }), so a refusal can name the gap instead of only its code.
++    if (detail !== null) this.detail = detail;
+   }
+ }
+-const fail = (code) => { throw new CriticCourseAdmissionError(code); };
++const fail = (code, detail = null) => { throw new CriticCourseAdmissionError(code, detail); };
++
++/**
++ * Codex greenfield, candidate 27: a manifest revision named an evidence file its own commit did not hold, and every course read
++ * failed with a bare CCA-EVIDENCE-MODE / CCA-EVIDENCE-READ. History is never rewritten and the reader stays strict (PO tile
++ * 2026-11-10), so the one way on is a new feature. This text says so, with the commit and the path.
++ */
++export const COURSE_EVIDENCE_GAP_CODES = Object.freeze(["CCA-EVIDENCE-MODE", "CCA-EVIDENCE-READ"]);
++/**
++ * Read-only: the first manifest revision (oldest first, up to `commit`) that lists a candidate-evidence path its own commit
++ * does not hold as a regular file, as { commit, path }, or null. Used only to name the gap in a refusal text; it decides nothing.
++ */
++export function locateCourseEvidenceGap({ repoRoot, featureId, commit }) {
++  try {
++    if (typeof repoRoot !== "string" || !FEATURE_ID.test(featureId ?? "") || !OID.test(commit ?? "")) return null;
++    const manifestPath = `specs/${featureId}/lifecycle.json`;
++    const run = (args) => execFileSync("git", ["-C", repoRoot, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 * 1024 * 1024 });
++    const revisions = run(["rev-list", "--reverse", commit, "--", manifestPath]).split("\n").filter(Boolean).slice(0, 512);
++    for (const revision of revisions) {
++      let manifest;
++      try { manifest = JSON.parse(run(["show", `${revision}:${manifestPath}`])); } catch { continue; }
++      for (const entry of Array.isArray(manifest?.artifacts) ? manifest.artifacts : []) {
++        if (entry?.class !== "candidate-evidence" || typeof entry.path !== "string") continue;
++        const row = run(["ls-tree", "-z", revision, "--", entry.path]);
++        if (!/^100644 blob [a-f0-9]{40,64}\t/u.test(row) || !row.endsWith(`\t${entry.path}\0`)) return { commit: revision, path: entry.path };
++      }
++    }
++    return null;
++  } catch { return null; }
++}
++
++export function courseEvidenceGapText(code, detail) {
++  if (!COURSE_EVIDENCE_GAP_CODES.includes(code)) return null;
++  const where = detail && typeof detail.commit === "string" && typeof detail.path === "string"
++    ? `commit ${detail.commit} lists ${detail.path} in the feature manifest, but that commit does not hold it as a regular file`
++    : "a revision of the feature manifest lists an evidence file that its own commit does not hold as a regular file";
++  return `The Critic course of this feature cannot be read (${code}): ${where}. `
++    + "Every course read checks each manifest revision, so this stays true for every later round and takeover of this feature, and history is not rewritten. "
++    + "Continue the remaining work as a new feature of rigor 1 (its own PRD and Spec) and run a full Critic over its commits.";
++}
+ 
+ // PF-34: the one refusal whose repair is a sanctioned command. The decision object's keys stay
+ // closed, so the route travels beside the decision; ${PIPELINE_PLUGIN_ROOT} is a literal placeholder.
+@@ -53,8 +94,10 @@ Object.assign(REPAIRS_EXTRA, {
+ });
+ const PO_DECIDES = new Set(["CCA-REVIEW-BUDGET-EXHAUSTED", "CCA-ACCEPTANCE", "CCA-ACCEPTANCE-REFERENCE", "CCA-ACCEPTANCE-BINDING", "CCA-GENESIS", "CCA-GENESIS-BINDING", "CCA-ALIAS-GENESIS", "CCA-ALIAS-GENESIS-UNAVAILABLE", "CCA-ALIAS-V1-GENESIS-UNAVAILABLE"]);
+ /** Repair text for a CCA refusal code, an explicit no-route object naming who decides, or null for non-CCA input. */
+-export function criticCourseRepair(code) {
++export function criticCourseRepair(code, detail = null) {
+   if (typeof code !== "string") return null;
++  const gap = courseEvidenceGapText(code, detail);
++  if (gap !== null) return gap;
+   if (Object.hasOwn(REPAIRS, code)) return REPAIRS[code];
+   if (Object.hasOwn(REPAIRS_EXTRA, code)) return REPAIRS_EXTRA[code];
+   if (!code.startsWith("CCA-")) return null;
+@@ -109,12 +152,12 @@ export function criticCourseParentRepair({ detail, candidate, specPath }) {
+   });
+ }
+ 
+-function gitBytes(root, args, code) {
++function gitBytes(root, args, code, detail = null) {
+   try {
+     return execFileSync("git", ["-C", root, ...args], {
+       encoding: "buffer", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1024 * 1024,
+     });
+-  } catch { fail(code); }
++  } catch { fail(code, detail); }
+ }
+ 
+ function manifestAt(root, commit, path) {
+@@ -128,9 +171,9 @@ function manifestAt(root, commit, path) {
+ }
+ 
+ function regularBlobAt(root, commit, path) {
+-  const row = gitBytes(root, ["ls-tree", "-z", commit, "--", path], "CCA-EVIDENCE-READ").toString("utf8");
++  const row = gitBytes(root, ["ls-tree", "-z", commit, "--", path], "CCA-EVIDENCE-READ", { commit, path }).toString("utf8");
+   if (!/^100644 blob [a-f0-9]{40,64}\t[^\0]+\0$/u.test(row)
+-    || !row.endsWith(`\t${path}\0`)) fail("CCA-EVIDENCE-MODE");
++    || !row.endsWith(`\t${path}\0`)) fail("CCA-EVIDENCE-MODE", { commit, path });
+ }
+ 
+ /**
+@@ -169,7 +212,7 @@ export function resolveRegisteredCriticCourseHistory({ repoRoot, featureId, cand
+         if (prior.critic) fail("CCA-REGISTRATION-DRIFT");
+       }
+       if (++inspected > 4096) fail("CCA-SOURCE-BOUND");
+-      const bytes = gitBytes(root, ["show", `${commit}:${artifact.path}`], "CCA-EVIDENCE-READ");
++      const bytes = gitBytes(root, ["show", `${commit}:${artifact.path}`], "CCA-EVIDENCE-READ", { commit, path: artifact.path });
+       if (digest(bytes) !== artifact.sha256) fail("CCA-EVIDENCE-DIGEST");
+       let value;
+       try { value = JSON.parse(bytes.toString("utf8")); } catch { value = null; }
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 789e5780242747e77cacf7e85febde057001c475..363efeb21a0dd1db8ada3cc096656e07f4291c69 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -41,7 +41,7 @@ import { CRITIC_DIAGNOSTIC_SCHEMA, diagnosticEvidenceLocation, readDiagnosticArt
+ import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
+ import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+ import { compileRegisteredCriticReviewLineage } from "./critic-review-lineage.mjs";
+-import { prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
++import { COURSE_EVIDENCE_GAP_CODES, courseEvidenceGapText, locateCourseEvidenceGap, prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
+ import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
+ import { readConsumedCourseClaimBinding } from "./critic-verify-lifecycle.mjs";
+ import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
+@@ -880,6 +880,10 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
+     if (code === "CCA-REVIEW-BUDGET-EXHAUSTED") return refused("FPR-DELTA-BUDGET", "the round budget or the correction-commit budget of the course is exhausted; no further Critic round can be requested without the PO gate", extra2);
+     if (code === "CCA-CORRECTION-RANGE") return refused("FPR-DELTA-NO-CORRECTION", "no correction commit exists since the last round", extra2);
+     if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (registrations, or the tracked export of a consumed review; ${code}); commit only the registration paths between the correction and this command. This command chose the candidate ${candidate} (the newest first-parent commit that is not evidence-only by the candidate-choice test: it changes beyond the manifest and specs/${featureId}/evidence/), the base ${tail.commit} and HEAD ${head}. A commit between ${candidate} and HEAD that is neither a registration nor a change outside the manifest core breaks the transport (a commit that changes the manifest core, for example a feature-package-reconcile commit, is itself taken as the candidate)`, { ...extra2, candidateCommit: candidate, baseCommit: tail.commit, headCommit: head });
++    if (COURSE_EVIDENCE_GAP_CODES.includes(code)) {
++      const gap = locateCourseEvidenceGap({ repoRoot: root, featureId, commit: head });
++      return refused("FPR-DELTA-COURSE-GAP", courseEvidenceGapText(code, gap), { ...extra2, ...(gap === null ? {} : { gapCommit: gap.commit, gapPath: gap.path }) });
++    }
+     return refused("FPR-DELTA-COMPILE", `the delta request does not compile (${code})`, extra2);
+   }
+   const { descriptor, artifact } = compiled.value;
+diff --git a/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs b/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
+index ef5c0c48833d1af57d98308c8f74c5aa774b62bc..e8529b3885d66bc7ea556abaafa9f9ee9cbd853e 100644
+--- a/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
++++ b/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
+@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import test from "node:test";
+-import { resolveRegisteredCriticCourseHistory } from "../lib/critic-course-admission.mjs";
++import { courseEvidenceGapText, criticCourseRepair, locateCourseEvidenceGap, resolveRegisteredCriticCourseHistory } from "../lib/critic-course-admission.mjs";
+ import { commitPipelineOwned } from "./commit-pipeline-owned.mjs";
+ 
+ function refusedFor(statusOut) {
+@@ -111,8 +111,20 @@ test("Codex report: the manifest committed alone is the gap the course reader ca
+     run("commit", "-q", "-m", "manifest alone", "--", "specs/feat-1/lifecycle.json");
+     run("add", "-A");
+     run("commit", "-q", "-m", "evidence later");
+-    assert.throws(() => resolveRegisteredCriticCourseHistory({ repoRoot: root, featureId: "feat-1", candidateCommit: run("rev-parse", "HEAD").trim() }),
++    const head = run("rev-parse", "HEAD").trim();
++    assert.throws(() => resolveRegisteredCriticCourseHistory({ repoRoot: root, featureId: "feat-1", candidateCommit: head }),
+       (error) => error.code === "CCA-EVIDENCE-READ");
++    // An already damaged history is named, not repaired: the commit, the path and the one way on (PO tile 2026-11-10).
++    const gapCommit = run("rev-parse", "HEAD~1").trim();
++    const gap = locateCourseEvidenceGap({ repoRoot: root, featureId: "feat-1", commit: head });
++    assert.deepEqual(gap, { commit: gapCommit, path: "specs/feat-1/evidence/final-candidate-verify.json" });
++    const text = criticCourseRepair("CCA-EVIDENCE-MODE", gap);
++    assert.equal(typeof text, "string");
++    assert.ok(text.includes(gapCommit) && text.includes("specs/feat-1/evidence/final-candidate-verify.json"), text);
++    assert.match(text, /new feature of rigor 1/u);
++    assert.match(courseEvidenceGapText("CCA-EVIDENCE-READ", null), /a revision of the feature manifest lists an evidence file/u);
++    assert.equal(courseEvidenceGapText("CCA-PARENT", gap), null, "other codes keep their own repair");
++    assert.equal(locateCourseEvidenceGap({ repoRoot: root, featureId: "feat-1", commit: gapCommit.replace(/.$/u, "x") }), null, "a malformed commit yields null");
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index b318c9dc073426a05a1611d1e2280e09589e4400..72f3cfa0c8e8712143ce64f526f24062875878fe 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -37,7 +37,7 @@ import {
+   RequirementTraceabilityError,
+   evaluateRequirementTraceability,
+ } from "../lib/requirement-traceability.mjs";
+-import { criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
++import { COURSE_EVIDENCE_GAP_CODES, criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, locateCourseEvidenceGap, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+ import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
+ import { criticRunnerFromEnv, describeCriticRouteAssurance } from "../lib/critic-route-assurance.mjs";
+ 
+@@ -454,7 +454,9 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+       deltaRequestPath: context.deltaRequestPath });
+     if (admission?.decision?.status !== "admitted") {
+       observeSource(observer, stage, "rejected", admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE", sourceCandidate, sourceSpecSha256);
+-      let repair = criticCourseRepair(admission?.decision?.code);
++      const gapCode = COURSE_EVIDENCE_GAP_CODES.includes(admission?.decision?.code);
++      let repair = criticCourseRepair(admission?.decision?.code,
++        gapCode ? locateCourseEvidenceGap({ repoRoot: realRoot, featureId: context.featureId, commit: context.registrationCommit }) : null);
+       // CCA-PARENT: name the last registered round and the base this preflight accepts, and the route that admits from here.
+       const parentDetail = admission?.decision?.code === "CCA-PARENT"
+         ? criticCourseParentDetail({ repoRoot: realRoot, featureId, candidateCommit, givenBase: baseCommit ?? baseTree }) : null;
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index 950b1bfa15deb22fe00e218738efde6626f51192..f3d99347b6ff62142eb243685504b3c62ddb2f3c 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -20,7 +20,7 @@ import { SPLIT_NEXT_ROUND_REPAIR, attributeVerdict, buildCriticSplit, criticSpli
+ import { GOVERNANCE_REVIEW_SOURCE_SCHEMA, buildGovernanceReviewAction, buildGovernanceReviewRetry, preflightGovernanceReviewActionOutput, writeGovernanceReviewAction } from "../lib/governance-review-action.mjs";
+ import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+-import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admission.mjs";
++import { COURSE_EVIDENCE_GAP_CODES, courseEvidenceGapText, locateCourseEvidenceGap, resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admission.mjs";
+ import { addCriticReviewLineage } from "../lib/feature-package-registration.mjs";
+ import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
+ import { registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission, SESSION_PACKET_BINDING_SCHEMA, canonicalJson, claimCandidatePacket, cleanupCandidatePacket, consumeCandidatePacket, inspectClaimedSessionAdmission, inspectClaimedCandidatePacket, inspectCandidatePacket, packetDigestMatches, prepareCandidatePacket, publishClaimedSessionAdmission, readConsumedCandidateReceipt, recordCandidateResult, sha256 } from "./critic-packet-preflight.mjs";
+@@ -78,6 +78,10 @@ function takeoverTarget(root, featureId, supersede = false) {
+   const unit = readCriticReviewUnit({ repoRoot: root, baseCommit: base, candidateCommit: head, specPath: declaration.specPath,
+     logicalWorkIds: declaration.logicalWorkIds, reviewUnitPath: unitPath, ...(introduced !== base ? { declarationCommit: introduced } : {}) });
+   const resolved = resolveRegisteredCriticCourseIdentity({ repoRoot: root, featureId, baseCommit: base, candidateCommit: head, registrationCommit: head, acceptedReference: null });
++  // A manifest revision that names evidence its own commit lacks: name that gap and the one way on (new feature), not the two other situations.
++  if (!resolved.ok && COURSE_EVIDENCE_GAP_CODES.includes(resolved.code)) {
++    fail("SCF-TAKEOVER-IDENTITY", courseEvidenceGapText(resolved.code, locateCourseEvidenceGap({ repoRoot: root, featureId, commit: head })));
++  }
+   if (!resolved.ok) fail("SCF-TAKEOVER-IDENTITY", takeoverIdentityDetail(featureId, resolved.code));
+   return { courseKey: resolved.value.courseIdentity.courseKey, logicalWorkIds: unit.declaration.logicalWorkIds,
+     courseHistoryRegistered: resolved.value.registeredHistory.length > 0, registeredRounds: resolved.value.registeredHistory.length };

@@ -1,0 +1,71 @@
+diff --git a/backlog/items/2026-11-10-design-addendum-for-a-single-value-after-0-7-0.md b/backlog/items/2026-11-10-design-addendum-for-a-single-value-after-0-7-0.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ccc8eb7557724a59891b614f5a54c5a6e3ac0d56
+--- /dev/null
++++ b/backlog/items/2026-11-10-design-addendum-for-a-single-value-after-0-7-0.md
+@@ -0,0 +1,29 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.design-addendum-for-a-single-value
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-10
++source: "PO tile of 2026-11-10 on a one-value design change during implementation, placing an addendum after 0.7.0"
++sprint: alfred
++done_when: manual
++---
++
++# A design addendum for a single changed value
++
++## Description
++
++Changing one design value during implementation requires a reopen today: the signature is void, and the design is submitted, signed and materialized again. In a greenfield run on native Windows one value cost a new signature and three separate stops. The PO's direction is that this must not turn into repeated reopens. Candidate 28 repairs the three stops, and the reopen stays the route for 0.7.0.
++
++The PO decided on 2026-11-10 that an addendum follows after 0.7.0.
++
++## Scope
++
++- The PO names the change, and it is recorded in its own file outside the signed design files, so the signature stays valid.
++- Implementation, Critic, Close and the audit bundle read the signed design together with its addenda.
++- The design has to settle which changes qualify. A change of goal, scope or the structure of the acceptance criteria stays a reopen.
++
++## Done when
++
++A one-value change reaches implementation without a new signature, a change that does not qualify is refused with the reopen route, and the PO accepts the behaviour.
+diff --git a/backlog/items/2026-11-10-queue-parallel-dispatch-starts-after-0-7-0.md b/backlog/items/2026-11-10-queue-parallel-dispatch-starts-after-0-7-0.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..df8804349aab439d0d1febff699f1c493ea9a1ca
+--- /dev/null
++++ b/backlog/items/2026-11-10-queue-parallel-dispatch-starts-after-0-7-0.md
+@@ -0,0 +1,30 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.queue-parallel-dispatch-starts
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-10
++source: "PO tile of 2026-11-10 on parallel Agent starts on native Windows, placing a queue after 0.7.0"
++sprint: alfred
++done_when: manual
++---
++
++# Queue parallel dispatch starts instead of letting them contend for the registry lock
++
++## Description
++
++In a greenfield run on native Windows, four Agent calls in one message cost five minutes and all four failed. Three waited for the registry lock until the 300 s admission budget ran out, the fourth was refused at about 56 s, and the retry of one slice then collided with what the failed start had left behind. The same message shape on WSL was admitted in about 2 s per call.
++
++The whole budget is used on purpose today (G20-40), and CGR-07 recorded no queue and no change to the lock timing. The PO decided on 2026-11-10 to replace that with a queue after 0.7.0.
++
++## Scope
++
++- Starts sent together wait in order and are admitted one after another, without a host hook timeout ending them.
++- A start that fails leaves nothing a retry collides with (`item-delivery-owner-collision`).
++- Linux and WSL keep their parallel starts.
++- Measured on native Windows; WSL cannot show this behaviour.
++
++## Done when
++
++Four Agent calls in one message on native Windows are all admitted, or a failure is reported early and a retry succeeds without manual repair, and the PO accepts the behaviour.

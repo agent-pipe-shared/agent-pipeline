@@ -1,0 +1,43 @@
+diff --git a/plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs b/plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs
+index a3f3529c74b7bd156274d983fc233e0e6ae55aa1..4e59dd3ed9879e336f06586c9801def803e9f501 100644
+--- a/plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs
++++ b/plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs
+@@ -74,7 +74,9 @@ function fresh(runner) {
+   const root = tmp("approval-policy-pin-root-");
+   const home = tmp("approval-policy-pin-home-");
+   const env = envFor(home, runner);
+-  const first = driveOnboardingInit({ rootDir: root, runner, env, runBudgetMs: WIDE_BUDGET_MS });
++  let first = driveOnboardingInit({ rootDir: root, runner, env, runBudgetMs: WIDE_BUDGET_MS });
++  // Antigravity stops once when this onboarding created the repository (PO decision 2026-11-08); the same command after the restart reaches the first round.
++  if (first.outcome === "runner-restart-required") first = driveOnboardingInit({ rootDir: root, runner, env, runBudgetMs: WIDE_BUDGET_MS });
+   return { root, home, env, runner, first };
+ }
+ // The first-round action is published either as a pending ask or as the collect-input itself.
+diff --git a/plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs b/plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs
+index 0c7257d4e480104b639be51b8d424a7d14992b08..f3f620f05d3fcaf7dddb8292eafa17a40fda6c90 100644
+--- a/plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs
++++ b/plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs
+@@ -55,7 +55,9 @@ for (const runner of RUNNERS) {
+     const env = envFor(home, runner);
+ 
+     // 1. Seed: declined before any answer; nothing approved without being asked.
+-    const first = driveOnboardingInit({ rootDir: root, runner, env });
++    let first = driveOnboardingInit({ rootDir: root, runner, env });
++    // Antigravity stops once when this onboarding created the repository (PO decision 2026-11-08); the same command after the restart reaches the first round.
++    if (first.outcome === "runner-restart-required") first = driveOnboardingInit({ rootDir: root, runner, env });
+     assert.equal(first.pendingAsks.length, 1, "one bundled first-answer round");
+     assert.equal(parseYaml(sourceOf(root)).advisor_export.consent, "declined");
+     assert.doesNotMatch(sourceOf(root), /consent:\s*"?approved/u);
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+index 27a1f6b2830bd036e7a45c16669b51cc43013bd1..f4f74a5566a167957bea538f04f953c25a75edfe 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+@@ -866,6 +866,8 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+       run,
+       env,
+     });
++    // Antigravity stops once when this onboarding created the repository (PO decision 2026-11-08); the same command after the restart continues.
++    if (driven.outcome === "runner-restart-required") driven = driveOnboardingInit({ rootDir: cwd, runner, run, env });
+     // The fixture already supplied the initial PO identity. Feed that same
+     // test value into the returned plan-submission action, then re-enter the
+     // generic driver. This is the one human value in this otherwise automatic

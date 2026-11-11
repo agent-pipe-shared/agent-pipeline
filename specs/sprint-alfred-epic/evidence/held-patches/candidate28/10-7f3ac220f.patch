@@ -1,0 +1,82 @@
+diff --git a/plugins/pipeline-core/lib/security-remote-identity.mjs b/plugins/pipeline-core/lib/security-remote-identity.mjs
+index 013384e581fb04cacb157ff66e50264a6fe58af0..fde1baa1d703c1b1fa1f7c65c7199e620ae6f93f 100644
+--- a/plugins/pipeline-core/lib/security-remote-identity.mjs
++++ b/plugins/pipeline-core/lib/security-remote-identity.mjs
+@@ -2,6 +2,20 @@
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ 
++/**
++ * The configured remote Git pushes the current branch to, in Git's own order, or null when no such remote is configured
++ * (a detached HEAD, a branch with no upstream, or a value that names no remote of this repository).
++ */
++function pushRemoteOfCurrentBranch(run, remotes) {
++  const branch = (run(["symbolic-ref", "--quiet", "--short", "HEAD"]) ?? "").trim();
++  if (branch === "") return null;
++  for (const key of [`branch.${branch}.pushRemote`, "remote.pushDefault", `branch.${branch}.remote`]) {
++    const value = (run(["config", "--get", key]) ?? "").trim();
++    if (value !== "") return remotes.includes(value) ? value : null;
++  }
++  return null;
++}
++
+ /** Resolve one effective Git push destination without publishing its URL. */
+ export function resolveSecurityRemoteIdentity(rootDir, remoteName = null, spawn = spawnSync) {
+   const run = (args) => {
+@@ -18,10 +32,12 @@ export function resolveSecurityRemoteIdentity(rootDir, remoteName = null, spawn
+   if (remoteName !== null && (typeof remoteName !== "string" || !remotes.includes(remoteName))) {
+     return { ok: false, reason: "remote-not-configured" };
+   }
+-  if (remoteName === null && remotes.length !== 1) {
++  // PO decision 2026-11-10: with several remotes and no name given, the remote the current branch pushes to decides; without one the scan refuses.
++  const branchRemote = remoteName === null && remotes.length > 1 ? pushRemoteOfCurrentBranch(run, remotes) : null;
++  if (remoteName === null && remotes.length !== 1 && branchRemote === null) {
+     return { ok: false, reason: remotes.length === 0 ? "remote-missing" : "remote-ambiguous" };
+   }
+-  const selected = remoteName ?? remotes[0];
++  const selected = remoteName ?? branchRemote ?? remotes[0];
+   const output = run(["remote", "get-url", "--push", "--all", selected]);
+   if (output === null) return { ok: false, reason: "push-destination-unavailable" };
+   const urls = output.split(/\r?\n/u).filter(Boolean);
+diff --git a/plugins/pipeline-core/scripts/security-scan.mjs b/plugins/pipeline-core/scripts/security-scan.mjs
+index f622dab728ff27f2fe9443db7cc4b8f59a085a0d..eb803b20144f479021c4b299d373d28ca51c0d58 100644
+--- a/plugins/pipeline-core/scripts/security-scan.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.mjs
+@@ -1198,8 +1198,11 @@ function statusLabel(status) {
+   }
+ }
+ 
++// PO decision 2026-11-10: the refusal names how to get past it.
++const REMOTE_AMBIGUOUS_HINT = "several remotes and the current branch pushes to none of them: run git branch --set-upstream-to=<remote>/<branch>, or pass --remote <name>";
++
+ export function formatScannerLine(s) {
+-  const reasonSuffix = s.reason ? ` -- ${s.reason}` : "";
++  const reasonSuffix = s.reason ? ` -- ${s.reason === "remote-ambiguous" ? `${s.reason}: ${REMOTE_AMBIGUOUS_HINT}` : s.reason}` : "";
+   const coverageSuffix = s.coverage?.status === "degraded" && Array.isArray(s.coverage.files)
+     ? ` -- coverage: degraded (${s.coverage.files.length} files partially parsed)`
+     : "";
+diff --git a/plugins/pipeline-core/scripts/security-scan.test.mjs b/plugins/pipeline-core/scripts/security-scan.test.mjs
+index 2777ad28c35c657c26a5da53f6901d276905a32a..0d084f92464fd3c058a14ce1a4f694493d7bb0eb 100644
+--- a/plugins/pipeline-core/scripts/security-scan.test.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.test.mjs
+@@ -2104,6 +2104,20 @@ security:
+     status: ambiguous.evidence.candidate.status, reason: ambiguous.evidence.candidate.reason,
+     destination: ambiguous.evidence.candidate.destination, repositorySha256: ambiguous.evidence.candidate.repositorySha256,
+   }, { status: "unsupported", reason: "remote-ambiguous", destination: "remote", repositorySha256: null });
++  assertTrue("local-only: the ambiguous refusal names how to get past it", /set-upstream-to=.*--remote <name>/u.test(scanModule.formatScannerLine({ tool: "t", status: "ERROR", classification: "candidate_snapshot", findingCount: 0, reason: "remote-ambiguous" })), "no hint");
++
++  // PO decision 2026-11-10: with several remotes and no name given, the remote the current branch pushes to decides.
++  const trackedRoot = makeRemoteFixture("runner-tracked-remote-root", ["origin", "mirror"]);
++  git(trackedRoot, "checkout", "-q", "-b", "tracked");
++  git(trackedRoot, "config", "branch.tracked.remote", "mirror");
++  const tracked = await runSecurityScan({ rootDir: trackedRoot, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
++  const named = await runSecurityScan({ rootDir: trackedRoot, remoteName: "mirror", env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
++  assertEqual("local-only: two remotes and a tracked one bind the candidate to the tracked remote", {
++    status: tracked.evidence.candidate.status, destination: tracked.evidence.candidate.destination, sameIdentity: tracked.evidence.candidate.repositorySha256 === named.evidence.candidate.repositorySha256,
++  }, { status: "clean", destination: "remote", sameIdentity: true });
++  git(trackedRoot, "config", "branch.tracked.remote", "nowhere");
++  const dangling = await runSecurityScan({ rootDir: trackedRoot, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
++  assertEqual("local-only: a tracked value that names no remote stays remote-ambiguous", dangling.evidence.candidate.reason, "remote-ambiguous");
+ 
+   const unknown = await runSecurityScan({ rootDir: localRoot, remoteName: "nowhere", env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+   assertEqual("local-only: a given unknown remote name stays unsupported remote-not-configured even with zero remotes", {

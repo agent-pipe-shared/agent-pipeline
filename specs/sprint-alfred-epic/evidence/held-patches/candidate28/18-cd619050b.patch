@@ -1,0 +1,371 @@
+diff --git a/plugins/pipeline-core/hooks/guard-git.mjs b/plugins/pipeline-core/hooks/guard-git.mjs
+index 2705f24996173bc1664671b75af5bdf7670fedd2..030777203078531dbb5dc3a48927f9f97d93cecb 100644
+--- a/plugins/pipeline-core/hooks/guard-git.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.mjs
+@@ -288,6 +288,7 @@ import {
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { appendGuardOverrideLedgerEntry, guardOverrideLedger, readGuardOverrideLedgerEntries } from "../lib/guard-override-ledger.mjs";
+ import { UNION_BLOCKERS, RAW_BLOCKERS, PRENORM_BLOCKERS, dangerousGitFindings } from "./git-dangerous-policy.mjs";
++import { RECURSIVE_DELETE_RULE_ID, recursiveDeleteFinding } from "./recursive-delete-policy.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ import { msysToWindows, relativeUnderRoot, sameNativePath } from "../lib/path-spelling.mjs";
+ 
+@@ -445,6 +446,7 @@ const KNOWN_RULE_IDS = new Set([
+   ...RAW_BLOCKERS.map((r) => r.id),
+   ...PRENORM_BLOCKERS.map((r) => r.id),
+   ...EXTRA_BLOCKERS.map((r) => r.id),
++  RECURSIVE_DELETE_RULE_ID,
+ ]);
+ 
+ // ---- override mechanism: arming parse ------------------------------------------------
+@@ -1423,6 +1425,8 @@ for (const rule of UNION_BLOCKERS) if (rule.re.test(normalizedC)) matched.push(r
+ for (const rule of RAW_BLOCKERS) if (rule.re.test(rawForQuoteRules)) matched.push(rule);
+ for (const rule of PRENORM_BLOCKERS) if (rule.re.test(c)) matched.push(rule);
+ for (const rule of EXTRA_BLOCKERS) if (rule.re.test(normalizedStripped)) matched.push(rule);
++const recursiveDelete = recursiveDeleteFinding(cmd, { root: projectDir, cwd: toolCwd ?? process.cwd(), throwawayDirs: projectConfig?.throwawayDirs, guardConfigPath: guardConfigRelPath });
++if (recursiveDelete) matched.push(recursiveDelete);
+ 
+ if (matched.length > 0) {
+   // ADR-0079: hook-bypass rules protect the mechanism that evaluates every
+diff --git a/plugins/pipeline-core/hooks/guard-git.test.mjs b/plugins/pipeline-core/hooks/guard-git.test.mjs
+index 9636d944e1a62f68ce2b32cf2d6a8a1f0c2110b9..653436b403aa35fba622e9274e109de4030448e5 100644
+--- a/plugins/pipeline-core/hooks/guard-git.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.test.mjs
+@@ -87,7 +87,8 @@ function runGuard(command, projectDir, envOverride = {}, toolCwd = undefined, na
+ // case is intended to exercise.
+ const EMPTY_DIR = mkdtempSync(join(tmpdir(), "guard-test-empty-"));
+ mkdirSync(join(EMPTY_DIR, ".claude"), { recursive: true });
+-writeFileSync(join(EMPTY_DIR, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "off" }));
++// The harmless targets of R12, R13 and R16 pin those rules' word boundaries; since the 2026-11-10 narrowing they are named as throwaway folders here.
++writeFileSync(join(EMPTY_DIR, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "off", throwawayDirs: ["build", "node_modules", ".github", "temp"] }));
+ const NO_CONFIG_DIR = mkdtempSync(join(tmpdir(), "guard-test-no-config-"));
+ 
+ let pass = 0;
+diff --git a/plugins/pipeline-core/hooks/recursive-delete-policy.mjs b/plugins/pipeline-core/hooks/recursive-delete-policy.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..0234ea3f47020a9337d85821ad82465b8a581471
+--- /dev/null
++++ b/plugins/pipeline-core/hooks/recursive-delete-policy.mjs
+@@ -0,0 +1,233 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * PO decision 2026-11-10 ("Eng begrenzen"): a recursive delete runs only under scratch/ and the folders the project names as throwaway in its
++ * guard config (`throwawayDirs`). Elsewhere it is refused with the allowed route. Motive: `find $tmp -delete` with an unset variable deleted a main worktree.
++ * Judges command TEXT only. A script that deletes on its own remains outside this rule.
++ */
++import { existsSync, realpathSync } from "node:fs";
++import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
++
++export const RECURSIVE_DELETE_RULE_ID = "GG-21";
++const NESTING_LIMIT = 3;
++const PREFIX_WORDS = new Set(["sudo", "command", "exec", "nice", "nohup", "time", "env"]);
++const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
++const INLINE_DELETERS = [
++  [/^(python\d*(\.\d+)?|py|pypy\d*)$/u, new Set(["-c"]), /\brmtree\b|\bremovedirs\b/u],
++  [/^node$/u, new Set(["-e", "--eval", "-p", "--print"]), /\b(rmSync|rm|rmdirSync|rmdir)\b[\s\S]*\brecursive\b/u],
++  [/^perl$/u, new Set(["-e", "-E"]), /\b(rmtree|remove_tree)\b/u],
++  [/^ruby$/u, new Set(["-e"]), /\brm_r\b|\brm_rf\b|\bremove_dir\b/u],
++];
++const XARGS_VALUE_FLAGS = new Set(["-I", "-n", "-P", "-L", "-s", "-d", "-E", "-a"]);
++const CONTROL_DIRS = new Set([".git", ".claude", "project"]);
++
++/** Splits a command into simple commands of words. A word records whether expansion could change it. */
++function parseSegments(command) {
++  const segments = [[]];
++  let word = null;
++  let quote = null;
++  const push = () => { if (word !== null) { segments.at(-1).push(word); word = null; } };
++  const ensure = () => { word ??= { text: "", dynamic: false, quoted: false }; return word; };
++  for (let index = 0; index < command.length; index += 1) {
++    const char = command[index];
++    if (quote === "'") { if (char === "'") quote = null; else ensure().text += char; continue; }
++    if (quote === '"') {
++      if (char === '"') { quote = null; continue; }
++      if (char === "\\" && index + 1 < command.length) { index += 1; ensure().text += command[index]; continue; }
++      if (char === "$" || char === "`") ensure().dynamic = true;
++      ensure().text += char;
++      continue;
++    }
++    if (char === "'" || char === '"') { quote = char; ensure().quoted = true; continue; }
++    if (char === "\\" && index + 1 < command.length && /\s/u.test(command[index + 1])) { index += 1; continue; }
++    if (/\s/u.test(char) && char !== "\n") { push(); continue; }
++    if (char === ";" || char === "|" || char === "&" || char === "\n") { push(); segments.push([]); continue; }
++    if (char === "(" || char === ")") { push(); if (char === "(") segments.push([]); continue; }
++    if (char === "$" || char === "`" || char === "%") ensure().dynamic = true;
++    ensure().text += char;
++  }
++  push();
++  return segments.filter(segment => segment.length > 0);
++}
++
++const commandName = word => basename(word.text.replace(/\\/gu, "/")).toLowerCase().replace(/\.exe$/u, "");
++const isRecursiveRmFlag = text => /^-[a-zA-Z]*[rR][a-zA-Z]*$/u.test(text) || (text.length > 2 && "--recursive".startsWith(text));
++
++function withoutPrefixes(words) {
++  let index = 0;
++  while (index < words.length) {
++    const text = words[index].text;
++    if (/^[A-Za-z_][A-Za-z0-9_]*=/u.test(text) || PREFIX_WORDS.has(commandName(words[index]))) { index += 1; continue; }
++    break;
++  }
++  return words.slice(index);
++}
++
++function rmTargets(args) {
++  let recursive = false;
++  let afterMarker = false;
++  const targets = [];
++  for (const arg of args) {
++    if (!afterMarker && arg.text === "--") { afterMarker = true; continue; }
++    if (!afterMarker && arg.text.startsWith("-")) { recursive ||= isRecursiveRmFlag(arg.text); continue; }
++    targets.push(arg);
++  }
++  return recursive ? targets : null;
++}
++
++function findDeletes(args) {
++  return args.some((arg, index) => arg.text === "-delete"
++    || (["-exec", "-execdir", "-ok", "-okdir"].includes(arg.text) && args[index + 1] !== undefined && ["rm", "rmdir", "shred"].includes(commandName(args[index + 1]))));
++}
++
++function findTargets(args) {
++  const targets = [];
++  for (let index = 0; index < args.length; index += 1) {
++    const text = args[index].text;
++    if (/^-[HLP]$/u.test(text) || /^-O\d*$/u.test(text)) continue;
++    if (text === "-D") { index += 1; continue; }
++    if (text.startsWith("-") || text === "(" || text === "!") break;
++    targets.push(args[index]);
++  }
++  return targets.length ? targets : [{ text: ".", dynamic: false, quoted: false }];
++}
++
++function xargsRunsRecursiveRm(args) {
++  let index = 0;
++  while (index < args.length && args[index].text.startsWith("-")) index += XARGS_VALUE_FLAGS.has(args[index].text) ? 2 : 1;
++  const rest = withoutPrefixes(args.slice(index));
++  return rest.length > 0 && commandName(rest[0]) === "rm" && rmTargets(rest.slice(1)) !== null;
++}
++
++function removeItemTargets(args) {
++  let recursive = false;
++  const targets = [];
++  for (let index = 0; index < args.length; index += 1) {
++    const text = args[index].text;
++    if (/^-r(e(c(u(r(s(e)?)?)?)?)?)?$/iu.test(text)) { recursive = true; continue; }
++    if (/^-(path|literalpath|lp)$/iu.test(text)) { if (args[index + 1]) targets.push(args[index + 1]); index += 1; continue; }
++    if (text.startsWith("-")) continue;
++    targets.push(args[index]);
++  }
++  return recursive ? targets : null;
++}
++
++function windowsRdTargets(args) {
++  if (!args.some(arg => /^\/s$/iu.test(arg.text))) return null;
++  return args.filter(arg => !arg.text.startsWith("/"));
++}
++
++function inlineValue(args, flags) {
++  for (let index = 0; index < args.length; index += 1) if (flags.has(args[index].text)) return args[index + 1] ?? null;
++  return null;
++}
++
++/** Every delete this command would run: `{ targets }` for readable paths, `{ opaque }` when no target can be read from the text. */
++function collectDeletes(command, depth = 0) {
++  const found = [];
++  for (const segment of parseSegments(command)) {
++    const words = withoutPrefixes(segment);
++    if (words.length === 0) continue;
++    const name = commandName(words[0]);
++    const args = words.slice(1);
++    if (name === "rm") {
++      const targets = rmTargets(args);
++      if (targets) found.push({ targets });
++    } else if (name === "find") {
++      if (findDeletes(args)) found.push({ targets: findTargets(args) });
++    } else if (name === "xargs") {
++      if (xargsRunsRecursiveRm(args)) found.push({ opaque: "xargs rm -r takes its targets from its input" });
++    } else if (name === "remove-item" || name === "ri" || name === "del" || name === "erase") {
++      const targets = removeItemTargets(args);
++      if (targets) found.push({ targets });
++    } else if (name === "rd" || name === "rmdir") {
++      const targets = windowsRdTargets(args);
++      if (targets) found.push({ targets });
++    } else if (SHELLS.has(name)) {
++      const flagIndex = args.findIndex(arg => /^-[a-zA-Z]*c[a-zA-Z]*$/u.test(arg.text));
++      if (flagIndex >= 0 && args[flagIndex + 1] && depth < NESTING_LIMIT) found.push(...collectDeletes(args[flagIndex + 1].text, depth + 1));
++    } else {
++      for (const [interpreter, flags, deletes] of INLINE_DELETERS) {
++        if (!interpreter.test(name)) continue;
++        const code = inlineValue(args, flags);
++        if (code && deletes.test(code.text)) found.push({ opaque: `a ${name} one-liner deletes recursively` });
++      }
++    }
++  }
++  return found;
++}
++
++function nearestRepositoryRoot(start) {
++  let current = start;
++  for (;;) {
++    if (existsSync(join(current, ".git"))) return current;
++    const parent = dirname(current);
++    if (parent === current) return null;
++    current = parent;
++  }
++}
++
++function real(path) {
++  let current = path;
++  const tail = [];
++  for (;;) {
++    try { return join(realpathSync(current), ...tail.reverse()); } catch { /* not created yet: resolve its parent */ }
++    const parent = dirname(current);
++    if (parent === current) return path;
++    tail.push(basename(current));
++    current = parent;
++  }
++}
++
++function contains(base, path, platform) {
++  const rel = relative(platform === "win32" ? base.toLowerCase() : base, platform === "win32" ? path.toLowerCase() : path);
++  return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
++}
++
++/** The folder part a glob cannot widen: `scratch/out*` gives `scratch/`, a bare `*` gives the working directory. */
++function literalPrefix(text) {
++  const glob = text.search(/[*?[{]/u);
++  if (glob < 0) return text;
++  const head = text.slice(0, glob);
++  const slash = head.lastIndexOf("/");
++  return slash < 0 ? "." : head.slice(0, slash + 1);
++}
++
++/** A named folder must be a plain relative path below the root that holds no Pipeline state. */
++export function validThrowawayDirs(value) {
++  if (!Array.isArray(value)) return [];
++  return value.filter(entry => {
++    if (typeof entry !== "string" || entry === "" || /[*?[{$`%]/u.test(entry)) return false;
++    const parts = entry.replace(/\\/gu, "/").replace(/\/+$/u, "").split("/");
++    return !isAbsolute(entry) && !/^[A-Za-z]:/u.test(entry) && parts.every(part => part !== "" && part !== "." && part !== "..") && !CONTROL_DIRS.has(parts[0].toLowerCase());
++  });
++}
++
++function allowedBases(root, cwd, throwawayDirs) {
++  const roots = [root, nearestRepositoryRoot(cwd)].filter(Boolean);
++  return [...roots.map(entry => real(join(entry, "scratch"))), ...validThrowawayDirs(throwawayDirs).map(entry => real(join(root, entry)))];
++}
++
++function targetAllowed(word, bases, cwd, platform) {
++  if (word.dynamic || word.text === "") return false;
++  const spelled = literalPrefix(word.text.replace(/\\/gu, "/"));
++  return bases.some(base => contains(base, real(resolve(cwd, spelled)), platform));
++}
++
++/** Null when the command deletes nothing recursively outside the allowed folders; otherwise the rule that refuses it. */
++export function recursiveDeleteFinding(command, { root, cwd = root, throwawayDirs = [], guardConfigPath = "project/guard-config.json", platform = process.platform } = {}) {
++  if (typeof command !== "string" || command === "") return null;
++  const deletes = collectDeletes(command);
++  if (deletes.length === 0) return null;
++  const bases = allowedBases(root, cwd, throwawayDirs);
++  const refused = [];
++  for (const entry of deletes) {
++    if (entry.opaque) refused.push(entry.opaque);
++    else if (entry.targets.length === 0) refused.push("a recursive delete without a readable target");
++    else for (const target of entry.targets) if (!targetAllowed(target, bases, cwd, platform)) refused.push(target.text || "an empty target");
++  }
++  if (refused.length === 0) return null;
++  const named = [...new Set(refused)].slice(0, 5).join(", ");
++  return { id: RECURSIVE_DELETE_RULE_ID,
++    why: `Recursive delete outside the throwaway folders: ${named}. It is allowed only under scratch/ and in folders listed under "throwawayDirs" in ${guardConfigPath}, each named literally without a variable. To remove tracked files name them with git rm <file>; to empty a build folder add it to throwawayDirs.`,
++    origin: "PO decision 2026-11-10 (recursive delete narrowed)" };
++}
+diff --git a/plugins/pipeline-core/hooks/recursive-delete-policy.test.mjs b/plugins/pipeline-core/hooks/recursive-delete-policy.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..0f1550a6595dfa4e2a484de54351a1a863e1b4aa
+--- /dev/null
++++ b/plugins/pipeline-core/hooks/recursive-delete-policy.test.mjs
+@@ -0,0 +1,83 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join, resolve } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++
++import { RECURSIVE_DELETE_RULE_ID, recursiveDeleteFinding, validThrowawayDirs } from "./recursive-delete-policy.mjs";
++
++const hook = join(dirname(fileURLToPath(import.meta.url)), "guard-git.mjs");
++const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
++
++function withRoot(run) {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "recursive-delete-")));
++  try { mkdirSync(join(root, ".git")); mkdirSync(join(root, "scratch")); return run(root); }
++  finally { rmSync(root, { recursive: true, force: true }); }
++}
++const refused = (command, options) => recursiveDeleteFinding(command, options);
++
++test("the measured destructive shapes are refused, each naming what it would delete", () => withRoot((root) => {
++  for (const command of ["find . -delete", "find docs -delete", "find .git -delete", "find . -name x -exec rm {} +", "find . -execdir rm -f {} ;",
++    "rm -rf docs", "rm -rf .", "rm -rf *", "rm -r -f src", "rm --recursive src", "rm -Rf src", "sh -c 'rm -rf *'", "bash -lc \"find docs -delete\"", "sudo rm -rf docs",
++    "FOO=1 rm -rf docs", "cat list | xargs rm -rf", "xargs -n 1 rm -r", "python3 -c \"import shutil; shutil.rmtree('docs')\"", "node -e \"require('fs').rmSync('docs',{recursive:true})\"",
++    "cd scratch && rm -rf ../docs", "rm -rf scratch/../docs", "Remove-Item -Recurse -Force docs", "Remove-Item docs -Rec", "rd /s /q docs", "rmdir /S docs"]) {
++    const finding = refused(command, { root });
++    assert.equal(finding?.id, RECURSIVE_DELETE_RULE_ID, command);
++    assert.match(finding.why, /scratch\/.*throwawayDirs/su, command);
++  }
++  assert.match(refused("rm -rf docs src", { root }).why, /: docs, src\./u, "both targets are named");
++}));
++
++test("an unset or expanded target is refused even under scratch/", () => withRoot((root) => {
++  for (const command of ["find $tmp -delete", "rm -rf $tmp/*", "rm -rf scratch/$name", "rm -rf \"scratch/$name\"", "rm -rf scratch/`id`", "rm -rf %TEMP%\\x"]) {
++    assert.equal(refused(command, { root })?.id, RECURSIVE_DELETE_RULE_ID, command);
++  }
++}));
++
++test("scratch/ and named throwaway folders stay open, including globs that stay inside", () => withRoot((root) => {
++  mkdirSync(join(root, "dist"));
++  for (const command of ["rm -rf scratch/out", "rm -rf scratch/out*", "rm -rf ./scratch/a scratch/b", "find scratch/out -delete", "find scratch -name x -exec rm {} +", "sh -c 'rm -rf scratch/out'", "Remove-Item -Recurse -Force scratch\\out", "rd /s /q scratch\\out"]) {
++    assert.equal(refused(command, { root }), null, command);
++  }
++  assert.equal(refused("rm -rf dist/assets", { root, throwawayDirs: ["dist"] }), null);
++  assert.equal(refused("rm -rf dist/assets", { root })?.id, RECURSIVE_DELETE_RULE_ID, "only a named folder opens");
++  assert.equal(refused("rm -rf *", { root, cwd: join(root, "scratch") }), null, "a bare glob is judged from the working directory");
++}));
++
++test("deletes that are not recursive, and commands that only mention one, are left alone", () => withRoot((root) => {
++  for (const command of ["rm docs/a.md", "rm -f docs/a.md", "git rm docs/a.md", "rmdir docs/empty", "find docs -name x", "echo rm -rf docs", "rg -n 'rm -rf docs' notes.md", "git commit -m 'rm -rf docs'", "node -e \"console.log(1)\""]) {
++    assert.equal(refused(command, { root }), null, command);
++  }
++}));
++
++test("a link inside scratch/ that leads elsewhere does not open its destination", () => withRoot((root) => {
++  mkdirSync(join(root, "docs"));
++  symlinkSync(join(root, "docs"), join(root, "scratch", "link"));
++  assert.equal(refused("rm -rf scratch/link/sub", { root })?.id, RECURSIVE_DELETE_RULE_ID);
++}));
++
++test("a dispatch in its own worktree may clear that worktree's scratch/", () => withRoot((root) => {
++  const worktree = join(root, ".claude", "worktrees", "w1");
++  mkdirSync(join(worktree, "scratch"), { recursive: true });
++  mkdirSync(join(worktree, ".git"));
++  assert.equal(refused("rm -rf scratch/out", { root, cwd: worktree }), null);
++  assert.equal(refused("rm -rf src", { root, cwd: worktree })?.id, RECURSIVE_DELETE_RULE_ID);
++}));
++
++test("a throwaway entry cannot name the root, a parent or Pipeline state", () => {
++  assert.deepEqual(validThrowawayDirs(["dist", "build/out/", ".", "..", "../x", "/abs", "C:/x", ".git", ".git/hooks", ".claude/x", "project", "a/../b", "tmp*", "", 7]), ["dist", "build/out/"]);
++  assert.deepEqual(validThrowawayDirs("dist"), []);
++});
++
++test("the git guard refuses and admits through the hook, on command text only", () => {
++  const judge = (command) => spawnSync(process.execPath, [hook], { cwd: repository, env: { ...process.env, CLAUDE_PROJECT_DIR: repository },
++    input: JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd: repository, hook_event_name: "PreToolUse" }), encoding: "utf8", timeout: 30_000 });
++  const denied = judge("find docs -delete");
++  assert.equal(denied.status, 2, denied.stderr);
++  assert.match(denied.stderr, new RegExp(RECURSIVE_DELETE_RULE_ID, "u"));
++  const admitted = judge("rm -rf scratch/never-created-by-this-test");
++  assert.equal(admitted.status, 0, admitted.stderr);
++});

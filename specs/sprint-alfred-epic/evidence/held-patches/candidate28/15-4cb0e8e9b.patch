@@ -1,0 +1,104 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index db439d5914d827329b58a8aa1011884fcbd7a958..96db126dbbd934f10d523ef38e1bdefab52ac55b 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -342,6 +342,30 @@ function committedOrWorkingTree(root, path) {
+   return String(status.stdout).trim() === "" ? "committed" : "working-tree-only";
+ }
+ 
++/**
++ * A reopened design gets a new signature under the same feature and plan path, so the receipt of the first materialization names old digests.
++ * The caller has already proven the current approval. Null when the receipt is not that case; each recorded target must still hold the bytes the receipt recorded.
++ * Returns the current targets, each replaceable only over its recorded preimage.
++ */
++function refreshReceiptAfterReapproval(root, stored, receipt, targets) {
++  let previous = null;
++  try { previous = JSON.parse(stored); } catch { return null; }
++  if (previous === null || typeof previous !== "object" || previous.schema !== receipt.schema || previous.featureId !== receipt.featureId
++    || previous.planPath !== receipt.planPath || !Array.isArray(previous.targets)
++    || (previous.planSha256 === receipt.planSha256 && previous.specSha256 === receipt.specSha256)) return null;
++  const recorded = new Map(previous.targets.map(row => [row?.path, row?.sha256]));
++  const current = new Set(targets.map(target => target.path));
++  const orphaned = [...recorded.keys()].filter(path => !current.has(path) && existsSync(physical(root, path)));
++  if (orphaned.length > 0) {
++    throw Object.assign(new Error("ARCHITECTURE-DESIGN-TARGET-REMOVED"), { field: "architecture/map",
++      expected: "the new design no longer names these files: delete them, commit, and run materialize-architecture again", rejectedValue: orphaned });
++  }
++  for (const target of targets) {
++    if (recorded.has(target.path)) requireValue(existsSync(physical(root, target.path)) && hash(bytes(root, target.path)) === recorded.get(target.path), "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
++  }
++  return targets.map(target => recorded.has(target.path) ? { ...target, preimageSha256: recorded.get(target.path) } : target);
++}
++
+ /** Read-only authority projection: no adoption record or second PO decision is fabricated. */
+ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) {
+   const root = resolve(rootDir);
+@@ -418,6 +442,8 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {})
+       const stored = bytes(root, receiptPath);
+       let inheritedFrom = null;
+       if (stored !== json(receipt)) {
++        const refreshed = refreshReceiptAfterReapproval(root, stored, receipt, targets);
++        if (refreshed) return { ok: true, status: "materialization-required", input, targets: refreshed, receipt, receiptPreimageSha256: hash(stored), scope: input.disposition.scope };
+         // C19-F1: the receipt of a CLOSED predecessor feature is accepted when the design and every target digest are equal.
+         // Only a parseable receipt of the same schema qualifies; the receipt on disk is never rewritten.
+         let predecessor = null;
+@@ -640,14 +666,15 @@ export function inspectArchitectureMaterializationTargets(rootDir, deps = {}) {
+   const prospective = subset.required ? prepareApprovedArchitectureMaterialization(subset.handle)
+     : { ok: true, required: false, targets: [] };
+   if (!prospective.ok) return { ok: false, status: "blocked", code: prospective.code };
++  const receiptTarget = inspected.receipt ? { path: "architecture/design-materialization.json", bytes: json(inspected.receipt),
++    ...(inspected.receiptPreimageSha256 ? { preimageSha256: inspected.receiptPreimageSha256 } : {}) } : null;
+   const mapTargets = inspected.receipt && inspected.status === "materialization-required"
+-    ? [...inspected.targets, { path: "architecture/design-materialization.json", bytes: json(inspected.receipt) }] : [];
++    ? [...inspected.targets, receiptTarget] : [];
+   // The retained authority is the final publication of the single transaction.
+   const targets = [...prospective.targets.filter(target => target.path !== prospective.referencePath),
+     ...mapTargets, ...prospective.targets.filter(target => target.path === prospective.referencePath)];
+   requireValue(new Set(targets.map(target => target.path)).size === targets.length, "ARCHITECTURE-DESIGN-DUPLICATE-TARGET");
+-  const mapInventory = inspected.receipt
+-    ? [...inspected.targets, { path: "architecture/design-materialization.json", bytes: json(inspected.receipt) }] : [];
++  const mapInventory = inspected.receipt ? [...inspected.targets, receiptTarget] : [];
+   const prospectiveInventory = prospective.inventoryTargets ?? [];
+   const sealedTargets = [...prospectiveInventory.filter(target => target.path !== prospective.referencePath),
+     ...mapInventory, ...prospectiveInventory.filter(target => target.path === prospective.referencePath)];
+diff --git a/plugins/pipeline-core/lib/architecture-design.test.mjs b/plugins/pipeline-core/lib/architecture-design.test.mjs
+index 037598ccb129bddc3e7b208b68c73adca88f4c33..ede2e2e253502427cc6a06ec0f914c5338020f07 100644
+--- a/plugins/pipeline-core/lib/architecture-design.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.test.mjs
+@@ -531,6 +531,36 @@ test("C19-F1: an accepted predecessor receipt does not relax the target drift ch
+   assert.equal(Object.hasOwn(exact, "inheritedFrom"), false);
+ });
+ 
++// Live on native Windows, 2026-11-10: after a reopened design got its new signature, the first materialization's receipt could only be answered with another reopen.
++test("a reopened and newly approved design refreshes its own receipt over the recorded bytes, and nothing else does", async () => {
++  const { stage, mod } = await hf9Load();
++  const own = (r, f) => ({ ...r, featureId: HF9_FEATURE, planPath: HF9_PLAN, planSha256: "a".repeat(64), specSha256: hf9Sha(HF9_SPEC_TEXT) });
++  const fixture = f1Fixture(stage, { edit: own });
++  const result = mod.inspectArchitectureDesign(fixture.root, null, {});
++  assert.equal(result.status, "materialization-required", result.code);
++  assert.ok(result.targets.every(target => /^[0-9a-f]{64}$/u.test(target.preimageSha256)), "every existing target is bound to its recorded bytes");
++  assert.equal(result.receiptPreimageSha256, hf9Sha(readFileSync(join(fixture.root, "architecture/design-materialization.json"), "utf8")));
++  const lockPath = join(fixture.root, "project", "pipeline-state.json.lock");
++  writeFileSync(lockPath, JSON.stringify({ schema: "pipeline.continuity-lock.v0", token: "token-1", ownerNonce: "nonce-1" }));
++  const published = mod.materializeArchitectureDesign(fixture.root, { lock: { ok: true, path: lockPath, token: "token-1", ownerNonce: "nonce-1" } });
++  assert.equal(published.status, "materialized", published.code);
++  assert.equal(JSON.parse(readFileSync(join(fixture.root, "architecture/design-materialization.json"), "utf8")).planSha256, fixture.prdSha, "the receipt now names the newly approved plan");
++  assert.equal(mod.inspectArchitectureDesign(fixture.root, null, {}).status, "materialized", "the refresh is settled, not repeated");
++
++  assert.equal(mod.inspectArchitectureDesign(f1Fixture(stage, { edit: own, driftTarget: true }).root, null, {}).code, "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT", "a hand-edited target is not silently replaced");
++  const unchangedSources = (r, f) => ({ ...own(r, f), planSha256: f.prdSha, designSha256: "d".repeat(64) });
++  assert.equal(mod.inspectArchitectureDesign(f1Fixture(stage, { edit: unchangedSources }).root, null, {}).code, "ARCHITECTURE-DESIGN-RECEIPT-STALE", "with unchanged plan and Spec a differing receipt was edited");
++
++  const orphan = "architecture/map/removed-module.md";
++  const withOrphan = f1Fixture(stage, { edit: (r, f) => ({ ...own(r, f), targets: [...r.targets, { path: orphan, sha256: "e".repeat(64) }] }) });
++  hf9Put(withOrphan.root, orphan, "old module\n");
++  const refused = mod.inspectArchitectureDesign(withOrphan.root, null, {});
++  assert.equal(refused.code, "ARCHITECTURE-DESIGN-TARGET-REMOVED");
++  assert.deepEqual(refused.rejectedValue, [orphan], "the refusal names the file the new design dropped");
++  unlinkSync(join(withOrphan.root, orphan));
++  assert.equal(mod.inspectArchitectureDesign(withOrphan.root, null, {}).status, "materialization-required", "once the file is gone the refresh proceeds");
++});
++
+ // --- G20-65 (AC-108): a module that owns no admissible check is reported at design time, before the PO signs, with the move that repairs it ---
+ // Measured in the Claude greenfield on candidate 20c: the module user-guide owned two documents and its test belonged to module shell; the dispatch
+ // route refused every check only after the design was signed.

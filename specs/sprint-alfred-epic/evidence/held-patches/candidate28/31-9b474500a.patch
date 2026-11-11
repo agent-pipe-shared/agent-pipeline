@@ -1,0 +1,26 @@
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+index 54e00e52235b8c8fb8a0c69d0bf6df950ed8ceed..b970384005f8c719241902d182ef635a532227bc 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+@@ -105,7 +105,7 @@ export function prepareGoldfishDispatch({ root, packagePath, out = null, noGoldf
+     return outcome(verb, "ready", { ...common, next: { tool: "spawn_agent", ...prepared.value.spawn_agent, ...(prepared.value.bindWindowSeconds === undefined ? {} : { bindWindowSeconds: prepared.value.bindWindowSeconds }), note: prepared.value.next ?? null } });
+   }
+   if (runner === "antigravity") {
+-    return outcome(verb, "ready", { ...common, next: { tool: "invoke_subagent", arguments: "flat, one child per call: TypeName is the bare role name, Prompt is the briefing file verbatim including its final newline", briefing, reference: "skills/pipeline-start/references/antigravity-native-dispatch.md" } });
++    return outcome(verb, "ready", { ...common, next: { tool: "invoke_subagent", arguments: "flat, one child per call: TypeName is the bare role name, Prompt is the briefing file verbatim including its final newline, Workspace is \"branch\" (a code-writing child runs in its own worktree; AGY-NATIVE-WORKSPACE-NOT-ISOLATED refuses any other)", briefing, reference: "skills/pipeline-start/references/antigravity-native-dispatch.md" } });
+   }
+   return outcome(verb, "ready", { ...common, next: built.value.dispatchCall ?? null });
+ }
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+index 1990e53f4653df6a9ada5680d69035cf04d24e48..df895edbdb5da16105ffea30e826d1e15711601c 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+@@ -66,6 +66,8 @@ test("Goldfish on Antigravity names invoke_subagent and adds no preparation step
+   const result = prepareGoldfishDispatch(input, { ...withRunner("antigravity"), runCommand: steps.runCommand });
+   assert.equal(result.next.tool, "invoke_subagent");
+   assert.equal(result.next.briefing, "scratch/w1.briefing.md");
++  // Antigravity greenfield 2026-11-10: the run chose Workspace "inherit" and was refused AGY-NATIVE-WORKSPACE-NOT-ISOLATED.
++  assert.match(result.next.arguments, /Workspace is "branch"/u);
+   assert.equal(steps.calls.length, 2);
+ });
+ 

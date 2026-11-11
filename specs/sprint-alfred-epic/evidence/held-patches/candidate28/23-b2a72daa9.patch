@@ -1,0 +1,30 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 4e4f22a0dd7b12f4b37f1006b5d6fcb80746ae22..d0e9f2d89f52fb7e03f63460687536c9bbe41a38 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -14825,6 +14825,10 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
+   if (error?.reason === "companion-owning-lifecycle-context-required" && /^continuity-result-(bootstrap|close)-(plan|apply)$/u.test(String(sub))) {
+     return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported, nothing was written. Cause: this project has a session-authority catalogue, so ${sub} runs only on the owner route, under a Close lifecycle at checkpointed. Repair: when closing a feature, run finish-feature.mjs: it opens that lifecycle and names each command. By hand: node ${fileURLToPath(new URL("./continuity-owner-route.mjs", import.meta.url))} run --root ${dir} --lifecycle <id> -- ${sub} <the same flags>.${elapsedText}`;
+   }
++  // Live on native Windows, 2026-11-10: inspect reported a healthy registry for this cause and the agent read plugin code for about 25 tool calls looking for the route.
++  if (error?.reason === "companion-owning-lifecycle-context-required" && STATE_COMPANION_ENTRIES.has(String(sub))) {
++    return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported, nothing was written. Cause: this project has a session-authority catalogue, so ${sub} needs an owning lifecycle context, and a plain shell call has none. The registry is healthy: inspect names nothing here, and reading plugin sources will not find a route. Stop and report this code to the human.${elapsedText}`;
++  }
+   // A short file-access conflict on Windows leaves nothing for inspect to name (claude greenfield 2026-11-08: inspect answered next: []).
+   if (error?.reason === "WIN-AUTH-OPEN") {
+     return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported. Repair: run ${repairInspect}. When its next list is empty this was a short file-access conflict: repeat the same command once. If it is refused again, the windowsAuthorityReadiness.causes field of the preflight names the folder.${elapsedText}`;
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index be27c684fdbe6a448a144df81ca3b1f3e1389d0f..9ad598747beee4f474456efebddfcf04ace0ef38 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -608,6 +608,10 @@ const cases = [
+     const windows = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-UNAVAILABLE", reason: "WIN-AUTH-OPEN" }, { elapsedMs: 1 });
+     assert.match(windows, /next list is empty this was a short file-access conflict: repeat the same command once/u, windows);
+     assert.doesNotMatch(windows, /names the cause and the command that clears it/u, windows);
++    const noContext = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-UNAVAILABLE", reason: "companion-owning-lifecycle-context-required" }, { elapsedMs: 1, sub: "discard-feature" });
++    assert.match(noContext, /discard-feature needs an owning lifecycle context/u, noContext);
++    assert.match(noContext, /Stop and report this code to the human/u, noContext);
++    assert.doesNotMatch(noContext, /names the cause and the command that clears it/u, noContext);
+   } },
+   { id: "SAS02", name: "SAD diag (2) an error without code and reason keeps the default code alone in the parenthesis and names its class, message and at most two bare frames after it", run: () => {
+     const untyped = describeStateAuthorityRefusal(new TypeError("boom"), { elapsedMs: 5 });

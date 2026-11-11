@@ -1,0 +1,73 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 96db126dbbd934f10d523ef38e1bdefab52ac55b..3f61f8f0a5425f56030d77e62d68cf517c7d9da3 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -731,8 +731,10 @@ export function materializeArchitectureDesign(rootDir, { lock, ...inspectDeps }
+       const retained = retainApprovedDesignArchitectureReference(subset.handle);
+       if (!retained.ok) return { ok: false, status: "blocked", code: retained.code };
+     }
+-    return inventory.prospective.required && readback.inspected.status === "not-required"
+-      ? { ...readback.inspected, required: true, status: "materialized", materializationKind: "prospective-adr-only", referencePath: inventory.prospective.referencePath }
+-      : readback.inspected;
++    if (inventory.prospective.required && readback.inspected.status === "not-required") {
++      return { ...readback.inspected, required: true, status: "materialized", materializationKind: "prospective-adr-only", referencePath: inventory.prospective.referencePath };
++    }
++    // Live on native Windows, 2026-11-10: the commit step left the retained approval reference out, and implementation entry then refused for it.
++    return inventory.prospective.required ? { ...readback.inspected, referencePath: inventory.prospective.referencePath } : readback.inspected;
+   } catch (error) { return { ok: false, status: "blocked", code: error.message }; }
+ }
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index 1d232832a39396eafefaa7f37b1df4b9ee1bcea1..5e86ccdde407494f23c07063aa4f354019e1f657 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -289,6 +289,15 @@ export function inspectPlanningDecisionApplicability(root, surface, now,
+   };
+ }
+ 
++/** Live on native Windows, 2026-11-10: the bare refusal sent the agent into the plugin's source to learn which finding blocked it. */
++function blockedDecisionFindings(applicability) {
++  const named = [...new Set(applicability.areas.filter(item => item.status === "blocked").flatMap(item => (Array.isArray(item.findings) && item.findings.length
++    ? item.findings.map(entry => `${item.area}: ${entry.code}${entry.path ? ` (${entry.path})` : ""}`)
++    : [`${item.area}: ${item.code ?? "no finding recorded"}`])))];
++  if (named.length === 0) return "";
++  return ` Blocking: ${named.slice(0, 6).join("; ")}${named.length > 6 ? `; and ${named.length - 6} more` : ""}.`;
++}
++
+ export function summarizePlanningDecisionApplicability(value) {
+   if (!value || !Array.isArray(value.areas) || !Array.isArray(value.unresolvedPaths)) return null;
+   return {
+@@ -455,7 +464,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
+       artifacts, disposition, null, {
+         kind: "repair-required",
+         code: "ARCHITECTURE-DECISION-APPLICABILITY-REPAIR",
+-        guidance: "Resolve the blocked area's decision findings through its owning authority, restore any required authenticated inherited source, and re-run architecture entry readiness. Preserve the original decision/source evidence; do not substitute a map, adoption approval, or fitness PASS for it.",
++        guidance: `Resolve the blocked area's decision findings through its owning authority, restore any required authenticated inherited source, and re-run architecture entry readiness. Preserve the original decision/source evidence; do not substitute a map, adoption approval, or fitness PASS for it.${blockedDecisionFindings(artifacts.decisionApplicability)}`,
+       });
+   }
+ 
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+index e6422603a82057c7babd0e084f9e3a13cc1121db..256bb2e0647ff6e692f9d7b4238bf5a67a858a15 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+@@ -548,6 +548,21 @@ test("a deferred architecture decision remains visible without changing lifecycl
+   assert.equal(result.code, "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED");
+ });
+ 
++test("a blocked architecture decision names its finding in the repair guidance", () => {
++  const result = inspectArchitectureEntryReadiness({
++    rootDir: repoRoot,
++    planningSurface: { planPath: "specs/architecture-entry.md",
++      paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
++    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt,
++      checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "adopted", scope: [ARCHITECTURE_ENTRY_SCOPE] }),
++      inspectDecisions: ({ area }) => ({ area, status: "blocked", code: "ARCH-DECISION-EFFECTIVE-UNRESOLVED", decisions: [],
++        findings: [{ code: "aggregate-design-authority-unverified", path: "project/aggregate-design-architecture-references" }] }),
++    },
++  });
++  assert.equal(result.code, "ARCHITECTURE-DECISION-APPLICABILITY-BLOCKED", JSON.stringify(result));
++  assert.match(result.nextAction.guidance, /Blocking: [^.]*aggregate-design-authority-unverified \(project\/aggregate-design-architecture-references\)/u);
++});
++
+ test("an unavailable optional decision clock remains diagnostic", () => {
+   const result = inspectPlanningDecisionApplicability(repoRoot,
+     { paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },

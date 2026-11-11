@@ -1,0 +1,52 @@
+diff --git a/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+index db8747cfde645c2ecfae1a6221b778de836d805c..6faa5e8c7be6b772b1c75a3e1fb79bd6c509828d 100644
+--- a/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
++++ b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+@@ -5,7 +5,7 @@ type: workflow-improvement
+ owner: pipeline
+ status: open
+ created: 2026-11-10
+-source: Codex greenfield report, point R5 (P1); PO tile 2026-11-10 places it after 0.7.0
++source: "Codex greenfield report, point R5 (P1); PO tile 2026-11-10 places it after 0.7.0"
+ sprint: alfred
+ done_when: manual
+ ---
+diff --git a/backlog/items/2026-11-10-device-test-result-in-the-repository-after-0-7-0.md b/backlog/items/2026-11-10-device-test-result-in-the-repository-after-0-7-0.md
+index 1466675ae71d2b4be5df6624e78773e446b42a37..4052bb74ec3b3db6b55eea1898ade6dc5657f538 100644
+--- a/backlog/items/2026-11-10-device-test-result-in-the-repository-after-0-7-0.md
++++ b/backlog/items/2026-11-10-device-test-result-in-the-repository-after-0-7-0.md
+@@ -5,7 +5,7 @@ type: workflow-improvement
+ owner: pipeline
+ status: open
+ created: 2026-11-10
+-source: Claude greenfield report, section 6.2; PO tile 2026-11-10 places it after 0.7.0
++source: "Claude greenfield report, section 6.2; PO tile 2026-11-10 places it after 0.7.0"
+ sprint: alfred
+ done_when: manual
+ ---
+diff --git a/backlog/items/2026-11-10-measure-elephant-admin-load-next-round.md b/backlog/items/2026-11-10-measure-elephant-admin-load-next-round.md
+index ad18c5b48148831222c4f74fe226e61446abb4c8..ab0bb914e29a7efdfe7bf215361bfe42ce189044 100644
+--- a/backlog/items/2026-11-10-measure-elephant-admin-load-next-round.md
++++ b/backlog/items/2026-11-10-measure-elephant-admin-load-next-round.md
+@@ -5,7 +5,7 @@ type: workflow-improvement
+ owner: pipeline
+ status: open
+ created: 2026-11-10
+-source: Claude greenfield report (592 Elephant messages, 69 percent cache reads); PO tile 2026-11-10
++source: "Claude greenfield report (592 Elephant messages, 69 percent cache reads); PO tile 2026-11-10"
+ sprint: alfred
+ done_when: manual
+ ---
+diff --git a/backlog/items/2026-11-10-personal-routing-override-after-0-7-0.md b/backlog/items/2026-11-10-personal-routing-override-after-0-7-0.md
+index 84c5a71bdc6e1f797a02f5250b96969cb463da1e..bb6e6ea594bd8a1e9f8237971d411a5d201be407 100644
+--- a/backlog/items/2026-11-10-personal-routing-override-after-0-7-0.md
++++ b/backlog/items/2026-11-10-personal-routing-override-after-0-7-0.md
+@@ -5,7 +5,7 @@ type: workflow-improvement
+ owner: pipeline
+ status: open
+ created: 2026-11-10
+-source: PO tile of 2026-11-10 on project-owned routing (ADR-0089), placing it after 0.7.0
++source: "PO tile of 2026-11-10 on project-owned routing (ADR-0089), placing it after 0.7.0"
+ sprint: alfred
+ done_when: manual
+ ---

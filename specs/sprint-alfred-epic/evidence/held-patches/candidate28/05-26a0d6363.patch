@@ -1,0 +1,47 @@
+diff --git a/plugins/pipeline-core/lib/native-platform-process-observer.test.mjs b/plugins/pipeline-core/lib/native-platform-process-observer.test.mjs
+index e9e6c1f5dd119602203fac7e5feb99ba2822c90f..356256f6975d36ee889b14e95d08433dbaa69341 100644
+--- a/plugins/pipeline-core/lib/native-platform-process-observer.test.mjs
++++ b/plugins/pipeline-core/lib/native-platform-process-observer.test.mjs
+@@ -41,8 +41,8 @@ test('actual Windows program branch keeps executable/module/argv/cwd custody and
+   let fresh=structuredClone(actual),refs=0;
+   const p={platform:'win32',pid:31,cwd:()=>'/repo',execPath:'/node',argv:['/node','/bridge']};
+   const fail=code=>{throw Object.assign(Error(code),{code});};
+-  const fn=compileFunction(body+'\nreturn osvProgram;',['process','osvObservedProcess','osvSameProcess','realpathSync','osvPhysicalRef','osvFail','sameNativeDarwinProcess','isAbsolute','readFileSync','processArgvDigest'])
+-    (p,()=>fresh,(a,b)=>JSON.stringify(a)===JSON.stringify(b),x=>x,path=>{refs++;return {path};},fail,()=>false,x=>x.startsWith('/'),()=>{throw Error('unexpected POSIX read');},()=>{throw Error('unexpected POSIX hash');});
++  const fn=compileFunction(body+'\nreturn osvProgram;',['process','osvObservedProcess','osvSameProcess','realpathSync','osvPhysicalRef','osvFail','sameNativeDarwinProcess','isAbsolute','readFileSync','processArgvDigest','windowsSameArgvPath'])
++    (p,()=>fresh,(a,b)=>JSON.stringify(a)===JSON.stringify(b),x=>x,path=>{refs++;return {path};},fail,()=>false,x=>x.startsWith('/'),()=>{throw Error('unexpected POSIX read');},()=>{throw Error('unexpected POSIX hash');},(a,b)=>a===b);
+   assert.deepEqual(fn(actual),{executable:{path:'/node'},module:{path:'/bridge'},argv:['/node','/bridge'],cwd:'/repo'});assert.equal(refs,2);
+   fresh={...actual,cwd:'/changed'};assert.throws(()=>fn(actual),{code:'OSV-INPUT-DRIFT'});
+   fresh={...actual,argv:['/node','/unbound']};assert.throws(()=>fn(actual),{code:'OSV-INPUT-DRIFT'});
+diff --git a/plugins/pipeline-core/lib/pins/outside-root-read-label-skips-option-value-file-tokens.test.mjs b/plugins/pipeline-core/lib/pins/outside-root-read-label-skips-option-value-file-tokens.test.mjs
+index e599550b74e6aa3b99fba7ae3a4bac06a86d9021..713846ca73f5b4868c32095b87d78128fdeab510 100644
+--- a/plugins/pipeline-core/lib/pins/outside-root-read-label-skips-option-value-file-tokens.test.mjs
++++ b/plugins/pipeline-core/lib/pins/outside-root-read-label-skips-option-value-file-tokens.test.mjs
+@@ -66,7 +66,7 @@ test('mirror without the option-file push loses the outside value (case can fail
+   const start=source.indexOf('const QP4_RG_SHORT_VALUE');
+   const end=source.indexOf('export function qp4OperandResolvesOutsideRoot');
+   assert.ok(start>0&&end>start,'production anchors present');
+-  const slice=source.slice(start,end);
++  const slice=source.slice(start,end).replace(/^export /gmu,''); // the slice is compiled as a function body, where `export` is a syntax error
+   const push='if (optionFile && typeof value === "string" && value !== "") fileValues.push(value);';
+   assert.ok(slice.includes(push),'option-file push present in production');
+   const build=text=>new Function(text+'\nreturn qp4ReadTargetOperands;')();
+diff --git a/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs b/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs
+index 851d3a30f39c8565643512b922601470313b613f..fd36d6d71a39cc9067fe0761bcca5788bdfa89fd 100644
+--- a/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs
++++ b/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs
+@@ -239,10 +239,10 @@ test('case B (structural): the OSV bridge bounds only osvWindowsPrivate with the
+   assert.deepEqual(callsOf(source, 'osvWindowsAncestors').map(({caller, args}) => [caller, args.join('|')]), [['osvWindowsRead', 'path|boundaryRoot'], ['osvWindowsRead', 'path|boundaryRoot']]);
+   const reads = callsOf(source, 'osvWindowsRead');
+   const bounded = reads.filter(({args}) => args.length > 3);
+-  assert.equal(bounded.length, 1, 'exactly one osvWindowsRead caller passes a boundary');
+-  assert.equal(bounded[0].caller, 'osvWindowsPrivate');
+-  assert.equal(bounded[0].args[3], 'osvWindowsBoundary(file,r.primaryRoot)');
+-  assert.deepEqual(reads.filter((call) => call !== bounded[0]).map(({caller}) => caller).sort(), ['osvWindowsEvidence', 'osvWindowsPhysical', 'osvWindowsPhysicalRef']);
++  // QG-04 restated (candidate 23, owner route): the owner-route invocation reads a private file under the same repository bound, so there are exactly two bounded readers.
++  assert.equal(bounded.length, 2, 'exactly the two private-file readers pass a boundary');
++  assert.deepEqual(bounded.map(({caller, args}) => [caller, args[3]]), [['osvWindowsPrivate', 'osvWindowsBoundary(file,r.primaryRoot)'], ['inspectSourceOwnedContinuityOwnerRouteInvocation', 'osvWindowsBoundary(path,r.primaryRoot)']]);
++  assert.deepEqual(reads.filter((call) => !bounded.includes(call)).map(({caller}) => caller).sort(), ['osvWindowsEvidence', 'osvWindowsPhysical', 'osvWindowsPhysicalRef']);
+ });
+ 
+ test('case C (structural): the host-process journal bounds only the three repository-bearing verification readers', () => {

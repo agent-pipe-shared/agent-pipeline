@@ -1,0 +1,130 @@
+diff --git a/plugins/pipeline-core/lib/critic-route-v3.test.mjs b/plugins/pipeline-core/lib/critic-route-v3.test.mjs
+index c517bbd4eccf200392166840fb5b8986c34426ab..90a06c674f7749edc054016e09bfd57b2787f6f0 100644
+--- a/plugins/pipeline-core/lib/critic-route-v3.test.mjs
++++ b/plugins/pipeline-core/lib/critic-route-v3.test.mjs
+@@ -44,14 +44,18 @@ test('Codex model-id and high-risk Critic resolution retain registered source an
+ });
+ test('unknown kind or substituted registry selector is refused by full default validation',t=>{
+   const f=fixture(t);
+-  for(const change of [{kind:'unknown',value:'sonnet'},{kind:'model-id',value:'sonnet'},{kind:'alias',value:'unregistered-alias'}]){
+-    const bad=structuredClone(f.config);bad.routing.duties.readiness.claude.selector=change;assert.equal(validatePipelineUserV3(bad).ok,false);
+-    const candidateCommit=f.commit(bad);assert.throws(()=>resolveV3DutyRoute({rootDir:f.root,dutyId:'readiness',runner:'claude',candidateCommit}),/did not pass V3 validation/);
++  // QG-04 restated (PO 2026-11-09, e931a315d): pipeline.user.yaml owns the routing, so any non-empty selector value is the project's choice; the selector KIND stays enumerated.
++  const bad=structuredClone(f.config);bad.routing.duties.readiness.claude.selector={kind:'unknown',value:'sonnet'};assert.equal(validatePipelineUserV3(bad).ok,false);
++  const candidateCommit=f.commit(bad);assert.throws(()=>resolveV3DutyRoute({rootDir:f.root,dutyId:'readiness',runner:'claude',candidateCommit}),/did not pass V3 validation/);
++  for(const change of [{kind:'model-id',value:'sonnet'},{kind:'alias',value:'unregistered-alias'}]){
++    const chosen=structuredClone(f.config);chosen.routing.duties.readiness.claude.selector=change;assert.equal(validatePipelineUserV3(chosen).ok,true);
++    assert.equal(resolveV3DutyRoute({rootDir:f.root,dutyId:'readiness',runner:'claude',candidateCommit:f.commit(chosen)}).model,change.value);
+   }
+ });
+ test('Codex cannot gain an alias through a changed committed cell',t=>{
+   const f=fixture(t),bad=structuredClone(f.config);bad.routing.duties.critic_high_risk.codex.selector={kind:'alias',value:'opus'};
+-  const candidateCommit=f.commit(bad);assert.throws(()=>resolveCriticHighRiskRoute({rootDir:f.root,candidateCommit}),/did not pass V3 validation/);
++  // QG-04 restated: the file itself validates since the project owns its routing; the alias on Codex is refused by the route lookup.
++  const candidateCommit=f.commit(bad);assert.throws(()=>resolveCriticHighRiskRoute({rootDir:f.root,candidateCommit}),/requested duty route is unavailable/);
+ });
+ test('malformed committed source and unavailable duty lookup fail without fallback',t=>{
+   const f=fixture(t);assert.throws(()=>resolveV3DutyRoute({rootDir:f.root,dutyId:'absent',runner:'claude',candidateCommit:f.candidateCommit}),/requested duty route is unavailable/);
+diff --git a/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs b/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
+index 30efe68fc754bb81b00e9bf826688d37ec182d68..ddf46e6bc58fecb754cd4c236c8d8390ee792c2e 100644
+--- a/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
++++ b/plugins/pipeline-core/lib/guard/no-route-denials-seed-no-override-request.test.mjs
+@@ -33,7 +33,8 @@ test("NRS01 refusals with no override route seed no request", () => {
+   for (const [toolName, toolInput, code] of [
+     ["Bash", { command: "cat /etc/hostname" }, "GUARD-READ-SCOPE-OUTSIDE-ROOT"],
+     ["Bash", { command: "cat .aws/credentials" }, "GUARD-READ-CREDENTIAL-TARGET"],
+-    ["Bash", { command: "rg -A3 x a.txt" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
++    // QG-04 restated (C22B admits the attached context flag -A3): -m3 is the attached value that stays refused.
++    ["Bash", { command: "rg -m3 x a.txt" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
+     ["Bash", { command: "cat a.txt | wc -l" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
+     ["Bash", { command: "nl -ba a.txt | wc -l" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
+     ["Bash", { command: "rm -rf scratch" }, "GUARD-LIFECYCLE-NOT-READY"],
+diff --git a/plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs b/plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs
+index fcb2ae0fc80d85e6004ed67fbc804e52ddebed6c..49658488a1af2c61b97dbf315b537dfc8af34e18 100644
+--- a/plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs
++++ b/plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs
+@@ -124,7 +124,9 @@ test("AC-194 flag combination: several flags together and the -e/--regexp patter
+ });
+ 
+ test("a refused commit-tree read names the spelling that passes, and that spelling is admitted", () => {
+-  const { code, stderr } = runGuard(`git rev-parse ${head}^{tree}`);
++  // QG-04 restated: the bare `git rev-parse <commit>^{tree}` read is admitted since REV_PARSE_TREE_READ_RE; any wider spelling stays refused and names the alternative.
++  assertAllowed(`git rev-parse ${head}^{tree}`);
++  const { code, stderr } = runGuard(`git rev-parse --verify ${head}^{tree}`);
+   assert.equal(code, 2);
+   assert.match(stderr, /git log -1 --format=%H%x20%T <commit>/u);
+   assertAllowed(`git log -1 --format=%H%x20%T ${head}`);
+diff --git a/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs b/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
+index 6ebf0488ddc6137438e5135e65f4e1db5115ef5b..3424ba2abe8727e7b38f6b8e1cc0be274d83b499 100644
+--- a/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
++++ b/plugins/pipeline-core/lib/powershell-bash-guard-parity.test.mjs
+@@ -116,7 +116,8 @@ test("sanctioned scripts: --help and the plan, inspect and binding verbs are adm
+   for (const command of admittedWhenReady) assert.equal(ps(command).exitCode, 0, command);
+   // readiness is what differs: the Bash grammar table admits `pipeline-state inspect` and `pipeline-state --help` before readiness too (and so does the
+   // dialect, through the same isSanctionedLifecycleCommand); every other route above exists only in a ready session
+-  const beforeReadiness = [state("inspect"), state("--help")];
++  // QG-04 restated (PO 2026-11-09): a sanctioned script's --help is admitted before onboarding too; a verb's own --help stays ready-only.
++  const beforeReadiness = [state("inspect"), state("--help"), `node ${scripts("dispatch-briefing.mjs")} --help`, `node ${HUMAN_OVERRIDE_SCRIPT} --help`];
+   for (const command of beforeReadiness) assert.equal(ps(command, NOT_READY).exitCode, 0, `not ready: ${command}`);
+   for (const command of admittedWhenReady.filter((entry) => !beforeReadiness.includes(entry))) assert.equal(ps(command, NOT_READY).exitCode, 2, `not ready: ${command}`);
+   for (const refused of [
+@@ -152,7 +153,10 @@ test("every PowerShell grammar refusal names the admitted alternative for the sh
+ }));
+ 
+ test("a native read of a project directory that is not a protected root states what is protected and which spelling is admitted", () => withRoot(({ root, run, ps }) => {
+-  const grep = run("Grep", { pattern: "x", path: join(root, "project") });
++  // QG-04 restated (PO 2026-11-10): native Grep on a non-hidden project directory is admitted like rg; a hidden one stays refused and carries the text.
++  assert.equal(run("Grep", { pattern: "x", path: join(root, "project") }).exitCode, 0);
++  mkdirSync(join(root, ".hidden"));
++  const grep = run("Grep", { pattern: "x", path: join(root, ".hidden") });
+   assert.equal(grep.exitCode, 2);
+   assert.match(grep.stderr, /GUARD-READ-TARGET:/u);
+   assert.match(grep.stderr, /Protected roots:/u, grep.stderr);
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+index f378f419157f327e5f7e847fa0077513cc9473ac..af6d0d8e51a98fe070d201176996b6b2eaa35b33 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+@@ -112,12 +112,13 @@ test("RCD13: an attached flag value gets the separate-argument spelling, other f
+ });
+ 
+ test("RCD14: the refusal of an attached value prints the spelling to use, and both spellings stay judged by the grammar", async () => {
+-  const attached = "rg -n -A8 needle README.md";
++  // QG-04 restated (C22B admits the attached context flags -A/-B/-C): -m is the value flag that stays separate.
++  const attached = "rg -n -m8 needle README.md";
+   assert.equal(isReadOnlyDiagnosticCommand(attached, root), false, "fixture must be refused");
+-  assert.equal(isReadOnlyDiagnosticCommand("rg -n -A 8 needle README.md", root), true, "the suggested spelling is admitted");
++  assert.equal(isReadOnlyDiagnosticCommand("rg -n -m 8 needle README.md", root), true, "the suggested spelling is admitted");
+   const result = await refusal(attached);
+   assert.equal(result.exitCode, 2);
+-  assert.match(String(result.stderr), /Rejected element: the flag "-A8" \(an attached value is not admitted; give it as a separate argument: -A 8\)\./u);
++  assert.match(String(result.stderr), /Rejected element: the flag "-m8" \(an attached value is not admitted; give it as a separate argument: -m 8\)\./u);
+ });
+ 
+ test("RCD-R6: a repeated option is named, with or without a value, and only when the repeat is the whole fault", async () => {
+diff --git a/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs b/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs
+index 6a794341ac3cd2492562291a638f414bc35f8c3f..2ec2bf6cfc8d744d125db278a11ee0896b8ac6a4 100644
+--- a/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs
++++ b/plugins/pipeline-core/scripts/d3-signed-reconcile-commit.test.mjs
+@@ -335,7 +335,8 @@ test("G20-66: approve-plan and close-feature are the wired writers; the wrapper
+     assert.equal(status, 0);
+     const out = printed.join("\n");
+     assert.match(out, new RegExp(`git add -- ${MANIFEST.replace(/[.]/g, "\\.")}`));
+-    assert.match(out, /git commit -m "chore\(pipeline\): /);
++    assert.match(out, /the line "chore\(pipeline\): /); // QG-04 restated: the push guard refuses parentheses on a command line, so the route is a message file
++    assert.match(out, /git commit -F /);
+     assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST) === null, false, "the record exists");
+     f.git("add", MANIFEST); assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST).admitted, true);
+   }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index 2f100c424751f1a56bf06435de0aebd2e0b65232..a987c32adc169cbb5801e60908e23bc0946b1aa1 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -737,7 +737,7 @@ test("N31r: the reconcile command marks --by as the PO's own value and names whe
+   const placeholders = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) }).out).reconcileCommand.placeholders;
+   const by = placeholders.find((entry) => entry.flag === "--by");
+   assert.equal(by.token, "<po-name>");
+-  assert.match(by.from, /PO/u); assert.match(by.from, /never the agent/u);
++  assert.match(by.from, /PO/u); assert.match(by.from, /never invented by the agent/u); // QG-04 restated: the label may come from this machine's operatorLabel (PO 2026-11-10)
+   for (const [flag, field] of [["--proof-request", "requestPath"], ["--proof-authority", "authorityPath"], ["--proof", "proofPath"]]) {
+     assert.match(placeholders.find((entry) => entry.flag === flag).from, new RegExp(field, "u"), `${flag} names the ${field} the signing terminal prints`);
+   }

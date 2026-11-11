@@ -1,0 +1,37 @@
+diff --git a/plugins/pipeline-core/hooks/guard-push-read-search.test.mjs b/plugins/pipeline-core/hooks/guard-push-read-search.test.mjs
+index c17f754c918504d903e8004d0e5146fd422ec4ac..9c347a9a84fc78513f9136c155b9e79b74a46e22 100644
+--- a/plugins/pipeline-core/hooks/guard-push-read-search.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-push-read-search.test.mjs
+@@ -116,3 +116,17 @@ test("a push anywhere in the command, or a substitution that would run one, stay
+     assert.ok(marker.stderr.includes(REFUSAL), marker.stderr);
+   } finally { rmSync(dir, { recursive: true, force: true }); }
+ });
++
++test("a git read refused for a backslash says so, and the spelling it names passes", () => {
++  const dir = activeGateRepo();
++  try {
++    const refused = run("git config --local --get-regexp ^user\\.", dir);
++    assert.equal(refused.code, 2, refused.stderr);
++    assert.match(refused.stderr, /a backslash next to git counts as a possible hidden push/u);
++    const respelled = run("git config --local --get-regexp ^user[.]", dir);
++    assert.equal(respelled.code, 0, respelled.stderr);
++    const push = run("git push origin main\\:refs/heads/x", dir);
++    assert.equal(push.code, 2, push.stderr);
++    assert.doesNotMatch(push.stderr, /a backslash next to git/u);
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index d49f16da49cd51ee8d2dbfe180c553e1a7c891c7..8b361ed968a3db4c5acf3e7099ff528dc06be2dc 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -1975,6 +1975,10 @@ if (!pushBinding.ok) {
+     ...(commandCarriesNamedMarker(cmd)
+       ? ["Why: a command that names git together with a ( ) { $ backtick or a nested shell -c is refused as a possible hidden push, even when it only reads or commits."]
+       : []),
++    // Live finding, candidate 27: `git config --local --get-regexp ^user\.` was refused and the run lost its only check of the local author.
++    ...(cmd.includes("\\") && !/\bpush\b/iu.test(cmd)
++      ? ["Why: a backslash next to git counts as a possible hidden push too. Write the pattern without one, for example `^user[.]` instead of `^user\\.`, and the same read passes."]
++      : []),
+     "Instead: commit with `git commit -F scratch/commit-msg/<slice>.txt -- <paths>` (message in a file, paths after the double dash), and for a search use rg -n <pattern> <file> rather than git grep.",
+     // Critics read a fixed commit, so rg and a plain rev-parse suffix do not help them; these spellings pass this guard.
+     ...(/\^\{(?:tree|commit)\}/u.test(cmd) ? ["For a commit's id and tree use `git log -1 --format=%H%x20%T <commit>`, which needs no braces."] : []),

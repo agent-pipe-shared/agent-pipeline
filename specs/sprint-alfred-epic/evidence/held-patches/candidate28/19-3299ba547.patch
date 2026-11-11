@@ -1,0 +1,133 @@
+diff --git a/plugins/pipeline-core/hooks/guard-git.mjs b/plugins/pipeline-core/hooks/guard-git.mjs
+index 030777203078531dbb5dc3a48927f9f97d93cecb..fdf39fa04ebea06cca5d580957d5d48bf3ca7711 100644
+--- a/plugins/pipeline-core/hooks/guard-git.mjs
++++ b/plugins/pipeline-core/hooks/guard-git.mjs
+@@ -1428,6 +1428,14 @@ for (const rule of EXTRA_BLOCKERS) if (rule.re.test(normalizedStripped)) matched
+ const recursiveDelete = recursiveDeleteFinding(cmd, { root: projectDir, cwd: toolCwd ?? process.cwd(), throwawayDirs: projectConfig?.throwawayDirs, guardConfigPath: guardConfigRelPath });
+ if (recursiveDelete) matched.push(recursiveDelete);
+ 
++// PO decision 2026-11-10: the author answered in onboarding reaches the local Git config directly before the commit that needs it.
++if (matched.length === 0 && /\bgit\s+commit\b/.test(normalizedC)) {
++  try {
++    const { applyHeldGitAuthor } = await import("../lib/held-git-author.mjs");
++    applyHeldGitAuthor(projectDir);
++  } catch { /* fail-open like the rest of this guard: a commit is not stopped by the author step */ }
++}
++
+ if (matched.length > 0) {
+   // ADR-0079: hook-bypass rules protect the mechanism that evaluates every
+   // other Git rule. Letting the same mechanism authorize its own removal is
+diff --git a/plugins/pipeline-core/lib/held-git-author.mjs b/plugins/pipeline-core/lib/held-git-author.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..1d296b8a6e62d11383efff74764ba4d73283a6fa
+--- /dev/null
++++ b/plugins/pipeline-core/lib/held-git-author.mjs
+@@ -0,0 +1,40 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * PO decision 2026-11-10: the author answered in onboarding goes into the repository's local Git config directly before the first commit.
++ * Live on native Windows, the answer was held but nothing wrote it, and the first commit carried the global account's identity.
++ * Only a value the PO answered is written, only where no repository-local value exists; a project that sets its own stays untouched.
++ */
++import { spawnSync } from "node:child_process";
++import * as fs from "node:fs";
++
++import { initialAnswersReceipt, intakeGitAuthor } from "./project-onboarding-v3-author-identity.mjs";
++import { readOnboardingIntakeCheckpoint } from "./onboarding-continuity.mjs";
++
++function localValue(root, key, spawn) {
++  const probe = spawn("git", ["config", "--local", "--get", key], { cwd: root, encoding: "utf8", timeout: 5_000 });
++  return probe.status === 0 ? String(probe.stdout ?? "").trim() : "";
++}
++
++function heldAuthor(root, deps) {
++  const receipt = (deps.initialAnswersReceipt ?? initialAnswersReceipt)(root, fs);
++  if (receipt?.gitAuthorName && receipt?.gitAuthorEmail) return { name: receipt.gitAuthorName, email: receipt.gitAuthorEmail };
++  return intakeGitAuthor((deps.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)({ rootDir: root, repositoryCapability: "local", spawn: deps.spawn ?? spawnSync }));
++}
++
++/** Writes each missing key from the held answer. Never throws: a commit is not stopped by this step. */
++export function applyHeldGitAuthor(root, deps = {}) {
++  const spawn = deps.spawn ?? spawnSync;
++  try {
++    const missing = [["user.name", "name"], ["user.email", "email"]].filter(([key]) => localValue(root, key, spawn) === "");
++    if (missing.length === 0) return { status: "already-configured" };
++    const held = heldAuthor(root, deps);
++    if (!held) return { status: "nothing-held" };
++    for (const [key, field] of missing) {
++      const written = spawn("git", ["config", "--local", key, held[field]], { cwd: root, encoding: "utf8", timeout: 5_000 });
++      if (written.status !== 0) return { status: "unavailable" };
++    }
++    return { status: "applied", keys: missing.map(([key]) => key) };
++  } catch {
++    return { status: "unavailable" };
++  }
++}
+diff --git a/plugins/pipeline-core/lib/held-git-author.test.mjs b/plugins/pipeline-core/lib/held-git-author.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..d674d67e2141567462bb8b45a00c00f6a4c16446
+--- /dev/null
++++ b/plugins/pipeline-core/lib/held-git-author.test.mjs
+@@ -0,0 +1,62 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { execFileSync, spawnSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++
++import { applyHeldGitAuthor } from "./held-git-author.mjs";
++import { resolveInitialAnswersState } from "./onboarding-initial-answers-state.mjs";
++import { PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA } from "./project-onboarding-v3-author-identity.mjs";
++
++function withRepository(run) {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "held-author-")));
++  try { execFileSync("git", ["init", "-q"], { cwd: root }); return run(root); }
++  finally { rmSync(root, { recursive: true, force: true }); }
++}
++const local = (root, key) => spawnSync("git", ["config", "--local", "--get", key], { cwd: root, encoding: "utf8" }).stdout.trim();
++const held = (name, email) => ({ initialAnswersReceipt: () => ({ gitAuthorName: name, gitAuthorEmail: email }), readOnboardingIntakeCheckpoint: () => ({ status: "absent" }) });
++
++test("the answered author reaches the local config before the first commit, and a later commit carries it", () => withRepository((root) => {
++  assert.deepEqual(applyHeldGitAuthor(root, held("Synthetic Author", "author@example.invalid")), { status: "applied", keys: ["user.name", "user.email"] });
++  assert.equal(local(root, "user.name"), "Synthetic Author");
++  execFileSync("git", ["commit", "-q", "--allow-empty", "-m", "first"], { cwd: root, env: { ...process.env, GIT_CONFIG_GLOBAL: join(root, "no-global") } });
++  assert.equal(execFileSync("git", ["log", "-1", "--format=%an <%ae>"], { cwd: root, encoding: "utf8" }).trim(), "Synthetic Author <author@example.invalid>");
++}));
++
++test("an author the intake record holds is used when the receipt has none", () => withRepository((root) => {
++  const deps = { initialAnswersReceipt: () => null, readOnboardingIntakeCheckpoint: () => ({ status: "present", value: { values: { gitAuthor: { name: "Intake Author", email: "intake@example.invalid" } } } }) };
++  assert.equal(applyHeldGitAuthor(root, deps).status, "applied");
++  assert.equal(local(root, "user.email"), "intake@example.invalid");
++}));
++
++test("a value the repository already sets is never replaced; only the missing key is written", () => withRepository((root) => {
++  execFileSync("git", ["config", "--local", "user.name", "Own Name"], { cwd: root });
++  assert.deepEqual(applyHeldGitAuthor(root, held("Other", "other@example.invalid")), { status: "applied", keys: ["user.email"] });
++  assert.equal(local(root, "user.name"), "Own Name");
++  assert.deepEqual(applyHeldGitAuthor(root, held("Other", "other@example.invalid")), { status: "already-configured" });
++}));
++
++test("the git guard writes the real held receipt before an agent's git commit runs in an enrolled project", () => withRepository((root) => {
++  mkdirSync(join(root, ".agent-pipeline"));
++  mkdirSync(join(root, ".claude"));
++  writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "off" }));
++  writeFileSync(join(root, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-09-29T00:00:00.000Z" }));
++  const receipt = resolveInitialAnswersState(root, "local").receipt;
++  mkdirSync(dirname(receipt), { recursive: true });
++  writeFileSync(receipt, JSON.stringify({ schema: PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA, root, pushApprovalPreference: "chat", gitAuthorName: "Receipt Author", gitAuthorEmail: "receipt@example.invalid" }));
++  const hook = fileURLToPath(new URL("../hooks/guard-git.mjs", import.meta.url));
++  const run = spawnSync(process.execPath, [hook], { cwd: root, env: { ...process.env, CLAUDE_PROJECT_DIR: root },
++    input: JSON.stringify({ tool_name: "Bash", tool_input: { command: "git commit -m 'chore: first'" }, cwd: root, hook_event_name: "PreToolUse" }), encoding: "utf8", timeout: 30_000 });
++  assert.equal(run.status, 0, run.stderr);
++  assert.equal(local(root, "user.name"), "Receipt Author");
++  assert.equal(local(root, "user.email"), "receipt@example.invalid");
++}));
++
++test("nothing is invented when no answer is held, and a failing Git never stops the commit", () => withRepository((root) => {
++  assert.deepEqual(applyHeldGitAuthor(root, { initialAnswersReceipt: () => null, readOnboardingIntakeCheckpoint: () => ({ status: "absent" }) }), { status: "nothing-held" });
++  assert.equal(local(root, "user.name"), "");
++  assert.deepEqual(applyHeldGitAuthor(root, { spawn: () => { throw new Error("no git"); } }), { status: "unavailable" });
++}));

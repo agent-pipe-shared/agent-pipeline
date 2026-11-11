@@ -1,0 +1,15 @@
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+index 7bf5a83f3fc8d089af473c1ea7c65163d19f140d..2d7126b86ab27ec4588e5177ad86e2396a9add1b 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+@@ -30,6 +30,10 @@ node "${PIPELINE_PLUGIN_ROOT}/scripts/push-init.mjs" --root <repo> --by <name> -
+ `--by` is an actor attribution, not a substitute for approval. Fill it only with
+ a value the PO supplied for this exact command, never with a name you inferred.
+ 
++A calibration that still says `repositoryMode: local-only` on a project that now
++has a remote is corrected with `node "${PIPELINE_PLUGIN_ROOT}/scripts/repository-mode-promote.mjs" --root <repo> --to remote-tracked`.
++`push-prepare` names it when it applies.
++
+ Use the absolute `pluginRoot` from the current ready start-preflight result for
+ `PIPELINE_PLUGIN_ROOT`. Never substitute a project source-tree
+ `plugins/pipeline-core` path: the lifecycle guard admits the loaded runtime

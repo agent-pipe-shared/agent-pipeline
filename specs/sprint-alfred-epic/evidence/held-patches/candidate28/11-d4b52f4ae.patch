@@ -1,0 +1,22 @@
+diff --git a/plugins/pipeline-core/install-agy.test.mjs b/plugins/pipeline-core/install-agy.test.mjs
+index cf292c8ee8cef0ece3b3493d0c65a541fc8c996d..5f608ae376c10da0752955e105f3b9ed52d76894 100644
+--- a/plugins/pipeline-core/install-agy.test.mjs
++++ b/plugins/pipeline-core/install-agy.test.mjs
+@@ -27,7 +27,7 @@ test("G6: installer refresh expands an owned user-level matcher to native file t
+   // Use the shipped plugin matcher and scripts as the source of the installer wiring.
+   const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
+   writeFileSync(join(source, "hooks.json"), JSON.stringify(manifest));
+-  for (const name of ["antigravity-slicing-hint", "antigravity-pretool-guard", "antigravity-stop-hook", "antigravity-start-hint"]) {
++  for (const name of ["antigravity-slicing-hint", "antigravity-pretool-guard", "antigravity-stop-hook", "antigravity-start-hint", "publication-readback-stop"]) {
+     writeFileSync(join(source, "hooks", `${name}.mjs`), "// inert fixture: never executed\n");
+   }
+   const target = join(configRoot, "config", "hooks.json");
+@@ -65,7 +65,7 @@ test("G6: host matcher ownership, approval, manifest and preimage controls", (t)
+   const manifestPath = join(source, "hooks.json");
+   const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
+   writeFileSync(manifestPath, JSON.stringify(manifest));
+-  for (const name of ["antigravity-slicing-hint", "antigravity-pretool-guard", "antigravity-stop-hook", "antigravity-start-hint"]) writeFileSync(join(source, "hooks", `${name}.mjs`), "// inert\n");
++  for (const name of ["antigravity-slicing-hint", "antigravity-pretool-guard", "antigravity-stop-hook", "antigravity-start-hint", "publication-readback-stop"]) writeFileSync(join(source, "hooks", `${name}.mjs`), "// inert\n");
+   const target = join(configRoot, "config", "hooks.json");
+   const owned = { type: "command", command: `node "${join(source, "hooks", "antigravity-pretool-guard.mjs")}"` };
+   const foreignBytes = '{ "matcher":"foreign_tool", "hooks":[{"command":"foreign-command"}], "keep":"\\u00df" }';

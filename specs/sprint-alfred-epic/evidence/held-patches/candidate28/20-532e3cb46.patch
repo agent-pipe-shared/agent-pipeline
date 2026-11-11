@@ -1,0 +1,32 @@
+diff --git a/guardrails/git.md b/guardrails/git.md
+index 42ab8b9ae02cdb6bc5406e5458c8cd2e2c101bc4..cf2cc4cbc44023d0a3f955e6ecf8b4bccf44e18d 100644
+--- a/guardrails/git.md
++++ b/guardrails/git.md
+@@ -153,6 +153,13 @@ Existing explicitly approved fixed registration exceptions remain unchanged.
+ - **Why:** A ruleset that claims more than the guard technically enforces is worse than no rule at all — a false sense of protection invites exactly the bypass it claims to prevent (`docs/operating-model.md`, *What the model protects* — rule 3, "Prefer deterministic checks", gate honesty).
+ - **Verification:** `plugins/pipeline-core/hooks/guard-git.test.mjs` carries a BLOCK case and an ALLOW counter-case per rule id (`GG-17`…`GG-20`); `node harness/scripts/verify.mjs` runs the full suite.
+ 
++## GIT-07a — Recursive deletes run only in throwaway folders
++
++- **MUST NOT** delete recursively (`rm -r`, `find -delete`, `find -exec rm`, `xargs rm -r`, `Remove-Item -Recurse`, `rd /s`, also inside `sh -c` or a Python or Node one-liner) outside `scratch/` and the folders the project lists under `throwawayDirs` in its guard config. The git-guard blocks it (`GG-21`), as well as a target holding a variable or any expansion, because an unset variable turns a scoped delete into a delete of the whole worktree.
++- Remove tracked files by name with `git rm <file>`.
++- **Not covered:** a script that deletes on its own; the guard reads command text only.
++- **Verification:** `plugins/pipeline-core/hooks/recursive-delete-policy.test.mjs`.
++
+ ## GIT-08 — Standing push approval does NOT cover a deploy-triggering ref
+ 
+ - **MUST NOT** treat the standing push approval (GIT-05) as covering a push to a deploy-triggering ref (a release tag/branch pattern declared under a manifest `release` section, e.g. `refs/tags/v*`). `standing-approved` covers ORDINARY commits to `main`; it is explicitly carved out for deploy triggers.
+diff --git a/templates/guard-config.json.example b/templates/guard-config.json.example
+index d6a3249b4d4358488307f0b522c648825a5f1cb0..e21b3a08bde78ed98a75a9e28e0f9a8ff2c7c58f 100644
+--- a/templates/guard-config.json.example
++++ b/templates/guard-config.json.example
+@@ -29,5 +29,8 @@
+       "reason": "db:reset wipes the local dev database - run it by hand, deliberately."
+     }
+   ],
+-  "$extraDenyPatterns": "git-guard field: project-specific Bash/PowerShell deny rules added ON TOP of the built-in union (config, never a fork of the hook). Each entry has 'pattern' (a JS regex body, matched case-insensitively against the quote-stripped command), a 'reason' (shown to the agent when the command is blocked), and an optional 'id' (defaults to PX-<n> by list position). A blocked command can still be run through the double-confirmation override procedure, or by the PO in their own terminal."
++  "$extraDenyPatterns": "git-guard field: project-specific Bash/PowerShell deny rules added ON TOP of the built-in union (config, never a fork of the hook). Each entry has 'pattern' (a JS regex body, matched case-insensitively against the quote-stripped command), a 'reason' (shown to the agent when the command is blocked), and an optional 'id' (defaults to PX-<n> by list position). A blocked command can still be run through the double-confirmation override procedure, or by the PO in their own terminal.",
++
++  "throwawayDirs": ["dist", "node_modules"],
++  "$throwawayDirs": "git-guard field: folders in which a recursive delete (rm -r, find -delete, find -exec rm, Remove-Item -Recurse) is allowed besides scratch/, which is always open. Each entry is a literal relative path below the project root; the root itself, a parent, a glob, .git, .claude and project are ignored. Everywhere else the delete is refused (GG-21)."
+ }

@@ -1,0 +1,577 @@
+diff --git a/plugins/pipeline-core/scripts/usage-ledger.mjs b/plugins/pipeline-core/scripts/usage-ledger.mjs
+index 8c6b4569360ce89963a0145ed3f7c5283b3692f6..1156e901493443c37366f221ba2224b43372f658 100644
+--- a/plugins/pipeline-core/scripts/usage-ledger.mjs
++++ b/plugins/pipeline-core/scripts/usage-ledger.mjs
+@@ -37,6 +37,13 @@
+  *     below. Same discipline as the token half: no transcript content, no
+  *     absolute path, nothing written to disk — counts only, printed to stdout.
+  *
++ *   - `--timeline <transcript-file> [--json]` (exclusive with `--row` and `--metering`; takes no root): the run
++ *     timeline of ONE session file in any of the three runner formats (Claude project JSONL, Codex rollout JSONL,
++ *     Antigravity transcript, detected from the content): human turns, per-turn duration, human wait, net run time,
++ *     per-response usage with actor, refusals per code. `--json` prints the same data as
++ *     `pipeline.usage-timeline.v1`. Counts, times and codes only; never message text or a path; `n/a` where the
++ *     format carries no such field.
++ *
+  * Session scoping: `--session <uuid>` restricts aggregation to one session (incl.
+  * its subagent transcripts, via the shared `sessionId` field — see schema notes
+  * below); `--latest [projectDirName]` resolves the most recently modified top-level
+@@ -129,7 +136,7 @@ const DEFAULT_PRICES_PATH = path.join(SCRIPT_DIR, "model-prices.json");
+ function usage(msg) {
+   if (msg) console.error(msg);
+   console.error(
+-    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...>",
++    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...> | --timeline <transcript-file> [--json]",
+   );
+   console.error('Example (full table):  node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects"');
+   console.error(
+@@ -159,6 +166,272 @@ function readMeteringBundle(file) {
+   }
+ }
+ 
++// --- Timeline mode (`--timeline <file> [--json]`): one session's run timeline, read from ONE transcript file. ---
++// Formats are detected from the file content: Claude project JSONL, Codex rollout JSONL, Antigravity transcript
++// (`turn.started` / `turn.completed` records). Output is path-free and never carries a human message's text or a tool
++// result's text; only lengths, times, token counts and refusal codes. A field the format does not carry prints as `n/a`.
++const TIMELINE_SCHEMA = "pipeline.usage-timeline.v1";
++const TIMELINE_MAX_BYTES = 512 * 1024 * 1024;
++// A refusal code: upper-case words joined by hyphens, each starting with a letter (so UTF-8 or SHA-256 never match).
++const REFUSAL_CODE_RE = /\b[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)+\b/;
++
++const isTimelineObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
++const timelineMs = (timestamp) => {
++  const ms = typeof timestamp === "string" ? Date.parse(timestamp) : NaN;
++  return Number.isFinite(ms) ? ms : null;
++};
++const timelineNumber = (value) => (Number.isFinite(value) ? value : null);
++const timelineChars = (text) => [...text].length;
++
++// "main" for a top-level session file, "subagent:<basename>" for anything under a `subagents/` directory — the same
++// derivation `actorOf` uses for the table/row modes. Both separators are split, so a Windows path works anywhere.
++function actorFromSegments(segments) {
++  if (!segments.includes("subagents")) return "main";
++  return `subagent:${segments[segments.length - 1].replace(/\.jsonl$/u, "")}`;
++}
++
++function timelineResultText(content) {
++  if (typeof content === "string") return content;
++  if (!Array.isArray(content)) return isTimelineObject(content) && typeof content.content === "string" ? content.content : "";
++  return content.map((block) => (typeof block === "string" ? block : isTimelineObject(block) && typeof block.text === "string" ? block.text : "")).join("\n");
++}
++
++// The guard's own denial ("BLOCKED (<hook>): <CODE>", the same on every runner) and a script's typed refusal
++// ({"status": "refused" | "blocked", ..., "code": "<CODE>"}) name the code exactly. Only without either form does a Claude
++// error result fall back to its first code; a Codex output without either form is not counted, because its text also carries
++// success and warning codes (measured on a real rollout: GHCR-COMMITTED, DBG-BUDGET-UNENFORCED were counted as refusals).
++const HOOK_DENIAL_RE = /BLOCKED \([^)\n]*\):\s*([A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)+)/;
++const TYPED_REFUSAL_RE = /\\?"status\\?"\s*:\s*\\?"(?:refused|blocked)\\?"[\s\S]{0,400}?\\?"code\\?"\s*:\s*\\?"([A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)+)\\?"/;
++function timelineRefusal(text, requireMarker) {
++  const exact = HOOK_DENIAL_RE.exec(text) ?? TYPED_REFUSAL_RE.exec(text);
++  if (exact) return exact[1];
++  if (requireMarker) return null;
++  const match = REFUSAL_CODE_RE.exec(text);
++  return match ? match[0] : null;
++}
++
++function detectTimelineFormat(records) {
++  for (const record of records.slice(0, 200)) {
++    if (!isTimelineObject(record)) continue;
++    if (["session_meta", "response_item", "event_msg", "turn_context"].includes(record.type)) return "codex";
++    if (record.type === "turn.started" || record.type === "turn.completed") return "antigravity";
++    if ((record.type === "user" || record.type === "assistant") && isTimelineObject(record.message)) return "claude";
++  }
++  return null;
++}
++
++// Normalised events: {kind:"human", ms, chars} | {kind:"response", ms, listed, model, usage} | {kind:"refusal", code}.
++// `listed` = the response is printed in the per-response usage list; a time-only response just ends a turn.
++function claudeTimelineEvents(records) {
++  const events = [];
++  const byId = new Map();
++  for (const record of records) {
++    if (!isTimelineObject(record) || !isTimelineObject(record.message)) continue;
++    const ms = timelineMs(record.timestamp);
++    const message = record.message;
++    if (record.type === "assistant") {
++      if (message.model === "<synthetic>") continue;
++      const usage = isTimelineObject(message.usage)
++        ? { input: timelineNumber(message.usage.input_tokens), output: timelineNumber(message.usage.output_tokens), cacheWrite: timelineNumber(message.usage.cache_creation_input_tokens), cacheRead: timelineNumber(message.usage.cache_read_input_tokens) }
++        : null;
++      const response = { kind: "response", ms, listed: true, model: typeof message.model === "string" ? message.model : null, usage };
++      const id = typeof message.id === "string" && message.id ? message.id : null;
++      const prior = id ? byId.get(id) : null;
++      if (prior) Object.assign(prior, response); // the same message streamed again: one response, last record wins
++      else {
++        if (id) byId.set(id, response);
++        events.push(response);
++      }
++    } else if (record.type === "user" && record.isSidechain !== true && record.isMeta !== true && message.role === "user"
++      // A compact summary, a task notification or another system-sourced prompt is a user row but no human turn (measured on a real run).
++      && record.isCompactSummary !== true && record.promptSource !== "system"
++      && (!isTimelineObject(record.origin) || record.origin.kind === undefined || record.origin.kind === "human")) {
++      const content = message.content;
++      if (typeof content === "string") {
++        if (content.trim() !== "") events.push({ kind: "human", ms, chars: timelineChars(content) });
++      } else if (Array.isArray(content) && content.length > 0) {
++        const results = content.filter((block) => isTimelineObject(block) && block.type === "tool_result");
++        if (results.length === 0) {
++          const chars = content.reduce((sum, block) => sum + (isTimelineObject(block) && block.type === "text" && typeof block.text === "string" ? timelineChars(block.text) : 0), 0);
++          events.push({ kind: "human", ms, chars });
++        }
++        for (const block of results) {
++          if (block.is_error !== true) continue;
++          const code = timelineRefusal(timelineResultText(block.content), false);
++          if (code) events.push({ kind: "refusal", code });
++        }
++      }
++    }
++  }
++  return events;
++}
++
++// A Codex rollout of 2026-11 records the human's input as a `response_item` user message whose content carries the provenance
++// `user` (harness and tool inserts carry another provenance) and has no `user_message` event; an older rollout has the event.
++// The provenance form wins when the file has it, so one input is never counted twice.
++function codexHumanChars(payload) {
++  if (payload.type !== "message" || payload.role !== "user" || !Array.isArray(payload.content)) return null;
++  const meta = payload.internal_chat_message_metadata_passthrough?.content_item_metadata;
++  if (!Array.isArray(meta) || !meta.some((entry) => entry?.provenance?.type === "user")) return null;
++  return payload.content.reduce((sum, block) => sum + (isTimelineObject(block) && typeof block.text === "string" ? timelineChars(block.text) : 0), 0);
++}
++
++function codexTimelineEvents(records) {
++  const events = [];
++  const provenanceForm = records.some((record) => isTimelineObject(record) && record.type === "response_item" && isTimelineObject(record.payload) && codexHumanChars(record.payload) !== null);
++  for (const record of records) {
++    if (!isTimelineObject(record) || !isTimelineObject(record.payload)) continue;
++    const payload = record.payload;
++    const ms = timelineMs(record.timestamp ?? payload.timestamp);
++    if (record.type === "response_item" && provenanceForm) {
++      const chars = codexHumanChars(payload);
++      if (chars !== null) { events.push({ kind: "human", ms, chars }); continue; }
++    }
++    if (record.type === "event_msg") {
++      if (payload.type === "user_message" && !provenanceForm) events.push({ kind: "human", ms, chars: typeof payload.message === "string" ? timelineChars(payload.message) : null });
++      else if (payload.type === "task_complete") events.push({ kind: "response", ms, listed: false, model: null, usage: null });
++      else if (payload.type === "token_count" && isTimelineObject(payload.info) && isTimelineObject(payload.info.last_token_usage)) {
++        const last = payload.info.last_token_usage;
++        events.push({ kind: "response", ms, listed: true, model: null, usage: { input: timelineNumber(last.input_tokens), output: timelineNumber(last.output_tokens), cacheWrite: null, cacheRead: timelineNumber(last.cached_input_tokens) } });
++      }
++    } else if (record.type === "response_item") {
++      if (payload.type === "message" && payload.role === "assistant") events.push({ kind: "response", ms, listed: false, model: null, usage: null });
++      else if (payload.type === "function_call_output" || payload.type === "custom_tool_call_output") {
++        const code = timelineRefusal(timelineResultText(payload.output), true);
++        if (code) events.push({ kind: "refusal", code });
++      }
++    }
++  }
++  return events;
++}
++
++// The Antigravity transcript records no human message and no tool result, so turns, waits and refusals stay `n/a`.
++function antigravityTimelineEvents(records) {
++  const events = [];
++  for (const record of records) {
++    if (!isTimelineObject(record) || record.type !== "turn.completed") continue;
++    const usage = isTimelineObject(record.usage)
++      ? { input: timelineNumber(record.usage.input_tokens), output: timelineNumber(record.usage.output_tokens), cacheWrite: null, cacheRead: timelineNumber(record.usage.cached_tokens) }
++      : null;
++    events.push({ kind: "response", ms: timelineMs(record.timestamp), listed: true, model: null, usage });
++  }
++  return events;
++}
++
++function buildTimeline(runner, records, actor, malformed) {
++  const events = runner === "claude" ? claudeTimelineEvents(records) : runner === "codex" ? codexTimelineEvents(records) : antigravityTimelineEvents(records);
++  const observed = runner !== "antigravity"; // human messages and tool results are recorded
++  const stamps = records.map((record) => (isTimelineObject(record) ? timelineMs(record.timestamp ?? record.payload?.timestamp) : null)).filter((ms) => ms !== null);
++  const grossMs = stamps.length > 0 ? Math.max(...stamps) - Math.min(...stamps) : null;
++  const humanIndexes = events.flatMap((event, index) => (event.kind === "human" ? [index] : []));
++  let waitKnown = true;
++  let waitTotal = 0;
++  const humanTurns = humanIndexes.map((from, ordinal) => {
++    const human = events[from];
++    const next = events[humanIndexes[ordinal + 1]];
++    const answers = events.slice(from + 1, humanIndexes[ordinal + 1] ?? events.length).filter((event) => event.kind === "response" && event.ms !== null);
++    const answerMs = answers.length > 0 ? Math.max(...answers.map((event) => event.ms)) : null;
++    const durationMs = human.ms !== null && answerMs !== null && answerMs >= human.ms ? answerMs - human.ms : null;
++    let waitAfterMs = null;
++    if (next) {
++      if (answerMs !== null && next.ms !== null && next.ms >= answerMs) {
++        waitAfterMs = next.ms - answerMs;
++        waitTotal += waitAfterMs;
++      } else if (answerMs === null && next.ms !== null && human.ms !== null && next.ms >= human.ms) {
++        waitAfterMs = 0; // the human wrote again before any answer (a queued or interrupting message): nobody waited on the human
++      } else waitKnown = false;
++    }
++    return { ordinal: ordinal + 1, at: human.ms === null ? null : new Date(human.ms).toISOString(), chars: human.chars, durationMs, humanWaitAfterMs: waitAfterMs, last: !next };
++  });
++  const humanWaitMs = observed && waitKnown ? waitTotal : null;
++  const refusals = {};
++  for (const event of events) if (event.kind === "refusal") refusals[event.code] = (refusals[event.code] ?? 0) + 1;
++  const refusalCount = Object.values(refusals).reduce((sum, count) => sum + count, 0);
++  const responses = events.filter((event) => event.kind === "response" && event.listed).map((event) => ({
++    at: event.ms === null ? null : new Date(event.ms).toISOString(), actor, model: event.model,
++    usage: event.usage && { inputTokens: event.usage.input, outputTokens: event.usage.output, cacheWriteTokens: event.usage.cacheWrite, cacheReadTokens: event.usage.cacheRead },
++  }));
++  return {
++    schema: TIMELINE_SCHEMA, runner, malformedLines: malformed,
++    humanTurns: observed ? humanTurns : null, responses, refusals: observed ? refusals : null,
++    totals: {
++      grossMs, humanWaitMs,
++      netMs: grossMs !== null && humanWaitMs !== null ? grossMs - humanWaitMs : null,
++      refusals: observed ? refusalCount : null, humanTurns: observed ? humanTurns.length : null,
++    },
++  };
++}
++
++function renderTimeline(timeline) {
++  const na = (value) => (value === null || value === undefined ? "n/a" : String(value));
++  const secs = (ms) => (ms === null ? "n/a" : `${(ms / 1000).toFixed(1)} s`);
++  const lines = [`# Run timeline (${timeline.runner})`, "", "Human turns:"];
++  if (timeline.humanTurns === null) lines.push("- n/a (this format records no human message)");
++  else if (timeline.humanTurns.length === 0) lines.push("- none");
++  else {
++    for (const turn of timeline.humanTurns) {
++      lines.push(`- turn ${turn.ordinal} | ${na(turn.at)} | ${na(turn.chars)} chars | duration ${secs(turn.durationMs)} | human wait after ${turn.last ? "none" : secs(turn.humanWaitAfterMs)}`);
++    }
++  }
++  lines.push("", "Responses:");
++  if (timeline.responses.length === 0) lines.push("- none");
++  for (const response of timeline.responses) {
++    const usage = response.usage ?? {};
++    lines.push(`- ${na(response.at)} | ${response.actor} | ${na(response.model)} | input ${na(usage.inputTokens)} | output ${na(usage.outputTokens)} | cache-write ${na(usage.cacheWriteTokens)} | cache-read ${na(usage.cacheReadTokens)}`);
++  }
++  lines.push("", "Refusals:");
++  if (timeline.refusals === null) lines.push("- n/a (this format records no tool result)");
++  else if (Object.keys(timeline.refusals).length === 0) lines.push("- none");
++  else for (const [code, count] of Object.entries(timeline.refusals).sort()) lines.push(`- ${code}: ${count}`);
++  if (timeline.malformedLines > 0) lines.push("", `Malformed lines skipped: ${timeline.malformedLines}`);
++  const totals = timeline.totals;
++  lines.push("", `TOTAL: run time gross ${secs(totals.grossMs)} | human wait ${secs(totals.humanWaitMs)} | run time net ${secs(totals.netMs)} | refusals ${na(totals.refusals)} | human turns ${na(totals.humanTurns)}`);
++  return lines.join("\n");
++}
++
++function runTimeline(args) {
++  if (args.includes("--row") || args.includes("--metering")) usage("--timeline is exclusive with --row and --metering.");
++  let file;
++  let json = false;
++  for (let i = 0; i < args.length; i++) {
++    if (args[i] === "--timeline") {
++      file = args[i + 1];
++      if (!file || file.startsWith("--")) usage("--timeline requires a <file> value.");
++      i++;
++    } else if (args[i] === "--json") json = true;
++    else usage("--timeline is exclusive: it accepts only one <file> and --json.");
++  }
++  let text;
++  try {
++    const info = lstatSync(file);
++    if (!info.isFile() || info.size > TIMELINE_MAX_BYTES) throw new Error("not-readable");
++    text = readFileSync(file, "utf8");
++  } catch {
++    console.error("usage-ledger --timeline: timeline-input-unreadable");
++    process.exit(1);
++  }
++  const records = [];
++  let malformed = 0;
++  for (const line of text.split(/\r?\n/u)) {
++    if (!line.trim()) continue;
++    try {
++      records.push(JSON.parse(line));
++    } catch {
++      malformed++;
++    }
++  }
++  const runner = detectTimelineFormat(records);
++  if (!runner) {
++    console.error("usage-ledger --timeline: timeline-format-unknown");
++    process.exit(1);
++  }
++  const timeline = buildTimeline(runner, records, actorFromSegments(file.split(/[\\/]/u)), malformed);
++  console.log(json ? JSON.stringify(timeline) : renderTimeline(timeline));
++  process.exit(0);
++}
++
++if (argv.includes("--timeline")) runTimeline(argv);
++
+ // Metering is intentionally an exclusive, selected-file mode. It never opens
+ // a transcript root, price table, provider endpoint, or directory tree.
+ if (argv[0] === "--metering") {
+@@ -330,10 +603,7 @@ function deriveFromPath(filePath) {
+ // directory (basename only, e.g. `agent-<uuid>` — never a path). See the
+ // "Activity accounting" doc block above.
+ function actorOf(filePath) {
+-  const rel = path.relative(root, filePath);
+-  const segments = rel.split(path.sep);
+-  if (!segments.includes("subagents")) return "main";
+-  return `subagent:${path.basename(filePath, ".jsonl")}`;
++  return actorFromSegments(path.relative(root, filePath).split(path.sep));
+ }
+ 
+ function emptyAgg() {
+diff --git a/plugins/pipeline-core/scripts/usage-ledger.test.mjs b/plugins/pipeline-core/scripts/usage-ledger.test.mjs
+index 2e07598eb2b14884bd44aff3ae33f7bd7d90efe5..90366c32fb45bca992aa03a87e8f651e6b232700 100644
+--- a/plugins/pipeline-core/scripts/usage-ledger.test.mjs
++++ b/plugins/pipeline-core/scripts/usage-ledger.test.mjs
+@@ -9,7 +9,7 @@ import { test } from "node:test";
+ import { spawnSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ const CLI_PATH = fileURLToPath(new URL("./usage-ledger.mjs", import.meta.url));
+@@ -282,3 +282,216 @@ test("usage-ledger --metering rejects nonregular, oversized, and excess selected
+     rmSync(root, { recursive: true, force: true });
+   }
+ });
++
++// --- C28-FORENSICS-TIMELINE (AC-108): `--timeline <file>` prints one session's run timeline for all three runner formats. ---
++// Fixtures are small fakes written here; no real transcript is opened.
++function timelineFile(records, relative = "session.jsonl") {
++  const dir = mkdtempSync(join(tmpdir(), "usage-ledger-timeline-"));
++  const file = join(dir, relative);
++  mkdirSync(dirname(file), { recursive: true });
++  writeFileSync(file, jsonl(records));
++  return { dir, file };
++}
++
++const HUMAN_TEXT = `please do ${SECRET_MARKER}`;
++const claudeUser = (timestamp, content, extra = {}) => ({ type: "user", sessionId: SESSION_ID, timestamp, message: { role: "user", content }, ...extra });
++const claudeAssistant = (timestamp, id, usage, content = [{ type: "text", text: SECRET_MARKER }]) => ({
++  type: "assistant", sessionId: SESSION_ID, timestamp, message: { id, model: "claude-sonnet-5", usage, content },
++});
++
++function claudeTimelineRecords() {
++  return [
++    claudeUser("2026-08-19T10:00:00.000Z", HUMAN_TEXT),
++    claudeUser("2026-08-19T10:00:01.000Z", "meta text", { isMeta: true }),
++    claudeAssistant("2026-08-19T10:00:10.000Z", "msg_1", { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 2, cache_read_input_tokens: 3 }),
++    claudeAssistant("2026-08-19T10:00:11.000Z", "msg_1", { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 2, cache_read_input_tokens: 3 }),
++    claudeUser("2026-08-19T10:00:13.000Z", [{ type: "tool_result", tool_use_id: "toolu_1", is_error: true, content: `PreToolUse hook error: BLOCKED GUARD-READ-SCOPE-OUTSIDE-ROOT ${SECRET_MARKER}` }]),
++    claudeUser("2026-08-19T10:00:14.000Z", [{ type: "tool_result", tool_use_id: "toolu_2", content: "a loaded document naming OTHER-LOADED-CODE only" }]),
++    claudeAssistant("2026-08-19T10:00:20.000Z", "msg_2", { input_tokens: 20, output_tokens: 8 }),
++    claudeUser("2026-08-19T10:01:20.000Z", [{ type: "text", text: "second human" }]),
++    claudeAssistant("2026-08-19T10:01:30.000Z", "msg_3", { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }),
++  ];
++}
++
++test("usage-ledger --timeline (claude) prints human turns, net run time, usage with actor and coded refusals, without content", () => {
++  const { dir, file } = timelineFile(claudeTimelineRecords());
++  try {
++    const result = run(["--timeline", file]);
++    assert.equal(result.status, 0, result.stderr);
++    const out = result.stdout;
++    assert.match(out, /Run timeline \(claude\)/);
++    assert.match(out, new RegExp(`- turn 1 \\| 2026-08-19T10:00:00.000Z \\| ${HUMAN_TEXT.length} chars \\| duration 20.0 s \\| human wait after 60.0 s`));
++    assert.match(out, /- turn 2 \| 2026-08-19T10:01:20.000Z \| 12 chars \| duration 10.0 s \| human wait after none/);
++    assert.match(out, /- 2026-08-19T10:00:20.000Z \| main \| claude-sonnet-5 \| input 20 \| output 8 \| cache-write n\/a \| cache-read n\/a/);
++    assert.equal((out.match(/\| main \| claude-sonnet-5 \|/g) ?? []).length, 3, "msg_1 repeated twice is ONE response");
++    assert.match(out, /- GUARD-READ-SCOPE-OUTSIDE-ROOT: 1/);
++    assert.doesNotMatch(out, /OTHER-LOADED-CODE/, "a code in a non-error tool result is not a refusal");
++    assert.match(out, /TOTAL: run time gross 90.0 s \| human wait 60.0 s \| run time net 30.0 s \| refusals 1 \| human turns 2/);
++    assert.doesNotMatch(out, new RegExp(SECRET_MARKER), "no transcript content");
++    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "no absolute path");
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("usage-ledger --timeline --json emits pipeline.usage-timeline.v1 with the same figures", () => {
++  const { dir, file } = timelineFile(claudeTimelineRecords());
++  try {
++    const result = run(["--timeline", file, "--json"]);
++    assert.equal(result.status, 0, result.stderr);
++    const data = JSON.parse(result.stdout);
++    assert.equal(data.schema, "pipeline.usage-timeline.v1");
++    assert.equal(data.runner, "claude");
++    assert.deepEqual(data.totals, { grossMs: 90000, humanWaitMs: 60000, netMs: 30000, refusals: 1, humanTurns: 2 });
++    assert.deepEqual(data.refusals, { "GUARD-READ-SCOPE-OUTSIDE-ROOT": 1 });
++    assert.equal(data.humanTurns.length, 2);
++    assert.equal(data.humanTurns[0].chars, HUMAN_TEXT.length);
++    assert.equal(data.humanTurns[0].durationMs, 20000);
++    assert.equal(data.responses.length, 3);
++    assert.equal(data.responses[0].actor, "main");
++    assert.equal(data.responses[0].usage.cacheReadTokens, 3);
++    assert.doesNotMatch(result.stdout, new RegExp(SECRET_MARKER));
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++// Measured on a real Claude run (candidate 28): a compact summary and a task notification are user rows, and a human
++// can write twice before any answer; none of the first two is a human turn, and the double message must not void the wait total.
++test("usage-ledger --timeline (claude) skips compact summaries and system notifications and keeps the wait total over a queued message", () => {
++  const { dir, file } = timelineFile([
++    claudeUser("2026-08-19T10:00:00.000Z", "first human"),
++    claudeAssistant("2026-08-19T10:00:10.000Z", "msg_a", { input_tokens: 1, output_tokens: 1 }),
++    claudeUser("2026-08-19T10:00:20.000Z", "summary of the earlier context", { isCompactSummary: true, isVisibleInTranscriptOnly: true }),
++    claudeAssistant("2026-08-19T10:00:30.000Z", "msg_b", { input_tokens: 1, output_tokens: 1 }),
++    claudeUser("2026-08-19T10:00:40.000Z", "<task-notification>done</task-notification>", { origin: { kind: "task-notification" }, promptSource: "system" }),
++    claudeAssistant("2026-08-19T10:00:50.000Z", "msg_c", { input_tokens: 1, output_tokens: 1 }),
++    claudeUser("2026-08-19T10:01:50.000Z", "oh stop", { origin: { kind: "human" } }),
++    claudeUser("2026-08-19T10:01:51.000Z", "do this instead", { origin: { kind: "human" } }),
++    claudeAssistant("2026-08-19T10:02:01.000Z", "msg_d", { input_tokens: 1, output_tokens: 1 }),
++  ]);
++  try {
++    const result = run(["--timeline", file, "--json"]);
++    assert.equal(result.status, 0, result.stderr);
++    const data = JSON.parse(result.stdout);
++    assert.equal(data.humanTurns.length, 3, "the compact summary and the task notification are not human turns");
++    assert.equal(data.humanTurns[0].durationMs, 50000, "the first turn runs through the system rows to its last answer");
++    assert.equal(data.humanTurns[1].humanWaitAfterMs, 0, "a message written before any answer leaves no wait");
++    assert.deepEqual(data.totals, { grossMs: 121000, humanWaitMs: 60000, netMs: 61000, refusals: 0, humanTurns: 3 });
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("usage-ledger --timeline names a subagent transcript's actor from its location", () => {
++  const { dir, file } = timelineFile(
++    [claudeAssistant("2026-08-19T10:00:04.000Z", "sub_1", { input_tokens: 7, output_tokens: 2 })],
++    join(SESSION_ID, "subagents", "agent-abc123.jsonl"),
++  );
++  try {
++    const result = run(["--timeline", file]);
++    assert.equal(result.status, 0, result.stderr);
++    assert.match(result.stdout, /\| subagent:agent-abc123 \| claude-sonnet-5 \|/);
++    assert.match(result.stdout, /human turns n\/a|human turns 0/);
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++// Measured on a real Codex rollout (candidate 28): the human's input is a response_item user message with provenance "user" and
++// there is no user_message event; harness inserts (AGENTS.md, hook context) are user messages with another provenance.
++test("usage-ledger --timeline (codex rollout) counts provenance-user messages as human turns and skips harness inserts", () => {
++  const rec = (timestamp, type, payload) => ({ timestamp, type, payload });
++  const userItem = (text, provenance) => ({ type: "message", role: "user", content: [{ type: "input_text", text }],
++    internal_chat_message_metadata_passthrough: { content_item_metadata: [{ provenance: { type: provenance } }] } });
++  const { dir, file } = timelineFile([
++    rec("2026-08-19T10:00:00.000Z", "session_meta", { id: "thread-1" }),
++    rec("2026-08-19T10:00:00.500Z", "response_item", userItem("# AGENTS.md instructions", "harness")),
++    rec("2026-08-19T10:00:01.000Z", "response_item", userItem("start", "user")),
++    rec("2026-08-19T10:00:05.000Z", "response_item", { type: "message", role: "assistant", content: [] }),
++    rec("2026-08-19T10:00:25.000Z", "response_item", userItem("go on", "user")),
++    rec("2026-08-19T10:00:30.000Z", "response_item", { type: "message", role: "assistant", content: [] }),
++  ]);
++  try {
++    const result = run(["--timeline", file, "--json"]);
++    assert.equal(result.status, 0, result.stderr);
++    const data = JSON.parse(result.stdout);
++    assert.equal(data.humanTurns.length, 2, "the harness insert is not a human turn");
++    assert.equal(data.humanTurns[0].chars, 5);
++    assert.deepEqual(data.totals, { grossMs: 30000, humanWaitMs: 20000, netMs: 10000, refusals: 0, humanTurns: 2 });
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("usage-ledger --timeline (codex rollout) reads user_message, token_count and coded tool output", () => {
++  const rec = (timestamp, type, payload) => ({ timestamp, type, payload });
++  const { dir, file } = timelineFile([
++    rec("2026-08-19T10:00:00.000Z", "session_meta", { id: "thread-1", cwd: "/somewhere" }),
++    rec("2026-08-19T10:00:01.000Z", "event_msg", { type: "user_message", message: HUMAN_TEXT }),
++    rec("2026-08-19T10:00:05.000Z", "response_item", { type: "message", role: "assistant", content: [{ type: "output_text", text: SECRET_MARKER }] }),
++    rec("2026-08-19T10:00:05.500Z", "event_msg", { type: "token_count", info: { last_token_usage: { input_tokens: 100, cached_input_tokens: 40, output_tokens: 9, reasoning_output_tokens: 4, total_tokens: 109 }, total_token_usage: { total_tokens: 109 } } }),
++    // QG-04 restated in place: the denial now has the shape a real Codex rollout records (measured candidate 28), not an invented one;
++    // a success output carrying a code and the word "blocked" in prose must not count.
++    rec("2026-08-19T10:00:06.000Z", "response_item", { type: "function_call_output", call_id: "c1", output: `Script error:\nCommand blocked by PreToolUse hook: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-GRAMMAR-REDIRECT-REFUSED: ${SECRET_MARKER}` }),
++    rec("2026-08-19T10:00:07.000Z", "response_item", { type: "function_call_output", call_id: "c2", output: "a file that mentions DOC-ONLY-CODE" }),
++    rec("2026-08-19T10:00:07.500Z", "response_item", { type: "custom_tool_call_output", call_id: "c3", output: "{\"exit_code\":0,\"output\":\"{\\n \\\"status\\\": \\\"committed\\\",\\n \\\"code\\\": \\\"GHCR-COMMITTED\\\", \\\"note\\\": \\\"nothing blocked\\\"\"}" }),
++    rec("2026-08-19T10:00:09.000Z", "event_msg", { type: "task_complete" }),
++    rec("2026-08-19T10:00:39.000Z", "event_msg", { type: "user_message", message: "again" }),
++    rec("2026-08-19T10:00:42.000Z", "response_item", { type: "message", role: "assistant", content: [] }),
++  ]);
++  try {
++    const result = run(["--timeline", file]);
++    assert.equal(result.status, 0, result.stderr);
++    const out = result.stdout;
++    assert.match(out, /Run timeline \(codex\)/);
++    assert.match(out, new RegExp(`- turn 1 \\| 2026-08-19T10:00:01.000Z \\| ${HUMAN_TEXT.length} chars \\| duration 8.0 s \\| human wait after 30.0 s`));
++    assert.match(out, /\| main \| n\/a \| input 100 \| output 9 \| cache-write n\/a \| cache-read 40/);
++    assert.match(out, /- GUARD-GRAMMAR-REDIRECT-REFUSED: 1/);
++    assert.doesNotMatch(out, /DOC-ONLY-CODE/);
++    assert.doesNotMatch(out, /GHCR-COMMITTED/, "a success code is not a refusal");
++    assert.match(out, /TOTAL: run time gross 42.0 s \| human wait 30.0 s \| run time net 12.0 s \| refusals 1 \| human turns 2/);
++    assert.doesNotMatch(out, new RegExp(`${SECRET_MARKER}|/somewhere`));
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("usage-ledger --timeline (antigravity transcript) prints n/a for what the format does not carry", () => {
++  const { dir, file } = timelineFile([
++    { type: "turn.started", timestamp: "2026-08-19T10:00:00.000Z" },
++    { type: "turn.completed", timestamp: "2026-08-19T10:00:30.000Z", usage: { input_tokens: 50, output_tokens: 6, cached_tokens: 20 } },
++  ]);
++  try {
++    const result = run(["--timeline", file]);
++    assert.equal(result.status, 0, result.stderr);
++    assert.match(result.stdout, /Run timeline \(antigravity\)/);
++    assert.match(result.stdout, /\| main \| n\/a \| input 50 \| output 6 \| cache-write n\/a \| cache-read 20/);
++    assert.match(result.stdout, /TOTAL: run time gross 30.0 s \| human wait n\/a \| run time net n\/a \| refusals n\/a \| human turns n\/a/);
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++test("usage-ledger --timeline is exclusive with --row and --metering and refuses unreadable or unknown input without a path", () => {
++  const { dir, file } = timelineFile([{ type: "something-else", note: "x" }]);
++  try {
++    const row = run(["--timeline", file, "--row"]);
++    assert.notEqual(row.status, 0);
++    assert.match(row.stderr, /--timeline is exclusive/);
++    const metering = run(["--timeline", file, "--metering", file]);
++    assert.notEqual(metering.status, 0);
++    assert.match(metering.stderr, /--timeline is exclusive/);
++    const unknown = run(["--timeline", file]);
++    assert.notEqual(unknown.status, 0);
++    assert.match(unknown.stderr, /timeline-format-unknown/);
++    const missing = run(["--timeline", join(dir, "absent.jsonl")]);
++    assert.notEqual(missing.status, 0);
++    assert.match(missing.stderr, /timeline-input-unreadable/);
++    const bare = run(["--timeline"]);
++    assert.notEqual(bare.status, 0);
++    for (const result of [row, metering, unknown, missing]) assert.doesNotMatch(result.stderr, new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md b/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
+index 3edec644344a42d2aaf4f4bf036b5a2ee4d93d7f..cd20385c5f5d9db380ed0ebcd534a37e5b410eff 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md
+@@ -1,7 +1,9 @@
+ # Transcript forensics — mining a runner's own session transcript for happy-path defects
+ 
+ This is a METHOD reference for the **Elephant** preparing a forensic-analysis
+-dispatch (typically a `general-purpose` subagent) after a live greenfield
++dispatch (a read-only `Explore` agent with an explicit model, or the Elephant itself
++running `usage-ledger.mjs --timeline`; a `general-purpose` subagent is refused by the
++dispatch guard with `DISPATCH-WRITE-CARRIER-REQUIRED`) after a live greenfield
+ test session. It is not a runtime component — nothing here executes
+ automatically, and it is not a Goldfish/Critic-facing document. Load it when
+ about to write such a dispatch, not as part of ordinary bootstrap.
+@@ -100,6 +102,19 @@ general impression:
+   `terminal-observed`). It is not a chat approval, so never count these files
+   as approvals by the human.
+ 
++## The run timeline: `usage-ledger.mjs --timeline`
++
++`node plugins/pipeline-core/scripts/usage-ledger.mjs --timeline <transcript-file> [--json]` reads ONE session
++file (Claude project JSONL, Codex rollout, Antigravity transcript; the format is detected from the content) and
++prints, path-free: every human turn (time, length in characters, never the text), each turn's duration from the
++human message to the last response before the next one, the human wait between turns, run time gross / human wait /
++net, per-response token usage with its actor (`main` or `subagent:<name>`), and refusals per code (a coded denial
++in a tool result; Claude: an error result, Codex: an output that says blocked, denied or refused). `--json` prints
++the same figures as `pipeline.usage-timeline.v1` (`null` where the text says `n/a`). A field the format does not
++carry is `n/a`, never a guess: the Antigravity transcript has no human message or tool result, so its turns, wait,
++net time and refusals are `n/a`. Run it per file: a subagent file is its own run, and a restarted Codex session
++needs each rollout file read in turn. It is exclusive with `--row` and `--metering`.
++
+ ## Report shape — one section per claim, independently traceable
+ 
+ Structure the forensic-analysis report as one section per claim under

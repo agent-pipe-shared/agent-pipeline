@@ -1,0 +1,38 @@
+diff --git a/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs b/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
+index 90629466fce084e7f9f543d79361538accc62be7..1078b5a46682b9ee75f020f3d41a68ffbe524b58 100644
+--- a/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
++++ b/plugins/pipeline-core/lib/pins/happy-path-guide-names-only-existing-scripts.test.mjs
+@@ -36,6 +36,17 @@ test("G20-61: the guide makes the wait command at the hand-back the cue to conti
+   assert.match(guide, /never end a turn with a status report/u);
+ });
+ 
++// PO decision 2026-11-10: a greenfield run handed the PO a first result for acceptance that showed nothing but a black page. The rule is
++// product-neutral and holds for every hand-over, not only the close's acceptance question (finish-feature.mjs carries that one).
++test("the guide asks for a self-run line before every hand-over to the PO, for any kind of result, without a gate", () => {
++  const guide = readFileSync(GUIDE, "utf8");
++  assert.match(guide, /Before you put anything in front of the PO for acceptance or to try out, make sure you have seen it work yourself/u);
++  assert.match(guide, /start or open it the way the PO will and look at what it really shows/u);
++  assert.match(guide, /or plainly that you could not\s+see it and why/u);
++  assert.match(guide, /every kind of result \(an app, a page, a command-line tool, a library, a document\)/u);
++  assert.match(guide, /It is not a gate/u);
++});
++
+ test("the guide keeps its honesty markers and holds no host path", () => {
+   const guide = readFileSync(GUIDE, "utf8");
+   assert.match(guide, /## Gaps this guide does not close/u);
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 02799cbe6cffa76cdb938c23cfbf2296005a3684..980aa05de151ebc3677c3b4bbed388fc9848ddc1 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -20,6 +20,11 @@ human-guard override are not covered. An action the consent covers prints `requi
+ `escalationJustification`: when a runner's escalation review asks for a reason to run it (Codex mounts `.git` read-only, so every lifecycle write is
+ escalated), give that line verbatim. Without a record nothing is marked covered.
+ 
++Before you put anything in front of the PO for acceptance or to try out, make sure you have seen it work yourself (PO decision 2026-11-10):
++start or open it the way the PO will and look at what it really shows. Then tell the PO in one line what you saw, or plainly that you could not
++see it and why. This holds for every kind of result (an app, a page, a command-line tool, a library, a document) and for every hand-over, not
++only the acceptance question at the close. It is not a gate: the Pipeline cannot check what you saw, only you can.
++
+ ## 1. Design
+ 
+ 1. `pipeline-state.mjs set-feature --id <id> --plan-path <path>` (agent). Both flags are required.

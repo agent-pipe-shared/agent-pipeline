@@ -1,0 +1,517 @@
+diff --git a/plugins/pipeline-core/lib/critic-briefing-build.mjs b/plugins/pipeline-core/lib/critic-briefing-build.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..cc6df8055025caae2a984b1f6c3dbfcf768f424e
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-briefing-build.mjs
+@@ -0,0 +1,165 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Fills the Critic template from a packet-ready preflight result (PO tile 2026-11-10: one command prepares the Critic dispatch
++ * including its briefing). Two greenfield runs on 2026-11-10 hand-wrote their Critic prompts: one dropped the correction input
++ * bindings and resumed the Critic with a message naming the earlier round's outcome, which made it withhold its verdict.
++ *
++ * Rules this module keeps:
++ * - The template is read at run time (templates/prompts/critic-review.md); no template text lives here. A missing marker, or a
++ *   placeholder this module does not know, refuses with a code instead of passing an unfilled template on.
++ * - Only the reviewer projection is used: the reviewer input (or a split entry's reviewer input), the correction input bindings
++ *   path, the review ordinal, the trigger and the generated MP-07 lines. Never the admit request, the packet id, coordinator-only
++ *   material, a prior Critic path or the delta request path.
++ * - Values only the dispatcher knows stay `<FILL NAME: hint>` and are listed, the same way the admit request lists its placeholders.
++ * - Antigravity gets the template's paths-only envelope with absolute paths (PO tile 2026-11-10), never the body.
++ */
++import { posix } from "node:path";
++
++export const CRITIC_BRIEFING_SCHEMA = "pipeline.critic-briefing.v1";
++const COPY_MARKER = "COPY EVERYTHING BELOW THIS LINE\n-->\n";
++const COORDINATOR_HEADING = "\n## Generic exact-range batch registration (Coordinator only)";
++const ENVELOPE_START = "<!-- AGY-CRITIC-PROMPT-ENVELOPE:START -->";
++const ENVELOPE_END = "<!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->";
++const PLACEHOLDER = /\{\{([A-Z0-9_]+)(?:\|[^}]*)?(?:[ :][^}]*)?\}\}/gsu;
++
++export class CriticBriefingError extends Error {
++  constructor(code, message) { super(`${code}: ${message}`); this.code = code; }
++}
++const refuse = (code, message) => { throw new CriticBriefingError(code, message); };
++const fill = (name, hint) => `<FILL ${name}: ${hint}>`;
++
++/** The body a Critic receives: everything after the copy marker, without the Coordinator-only section at the end. */
++export function criticTemplateBody(templateText) {
++  const text = String(templateText ?? "").replace(/\r\n/gu, "\n");
++  const start = text.indexOf(COPY_MARKER);
++  if (start < 0) refuse("CBB-TEMPLATE-MARKER", "the Critic template has no copy marker; the template changed shape, repair the builder before dispatching");
++  const end = text.indexOf(COORDINATOR_HEADING, start);
++  if (end < 0) refuse("CBB-TEMPLATE-MARKER", "the Critic template has no Coordinator-only section heading; the cut would hand Coordinator material to the Critic");
++  return text.slice(start + COPY_MARKER.length, end).replace(/^\n+/u, "");
++}
++
++/** The Antigravity envelope lines between its markers, without the code fence and indentation. */
++export function criticTemplateEnvelope(templateText) {
++  const text = String(templateText ?? "").replace(/\r\n/gu, "\n");
++  const start = text.indexOf(ENVELOPE_START), end = text.indexOf(ENVELOPE_END);
++  if (start < 0 || end < start) refuse("CBB-TEMPLATE-MARKER", "the Critic template has no Antigravity envelope markers");
++  const lines = text.slice(start + ENVELOPE_START.length, end).split("\n").map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("```"));
++  if (lines.length === 0) refuse("CBB-TEMPLATE-MARKER", "the Antigravity envelope is empty");
++  return lines;
++}
++
++function reviewFacts(preflight, entry) {
++  const input = entry?.reviewerInput ?? preflight?.dispatch?.reviewerInput;
++  if (input === null || typeof input !== "object") refuse("CBB-PREFLIGHT-SHAPE", "the preflight result carries no reviewer input");
++  for (const key of ["baseCommit", "candidateCommit", "rulesetSha", "specPath"]) {
++    if (typeof input[key] !== "string" || input[key] === "") refuse("CBB-PREFLIGHT-SHAPE", `the reviewer input has no ${key}`);
++  }
++  return {
++    base: input.baseCommit, candidate: input.candidateCommit, rulesetSha: input.rulesetSha, spec: input.specPath,
++    guardrails: [...(input.governanceConstraintPaths ?? []), ...(input.guardrailPaths ?? [])],
++    evidence: [...(input.evidencePaths ?? [])],
++  };
++}
++
++const ordinalOf = (preflight) => {
++  const round = preflight?.coordinatorOnly?.courseAdmission?.round;
++  return Number.isInteger(round) && round >= 2 ? round : null;
++};
++
++/**
++ * Renders the Critic briefing(s). Input:
++ * - preflight: the packet-ready preflight result (printed form, with split / criticDispatchPromptLines when present)
++ * - templateText: the text of templates/prompts/critic-review.md
++ * - commits: the enumerated commit ids of the reviewed range, oldest first
++ * - bindingsPath: repository-relative path of the written correction input bindings file, or null
++ * - runner: "claude" | "codex" | "antigravity" | "unknown"; root: absolute repository root (used for Antigravity only)
++ * - projectName: the project name for the confirmation line
++ * Returns { schema, briefings: [{ entryId, text, placeholders }] }.
++ */
++export function renderCriticBriefings({ preflight, templateText, commits, bindingsPath = null, runner = "claude", root = null, projectName }) {
++  if (preflight?.status !== "packet-ready") refuse("CBB-PREFLIGHT-SHAPE", "a briefing is built only from a packet-ready preflight result");
++  if (!Array.isArray(commits) || commits.length === 0 || commits.some((sha) => !/^[a-f0-9]{40,64}$/u.test(sha))) refuse("CBB-COMMITS", "the enumerated commit list is empty or malformed");
++  const entries = Array.isArray(preflight.split?.entries) && preflight.split.entries.length > 0 ? preflight.split.entries : [null];
++  const ordinal = ordinalOf(preflight);
++  const trigger = typeof preflight.admitRequest?.trigger === "string" ? preflight.admitRequest.trigger : "T1";
++  const promptLines = Array.isArray(preflight.criticDispatchPromptLines) ? preflight.criticDispatchPromptLines : null;
++  const briefings = entries.map((entry) => {
++    const facts = reviewFacts(preflight, entry);
++    if (facts.candidate !== commits[commits.length - 1]) refuse("CBB-COMMITS", "the enumerated commits do not end at the reviewed candidate");
++    return runner === "antigravity"
++      ? renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, root, entry })
++      : renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner });
++  });
++  return { schema: CRITIC_BRIEFING_SCHEMA, briefings };
++}
++
++function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner }) {
++  const placeholders = [];
++  const open = (name, hint) => { placeholders.push(name); return fill(name, hint); };
++  const scope = entry?.batchScopeLine ?? promptLines?.[0] ?? `Batch scope (MP-07): the reviewed range ${facts.base.slice(0, 12)}..${facts.candidate.slice(0, 12)}, one batch.`;
++  const scopeValue = scope.replace(/^Batch scope \(MP-07\):\s*/u, "")
++    + (entry ? ` Paths of this part: ${(entry.reviewerInput?.changedPaths ?? entry.paths ?? []).map((path) => `\`${path}\``).join(", ")}. Begin trajectory_evidence with "${entry.scopeMarker} ".` : "");
++  const rationale = promptLines?.[1] ?? null;
++  const list = (paths, none) => (paths.length === 0 ? none : paths.map((path) => `\`${path}\``).join(", "));
++  const values = {
++    SPEC_PATH: facts.spec,
++    COMMIT_SHAS: commits.join(", "),
++    FIRST_SHA: commits[0],
++    LAST_SHA: commits[commits.length - 1],
++    REVIEWED_DIFF_SNAPSHOT_PATH: "not applicable (committed range)",
++    CORRECTION_INPUT_BINDINGS_PATH_OR_NOT_APPLICABLE: bindingsPath ?? "not applicable",
++    DISPATCH_LIST_PATH: "none (no stripped dispatch record is among the evidence paths)",
++    GUARDRAILS_PATHS: list(facts.guardrails, "none named for this review"),
++    EVIDENCE_PATHS: list(facts.evidence, "none"),
++    CLAIMS_EVIDENCE_PATH: "none beyond the evidence artifacts above",
++    RULESET_SHA: facts.rulesetSha,
++    CRITICALITY_MODEL: rationale === null ? "standard → review-tier model" : "genuinely critical architecture or security change, ONE batched Critic → higher-capability review model",
++    BATCH_SCOPE: scopeValue,
++    MODEL_ID: open("MODEL_ID", "the concrete model id the dispatch call passes as model"),
++    EFFORT: open("EFFORT", "the effort the dispatch call requests"),
++    T1_ASSURANCE: runner === "codex" ? open("T1_ASSURANCE", "the Codex Critic lane and its assurance") : "functional-equivalent-read-only; OS isolation not asserted",
++    TOOL_BUDGET: "≤30 tool uses",
++    PROJECT_NAME: projectName,
++    CALIBRATION_FILE: "n/a",
++    AC_IDS: "all in the spec",
++    RISK_ZONES: "per calibration",
++    VERDICT_REQUESTED: "yes — pass/fail required",
++  };
++  let text = criticTemplateBody(templateText);
++  // Whole-line placeholders: the re-critic pair for a correction round, nothing for a full review; the Advisor line only on demand.
++  const lineOf = (name) => new RegExp(`^- \\{\\{${name}:[^}]*\\}\\}\\n`, "mu");
++  for (const name of ["RECRITIC_LINE", "REVIEW_ORDINAL_LINE", "ADVISOR_DEMAND_LINE"]) {
++    if (!lineOf(name).test(text)) refuse("CBB-TEMPLATE-MARKER", `the template has no ${name} line`);
++  }
++  text = text.replace(lineOf("RECRITIC_LINE"), ordinal === null ? "" : `- Re-critic (MP-07): ${facts.base}..${facts.candidate}\n`);
++  text = text.replace(lineOf("REVIEW_ORDINAL_LINE"), ordinal === null ? "" : `- Review ordinal: ${ordinal}\n`);
++  text = text.replace(lineOf("ADVISOR_DEMAND_LINE"), "");
++  text = text.replace(PLACEHOLDER, (whole, name) => {
++    if (!Object.hasOwn(values, name)) refuse("CBB-TEMPLATE-PLACEHOLDER", `the template holds a placeholder this builder does not know: ${name}`);
++    return values[name];
++  });
++  if (rationale !== null) text = text.replace(/^(- Batch scope \(MP-07\): .*)$/mu, `$1\n- ${rationale}`);
++  if (/\{\{/u.test(text)) refuse("CBB-TEMPLATE-PLACEHOLDER", "an unfilled placeholder is left in the briefing");
++  return { entryId: entry?.id ?? null, text, placeholders };
++}
++
++function renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, root, entry }) {
++  if (typeof root !== "string" || !posix.isAbsolute(root.replace(/\\/gu, "/")) && !/^[A-Za-z]:[\\/]/u.test(root)) refuse("CBB-ROOT", "an Antigravity envelope needs the absolute repository root");
++  const abs = (path) => `${root.replace(/[\\/]+$/u, "")}/${path}`;
++  const placeholders = [];
++  const lines = [];
++  for (const line of criticTemplateEnvelope(templateText)) {
++    const name = /\{\{([A-Z0-9_]+)\}\}/u.exec(line)?.[1] ?? null;
++    if (name === null) { lines.push(line); continue; }
++    if (name === "SPEC_PATH") lines.push(line.replace(`{{${name}}}`, abs(facts.spec)));
++    else if (name === "COMMIT_SHA") for (const sha of commits) lines.push(line.replace(`{{${name}}}`, sha));
++    else if (name === "GUARDRAIL_PATH") for (const path of facts.guardrails) lines.push(line.replace(`{{${name}}}`, abs(path)));
++    // The correction input bindings travel as an evidence row: the envelope has no row of its own for them.
++    else if (name === "EVIDENCE_PATH") for (const path of [...facts.evidence, ...(bindingsPath === null ? [] : [bindingsPath])]) lines.push(line.replace(`{{${name}}}`, abs(path)));
++    else if (name === "TRIGGER_ROW") lines.push(line.replace(`{{${name}}}`, trigger));
++    else if (name === "RULESET_SHA") lines.push(line.replace(`{{${name}}}`, facts.rulesetSha));
++    else if (name === "MODEL") { placeholders.push("MODEL"); lines.push(line.replace(`{{${name}}}`, fill("MODEL", "the Antigravity route model of the Critic duty"))); }
++    else refuse("CBB-TEMPLATE-PLACEHOLDER", `the Antigravity envelope holds a placeholder this builder does not know: ${name}`);
++  }
++  return { entryId: entry?.id ?? null, text: `${lines.join("\n")}\n`, placeholders, ...(entry ? { limitation: `a split entry on Antigravity: the envelope cannot carry the instruction to begin trajectory_evidence with "${entry.scopeMarker} "` } : {}) };
++}
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index cc41cb01d5d230b0b6f972f82462fefc411b9f47..b318c9dc073426a05a1611d1e2280e09589e4400 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -740,24 +740,23 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
+     const reason = `This range needs ${split.entries.length} split entries, above the bound of ${SPLIT_MAX_ENTRIES} for one review round (${split.changedFileCount} changed files).`;
+     fail("CDP-SPLIT-TOO-LARGE", reason, { reason, repair: "Review a narrower exact range (a later --base), or review the range in several delivery units." });
+   }
+-  // 2026-11 greenfield report: all six Antigravity Critics lost their first read to "path is not absolute", because a Critic briefing carries repository-relative paths only. One generated line names the root; the paths themselves stay as they are.
+-  const runnerPromptLines = criticRunnerFromEnv(deps.env ?? process.env) === "antigravity"
+-    ? [`Repository root: ${root}. This runner's native file tools take absolute paths only: join every repository-relative path in this briefing with that root before the first read.`]
+-    : null;
++  // 2026-11 greenfield reports: Antigravity Critics lost their first read to "path is not absolute". A prose line naming the root contradicted the
++  // template's paths-only envelope and was dropped by the run; PO tile 2026-11-10: the envelope carries absolute paths instead (prepare-dispatch.mjs critic).
++  const antigravity = criticRunnerFromEnv(deps.env ?? process.env) === "antigravity";
+   // R9: the last moment a calibration commit is free: it then sits inside the reviewed range. After the last Critic round it ends the push's Critic carry (CVL-CARRY-CONTENT-CHANGED).
+   const remotes = calibrationRepositoryMode(root) === "local-only" ? String(gitOrNull(root, ["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
+   const nextStep = [
+     ...(remotes.length === 0 ? [] : [`This project's calibration says repositoryMode local-only, but it has a remote (${remotes.join(", ")}). If the project is meant to be published, correct that BEFORE this Critic round, so the commit is inside the reviewed range: node \${PIPELINE_PLUGIN_ROOT}/scripts/repository-mode-promote.mjs --root <repo> --to remote-tracked, commit the paths it prints, then run this preflight again with the new candidate. After the last Critic round that commit would end the push's Critic carry.`]),
+-    ...(runnerPromptLines === null ? [] : ["Put criticRunnerPromptLines into the Critic dispatch prompt: without the repository root every first read of an Antigravity child fails."]),
++    ...(!antigravity ? [] : ["Build the Critic prompt with prepare-dispatch.mjs critic: on Antigravity it writes the template's paths-only envelope with absolute paths, because that runner's file tools read absolute paths only and the envelope takes no prose."]),
+     `Write admitRequest verbatim as ${ADMIT_REQUEST_FILE} (JSON), replace only its placeholders (${admitRequestPlaceholderPaths(request).join(", ")}), then run admitCommand; admit refuses an unfilled placeholder by name.`,
+     `trigger ${trigger} is ${trigger === appliedRow ? "the applied Critic row of the matched dispatch record" : "the strictest default (no matched record row of T1 to T3)"}; change it only if your Critic-required decision says otherwise.`,
+     ...(taskIdResolution === null ? [] : [`taskId: ${taskIdResolution.reason}.`]),
+     ...(course ? [] : ["This review is no feature package, so it needs a registered generic batch: run session-critic-finalizer.mjs register-batch first and copy its batchRef and memberSha256 into review.genericBatchRef."]),
+-    ...(promptLines === null ? [] : ["The Critic route is Opus: put criticDispatchPromptLines into the Critic dispatch prompt (MP-07), or the dispatch policy refuses it."]),
++    ...(promptLines === null ? [] : ["The Critic route is Opus: the Critic dispatch prompt carries criticDispatchPromptLines (MP-07), or the dispatch policy refuses it; the briefing files of prepare-dispatch.mjs critic already hold them."]),
+     ...(split === null ? [] : [`SPLIT: this range has ${split.changedFileCount} changed files, above the bound of ${split.maxChangedFiles} one Critic can read, so it is split (split.entries, ${split.entries.length} entries, plan ${split.plan.status}; bound exclusions and the delivery records named in the review protocol §2.2 are in no entry). Dispatch one Critic per split entry from the template, each with its entry's reviewerInput, its entry's batchScopeLine as the Batch scope (MP-07) line${promptLines === null ? "" : " (in place of criticDispatchPromptLines[0]; keep the rationale line)"} and the instruction to begin trajectory_evidence with its scopeMarker; run each entry's Critic once (a second run for an entry makes finalize refuse the round). When every child has returned, merge them without copying any verdict: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-split-merge.mjs --root <repo> --packet <packetId> --out <merged verdict file>; only for a child without a Source return, save split as a JSON file under scratch/ and pass --split <split file> and --child <entryId>=<verdict file> (one per entry) instead of --packet; admit binds the split, finalize takes the merged verdict as verdictPath and labels it source-issued only when every child returned through the Critic stop.`]),
+   ].join(" ");
+   return { ...result, admitRequest: request, admitCommand: ["node", ADMIT_SCRIPT, "admit", "--root", input.root, "--request", ADMIT_REQUEST_FILE], nextStep,
+-    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(runnerPromptLines === null ? {} : { criticRunnerPromptLines: runnerPromptLines }), ...(split === null ? {} : { split }),
++    ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(split === null ? {} : { split }),
+     routeAssurance };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 81cd1983a3de2cad009ced7f819f2230cf8b637d..5907a49a5c3f451cf3cf0bf02b3ccdfeb64a9cc2 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -2137,18 +2137,18 @@ test("R9: a local-only calibration beside a real remote is named before the Crit
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
+-test("AGY report: an Antigravity Critic gets one generated line naming the repository root, the dispatch policy admits it, other runners get none", () => {
++// PO tile 2026-11-10: the prose "Repository root" line contradicted the paths-only envelope and is gone; prepare-dispatch.mjs critic writes the
++// envelope with absolute paths instead, and the preflight's nextStep sends an Antigravity session there.
++test("AGY report: an Antigravity session is sent to the absolute-path envelope, no prose root line is printed for any runner", () => {
+   const fx = fixture();
+   try {
+     const printed = g2069Printed(fx, {}, { env: { ANTIGRAVITY_AGENT: "antigravity" } });
+-    assert.equal(printed.criticRunnerPromptLines.length, 1);
+-    assert.ok(printed.criticRunnerPromptLines[0].startsWith(`Repository root: ${fs.realpathSync(fx.root)}. `), printed.criticRunnerPromptLines[0]);
+-    assert.match(printed.criticRunnerPromptLines[0], /absolute paths only/u);
+-    assert.match(printed.nextStep, /criticRunnerPromptLines/u);
+-    const findings = (extra) => dispatchFindings({ subagentType: "critic", prompt: [`Ruleset SHA: ${fx.candidate}`, ...extra].join("\n") }).findings.map(({ code }) => code).sort();
+-    assert.deepEqual(findings(printed.criticRunnerPromptLines), findings([]), "the whole dispatch policy reads the prompt the same with and without the line");
++    assert.equal(Object.hasOwn(printed, "criticRunnerPromptLines"), false);
++    assert.match(printed.nextStep, /prepare-dispatch\.mjs critic: on Antigravity it writes the template's paths-only envelope with absolute paths/u);
+     for (const env of [{ CLAUDE_CODE_SESSION_ID: "s" }, { CODEX_SESSION_ID: "s" }, {}]) {
+-      assert.equal(Object.hasOwn(g2069Printed(fx, {}, { env }), "criticRunnerPromptLines"), false, JSON.stringify(env));
++      const other = g2069Printed(fx, {}, { env });
++      assert.equal(Object.hasOwn(other, "criticRunnerPromptLines"), false, JSON.stringify(env));
++      assert.doesNotMatch(other.nextStep, /paths-only envelope/u, JSON.stringify(env));
+     }
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+@@ -2163,7 +2163,6 @@ test("AGY report: an Antigravity session gets no Claude Opus lines, and every ge
+     const agy = { env: { ANTIGRAVITY_AGENT: "antigravity" } };
+     const printed = g2069Printed(fx, {}, agy);
+     assert.equal(Object.hasOwn(printed, "criticDispatchPromptLines"), false, "the registered Antigravity Critic route is not Opus");
+-    for (const line of printed.criticRunnerPromptLines) assert.doesNotMatch(line, CRITIC_DISPATCH_PROSE, line);
+     // An Antigravity route configured to Opus does get the lines, and they pass the rule too.
+     const registry = structuredClone(loadRunnerProfilesV3Registry());
+     registry.duties.critic_high_risk.antigravity = { ...registry.duties.critic_high_risk.claude };
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+index b970384005f8c719241902d182ef635a532227bc..7f3615e8bc25c7b562b44d03b724cbed28a1dec3 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.mjs
+@@ -12,6 +12,8 @@ import { basename, dirname, join, posix, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
++import { renderCriticBriefings } from "../lib/critic-briefing-build.mjs";
++import { criticRunnerFromEnv } from "../lib/critic-route-assurance.mjs";
+ 
+ export const DISPATCH_PREPARATION_SCHEMA = "pipeline.dispatch-preparation.v1";
+ const HERE = dirname(fileURLToPath(import.meta.url));
+@@ -166,21 +168,68 @@ export function prepareCriticDispatch(input, deps = {}) {
+   const value = preflight.value;
+   // A current-artifact review scope prints no admit request; the preflight's own result then says what follows.
+   if (value.admitRequest === undefined) return outcome(verb, "ready", { preflight: value, next: { nextStep: value.nextStep ?? "the preflight returned packet-ready without an admit request; follow its result" } });
++  // The briefing is built before anything is written, so a refusal here leaves no half-prepared state behind.
++  const briefing = buildCriticBriefingFiles({ root, value, run, step, deps });
++  if (briefing.stop !== undefined) return stopped(verb, "briefing", briefing.stop, "PREP-BRIEFING-FAILED");
+   const target = resolve(root, ADMIT_REQUEST_FILE);
+   const previousRequest = setAsideFilledRequest(target, deps);
+   (deps.mkdir ?? mkdirSync)(dirname(target), { recursive: true });
+   (deps.writeFile ?? writeFileSync)(target, `${JSON.stringify(value.admitRequest, null, 2)}\n`, "utf8");
++  for (const file of briefing.files) {
++    (deps.mkdir ?? mkdirSync)(dirname(resolve(root, file.path)), { recursive: true });
++    (deps.writeFile ?? writeFileSync)(resolve(root, file.path), file.text, "utf8");
++  }
+   const admitCommand = (value.admitCommand ?? []).map((part) => part.replace("${PIPELINE_PLUGIN_ROOT}/scripts/", `${HERE.replace(/\\/gu, "/")}/`));
+   return outcome(verb, "ready", {
+     packetId: value.admitRequest.packetId, candidate: value.candidate?.commit ?? candidate,
+     ...(previousRequest === null ? {} : { previousRequest }),
+-    next: { requestPath: ADMIT_REQUEST_FILE, placeholders: admitRequestPlaceholderPaths(value.admitRequest), admitCommand, nextStep: value.nextStep,
+-      ...(value.criticDispatchPromptLines === undefined ? {} : { criticDispatchPromptLines: value.criticDispatchPromptLines }),
+-      ...(value.criticRunnerPromptLines === undefined ? {} : { criticRunnerPromptLines: value.criticRunnerPromptLines }),
++    next: { requestPath: ADMIT_REQUEST_FILE, placeholders: admitRequestPlaceholderPaths(value.admitRequest), admitCommand,
++      briefings: briefing.files.map(({ path, entryId, placeholders, limitation }) => ({ path, entryId, placeholders, ...(limitation === undefined ? {} : { limitation }) })),
++      ...(briefing.bindingsPath === null ? {} : { correctionInputBindings: briefing.bindingsPath }),
++      briefingUse: briefing.runner === "antigravity"
++        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. It holds paths and refs only: add nothing."
++        : "After admit, each briefing file is the prompt of one fresh Critic dispatch, verbatim; replace only its <FILL ...> values. Add nothing to it: no earlier round, no verdict, no explanation (critic-review.md, fail-closed reference boundary).",
++      nextStep: value.nextStep,
+       ...(value.taskIdResolution === undefined ? {} : { taskIdResolution: value.taskIdResolution }), ...(value.split === undefined ? {} : { split: value.split }) },
+   });
+ }
+ 
++const TEMPLATE_PATH = join(HERE, "..", "templates", "prompts", "critic-review.md");
++
++/** Correction input bindings file (derived once, never overwritten), the enumerated commits and the filled briefing text(s). */
++function buildCriticBriefingFiles({ root, value, run, step, deps }) {
++  const read = deps.readFile ?? readFileSync;
++  const exists = deps.exists ?? existsSync;
++  const base = value.base?.commit ?? value.dispatch?.reviewerInput?.baseCommit;
++  const head = value.candidate?.commit;
++  const folder = `scratch/critic-briefing/${String(base).slice(0, 12)}-${String(head).slice(0, 12)}`;
++  let bindingsPath = null;
++  const bound = value.correctionInputBindings;
++  if (typeof bound?.path === "string" && bound.path !== "") bindingsPath = bound.path;
++  else if (bound?.derived === true) {
++    bindingsPath = `${folder}/correction-input-bindings.json`;
++    let onDisk = null;
++    if (exists(resolve(root, bindingsPath))) { try { onDisk = JSON.parse(read(resolve(root, bindingsPath), "utf8")).digestSha256 ?? null; } catch { onDisk = null; } }
++    if (onDisk === null) {
++      const derived = step("critic-correction-input-bindings.mjs", ["derive", "--root", root, "--base", base, "--head", head, "--out", bindingsPath]);
++      if (derived.exit !== 0) return { stop: asReason(derived) };
++      onDisk = derived.value?.digestSha256 ?? null;
++    }
++    if (onDisk !== bound.digestSha256) return { stop: { code: "PREP-BINDINGS-DIGEST", reason: `${bindingsPath} does not carry the digest the preflight bound (${bound.digestSha256})`, repair: `remove ${bindingsPath} and run the identical command again` } };
++  }
++  const listed = gitOutput(run, ["rev-list", "--reverse", `${base}..${head}`]);
++  const commits = listed === "" ? [] : listed.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
++  const runner = criticRunnerFromEnv(deps.env ?? process.env);
++  let rendered;
++  try {
++    rendered = renderCriticBriefings({ preflight: value, templateText: (deps.readTemplate ?? (() => readFileSync(TEMPLATE_PATH, "utf8")))(), commits, bindingsPath, runner, root, projectName: basename(root) });
++  } catch (error) {
++    return { stop: { code: error?.code ?? "PREP-BRIEFING-FAILED", reason: String(error?.message ?? error), repair: "the Critic template or the preflight result changed shape; report this code, do not hand-write the briefing" } };
++  }
++  const files = rendered.briefings.map((entry) => ({ ...entry, path: `${folder}/critic${entry.entryId === null ? "" : `-${entry.entryId}`}.briefing.md` }));
++  return { files, bindingsPath, runner };
++}
++
+ function criticArgv(input) {
+   const pair = (flag, value) => (value === null || value === undefined ? [] : [flag, value]);
+   return ["critic", "--root", input.root, "--spec", input.spec, "--base", input.base, "--candidate", input.candidate,
+diff --git a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+index df895edbdb5da16105ffea30e826d1e15711601c..e3cc9e84ea4ced1d34a7c08f0c24b147467ba7b5 100644
+--- a/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
++++ b/plugins/pipeline-core/scripts/prepare-dispatch.test.mjs
+@@ -2,11 +2,16 @@
+ import { test } from "node:test";
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+-import { mkdtempSync, rmSync } from "node:fs";
++import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { basename, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatch } from "./prepare-dispatch.mjs";
++import * as criticBriefingLib from "../lib/critic-briefing-build.mjs";
++import { dispatchFindings } from "../lib/dispatch-policy.mjs";
++import { CRITIC_DISPATCH_PROSE } from "../hooks/antigravity-pretool-guard.mjs";
++
++const TEMPLATE = readFileSync(fileURLToPath(new URL("../templates/prompts/critic-review.md", import.meta.url)), "utf8");
+ 
+ const SCRIPT = fileURLToPath(new URL("./prepare-dispatch.mjs", import.meta.url));
+ const ROOT = join(tmpdir(), "prepare-dispatch-root");
+@@ -108,8 +113,11 @@ test("--no-goldfish-running heals once, probes again and clears the named comman
+ });
+ 
+ const CRITIC = { root: ROOT, spec: "specs/f/spec.md", base: "b".repeat(40), candidate: CANDIDATE, guardrails: ["guardrails/git.md"], label: "suite", command: ["node", "--test", "x.test.mjs"] };
+-const PACKET_READY = { status: "packet-ready", candidate: { commit: CANDIDATE }, nextStep: "write and admit",
++const BASE = "b".repeat(40);
++const PACKET_READY = { status: "packet-ready", base: { commit: BASE }, candidate: { commit: CANDIDATE }, nextStep: "write and admit",
++  dispatch: { reviewerInput: { baseCommit: BASE, candidateCommit: CANDIDATE, rulesetSha: CANDIDATE, specPath: "specs/f/spec.md", governanceConstraintPaths: [], guardrailPaths: ["guardrails/git.md"], evidencePaths: ["specs/f/evidence/suite.json"] } },
+   admitRequest: { packetId: "c".repeat(32), sessionId: "<FILL sessionId: hint>", taskId: "T1" }, admitCommand: ["node", "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs", "admit"] };
++const REV_LIST = { status: 0, stdout: `${CANDIDATE}\n`, stderr: "" };
+ const noFiles = { exists: () => false, mkdir: () => {}, writeFile: () => {} };
+ const SAME_CANDIDATE = JSON.stringify({ candidate: { commit: CANDIDATE } });
+ 
+@@ -140,7 +148,7 @@ test("a label that recorded another candidate is refused before anything runs",
+ 
+ test("a rerun keeps a request the agent already filled and replaces an untouched draft", () => {
+   const commit = "d".repeat(40);
+-  const answers = { "git log": { status: 0, stdout: `${commit}\n`, stderr: "" }, "critic-dispatch-preflight.mjs": ok(PACKET_READY) };
++  const answers = { "git log": { status: 0, stdout: `${commit}\n`, stderr: "" }, "critic-dispatch-preflight.mjs": ok(PACKET_READY), "git rev-list": REV_LIST };
+   const requestOr = (request) => (path) => (String(path).endsWith("session-critic-finalization-request.json") ? JSON.stringify(request) : SAME_CANDIDATE);
+   const renamed = [];
+   const files = { mkdir: () => {}, writeFile: () => {}, exists: () => true, rename: (from, to) => renamed.push([from, to]) };
+@@ -155,18 +163,20 @@ test("a rerun keeps a request the agent already filled and replaces an untouched
+ test("the identical rerun finds the evidence commit, reaches packet-ready and writes the admit request", () => {
+   const commit = "d".repeat(40);
+   const written = [];
+-  const steps = stub({ "git log": { status: 0, stdout: `${commit}\n`, stderr: "" }, "critic-dispatch-preflight.mjs": ok(PACKET_READY) });
++  const steps = stub({ "git log": { status: 0, stdout: `${commit}\n`, stderr: "" }, "critic-dispatch-preflight.mjs": ok(PACKET_READY), "git rev-list": REV_LIST });
+   const result = prepareCriticDispatch(CRITIC, { mkdir: () => {}, writeFile: (path, text) => written.push([path, text]), exists: (path) => !String(path).endsWith("finalization-request.json"), readFile: () => SAME_CANDIDATE, runCommand: steps.runCommand });
+   assert.equal(result.status, "ready");
+   assert.equal(result.packetId, "c".repeat(32));
+   assert.deepEqual(result.next.placeholders, ["sessionId"]);
+   assert.match(result.next.admitCommand[1], /session-critic-finalizer\.mjs$/u);
+   assert.doesNotMatch(result.next.admitCommand[1], /PIPELINE_PLUGIN_ROOT/u);
+-  const argv = steps.calls.at(-1).argv;
++  const argv = steps.calls.find((call) => call.key === "critic-dispatch-preflight.mjs").argv;
+   assert.equal(argv.includes("--registration-commit"), false, "the preflight derives it: in a correction round it is the later delta registration, not the evidence commit");
+   assert.equal(argv[argv.indexOf("--evidence") + 1], "specs/f/evidence/suite.json");
+-  assert.equal(written.length, 1);
++  assert.equal(written.length, 2, "the admit request and one Critic briefing");
+   assert.deepEqual(JSON.parse(written[0][1]), PACKET_READY.admitRequest);
++  assert.match(written[1][0].replace(/\\/gu, "/"), /scratch\/critic-briefing\/bbbbbbbbbbbb-aaaaaaaaaaaa\/critic\.briefing\.md$/u);
++  assert.deepEqual(result.next.briefings.map(({ path, entryId }) => [path, entryId]), [["scratch/critic-briefing/bbbbbbbbbbbb-aaaaaaaaaaaa/critic.briefing.md", null]]);
+ });
+ 
+ test("a preflight refusal keeps its own code and reason", () => {
+@@ -177,9 +187,9 @@ test("a preflight refusal keeps its own code and reason", () => {
+ 
+ test("an explicit registration commit passes through, and a step with a code but no words shows its output", () => {
+   const given = "9".repeat(40);
+-  const passed = stub({ "critic-dispatch-preflight.mjs": ok(PACKET_READY) });
++  const passed = stub({ "critic-dispatch-preflight.mjs": ok(PACKET_READY), "git rev-list": REV_LIST });
+   prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"], registrationCommit: given }, { ...noFiles, runCommand: passed.runCommand });
+-  const argv = passed.calls.at(-1).argv;
++  const argv = passed.calls.find((call) => call.key === "critic-dispatch-preflight.mjs").argv;
+   assert.equal(argv[argv.indexOf("--registration-commit") + 1], given);
+   const silent = stub({ "critic-dispatch-preflight.mjs": no({ code: "CDP-GIT" }, 1) });
+   const result = prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"] }, { ...noFiles, runCommand: silent.runCommand });
+@@ -202,6 +212,106 @@ test("the argument parser takes the check command after the separator and refuse
+   assert.match(parsePrepareDispatchArgv(["goldfish"]).error, /--root is required/u);
+ });
+ 
++// --- PO tile 2026-11-10: the Critic preparation writes the filled briefing. Two greenfield runs hand-wrote it the same day: one Critic got no
++// correction input bindings and was then resumed with a message naming the earlier round's outcome, which made it withhold its verdict. ---
++
++const PREV = "1".repeat(40), MID = "2".repeat(40), HEAD = "3".repeat(40);
++const REGISTRATION = "4".repeat(40), SOURCE_SHA = "5".repeat(64), DECISION_SHA = "6".repeat(64), PACKET = "7".repeat(32);
++const DELTA_REQUEST = "specs/f/evidence/critic-delta-request-x.json", PRIOR = "specs/f/evidence/critic-prior.json";
++const reviewerInput = (over = {}) => ({ baseCommit: PREV, candidateCommit: HEAD, candidateTree: "8".repeat(40), rulesetSha: HEAD, specPath: "specs/f/spec.md",
++  governanceConstraintPaths: [], guardrailPaths: ["guardrails/git.md"], evidencePaths: ["specs/f/evidence/suite-2.json"], ...over });
++function deltaSplitPreflight() {
++  const entry = (id, paths) => ({ id, moduleId: null, paths, scopeMarker: `scope:${id}`, reviewerInput: reviewerInput({ changedPaths: paths }),
++    batchScopeLine: `Batch scope (MP-07): path group ${id} of the reviewed range ${PREV.slice(0, 12)}..${HEAD.slice(0, 12)} (1 of 2 changed files), part 1 of 2 of one split review round.` });
++  return { status: "packet-ready", base: { commit: PREV }, candidate: { commit: HEAD },
++    correctionInputBindings: { path: null, derived: true, digestSha256: "9".repeat(64) },
++    coordinatorOnly: { priorCriticEvidence: { path: PRIOR }, courseAdmission: { featureId: "f", registrationCommit: REGISTRATION, sourceSha256: SOURCE_SHA, decisionSha256: DECISION_SHA, round: 2, correctionCommits: 1 } },
++    dispatch: { reviewerInput: reviewerInput() },
++    admitRequest: { packetId: PACKET, trigger: "T1", review: { priorCriticEvidencePath: PRIOR, deltaRequest: DELTA_REQUEST } },
++    criticDispatchPromptLines: [`Batch scope (MP-07): the reviewed range ${PREV.slice(0, 12)}..${HEAD.slice(0, 12)} (2 changed files in 2 top-level paths), one batch.`,
++      "Rationale (MP-07): the registered Critic route duty.critic_high_risk requests opus at effort max; it is used for critical architecture or security checks of this one batch only."],
++    split: { entries: [entry("group-1", ["a.mjs"]), entry("group-2", ["b.mjs"])] } };
++}
++const BINDINGS_FILE = `scratch/critic-briefing/${PREV.slice(0, 12)}-${HEAD.slice(0, 12)}/correction-input-bindings.json`;
++const FORBIDDEN = [PACKET, REGISTRATION, SOURCE_SHA, DECISION_SHA, DELTA_REQUEST, PRIOR];
++
++test("a split correction round gets one filled briefing per entry with its scope, ordinal, range and bindings, and nothing from earlier rounds", () => {
++  const { renderCriticBriefings } = criticBriefingLib;
++  const { briefings } = renderCriticBriefings({ preflight: deltaSplitPreflight(), templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "claude", root: ROOT, projectName: "p" });
++  assert.deepEqual(briefings.map((entry) => entry.entryId), ["group-1", "group-2"]);
++  for (const [index, { text, placeholders }] of briefings.entries()) {
++    const id = `group-${index + 1}`;
++    assert.match(text, new RegExp(`^- Batch scope \\(MP-07\\): path group ${id} of the reviewed range .* Paths of this part: \`${index === 0 ? "a" : "b"}\\.mjs\`\\. Begin trajectory_evidence with "scope:${id} "\\.$`, "mu"));
++    assert.match(text, /^- Rationale \(MP-07\): .*critical architecture or security/mu, "the Opus MP-07 rationale sits in the briefing");
++    assert.match(text, new RegExp(`^- Re-critic \\(MP-07\\): ${PREV}\\.\\.${HEAD}$`, "mu"));
++    assert.match(text, /^- Review ordinal: 2$/mu);
++    assert.ok(text.includes(BINDINGS_FILE), "the correction input bindings are named");
++    assert.ok(text.includes(`${MID}, ${HEAD}`), "the enumerated commits");
++    assert.ok(text.includes("- Spec (the contract): specs/f/spec.md"));
++    assert.doesNotMatch(text, /\{\{/u, "no template placeholder is left");
++    assert.doesNotMatch(text, /Generic exact-range batch registration \(Coordinator only\)/u, "the Coordinator-only section is cut off");
++    for (const value of FORBIDDEN) assert.equal(text.includes(value), false, `the briefing carries ${value}`);
++    assert.deepEqual(placeholders, ["MODEL_ID", "EFFORT"]);
++    // What the dispatcher sends: the briefing with its two values filled. The dispatch policy admits it as a clean Opus Critic prompt.
++    const prompt = text.replace("<FILL MODEL_ID: the concrete model id the dispatch call passes as model>", "claude-opus-4-1").replace("<FILL EFFORT: the effort the dispatch call requests>", "max");
++    const codes = dispatchFindings({ subagentType: "critic", prompt: `Model/effort for this run: claude-opus-4-1 / max\n${prompt}` }).findings.map(({ code }) => code);
++    assert.deepEqual(codes.filter((code) => code.startsWith("DISPATCH-CONTAMINATION") || code === "DISPATCH-OPUS-NO-BATCH-RATIONALE" || code.startsWith("DISPATCH-RECRITIC")), [], codes.join(", "));
++  }
++});
++
++test("a first full review gets no re-critic or ordinal line and states that no bindings apply", () => {
++  const preflight = { ...deltaSplitPreflight(), coordinatorOnly: { priorCriticEvidence: null, courseAdmission: { round: 1 } }, correctionInputBindings: undefined, split: undefined, criticDispatchPromptLines: undefined };
++  const [{ text, entryId }] = criticBriefingLib.renderCriticBriefings({ preflight, templateText: TEMPLATE, commits: [MID, HEAD], runner: "claude", root: ROOT, projectName: "p" }).briefings;
++  assert.equal(entryId, null);
++  assert.doesNotMatch(text, /^- Re-critic/mu);
++  assert.doesNotMatch(text, /^- Review ordinal/mu);
++  assert.doesNotMatch(text, /^- Rationale \(MP-07\)/mu);
++  assert.match(text, /Correction input bindings \(when retained prior results occur in the range\):\n\s+not applicable\./u);
++  assert.match(text, /^- Batch scope \(MP-07\): the reviewed range 111111111111\.\.333333333333, one batch\.$/mu);
++});
++
++test("Antigravity gets the template's paths-only envelope with absolute paths, which the Contamination Rule admits", () => {
++  const { briefings } = criticBriefingLib.renderCriticBriefings({ preflight: { ...deltaSplitPreflight(), split: undefined }, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "antigravity", root: "/repo/root", projectName: "p" });
++  const [{ text, placeholders }] = briefings;
++  const lines = text.trimEnd().split("\n");
++  assert.equal(lines[0], "templates/prompts/critic-review.md", "the first line stays the canonical template path");
++  assert.ok(lines.includes("spec: /repo/root/specs/f/spec.md"));
++  assert.ok(lines.includes(`commit: ${MID}`) && lines.includes(`commit: ${HEAD}`), "one commit row per enumerated commit");
++  assert.ok(lines.includes("guardrail: /repo/root/guardrails/git.md"));
++  assert.ok(lines.includes(`evidence: /repo/root/${BINDINGS_FILE}`), "the bindings travel as an evidence row");
++  assert.ok(lines.includes("route: T1") && lines.includes(`ruleset-sha: ${HEAD}`));
++  assert.deepEqual(placeholders, ["MODEL"]);
++  assert.doesNotMatch(text, CRITIC_DISPATCH_PROSE);
++  assert.doesNotMatch(text, /Repository root|Rationale|Batch scope/u, "no prose and no Claude MP-07 line in the envelope");
++  for (const value of FORBIDDEN) assert.equal(text.includes(value), false, `the envelope carries ${value}`);
++});
++
++test("a template that lost its copy marker or holds an unknown placeholder refuses instead of handing on an unfilled briefing", () => {
++  const render = (templateText) => () => criticBriefingLib.renderCriticBriefings({ preflight: { ...deltaSplitPreflight(), split: undefined }, templateText, commits: [MID, HEAD], runner: "claude", root: ROOT, projectName: "p" });
++  assert.throws(render(TEMPLATE.replace("COPY EVERYTHING BELOW THIS LINE", "COPY BELOW")), { code: "CBB-TEMPLATE-MARKER" });
++  assert.throws(render(TEMPLATE.replace("- Spec (the contract): {{SPEC_PATH}}", "- Spec (the contract): {{NEW_FIELD}}")), { code: "CBB-TEMPLATE-PLACEHOLDER" });
++});
++
++test("prepare-dispatch derives the bindings file once, writes one briefing per split entry and names them in next", () => {
++  const written = [];
++  const steps = stub({ "critic-dispatch-preflight.mjs": ok(deltaSplitPreflight()), "critic-correction-input-bindings.mjs derive": ok({ digestSha256: "9".repeat(64), path: BINDINGS_FILE }), "git rev-list": { status: 0, stdout: `${MID}\n${HEAD}\n`, stderr: "" } });
++  const result = prepareCriticDispatch({ root: ROOT, spec: "specs/f/spec.md", base: PREV, candidate: HEAD, evidence: ["specs/f/evidence/suite-2.json"] },
++    { exists: () => false, mkdir: () => {}, writeFile: (path, text) => written.push([path.replace(/\\/gu, "/"), text]), env: { CLAUDE_CODE_SESSION_ID: "s" }, runCommand: steps.runCommand });
++  assert.equal(result.status, "ready", JSON.stringify(result.stop ?? null));
++  const derive = steps.calls.find((call) => call.key === "critic-correction-input-bindings.mjs derive").argv;
++  assert.equal(derive[derive.indexOf("--out") + 1], BINDINGS_FILE);
++  assert.deepEqual(result.next.briefings.map(({ entryId }) => entryId), ["group-1", "group-2"]);
++  assert.equal(result.next.correctionInputBindings, BINDINGS_FILE);
++  assert.match(result.next.briefingUse, /Add nothing to it: no earlier round, no verdict/u);
++  assert.equal(Object.hasOwn(result.next, "criticDispatchPromptLines"), false, "the MP-07 lines live in the briefings, not beside them");
++  assert.equal(written.filter(([path]) => path.endsWith(".briefing.md")).length, 2);
++  // A bindings file on disk with another digest is refused, never silently used.
++  const stale = stub({ "critic-dispatch-preflight.mjs": ok(deltaSplitPreflight()), "git rev-list": { status: 0, stdout: `${MID}\n${HEAD}\n`, stderr: "" } });
++  const refused = prepareCriticDispatch({ root: ROOT, spec: "specs/f/spec.md", base: PREV, candidate: HEAD, evidence: ["e.json"] },
++    { exists: (path) => String(path).endsWith("correction-input-bindings.json"), readFile: () => JSON.stringify({ digestSha256: "0".repeat(64) }), mkdir: () => {}, writeFile: () => {}, runCommand: stale.runCommand });
++  assert.equal(refused.stop.code, "PREP-BINDINGS-DIGEST");
++});
++
+ test("--help works in an empty directory and names both verbs", () => {
+   const empty = mkdtempSync(join(tmpdir(), "prepare-dispatch-help-"));
+   try {

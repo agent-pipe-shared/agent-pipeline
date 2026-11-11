@@ -1,0 +1,54 @@
+diff --git a/plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs b/plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs
+index 2e63eb9ff0b8e47825a42b6626a9dd94a2f598f7..8baee1b129d03a5a59e38b24b9b682013559206d 100644
+--- a/plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs
+@@ -166,4 +166,13 @@ test('APM018','greenfield exact inventory combines ADR and map publication with
+   assert.equal(inventory.targets.at(-1).path,inventory.prospective.referencePath);
+   fxt.must(f,['materialize-architecture']);assert.equal(inspectArchitectureMaterializationTargets(f.dir).targets.length,0);
+ });
++test('APM019','a reopened design reads only the newest approval of its feature, and a forged newer one still fails verification',()=>{
++  const f=fxt.makeAggregateFixture();fxt.must(f,['materialize-architecture']);
++  const directory=join(f.dir,'project/aggregate-design-architecture-references'),[name]=readdirSync(directory),current=JSON.parse(readFileSync(join(directory,name),'utf8'));
++  const plant=(digit,approvedAt)=>{const path=join(directory,`${digit.repeat(64)}.json`);writeFileSync(path,json({...current,approvalBasis:{...current.approvalBasis,requestSha256:digit.repeat(64)},approval:{...current.approval,approvedAt}}));return path;};
++  const older=plant('0','2000-01-01T00:00:00.000Z');
++  const read=readEffectiveDesignArchitectureAuthority({rootDir:f.dir});assert(read.ok,JSON.stringify(read));assert.equal(read.decisions.length,1);
++  unlinkSync(older);plant('f','2999-01-01T00:00:00.000Z');
++  refuse(readEffectiveDesignArchitectureAuthority({rootDir:f.dir}));
++});
+ registerTestCaseCompletion({cases,fd:3,maxBytes:8192});
+diff --git a/plugins/pipeline-core/lib/design-decision-bindings.mjs b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+index 022f68d1067184520a05046dddcf171725a8efed..b63dabc1db4c97b7d9c5967c72cb9e4bed8044ee 100644
+--- a/plugins/pipeline-core/lib/design-decision-bindings.mjs
++++ b/plugins/pipeline-core/lib/design-decision-bindings.mjs
+@@ -619,13 +619,30 @@ function retainedArchitecture(root, path) {
+   requireValue(result.required && canonicalizeJson(result.approvalBasis) === canonicalizeJson(record.approvalBasis), 'DDB-RETENTION-DRIFT');
+   result.files.push(file); reopen(root, result.files); return result;
+ }
++/**
++ * A reopened design is signed again under the same feature. The earlier approval's sources changed, so it can no longer verify and must not
++ * block the current one (live on native Windows, 2026-11-10). Only the newest approval of a feature is read: skipping removes authority,
++ * never adds it, and a forged newer entry still has to pass full verification.
++ */
++function latestReferencePerFeature(root, names) {
++  const latest = new Map();
++  for (const name of names) {
++    const path = `${ARCHITECTURE_REFERENCES}/${name}`;
++    const record = parseStrictJson(physical(root, path).bytes);
++    const featureId = record?.approvalBasis?.featureId, approvedAt = record?.approval?.approvedAt;
++    requireValue(typeof featureId === 'string' && typeof approvedAt === 'string', 'DDB-RETENTION-SHAPE');
++    const earlier = latest.get(featureId);
++    if (!earlier || earlier.approvedAt < approvedAt) latest.set(featureId, { path, approvedAt });
++  }
++  return [...latest.values()].map(entry => entry.path);
++}
+ export function readEffectiveDesignArchitectureAuthority({ rootDir } = {}) {
+   try {
+     const root = rootPath(rootDir), results = [];
+     const directory = architectureReferenceDirectory(root);
+     const directoryIdentity = directory ? locator(lstatSync(directory, { bigint: true })) : null;
+     const names = directory ? architectureReferenceNames(directory) : [];
+-    for (const name of names) results.push(retainedArchitecture(root, `${ARCHITECTURE_REFERENCES}/${name}`));
++    for (const path of latestReferencePerFeature(root, names)) results.push(retainedArchitecture(root, path));
+     // Absence/staleness of a current feature never creates authority and does
+     // not erase an independently reverified original retained approval.
+     try { const current = approved(root, 'architecture'); if (current.required) results.push(current); } catch { /* no current grant */ }

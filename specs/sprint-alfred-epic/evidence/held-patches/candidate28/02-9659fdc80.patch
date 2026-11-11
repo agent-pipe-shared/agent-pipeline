@@ -1,0 +1,21 @@
+diff --git a/harness/verify-suite-history-recovery.json b/harness/verify-suite-history-recovery.json
+index ebd59abaa43e70b58cbec58b72328f1d68aae482..acd44490736a264ccad065861f66073ea4d4a8dd 100644
+--- a/harness/verify-suite-history-recovery.json
++++ b/harness/verify-suite-history-recovery.json
+@@ -71,6 +71,16 @@
+       "owner": "Elephant",
+       "signed": false,
+       "reason": "Historical, unsigned exception recorded by the Elephant (fourth entry of this kind, found by the candidate 19l Full Verify): this one commit (candidate 19k, w249) extended the caseCompletion case-ID list of the existing native Goldfish host stop-pair registry row by NGSP6 to NGSP9D in place and appended two clauses to the same row's pinned invariant, and inserted one row. Narrow and not extendable by pattern: bound to this commit, its parent and their registry bytes, and the witness re-derives from bytes that the old invariant text is an exact prefix of the new one and that the row is otherwise unchanged."
++    },
++    {
++      "schema": "pipeline.verify-suite-case-list-extension-entry.v1",
++      "commit": "4c37267c157777917be099efc8cb1ea8fb929d42",
++      "parent": "de11e66325b32ad3b89d13a7e94047a7a568848b",
++      "preimageSha256": "3cc0747737ebb493b834f07c7694b97dd4349f0867df16ba1e95e8c38890d593",
++      "postimageSha256": "fb5ef8cf8abf5747efb45df88368d9b139697e59d3f113dd986858bb2545b3e9",
++      "owner": "Elephant",
++      "signed": false,
++      "reason": "An unsigned, historical record: commit 4c37267c1 extended case lists of existing registry rows in place, found by the candidate 27 Full Verify; the witness re-derives the extension from the bytes."
+     }
+   ]
+ }

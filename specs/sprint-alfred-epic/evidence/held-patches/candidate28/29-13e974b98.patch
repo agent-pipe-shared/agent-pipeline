@@ -1,0 +1,71 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index f90652b4ffae1f89117f483846601f421e2af3ba..5bf97fa153746d40cde4a093f9b721d27797c447 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -618,6 +618,11 @@ export function issueAntigravityCriticReturn(input, attributed, { nowMs = Date.n
+ /** C21B: the one refusal a Critic child gets when its message to the parent carries no verdict while its packet waits for one. */
+ export const CRITIC_VERDICT_REQUIRED_DENIAL = "BLOCKED (Antigravity Critic return): CRITIC-VERDICT-JSON-REQUIRED: this message to your parent carries no machine-readable verdict that holds together (pass may be true only when no finding is blocker or major, briefing_violations is empty and trajectory_verdict is consistent), so the review cannot be bound to its packet and the feature close would need a PO signature. Send the same report again and end it with one fenced json block holding exactly the keys findings, deliberately_not_flagged, trajectory_verdict, trajectory_evidence, briefing_violations and pass (each finding: gap, risk, severity blocker|major|minor, evidence, spec_ref; trajectory_verdict: consistent|inconsistent|not verifiable). If you cannot state a verdict, send your message unchanged: this refusal happens once.";
+ 
++// The Contamination Rule's trigger words for a Critic dispatch prompt (Hardening Layer below). Exported so the generators of Critic
++// prompt lines (critic-dispatch-preflight.mjs) can be tested against the same rule: an Antigravity greenfield run on 2026-11-10 was
++// refused after pasting the generated lines, because one of them said "security review".
++export const CRITIC_DISPATCH_PROSE = /(?<![\w-])(you are|please|examine|look at|review)\b/i;
++
+ export async function runAntigravityPreToolGuard(rawInput) {
+   // M4b: a native child in a branch worktree names the worktree FIRST in workspacePaths. The worktree is outside the project and carries no
+   // governance marker, so every check below would see an ungoverned directory and allow the call (measured: even `git push origin main`).
+@@ -795,7 +800,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
+       // only word-characters and the hyphen keeps the D2 fix (a hyphen still is not a boundary)
+       // while restoring detection for every other non-word character that can precede a
+       // trigger word in ordinary prose.
+-      if (/(?<![\w-])(you are|please|examine|look at|review)\b/i.test(prompt)) {
++      if (CRITIC_DISPATCH_PROSE.test(prompt)) {
+         deny("BLOCKED (Hardening Layer): Critic dispatch prompt contains prose. Only paths and refs are allowed (Contamination Rule).");
+       }
+     }
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 952b46b9b0deffc3d29cfd5a1c1889174ee0e87b..692fb036b73212453119ccb6b8f9407e056f09c9 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -670,7 +670,7 @@ function opusCriticPromptLines({ root, result, env, registry, trigger }) {
+     `Batch scope (MP-07): the reviewed range ${base.slice(0, 12)}..${head.slice(0, 12)}${counts}, one batch.`,
+     // CGR-20: the cell is what the route REQUESTS. Nothing at this point observes the effort that is applied, and the project calibration is
+     // a different value that this line neither reads nor overwrites, so the line says "requests" and states the missing observation.
+-    `Rationale (MP-07): the registered Critic route duty.${duty} requests ${cell.selector.value} at effort ${cell.effort}; it is used for critical architecture or security review of this one batch only. The applied effort is not observed by this packet: report the requested effort as requested, and name an applied effort only where a dispatch receipt shows it.`,
++    `Rationale (MP-07): the registered Critic route duty.${duty} requests ${cell.selector.value} at effort ${cell.effort}; it is used for critical architecture or security checks of this one batch only. The applied effort is not observed by this packet: report the requested effort as requested, and name an applied effort only where a dispatch receipt shows it.`,
+   ];
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 4c98c2072419f69932cd99953be7b852756d0ca7..dd5c8e2559101c283e22b8f13d395331b976aed8 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -25,6 +25,7 @@ import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
+ import { admitSessionCriticReview } from "./session-critic-finalizer.mjs";
+ import * as readModule from "../lib/session-critic-finalizer-read.mjs";
+ import { dispatchFindings } from "../lib/dispatch-policy.mjs";
++import { CRITIC_DISPATCH_PROSE } from "../hooks/antigravity-pretool-guard.mjs";
+ import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+ import { sha256Canonical } from "../lib/review-economy.mjs";
+ import { CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA, CriticCorrectionInputBindingsError, FINDING_RECORDS_FIELD, bindingsRoleCounts, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
+@@ -2152,6 +2153,20 @@ test("AGY report: an Antigravity Critic gets one generated line naming the repos
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++// Antigravity greenfield 2026-11-10: the run pasted the generated lines as nextStep says and the Antigravity guard refused the Critic
++// dispatch under its Contamination Rule, because the Opus rationale line said "security review". Every generated prompt line must pass
++// that same rule (imported from the guard, not copied).
++test("AGY report: every generated Critic prompt line passes the Antigravity Contamination Rule", () => {
++  const fx = fixture();
++  try {
++    const printed = g2069Printed(fx, {}, { env: { ANTIGRAVITY_AGENT: "antigravity" } });
++    const lines = [...printed.criticRunnerPromptLines, ...(printed.criticDispatchPromptLines ?? [])];
++    assert.ok(printed.criticDispatchPromptLines?.length === 2, "control: the registered Critic route is Opus, so the MP-07 lines are printed too");
++    for (const line of lines) assert.doesNotMatch(line, CRITIC_DISPATCH_PROSE, line);
++    assert.match(CRITIC_DISPATCH_PROSE.source, /review/u, "control: the rule still names the trigger word");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ test("G20-71 an Opus Critic route carries the MP-07 prompt lines the dispatch policy admits unchanged; a non-Opus route carries none", () => {
+   const fx = fixture();
+   try {

@@ -1,0 +1,56 @@
+diff --git a/plugins/pipeline-core/agents/readiness-reviewer.md b/plugins/pipeline-core/agents/readiness-reviewer.md
+index 32a1e3793a248656c365748b379fb8292909a883..4ef644e4a2e7e6be879c83d0231985476d06871f 100644
+--- a/plugins/pipeline-core/agents/readiness-reviewer.md
++++ b/plugins/pipeline-core/agents/readiness-reviewer.md
+@@ -52,6 +52,10 @@ context) and for the actual effect asserted, not only that text changed. A
+ criterion that names none is not ready: raise it as a finding naming the criterion
+ and the typed code `PLR-HANDOFF-NO-JOURNEY`, with the repair (add a `Journeys:` and
+ an `Asserts:` clause, or tag a criterion no user sees `[not user-facing: <reason>]`).
++For a criterion that deletes, replaces, imports or migrates stored data, also ask
++whether its journeys name recoverability and unintended valid input (an empty,
++partial or older input that passes validation); a missing one is a question in the
++review, not a block.
+ 
+ Decisions to record: read the design for choices that need an ADR (module
+ boundaries, data keeping, offline and error strategy, a security trade-off). When
+diff --git a/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+index 0234466042e7409114060ee88fb55edb023bc7fc..59c3937bbcb889bf6dabcb0f04c52933b2d6d88a 100644
+--- a/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
++++ b/plugins/pipeline-core/lib/pins/acceptance-criteria-are-examined-as-whole-user-journeys.test.mjs
+@@ -142,6 +142,18 @@ test("J4 the generated Goldfish briefing and the readiness reviewer carry the du
+   has(reviewer, /journey/iu, "the readiness reviewer asks about journeys");
+ });
+ 
++// Codex greenfield report (candidate 27): a valid but empty import replaced every stored record. A data operation's journeys
++// name recoverability and unintended valid input, in the Spec template and in the readiness review (a question, not a block).
++test("J6 a data operation's journeys name recoverability and unintended valid input in the Spec template and the readiness review", () => {
++  const spec = flat(read("templates/spec.md"));
++  has(spec, /deletes, replaces, imports or migrates stored data/u, "templates/spec.md names data operations");
++  has(spec, /recoverability/u, "templates/spec.md asks for recoverability");
++  has(spec, /unintended valid input/u, "templates/spec.md asks for unintended valid input");
++  const reviewer = flat(read("plugins/pipeline-core/agents/readiness-reviewer.md"));
++  has(reviewer, /recoverability and unintended valid input/u, "the readiness reviewer asks both questions");
++  has(reviewer, /not a block/u, "the question never blocks");
++});
++
+ test("J5 the close readback reports journey coverage per criterion as covered / not covered, never a bare count", async () => {
+   const { closeQualityReadback, QUALITY_ROW_IDS } = await load("lib/close-quality-readback.mjs");
+   assert.ok(QUALITY_ROW_IDS.includes("journey-coverage"));
+diff --git a/templates/spec.md b/templates/spec.md
+index 12b5584e3552987fd6e19dd524200a5cb36232b3..91d63780f4c6b965ae07d12a99fadea63298c293 100644
+--- a/templates/spec.md
++++ b/templates/spec.md
+@@ -158,6 +158,13 @@ its own text (a table cell, or an indented continuation line of a bullet):
+ - `Asserts:` the actual effect checked (the stored state, the produced output,
+   the refused write), never only that "text changed".
+ 
++A criterion that deletes, replaces, imports or migrates stored data also names,
++in its `Journeys:`, two standard cases (Codex greenfield, candidate 27: a valid
++but empty import replaced every stored record): recoverability (how the previous
++state is restored after the operation, or why it need not be) and unintended
++valid input (an empty, partial or older-revision input that passes validation
++must not silently wipe or downgrade what is stored).
++
+ `[user-facing]` forces the duty on a criterion the vocabulary check would miss
+ (it recognises English wording only); `[not user-facing: <reason>]` exempts a
+ criterion no user sees, and a tag without a reason exempts nothing. A Spec whose

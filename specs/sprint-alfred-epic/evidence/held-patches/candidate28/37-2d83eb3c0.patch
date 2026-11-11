@@ -1,0 +1,228 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index aa1ece66b66bff83ab7c929c9e208e854153e5ee..dc162a63ab5248e990093810c9888d752b007b23 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -350,6 +350,9 @@ below assumes it holds and is written to catch a change that would break it.
+   The pure validation half split out of `lib/critic-review-lineage.mjs`
+   (`lib/critic-review-lineage-core.mjs`, imported by that kernel path and re-exported
+   unchanged) is protected for the same reason.
++  The damaged-course locator `lib/course-evidence-gap.mjs` is imported by the State
++  writer and `lib/critic-course-admission.mjs`; a discard with a bound Result is admitted
++  only on its finding (PO decision 2026-11-10), so it is protected as well.
+   The Critic preflight, the session finalizer and the diagnostic producer also import
+   `lib/critic-correction-input-bindings.mjs`, `lib/critic-packet-release.mjs`, and
+   `lib/critic-required-guardrails.mjs`, which are protected for the same reason.
+diff --git a/plugins/pipeline-core/lib/course-evidence-gap.mjs b/plugins/pipeline-core/lib/course-evidence-gap.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..88e16d33ad67d9bf2aa03db18e907d6fcedd674e
+--- /dev/null
++++ b/plugins/pipeline-core/lib/course-evidence-gap.mjs
+@@ -0,0 +1,31 @@
++// SPDX-License-Identifier: SUL-1.0
++// Codex greenfield, candidate 27: a feature manifest revision listed a candidate-evidence file that its own commit did not hold,
++// and every later Critic course read of that feature failed for good. This read-only locator names that revision and path.
++// It lives apart from critic-course-admission.mjs because the State writer needs it too, and that library imports the writer.
++import { execFileSync } from "node:child_process";
++
++const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
++const FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
++
++/**
++ * Read-only: the first manifest revision (oldest first, up to `commit`) that lists a candidate-evidence path its own commit
++ * does not hold as a regular file, as { commit, path }, or null. It runs only git rev-list, show and ls-tree, and never throws.
++ */
++export function locateCourseEvidenceGap({ repoRoot, featureId, commit }) {
++  try {
++    if (typeof repoRoot !== "string" || !FEATURE_ID.test(featureId ?? "") || !OID.test(commit ?? "")) return null;
++    const manifestPath = `specs/${featureId}/lifecycle.json`;
++    const run = (args) => execFileSync("git", ["-C", repoRoot, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 * 1024 * 1024 });
++    const revisions = run(["rev-list", "--reverse", commit, "--", manifestPath]).split("\n").filter(Boolean).slice(0, 512);
++    for (const revision of revisions) {
++      let manifest;
++      try { manifest = JSON.parse(run(["show", `${revision}:${manifestPath}`])); } catch { continue; }
++      for (const entry of Array.isArray(manifest?.artifacts) ? manifest.artifacts : []) {
++        if (entry?.class !== "candidate-evidence" || typeof entry.path !== "string") continue;
++        const row = run(["ls-tree", "-z", revision, "--", entry.path]);
++        if (!/^100644 blob [a-f0-9]{40,64}\t/u.test(row) || !row.endsWith(`\t${entry.path}\0`)) return { commit: revision, path: entry.path };
++      }
++    }
++    return null;
++  } catch { return null; }
++}
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 174febef8e650db4f024c65bc463312c93760950..383131793e2de2a835844b397b216bfbe5a40c20 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -16,6 +16,7 @@ import { validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+ import { validateCriticDispositionAddendum } from "./critic-disposition-addendum.mjs";
+ import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
+ import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
++import { locateCourseEvidenceGap } from "./course-evidence-gap.mjs";
+ 
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const MODES = new Set(["full", "delta"]);
+@@ -44,28 +45,8 @@ const fail = (code, detail = null) => { throw new CriticCourseAdmissionError(cod
+  * 2026-11-10), so the one way on is a new feature. This text says so, with the commit and the path.
+  */
+ export const COURSE_EVIDENCE_GAP_CODES = Object.freeze(["CCA-EVIDENCE-MODE", "CCA-EVIDENCE-READ"]);
+-/**
+- * Read-only: the first manifest revision (oldest first, up to `commit`) that lists a candidate-evidence path its own commit
+- * does not hold as a regular file, as { commit, path }, or null. Used only to name the gap in a refusal text; it decides nothing.
+- */
+-export function locateCourseEvidenceGap({ repoRoot, featureId, commit }) {
+-  try {
+-    if (typeof repoRoot !== "string" || !FEATURE_ID.test(featureId ?? "") || !OID.test(commit ?? "")) return null;
+-    const manifestPath = `specs/${featureId}/lifecycle.json`;
+-    const run = (args) => execFileSync("git", ["-C", repoRoot, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 * 1024 * 1024 });
+-    const revisions = run(["rev-list", "--reverse", commit, "--", manifestPath]).split("\n").filter(Boolean).slice(0, 512);
+-    for (const revision of revisions) {
+-      let manifest;
+-      try { manifest = JSON.parse(run(["show", `${revision}:${manifestPath}`])); } catch { continue; }
+-      for (const entry of Array.isArray(manifest?.artifacts) ? manifest.artifacts : []) {
+-        if (entry?.class !== "candidate-evidence" || typeof entry.path !== "string") continue;
+-        const row = run(["ls-tree", "-z", revision, "--", entry.path]);
+-        if (!/^100644 blob [a-f0-9]{40,64}\t/u.test(row) || !row.endsWith(`\t${entry.path}\0`)) return { commit: revision, path: entry.path };
+-      }
+-    }
+-    return null;
+-  } catch { return null; }
+-}
++// The locator (read only, names the gap in a refusal text, decides nothing here) lives in its own file so the State writer can use it too.
++export { locateCourseEvidenceGap };
+ 
+ export function courseEvidenceGapText(code, detail) {
+   if (!COURSE_EVIDENCE_GAP_CODES.includes(code)) return null;
+@@ -74,7 +55,9 @@ export function courseEvidenceGapText(code, detail) {
+     : "a revision of the feature manifest lists an evidence file that its own commit does not hold as a regular file";
+   return `The Critic course of this feature cannot be read (${code}): ${where}. `
+     + "Every course read checks each manifest revision, so this stays true for every later round and takeover of this feature, and history is not rewritten. "
+-    + "Continue the remaining work as a new feature of rigor 1 (its own PRD and Spec) and run a full Critic over its commits.";
++    + "Continue the remaining work as a new feature of rigor 1 (its own PRD and Spec) and run a full Critic over its commits. "
++    + "Before that, the PO ends this feature in the PO's own terminal: node ${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-state.mjs discard-feature --by \"<the PO's name>\" --reason \"<why>\" "
++    + "(admitted with a bound Result only because of this damaged course; the agent never supplies the name).";
+ }
+ 
+ // PF-34: the one refusal whose repair is a sanctioned command. The decision object's keys stay
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 560a6ae952d6fea40987bbbb5d03136bed6c23c7..58266630a96fe0b759e877bcc72bc64a115e4977 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -594,6 +594,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/onboarding-initial-answers-transaction.mjs",
+   "plugins/pipeline-core/lib/onboarding-later-language.mjs",
+   "plugins/pipeline-core/lib/critic-course-admission.mjs",
++  // The damaged-course locator: the State writer admits a discard with a bound Result only on its finding.
++  "plugins/pipeline-core/lib/course-evidence-gap.mjs",
+   // The selector/bootstrap and protected design gates are transitively closed
+   // over these authorities, host observations, evidence readers, and their
+   // sandbox contract. A maintenance window must not rewrite the route, its
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-discard-feature.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-discard-feature.test.mjs
+index bd355ed5f306d331c5104855171303fd6b034798..ba103fca96e19dda2148719ef1d7347918d21671 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-discard-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-discard-feature.test.mjs
+@@ -100,6 +100,58 @@ test("AC-2: discard-feature refuses when continuity.authority.result already exi
+   }
+ });
+ 
++// PO tile 2026-11-10 (Codex greenfield, candidate 27): a bound Result plus a damaged Critic course history is a dead end
++// (close needs the course, submit-plan is busy, set-feature refuses). The discard is admitted for exactly that case.
++function damagedCourseFixture({ damaged }) {
++  const featureId = "abandoned-feature";
++  const state = stuckState({ continuity: { authority: { result: { path: "specs/abandoned-feature/result.md", sha256: "a".repeat(64) } } } });
++  const { root, statePath } = fixture(state);
++  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
++  git("config", "commit.gpgsign", "false");
++  const put = (rel, text) => { mkdirSync(join(root, rel, ".."), { recursive: true }); writeFileSync(join(root, rel), text); };
++  const evidencePath = `specs/${featureId}/evidence/final-candidate-verify.json`;
++  put(`specs/${featureId}/lifecycle.json`, `${JSON.stringify({ artifacts: [] })}\n`);
++  git("add", "--", `specs/${featureId}/lifecycle.json`);
++  git("commit", "-q", "-m", "base");
++  put(evidencePath, "{}\n");
++  put(`specs/${featureId}/lifecycle.json`, `${JSON.stringify({ artifacts: [{ class: "candidate-evidence", path: evidencePath, sha256: "b".repeat(64) }] })}\n`);
++  if (damaged) {
++    git("add", "--", `specs/${featureId}/lifecycle.json`);
++    git("commit", "-q", "-m", "manifest alone");
++  }
++  git("add", "--", `specs/${featureId}`);
++  git("commit", "-q", "-m", damaged ? "evidence later" : "manifest with its evidence");
++  return { root, statePath, gapCommit: damaged ? git("rev-parse", "HEAD~1").trim() : null, evidencePath };
++}
++
++test("PO tile 2026-11-10: with a bound Result, a damaged Critic course admits the discard, records the gap, and set-feature works again", () => {
++  const { root, statePath, gapCommit, evidencePath } = damagedCourseFixture({ damaged: true });
++  try {
++    assert.equal(run(["discard-feature", "--by", "PO", "--reason", "Critic course damaged; continue as a new feature"], { dir: root, now: () => "2026-11-10T21:30:00.000Z" }), 0);
++    const after = readState(statePath);
++    assert.equal(Object.hasOwn(after, "activeFeature"), false);
++    assert.equal(Object.hasOwn(after, "continuity"), false);
++    const entry = after.discardedFeatures.at(-1);
++    assert.deepEqual(entry.damagedCriticCourse, { commit: gapCommit, path: evidencePath, result: { path: "specs/abandoned-feature/result.md", sha256: "a".repeat(64) } });
++    assert.equal(entry.discardedBy, "PO");
++    assert.equal(run(["set-feature", "--id", "next-feature", "--plan-path", "specs/next/prd.md"], { dir: root, now: () => "2026-11-10T21:31:00.000Z" }), 0);
++    assert.equal(readState(statePath).activeFeature.id, "next-feature");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("PO tile 2026-11-10: with a bound Result and an intact course history the discard still refuses, zero write", () => {
++  const { root, statePath } = damagedCourseFixture({ damaged: false });
++  try {
++    const before = readFileSync(statePath, "utf8");
++    assert.equal(run(["discard-feature", "--by", "PO", "--reason", "changed mind"], { dir: root, now: () => "2026-11-10T21:30:00.000Z" }), 2);
++    assert.equal(readFileSync(statePath, "utf8"), before);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
+ test("AC-2: close-feature is structurally unsatisfiable in the stuck state (Result null, no request), proving the deadlock", () => {
+   const { root, statePath } = fixture(stuckState());
+   try {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index d0e9f2d89f52fb7e03f63460687536c9bbe41a38..2b6b5ace18507bf6583a4a1974c8c505068f53c2 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -472,6 +472,7 @@ import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib
+ import {coverOnboardingOutput} from '../lib/onboarding-consent-scope.mjs';
+ import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
+ import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
++import { locateCourseEvidenceGap } from "../lib/course-evidence-gap.mjs";
+ import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
+ import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
+ import { rebindApproval } from "../lib/rebind-approval.mjs";
+@@ -14129,14 +14130,23 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       // unconditionally, so this refuses and names it; continuity present with a Result
+       // already means the close ceremony is available, so this refuses for the same reason.
+       // Never widen this to a heuristic ("was anything implemented").
++      // The one exception (PO tile 2026-11-10, Codex greenfield): with a bound Result, close-feature is
++      // unsatisfiable as well when the feature's Critic course history is damaged (a manifest revision lists
++      // evidence its own commit lacks), because every course read refuses for good. Only that located gap
++      // admits the discard, and the record names it.
++      const discardHead = gitHead(dir);
++      let courseGap = null;
+       if (base.continuity === undefined) {
+         // A legacy state with no continuity cannot satisfy the current coordinator-close
+         // contract.  Record an honest discard instead of falsely advertising close-feature.
+       } else if (base.continuity.authority.result !== null) {
+-        console.error('Error: discard-feature refused -- continuity.authority.result already exists; close-feature is the route that is available.');
+-        return 2;
++        courseGap = discardHead.ok ? (deps.locateCourseEvidenceGapFn ?? locateCourseEvidenceGap)({ repoRoot: dir, featureId: activeFeature.id, commit: discardHead.commit }) : null;
++        if (courseGap === null) {
++          console.error('Error: discard-feature refused -- continuity.authority.result already exists; close-feature is the route that is available. A discard with a bound Result is admitted only when the feature\'s Critic course history is damaged (a feature manifest revision lists evidence its own commit does not hold), and none was found.');
++          return 2;
++        }
++        console.error(`discard-feature: the Critic course of this feature is damaged (commit ${courseGap.commit} lists ${courseGap.path}, which that commit does not hold), so close-feature cannot run; the discard records it.`);
+       }
+-      const discardHead = gitHead(dir);
+       let discardForCommit = null;
+       if (discardHead.ok) {
+         discardForCommit = discardHead.commit;
+@@ -14155,6 +14165,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         reason,
+         forCommit: discardForCommit,
+       };
++      if (courseGap !== null) discardedEntry.damagedCriticCourse = { commit: courseGap.commit, path: courseGap.path, result: base.continuity.authority.result };
+       if (base.planCancellation !== undefined) discardedEntry.planCancellation = base.planCancellation;
+       if (base.planMixedStateRecovery !== undefined) discardedEntry.planMixedStateRecovery = base.planMixedStateRecovery;
+       const discardNext = {

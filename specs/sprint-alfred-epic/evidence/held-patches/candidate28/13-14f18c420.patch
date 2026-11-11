@@ -1,0 +1,76 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index e60563655b993c09990c5d8ba3c76ee24b32e3bd..c3e6b81b318ea385891643a88b423992af880baa 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -13223,6 +13223,7 @@ function rrAdmitted(path) {
+     `${process.execPath} ${RR_SCRIPT} list`,
+     `node ${RR_SCRIPT} run heal ${flags}`,
+     `node ${RR_SCRIPT} run heal --reason ${reason} --root ${path}`,
++    `node ${RR_SCRIPT} run heal ${flags} --no-goldfish-running`,
+     `node ${RR_SCRIPT} run stop-failure-aside ${flags}`,
+     `node ${RR_SCRIPT} run settled-pending-aside ${flags}`,
+     `node ${RR_SCRIPT} run move-aside ${flags} --no-goldfish-running`,
+@@ -13247,7 +13248,8 @@ function rrRefused(path) {
+     `node ${RR_SCRIPT} run heal ${flags} --reason ${reason}`,
+     `node ${RR_SCRIPT} run heal ${flags} --root ${path}`,
+     `node ${RR_SCRIPT} run heal ${flags} stray`,
+-    `node ${RR_SCRIPT} run heal ${flags} --no-goldfish-running`,
++    `node ${RR_SCRIPT} run heal ${flags} --no-goldfish-running --no-goldfish-running`,
++    `node ${RR_SCRIPT} run heal ${flags} --started`,
+     `node ${RR_SCRIPT} run heal ${flags} --class budget`,
+     `node ${RR_SCRIPT} run move-aside ${flags}`,
+     `node ${RR_SCRIPT} run slice-cancel ${flags} --class budget`,
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index a96abc6b63d2d3b0fbafdfe51a6b54861310d72a..6ef96de72baca23c52d26c83b407d74eda00d3d4 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -15,7 +15,7 @@ import { readState as readDesignCourseState } from "../../scripts/pipeline-state
+ import { RUNNER_CAPABILITIES_SCRIPT, CHECK_PRIVATE_IDENTIFIERS_SCRIPT, CHECK_PO_GATE_AUTHORITY_SCRIPT, ANALYSIS_RUN_SCRIPT, AUDIT_PACK_SCRIPT, HUMAN_APPROVAL_TRACE_SCRIPT,AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, CREATE_ADR_SCRIPT, BIND_ADR_PROPOSALS_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { MODULE_SLICE_PROPOSAL_SCRIPT } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+-import { isNodeInterpreterWord, relativeUnderRoot, samePathSpelling } from "../path-spelling.mjs";
++import { isNodeInterpreterWord, relativeUnderRoot, sameNativePath, samePathSpelling } from "../path-spelling.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+ import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
+ 
+@@ -572,6 +572,8 @@ function sanctionedRoutineRepairArgs(args, root) {
+   if (kind === "move-aside") {
+     return positional.length === 0 && values.size === 2 && booleans.size === 1 && booleans.has("--no-goldfish-running");
+   }
++  // heal names --no-goldfish-running as its own next step when a member was left in flight (lib/routine-repair.mjs), so the flag has to be reachable here.
++  if (kind === "heal") return positional.length === 0 && values.size === 2 && !booleans.has("--started");
+   return positional.length === 0 && values.size === 2 && booleans.size === 0;
+ }
+ 
+@@ -703,7 +705,9 @@ export function scriptHelpRefusalHint(command, root, options = {}) {
+   return `${name} has no usable help: ${resolved.args[0]} would start the script or be refused by it without a usage text, so it is refused here. This refusal is about that, not about the feature's lifecycle. Read the comment at the top of ${resolved.script} for its usage.`;
+ }
+ 
+-function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
++function sanctionedLifecycleScriptArgs(script, typedArgs, root, options = {}) {
++  // Every shape below compares its root argument byte for byte. `D:/x` and `D:\x` name one folder on Windows, so the check sees the canonical spelling; Linux keeps its one spelling.
++  const args = typedArgs.map((arg) => (typeof arg === "string" && arg !== root && sameNativePath(arg, root, { platform: options.platform, lstatFn: options.lstatFn }) ? root : arg));
+   if (isAnsweredScriptHelp(script, args, options)) return true;
+   if (script === PROOF_WAIT_SCRIPT) return sanctionedProofWaitArgs(args, root);
+   if (script === SESSION_AUTHORITY_REPAIR_SCRIPT) return sanctionedSessionAuthorityRepairReadArgs(args, root);
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.path-spelling.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.path-spelling.test.mjs
+index 66101cbcfcd08cd4214bc77b229981d5ebf05adf..11293c2cbdfc50041f0f3f307ed8eb41f525822d 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.path-spelling.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.path-spelling.test.mjs
+@@ -47,6 +47,16 @@ function assertRecognised(spelling, expected, label) {
+   }
+ }
+ 
++// Live on native Windows, 2026-11-10: `--root D:/x` was refused while the root reads `D:\x`, and the repair stayed out of reach. Comparison-only, so the injected platform is enough.
++test("FSLASH: a root argument in another spelling of the same folder is admitted on Windows and stays refused on Linux", () => {
++  const repair = fileURLToPath(new URL("./routine-repair.mjs", import.meta.url));
++  const command = (root) => `node '${repair}' run heal --root '${root}' --reason 'routine' --no-goldfish-running`;
++  assert.equal(isSanctionedLifecycleCommand(command(ROOT), ROOT), true, "the root's own spelling");
++  assert.equal(isSanctionedLifecycleCommand(command(swapCase(ROOT)), ROOT, { platform: "win32" }), true, "same folder, other spelling");
++  assert.equal(isSanctionedLifecycleCommand(command(`${ROOT}-other`), ROOT, { platform: "win32" }), false, "another folder");
++  assert.equal(isSanctionedLifecycleCommand(command(swapCase(ROOT)), ROOT, { platform: "linux" }), false, "Linux has one spelling");
++});
++
+ test("FSLASH: the canonical backslash spelling is recognised by the receipt trigger and the lifecycle admission", { skip: NOT_WIN32 }, () => {
+   assertRecognised(SCRIPT, true, "backslash, as cased");
+ });

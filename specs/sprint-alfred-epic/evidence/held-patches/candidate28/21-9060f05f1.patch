@@ -1,0 +1,133 @@
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 0115f08eb22deebdf62c9bfa2291c3a40369f924..4cfeb76b2c8777bfbd41badbe35cb72450afa090 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -15,7 +15,7 @@ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { observeGovernanceScope } from "../governance-scope.mjs";
+ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
+ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+-import { firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, recursiveGrepHint, repeatedFlagHint } from "../read-command-diagnosis.mjs";
++import { EXTERNAL_DIRECTORY_FILTER_HINT, filterRefusedOnExternalDirectory, firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, recursiveGrepHint, repeatedFlagHint } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+ import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+ import { controlPlaneScriptBlocked, controlPlaneScriptHit } from "./control-plane-script-scan.mjs";
+@@ -545,8 +545,10 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       let glob = null;
+       let listing = null;
+       let recursiveSearch = null;
++      let externalFilter = null;
+       if (!outsideRoot) {
+         const readCommand = input.tool_input.command ?? input.tool_input.CommandLine;
++        try { externalFilter = filterRefusedOnExternalDirectory(readCommand, root); } catch { externalFilter = null; }
+         // F9: a rejected rg glob value is named first, with the forms that are admitted (the value, not the -g flag, is the fault).
+         try { glob = firstUnadmittedGlobValue(readCommand, root); } catch { glob = null; }
+         if (glob === null) {
+@@ -561,6 +563,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       }
+       const spelling = flag === null ? null : (flagSpellingHint(flag) ?? listing);
+       const rejected = glob !== null ? `the glob value "${glob}" (${GLOB_FORM_HINT})`
++        : externalFilter !== null ? `the filter "${externalFilter}" (${EXTERNAL_DIRECTORY_FILTER_HINT})`
+         : flag === null ? (recursiveSearch === null ? null : `the tree this recursive search reads (an admitted spelling of the same search: \`${recursiveSearch}\`)`)
+           : `the flag "${flag}"${spelling === null ? "" : ` (${spelling})`}`;
+       return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejected));
+diff --git a/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs b/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
+index 1d9d22c28e9a92888d2d193fa1012a90331ac305..1b9d4ed25a4b02ca0bd44687c8c1e0c092f57bda 100644
+--- a/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
+@@ -3,6 +3,7 @@
+ import assert from "node:assert/strict";
+ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
+ import { isBoundedReadOnlyPipeline, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { evaluateLifecycleReadyGuard } from "./evaluate.mjs";
+ import { isMissingSingleReadTarget } from "./read-scope.mjs";
+@@ -32,6 +33,29 @@ function fixture(run) {
+   finally { rmSync(base, { recursive: true, force: true }); }
+ }
+ 
++test("a read of the plugin's own files is never reported as outside the project when a flag or value is the fault", () => fixture(({ guard }) => {
++  const pluginRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
++  const overLimit = guard(`rg -n "a" ${join(pluginRoot, "lib/guard/verdict.mjs")} --max-columns 620`);
++  assert.equal(overLimit.exitCode, 2);
++  assert.match(overLimit.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u);
++  assert.match(overLimit.stderr, /--max-columns|flags or spelling/u);
++  const filtered = guard(`rg -n "a" ${join(pluginRoot, "templates")} --glob "*.md"`);
++  assert.equal(filtered.exitCode, 2);
++  assert.match(filtered.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u);
++  assert.match(filtered.stderr, /the filter "--glob"/u);
++  assert.equal(guard(`rg -n "a" ${join(pluginRoot, "templates")}`).exitCode, 0);
++}));
++
++test("a target truly outside the project keeps the scope refusal, and a missing plugin file keeps its own text", () => fixture(({ outside, guard }) => {
++  const outsideRead = guard(`rg -n "a" ${join(outside, "ordinary.txt")} --max-columns 620`);
++  assert.equal(outsideRead.exitCode, 2);
++  assert.match(outsideRead.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
++  const pluginRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
++  const missing = guard(`rg -n "a" ${join(pluginRoot, "lib/guard/does-not-exist.mjs")} --max-columns 620`);
++  assert.equal(missing.exitCode, 2);
++  assert.match(missing.stderr, /GUARD-READ-TARGET-MISSING/u);
++}));
++
+ test("original quoted test-file narrowing is admitted through parser and actual guard", () => fixture(({ root, parse, guard }) => {
+   for (const path of ["plugins/pipeline-core", `'${join(root, "plugins/pipeline-core")}'`]) {
+     const command = `rg --files ${path} -g '*.test.mjs' | rg '(domain-owner|authority-registry|managed|journal)'`;
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index 9b7ace48bdba64ff046a253aa546b14c17e28bcc..82e841d21f6e9c19ef83d8116091601ad7bed0ba 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -1182,7 +1182,11 @@ export function qp4OperandResolvesOutsideRoot(parsed, root) {
+   return operands.some((token) => {
+     if (typeof token !== "string" || token.includes("\0")) return false;
+     const candidate = rawReadCandidatePath(token, root);
+-    return candidate !== null && !pathInside(rootResolved, resolve(candidate));
++    if (candidate === null || pathInside(rootResolved, resolve(candidate))) return false;
++    // Label only. An existing file in the plugin's own approved read root is not the cause when a read of it is refused: the flag or value is,
++    // and "outside the project" would send the agent looking for another path. A plugin path that does not exist keeps this label, because
++    // the caller then prints the missing-plugin-file text.
++    return !(existsSync(candidate) && BOUNDED_PIPELINE_ADDITIONAL_ROOTS.some((approved) => isRealpathedWithinBoundary(candidate, approved)));
+   });
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+index fc39032d9b9258bfca00897608bf4e55aa4c315d..a39e646ad823f346f8168b207291c25dfc135177 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+@@ -49,6 +49,37 @@ export function firstUnadmittedGlobValue(command, root) {
+   return null;
+ }
+ 
++export const EXTERNAL_DIRECTORY_FILTER_HINT = "a filename filter is admitted for a search inside the project, not for a directory outside it; "
++  + "search that directory without the filter, or name one file";
++
++/**
++ * Names the filename filter when it is the whole reason an `rg` search of an approved directory outside the project is refused: the same
++ * command without every `-g`/`--glob` pair is admitted. The filter stays refused there; this only says so. Same contract as above.
++ * @returns {string|null} the filter flag (as written), else null.
++ */
++export function filterRefusedOnExternalDirectory(command, root) {
++  if (typeof command !== "string" || command.trim() === "") return null;
++  let parsed;
++  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
++  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
++    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
++  const { executable, argv } = parsed.segments[0];
++  if (String(executable).split("/").pop() !== "rg" || isReadOnlyDiagnosticCommand(command, root)) return null;
++  const endOfOptions = argv.indexOf("--");
++  const limit = endOfOptions === -1 ? argv.length : endOfOptions;
++  const dropped = new Set();
++  let flag = null;
++  for (let index = 0; index < limit - 1; index += 1) {
++    if (argv[index] !== "-g" && argv[index] !== "--glob") continue;
++    flag ??= argv[index];
++    dropped.add(index).add(index + 1);
++    index += 1;
++  }
++  if (flag === null) return null;
++  const rest = argv.filter((_, position) => !dropped.has(position));
++  return isReadOnlyDiagnosticCommand([executable, ...rest.map(quote)].join(" "), root) ? flag : null;
++}
++
+ /**
+  * F9 (candidate 19): a flag written with its value attached (`-A8`, `-m5`, `--max-count=5`) is refused by the grammar, which takes the value as a
+  * separate argument. Returns one sentence naming the spelling to use, or null for any other flag. Prose only; it grants nothing.
