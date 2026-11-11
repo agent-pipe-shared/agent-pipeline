@@ -66,6 +66,8 @@ test("Goldfish on Antigravity names invoke_subagent and adds no preparation step
   const result = prepareGoldfishDispatch(input, { ...withRunner("antigravity"), runCommand: steps.runCommand });
   assert.equal(result.next.tool, "invoke_subagent");
   assert.equal(result.next.briefing, "scratch/w1.briefing.md");
+  // Antigravity greenfield 2026-11-10: the run chose Workspace "inherit" and was refused AGY-NATIVE-WORKSPACE-NOT-ISOLATED.
+  assert.match(result.next.arguments, /Workspace is "branch"/u);
   assert.equal(steps.calls.length, 2);
 });
 

@@ -105,7 +105,7 @@ export function prepareGoldfishDispatch({ root, packagePath, out = null, noGoldf
     return outcome(verb, "ready", { ...common, next: { tool: "spawn_agent", ...prepared.value.spawn_agent, ...(prepared.value.bindWindowSeconds === undefined ? {} : { bindWindowSeconds: prepared.value.bindWindowSeconds }), note: prepared.value.next ?? null } });
   }
   if (runner === "antigravity") {
-    return outcome(verb, "ready", { ...common, next: { tool: "invoke_subagent", arguments: "flat, one child per call: TypeName is the bare role name, Prompt is the briefing file verbatim including its final newline", briefing, reference: "skills/pipeline-start/references/antigravity-native-dispatch.md" } });
+    return outcome(verb, "ready", { ...common, next: { tool: "invoke_subagent", arguments: "flat, one child per call: TypeName is the bare role name, Prompt is the briefing file verbatim including its final newline, Workspace is \"branch\" (a code-writing child runs in its own worktree; AGY-NATIVE-WORKSPACE-NOT-ISOLATED refuses any other)", briefing, reference: "skills/pipeline-start/references/antigravity-native-dispatch.md" } });
   }
   return outcome(verb, "ready", { ...common, next: built.value.dispatchCall ?? null });
 }
