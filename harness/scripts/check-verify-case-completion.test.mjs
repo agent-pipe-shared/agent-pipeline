@@ -173,6 +173,9 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // Restated 2026-11-08 (split without a module plan, then delivery records, QG-04, extension only): critic-dispatch-preflight 488->508->520, measured with the unchanged classifier; only this number changes.
   // Restated 2026-11-09 (candidate 22, QG-04, extension only): three sites counts were outgrown by their suites, measured on the candidate 22 chain with the unchanged classifier:
   // critic-dispatch-preflight 527->544, critic-generic-batch 119->157, guard-dispatch-budget-checkpoint 169->178. Only these three numbers change and close-path-e2e-tests leaves the list (see its comment).
+  // Restated 2026-11-10 (candidate 28, QG-04, extension only): six sites counts were outgrown by their suites, measured on the candidate 28 chain with the unchanged classifier:
+  // critic-course-admission 349->353, critic-dispatch-preflight 544->563, devplan-shell-sanctioned-recovery 40->46, g23-read-help 36->51, native-goldfish-host-stop-pair 66->71,
+  // windows-authority-readiness 69->76. Only these six numbers change; names, paths, classifications and the other counts stay as pinned, and no assertion is weakened.
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",36],
@@ -196,8 +199,8 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
-    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",349],
-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",544], // cand. 21 (QG-04: extension only): the move into the state archive and the printed refusal reason; before that cand. 20 w252: G20-11 retained prior result cases, measured
+    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",353],
+    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",563], // cand. 21 (QG-04: extension only): the move into the state archive and the printed refusal reason; before that cand. 20 w252: G20-11 retained prior result cases, measured
     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",157], // cand. 20 w252 (QG-04: extension only), measured
     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
@@ -214,13 +217,13 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["design-workflow-candidate-binding-tests","plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs","top-level-assertions",13],
     ["design-workflow-package-builder-tests","plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs","top-level-assertions",28],
     ["devplan-shell-lane-recovery-tests","plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs","top-level-assertions",14],
-    ["devplan-shell-sanctioned-recovery-tests","plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs","top-level-assertions",40],
+    ["devplan-shell-sanctioned-recovery-tests","plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs","top-level-assertions",46],
     ["doc-reader-course-budget-tests","harness/scripts/doc-reader-course-budget.test.mjs","top-level-assertions",8],
     ["fanout-governor-tests","plugins/pipeline-core/lib/fanout-governor.test.mjs","top-level-assertions",273],
     ["fanout-ledger-tests","plugins/pipeline-core/lib/fanout-ledger.test.mjs","top-level-assertions",62],
     ["g17-publication-observation-tests","plugins/pipeline-core/lib/g17-publication-observation.test.mjs","top-level-assertions",31],
     ["g23-quoted-pipeline-reads-tests","plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs","top-level-assertions",19],
-    ["g23-read-help-tests","plugins/pipeline-core/lib/guard/g23-read-help.test.mjs","top-level-assertions",36],
+    ["g23-read-help-tests","plugins/pipeline-core/lib/guard/g23-read-help.test.mjs","top-level-assertions",51],
     ["g29-public-handover-admission-tests","plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs","top-level-assertions",3],
     ["g6-aggregate-native-boundaries-tests","plugins/pipeline-core/hooks/g6-aggregate-native-boundaries.test.mjs","top-level-assertions",6],
     ["git-hook-runtime-snapshot-fast-verify-tests","plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs","top-level-assertions",57],
@@ -243,7 +246,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["model-family-approval-request-tests","plugins/pipeline-core/scripts/model-family-approval-request.test.mjs","top-level-assertions",49],
     ["native-goldfish-host-parallel-admission-tests","plugins/pipeline-core/lib/native-goldfish-host-parallel-admission.test.mjs","top-level-assertions",29], // cand. 19i w236/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
     ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",82], // cand. 21 (QG-04: extension only): NGFO01 gained the bounded Windows race retry; cand. 20 w252 G20-4 release retry cases (QG-04: extension only), measured; cand. 19l w250 (QG-04: extension only): NGFO01 gained the binding-change retry and terminal-round cases, measured with the unchanged classifier
-    ["native-goldfish-host-stop-pair-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs","top-level-assertions",66], // cand. 19j w242/w244, 19k w245/w246 (QG-04: extension only): new suite, measured with the unchanged classifier; 19k added NGSP6-NGSP9D
+    ["native-goldfish-host-stop-pair-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs","top-level-assertions",71], // cand. 19j w242/w244, 19k w245/w246 (QG-04: extension only): new suite, measured with the unchanged classifier; 19k added NGSP6-NGSP9D
     ["native-goldfish-host-stop-read-scope-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs","top-level-assertions",46], // cand. 19i w237/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
     ["native-platform-process-observer-tests","plugins/pipeline-core/lib/native-platform-process-observer.test.mjs","top-level-assertions",20],
     ["onboarding-greenfield-walk-tests","plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs","top-level-assertions",16],
@@ -280,7 +283,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["stop-fanout-tests","plugins/pipeline-core/hooks/stop-fanout.test.mjs","top-level-assertions",94],
     ["verify-case-completion-augmentation-policy-tests","harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs","top-level-assertions",8],
     ["verify-run-record-tests","plugins/pipeline-core/lib/verify-run-record.test.mjs","top-level-assertions",24],
-    ["windows-authority-readiness-tests","plugins/pipeline-core/lib/windows-authority-readiness.test.mjs","top-level-assertions",69],
+    ["windows-authority-readiness-tests","plugins/pipeline-core/lib/windows-authority-readiness.test.mjs","top-level-assertions",76],
   ];
   const registry = JSON.parse(readFileSync(join(REPO_ROOT, DEFAULT_REGISTRY), "utf8"));
   const classified = registry.entries.flatMap((entry) => {

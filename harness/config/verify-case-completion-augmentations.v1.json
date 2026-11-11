@@ -142,7 +142,8 @@
           "TCP050",
           "TCP051",
           "TCP052",
-          "TCP053"
+          "TCP053",
+          "TCP054"
         ],
         "maxBytes": 65536
       }
@@ -301,6 +302,7 @@
       "caseCompletion": {
         "schema": "pipeline.verify-case-completion-policy.v1",
         "caseIds": [
+          "C27-readiness-lock-is-not-a-held-dependency",
           "D177-a-memo-per-admission",
           "D177-b-member-records-once-per-admission",
           "D177-c-batch-member-records-equal-single",
@@ -379,7 +381,9 @@
           "NGHS65",
           "NGHS66",
           "NGHS67",
-          "NGHS68"
+          "NGHS68",
+          "NGHS69",
+          "NGHS70"
         ],
         "maxBytes": 65536
       }
@@ -474,7 +478,8 @@
           "CCA082",
           "CCA083",
           "CCA084",
-          "CCA085"
+          "CCA085",
+          "CCA086"
         ],
         "maxBytes": 65536
       }
@@ -590,7 +595,12 @@
           "CDPF103",
           "CDPF104",
           "CDPF105",
-          "CDPF106"
+          "CDPF106",
+          "CDPF107",
+          "CDPF108",
+          "CDPF109",
+          "CDPF110",
+          "CDPF111"
         ],
         "maxBytes": 65536
       }
@@ -619,6 +629,9 @@
           "NGHF-TF4",
           "NGHF01",
           "NGHF01-DEEP",
+          "NGHF01-DEEP-C23A",
+          "NGHF01-DEEP-C23B",
+          "NGHF01-DEEP-C23C",
           "NGHF01-P3",
           "NGHF02",
           "NGHF03",
@@ -662,7 +675,14 @@
           "NGHF39",
           "NGHF40",
           "NGHF41",
-          "NGHF42"
+          "NGHF42",
+          "NGHF43",
+          "NGHF44",
+          "NGHF45",
+          "NGHF46",
+          "NGHF47",
+          "NGHF48",
+          "NGHF49"
         ],
         "maxBytes": 65536
       }
@@ -907,7 +927,8 @@
           "DLR053",
           "DLR054",
           "DLR055",
-          "DLR056"
+          "DLR056",
+          "DLR057"
         ],
         "maxBytes": 65536
       }
@@ -1904,7 +1925,8 @@
           "AHC13",
           "AHC14",
           "AHC15",
-          "AHC16"
+          "AHC16",
+          "AHC17"
         ],
         "maxBytes": 65536
       },
@@ -2070,7 +2092,10 @@
           "RPM57",
           "RPM58",
           "RPM59",
-          "RPM60"
+          "RPM60",
+          "RPM61",
+          "RPM62",
+          "RPM63"
         ],
         "maxBytes": 65536
       },
@@ -2355,7 +2380,10 @@
           "GD82",
           "GD83",
           "GD84",
-          "GD85"
+          "GD85",
+          "GD86",
+          "GD87",
+          "GD88"
         ],
         "maxBytes": 65536
       },
@@ -2525,7 +2553,8 @@
           "DRW43",
           "DRW44",
           "DRW45",
-          "DRW46"
+          "DRW46",
+          "DRW47"
         ],
         "maxBytes": 65536
       },
@@ -2593,7 +2622,10 @@
           "NGHR08",
           "NGHR09",
           "NGHR10",
-          "NGHR11"
+          "NGHR11",
+          "NGHR12",
+          "NGHR13",
+          "NGHR14"
         ],
         "maxBytes": 65536
       },
@@ -2727,7 +2759,9 @@
           "WAR015",
           "WAR016",
           "WAR017",
-          "WAR018"
+          "WAR018",
+          "WAR019",
+          "WAR020"
         ],
         "maxBytes": 65536
       },
@@ -2908,6 +2942,313 @@
         "maxBytes": 65536
       },
       "previousPolicySha256": "a64de0159ca8d5fc2448cbd7b963378396262cc82e6b7d3f74db9a0aef141142"
+    },
+    {
+      "name": "codex-critic-host-tests",
+      "file": "plugins/pipeline-core/scripts/codex-critic-host.test.mjs",
+      "previousPolicySha256": "a5f50c99e424ed234c7960f159ec36400b0ac51e63f785bb11f82e89cbccf815",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CCH001",
+          "CCH002",
+          "CCH003",
+          "CCH004",
+          "CCH005",
+          "CCH006",
+          "CCH007",
+          "CCH008",
+          "CCH009",
+          "CCH010",
+          "CCH011",
+          "CCH012",
+          "CCH013",
+          "CCH014",
+          "CCH015",
+          "CCH016",
+          "CCH017",
+          "CCH018",
+          "CCH019",
+          "CCH020",
+          "CCH021",
+          "CCH022",
+          "CCH023",
+          "CCH024",
+          "CCH025",
+          "CCH026",
+          "CCH027",
+          "CCH028",
+          "CCH029",
+          "CCH030",
+          "CCH031",
+          "CCH032",
+          "CCH033",
+          "CCH034",
+          "CCH035",
+          "CCH036",
+          "CCH037",
+          "CCH038",
+          "CCH039",
+          "CCH040",
+          "CCH041",
+          "CCH042",
+          "CCH043",
+          "CCH044",
+          "CCH045",
+          "CCH046",
+          "CCH047",
+          "CCH048",
+          "CCH049",
+          "CCH050",
+          "CCH051",
+          "CCH052",
+          "CCH053",
+          "CCH054",
+          "CCH055",
+          "CCH056",
+          "CCH057",
+          "CCH058",
+          "CCH059",
+          "CCH060",
+          "CCH061",
+          "CCH062",
+          "CCH063",
+          "CCH064",
+          "CCH065",
+          "CCH066",
+          "CCH067",
+          "CCH068",
+          "CCH069",
+          "CCH070",
+          "CCH071",
+          "CCH072",
+          "CCH073",
+          "CCH074",
+          "CCH075",
+          "CCH076",
+          "CCH077",
+          "CCH078",
+          "CCH079",
+          "CCH080",
+          "CCH081",
+          "CCH082",
+          "CCH083",
+          "CCH084",
+          "CCH085",
+          "CCH086",
+          "CCH087",
+          "CCH088",
+          "CCH089",
+          "CCH090",
+          "CCH091",
+          "CCH092",
+          "CCH093",
+          "CCH094",
+          "CCH095",
+          "CCH096",
+          "CCH097",
+          "CCH098",
+          "CCH099",
+          "CCH100",
+          "CCH101",
+          "CCH102",
+          "CCH103",
+          "CCH104",
+          "CCH105",
+          "CCH106",
+          "CCH107",
+          "CCH108",
+          "CCH109",
+          "CCH110",
+          "CCH111",
+          "CCH112",
+          "CCH113",
+          "CCH114",
+          "CCH115",
+          "CCH116",
+          "CCH117",
+          "CCH118",
+          "CCH119",
+          "CCH120",
+          "CCH121",
+          "CCH122",
+          "CCH123",
+          "CCH124",
+          "CCH125",
+          "CCH126",
+          "CCH127",
+          "CCH128",
+          "CCH129",
+          "CCH130",
+          "CCH131",
+          "CCH132",
+          "CCH133",
+          "CCH134",
+          "CCH135",
+          "CCH136",
+          "CCH137",
+          "CCH138",
+          "CCH139",
+          "CCH140",
+          "CCH141"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "g23-read-help-tests",
+      "file": "plugins/pipeline-core/lib/guard/g23-read-help.test.mjs",
+      "previousPolicySha256": "20f331828de57de708b914f523b1606b5f9f945b942ac9e16db4eecab96a1711",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "G23C001",
+          "G23C002",
+          "G23C003",
+          "G23C004",
+          "G23C005"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "guard-dispatch-native-worker-tests",
+      "file": "plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs",
+      "previousPolicySha256": "68756229cf1b952b957f28a03da08686cbde70d446ea0b36f0854e4dc211d1c3",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "GDW01",
+          "GDW02",
+          "GDW03",
+          "GDW04",
+          "GDW05",
+          "GDW06",
+          "GDW07",
+          "GDW08",
+          "GDW09"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "model-role-session-tests",
+      "file": "plugins/pipeline-core/lib/model-role-session.test.mjs",
+      "previousPolicySha256": "ec7e6bee4923d75626bd1c4548a3b287154c5beeab5b32b67b168f2e992b05c7",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "MRS01",
+          "MRS02",
+          "MRS03",
+          "MRS04",
+          "MRS05",
+          "MRS06",
+          "MRS07",
+          "MRS08",
+          "MRS09",
+          "MRS10",
+          "MRS11",
+          "MRS12",
+          "MRS13",
+          "MRS14",
+          "MRS15",
+          "MRS16",
+          "MRS17",
+          "MRS18",
+          "MRS19",
+          "MRS20",
+          "MRS21",
+          "MRS22",
+          "MRS23",
+          "MRS24",
+          "MRS25",
+          "MRS26",
+          "MRS27",
+          "MRS28",
+          "MRS29",
+          "MRS30",
+          "MRS31",
+          "MRS32",
+          "MRS33",
+          "MRS34",
+          "MRS35",
+          "MRS36",
+          "MRS37",
+          "MRS38",
+          "MRS39",
+          "MRS40",
+          "MRS41"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "native-goldfish-host-stop-pair-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs",
+      "previousPolicySha256": "862f6b8f6ab75c9c54a28e2f4a0c6d6ad00230044cf4a90ab9b20472ed069aad",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGSP1",
+          "NGSP2",
+          "NGSP3",
+          "NGSP3A",
+          "NGSP3A2",
+          "NGSP3B",
+          "NGSP4",
+          "NGSP5",
+          "NGSP6",
+          "NGSP7",
+          "NGSP8",
+          "NGSP9",
+          "NGSP9B",
+          "NGSP9C",
+          "NGSP9D"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "post-compact-reground-tests",
+      "file": "plugins/pipeline-core/hooks/post-compact-reground.test.mjs",
+      "previousPolicySha256": "350ce6d0f8491eb6c5c53c237be76d896f7b78b70cea8424b47a01a7e841aefc",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PCR001",
+          "PCR002",
+          "PCR003",
+          "PCR004",
+          "PCR005",
+          "PCR006",
+          "PCR007",
+          "PCR008",
+          "PCR009",
+          "PCR010",
+          "PCR011",
+          "PCR012",
+          "PCR013",
+          "PCR014",
+          "PCR015",
+          "PCR016",
+          "PCR017",
+          "PCR018",
+          "PCR019",
+          "PCR020",
+          "PCR021",
+          "PCR022",
+          "PCR023",
+          "PCR024",
+          "PCR025",
+          "PCR026",
+          "PCR027",
+          "PCR028",
+          "PCR029",
+          "PCR030"
+        ],
+        "maxBytes": 65536
+      }
     }
   ]
 }
