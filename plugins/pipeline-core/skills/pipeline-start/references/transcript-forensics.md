@@ -1,7 +1,9 @@
 # Transcript forensics — mining a runner's own session transcript for happy-path defects
 
 This is a METHOD reference for the **Elephant** preparing a forensic-analysis
-dispatch (typically a `general-purpose` subagent) after a live greenfield
+dispatch (a read-only `Explore` agent with an explicit model, or the Elephant itself
+running `usage-ledger.mjs --timeline`; a `general-purpose` subagent is refused by the
+dispatch guard with `DISPATCH-WRITE-CARRIER-REQUIRED`) after a live greenfield
 test session. It is not a runtime component — nothing here executes
 automatically, and it is not a Goldfish/Critic-facing document. Load it when
 about to write such a dispatch, not as part of ordinary bootstrap.
@@ -99,6 +101,19 @@ general impression:
   lifecycle reaching its terminal phase (`reserved`, `running`,
   `terminal-observed`). It is not a chat approval, so never count these files
   as approvals by the human.
+
+## The run timeline: `usage-ledger.mjs --timeline`
+
+`node plugins/pipeline-core/scripts/usage-ledger.mjs --timeline <transcript-file> [--json]` reads ONE session
+file (Claude project JSONL, Codex rollout, Antigravity transcript; the format is detected from the content) and
+prints, path-free: every human turn (time, length in characters, never the text), each turn's duration from the
+human message to the last response before the next one, the human wait between turns, run time gross / human wait /
+net, per-response token usage with its actor (`main` or `subagent:<name>`), and refusals per code (a coded denial
+in a tool result; Claude: an error result, Codex: an output that says blocked, denied or refused). `--json` prints
+the same figures as `pipeline.usage-timeline.v1` (`null` where the text says `n/a`). A field the format does not
+carry is `n/a`, never a guess: the Antigravity transcript has no human message or tool result, so its turns, wait,
+net time and refusals are `n/a`. Run it per file: a subagent file is its own run, and a restarted Codex session
+needs each rollout file read in turn. It is exclusive with `--row` and `--metering`.
 
 ## Report shape — one section per claim, independently traceable
 

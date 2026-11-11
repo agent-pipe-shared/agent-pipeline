@@ -9,7 +9,7 @@ import { test } from "node:test";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const CLI_PATH = fileURLToPath(new URL("./usage-ledger.mjs", import.meta.url));
@@ -280,5 +280,218 @@ test("usage-ledger --metering rejects nonregular, oversized, and excess selected
     assert.match(excess.stderr, /bounded list of sanitized bundle files/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// --- C28-FORENSICS-TIMELINE (AC-108): `--timeline <file>` prints one session's run timeline for all three runner formats. ---
+// Fixtures are small fakes written here; no real transcript is opened.
+function timelineFile(records, relative = "session.jsonl") {
+  const dir = mkdtempSync(join(tmpdir(), "usage-ledger-timeline-"));
+  const file = join(dir, relative);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, jsonl(records));
+  return { dir, file };
+}
+
+const HUMAN_TEXT = `please do ${SECRET_MARKER}`;
+const claudeUser = (timestamp, content, extra = {}) => ({ type: "user", sessionId: SESSION_ID, timestamp, message: { role: "user", content }, ...extra });
+const claudeAssistant = (timestamp, id, usage, content = [{ type: "text", text: SECRET_MARKER }]) => ({
+  type: "assistant", sessionId: SESSION_ID, timestamp, message: { id, model: "claude-sonnet-5", usage, content },
+});
+
+function claudeTimelineRecords() {
+  return [
+    claudeUser("2026-08-19T10:00:00.000Z", HUMAN_TEXT),
+    claudeUser("2026-08-19T10:00:01.000Z", "meta text", { isMeta: true }),
+    claudeAssistant("2026-08-19T10:00:10.000Z", "msg_1", { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 2, cache_read_input_tokens: 3 }),
+    claudeAssistant("2026-08-19T10:00:11.000Z", "msg_1", { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 2, cache_read_input_tokens: 3 }),
+    claudeUser("2026-08-19T10:00:13.000Z", [{ type: "tool_result", tool_use_id: "toolu_1", is_error: true, content: `PreToolUse hook error: BLOCKED GUARD-READ-SCOPE-OUTSIDE-ROOT ${SECRET_MARKER}` }]),
+    claudeUser("2026-08-19T10:00:14.000Z", [{ type: "tool_result", tool_use_id: "toolu_2", content: "a loaded document naming OTHER-LOADED-CODE only" }]),
+    claudeAssistant("2026-08-19T10:00:20.000Z", "msg_2", { input_tokens: 20, output_tokens: 8 }),
+    claudeUser("2026-08-19T10:01:20.000Z", [{ type: "text", text: "second human" }]),
+    claudeAssistant("2026-08-19T10:01:30.000Z", "msg_3", { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }),
+  ];
+}
+
+test("usage-ledger --timeline (claude) prints human turns, net run time, usage with actor and coded refusals, without content", () => {
+  const { dir, file } = timelineFile(claudeTimelineRecords());
+  try {
+    const result = run(["--timeline", file]);
+    assert.equal(result.status, 0, result.stderr);
+    const out = result.stdout;
+    assert.match(out, /Run timeline \(claude\)/);
+    assert.match(out, new RegExp(`- turn 1 \\| 2026-08-19T10:00:00.000Z \\| ${HUMAN_TEXT.length} chars \\| duration 20.0 s \\| human wait after 60.0 s`));
+    assert.match(out, /- turn 2 \| 2026-08-19T10:01:20.000Z \| 12 chars \| duration 10.0 s \| human wait after none/);
+    assert.match(out, /- 2026-08-19T10:00:20.000Z \| main \| claude-sonnet-5 \| input 20 \| output 8 \| cache-write n\/a \| cache-read n\/a/);
+    assert.equal((out.match(/\| main \| claude-sonnet-5 \|/g) ?? []).length, 3, "msg_1 repeated twice is ONE response");
+    assert.match(out, /- GUARD-READ-SCOPE-OUTSIDE-ROOT: 1/);
+    assert.doesNotMatch(out, /OTHER-LOADED-CODE/, "a code in a non-error tool result is not a refusal");
+    assert.match(out, /TOTAL: run time gross 90.0 s \| human wait 60.0 s \| run time net 30.0 s \| refusals 1 \| human turns 2/);
+    assert.doesNotMatch(out, new RegExp(SECRET_MARKER), "no transcript content");
+    assert.doesNotMatch(result.stdout + result.stderr, new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "no absolute path");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("usage-ledger --timeline --json emits pipeline.usage-timeline.v1 with the same figures", () => {
+  const { dir, file } = timelineFile(claudeTimelineRecords());
+  try {
+    const result = run(["--timeline", file, "--json"]);
+    assert.equal(result.status, 0, result.stderr);
+    const data = JSON.parse(result.stdout);
+    assert.equal(data.schema, "pipeline.usage-timeline.v1");
+    assert.equal(data.runner, "claude");
+    assert.deepEqual(data.totals, { grossMs: 90000, humanWaitMs: 60000, netMs: 30000, refusals: 1, humanTurns: 2 });
+    assert.deepEqual(data.refusals, { "GUARD-READ-SCOPE-OUTSIDE-ROOT": 1 });
+    assert.equal(data.humanTurns.length, 2);
+    assert.equal(data.humanTurns[0].chars, HUMAN_TEXT.length);
+    assert.equal(data.humanTurns[0].durationMs, 20000);
+    assert.equal(data.responses.length, 3);
+    assert.equal(data.responses[0].actor, "main");
+    assert.equal(data.responses[0].usage.cacheReadTokens, 3);
+    assert.doesNotMatch(result.stdout, new RegExp(SECRET_MARKER));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Measured on a real Claude run (candidate 28): a compact summary and a task notification are user rows, and a human
+// can write twice before any answer; none of the first two is a human turn, and the double message must not void the wait total.
+test("usage-ledger --timeline (claude) skips compact summaries and system notifications and keeps the wait total over a queued message", () => {
+  const { dir, file } = timelineFile([
+    claudeUser("2026-08-19T10:00:00.000Z", "first human"),
+    claudeAssistant("2026-08-19T10:00:10.000Z", "msg_a", { input_tokens: 1, output_tokens: 1 }),
+    claudeUser("2026-08-19T10:00:20.000Z", "summary of the earlier context", { isCompactSummary: true, isVisibleInTranscriptOnly: true }),
+    claudeAssistant("2026-08-19T10:00:30.000Z", "msg_b", { input_tokens: 1, output_tokens: 1 }),
+    claudeUser("2026-08-19T10:00:40.000Z", "<task-notification>done</task-notification>", { origin: { kind: "task-notification" }, promptSource: "system" }),
+    claudeAssistant("2026-08-19T10:00:50.000Z", "msg_c", { input_tokens: 1, output_tokens: 1 }),
+    claudeUser("2026-08-19T10:01:50.000Z", "oh stop", { origin: { kind: "human" } }),
+    claudeUser("2026-08-19T10:01:51.000Z", "do this instead", { origin: { kind: "human" } }),
+    claudeAssistant("2026-08-19T10:02:01.000Z", "msg_d", { input_tokens: 1, output_tokens: 1 }),
+  ]);
+  try {
+    const result = run(["--timeline", file, "--json"]);
+    assert.equal(result.status, 0, result.stderr);
+    const data = JSON.parse(result.stdout);
+    assert.equal(data.humanTurns.length, 3, "the compact summary and the task notification are not human turns");
+    assert.equal(data.humanTurns[0].durationMs, 50000, "the first turn runs through the system rows to its last answer");
+    assert.equal(data.humanTurns[1].humanWaitAfterMs, 0, "a message written before any answer leaves no wait");
+    assert.deepEqual(data.totals, { grossMs: 121000, humanWaitMs: 60000, netMs: 61000, refusals: 0, humanTurns: 3 });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("usage-ledger --timeline names a subagent transcript's actor from its location", () => {
+  const { dir, file } = timelineFile(
+    [claudeAssistant("2026-08-19T10:00:04.000Z", "sub_1", { input_tokens: 7, output_tokens: 2 })],
+    join(SESSION_ID, "subagents", "agent-abc123.jsonl"),
+  );
+  try {
+    const result = run(["--timeline", file]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /\| subagent:agent-abc123 \| claude-sonnet-5 \|/);
+    assert.match(result.stdout, /human turns n\/a|human turns 0/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Measured on a real Codex rollout (candidate 28): the human's input is a response_item user message with provenance "user" and
+// there is no user_message event; harness inserts (AGENTS.md, hook context) are user messages with another provenance.
+test("usage-ledger --timeline (codex rollout) counts provenance-user messages as human turns and skips harness inserts", () => {
+  const rec = (timestamp, type, payload) => ({ timestamp, type, payload });
+  const userItem = (text, provenance) => ({ type: "message", role: "user", content: [{ type: "input_text", text }],
+    internal_chat_message_metadata_passthrough: { content_item_metadata: [{ provenance: { type: provenance } }] } });
+  const { dir, file } = timelineFile([
+    rec("2026-08-19T10:00:00.000Z", "session_meta", { id: "thread-1" }),
+    rec("2026-08-19T10:00:00.500Z", "response_item", userItem("# AGENTS.md instructions", "harness")),
+    rec("2026-08-19T10:00:01.000Z", "response_item", userItem("start", "user")),
+    rec("2026-08-19T10:00:05.000Z", "response_item", { type: "message", role: "assistant", content: [] }),
+    rec("2026-08-19T10:00:25.000Z", "response_item", userItem("go on", "user")),
+    rec("2026-08-19T10:00:30.000Z", "response_item", { type: "message", role: "assistant", content: [] }),
+  ]);
+  try {
+    const result = run(["--timeline", file, "--json"]);
+    assert.equal(result.status, 0, result.stderr);
+    const data = JSON.parse(result.stdout);
+    assert.equal(data.humanTurns.length, 2, "the harness insert is not a human turn");
+    assert.equal(data.humanTurns[0].chars, 5);
+    assert.deepEqual(data.totals, { grossMs: 30000, humanWaitMs: 20000, netMs: 10000, refusals: 0, humanTurns: 2 });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("usage-ledger --timeline (codex rollout) reads user_message, token_count and coded tool output", () => {
+  const rec = (timestamp, type, payload) => ({ timestamp, type, payload });
+  const { dir, file } = timelineFile([
+    rec("2026-08-19T10:00:00.000Z", "session_meta", { id: "thread-1", cwd: "/somewhere" }),
+    rec("2026-08-19T10:00:01.000Z", "event_msg", { type: "user_message", message: HUMAN_TEXT }),
+    rec("2026-08-19T10:00:05.000Z", "response_item", { type: "message", role: "assistant", content: [{ type: "output_text", text: SECRET_MARKER }] }),
+    rec("2026-08-19T10:00:05.500Z", "event_msg", { type: "token_count", info: { last_token_usage: { input_tokens: 100, cached_input_tokens: 40, output_tokens: 9, reasoning_output_tokens: 4, total_tokens: 109 }, total_token_usage: { total_tokens: 109 } } }),
+    // QG-04 restated in place: the denial now has the shape a real Codex rollout records (measured candidate 28), not an invented one;
+    // a success output carrying a code and the word "blocked" in prose must not count.
+    rec("2026-08-19T10:00:06.000Z", "response_item", { type: "function_call_output", call_id: "c1", output: `Script error:\nCommand blocked by PreToolUse hook: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-GRAMMAR-REDIRECT-REFUSED: ${SECRET_MARKER}` }),
+    rec("2026-08-19T10:00:07.000Z", "response_item", { type: "function_call_output", call_id: "c2", output: "a file that mentions DOC-ONLY-CODE" }),
+    rec("2026-08-19T10:00:07.500Z", "response_item", { type: "custom_tool_call_output", call_id: "c3", output: "{\"exit_code\":0,\"output\":\"{\\n \\\"status\\\": \\\"committed\\\",\\n \\\"code\\\": \\\"GHCR-COMMITTED\\\", \\\"note\\\": \\\"nothing blocked\\\"\"}" }),
+    rec("2026-08-19T10:00:09.000Z", "event_msg", { type: "task_complete" }),
+    rec("2026-08-19T10:00:39.000Z", "event_msg", { type: "user_message", message: "again" }),
+    rec("2026-08-19T10:00:42.000Z", "response_item", { type: "message", role: "assistant", content: [] }),
+  ]);
+  try {
+    const result = run(["--timeline", file]);
+    assert.equal(result.status, 0, result.stderr);
+    const out = result.stdout;
+    assert.match(out, /Run timeline \(codex\)/);
+    assert.match(out, new RegExp(`- turn 1 \\| 2026-08-19T10:00:01.000Z \\| ${HUMAN_TEXT.length} chars \\| duration 8.0 s \\| human wait after 30.0 s`));
+    assert.match(out, /\| main \| n\/a \| input 100 \| output 9 \| cache-write n\/a \| cache-read 40/);
+    assert.match(out, /- GUARD-GRAMMAR-REDIRECT-REFUSED: 1/);
+    assert.doesNotMatch(out, /DOC-ONLY-CODE/);
+    assert.doesNotMatch(out, /GHCR-COMMITTED/, "a success code is not a refusal");
+    assert.match(out, /TOTAL: run time gross 42.0 s \| human wait 30.0 s \| run time net 12.0 s \| refusals 1 \| human turns 2/);
+    assert.doesNotMatch(out, new RegExp(`${SECRET_MARKER}|/somewhere`));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("usage-ledger --timeline (antigravity transcript) prints n/a for what the format does not carry", () => {
+  const { dir, file } = timelineFile([
+    { type: "turn.started", timestamp: "2026-08-19T10:00:00.000Z" },
+    { type: "turn.completed", timestamp: "2026-08-19T10:00:30.000Z", usage: { input_tokens: 50, output_tokens: 6, cached_tokens: 20 } },
+  ]);
+  try {
+    const result = run(["--timeline", file]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Run timeline \(antigravity\)/);
+    assert.match(result.stdout, /\| main \| n\/a \| input 50 \| output 6 \| cache-write n\/a \| cache-read 20/);
+    assert.match(result.stdout, /TOTAL: run time gross 30.0 s \| human wait n\/a \| run time net n\/a \| refusals n\/a \| human turns n\/a/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("usage-ledger --timeline is exclusive with --row and --metering and refuses unreadable or unknown input without a path", () => {
+  const { dir, file } = timelineFile([{ type: "something-else", note: "x" }]);
+  try {
+    const row = run(["--timeline", file, "--row"]);
+    assert.notEqual(row.status, 0);
+    assert.match(row.stderr, /--timeline is exclusive/);
+    const metering = run(["--timeline", file, "--metering", file]);
+    assert.notEqual(metering.status, 0);
+    assert.match(metering.stderr, /--timeline is exclusive/);
+    const unknown = run(["--timeline", file]);
+    assert.notEqual(unknown.status, 0);
+    assert.match(unknown.stderr, /timeline-format-unknown/);
+    const missing = run(["--timeline", join(dir, "absent.jsonl")]);
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /timeline-input-unreadable/);
+    const bare = run(["--timeline"]);
+    assert.notEqual(bare.status, 0);
+    for (const result of [row, metering, unknown, missing]) assert.doesNotMatch(result.stderr, new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

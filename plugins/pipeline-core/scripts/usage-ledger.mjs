@@ -37,6 +37,13 @@
  *     below. Same discipline as the token half: no transcript content, no
  *     absolute path, nothing written to disk — counts only, printed to stdout.
  *
+ *   - `--timeline <transcript-file> [--json]` (exclusive with `--row` and `--metering`; takes no root): the run
+ *     timeline of ONE session file in any of the three runner formats (Claude project JSONL, Codex rollout JSONL,
+ *     Antigravity transcript, detected from the content): human turns, per-turn duration, human wait, net run time,
+ *     per-response usage with actor, refusals per code. `--json` prints the same data as
+ *     `pipeline.usage-timeline.v1`. Counts, times and codes only; never message text or a path; `n/a` where the
+ *     format carries no such field.
+ *
  * Session scoping: `--session <uuid>` restricts aggregation to one session (incl.
  * its subagent transcripts, via the shared `sessionId` field — see schema notes
  * below); `--latest [projectDirName]` resolves the most recently modified top-level
@@ -129,7 +136,7 @@ const DEFAULT_PRICES_PATH = path.join(SCRIPT_DIR, "model-prices.json");
 function usage(msg) {
   if (msg) console.error(msg);
   console.error(
-    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...>",
+    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>] | --metering <sanitized-bundle.json...> | --timeline <transcript-file> [--json]",
   );
   console.error('Example (full table):  node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects"');
   console.error(
@@ -158,6 +165,272 @@ function readMeteringBundle(file) {
     if (descriptor !== undefined) closeSync(descriptor);
   }
 }
+
+// --- Timeline mode (`--timeline <file> [--json]`): one session's run timeline, read from ONE transcript file. ---
+// Formats are detected from the file content: Claude project JSONL, Codex rollout JSONL, Antigravity transcript
+// (`turn.started` / `turn.completed` records). Output is path-free and never carries a human message's text or a tool
+// result's text; only lengths, times, token counts and refusal codes. A field the format does not carry prints as `n/a`.
+const TIMELINE_SCHEMA = "pipeline.usage-timeline.v1";
+const TIMELINE_MAX_BYTES = 512 * 1024 * 1024;
+// A refusal code: upper-case words joined by hyphens, each starting with a letter (so UTF-8 or SHA-256 never match).
+const REFUSAL_CODE_RE = /\b[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)+\b/;
+
+const isTimelineObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const timelineMs = (timestamp) => {
+  const ms = typeof timestamp === "string" ? Date.parse(timestamp) : NaN;
+  return Number.isFinite(ms) ? ms : null;
+};
+const timelineNumber = (value) => (Number.isFinite(value) ? value : null);
+const timelineChars = (text) => [...text].length;
+
+// "main" for a top-level session file, "subagent:<basename>" for anything under a `subagents/` directory — the same
+// derivation `actorOf` uses for the table/row modes. Both separators are split, so a Windows path works anywhere.
+function actorFromSegments(segments) {
+  if (!segments.includes("subagents")) return "main";
+  return `subagent:${segments[segments.length - 1].replace(/\.jsonl$/u, "")}`;
+}
+
+function timelineResultText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return isTimelineObject(content) && typeof content.content === "string" ? content.content : "";
+  return content.map((block) => (typeof block === "string" ? block : isTimelineObject(block) && typeof block.text === "string" ? block.text : "")).join("\n");
+}
+
+// The guard's own denial ("BLOCKED (<hook>): <CODE>", the same on every runner) and a script's typed refusal
+// ({"status": "refused" | "blocked", ..., "code": "<CODE>"}) name the code exactly. Only without either form does a Claude
+// error result fall back to its first code; a Codex output without either form is not counted, because its text also carries
+// success and warning codes (measured on a real rollout: GHCR-COMMITTED, DBG-BUDGET-UNENFORCED were counted as refusals).
+const HOOK_DENIAL_RE = /BLOCKED \([^)\n]*\):\s*([A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)+)/;
+const TYPED_REFUSAL_RE = /\\?"status\\?"\s*:\s*\\?"(?:refused|blocked)\\?"[\s\S]{0,400}?\\?"code\\?"\s*:\s*\\?"([A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)+)\\?"/;
+function timelineRefusal(text, requireMarker) {
+  const exact = HOOK_DENIAL_RE.exec(text) ?? TYPED_REFUSAL_RE.exec(text);
+  if (exact) return exact[1];
+  if (requireMarker) return null;
+  const match = REFUSAL_CODE_RE.exec(text);
+  return match ? match[0] : null;
+}
+
+function detectTimelineFormat(records) {
+  for (const record of records.slice(0, 200)) {
+    if (!isTimelineObject(record)) continue;
+    if (["session_meta", "response_item", "event_msg", "turn_context"].includes(record.type)) return "codex";
+    if (record.type === "turn.started" || record.type === "turn.completed") return "antigravity";
+    if ((record.type === "user" || record.type === "assistant") && isTimelineObject(record.message)) return "claude";
+  }
+  return null;
+}
+
+// Normalised events: {kind:"human", ms, chars} | {kind:"response", ms, listed, model, usage} | {kind:"refusal", code}.
+// `listed` = the response is printed in the per-response usage list; a time-only response just ends a turn.
+function claudeTimelineEvents(records) {
+  const events = [];
+  const byId = new Map();
+  for (const record of records) {
+    if (!isTimelineObject(record) || !isTimelineObject(record.message)) continue;
+    const ms = timelineMs(record.timestamp);
+    const message = record.message;
+    if (record.type === "assistant") {
+      if (message.model === "<synthetic>") continue;
+      const usage = isTimelineObject(message.usage)
+        ? { input: timelineNumber(message.usage.input_tokens), output: timelineNumber(message.usage.output_tokens), cacheWrite: timelineNumber(message.usage.cache_creation_input_tokens), cacheRead: timelineNumber(message.usage.cache_read_input_tokens) }
+        : null;
+      const response = { kind: "response", ms, listed: true, model: typeof message.model === "string" ? message.model : null, usage };
+      const id = typeof message.id === "string" && message.id ? message.id : null;
+      const prior = id ? byId.get(id) : null;
+      if (prior) Object.assign(prior, response); // the same message streamed again: one response, last record wins
+      else {
+        if (id) byId.set(id, response);
+        events.push(response);
+      }
+    } else if (record.type === "user" && record.isSidechain !== true && record.isMeta !== true && message.role === "user"
+      // A compact summary, a task notification or another system-sourced prompt is a user row but no human turn (measured on a real run).
+      && record.isCompactSummary !== true && record.promptSource !== "system"
+      && (!isTimelineObject(record.origin) || record.origin.kind === undefined || record.origin.kind === "human")) {
+      const content = message.content;
+      if (typeof content === "string") {
+        if (content.trim() !== "") events.push({ kind: "human", ms, chars: timelineChars(content) });
+      } else if (Array.isArray(content) && content.length > 0) {
+        const results = content.filter((block) => isTimelineObject(block) && block.type === "tool_result");
+        if (results.length === 0) {
+          const chars = content.reduce((sum, block) => sum + (isTimelineObject(block) && block.type === "text" && typeof block.text === "string" ? timelineChars(block.text) : 0), 0);
+          events.push({ kind: "human", ms, chars });
+        }
+        for (const block of results) {
+          if (block.is_error !== true) continue;
+          const code = timelineRefusal(timelineResultText(block.content), false);
+          if (code) events.push({ kind: "refusal", code });
+        }
+      }
+    }
+  }
+  return events;
+}
+
+// A Codex rollout of 2026-11 records the human's input as a `response_item` user message whose content carries the provenance
+// `user` (harness and tool inserts carry another provenance) and has no `user_message` event; an older rollout has the event.
+// The provenance form wins when the file has it, so one input is never counted twice.
+function codexHumanChars(payload) {
+  if (payload.type !== "message" || payload.role !== "user" || !Array.isArray(payload.content)) return null;
+  const meta = payload.internal_chat_message_metadata_passthrough?.content_item_metadata;
+  if (!Array.isArray(meta) || !meta.some((entry) => entry?.provenance?.type === "user")) return null;
+  return payload.content.reduce((sum, block) => sum + (isTimelineObject(block) && typeof block.text === "string" ? timelineChars(block.text) : 0), 0);
+}
+
+function codexTimelineEvents(records) {
+  const events = [];
+  const provenanceForm = records.some((record) => isTimelineObject(record) && record.type === "response_item" && isTimelineObject(record.payload) && codexHumanChars(record.payload) !== null);
+  for (const record of records) {
+    if (!isTimelineObject(record) || !isTimelineObject(record.payload)) continue;
+    const payload = record.payload;
+    const ms = timelineMs(record.timestamp ?? payload.timestamp);
+    if (record.type === "response_item" && provenanceForm) {
+      const chars = codexHumanChars(payload);
+      if (chars !== null) { events.push({ kind: "human", ms, chars }); continue; }
+    }
+    if (record.type === "event_msg") {
+      if (payload.type === "user_message" && !provenanceForm) events.push({ kind: "human", ms, chars: typeof payload.message === "string" ? timelineChars(payload.message) : null });
+      else if (payload.type === "task_complete") events.push({ kind: "response", ms, listed: false, model: null, usage: null });
+      else if (payload.type === "token_count" && isTimelineObject(payload.info) && isTimelineObject(payload.info.last_token_usage)) {
+        const last = payload.info.last_token_usage;
+        events.push({ kind: "response", ms, listed: true, model: null, usage: { input: timelineNumber(last.input_tokens), output: timelineNumber(last.output_tokens), cacheWrite: null, cacheRead: timelineNumber(last.cached_input_tokens) } });
+      }
+    } else if (record.type === "response_item") {
+      if (payload.type === "message" && payload.role === "assistant") events.push({ kind: "response", ms, listed: false, model: null, usage: null });
+      else if (payload.type === "function_call_output" || payload.type === "custom_tool_call_output") {
+        const code = timelineRefusal(timelineResultText(payload.output), true);
+        if (code) events.push({ kind: "refusal", code });
+      }
+    }
+  }
+  return events;
+}
+
+// The Antigravity transcript records no human message and no tool result, so turns, waits and refusals stay `n/a`.
+function antigravityTimelineEvents(records) {
+  const events = [];
+  for (const record of records) {
+    if (!isTimelineObject(record) || record.type !== "turn.completed") continue;
+    const usage = isTimelineObject(record.usage)
+      ? { input: timelineNumber(record.usage.input_tokens), output: timelineNumber(record.usage.output_tokens), cacheWrite: null, cacheRead: timelineNumber(record.usage.cached_tokens) }
+      : null;
+    events.push({ kind: "response", ms: timelineMs(record.timestamp), listed: true, model: null, usage });
+  }
+  return events;
+}
+
+function buildTimeline(runner, records, actor, malformed) {
+  const events = runner === "claude" ? claudeTimelineEvents(records) : runner === "codex" ? codexTimelineEvents(records) : antigravityTimelineEvents(records);
+  const observed = runner !== "antigravity"; // human messages and tool results are recorded
+  const stamps = records.map((record) => (isTimelineObject(record) ? timelineMs(record.timestamp ?? record.payload?.timestamp) : null)).filter((ms) => ms !== null);
+  const grossMs = stamps.length > 0 ? Math.max(...stamps) - Math.min(...stamps) : null;
+  const humanIndexes = events.flatMap((event, index) => (event.kind === "human" ? [index] : []));
+  let waitKnown = true;
+  let waitTotal = 0;
+  const humanTurns = humanIndexes.map((from, ordinal) => {
+    const human = events[from];
+    const next = events[humanIndexes[ordinal + 1]];
+    const answers = events.slice(from + 1, humanIndexes[ordinal + 1] ?? events.length).filter((event) => event.kind === "response" && event.ms !== null);
+    const answerMs = answers.length > 0 ? Math.max(...answers.map((event) => event.ms)) : null;
+    const durationMs = human.ms !== null && answerMs !== null && answerMs >= human.ms ? answerMs - human.ms : null;
+    let waitAfterMs = null;
+    if (next) {
+      if (answerMs !== null && next.ms !== null && next.ms >= answerMs) {
+        waitAfterMs = next.ms - answerMs;
+        waitTotal += waitAfterMs;
+      } else if (answerMs === null && next.ms !== null && human.ms !== null && next.ms >= human.ms) {
+        waitAfterMs = 0; // the human wrote again before any answer (a queued or interrupting message): nobody waited on the human
+      } else waitKnown = false;
+    }
+    return { ordinal: ordinal + 1, at: human.ms === null ? null : new Date(human.ms).toISOString(), chars: human.chars, durationMs, humanWaitAfterMs: waitAfterMs, last: !next };
+  });
+  const humanWaitMs = observed && waitKnown ? waitTotal : null;
+  const refusals = {};
+  for (const event of events) if (event.kind === "refusal") refusals[event.code] = (refusals[event.code] ?? 0) + 1;
+  const refusalCount = Object.values(refusals).reduce((sum, count) => sum + count, 0);
+  const responses = events.filter((event) => event.kind === "response" && event.listed).map((event) => ({
+    at: event.ms === null ? null : new Date(event.ms).toISOString(), actor, model: event.model,
+    usage: event.usage && { inputTokens: event.usage.input, outputTokens: event.usage.output, cacheWriteTokens: event.usage.cacheWrite, cacheReadTokens: event.usage.cacheRead },
+  }));
+  return {
+    schema: TIMELINE_SCHEMA, runner, malformedLines: malformed,
+    humanTurns: observed ? humanTurns : null, responses, refusals: observed ? refusals : null,
+    totals: {
+      grossMs, humanWaitMs,
+      netMs: grossMs !== null && humanWaitMs !== null ? grossMs - humanWaitMs : null,
+      refusals: observed ? refusalCount : null, humanTurns: observed ? humanTurns.length : null,
+    },
+  };
+}
+
+function renderTimeline(timeline) {
+  const na = (value) => (value === null || value === undefined ? "n/a" : String(value));
+  const secs = (ms) => (ms === null ? "n/a" : `${(ms / 1000).toFixed(1)} s`);
+  const lines = [`# Run timeline (${timeline.runner})`, "", "Human turns:"];
+  if (timeline.humanTurns === null) lines.push("- n/a (this format records no human message)");
+  else if (timeline.humanTurns.length === 0) lines.push("- none");
+  else {
+    for (const turn of timeline.humanTurns) {
+      lines.push(`- turn ${turn.ordinal} | ${na(turn.at)} | ${na(turn.chars)} chars | duration ${secs(turn.durationMs)} | human wait after ${turn.last ? "none" : secs(turn.humanWaitAfterMs)}`);
+    }
+  }
+  lines.push("", "Responses:");
+  if (timeline.responses.length === 0) lines.push("- none");
+  for (const response of timeline.responses) {
+    const usage = response.usage ?? {};
+    lines.push(`- ${na(response.at)} | ${response.actor} | ${na(response.model)} | input ${na(usage.inputTokens)} | output ${na(usage.outputTokens)} | cache-write ${na(usage.cacheWriteTokens)} | cache-read ${na(usage.cacheReadTokens)}`);
+  }
+  lines.push("", "Refusals:");
+  if (timeline.refusals === null) lines.push("- n/a (this format records no tool result)");
+  else if (Object.keys(timeline.refusals).length === 0) lines.push("- none");
+  else for (const [code, count] of Object.entries(timeline.refusals).sort()) lines.push(`- ${code}: ${count}`);
+  if (timeline.malformedLines > 0) lines.push("", `Malformed lines skipped: ${timeline.malformedLines}`);
+  const totals = timeline.totals;
+  lines.push("", `TOTAL: run time gross ${secs(totals.grossMs)} | human wait ${secs(totals.humanWaitMs)} | run time net ${secs(totals.netMs)} | refusals ${na(totals.refusals)} | human turns ${na(totals.humanTurns)}`);
+  return lines.join("\n");
+}
+
+function runTimeline(args) {
+  if (args.includes("--row") || args.includes("--metering")) usage("--timeline is exclusive with --row and --metering.");
+  let file;
+  let json = false;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--timeline") {
+      file = args[i + 1];
+      if (!file || file.startsWith("--")) usage("--timeline requires a <file> value.");
+      i++;
+    } else if (args[i] === "--json") json = true;
+    else usage("--timeline is exclusive: it accepts only one <file> and --json.");
+  }
+  let text;
+  try {
+    const info = lstatSync(file);
+    if (!info.isFile() || info.size > TIMELINE_MAX_BYTES) throw new Error("not-readable");
+    text = readFileSync(file, "utf8");
+  } catch {
+    console.error("usage-ledger --timeline: timeline-input-unreadable");
+    process.exit(1);
+  }
+  const records = [];
+  let malformed = 0;
+  for (const line of text.split(/\r?\n/u)) {
+    if (!line.trim()) continue;
+    try {
+      records.push(JSON.parse(line));
+    } catch {
+      malformed++;
+    }
+  }
+  const runner = detectTimelineFormat(records);
+  if (!runner) {
+    console.error("usage-ledger --timeline: timeline-format-unknown");
+    process.exit(1);
+  }
+  const timeline = buildTimeline(runner, records, actorFromSegments(file.split(/[\\/]/u)), malformed);
+  console.log(json ? JSON.stringify(timeline) : renderTimeline(timeline));
+  process.exit(0);
+}
+
+if (argv.includes("--timeline")) runTimeline(argv);
 
 // Metering is intentionally an exclusive, selected-file mode. It never opens
 // a transcript root, price table, provider endpoint, or directory tree.
@@ -330,10 +603,7 @@ function deriveFromPath(filePath) {
 // directory (basename only, e.g. `agent-<uuid>` — never a path). See the
 // "Activity accounting" doc block above.
 function actorOf(filePath) {
-  const rel = path.relative(root, filePath);
-  const segments = rel.split(path.sep);
-  if (!segments.includes("subagents")) return "main";
-  return `subagent:${path.basename(filePath, ".jsonl")}`;
+  return actorFromSegments(path.relative(root, filePath).split(path.sep));
 }
 
 function emptyAgg() {
