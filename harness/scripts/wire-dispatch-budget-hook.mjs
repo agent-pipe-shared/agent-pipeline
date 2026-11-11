@@ -112,7 +112,8 @@ const INVENTORY_CHECKER = join(REPO_ROOT, "harness", "scripts", "check-product-c
  * one-character change, but it is untested, and untested is what produced this
  * comment.
  */
-const MATCHER = "Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write";
+// C28 (AC-108): SendMessage added -- a Critic resume is the orchestrator's SendMessage, and the guard admits only its generated text.
+const MATCHER = "Bash|Edit|Glob|Grep|NotebookEdit|Read|SendMessage|Task|TodoWrite|WebFetch|WebSearch|Write";
 
 /** The match-all literal this hook was first wired with; silently matched nothing. */
 const SUPERSEDED_MATCHER = "*";

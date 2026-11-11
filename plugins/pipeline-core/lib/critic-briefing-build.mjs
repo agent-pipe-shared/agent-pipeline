@@ -14,6 +14,7 @@
  * - Antigravity gets the template's paths-only envelope with absolute paths (PO tile 2026-11-10), never the body.
  */
 import { posix } from "node:path";
+import { criticToolBudget } from "./critic-split.mjs";
 
 export const CRITIC_BRIEFING_SCHEMA = "pipeline.critic-briefing.v1";
 const COPY_MARKER = "COPY EVERYTHING BELOW THIS LINE\n-->\n";
@@ -76,7 +77,7 @@ const ordinalOf = (preflight) => {
  * - projectName: the project name for the confirmation line
  * Returns { schema, briefings: [{ entryId, text, placeholders }] }.
  */
-export function renderCriticBriefings({ preflight, templateText, commits, bindingsPath = null, runner = "claude", root = null, projectName }) {
+export function renderCriticBriefings({ preflight, templateText, commits, bindingsPath = null, runner = "claude", root = null, projectName, reviewPaths = null }) {
   if (preflight?.status !== "packet-ready") refuse("CBB-PREFLIGHT-SHAPE", "a briefing is built only from a packet-ready preflight result");
   if (!Array.isArray(commits) || commits.length === 0 || commits.some((sha) => !/^[a-f0-9]{40,64}$/u.test(sha))) refuse("CBB-COMMITS", "the enumerated commit list is empty or malformed");
   const entries = Array.isArray(preflight.split?.entries) && preflight.split.entries.length > 0 ? preflight.split.entries : [null];
@@ -86,19 +87,30 @@ export function renderCriticBriefings({ preflight, templateText, commits, bindin
   const briefings = entries.map((entry) => {
     const facts = reviewFacts(preflight, entry);
     if (facts.candidate !== commits[commits.length - 1]) refuse("CBB-COMMITS", "the enumerated commits do not end at the reviewed candidate");
-    return runner === "antigravity"
+    const rendered = runner === "antigravity"
       ? renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, root, entry })
-      : renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner });
+      : renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner, reviewPaths });
+    // C28-CRITIC-TOIL: a range whose preflight bound correction input bindings (retained results, state or history files are in it) never gets a briefing that says "not applicable":
+    // that Critic stops on missing bindings and a fresh one is spent. The caller derives them (prepare-dispatch.mjs does) or the briefing is refused here, after the template checks.
+    if (bindingsPath === null && preflight.correctionInputBindings !== undefined && preflight.correctionInputBindings !== null) {
+      refuse("CBB-BINDINGS-MISSING", "the preflight bound correction input bindings for this range (excluded paths are in it), but no bindings path was given; derive them (prepare-dispatch.mjs critic does) and pass the path");
+    }
+    return rendered;
   });
   return { schema: CRITIC_BRIEFING_SCHEMA, briefings };
 }
 
-function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner }) {
+function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner, reviewPaths }) {
   const placeholders = [];
   const open = (name, hint) => { placeholders.push(name); return fill(name, hint); };
   const scope = entry?.batchScopeLine ?? promptLines?.[0] ?? `Batch scope (MP-07): the reviewed range ${facts.base.slice(0, 12)}..${facts.candidate.slice(0, 12)}, one batch.`;
+  // C28-CRITIC-TOIL: the paths this Critic reads are the part's own, or the range's reviewable ones the preflight printed; both come without any path the bindings exclude, and the diff
+  // command names them as literal pathspecs (critic-review.md: exact literal source pathspecs, external diff and text conversion off), so the range diff never carries an excluded file.
+  const paths = entry ? (entry.reviewerInput?.changedPaths ?? entry.paths ?? []) : (Array.isArray(reviewPaths) && reviewPaths.length > 0 ? reviewPaths : null);
+  const diffCommand = paths === null || paths.length === 0 ? "" : `\n- Diff command: \`git diff --no-textconv --no-ext-diff ${facts.base} ${facts.candidate} -- ${paths.join(" ")}\``;
   const scopeValue = scope.replace(/^Batch scope \(MP-07\):\s*/u, "")
-    + (entry ? ` Paths of this part: ${(entry.reviewerInput?.changedPaths ?? entry.paths ?? []).map((path) => `\`${path}\``).join(", ")}. Begin trajectory_evidence with "${entry.scopeMarker} ".` : "");
+    + (entry ? ` Paths of this part: ${paths.map((path) => `\`${path}\``).join(", ")}. Begin trajectory_evidence with "${entry.scopeMarker} ".` : (paths === null ? "" : ` Paths of this range: ${paths.map((path) => `\`${path}\``).join(", ")}.`))
+    + diffCommand;
   const rationale = promptLines?.[1] ?? null;
   const list = (paths, none) => (paths.length === 0 ? none : paths.map((path) => `\`${path}\``).join(", "));
   const values = {
@@ -118,7 +130,8 @@ function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promp
     MODEL_ID: open("MODEL_ID", "the concrete model id the dispatch call passes as model"),
     EFFORT: open("EFFORT", "the effort the dispatch call requests"),
     T1_ASSURANCE: runner === "codex" ? open("T1_ASSURANCE", "the Codex Critic lane and its assurance") : "functional-equivalent-read-only; OS isolation not asserted",
-    TOOL_BUDGET: "≤30 tool uses",
+    // The base cap follows the path count (PO decision 2026-11-10), never above the working cap of the shipped Critic definition; without a count the template default stays.
+    TOOL_BUDGET: paths === null ? "≤30 tool uses" : `≤${criticToolBudget(paths.length)} tool uses`,
     PROJECT_NAME: projectName,
     CALIBRATION_FILE: "n/a",
     AC_IDS: "all in the spec",

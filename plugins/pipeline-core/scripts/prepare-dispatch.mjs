@@ -222,7 +222,7 @@ function buildCriticBriefingFiles({ root, value, run, step, deps }) {
   const runner = criticRunnerFromEnv(deps.env ?? process.env);
   let rendered;
   try {
-    rendered = renderCriticBriefings({ preflight: value, templateText: (deps.readTemplate ?? (() => readFileSync(TEMPLATE_PATH, "utf8")))(), commits, bindingsPath, runner, root, projectName: basename(root) });
+    rendered = renderCriticBriefings({ preflight: value, templateText: (deps.readTemplate ?? (() => readFileSync(TEMPLATE_PATH, "utf8")))(), commits, bindingsPath, runner, root, projectName: basename(root), reviewPaths: Array.isArray(value.criticReviewPaths) ? value.criticReviewPaths : null });
   } catch (error) {
     return { stop: { code: error?.code ?? "PREP-BRIEFING-FAILED", reason: String(error?.message ?? error), repair: "the Critic template or the preflight result changed shape; report this code, do not hand-write the briefing" } };
   }

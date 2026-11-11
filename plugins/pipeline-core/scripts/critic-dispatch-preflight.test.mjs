@@ -699,7 +699,10 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
   // G20-72 (same criterion, same strictness): a range above the split bound also prints the additive `split`; it is stripped like the other additive fields, and this fixture's
   // one-file range is below the bound so the printed line is compared byte for byte without it.
   // C22 (CGF-03, QG-04 restated in place): the printed-only `routeAssurance` is one more additive field next to the admit fields; every other key still equals the library result.
-  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, split: _printedSplit, routeAssurance: _printedAssurance, ...printedRest } = JSON.parse(printedRun.stdout);
+  // C28-CRITIC-TOIL (QG-04 restated in place): the printed-only `criticSizing` and `criticReviewPaths` are two more additive fields; every other key still equals the library result.
+  const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, split: _printedSplit, routeAssurance: _printedAssurance, criticSizing: _printedSizing, criticReviewPaths: _printedPaths, ...printedRest } = JSON.parse(printedRun.stdout);
+  assert.deepEqual(_printedSizing.parts, [{ id: null, files: 1, toolBudget: 17, workingCap: 50, aboveBound: false }], "the one-file range prints the sizing of its one part");
+  assert.deepEqual(_printedPaths, ["specs/spec.md"]);
   assert.equal(_printedSplit, undefined, "a one-file range carries no split");
   assert.equal(JSON.stringify(printedRest) + "\n", JSON.stringify(expected) + "\n");
   assert.equal(printedAdmitRequest.schema, "pipeline.session-critic-finalization-request.v3");
@@ -2074,7 +2077,8 @@ test("G20-69 the printed packet-ready result carries the complete admit request,
     assert.equal(Object.hasOwn(preflightCriticDispatch(input(fx)), "admitRequest"), false, "the library result is digest-bound by the session finalizer");
     const printed = g2069Printed(fx);
     // C22 (CGF-03, QG-04 restated in place): the printed-only `routeAssurance` joins the admit fields; the other keys are still exactly the coverage result.
-    const { admitRequest, admitCommand, nextStep, criticDispatchPromptLines: _lines, routeAssurance: _assurance, ...rest } = printed;
+    // C28-CRITIC-TOIL (QG-04 restated in place): the printed-only `criticSizing` and `criticReviewPaths` join the admit fields too.
+    const { admitRequest, admitCommand, nextStep, criticDispatchPromptLines: _lines, routeAssurance: _assurance, criticSizing: _sizing, criticReviewPaths: _paths, ...rest } = printed;
     assert.deepEqual(rest, covered, "the admit fields are the only difference");
     assert.deepEqual(Object.keys(admitRequest), G2069_KEYS);
     assert.equal(admitRequest.schema, "pipeline.session-critic-finalization-request.v3", "a review that is no feature package is a generic batch request");
@@ -2308,7 +2312,9 @@ const g2072Input = (fx) => ({ root: fx.root, base: fx.base, candidate: fx.candid
 const g2072Changed = (fx) => git(fx.root, ["diff", "--name-only", fx.base, fx.candidate]).split("\n").filter((line) => line !== "");
 test("G20-72 above SPLIT_MAX_CHANGED_FILES the printed result carries one split entry per module plus a shared entry, disjoint and covering every changed path; the library result is unchanged", async () => {
   const { CRITIC_SPLIT_SCHEMA, SPLIT_MAX_CHANGED_FILES, SPLIT_SHARED_ENTRY_ID } = await import("../lib/critic-split.mjs");
-  const fx = g2072Fixture({ core: 13, api: 13, loose: 13 }); // QG-04 (PO decision 2026-11-09, small groups are packed): no two of these fit one Critic
+  // QG-04 (PO decision 2026-11-09, small groups are packed): no two of these fit one Critic. Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the bound is derived from the Critic budget
+  // now, so the fixture scales with it (same shape at 25: 24, 24 and 22 loose files; the shared entry holds the loose files plus the spec and the plan).
+  const fx = g2072Fixture({ core: SPLIT_MAX_CHANGED_FILES - 1, api: SPLIT_MAX_CHANGED_FILES - 1, loose: SPLIT_MAX_CHANGED_FILES - 3 });
   try {
     const changed = g2072Changed(fx);
     assert.ok(changed.length > SPLIT_MAX_CHANGED_FILES, `${changed.length} changed files`);
@@ -2336,15 +2342,17 @@ test("G20-72 above SPLIT_MAX_CHANGED_FILES the printed result carries one split 
     assert.match(printed.nextStep, /one Critic per split entry/u);
     assert.match(printed.nextStep, /critic-split-merge\.mjs --root <repo> --packet <packetId>/u);
     // C22 (CGF-03, QG-04 restated in place): `routeAssurance` is printed-only like the other admit fields and is set aside before the library comparison.
-    const { admitRequest: _a, admitCommand: _c, nextStep: _n, criticDispatchPromptLines: _l, taskIdResolution: _t, split: _s, routeAssurance: _r, ...rest } = printed;
+    // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the printed sizing of each part and the printed review paths are two more printed-only additions, set aside like the others.
+    const { admitRequest: _a, admitCommand: _c, nextStep: _n, criticDispatchPromptLines: _l, taskIdResolution: _t, split: _s, routeAssurance: _r, criticSizing: _z, criticReviewPaths: _p, ...rest } = printed;
     assert.deepEqual(rest, preflightModule.preflightCriticDispatchWithCoverage(g2072Input(fx)), "the admit fields and the split are the only additions");
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
 test("G20-72 a range at the bound prints no split and a next step without a merge; one file more prints it", async () => {
   const { SPLIT_MAX_CHANGED_FILES } = await import("../lib/critic-split.mjs");
-  const small = g2072Fixture({ core: 10, api: 9, loose: 4 });
-  const big = g2072Fixture({ core: 10, api: 10, loose: 4 });
+  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the fixture scales with the derived bound (core and api split what is left after 4 loose files, the spec and the plan; 10 and 9 at 25).
+  const small = g2072Fixture({ core: Math.ceil((SPLIT_MAX_CHANGED_FILES - 6) / 2), api: Math.floor((SPLIT_MAX_CHANGED_FILES - 6) / 2), loose: 4 });
+  const big = g2072Fixture({ core: Math.ceil((SPLIT_MAX_CHANGED_FILES - 6) / 2), api: Math.floor((SPLIT_MAX_CHANGED_FILES - 6) / 2) + 1, loose: 4 });
   try {
     assert.equal(g2072Changed(small).length, SPLIT_MAX_CHANGED_FILES);
     const atBound = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(small), { env: {} });
@@ -2362,7 +2370,8 @@ test("G20-72 a range at the bound prints no split and a next step without a merg
 // split did nothing. The case keeps its fixture and its "flagged, never drops a path" assertions and now pins that no entry is above the bound.
 test("G20-72 without an approved architecture plan the shared paths are cut along directories, flagged; no entry is above the bound and no path is dropped", async () => {
   const { SPLIT_MAX_CHANGED_FILES, attributeVerdict, criticSplitProblem } = await import("../lib/critic-split.mjs");
-  const fx = g2072Fixture({ plan: false });
+  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): src holds bound - 1 files whatever the bound is (12 and 12 at 25, the old default), plus 4 loose files and the spec.
+  const fx = g2072Fixture({ plan: false, core: Math.ceil((SPLIT_MAX_CHANGED_FILES - 1) / 2), api: Math.floor((SPLIT_MAX_CHANGED_FILES - 1) / 2) });
   try {
     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
     assert.deepEqual(split.entries.map((entry) => entry.id), ["shared-part-1", "shared-part-2"]);
@@ -2382,7 +2391,9 @@ test("G20-72 without an approved architecture plan the shared paths are cut alon
 test("G20-72 a module above the bound is cut into parts, one flat directory included, while a module that fits keeps its entry", async () => {
   const { SPLIT_MAX_CHANGED_FILES, criticSplitProblem } = await import("../lib/critic-split.mjs");
   // QG-04 (PO decision 2026-11-09, small groups are packed): api and the shared group are too large to fit with each other or with core-part-2, so every entry stays.
-  const fx = g2072Fixture({ core: 40, api: 13, loose: 13 });
+  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the sizes scale with the derived bound (40, 13 and 13 at 25): core-part-2 holds 0.6 of the bound, api 0.52, the shared group 0.6.
+  const rest = Math.ceil(SPLIT_MAX_CHANGED_FILES * 0.6);
+  const fx = g2072Fixture({ core: SPLIT_MAX_CHANGED_FILES + rest, api: Math.ceil(SPLIT_MAX_CHANGED_FILES * 0.52), loose: rest - 2 });
   try {
     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
     assert.deepEqual(split.entries.map((entry) => entry.id), ["api", "core-part-1", "core-part-2", "shared"]);
@@ -2396,7 +2407,8 @@ test("G20-72 a module above the bound is cut into parts, one flat directory incl
 
 test("C23 PO decision 2026-11-09: small groups share one Critic up to the bound, the packed entry names its members and covers every path, and a group that stays alone keeps its module", async () => {
   const { SPLIT_MAX_CHANGED_FILES, attributeVerdict, criticSplitProblem } = await import("../lib/critic-split.mjs");
-  const fx = g2072Fixture({ core: 40, api: 3, loose: 1 });
+  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): core is 2 x bound - 10 files (40 at 25), so core-part-2 is bound - 10 and the small module, that rest and the shared group (3 + rest + 3) still fit one Critic.
+  const fx = g2072Fixture({ core: 2 * SPLIT_MAX_CHANGED_FILES - 10, api: 3, loose: 1 });
   try {
     const first = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} }).split;
     assert.deepEqual(first.entries.map((entry) => entry.id), ["group-1", "core-part-1"], "the small module, the rest of core and the shared group take one Critic");
@@ -2409,7 +2421,8 @@ test("C23 PO decision 2026-11-09: small groups share one Critic up to the bound,
     assert.equal(attributeVerdict(first, { trajectory_evidence: `${packed.scopeMarker} reviewed` }), "group-1");
     assert.deepEqual(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} }).split, first, "admit rebuilds the identical object");
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
-  const alone = g2072Fixture({ core: 14, api: 14, loose: 14 });
+  const size = Math.floor(SPLIT_MAX_CHANGED_FILES / 2) + 2; // restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): 14 at the old bound of 25, two of these never fit one Critic
+  const alone = g2072Fixture({ core: size, api: size, loose: size });
   try {
     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(alone), { env: {} });
     assert.equal(split.entries.find((entry) => entry.id === "api").moduleId, "api", "a group nothing fits with stays alone and keeps its module");
@@ -2452,8 +2465,9 @@ test("G20-72 a split round leaves the named delivery records out of its parts an
 
 test("G20-72 delivery records count towards the size bound: a range they push over it is split, one that stays at the bound keeps them and is not split", async () => {
   const { SPLIT_MAX_CHANGED_FILES, criticSplitProblem } = await import("../lib/critic-split.mjs");
-  const over = g2072Fixture({ core: 5, api: 4, loose: 2, plan: false, delivery: 20 });
-  const atBound = g2072Fixture({ core: 5, api: 4, loose: 2, plan: false, delivery: 13 });
+  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the delivery records scale with the derived bound (20 and 13 at 25; 12 reviewable files stay below any bound this test can meet).
+  const over = g2072Fixture({ core: 5, api: 4, loose: 2, plan: false, delivery: SPLIT_MAX_CHANGED_FILES - 5 });
+  const atBound = g2072Fixture({ core: 5, api: 4, loose: 2, plan: false, delivery: SPLIT_MAX_CHANGED_FILES - 12 });
   try {
     assert.ok(g2072Changed(over).length > SPLIT_MAX_CHANGED_FILES);
     const { split } = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(over), { env: {} });
@@ -2482,13 +2496,57 @@ test("G20-72 a range of nothing but delivery records has no part to review and i
 test("G20-72 the bound exclusions do not count against the size bound, and a range above the entry bound is refused before anything is reserved", async () => {
   const { SPLIT_MAX_CHANGED_FILES, SPLIT_MAX_ENTRIES } = await import("../lib/critic-split.mjs");
   assert.equal(SPLIT_MAX_ENTRIES, 256);
-  const fits = g2072Fixture({ core: 10, api: 8, loose: 4, records: true });
+  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the fixture scales with the derived bound (10, 8 and 4 at 25; the spec, the plan and machine.json are reviewable too, two records are bound exclusions).
+  const fits = g2072Fixture({ core: Math.ceil((SPLIT_MAX_CHANGED_FILES - 7) / 2), api: Math.floor((SPLIT_MAX_CHANGED_FILES - 7) / 2), loose: 4, records: true });
   const huge = g2072Fixture({ core: SPLIT_MAX_ENTRIES * SPLIT_MAX_CHANGED_FILES + 1, api: 0, loose: 0, plan: false });
   try {
     assert.equal(g2072Changed(fits).length, SPLIT_MAX_CHANGED_FILES + 2);
     assert.equal(Object.hasOwn(preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fits), { env: {} }), "split"), false, "25 reviewable files fit one Critic");
     assert.throws(() => preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(huge), { env: {} }), (error) => error.code === "CDP-SPLIT-TOO-LARGE" && /later --base/u.test(error.details.repair));
   } finally { rmSync(fits.root, { recursive: true, force: true }); rmSync(huge.root, { recursive: true, force: true }); }
+});
+
+// C28-CRITIC-TOIL (AC-108, PO decision 2026-11-10): the one size bound follows the Critic budget instead of a first estimate. A part of 17 to 25 files reached its checkpoint at call 40
+// of 50 and needed a grant (live, greenfield reports). The Critic agent definition is preimage-pinned, so its 65 turns do not move: the part size does.
+test("C28 the split bound is derived from the Critic working cap and a stated reads-per-file figure, and the briefed budget of a part scales with its path count", async () => {
+  const split = await import("../lib/critic-split.mjs");
+  const { dispatchCheckpointThreshold, dispatchWorkingCap } = await import("../lib/dispatch-budget-core.mjs");
+  const definition = readFileSync(new URL("../agents/critic.md", import.meta.url), "utf8");
+  assert.equal(split.CRITIC_MAX_TURNS, Number(/^maxTurns:\s*(\d+)\s*$/mu.exec(definition)?.[1]), "the one turn figure is the pinned agent definition's own");
+  const workingCap = dispatchWorkingCap(split.CRITIC_MAX_TURNS);
+  assert.equal(workingCap, 50);
+  assert.ok(Number.isInteger(split.CRITIC_READS_PER_FILE) && split.CRITIC_READS_PER_FILE >= 2, "the stated figure is measured: 17 files used 40 calls with about 8 fixed ones");
+  const need = (files) => split.CRITIC_FIXED_CALLS + split.CRITIC_READS_PER_FILE * files + split.CRITIC_VERDICT_RESERVE;
+  assert.ok(split.SPLIT_MAX_CHANGED_FILES < 17, "a part of 17 files reached the checkpoint while still reading");
+  assert.ok(need(split.SPLIT_MAX_CHANGED_FILES) <= dispatchCheckpointThreshold(workingCap), "a part at the bound is read and its verdict composed before the checkpoint");
+  assert.ok(need(split.SPLIT_MAX_CHANGED_FILES + 1) > dispatchCheckpointThreshold(workingCap), "the bound is the largest part that fits");
+  const budgets = [1, 3, 6, split.SPLIT_MAX_CHANGED_FILES].map((files) => split.criticToolBudget(files));
+  assert.deepEqual(budgets, [...budgets].sort((left, right) => left - right), "the budget grows with the path count");
+  assert.ok(budgets[0] < budgets.at(-1) && budgets.at(-1) <= workingCap);
+  assert.equal(split.criticToolBudget(10_000), workingCap, "never above the working cap the shipped definition carries");
+  for (const files of [1, 6, split.SPLIT_MAX_CHANGED_FILES]) assert.ok(dispatchCheckpointThreshold(split.criticToolBudget(files)) >= need(files), `${files} files: the checkpoint comes after the review`);
+  assert.deepEqual(split.criticSizing(split.SPLIT_MAX_CHANGED_FILES), { files: split.SPLIT_MAX_CHANGED_FILES, toolBudget: split.criticToolBudget(split.SPLIT_MAX_CHANGED_FILES), workingCap, aboveBound: false });
+  const above = split.criticSizing(split.SPLIT_MAX_CHANGED_FILES + 1);
+  assert.equal(above.aboveBound, true);
+  assert.match(above.notice, new RegExp(`${split.SPLIT_MAX_CHANGED_FILES + 1} files`, "u"));
+  assert.match(above.notice, /budget checkpoint/u);
+  assert.match(above.notice, /80 or more/u, "the notes' sentence: a budget of 80 or more per Critic needs the pinned agent file (PO decision)");
+});
+
+test("C28 the printed split result carries the sizing of every part, and the library result stays byte-identical", async () => {
+  const { SPLIT_MAX_CHANGED_FILES, criticSizing } = await import("../lib/critic-split.mjs");
+  const fx = g2072Fixture({ core: SPLIT_MAX_CHANGED_FILES - 1, api: SPLIT_MAX_CHANGED_FILES - 1, loose: 2 });
+  try {
+    const printed = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(fx), { env: {} });
+    assert.deepEqual(printed.criticSizing.parts, printed.split.entries.map((entry) => ({ id: entry.id, ...criticSizing(entry.paths.length) })));
+    assert.ok(printed.criticSizing.parts.every((part) => part.aboveBound === false), "no part of a split is above the bound by construction");
+    assert.equal(Object.hasOwn(preflightCriticDispatch(g2072Input(fx)), "criticSizing"), false, "the library result is digest-bound by the session finalizer");
+    const small = g2072Fixture({ core: 2, api: 1, loose: 1 });
+    try {
+      const unsplit = preflightModule.preflightCriticDispatchWithAdmitRequest(g2072Input(small), { env: {} });
+      assert.deepEqual(unsplit.criticSizing.parts, [{ id: null, ...criticSizing(g2072Changed(small).length) }], "a range one Critic reads says how large its budget is");
+    } finally { rmSync(small.root, { recursive: true, force: true }); }
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});

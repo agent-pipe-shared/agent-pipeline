@@ -45,6 +45,22 @@ export function grantNoticeText({ agentId, summary, count, workingCap, baseWorki
     + (nativeHost ? NATIVE_HOST_FINAL_CONTRACT : "");
 }
 
+/**
+ * C28-CRITIC-TOIL: the one text a Critic is resumed with at its budget checkpoint: the grant digest and the probe-first rule, nothing about findings, verdicts or earlier rounds.
+ * Byte-equal to the `continuationMessage` of the grant result (a test compares them), and the only message the budget hook admits to a running Critic.
+ */
+export function criticResumeText({ digest }) {
+  return `Grant digest ${digest} is recorded (a grant is repeatable; resume this same agent with SendMessage). When you receive this message, make exactly one read-only tool call first; continue from your continuation card only after the budget hook's DISPATCH-BUDGET-GRANT notice in that call's result names this digest, otherwise do not act and report that no grant was found.`;
+}
+
+/** The refusal of a message to a running Critic that is not its generated resume text. It hands over the exact text to send and never repeats the refused message. */
+export function criticResumeRefusalText({ agentId, expected }) {
+  return `DISPATCH-BUDGET-CRITIC-RESUME-NOT-GENERATED: the message to the running Critic ${agentId} is not the generated resume text of its recorded grant. A Critic is resumed only with that text, which carries the grant digest and nothing about findings, verdicts or earlier rounds. `
+    + (expected === null
+      ? "No grant is recorded for this Critic: record one first (the grant line of its checkpoint notice), then send the generated text."
+      : `Send exactly this text, unchanged: ${expected}`);
+}
+
 // Every hand-back ends with a continuation card, and a budget grant is only ever what the hook announces.
 const CONTINUATION_CARD = "CONTINUATION CARD -- done: ...; remaining: ...; next step: ...";
 // A continued child has made no tool call when the continuation message arrives and the hook announces a grant only on the

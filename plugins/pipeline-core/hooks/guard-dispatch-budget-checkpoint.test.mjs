@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { GRANT_USAGE, grantDispatchBudget } from "../scripts/dispatch-budget-grant.mjs";
-import { checkpointNoticeText, grantCommandLine } from "../lib/dispatch-budget-notice.mjs";
+import { checkpointNoticeText, criticResumeText, grantCommandLine } from "../lib/dispatch-budget-notice.mjs";
 import { persistPendingDispatchBudgetBindings, readAgentMaxTurns } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetBinding, dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
 import { applyGovernanceScopeDecision, planGovernanceScopeDecision } from "../lib/governance-scope.mjs";
@@ -556,4 +556,65 @@ assert.equal(cases.length, 17, "the complete dispatch-budget checkpoint corpus m
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+// C28-CRITIC-TOIL (AC-108): a resumed Critic got a free-text message that carried the earlier round's verdict and then returned no schema verdict. A message to a Critic is now
+// admitted only as the one generated text of its recorded grant (the grant digest and nothing else). The guard sees a Claude SendMessage call only where hooks.json matches the tool
+// name (not yet: hooks/hooks.json is a protected file, so these cases drive the hook with the payload a wired matcher would hand it; the shape of that payload is NOT proven live).
+register("GDBC18", "hook: a message to a running Critic is refused unless it is the generated resume text of its recorded grant; other agents and unknown ids are untouched", () => {
+  const root = activeRoot("resume");
+  seed(root, { agentId: "rc1", agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 40, count: 32 });
+  seed(root, { agentId: "gf1", agentType: GOLDFISH, count: 20 });
+  const send = (to, message) => callGuard(root, { session_id: "s", transcript_path: join(root, "top.jsonl"), tool_name: "SendMessage", tool_input: { to, message } });
+  const none = send("rc1", "Continue the review.");
+  assert.equal(none.status, 2, "no grant is recorded: nothing to resume on");
+  assert.match(none.stderr, /DISPATCH-BUDGET-CRITIC-RESUME-NOT-GENERATED/u);
+  assert.match(none.stderr, /grant/u);
+  const granted = grantDispatchBudget(["--agent-id", "rc1", "--extra", "10", "--reason", "finish the remaining files", "--root", root]);
+  assert.equal(granted.status, "granted", JSON.stringify(granted));
+  const generated = criticResumeText({ digest: granted.result.digest });
+  assert.equal(generated, granted.result.continuationMessage, "the grant script and the guard hold one text");
+  assert.ok(generated.includes(granted.result.digest));
+  assert.doesNotMatch(generated, /finding|verdict|round|pass/iu, "the generated text carries the digest and nothing about earlier work");
+  for (const text of ["Round 1 said pass: false with two minors; please continue.", `${generated} Round 1 said pass: false.`, generated.toLowerCase(), ""]) {
+    const refused = send("rc1", text);
+    assert.equal(refused.status, 2, JSON.stringify(text));
+    assert.match(refused.stderr, /DISPATCH-BUDGET-CRITIC-RESUME-NOT-GENERATED/u);
+    assert.ok(refused.stderr.includes(generated), "the refusal hands over the exact text to send");
+    assert.equal(refused.stderr.includes("Round 1"), false, "the refusal never repeats the refused message");
+  }
+  assert.deepEqual([send("rc1", generated).status, send("rc1", generated).stderr], [0, ""]);
+  assert.equal(send("gf1", "any free text a Goldfish resume carries").status, 0, "only a Critic's resume is generated text");
+  assert.equal(send("not-an-agent", "hello").status, 0, "an id with no counter is no running Critic");
+});
+
+register("GDBC19", "hook: a Critic's read of a path its correction-input bindings exclude is refused with a code naming the binding; sources and other agents are untouched", () => {
+  const root = activeRoot("readbind");
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({ handover: "docs/state.md", criticFindingRecordPaths: ["docs/findings.md"] })}\n`);
+  const critic = (toolName, toolInput, agentId = "rb1") => {
+    seed(root, { agentId, agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 40, count: 3 });
+    return callGuard(root, subagentCall(root, agentId, CRITIC, toolName, toolInput));
+  };
+  const excluded = [
+    ["docs/state.md", /project-state record/u], ["docs/HISTORY.md", /project-state record/u], ["docs/state-archive/old.md", /project-state record/u],
+    ["evidence/critic/p1/verdict.json", /retained prior result/u], [`specs/f/evidence/critic-lineage-${"a".repeat(64)}.json`, /retained prior result/u],
+    ["specs/f/evidence/reader-review/spec/1.md", /retained prior result/u], ["docs/findings.md", /finding-disposition record/u],
+  ];
+  for (const [rel, role] of excluded) {
+    const absolute = join(root, ...rel.split("/"));
+    for (const [toolName, input] of [["Read", { file_path: absolute }], ["Grep", { pattern: "x", path: absolute }], ["Bash", { command: `cat ${rel}` }], ["Bash", { command: `git show abcdef0:${rel}` }]]) {
+      const refused = critic(toolName, input);
+      assert.equal(refused.status, 2, `${toolName} ${rel}`);
+      assert.match(refused.stderr, /CRITIC-READ-EXCLUDED-BY-BINDING/u);
+      assert.match(refused.stderr, role);
+      assert.match(refused.stderr, /correction-input-bindings/u, "the code names the binding");
+      assert.ok(refused.stderr.includes(rel), "the refusal names the path");
+    }
+  }
+  for (const [toolName, input] of [["Read", { file_path: join(root, "src", "a.mjs") }], ["Read", { file_path: join(root, "specs", "f", "spec.md") }], ["Bash", { command: "git diff abcdef0 1234567 -- src/a.mjs" }], ["Grep", { pattern: "x", path: join(root, "src") }]]) {
+    assert.equal(critic(toolName, input).status, 0, `${toolName} ${JSON.stringify(input)}`);
+  }
+  seed(root, { agentId: "gf2", agentType: GOLDFISH, count: 3 });
+  assert.equal(callGuard(root, subagentCall(root, "gf2", GOLDFISH, "Read", { file_path: join(root, "docs", "state.md") })).status, 0, "only a Critic is confined");
+});
+
 registerTestCaseCompletion({ cases: cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

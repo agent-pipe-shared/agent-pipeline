@@ -26,7 +26,7 @@ import { evaluateReviewAdmission } from "../lib/review-admission-read.mjs";
 import { criticCoverageAdvisory, listUncoveredCriticRecords, terminalAuthoredDelivery, walkDispatchRecordsForReview } from "../lib/review-admission-read.mjs";
 import { criticDisposition } from "../lib/critic-skip-decision.mjs";
 import { SAFE_ID, admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
-import { SPLIT_MAX_ENTRIES, buildCriticSplit } from "../lib/critic-split.mjs";
+import { SPLIT_MAX_ENTRIES, buildCriticSplit, criticReviewPaths, criticSizing } from "../lib/critic-split.mjs";
 import { loadProjectRoutingRegistry } from "../lib/runner-profiles-v3.mjs";
 import {
   CriticGuardrailDerivationError,
@@ -742,6 +742,12 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
     const reason = `This range needs ${split.entries.length} split entries, above the bound of ${SPLIT_MAX_ENTRIES} for one review round (${split.changedFileCount} changed files).`;
     fail("CDP-SPLIT-TOO-LARGE", reason, { reason, repair: "Review a narrower exact range (a later --base), or review the range in several delivery units." });
   }
+  // C28-CRITIC-TOIL: what one Critic can read within its budget, said before the dispatch. Every part of a split is at or below the bound by construction; a range one Critic reads and
+  // a current-artifact review scope (never split) can be above it, and then the notice names the figures instead of leaving the finding to a checkpoint in the middle of the review.
+  const reviewPaths = split === null ? criticReviewPaths({ root, result }) : null;
+  const sizingParts = split !== null ? split.entries.map((entry) => ({ id: entry.id, ...criticSizing(entry.paths.length) }))
+    : result.reviewScope !== undefined ? [{ id: null, ...criticSizing(result.reviewScope.paths?.length ?? 0) }]
+      : reviewPaths !== null ? [{ id: null, ...criticSizing(reviewPaths.length) }] : [];
   // 2026-11 greenfield reports: Antigravity Critics lost their first read to "path is not absolute". A prose line naming the root contradicted the
   // template's paths-only envelope and was dropped by the run; PO tile 2026-11-10: the envelope carries absolute paths instead (prepare-dispatch.mjs critic).
   const antigravity = criticRunnerFromEnv(deps.env ?? process.env) === "antigravity";
@@ -756,9 +762,11 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
     ...(course ? [] : ["This review is no feature package, so it needs a registered generic batch: run session-critic-finalizer.mjs register-batch first and copy its batchRef and memberSha256 into review.genericBatchRef."]),
     ...(promptLines === null ? [] : ["The Critic route is Opus: the Critic dispatch prompt carries criticDispatchPromptLines (MP-07), or the dispatch policy refuses it; the briefing files of prepare-dispatch.mjs critic already hold them."]),
     ...(split === null ? [] : [`SPLIT: this range has ${split.changedFileCount} changed files, above the bound of ${split.maxChangedFiles} one Critic can read, so it is split (split.entries, ${split.entries.length} entries, plan ${split.plan.status}; bound exclusions and the delivery records named in the review protocol §2.2 are in no entry). Dispatch one Critic per split entry from the template, each with its entry's reviewerInput, its entry's batchScopeLine as the Batch scope (MP-07) line${promptLines === null ? "" : " (in place of criticDispatchPromptLines[0]; keep the rationale line)"} and the instruction to begin trajectory_evidence with its scopeMarker; run each entry's Critic once (a second run for an entry makes finalize refuse the round). When every child has returned, merge them without copying any verdict: node \${PIPELINE_PLUGIN_ROOT}/scripts/critic-split-merge.mjs --root <repo> --packet <packetId> --out <merged verdict file>; only for a child without a Source return, save split as a JSON file under scratch/ and pass --split <split file> and --child <entryId>=<verdict file> (one per entry) instead of --packet; admit binds the split, finalize takes the merged verdict as verdictPath and labels it source-issued only when every child returned through the Critic stop.`]),
+    ...sizingParts.filter((part) => part.aboveBound).map((part) => `SIZE: ${part.notice}`),
   ].join(" ");
   return { ...result, admitRequest: request, admitCommand: ["node", ADMIT_SCRIPT, "admit", "--root", input.root, "--request", ADMIT_REQUEST_FILE], nextStep,
     ...(taskIdResolution === null ? {} : { taskIdResolution }), ...(promptLines === null ? {} : { criticDispatchPromptLines: promptLines }), ...(split === null ? {} : { split }),
+    criticSizing: { parts: sizingParts }, ...(reviewPaths === null ? {} : { criticReviewPaths: reviewPaths }),
     routeAssurance };
 }
 

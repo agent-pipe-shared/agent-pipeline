@@ -876,6 +876,22 @@ test("normal fresh-session finalization consumes the prelaunch packet, reads bac
   } finally { cleanup(fx); }
 });
 
+// C28-CRITIC-TOIL (AC-108): the finalize result shows the model verdict, the policy decision and the remaining findings as three separate things, and the next step follows the policy.
+test("a minor-only round with pass false completes as passed by policy and its display says so without asking for another round", () => {
+  const fx = fixture({ targetedExitCode: 1 });
+  try {
+    const minor = { gap: "gap", risk: "risk", severity: "minor", evidence: "a:1", spec_ref: "AC-1" };
+    const result = finalizeSessionCriticReview(preadmitted(fx, { packetId: "4".repeat(32), verdict: verdict({ pass: false, findings: [minor] }) }));
+    assert.equal(result.status, "completed");
+    assert.equal(result.receipt.reviewPass, true);
+    assert.deepEqual(result.display.modelVerdict, { pass: false });
+    assert.equal(result.display.policyDecision.reviewPass, true);
+    assert.deepEqual(result.display.remainingFindings, { total: 1, blocker: 0, major: 0, minor: 1 });
+    assert.match(result.display.nextStep, /passed by policy/u);
+    assert.doesNotMatch(result.display.nextStep, /open the next round/u);
+  } finally { cleanup(fx); }
+});
+
 test("a schema-invalid or contradictory verdict fails before packet or event publication", () => {
   const fx = fixture();
   try {
@@ -2755,12 +2771,14 @@ test("G20-69 the printed feature-package admit request is a v2 request carrying 
 
 // G20-72 (candidate 20e, AC-108): a review range too large for one Critic is split per module. Every module Critic has its own Source return; the merged verdict is
 // the merge of exactly those children, so a whole-feature review still ends in one SOURCE-issued verdict. Criterion-bound cases, written before the implementation existed.
+import { SPLIT_MAX_CHANGED_FILES } from "../lib/critic-split.mjs";
 const MERGE_SCRIPT = fileURLToPath(new URL("./critic-split-merge.mjs", import.meta.url));
 const NATIVE_HOOK = fileURLToPath(new URL("../hooks/native-goldfish-host.mjs", import.meta.url));
 function g2072Fixture() {
   const fx = fixture();
   // The fixture leaves its diagnostic untracked; the split candidate carries 48 module files, a PRD with the approved architecture design and its own diagnostic.
-  // QG-04 (PO decision 2026-11-09, small groups are packed): 24 files per module keep api, core and shared three entries, so this walk stays one Critic per entry.
+  // QG-04 (PO decision 2026-11-09, small groups are packed): bound - 1 files per module keep api, core and shared three entries, so this walk stays one Critic per entry.
+  // Restated 2026-11-10 (C28-CRITIC-TOIL, QG-04): the bound is derived from the Critic budget now, so the per-module count scales with it (24 at the old bound of 25).
   rmSync(join(fx.root, "evidence", "verify.json"), { force: true });
   rmSync(join(fx.root, "evidence", "targeted.log"), { force: true });
   const design = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield", disposition: { decision: "approved-scoped", scope: ["specs/", "src/"], rationale: "fixture" },
@@ -2771,7 +2789,7 @@ function g2072Fixture() {
   writeFileSync(join(fx.root, "specs", "prd.md"), `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(design, null, 2)}\n\`\`\`\n`);
   for (const dir of ["core", "api"]) {
     mkdirSync(join(fx.root, "src", dir), { recursive: true });
-    for (let index = 0; index < 24; index += 1) writeFileSync(join(fx.root, "src", dir, `m${index}.mjs`), `export const m${index} = ${index};\n`);
+    for (let index = 0; index < SPLIT_MAX_CHANGED_FILES - 1; index += 1) writeFileSync(join(fx.root, "src", dir, `m${index}.mjs`), `export const m${index} = ${index};\n`);
   }
   fx.candidate = commit(fx.root, "split candidate");
   fx.tree = git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`]);

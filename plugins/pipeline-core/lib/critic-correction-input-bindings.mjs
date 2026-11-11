@@ -97,6 +97,20 @@ function classify(path, handover, findingRecords = []) {
   return "source";
 }
 
+/**
+ * C28-CRITIC-TOIL (AC-108): the role of a repository-relative path in any Critic range's bindings, or null for a source path. The same classification the derivation applies, so a
+ * Critic's read guard needs no range lookup: a path classed here is excluded from every range's source diff and is never read by a Critic. `calibration` is the parsed project
+ * calibration or null; an unusable handover or finding-record list excludes nothing beyond the built-in conventions (the derivation itself refuses those, the guard never throws).
+ */
+export function criticExcludedRole(path, calibration = null) {
+  let handover = null;
+  let findingRecords = [];
+  try { handover = handoverOf(calibration); } catch { handover = null; }
+  try { findingRecords = findingRecordsOf(calibration); } catch { findingRecords = []; }
+  const role = classify(path, handover, findingRecords);
+  return role === "source" ? null : role;
+}
+
 function parseRaw(output) {
   const parts = output.split("\0");
   const entries = [];

@@ -16,16 +16,45 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { deriveCriticCorrectionInputBindings } from "./critic-correction-input-bindings.mjs";
+import { dispatchCheckpointThreshold, dispatchWorkingCap } from "./dispatch-budget-core.mjs";
 import { sha256Canonical } from "./review-economy.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 
 export const CRITIC_SPLIT_SCHEMA = "pipeline.critic-review-split.v1";
 /**
- * The ONE size bound. A Critic has `dispatchWorkingCap(65) = 65 - (CLOSING_ALLOWANCE 5 + SAFETY_MARGIN 10) = 50` working calls (lib/dispatch-budget-core.mjs), of which about half
- * are left for reading before the verdict is composed; at one read per changed file that is 25 files. FIRST ESTIMATE, to be calibrated: it comes from one measured run (about 10
- * modules, 287 tests, call 40 of 50 still in Phase 1), not from a distribution of reviews. Change it here and nowhere else.
+ * C28-CRITIC-TOIL (PO decision 2026-11-10): the part size follows the Critic budget. The agent definition (`agents/critic.md`, maxTurns 65) is preimage-pinned, so one Critic's budget
+ * cannot grow; a budget of 80 or more per Critic needs that pinned file and is a PO decision. A Critic has `dispatchWorkingCap(65) = 50` working calls (lib/dispatch-budget-core.mjs)
+ * and is told to hand back at the checkpoint, call 40. The review must be read AND its verdict composed before that call, so the figures below fix the one bound.
+ *
+ * MEASURED: the greenfield Critic parts of 17 to 25 changed files reached the checkpoint at call 40 of 50 while still reading. With about 8 fixed calls (spec criterion,
+ * guardrails, evidence, bindings, notes) that is (40 - 8) / 17 = 1.9 reads per file, so 2 (the file's diff and the source or test beside it). The verdict needs about 4 more.
+ * Still a small sample, not a distribution of reviews: change the figures here and nowhere else.
  */
-export const SPLIT_MAX_CHANGED_FILES = 25;
+export const CRITIC_MAX_TURNS = 65;
+export const CRITIC_FIXED_CALLS = 8;
+export const CRITIC_READS_PER_FILE = 2;
+export const CRITIC_VERDICT_RESERVE = 4;
+const CRITIC_WORKING_CAP = dispatchWorkingCap(CRITIC_MAX_TURNS);
+const criticReviewNeed = (files) => CRITIC_FIXED_CALLS + CRITIC_READS_PER_FILE * files + CRITIC_VERDICT_RESERVE;
+/** The ONE size bound: the largest part whose estimated calls end before the checkpoint of the full working cap (14 for the figures above). */
+export const SPLIT_MAX_CHANGED_FILES = Math.floor((dispatchCheckpointThreshold(CRITIC_WORKING_CAP) - CRITIC_FIXED_CALLS - CRITIC_VERDICT_RESERVE) / CRITIC_READS_PER_FILE);
+
+/** The base tool budget a Critic part of `files` paths is briefed with: the smallest base cap whose checkpoint comes after the estimated review, never above the working cap. */
+export function criticToolBudget(files) {
+  const need = criticReviewNeed(Math.max(0, Number.isSafeInteger(files) ? files : 0));
+  for (let budget = 1; budget < CRITIC_WORKING_CAP; budget += 1) if (dispatchCheckpointThreshold(budget) >= need) return budget;
+  return CRITIC_WORKING_CAP;
+}
+
+/**
+ * What the preflight prints for one part (or for a whole range one Critic reads): its path count, the budget it is briefed with and whether it is above the bound. A part above
+ * the bound (a current-artifact review scope is never split) says so here, with the figures, instead of leaving it to a budget checkpoint in the middle of the review.
+ */
+export function criticSizing(files) {
+  const sizing = { files, toolBudget: criticToolBudget(files), workingCap: CRITIC_WORKING_CAP, aboveBound: files > SPLIT_MAX_CHANGED_FILES };
+  if (!sizing.aboveBound) return sizing;
+  return { ...sizing, notice: `${files} files are above the ${SPLIT_MAX_CHANGED_FILES} one Critic reads within its budget (estimated ${criticReviewNeed(files)} calls against the budget checkpoint at call ${dispatchCheckpointThreshold(CRITIC_WORKING_CAP)} of ${CRITIC_WORKING_CAP}): expect a budget checkpoint and a grant, or review a smaller range. A budget of 80 or more per Critic needs the pinned agent file (agents/critic.md, maxTurns ${CRITIC_MAX_TURNS}; a PO decision), so the part size is the lever.` };
+}
 export const SPLIT_SHARED_ENTRY_ID = "shared";
 export const SPLIT_SCOPE_PREFIX = "scope:";
 export const splitScopeMarker = (id) => `${SPLIT_SCOPE_PREFIX}${id}`;
@@ -154,6 +183,26 @@ function packSmallGroups(parts, max, taken) {
 }
 
 /**
+ * The changed paths of a packet-ready exact-range result and the ones left once the bound exclusions are removed, or null (a review scope, no range, git unreadable).
+ * `remaining` is what a Critic is given as its path list and its diff command: no history path, prior review, verdict or receipt the bindings exclude (C28-CRITIC-TOIL).
+ */
+function rangePaths(root, result) {
+  if (result?.status !== "packet-ready" || result.reviewScope !== undefined || typeof result.candidate?.commit !== "string") return null;
+  const base = result.base?.commit ?? result.base?.tree;
+  const candidate = result.candidate.commit;
+  const changed = typeof base === "string" ? gitLines(root, ["diff", "--name-only", "--no-renames", "-z", base, candidate]) : null;
+  if (changed === null) return null;
+  const excluded = boundExclusions(root, base, candidate);
+  return { base, candidate, changed, remaining: changed.filter((file) => !excluded.has(file)) };
+}
+
+/** The reviewable paths of a packet-ready exact-range result (the bound exclusions left out), or null. Printed beside the result; the library result is unchanged. */
+export function criticReviewPaths({ root, result }) {
+  const range = rangePaths(root, result);
+  return range === null ? null : [...range.remaining].sort();
+}
+
+/**
  * The split of a packet-ready exact-range result, or null when the range fits one Critic (at most SPLIT_MAX_CHANGED_FILES changed files after the bound exclusions) or holds nothing but
  * delivery records. Delivery records count towards that bound, because an unsplit Critic would have them in its range, and are then left out of the parts.
  * One entry per module of the approved architecture plan that owns a changed path (disjoint scopes: a path goes to the module whose owned-path pattern matches it most
@@ -163,13 +212,9 @@ function packSmallGroups(parts, max, taken) {
  * @param {{ root: string, result: object }} input `result` is the library preflight result (status packet-ready, exact range).
  */
 export function buildCriticSplit({ root, result }) {
-  if (result?.status !== "packet-ready" || result.reviewScope !== undefined || typeof result.candidate?.commit !== "string") return null;
-  const base = result.base?.commit ?? result.base?.tree;
-  const candidate = result.candidate.commit;
-  const changed = typeof base === "string" ? gitLines(root, ["diff", "--name-only", "--no-renames", "-z", base, candidate]) : null;
-  if (changed === null) return null;
-  const excluded = boundExclusions(root, base, candidate);
-  const remaining = changed.filter((file) => !excluded.has(file));
+  const paths = rangePaths(root, result);
+  if (paths === null) return null;
+  const { base, candidate, changed, remaining } = paths;
   if (remaining.length <= SPLIT_MAX_CHANGED_FILES) return null;
   const reviewable = remaining.filter((file) => !isDeliveryRecord(file));
   if (reviewable.length === 0) return null;

@@ -312,6 +312,53 @@ test("prepare-dispatch derives the bindings file once, writes one briefing per s
   assert.equal(refused.stop.code, "PREP-BINDINGS-DIGEST");
 });
 
+// --- C28-CRITIC-TOIL (AC-108, PO decisions 2026-11-10 on the greenfield run reports) ---
+
+const budgetOf = (text) => Number(/Tool budget \(hard cap, first-class field\):\*\* ≤(\d+) tool uses/u.exec(text)?.[1]);
+const entryOf = (id, paths) => ({ id, moduleId: null, paths, scopeMarker: `scope:${id}`, reviewerInput: reviewerInput({ changedPaths: paths }),
+  batchScopeLine: `Batch scope (MP-07): path group ${id} of the reviewed range ${PREV.slice(0, 12)}..${HEAD.slice(0, 12)} (${paths.length} of 20 changed files), part 1 of 2 of one split review round.` });
+
+test("C28 the briefed tool budget of a part scales with its path count and never passes the working cap", async () => {
+  const { criticToolBudget } = await import("../lib/critic-split.mjs");
+  const render = (preflight, extra = {}) => criticBriefingLib.renderCriticBriefings({ preflight, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "claude", root: ROOT, projectName: "p", ...extra }).briefings;
+  const paths = (count) => Array.from({ length: count }, (_, index) => `src/m${index}.mjs`);
+  const small = budgetOf(render({ ...deltaSplitPreflight(), split: { entries: [entryOf("group-1", paths(2))] } })[0].text);
+  const large = budgetOf(render({ ...deltaSplitPreflight(), split: { entries: [entryOf("group-1", paths(14))] } })[0].text);
+  assert.equal(small, criticToolBudget(2));
+  assert.equal(large, criticToolBudget(14));
+  assert.ok(small < large && large <= 50, `${small} < ${large} <= 50`);
+  const unsplit = budgetOf(render({ ...deltaSplitPreflight(), split: undefined }, { reviewPaths: paths(5) })[0].text);
+  assert.equal(unsplit, criticToolBudget(5), "an unsplit range is sized by the paths the preflight printed");
+  assert.equal(budgetOf(render({ ...deltaSplitPreflight(), split: undefined })[0].text), 30, "without a path count the template default stays");
+});
+
+test("C28 the briefing names the review paths and a diff command without any excluded path, and the bindings are required where the preflight derived them", () => {
+  const render = (preflight, extra = {}) => criticBriefingLib.renderCriticBriefings({ preflight, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "claude", root: ROOT, projectName: "p", ...extra }).briefings;
+  const split = render(deltaSplitPreflight());
+  assert.ok(split[0].text.includes(`git diff --no-textconv --no-ext-diff ${PREV} ${HEAD} -- a.mjs`), "a part reads its own paths, literal pathspecs");
+  assert.ok(split[1].text.includes(`git diff --no-textconv --no-ext-diff ${PREV} ${HEAD} -- b.mjs`));
+  assert.equal(split[0].text.includes("b.mjs"), false, "a part names nothing of another part");
+  const whole = render({ ...deltaSplitPreflight(), split: undefined }, { reviewPaths: ["src/a.mjs", "src/b.mjs"] })[0].text;
+  assert.ok(whole.includes(`git diff --no-textconv --no-ext-diff ${PREV} ${HEAD} -- src/a.mjs src/b.mjs`));
+  assert.equal(whole.includes("evidence/critic/"), false, "the retained prior result the bindings exclude is in no path the briefing gives");
+  assert.throws(() => render({ ...deltaSplitPreflight(), split: undefined }, { bindingsPath: null }), { code: "CBB-BINDINGS-MISSING" });
+  assert.doesNotThrow(() => render({ ...deltaSplitPreflight(), split: undefined, correctionInputBindings: undefined }, { bindingsPath: null }), "a range without exclusions needs no bindings");
+});
+
+test("C28 prepare-dispatch hands the preflight's review paths to the briefing, and a delta round asks for no bindings file", () => {
+  const written = [];
+  const preflight = { ...deltaSplitPreflight(), split: undefined, criticReviewPaths: ["src/a.mjs", "src/b.mjs"] };
+  const steps = stub({ "critic-dispatch-preflight.mjs": ok(preflight), "critic-correction-input-bindings.mjs derive": ok({ digestSha256: "9".repeat(64), path: BINDINGS_FILE }), "git rev-list": { status: 0, stdout: `${MID}\n${HEAD}\n`, stderr: "" } });
+  const result = prepareCriticDispatch({ root: ROOT, spec: "specs/f/spec.md", base: PREV, candidate: HEAD, evidence: ["specs/f/evidence/suite-2.json"], deltaRequest: DELTA_REQUEST },
+    { exists: () => false, mkdir: () => {}, writeFile: (path, text) => written.push([path.replace(/\\/gu, "/"), text]), env: { CLAUDE_CODE_SESSION_ID: "s" }, runCommand: steps.runCommand });
+  assert.equal(result.status, "ready", JSON.stringify(result.stop ?? null));
+  assert.equal(steps.calls.find((call) => call.key === "critic-dispatch-preflight.mjs").argv.includes("--correction-input-bindings"), false, "no route asks for a bindings file: the preflight derives them from the range");
+  assert.equal(result.next.correctionInputBindings, BINDINGS_FILE);
+  const briefing = written.find(([path]) => path.endsWith(".briefing.md"))[1];
+  assert.ok(briefing.includes(BINDINGS_FILE));
+  assert.ok(briefing.includes(`-- src/a.mjs src/b.mjs`));
+});
+
 test("--help works in an empty directory and names both verbs", () => {
   const empty = mkdtempSync(join(tmpdir(), "prepare-dispatch-help-"));
   try {

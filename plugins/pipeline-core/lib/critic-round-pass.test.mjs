@@ -48,6 +48,38 @@ test("anything that is not a verdict fails closed", () => {
   for (const value of [null, undefined, "pass", {}, { pass: true }, { pass: true, findings: [] }]) assert.equal(criticRoundPassed(value), false);
 });
 
+// C28-CRITIC-TOIL (AC-108): a round's result is shown as three separate things, so a model pass:false with a passing policy decision cannot read as a failed round
+// (live, Codex round 4: the Elephant ran an extra round). Imported inside the cases so the cases above keep running whatever this export does.
+test("the display of a minor-only round with pass false keeps the model verdict, the policy decision and the remaining findings apart, and its next step follows the policy", async () => {
+  const { criticRoundDisplay } = await import("./critic-round-pass.mjs");
+  const display = criticRoundDisplay(verdict({ pass: false, findings: [finding("minor")] }));
+  assert.deepEqual(display.modelVerdict, { pass: false });
+  assert.equal(display.policyDecision.reviewPass, true);
+  assert.match(display.policyDecision.reason, /minor/iu);
+  assert.deepEqual(display.remainingFindings, { total: 1, blocker: 0, major: 0, minor: 1 });
+  assert.match(display.nextStep, /passed by policy/u);
+  assert.match(display.nextStep, /no further (?:Critic )?round/iu);
+  assert.doesNotMatch(display.nextStep, /open the next round/u);
+});
+
+test("the display of a round with a major finding fails by policy and sends the next step to a correction round", async () => {
+  const { criticRoundDisplay } = await import("./critic-round-pass.mjs");
+  const display = criticRoundDisplay(verdict({ pass: true, findings: [finding("major"), finding("minor")] }));
+  assert.deepEqual(display.modelVerdict, { pass: true });
+  assert.equal(display.policyDecision.reviewPass, false);
+  assert.deepEqual(display.remainingFindings, { total: 2, blocker: 0, major: 1, minor: 1 });
+  assert.match(display.nextStep, /did not pass by policy/u);
+  assert.match(display.nextStep, /open the next round/u);
+});
+
+test("the display of anything that is not a verdict fails closed and claims no model verdict", async () => {
+  const { criticRoundDisplay } = await import("./critic-round-pass.mjs");
+  for (const value of [null, undefined, "pass", {}]) {
+    const display = criticRoundDisplay(value);
+    assert.deepEqual([display.modelVerdict.pass, display.policyDecision.reviewPass, display.remainingFindings.total], [null, false, 0]);
+  }
+});
+
 test("a receipt written before the rule still matches its minor-only verdict, a contradicting receipt does not", () => {
   const minors = verdict({ pass: false, findings: [finding("minor")] });
   assert.equal(receiptMatchesVerdict(false, minors), true);

@@ -223,7 +223,8 @@ import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { bindDispatchBudget, consumePendingDispatchBudgetBinding, persistPendingDispatchBudgetBindings, readAgentMaxTurns, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetContractForRole } from "../lib/dispatch-policy.mjs";
-import { allowContextStdout, checkpointNoticeText, grantCommandLine, grantNoticeText, grantStateSentence, nativeHostBlockedContinuation } from "../lib/dispatch-budget-notice.mjs";
+import { criticExcludedRole } from "../lib/critic-correction-input-bindings.mjs";
+import { allowContextStdout, checkpointNoticeText, criticResumeRefusalText, criticResumeText, grantCommandLine, grantNoticeText, grantStateSentence, nativeHostBlockedContinuation } from "../lib/dispatch-budget-notice.mjs";
 import {
   CLOSING_ALLOWANCE,
   DENIAL_CODE,
@@ -1466,6 +1467,10 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
     // CRITIC-CKPT-F2 (Rulings 157/159/161): behind the budget decision on purpose. A write after the allowance is already
     // answered by the budget's own exhaustion refusal (CRITIC-CKPT-T2 (d2)-(d4)); only a call the budget admits reaches
     // this line, and a Critic write to anything but its notes file is then refused with a typed code (CRITIC-CKPT-T3).
+    if (isCriticAgentType(identity.agentType) && ["Read", "Grep", "Glob", "Bash"].includes(String(input?.tool_name ?? ""))) {
+      const excludedRead = criticReadRefusal(input, rootDir, dependencies);
+      if (excludedRead !== null) return excludedRead;
+    }
     if (isCriticAgentType(identity.agentType) && WRITE_TOOLS.includes(String(input?.tool_name ?? ""))) {
       if (writesOutsideCriticNotes(input, rootDir, identity, dependencies)) {
         return criticWriteConfined({ agentId: identity.agentId, agentType: identity.agentType });
@@ -1651,6 +1656,62 @@ function dispatchBudgetCallerIdentity(input) {
   });
 }
 
+/**
+ * C28-CRITIC-TOIL (AC-108): a message to a running Critic is admitted only as the one generated resume text of its recorded grant. A free-text resume carried the prior round's verdict
+ * to a stopped Critic (live, Codex and Claude greenfield runs) and the Critic then returned no schema verdict. Returns null (not a Critic's resume, or the exact generated text) or
+ * the refusal. The recipient is a Critic only when its own counter says so; an unknown id is untouched. It runs BEFORE the orchestrator exemption, because a resume is sent by the
+ * orchestrator. Claude fires this only where hooks.json matches the SendMessage tool name (the payload shape tool_input.to and message is assumed, not proven live).
+ */
+function criticResumeRefusal(input, commonDir, dependencies) {
+  const toolInput = input?.tool_input;
+  const target = [toolInput?.to, toolInput?.agent_id, toolInput?.agentId, toolInput?.recipient].find((value) => typeof value === "string" && value !== "");
+  if (!isValidGrantAgentId(target)) return null;
+  const path = counterPath(commonDir, target);
+  let counter;
+  try {
+    if (!(dependencies.existsSyncFn ?? existsSync)(path)) return null;
+    counter = JSON.parse((dependencies.readFileSyncFn ?? readFileSync)(path, "utf8"));
+  } catch { return null; }
+  if (counter?.agentId !== target || !isCriticAgentType(counter?.agentType)) return null;
+  const grant = readGrantedCalls(path, target, dependencies);
+  const expected = grant.summary === null ? null : criticResumeText({ digest: grant.summary.digest });
+  const message = toolInput.message ?? toolInput.content ?? toolInput.text;
+  if (expected !== null && message === expected) return null;
+  return verdict(2, `BLOCKED (guard-dispatch-budget, plugin pipeline-core): ${criticResumeRefusalText({ agentId: target, expected })}\n`);
+}
+
+/**
+ * C28-CRITIC-TOIL (AC-108): a Critic never reads a path the correction-input bindings exclude (retained prior results, the project-state record, finding-disposition records; review
+ * protocol 2.2). Live (Codex): a fresh Critic ran the range diff, the diff held an earlier review the bindings excluded, the Critic read it and had to abort. The refusal names the role
+ * and the bindings file. Read, Grep and Glob are judged by their path, Bash by every word of the command (a `rev:path` word by its path part). Classification is the derivation's own
+ * (lib/critic-correction-input-bindings.mjs), so no range lookup is needed. A command that names no excluded path is untouched: a range diff without pathspecs is a briefing matter
+ * (the generated briefing carries a diff command with literal source paths).
+ */
+function criticReadRefusal(input, rootDir, dependencies) {
+  const toolInput = input?.tool_input ?? {};
+  const toolName = String(input?.tool_name ?? "");
+  const words = toolName === "Bash" ? String(toolInput.command ?? toolInput.CommandLine ?? "").split(/\s+/u)
+    : [toolInput.file_path, toolInput.path, toolInput.pattern].filter((value) => typeof value === "string");
+  const root = String(rootDir ?? "").replaceAll("\\", "/").replace(/\/+$/u, "");
+  let calibration = null;
+  for (const name of ["project/pipeline.json", ".claude/pipeline.json"]) {
+    try { calibration = JSON.parse((dependencies.readFileSyncFn ?? readFileSync)(join(rootDir, ...name.split("/")), "utf8")); break; } catch { /* the next calibration location, or none */ }
+  }
+  for (const word of words) {
+    let rel = word.replace(/^["']|["']$/gu, "").replaceAll("\\", "/");
+    const revision = /^[0-9A-Za-z._~^@{}-]{2,}:(?!\/)(.+)$/u.exec(rel);
+    if (revision !== null) rel = revision[1];
+    if (root !== "" && rel.toLowerCase().startsWith(`${root.toLowerCase()}/`)) rel = rel.slice(root.length + 1);
+    rel = rel.replace(/^(?:\.\/)+/u, "");
+    if (rel === "" || rel.startsWith("-") || rel.startsWith("/") || rel.split("/").includes("..")) continue;
+    const role = criticExcludedRole(rel, calibration) ?? criticExcludedRole(`${rel}/`, calibration);
+    if (role !== null) {
+      return verdict(2, `BLOCKED (guard-dispatch-budget, plugin pipeline-core): CRITIC-READ-EXCLUDED-BY-BINDING: ${rel} is a ${role}, a path the correction-input-bindings file of a Critic range excludes. Never read it: verify its blob SHA-256 and mode from the correction-input-bindings file instead, and review only the literal source paths of your briefing.\n`);
+    }
+  }
+  return null;
+}
+
 function normalizedAgentType(value) {
   if (typeof value !== "string") return null;
   return value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
@@ -1697,6 +1758,11 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
       branch: "common-dir-unresolved", identityKind: identity.kind,
       root: rootDir, commonDir: null, transcriptPath: rawTranscriptPath, at: nowFn(),
     }));
+  }
+
+  if (String(input?.tool_name ?? "") === "SendMessage") {
+    const resumeRefusal = criticResumeRefusal(input, commonDir, options);
+    if (resumeRefusal !== null) return resumeRefusal;
   }
 
   if (identity.kind === "orchestrator") {
