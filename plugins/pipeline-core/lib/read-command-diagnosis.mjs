@@ -49,6 +49,37 @@ export function firstUnadmittedGlobValue(command, root) {
   return null;
 }
 
+export const EXTERNAL_DIRECTORY_FILTER_HINT = "a filename filter is admitted for a search inside the project, not for a directory outside it; "
+  + "search that directory without the filter, or name one file";
+
+/**
+ * Names the filename filter when it is the whole reason an `rg` search of an approved directory outside the project is refused: the same
+ * command without every `-g`/`--glob` pair is admitted. The filter stays refused there; this only says so. Same contract as above.
+ * @returns {string|null} the filter flag (as written), else null.
+ */
+export function filterRefusedOnExternalDirectory(command, root) {
+  if (typeof command !== "string" || command.trim() === "") return null;
+  let parsed;
+  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
+  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
+  const { executable, argv } = parsed.segments[0];
+  if (String(executable).split("/").pop() !== "rg" || isReadOnlyDiagnosticCommand(command, root)) return null;
+  const endOfOptions = argv.indexOf("--");
+  const limit = endOfOptions === -1 ? argv.length : endOfOptions;
+  const dropped = new Set();
+  let flag = null;
+  for (let index = 0; index < limit - 1; index += 1) {
+    if (argv[index] !== "-g" && argv[index] !== "--glob") continue;
+    flag ??= argv[index];
+    dropped.add(index).add(index + 1);
+    index += 1;
+  }
+  if (flag === null) return null;
+  const rest = argv.filter((_, position) => !dropped.has(position));
+  return isReadOnlyDiagnosticCommand([executable, ...rest.map(quote)].join(" "), root) ? flag : null;
+}
+
 /**
  * F9 (candidate 19): a flag written with its value attached (`-A8`, `-m5`, `--max-count=5`) is refused by the grammar, which takes the value as a
  * separate argument. Returns one sentence naming the spelling to use, or null for any other flag. Prose only; it grants nothing.

@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { isBoundedReadOnlyPipeline, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { evaluateLifecycleReadyGuard } from "./evaluate.mjs";
 import { isMissingSingleReadTarget } from "./read-scope.mjs";
@@ -31,6 +32,29 @@ function fixture(run) {
   try { run({ root, outside, parse, guard }); }
   finally { rmSync(base, { recursive: true, force: true }); }
 }
+
+test("a read of the plugin's own files is never reported as outside the project when a flag or value is the fault", () => fixture(({ guard }) => {
+  const pluginRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
+  const overLimit = guard(`rg -n "a" ${join(pluginRoot, "lib/guard/verdict.mjs")} --max-columns 620`);
+  assert.equal(overLimit.exitCode, 2);
+  assert.match(overLimit.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u);
+  assert.match(overLimit.stderr, /--max-columns|flags or spelling/u);
+  const filtered = guard(`rg -n "a" ${join(pluginRoot, "templates")} --glob "*.md"`);
+  assert.equal(filtered.exitCode, 2);
+  assert.match(filtered.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u);
+  assert.match(filtered.stderr, /the filter "--glob"/u);
+  assert.equal(guard(`rg -n "a" ${join(pluginRoot, "templates")}`).exitCode, 0);
+}));
+
+test("a target truly outside the project keeps the scope refusal, and a missing plugin file keeps its own text", () => fixture(({ outside, guard }) => {
+  const outsideRead = guard(`rg -n "a" ${join(outside, "ordinary.txt")} --max-columns 620`);
+  assert.equal(outsideRead.exitCode, 2);
+  assert.match(outsideRead.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+  const pluginRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
+  const missing = guard(`rg -n "a" ${join(pluginRoot, "lib/guard/does-not-exist.mjs")} --max-columns 620`);
+  assert.equal(missing.exitCode, 2);
+  assert.match(missing.stderr, /GUARD-READ-TARGET-MISSING/u);
+}));
 
 test("original quoted test-file narrowing is admitted through parser and actual guard", () => fixture(({ root, parse, guard }) => {
   for (const path of ["plugins/pipeline-core", `'${join(root, "plugins/pipeline-core")}'`]) {
