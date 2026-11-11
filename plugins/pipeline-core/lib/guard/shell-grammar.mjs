@@ -1185,7 +1185,9 @@ export function qp4OperandResolvesOutsideRoot(parsed, root) {
     if (candidate === null || pathInside(rootResolved, resolve(candidate))) return false;
     // Label only. An existing file in the plugin's own approved read root is not the cause when a read of it is refused: the flag or value is,
     // and "outside the project" would send the agent looking for another path. A plugin path that does not exist keeps this label, because
-    // the caller then prints the missing-plugin-file text.
+    // the caller then prints the missing-plugin-file text. A dot-dot segment keeps the label too: that spelling is the refused part,
+    // whatever file it lands on (C23 AC-108).
+    if (/(^|[\\/])\.\.([\\/]|$)/u.test(token)) return true;
     return !(existsSync(candidate) && BOUNDED_PIPELINE_ADDITIONAL_ROOTS.some((approved) => isRealpathedWithinBoundary(candidate, approved)));
   });
 }
