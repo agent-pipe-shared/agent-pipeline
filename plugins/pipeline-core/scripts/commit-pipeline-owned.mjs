@@ -15,8 +15,9 @@
 //
 // Prints one JSON result. Exit 0: committed | nothing-to-commit | dry-run. Exit 2: refused.
 import { spawnSync } from "node:child_process";
-import { realpathSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { classifyDirtyTree, porcelainPaths } from "../lib/pipeline-owned-files.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -28,8 +29,12 @@ const BODY = "chore(pipeline): commit the Pipeline's own state files\n\n"
   + "itself and would otherwise keep the tree a push needs clean dirty.\n";
 const AGENT_TRAILERS = "\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n";
 
-export function commitPipelineOwnedMessage({ agent }) {
-  return agent ? BODY + AGENT_TRAILERS : BODY;
+const CARRIED_NOTE = "\nThe feature manifest in this commit lists candidate evidence that was not committed yet;\n"
+  + "those files, with exactly the listed bytes, are committed with it.\n";
+
+export function commitPipelineOwnedMessage({ agent, carried = false }) {
+  const body = carried ? BODY + CARRIED_NOTE : BODY;
+  return agent ? body + AGENT_TRAILERS : body;
 }
 
 function parse(argv) {
@@ -72,16 +77,68 @@ export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
   const untracked = new Set(porcelainPaths(status.stdout.split("\n").filter((line) => line.startsWith("?? ")).join("\n")));
   const blocking = others.filter((path) => !untracked.has(path));
   const untouched = others.filter((path) => untracked.has(path));
-  const left = untouched.length ? { untouched } : {};
-  if (blocking.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(blocking), others: blocking, owned, ...left };
+  if (blocking.length) {
+    const left = untouched.length ? { untouched } : {};
+    return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(blocking), others: blocking, owned, ...left };
+  }
+  const evidence = manifestEvidence(root, owned, untracked, git);
+  if (evidence.refusal) return { status: "refused", code: "CPO-MANIFEST-EVIDENCE", reason: evidence.refusal, owned, missing: evidence.missing };
+  const carried = evidence.carried;
+  const rest = untouched.filter((path) => !carried.includes(path));
+  const left = { ...(rest.length ? { untouched: rest } : {}), ...(carried.length ? { carried } : {}) };
   if (!owned.length) return { status: "nothing-to-commit", owned: [], ...left };
   if (parsed.dryRun) return { status: "dry-run", owned, ...left };
-  const add = git(["add", "--", ...owned]);
+  const paths = [...owned, ...carried];
+  const add = git(["add", "--", ...paths]);
   if (!isSuccessfulSpawn(add)) return { status: "refused", code: "CPO-GIT", reason: "git add failed", owned };
-  const commit = git(["commit", "-m", commitPipelineOwnedMessage({ agent: parsed.agent }), "--", ...owned]);
+  const commit = git(["commit", "-m", commitPipelineOwnedMessage({ agent: parsed.agent, carried: carried.length > 0 }), "--", ...paths]);
   if (!isSuccessfulSpawn(commit)) return { status: "refused", code: "CPO-GIT", reason: `git commit failed: ${String(commit.stderr ?? "").trim().slice(0, 300)}`, owned };
   const head = git(["rev-parse", "HEAD"]);
   return { status: "committed", owned, commit: isSuccessfulSpawn(head) ? head.stdout.trim() : null, ...left };
+}
+
+// Codex greenfield, candidate 27 (2026-11-10): the close route sent the agent here with a feature manifest that already
+// listed `evidence/final-candidate-verify.json` while that file was still untracked. The manifest was committed alone,
+// the evidence 46 s later; every later Critic course read walks each manifest revision and reads each listed evidence file
+// at that revision, so the course of that feature could never resolve again (CCA-EVIDENCE-MODE / CCA-EVIDENCE-READ).
+// An owned manifest therefore goes into a commit only together with every candidate-evidence file it lists: an untracked
+// regular file whose bytes match the listed digest is carried into the same commit; anything else refuses, naming it.
+const FEATURE_MANIFEST = /^specs\/([A-Za-z0-9][A-Za-z0-9._-]*)\/lifecycle\.json$/u;
+
+function manifestEvidence(root, owned, untracked, git) {
+  const carried = [];
+  const missing = [];
+  for (const manifestPath of owned) {
+    const match = FEATURE_MANIFEST.exec(manifestPath);
+    if (!match) continue;
+    let manifest;
+    try { manifest = JSON.parse(readFileSync(join(root, manifestPath), "utf8")); } catch { continue; }
+    const listed = (Array.isArray(manifest?.artifacts) ? manifest.artifacts : [])
+      .filter((entry) => entry?.class === "candidate-evidence" && typeof entry.path === "string");
+    if (!listed.length) continue;
+    const tracked = git(["ls-files", "-z", "--", `specs/${match[1]}`]);
+    if (!isSuccessfulSpawn(tracked) || typeof tracked.stdout !== "string") return { refusal: "git ls-files failed", missing: [], carried: [] };
+    const trackedPaths = new Set(tracked.stdout.split("\0").filter(Boolean));
+    for (const entry of listed) {
+      if (trackedPaths.has(entry.path) || carried.includes(entry.path)) continue;
+      let ok = false;
+      if (untracked.has(entry.path) && entry.path.startsWith(`specs/${match[1]}/evidence/`) && !entry.path.split("/").includes("..")) {
+        try {
+          const file = join(root, entry.path);
+          const info = lstatSync(file);
+          ok = info.isFile() && !info.isSymbolicLink()
+            && createHash("sha256").update(readFileSync(file)).digest("hex") === entry.sha256;
+        } catch { ok = false; }
+      }
+      if (ok) carried.push(entry.path); else missing.push(entry.path);
+    }
+  }
+  if (missing.length) {
+    return { carried: [], missing, refusal: `the feature manifest lists candidate evidence that is neither committed nor an untracked file with exactly the listed bytes (${missing.join(", ")}). `
+      + "Committing the manifest without it would leave a manifest revision that names a file its own commit does not hold, and the Critic course of that feature could not be read again. "
+      + "Restore or re-register that evidence first (register-feature-package.mjs), then rerun this command." };
+  }
+  return { carried, missing: [] };
 }
 
 if (isDirectInvocation(import.meta.url)) {
