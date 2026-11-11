@@ -25,6 +25,7 @@ import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
 import { admitSessionCriticReview } from "./session-critic-finalizer.mjs";
 import * as readModule from "../lib/session-critic-finalizer-read.mjs";
 import { dispatchFindings } from "../lib/dispatch-policy.mjs";
+import { CRITIC_DISPATCH_PROSE } from "../hooks/antigravity-pretool-guard.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
 import { CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA, CriticCorrectionInputBindingsError, FINDING_RECORDS_FIELD, bindingsRoleCounts, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
@@ -2149,6 +2150,20 @@ test("AGY report: an Antigravity Critic gets one generated line naming the repos
     for (const env of [{ CLAUDE_CODE_SESSION_ID: "s" }, { CODEX_SESSION_ID: "s" }, {}]) {
       assert.equal(Object.hasOwn(g2069Printed(fx, {}, { env }), "criticRunnerPromptLines"), false, JSON.stringify(env));
     }
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+// Antigravity greenfield 2026-11-10: the run pasted the generated lines as nextStep says and the Antigravity guard refused the Critic
+// dispatch under its Contamination Rule, because the Opus rationale line said "security review". Every generated prompt line must pass
+// that same rule (imported from the guard, not copied).
+test("AGY report: every generated Critic prompt line passes the Antigravity Contamination Rule", () => {
+  const fx = fixture();
+  try {
+    const printed = g2069Printed(fx, {}, { env: { ANTIGRAVITY_AGENT: "antigravity" } });
+    const lines = [...printed.criticRunnerPromptLines, ...(printed.criticDispatchPromptLines ?? [])];
+    assert.ok(printed.criticDispatchPromptLines?.length === 2, "control: the registered Critic route is Opus, so the MP-07 lines are printed too");
+    for (const line of lines) assert.doesNotMatch(line, CRITIC_DISPATCH_PROSE, line);
+    assert.match(CRITIC_DISPATCH_PROSE.source, /review/u, "control: the rule still names the trigger word");
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 

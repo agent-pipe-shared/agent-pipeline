@@ -618,6 +618,11 @@ export function issueAntigravityCriticReturn(input, attributed, { nowMs = Date.n
 /** C21B: the one refusal a Critic child gets when its message to the parent carries no verdict while its packet waits for one. */
 export const CRITIC_VERDICT_REQUIRED_DENIAL = "BLOCKED (Antigravity Critic return): CRITIC-VERDICT-JSON-REQUIRED: this message to your parent carries no machine-readable verdict that holds together (pass may be true only when no finding is blocker or major, briefing_violations is empty and trajectory_verdict is consistent), so the review cannot be bound to its packet and the feature close would need a PO signature. Send the same report again and end it with one fenced json block holding exactly the keys findings, deliberately_not_flagged, trajectory_verdict, trajectory_evidence, briefing_violations and pass (each finding: gap, risk, severity blocker|major|minor, evidence, spec_ref; trajectory_verdict: consistent|inconsistent|not verifiable). If you cannot state a verdict, send your message unchanged: this refusal happens once.";
 
+// The Contamination Rule's trigger words for a Critic dispatch prompt (Hardening Layer below). Exported so the generators of Critic
+// prompt lines (critic-dispatch-preflight.mjs) can be tested against the same rule: an Antigravity greenfield run on 2026-11-10 was
+// refused after pasting the generated lines, because one of them said "security review".
+export const CRITIC_DISPATCH_PROSE = /(?<![\w-])(you are|please|examine|look at|review)\b/i;
+
 export async function runAntigravityPreToolGuard(rawInput) {
   // M4b: a native child in a branch worktree names the worktree FIRST in workspacePaths. The worktree is outside the project and carries no
   // governance marker, so every check below would see an ungoverned directory and allow the call (measured: even `git push origin main`).
@@ -795,7 +800,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
       // only word-characters and the hyphen keeps the D2 fix (a hyphen still is not a boundary)
       // while restoring detection for every other non-word character that can precede a
       // trigger word in ordinary prose.
-      if (/(?<![\w-])(you are|please|examine|look at|review)\b/i.test(prompt)) {
+      if (CRITIC_DISPATCH_PROSE.test(prompt)) {
         deny("BLOCKED (Hardening Layer): Critic dispatch prompt contains prose. Only paths and refs are allowed (Contamination Rule).");
       }
     }
