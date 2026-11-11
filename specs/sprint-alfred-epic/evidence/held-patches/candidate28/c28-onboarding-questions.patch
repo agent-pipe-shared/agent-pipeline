@@ -1,0 +1,1154 @@
+diff --git a/docs/v3-consumer-onboarding.md b/docs/v3-consumer-onboarding.md
+index 2b5703af9..37a0614aa 100644
+--- a/docs/v3-consumer-onboarding.md
++++ b/docs/v3-consumer-onboarding.md
+@@ -168,9 +168,12 @@ operator's live onboarding acceptance.
+ Advisor and Critic export consent is not an onboarding precondition; see
+ [private review export](usage.md#private-review-export). Whether the Advisor may
+ receive repository data depends on the recorded `advisor_export.consent`
+-(`approved` or `declined`), which the onboarding Driver asks for explicitly;
+-nothing is exported without a recorded consent, and this guide does not state a
+-default for a missing field. Do not run a
++(`approved` or `declined`). The Advisor export is part of the first Pipeline
++consent question (the question names it, and a yes records it in the same consent
++record), so the first onboarding round no longer asks it a second time; a project
++whose consent record does not name it (an older record, a no, none) is still asked
++`approved` or `declined` explicitly by the onboarding Driver. Nothing is exported
++without a recorded consent, and this guide does not state a default for a missing field. Do not run a
+ consultation merely to activate or bootstrap.
+ 
+ ## Legacy consumer with no projections
+diff --git a/plugins/pipeline-core/lib/critic-evidence-carry.mjs b/plugins/pipeline-core/lib/critic-evidence-carry.mjs
+index 785caae66..c3ac6f447 100644
+--- a/plugins/pipeline-core/lib/critic-evidence-carry.mjs
++++ b/plugins/pipeline-core/lib/critic-evidence-carry.mjs
+@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
+ import { administrationDocumentationClassOf } from "./administration-documentation-paths.mjs";
++import { promoteRepositoryModeBytes } from "../scripts/repository-mode-promote.mjs";
+ 
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const MAX_RANGE_COMMITS = 512;
+@@ -50,9 +51,33 @@ function changedEntries(root, from, to) {
+   return entries;
+ }
+ 
+-function offending(entries, featureIds) {
++const CALIBRATION_TWINS = new Set(["project/pipeline.json", ".claude/pipeline.json"]);
++const GIT_ENV = { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: GIT_NULL_DEVICE,
++  GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_COUNT: "0", GIT_TERMINAL_PROMPT: "0" };
++
++function blobBytes(root, commit, path) {
++  const result = spawnSync("git", ["-C", root, "cat-file", "blob", `${commit}:${path}`], { shell: false, encoding: "buffer", timeout: 10000, maxBuffer: 2 * 1024 * 1024, env: GIT_ENV });
++  return !result.error && !result.signal && result.status === 0 ? result.stdout : null;
++}
++
++/**
++ * C28-ONBOARDING-QUESTIONS (AC-108, PO decision 2026-11-10). The calibration twins are content, so the one commit that moved `repositoryMode` from local-only
++ * to remote-tracked ended the Critic carry and the first push could not continue in the same feature. This admits exactly that change and nothing else: the
++ * twin is modified (regular file both sides) and the reviewed bytes run through repository-mode-promote.mjs's own rule equal the candidate bytes. Any other byte
++ * of the calibration, the other direction, another path or a mode change is still content. Unreadable blobs answer no.
++ */
++function isRepositoryModePromotion(entry, ctx) {
++  if (ctx === null || entry.status !== "M" || entry.oldMode !== "100644" || entry.newMode !== "100644" || !CALIBRATION_TWINS.has(entry.path)) return false;
++  const before = blobBytes(ctx.root, ctx.from, entry.path);
++  const after = blobBytes(ctx.root, ctx.to, entry.path);
++  if (before === null || after === null) return false;
++  const promoted = promoteRepositoryModeBytes(before);
++  return promoted.ok === true && Buffer.compare(promoted.bytes, after) === 0;
++}
++
++function offending(entries, featureIds, ctx = null) {
+   return entries.filter((entry) => !["A", "M", "D"].includes(entry.status) || !REGULAR.has(entry.oldMode) || !REGULAR.has(entry.newMode)
+-    || administrationDocumentationClassOf(entry.path, { featureIds }) === null).map((entry) => entry.path);
++    || (administrationDocumentationClassOf(entry.path, { featureIds }) === null && !isRepositoryModePromotion(entry, ctx))).map((entry) => entry.path);
+ }
+ 
+ /**
+@@ -80,7 +105,7 @@ export function decideCriticEvidenceCarry({ repoRoot, reviewedCommit, candidateC
+     const tree = git(repoRoot, ["rev-parse", `${candidateCommit}^{tree}`]);
+     if (entries === null || tree.status !== 0 || !OID.test(tree.stdout.trim())) return answer({ ...base, code: "CEC-UNREADABLE" });
+     const changedPaths = entries.map((entry) => entry.path);
+-    const bad = offending(entries, featureIds);
++    const bad = offending(entries, featureIds, { root: repoRoot, from: reviewedCommit, to: candidateCommit });
+     if (bad.length > 0) return answer({ ...base, code: "CEC-CONTENT-CHANGED", changedPaths: Object.freeze(changedPaths), offendingPaths: Object.freeze(bad) });
+     return answer({ ...base, carried: true, code: "CEC-CARRIED", candidateTree: tree.stdout.trim(),
+       passedOverCommits: Object.freeze(commits), changedPaths: Object.freeze(changedPaths) });
+@@ -100,7 +125,7 @@ export function administrationDocumentationOnlyCommit(repoRoot, commit, { featur
+     if (parents.status !== 0 || ids.length !== 2 || ids[0] !== commit) return false;
+     const entries = changedEntries(repoRoot, ids[1], commit);
+     if (entries === null || entries.length === 0) return false;
+-    return entries.every((entry) => !entry.path.endsWith("/lifecycle.json")) && offending(entries, featureIds).length === 0;
++    return entries.every((entry) => !entry.path.endsWith("/lifecycle.json")) && offending(entries, featureIds, { root: repoRoot, from: ids[1], to: commit }).length === 0;
+   } catch { return false; }
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/critic-evidence-carry.test.mjs b/plugins/pipeline-core/lib/critic-evidence-carry.test.mjs
+index 9ab796b05..8d4084f00 100644
+--- a/plugins/pipeline-core/lib/critic-evidence-carry.test.mjs
++++ b/plugins/pipeline-core/lib/critic-evidence-carry.test.mjs
+@@ -121,6 +121,49 @@ test("an administration-only range is carried and names the passed-over commits"
+   for (const commit of [d1, d2, d3]) assert.match(readback, new RegExp(commit.slice(0, 8), "u"));
+ });
+ 
++// C28-ONBOARDING-QUESTIONS (AC-108), friction 4. Why the correction was deferred: the calibration twins are content, so the one commit that moves
++// repositoryMode from local-only to remote-tracked ended the Critic carry (CVL-CARRY-CONTENT-CHANGED) and the first push could not continue in the same
++// feature. Only that exact byte change (repository-mode-promote.mjs's own rule) is carried; every other calibration change is still content.
++const CALIBRATION = (mode, extra = "") => `{\r\n  "project": "p",\r\n  "stakes": "standard",\r\n  "repositoryMode": "${mode}"${extra}\r\n}\r\n`;
++test("the exact repositoryMode promotion of both calibration twins is carried; any other calibration change ends the carry", (t) => {
++  const r = repo(t);
++  r.write("src/app.js", "1\n"); r.write("project/pipeline.json", CALIBRATION("local-only")); r.write(".claude/pipeline.json", CALIBRATION("local-only"));
++  const reviewed = r.commit("reviewed");
++  r.write("project/pipeline.json", CALIBRATION("remote-tracked")); r.write(".claude/pipeline.json", CALIBRATION("remote-tracked"));
++  const promoted = r.commit("promote");
++  const carried = decide(r, reviewed, promoted);
++  assert.equal(carried.carried, true, JSON.stringify(carried));
++  assert.deepEqual(carried.passedOverCommits, [promoted]);
++  assert.equal(administrationDocumentationOnlyCommit(r.root, promoted), true, "the per-commit test of the registration course agrees");
++  // Near misses, each from a fresh reviewed commit: all stay content.
++  const miss = (mutate) => {
++    const m = repo(t);
++    m.write("src/app.js", "1\n"); m.write("project/pipeline.json", CALIBRATION("local-only")); m.write(".claude/pipeline.json", CALIBRATION("local-only"));
++    const base = m.commit("reviewed");
++    mutate(m);
++    return { m, decision: decide(m, base, m.commit("change")) };
++  };
++  for (const [name, mutate] of [
++    ["another field changes with it", (m) => m.write("project/pipeline.json", CALIBRATION("remote-tracked").replace('"standard"', '"critical"'))],
++    ["a field is added", (m) => m.write("project/pipeline.json", CALIBRATION("remote-tracked", ',\r\n  "x": 1'))],
++    ["a gate is weakened without the mode moving", (m) => m.write("project/pipeline.json", CALIBRATION("local-only").replace('"standard"', '"minimal"'))],
++    ["host-managed is not the promotion target", (m) => m.write("project/pipeline.json", CALIBRATION("host-managed"))],
++    ["the bytes are rewritten (line ending changes)", (m) => m.write("project/pipeline.json", CALIBRATION("remote-tracked").replaceAll("\r\n", "\n"))],
++    ["a source file rides along", (m) => { m.write("project/pipeline.json", CALIBRATION("remote-tracked")); m.write("src/app.js", "2\n"); }],
++    ["another calibration-like path", (m) => m.write("project/other.json", CALIBRATION("remote-tracked"))],
++    ["the file becomes executable", (m) => { m.write("project/pipeline.json", CALIBRATION("remote-tracked")); chmodSync(join(m.root, "project/pipeline.json"), 0o755); }],
++  ]) {
++    const { decision } = miss(mutate);
++    assert.equal(decision.carried, false, `${name}: ${JSON.stringify(decision)}`);
++    assert.equal(decision.code, "CEC-CONTENT-CHANGED", name);
++  }
++  const back = repo(t);
++  back.write("project/pipeline.json", CALIBRATION("remote-tracked"));
++  const reviewedRemote = back.commit("reviewed remote-tracked");
++  back.write("project/pipeline.json", CALIBRATION("local-only"));
++  assert.equal(decide(back, reviewedRemote, back.commit("demote")).carried, false, "the other direction (remote-tracked to local-only) is content");
++});
++
+ test("one source file anywhere in the range ends the carry, even when later commits are administration only", (t) => {
+   const r = repo(t);
+   r.write("src/app.js", "1\n");
+diff --git a/plugins/pipeline-core/lib/machine-plane.mjs b/plugins/pipeline-core/lib/machine-plane.mjs
+index 2539a7fe3..9d30a183d 100644
+--- a/plugins/pipeline-core/lib/machine-plane.mjs
++++ b/plugins/pipeline-core/lib/machine-plane.mjs
+@@ -35,7 +35,43 @@ const MACHINE_PLANE_KEYS = Object.freeze([
+ ]);
+ // C27 (PO decision 2026-11-10, EL-36 amended): may be absent, so every machine file written before it stays valid. Attribution only: the label fills `--by`,
+ // it never stands in for a signature or a PO decision.
+-const OPTIONAL_MACHINE_PLANE_KEYS = Object.freeze(["operatorLabel"]);
++const OPTIONAL_MACHINE_PLANE_KEYS = Object.freeze(["operatorLabel", "pushTransport"]);
++
++// C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10): optional `pushTransport` = { <remote name>: { kind, reference } }. The transport of a push (which SSH key,
++// or the credential helper) is asked once at the first push setup and kept HERE, machine-local, never in a tracked file; later pushes read it. A name or path
++// only, never a key's content (the shape check below and writeMachinePlane's key-material refusal both apply). Mirrored in lib/po-human-approval-read.mjs.
++export const PUSH_TRANSPORT_KINDS = Object.freeze(["ssh-key", "credential-helper", "configured-default"]);
++export function validPushTransport(value) {
++  if (value === null) return true;
++  if (!object(value)) return false;
++  for (const [remote, entry] of Object.entries(value)) {
++    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u.test(remote) || !object(entry)) return false;
++    if (Object.keys(entry).some((key) => key !== "kind" && key !== "reference") || !PUSH_TRANSPORT_KINDS.includes(entry.kind)) return false;
++    if (entry.kind === "configured-default") { if (entry.reference !== null) return false; continue; }
++    if (typeof entry.reference !== "string" || entry.reference.length === 0 || entry.reference.length > 512 || /[\x00-\x1f\x7f]/u.test(entry.reference)
++      || entry.reference.trim() !== entry.reference || looksLikeKeyMaterial(entry.reference)) return false;
++  }
++  return true;
++}
++
++/** The transport recorded for `remote` on this machine ({ kind, reference }), or null (unasked, or no valid plane). Never throws. */
++export function readPushTransport(remote, dependencies = {}) {
++  const read = readMachinePlane(dependencies);
++  if (read.status !== "valid" || !object(read.plane.pushTransport)) return null;
++  return Object.hasOwn(read.plane.pushTransport, remote) ? read.plane.pushTransport[remote] : null;
++}
++
++/** Records one remote's transport, keeping every other field; creates a fail-closed plane (signature default) when none exists; never overwrites an invalid one. */
++export function recordPushTransport(remote, entry, dependencies = {}) {
++  if (!validPushTransport({ [remote]: entry })) throw new Error("MP-PUSH-TRANSPORT-REFUSED: PUSH-TRANSPORT");
++  const read = readMachinePlane(dependencies);
++  if (read.status === "invalid") throw new Error("MP-WRITE-REFUSED: MP-INVALID-PLANE");
++  const base = read.status === "valid" ? read.plane : {
++    schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: null, pushApprovalDefault: "signature", routing: null, language: null, session: null, usage: null, updatedAt: new Date().toISOString(),
++  };
++  writeMachinePlane({ ...base, pushTransport: { ...(object(base.pushTransport) ? base.pushTransport : {}), [remote]: { kind: entry.kind, reference: entry.reference } }, updatedAt: new Date().toISOString() }, dependencies);
++  return { status: "recorded" };
++}
+ const PUSH_APPROVAL_DEFAULTS = Object.freeze(["signature", "chat"]);
+ 
+ /**
+@@ -136,6 +172,7 @@ export function validateMachinePlane(value) {
+   if (Object.hasOwn(value, "operatorLabel") && value.operatorLabel !== null && !validOperatorLabel(value.operatorLabel)) {
+     return { ok: false, code: "MP-OPERATOR-LABEL", detail: "operatorLabel" };
+   }
++  if (Object.hasOwn(value, "pushTransport") && !validPushTransport(value.pushTransport)) return { ok: false, code: "MP-PUSH-TRANSPORT", detail: "pushTransport" };
+   return { ok: true };
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/machine-plane.test.mjs b/plugins/pipeline-core/lib/machine-plane.test.mjs
+index 9ab438e6b..60cea9594 100644
+--- a/plugins/pipeline-core/lib/machine-plane.test.mjs
++++ b/plugins/pipeline-core/lib/machine-plane.test.mjs
+@@ -22,6 +22,8 @@ import {
+   machinePlaneFilePath,
+   readMachineOperatorLabel,
+   readMachinePlane,
++  readPushTransport,
++  recordPushTransport,
+   resolveLocalOperatorKeyAnchor,
+   validateMachinePlane,
+   writeMachinePlane,
+@@ -201,6 +203,41 @@ test("C27: operatorLabel is optional, so a plane without it stays valid; a prese
+   } finally { rmSync(home, { recursive: true, force: true }); }
+ });
+ 
++// C28-ONBOARDING-QUESTIONS (AC-108), friction 4 (PO decision 2026-11-10): the transport of a push (which SSH key, or the credential helper) is asked once at the
++// first push setup and remembered here, in the machine-local file and never in a tracked file; later pushes read it. Optional, so every older file stays valid.
++test("C28-ONBOARDING-QUESTIONS: pushTransport is optional and closed; it records and reads back one transport per remote without touching the other fields", () => {
++  assert.deepEqual(validateMachinePlane(validPlane()), { ok: true });
++  const entry = (kind, reference) => ({ kind, reference });
++  for (const pushTransport of [null, {}, { origin: entry("ssh-key", "/home/someone/.ssh/id_fixture") }, { origin: entry("credential-helper", "manager") },
++    { origin: entry("configured-default", null), upstream: entry("ssh-key", "id_fixture_two") }]) {
++    assert.deepEqual(validateMachinePlane(validPlane({ pushTransport })), { ok: true }, JSON.stringify(pushTransport));
++  }
++  for (const pushTransport of ["ssh", [], { "-x": entry("ssh-key", "k") }, { origin: entry("password", "k") }, { origin: entry("ssh-key", null) }, { origin: entry("ssh-key", "a\nb") },
++    { origin: entry("ssh-key", "x".repeat(513)) }, { origin: { kind: "ssh-key", reference: "k", extra: 1 } }, { origin: "id" }, { origin: entry("credential-helper", "-----BEGIN PRIVATE KEY-----") }]) {
++    assert.deepEqual(validateMachinePlane(validPlane({ pushTransport })), { ok: false, code: "MP-PUSH-TRANSPORT", detail: "pushTransport" }, JSON.stringify(pushTransport));
++  }
++  const { home } = homeFixture();
++  try {
++    const dependencies = { homedirFn: () => home };
++    assert.equal(readPushTransport("origin", dependencies), null, "no file: unasked");
++    const first = recordPushTransport("origin", entry("ssh-key", "/home/someone/.ssh/id_fixture"), dependencies);
++    assert.equal(first.status, "recorded");
++    assert.deepEqual(readPushTransport("origin", dependencies), entry("ssh-key", "/home/someone/.ssh/id_fixture"));
++    assert.equal(readPushTransport("upstream", dependencies), null, "another remote is still unasked");
++    assert.equal(readMachinePlane(dependencies).plane.pushApprovalDefault, "signature", "a file created here fails closed on the approval default");
++    writeMachinePlane({ ...readMachinePlane(dependencies).plane, pushApprovalDefault: "chat", operatorLabel: "Alex" }, dependencies);
++    recordPushTransport("upstream", entry("credential-helper", "manager"), dependencies);
++    const plane = readMachinePlane(dependencies).plane;
++    assert.equal(plane.pushApprovalDefault, "chat", "the other fields are kept");
++    assert.equal(plane.operatorLabel, "Alex");
++    assert.deepEqual(Object.keys(plane.pushTransport).sort(), ["origin", "upstream"]);
++    assert.equal(readHumanApprovalMachinePlane(dependencies).status, "valid", "the read-only copy used by the signing path accepts the same file");
++    assert.throws(() => recordPushTransport("origin", entry("ssh-key", ""), dependencies), /MP-WRITE-REFUSED|PUSH-TRANSPORT/u);
++    assert.throws(() => recordPushTransport("--evil", entry("ssh-key", "k"), dependencies), /PUSH-TRANSPORT/u);
++    assert.deepEqual(readPushTransport("origin", dependencies), entry("ssh-key", "/home/someone/.ssh/id_fixture"), "a refused record changes nothing");
++  } finally { rmSync(home, { recursive: true, force: true }); }
++});
++
+ test("AC-2: any single missing key makes the plane invalid, naming that key", () => {
+   for (const key of Object.keys(validPlane())) {
+     const plane = validPlane();
+diff --git a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+index f4decb2fd..67af061dd 100644
+--- a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
++++ b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+@@ -28,6 +28,7 @@ export const ONBOARDING_CONSENT_MARK_SCHEMA_V1 = "pipeline.onboarding-consent-ma
+ export const ONBOARDING_CONSENT_MARK_SCHEMA_V2 = "pipeline.onboarding-consent-mark.v2";
+ export const ONBOARDING_CONSENT_QUESTION_SCHEMA = "pipeline.onboarding-consent-question.v1";
+ export const ONBOARDING_CONSENT_ID = "onboarding-consent";
++export const ADVISOR_EXPORT_STEP_ID = "advisor-export";
+ export const ONBOARDING_CONSENT_QUOTE_MAX = 400;
+ 
+ const ONBOARDING = "project-onboarding-v3.mjs";
+@@ -43,6 +44,14 @@ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
+       { script: "onboarding-init.mjs", verbs: null },
+     ]),
+   }),
++  // C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10): the Advisor export consent is part of THIS question, mandatory for the Pipeline, so it is never asked
++  // as a question of its own later. It names no action route: it is a consent the first answer records (`advisorExportConsentFromRecord`).
++  Object.freeze({
++    id: ADVISOR_EXPORT_STEP_ID,
++    en: "let the Pipeline's same-runner Advisor read scoped repository material for a concrete consultation (this export consent is part of using the Pipeline, so it is not asked again separately)",
++    de: "dem Advisor der Pipeline (derselbe Runner) für eine konkrete Beratung ausgewählte Repository-Inhalte zeigen (diese Exportfreigabe gehört zur Nutzung der Pipeline und wird nicht noch einmal gesondert gefragt)",
++    routes: Object.freeze([]),
++  }),
+   Object.freeze({
+     id: "hooks",
+     en: "activate and refresh the git hooks, plus the runner's own refresh step",
+@@ -117,8 +126,8 @@ export const ONBOARDING_CONSENT_NOT_COVERED = Object.freeze([
+ ]);
+ 
+ const QUESTION_FRAME = Object.freeze({
+-  en: (covered, excluded) => `Agent Pipeline adds a structured, verifiable delivery workflow to a project. Should this project use it? If you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval: ${covered}. Your yes does not cover ${excluded}; those stay your own decisions.`,
+-  de: (covered, excluded) => `Agent Pipeline ergänzt ein Projekt um einen strukturierten, nachprüfbaren Lieferablauf. Soll dieses Projekt es nutzen? Wenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird: ${covered}. Ihr Ja deckt nicht ab: ${excluded}; das bleiben Ihre eigenen Entscheidungen.`,
++  en: (covered, advisor, excluded) => `Agent Pipeline adds a structured, verifiable delivery workflow to a project. Should this project use it? If you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval: ${covered}. Your yes also lets me ${advisor}. Your yes does not cover ${excluded}; those stay your own decisions.`,
++  de: (covered, advisor, excluded) => `Agent Pipeline ergänzt ein Projekt um einen strukturierten, nachprüfbaren Lieferablauf. Soll dieses Projekt es nutzen? Wenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird: ${covered}. Ihr Ja erlaubt außerdem, ${advisor}. Ihr Ja deckt nicht ab: ${excluded}; das bleiben Ihre eigenen Entscheidungen.`,
+ });
+ 
+ /**
+@@ -127,7 +136,8 @@ const QUESTION_FRAME = Object.freeze({
+  */
+ export function onboardingConsentQuestion({ language = "en" } = {}) {
+   const textFor = (lang) => QUESTION_FRAME[lang](
+-    ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step[lang]).join("; "),
++    ONBOARDING_CONSENT_COVERED_STEPS.filter((step) => step.id !== ADVISOR_EXPORT_STEP_ID).map((step) => step[lang]).join("; "),
++    ONBOARDING_CONSENT_COVERED_STEPS.find((step) => step.id === ADVISOR_EXPORT_STEP_ID)[lang],
+     ONBOARDING_CONSENT_NOT_COVERED.map((step) => step[lang]).join("; "),
+   );
+   const chosen = language === "de" ? "de" : "en";
+@@ -198,6 +208,17 @@ export function readOnboardingConsentRecord(rootDir) {
+   return newest;
+ }
+ 
++/**
++ * C28-ONBOARDING-QUESTIONS: "approved" exactly when the newest readable consent record is a yes whose scope names the Advisor export, otherwise null.
++ * A v1 record (no scope), an older v2 record that did not name it, a no or no record at all gives nothing: such a project keeps asking the Advisor
++ * question as before and nothing is ever inferred as approved. Never throws. `readRecord` is a test seam.
++ */
++export function advisorExportConsentFromRecord(rootDir, { readRecord = readOnboardingConsentRecord } = {}) {
++  let record = null;
++  try { record = readRecord(rootDir); } catch { return null; }
++  return record?.answer === "yes" && Array.isArray(record.scope) && record.scope.includes(ADVISOR_EXPORT_STEP_ID) ? "approved" : null;
++}
++
+ export function onboardingConsentEscalationJustification(recordPath, step) {
+   return `covered by the user's recorded onboarding consent (${recordPath}): ${step.en}; no further approval before the design approval`;
+ }
+diff --git a/plugins/pipeline-core/lib/po-human-approval-read.mjs b/plugins/pipeline-core/lib/po-human-approval-read.mjs
+index f7081164c..891c91a60 100644
+--- a/plugins/pipeline-core/lib/po-human-approval-read.mjs
++++ b/plugins/pipeline-core/lib/po-human-approval-read.mjs
+@@ -16,7 +16,21 @@ export const MACHINE_PLANE_SCHEMA = "pipeline.machine-plane.v1";
+ const MACHINE_PLANE_KEYS = Object.freeze([
+   "schema", "poKeyDirectory", "pushApprovalDefault", "routing", "language", "session", "usage", "updatedAt",
+ ]);
+-const OPTIONAL_MACHINE_PLANE_KEYS = Object.freeze(["operatorLabel"]);
++const OPTIONAL_MACHINE_PLANE_KEYS = Object.freeze(["operatorLabel", "pushTransport"]);
++
++// C28-ONBOARDING-QUESTIONS: read-only copy of machine-plane.mjs `validPushTransport` (this path keeps its own closed validator; the two must accept the same file).
++function validPushTransport(value) {
++  if (value === null) return true;
++  if (!object(value)) return false;
++  for (const [remote, entry] of Object.entries(value)) {
++    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u.test(remote) || !object(entry)) return false;
++    if (Object.keys(entry).some((key) => key !== "kind" && key !== "reference") || !["ssh-key", "credential-helper", "configured-default"].includes(entry.kind)) return false;
++    if (entry.kind === "configured-default") { if (entry.reference !== null) return false; continue; }
++    if (typeof entry.reference !== "string" || entry.reference.length === 0 || entry.reference.length > 512 || /[\x00-\x1f\x7f]/u.test(entry.reference)
++      || entry.reference.trim() !== entry.reference || entry.reference.includes("PRIVATE KEY") || /-----BEGIN [A-Z0-9 ]+-----/u.test(entry.reference)) return false;
++  }
++  return true;
++}
+ const PUSH_APPROVAL_DEFAULTS = Object.freeze(["signature", "chat"]);
+ 
+ /**
+@@ -117,6 +131,7 @@ export function validateMachinePlane(value) {
+   if (Object.hasOwn(value, "operatorLabel") && value.operatorLabel !== null && !validOperatorLabel(value.operatorLabel)) {
+     return { ok: false, code: "MP-OPERATOR-LABEL", detail: "operatorLabel" };
+   }
++  if (Object.hasOwn(value, "pushTransport") && !validPushTransport(value.pushTransport)) return { ok: false, code: "MP-PUSH-TRANSPORT", detail: "pushTransport" };
+   return { ok: true };
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 5ef303144..7b337cbb4 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -129,6 +129,7 @@ import { observeCompletedUninstallJournals, readUninstallRetainedMetadata } from
+ import { uninstallWorkspacePath } from "./project-uninstall-workspace.mjs";
+ import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3, readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
+ import { readMachinePlane } from "./machine-plane.mjs";
++import { advisorExportConsentFromRecord } from "./onboarding-consent-scope.mjs";
+ import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
+ import { recordGovernanceEnrollmentAfterOnboarding, readGovernanceEnrollmentRetirement, prepareGovernanceEnrollmentBeforeIntake, governanceEnrollmentRecoveryAction, observeGovernanceScope, planGovernanceScopeDecision, applyGovernanceScopeDecision } from "./governance-scope.mjs";
+ import { observeOnboardingEnrollmentHistory } from "./onboarding-continuity.mjs";
+@@ -6178,6 +6179,31 @@ const INITIAL_GIT_AUTHOR_NAME_PLACEHOLDER = "<PO_GIT_AUTHOR_NAME>";
+ const INITIAL_GIT_AUTHOR_EMAIL_PLACEHOLDER = "<PO_GIT_AUTHOR_EMAIL>";
+ const INITIAL_PUSH_APPROVAL_PLACEHOLDER = "<signature|chat>";
+ const INITIAL_ADVISOR_EXPORT_CONSENT_PLACEHOLDER = "<approved|declined>";
++// C28-ONBOARDING-QUESTIONS: said once where the Advisor question is no longer asked (shared with the driver's rewrite of this guidance).
++export const ADVISOR_EXPORT_FOLDED_GUIDANCE = "The Advisor export consent was already given with the first Pipeline consent question and is recorded with it, so do not ask it again: the returned argv carries approved.";
++const FIELDS_AT_ONCE_MARK = "Ask for every field in fieldsAtOnce";
++const FIELDS_AT_ONCE_DEFAULT_INPUTS = Object.freeze({ language: "language", humanApprovalMode: "humanApproval", advisorExportConsent: "advisorExportConsent" });
++
++/**
++ * C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10, Codex run: a second round asked for fields the first answer missed). The first-answer round names
++ * every field it needs in ONE list, each with its default where one exists (`default: null` means the PO has to answer it), and the fields a signature
++ * answer would otherwise ask in a later round (`followUpIfSignature`). Pure and idempotent: it recomputes from the action's final `inputs`, so the driver
++ * can call it again after it adds the actor label or strips the trust-anchor inputs; the guidance sentence is added once. Any other action is returned as is.
++ */
++export function withFieldsAtOnce(action) {
++  if (action === null || typeof action !== "object" || !Array.isArray(action.inputs) || !action.inputs.some((input) => input?.name === "humanApprovalMode")) return action;
++  const defaults = action.reviewedDefaults ?? {};
++  const defaultFor = (name) => {
++    if (name === "pipelineActorLabel") return "none";
++    const key = FIELDS_AT_ONCE_DEFAULT_INPUTS[name];
++    const value = key === undefined ? undefined : defaults[key]?.value;
++    return typeof value === "string" ? value : null;
++  };
++  const followUp = Array.isArray(action.followUpIfSignature) ? action.followUpIfSignature.map((field) => ({ name: field.name, default: null })) : [];
++  const guidance = typeof action.guidance !== "string" || action.guidance.includes(FIELDS_AT_ONCE_MARK) ? action.guidance
++    : `${action.guidance} ${FIELDS_AT_ONCE_MARK} in this ONE question, naming each with its default where one is given (a null default means the PO has to answer it), so a single answer completes the round and no second round asks for a field this one missed.${followUp.length === 0 ? "" : " When the approval answer is signature, also ask the followUpIfSignature fields in the same question."}`;
++  return { ...action, fieldsAtOnce: action.inputs.map((input) => ({ name: input.name, default: defaultFor(input.name) })), ...(followUp.length === 0 ? {} : { followUpIfSignature: followUp }), guidance };
++}
+ const INITIAL_LANGUAGE_PLACEHOLDER = "<de|en>";
+ 
+ // Same `collect-input` shape as `collectGoalAction()`, asking for both fields
+@@ -7321,10 +7347,13 @@ function collectInitialAnswersAction(observed, fs) {
+     && ["--trust-anchor-mode", "--trust-anchor-directory", "--trust-anchor-human-name", "--trust-anchor-existing-key"].every(flag => trustSetupArgv.includes(flag))
+     ? observed.trustAnchorGuidanceAction
+     : null;
++  // C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10): a recorded first consent that names the Advisor export IS the Advisor consent, so this round does not
++  // ask it again. Without such a record (none yet, a v1 record, an older v2 record, a no) the question stays exactly as it was and nothing is inferred.
++  const advisorFolded = advisorExportConsentFromRecord(observed.root) === "approved";
+   const inputs = [
+     ...authorInputs,
+     observed.pushApprovalSetupAction.input,
+-    { name: "advisorExportConsent", encoding: "utf8", trim: true, minBytes: 8, maxBytes: 8, singleLine: true, rejectNul: true },
++    ...(advisorFolded ? [] : [{ name: "advisorExportConsent", encoding: "utf8", trim: true, minBytes: 8, maxBytes: 8, singleLine: true, rejectNul: true }]),
+     ...(answeredLanguage === null ? [{ name: "language", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 2, singleLine: true, rejectNul: true }] : []),
+     ...(trustSetup?.inputs ?? []),
+     // The language is asked once above and fills both commands; consent's other inputs follow.
+@@ -7342,7 +7371,7 @@ function collectInitialAnswersAction(observed, fs) {
+   // `--push-approval` as a read-compatible alias for old copied commands, but
+   // every newly rendered action names the shared policy it actually applies.
+   argv.push("--human-approval", INITIAL_PUSH_APPROVAL_PLACEHOLDER);
+-  argv.push("--advisor-export-consent", INITIAL_ADVISOR_EXPORT_CONSENT_PLACEHOLDER);
++  argv.push("--advisor-export-consent", advisorFolded ? "approved" : INITIAL_ADVISOR_EXPORT_CONSENT_PLACEHOLDER);
+   argv.push("--language", answeredLanguage ?? INITIAL_LANGUAGE_PLACEHOLDER);
+   if (trustSetup) {
+     argv.push(
+@@ -7352,7 +7381,7 @@ function collectInitialAnswersAction(observed, fs) {
+       "--trust-anchor-existing-key", TRUST_ANCHOR_EXISTING_KEY_PLACEHOLDER,
+     );
+   }
+-  return {
++  return withFieldsAtOnce({
+     kind: "collect-input",
+     inputs,
+     mutation: false,
+@@ -7364,9 +7393,11 @@ function collectInitialAnswersAction(observed, fs) {
+         : { value: answeredLanguage, source: "confirmed-intake-checkpoint", requiresConfirmation: false },
+       gitIdentity: identityProvenance,
+       humanApproval: { value: machinePushApprovalPreference(fs) ?? "signature", source: "machine-plane-or-fail-closed-default", requiresConfirmation: true },
+-      advisorExportConsent: { value: "declined", source: "fresh-project-no-export-default", requiresConfirmation: true },
++      advisorExportConsent: advisorFolded
++        ? { value: "approved", source: "onboarding-consent-record", requiresConfirmation: false }
++        : { value: "declined", source: "fresh-project-no-export-default", requiresConfirmation: true },
+     },
+-    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. ${mergedConsent === null ? "Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. " : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (observed.runner === "claude" ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
++    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} ${advisorFolded ? ADVISOR_EXPORT_FOLDED_GUIDANCE : "Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation."} Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. ${mergedConsent === null ? "Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. " : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (observed.runner === "claude" ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
+     applyAction: commandAction(
+       argv,
+       true,
+@@ -7376,7 +7407,7 @@ function collectInitialAnswersAction(observed, fs) {
+     ),
+     ...(mergedConsent === null ? {} : mergedIntakeConsentFields(mergedConsent, observed.runner)),
+     expected: { schema: "pipeline.onboarding-init.v1", outcomes: ["ready", "collect-input", "pending-asks", "unsupported-next-action"] },
+-  };
++  });
+ }
+ 
+ function withPendingAsksSurfacedOnNextAction(observed, fs) {
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index aa192c4a4..33c91e4f1 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -754,7 +754,7 @@ export function preflightCriticDispatchWithAdmitRequest(input, deps = {}) {
+   // R9: the last moment a calibration commit is free: it then sits inside the reviewed range. After the last Critic round it ends the push's Critic carry (CVL-CARRY-CONTENT-CHANGED).
+   const remotes = calibrationRepositoryMode(root) === "local-only" ? String(gitOrNull(root, ["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
+   const nextStep = [
+-    ...(remotes.length === 0 ? [] : [`This project's calibration says repositoryMode local-only, but it has a remote (${remotes.join(", ")}). If the project is meant to be published, correct that BEFORE this Critic round, so the commit is inside the reviewed range: node \${PIPELINE_PLUGIN_ROOT}/scripts/repository-mode-promote.mjs --root <repo> --to remote-tracked, commit the paths it prints, then run this preflight again with the new candidate. After the last Critic round that commit would end the push's Critic carry.`]),
++    ...(remotes.length === 0 ? [] : [`This project's calibration says repositoryMode local-only, but it has a remote (${remotes.join(", ")}). If the project is meant to be published, correct that BEFORE this Critic round, so the commit is inside the reviewed range: node \${PIPELINE_PLUGIN_ROOT}/scripts/repository-mode-promote.mjs --root <repo> --to remote-tracked, commit the paths it prints, then run this preflight again with the new candidate. After the last Critic round the same commit is still fine at the first push (the Critic carry admits exactly that one-token change; push-init offers the step and Verify runs again), so this is not a reason to hold the push.`]),
+     ...(!antigravity ? [] : ["Build the Critic prompt with prepare-dispatch.mjs critic: on Antigravity it writes the template's paths-only envelope with absolute paths, because that runner's file tools read absolute paths only and the envelope takes no prose."]),
+     `Write admitRequest verbatim as ${ADMIT_REQUEST_FILE} (JSON), replace only its placeholders (${admitRequestPlaceholderPaths(request).join(", ")}), then run admitCommand; admit refuses an unfilled placeholder by name.`,
+     `trigger ${trigger} is ${trigger === appliedRow ? "the applied Critic row of the matched dispatch record" : "the strictest default (no matched record row of T1 to T3)"}; change it only if your Critic-required decision says otherwise.`,
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 9a9e8caed..fc37d1dfa 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -663,10 +663,10 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     let securityDocument = null; try { securityDocument = JSON.parse(readFileSync(resolve(root, "evidence/security-latest.v2.verdict.json"), "utf8")); } catch { securityDocument = null; }
+     const securityScope = closeSecurityScope(securityDocument);
+     const securitySentence = describeCloseSecurityScope(securityScope);
+-    // R9: a project with a remote whose calibration still says local-only. Named here, never fixed here: a calibration commit after the last Critic round ends the push's Critic carry (CVL-CARRY-CONTENT-CHANGED).
++    // R9: a project with a remote whose calibration still says local-only. Named here, never fixed here. C28-ONBOARDING-QUESTIONS: the push setup offers the switch as its own agent step and the push continues in the same feature (the Critic carry admits exactly that one-token commit).
+     let declaredMode = null; try { declaredMode = declaredRepositoryMode(root)?.mode ?? null; } catch { declaredMode = null; }
+     const remotes = declaredMode === "local-only" ? String(rawGit(["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
+-    const repositoryMode = remotes.length === 0 ? null : { declared: "local-only", remotes, status: "calibration-behind-the-remote", next: "Leave it for this close: a calibration commit now ends the Critic carry of the push. Correct it as the first commit of the next feature with repository-mode-promote.mjs." };
++    const repositoryMode = remotes.length === 0 ? null : { declared: "local-only", remotes, status: "calibration-behind-the-remote", next: "Correct it before the push, in this same feature, as its own commit with repository-mode-promote.mjs --root <repo> --to remote-tracked (push-init names the step; no signature): the Critic carry admits exactly that one-token change, and Verify runs again on the new HEAD." };
+     return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, securityScope, commits, ...(repositoryMode === null ? {} : { repositoryMode }), ...pushEvidenceStep(closedFeatureId),
+       message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. ${describeCommitSplit(commits)}${securitySentence === "" ? "" : ` ${securitySentence}`}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
+   }
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index fa3682ef0..554cb5bd8 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -1045,7 +1045,7 @@ test("R8: closed-local states what the security result covers, read from the v2
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
+-test("R9: closed-local names a calibration that still says local-only beside a real remote and says to leave it for this close", () => {
++test("R9: closed-local names a calibration that still says local-only beside a real remote and says to correct it before the push in the same feature", () => {
+   const f = closedLocalFixture();
+   try {
+     assert.equal(Object.hasOwn(oneShotClose(f.resumed, { runCommand: f.runner }), "repositoryMode"), false, "no remote: nothing to say");
+@@ -1059,7 +1059,13 @@ test("R9: closed-local names a calibration that still says local-only beside a r
+     assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
+     assert.deepEqual(done.repositoryMode.remotes, ["publish"]);
+     assert.match(done.message, /still says local-only although a remote exists \(publish\)/u);
+-    assert.match(done.message, /ends the Critic carry/u);
++    // QG-04, restated in place (C28-ONBOARDING-QUESTIONS, PO decision 2026-11-10): this pin said "a calibration commit now ends the Critic carry ... leave it for
++    // the next feature". The carry now admits exactly the one-token repositoryMode promotion (lib/critic-evidence-carry.mjs), so the close names the correction
++    // before the push in the same feature, with the Verify rerun. Same subject (what the close says about the mismatch), same strength.
++    assert.match(done.message, /same feature/u);
++    assert.match(done.message, /admits exactly that one-token change/u);
++    assert.match(done.message, /repository-mode-promote\.mjs/u);
++    assert.doesNotMatch(done.message, /next feature|ends the Critic carry/u);
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs b/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs
+index e67e18fae..e15d97a48 100644
+--- a/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs
+@@ -19,6 +19,7 @@ import {
+ import {
+   ONBOARDING_CONSENT_COVERED_STEPS,
+   ONBOARDING_CONSENT_NOT_COVERED,
++  advisorExportConsentFromRecord,
+   coverOnboardingOutput,
+   coveringStepForArgv,
+   onboardingConsentQuestion,
+@@ -118,6 +119,47 @@ test("G20-45: the rendered consent question names every covered step and every e
+   assert.equal(onboardingConsentQuestion().textByLanguage.de, onboardingConsentQuestion({ language: "de" }).text);
+ });
+ 
++// C28-ONBOARDING-QUESTIONS (AC-108), friction 1 (PO decision 2026-11-10): the Advisor export consent is part of the FIRST consent question. Agreeing
++// activates it, so no separate Advisor question follows; a record that does not name it (v1, an older v2, a no) never reads as approved.
++test("C28-ONBOARDING-QUESTIONS: the first consent question lists the Advisor export among what agreeing activates, and a yes records it in the same record", () => {
++  const ids = ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step.id);
++  assert.ok(ids.includes("advisor-export"), "the Advisor export is a covered item of the one consent");
++  assert.equal(coveringStepForArgv([STATE_SCRIPT, "submit-plan"])?.id, "submit-plan");
++  for (const route of ONBOARDING_CONSENT_COVERED_STEPS.find((step) => step.id === "advisor-export").routes) assert.fail(`the Advisor export names no action route: ${JSON.stringify(route)}`);
++  for (const language of ["en", "de"]) {
++    const question = onboardingConsentQuestion({ language });
++    assert.match(question.text, /Advisor/u, language);
++    assert.ok(question.scope.includes("advisor-export"), language);
++    assert.ok(question.text.length <= 2600, `${language}: the relayed question stays one short message (${question.text.length})`);
++  }
++  assert.match(onboardingConsentQuestion({ language: "en" }).text, /mandatory|part of using|agreeing/iu);
++  withRoot((root) => {
++    recordOnboardingConsent(root, "onboarding", "yes", "2026-11-11T10:00:00.000Z", "yes");
++    assert.ok(readOnboardingConsentRecord(root).scope.includes("advisor-export"), "the same record carries the Advisor export");
++    assert.equal(advisorExportConsentFromRecord(root), "approved");
++  });
++});
++
++test("C28-ONBOARDING-QUESTIONS: only a recorded yes that names the Advisor export reads as approved; every other record or none reads as not given", () => {
++  withRoot((root) => {
++    assert.equal(advisorExportConsentFromRecord(root), null, "no record");
++    assert.equal(advisorExportConsentFromRecord(""), null);
++    assert.equal(advisorExportConsentFromRecord(undefined), null);
++    mkdirSync(join(root, ".claude"), { recursive: true });
++    const put = (name, body) => writeFileSync(onboardingConsentMarkerPath(root, name), `${JSON.stringify(body)}\n`);
++    put("v1", { schema: ONBOARDING_CONSENT_MARK_SCHEMA_V1, sessionId: "v1", answer: "yes", recordedAt: "2026-08-20T00:00:00.000Z" });
++    assert.equal(advisorExportConsentFromRecord(root), null, "v1 yes recorded no scope");
++    put("v1", { schema: ONBOARDING_CONSENT_MARK_SCHEMA, sessionId: "v1", answer: "yes", recordedAt: "2026-10-01T00:00:00.000Z", scope: ["install", "hooks"], notCovered: ["push"], quote: null });
++    assert.equal(advisorExportConsentFromRecord(root), null, "an older v2 yes did not name the Advisor export (existing records stay valid, nothing is inferred)");
++    put("no", { schema: ONBOARDING_CONSENT_MARK_SCHEMA, sessionId: "no", answer: "no", recordedAt: "2026-11-11T02:00:00.000Z", scope: [], notCovered: [], quote: null });
++    assert.equal(advisorExportConsentFromRecord(root), null, "a no never approves");
++    put("new", { schema: ONBOARDING_CONSENT_MARK_SCHEMA, sessionId: "new", answer: "yes", recordedAt: "2026-11-11T01:00:00.000Z", scope: ["install", "advisor-export"], notCovered: ["push"], quote: "ok" });
++    assert.equal(advisorExportConsentFromRecord(root), null, "the newest record is the later no");
++    put("no", { schema: ONBOARDING_CONSENT_MARK_SCHEMA, sessionId: "no", answer: "no", recordedAt: "2026-11-10T00:00:00.000Z", scope: [], notCovered: [], quote: null });
++    assert.equal(advisorExportConsentFromRecord(root), "approved", "the newest record is the yes that names it");
++  });
++});
++
+ test("G20-45: with a recorded yes, every consent-covered action prints requiresConfirmation false, coveredBy with the record path and a verbatim escalation line", () => {
+   withRoot((root) => {
+     recordOnboardingConsent(root, "session-1", "yes", "2026-11-08T10:00:00.000Z", "ich folge deinen empfehlungen");
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.mjs b/plugins/pipeline-core/scripts/onboarding-init.mjs
+index c36675502..828dcd90e 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.mjs
+@@ -130,6 +130,7 @@ import {
+   INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE,
+   INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE,
+   INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE,
++  ADVISOR_EXPORT_FOLDED_GUIDANCE, withFieldsAtOnce,
+   shellWord, intakeGitAuthor,
+ } from "../lib/project-onboarding-v3.mjs";
+ import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
+@@ -1183,6 +1184,34 @@ function applyInitialOnboardingAnswersCore({
+  * process exited non-zero) is folded into a typed `ok: false` result the caller reports
+  * rather than crashes on.
+  */
++// C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10; Codex run: `spawnSync node EPERM` in the middle of the init, only the host route worked). The execution
++// route is checked BEFORE the first mutating step and the host route is named in the answer, so nothing fails half way and nothing was changed.
++const HOST_ROUTE_CODES = new Set(["EPERM", "EACCES"]);
++
++/** Default route probe: can this context start the executable at all? Only a refused start (no status, EPERM/EACCES) says no; anything else is the step's own business. */
++function probeExecutionRoute(executable) {
++  const base = String(executable).split(/[\\/]/u).pop().toLowerCase();
++  if (executable !== process.execPath && base !== "node" && base !== "node.exe") return { ok: true };
++  const result = spawnSync(executable, ["--version"], { encoding: "utf8", shell: false, timeout: 10_000, windowsHide: true });
++  const code = result?.error?.code;
++  return (result?.status === null || result?.status === undefined) && HOST_ROUTE_CODES.has(code) ? { ok: false, code } : { ok: true };
++}
++
++function hostRouteReadback({ root, runner, cause, mutationsExecuted }) {
++  return {
++    executionBoundary: "host",
++    cause,
++    mutationsExecuted,
++    guidance: `This execution context refuses to start child processes (${cause}), so the onboarding cannot run here. ${mutationsExecuted === 0 ? "Nothing was changed. " : "Earlier steps are on disk; the run resumes from them. "}Run retryAction at the host boundary (outside the sandbox, with the host route this runner offers) from its first call; do not retry it inside the sandbox.`,
++    retryAction: {
++      kind: "command", executable: process.execPath,
++      argv: [fileURLToPath(import.meta.url), "--root", root, ...(runner ? ["--runner", runner] : [])],
++      mutation: false, requiresConfirmation: false, executionBoundary: "host",
++      expected: { schema: SCHEMA },
++    },
++  };
++}
++
+ function runOnboardingStep({ executable, argv, run, env = null, projectRoot = null, timeout }) {
+   const options = { encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024, timeout, killSignal: "SIGKILL" };
+   // Supplying `env` lets callers override what the spawned
+@@ -1221,7 +1250,9 @@ function runOnboardingStep({ executable, argv, run, env = null, projectRoot = nu
+     return { ok: false, faultCode: "execution-budget-exhausted", exitCode: result.status ?? null, stderr: "The child exceeded the remaining onboarding budget. Its operation may be partial; re-inspect before any retry." };
+   }
+   if (result?.error && !isSuccessfulSpawn(result)) {
+-    return { ok: false, faultCode: "spawn-failed", exitCode: result.status ?? null, stderr: String(result.error?.message ?? "") };
++    // C28-ONBOARDING-QUESTIONS: a spawn the sandbox refused before the child started (no exit status, EPERM/EACCES) is a route problem, not a failed command.
++    const neverStarted = (result.status === null || result.status === undefined) && HOST_ROUTE_CODES.has(result.error?.code);
++    return { ok: false, faultCode: "spawn-failed", exitCode: result.status ?? null, stderr: String(result.error?.message ?? ""), ...(neverStarted ? { hostRouteCause: result.error.code } : {}) };
+   }
+   const exitCode = result?.status ?? null;
+   let parsed = null;
+@@ -1342,6 +1373,9 @@ function isTrustAnchorAction(action) {
+ function initialAnswersActionWithoutTrustAnchor(action) {
+   if (!isTrustAnchorAction(action) || !action.applyAction.argv.includes("--human-approval")) return action;
+   const asksLanguage = action.inputs?.some((input) => input?.name === "language") === true;
++  // C28-ONBOARDING-QUESTIONS: with the Advisor export folded into the first consent the round no longer asks it; the rewritten guidance says so too.
++  const asksAdvisor = action.inputs?.some((input) => input?.name === "advisorExportConsent") === true;
++  const trustFollowUp = (action.inputs ?? []).filter((input) => String(input?.name ?? "").startsWith("trustAnchor")).map((input) => ({ name: input.name, default: null }));
+   const argv = [];
+   for (let index = 0; index < action.applyAction.argv.length; index += 1) {
+     const part = action.applyAction.argv[index];
+@@ -1354,7 +1388,8 @@ function initialAnswersActionWithoutTrustAnchor(action) {
+   return {
+     ...action,
+     inputs: (action.inputs ?? []).filter((input) => !String(input?.name ?? "").startsWith("trustAnchor")),
+-    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy, and explicit approved|declined repository-data export consent for the same-runner Advisor${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}${action.precedingApplyAction === undefined ? "" : ", plus the intake consent values collected in this same round"}. Declined keeps the Advisor disabled; never infer approval from using the Pipeline. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval${action.precedingApplyAction === undefined ? ", and later intake consent reuses the confirmed language without asking again. " : ". "}A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. ${action.precedingApplyAction === undefined ? "" : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (action.precedingExistingFileApplyAction === undefined ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
++    ...(trustFollowUp.length === 0 ? {} : { followUpIfSignature: trustFollowUp }),
++    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy${asksAdvisor ? ", and explicit approved|declined repository-data export consent for the same-runner Advisor" : ""}${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}${action.precedingApplyAction === undefined ? "" : ", plus the intake consent values collected in this same round"}. ${asksAdvisor ? "Declined keeps the Advisor disabled; never infer approval from using the Pipeline." : ADVISOR_EXPORT_FOLDED_GUIDANCE} The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval${action.precedingApplyAction === undefined ? ", and later intake consent reuses the confirmed language without asking again. " : ". "}A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. ${action.precedingApplyAction === undefined ? "" : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (action.precedingExistingFileApplyAction === undefined ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
+     applyAction: { ...action.applyAction, argv },
+   };
+ }
+@@ -1400,7 +1435,7 @@ function normalizeOnboardingDriverOutput(output, root) {
+   if (!nextAction || typeof nextAction !== "object" || !Array.isArray(nextAction.pendingAsks)) return output;
+   const pushApproval = persistedInitialPushApproval(root, output?.repository?.mode ?? "local");
+   const pendingAsks = nextAction.pendingAsks
+-    .map((action) => withPipelineActorAsk(initialAnswersActionWithoutTrustAnchor(action)))
++    .map((action) => withFieldsAtOnce(withPipelineActorAsk(initialAnswersActionWithoutTrustAnchor(action))))
+     .filter((action) => pushApproval !== "chat" || !isTrustAnchorAction(action));
+   return pendingAsks.length === nextAction.pendingAsks.length
+     && pendingAsks.every((action, index) => action === nextAction.pendingAsks[index])
+@@ -1484,7 +1519,7 @@ export function driveOnboardingInit(options = {}) {
+   return result;
+ }
+ 
+-function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null, runBudgetMs = DEFAULT_RUN_BUDGET_MS, now = () => performance.now(), onStep = () => {} } = {}) {
++function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null, runBudgetMs = DEFAULT_RUN_BUDGET_MS, now = () => performance.now(), onStep = () => {}, probeRoute = probeExecutionRoute } = {}) {
+   const root = resolve(rootDir);
+   const steps = [];
+   if (!Number.isSafeInteger(runBudgetMs) || runBudgetMs < 1) throw new Error("runBudgetMs must be a positive safe integer");
+@@ -1511,12 +1546,23 @@ function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STE
+   // evidence, not permission to replay a possibly partial mutation: callers
+   // must re-inspect and use the newly returned action.
+   let attemptedAction = null;
++  let routeChecked = false;
++  let mutationsExecuted = 0;
+ 
+   for (let stepIndex = 0; stepIndex < stepCap; stepIndex += 1) {
+     const remaining = Math.floor(deadline - now());
+     if (remaining < 1) return { schema: SCHEMA, runner, root, outcome: "execution-budget-exhausted", stepCap, stepsExecuted: steps.length, steps, recovery, final: lastAnchorOutput };
+     onStep({ step: stepIndex + 1, stepCap, remainingMs: remaining, isAnchor: isAnchorStep });
++    // C28-ONBOARDING-QUESTIONS: once, before the first step that mutates, ask whether this context can start the executable at all.
++    if (!isAnchorStep && attemptedAction?.mutation === true && !routeChecked) {
++      routeChecked = true;
++      const probe = probeRoute(executable, env);
++      if (probe?.ok === false) {
++        return { schema: SCHEMA, runner, root, outcome: "host-route-required", stepCap, stepsExecuted: steps.length, steps, hostRoute: hostRouteReadback({ root, runner, cause: String(probe.code ?? "EPERM"), mutationsExecuted }), final: lastAnchorOutput };
++      }
++    }
+     const stepResult = runOnboardingStep({ executable, argv, run, env, projectRoot: root, timeout: remaining });
++    if (!isAnchorStep && attemptedAction?.mutation === true && stepResult.hostRouteCause === undefined) mutationsExecuted += 1;
+     steps.push({
+       executable,
+       argv,
+@@ -1549,6 +1595,7 @@ function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STE
+         stepsExecuted: steps.length,
+         steps,
+         ...(stepResult.faultCode === "execution-budget-exhausted" ? { recovery } : {}),
++        ...(stepResult.hostRouteCause === undefined ? {} : { hostRoute: hostRouteReadback({ root, runner, cause: stepResult.hostRouteCause, mutationsExecuted }) }),
+         error: {
+           faultCode: stepResult.faultCode,
+           exitCode: stepResult.exitCode,
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.test.mjs b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+index 06f4b90e5..3bdc2e3bf 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.test.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+@@ -2419,6 +2419,140 @@ test("driveOnboardingInit: an unapplied migration plan missing its apply action
+   }
+ });
+ 
++// C28-ONBOARDING-QUESTIONS (AC-108), friction 2: the host route is named BEFORE the first mutating step, never after a failure in the middle.
++// Observed in a Codex run: `spawnSync node EPERM` inside the sandbox in the middle of the init; only a retry on the host route worked.
++test("C28-ONBOARDING-QUESTIONS: a blocked execution route stops before the first mutating step and names the host route", () => {
++  const root = freshRoot();
++  try {
++    const calls = [];
++    const run = (executable, argv) => {
++      calls.push(argv);
++      return respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction: { kind: "command", executable: "node", argv: ["tool"], mutation: true } });
++    };
++    const result = driveOnboardingInit({ rootDir: root, runner: "codex", run, probeRoute: () => ({ ok: false, code: "EPERM" }) });
++    assert.equal(result.outcome, "host-route-required", JSON.stringify(result));
++    assert.equal(calls.length, 1, "only the read-only inspect ran; the mutating step never started");
++    assert.equal(result.steps.length, 1);
++    assert.equal(result.hostRoute.executionBoundary, "host");
++    assert.equal(result.hostRoute.cause, "EPERM");
++    assert.equal(result.hostRoute.mutationsExecuted, 0);
++    assert.equal(result.hostRoute.retryAction.kind, "command");
++    assert.equal(result.hostRoute.retryAction.mutation, false);
++    assert.ok(result.hostRoute.retryAction.argv.includes("--root") && result.hostRoute.retryAction.argv.includes(root));
++    assert.ok(result.hostRoute.retryAction.argv.includes("codex"), "the retry keeps the pinned runner");
++    assert.match(result.hostRoute.guidance, /host/u);
++    // A route that works changes nothing: the mutating step runs as before.
++    const open = [];
++    driveOnboardingInit({ rootDir: root, runner: "codex", run: (executable, argv) => { open.push(argv); return respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null }); }, probeRoute: () => ({ ok: true }) });
++    assert.ok(open.length >= 1);
++  } finally { dispose(root); }
++});
++
++test("C28-ONBOARDING-QUESTIONS: a spawn that is refused before it starts (EPERM, no exit status) names the host route; a started child's failure does not", () => {
++  const root = freshRoot();
++  try {
++    const refused = driveOnboardingInit({ rootDir: root, runner: "codex", run: () => ({ status: null, stdout: "", stderr: "", error: Object.assign(new Error("spawnSync node EPERM"), { code: "EPERM" }) }) });
++    assert.equal(refused.outcome, "error");
++    assert.equal(refused.error.faultCode, "spawn-failed", "the typed fault stays");
++    assert.equal(refused.hostRoute.executionBoundary, "host");
++    assert.equal(refused.hostRoute.mutationsExecuted, 0);
++    const started = driveOnboardingInit({ rootDir: root, run: () => ({ status: 1, stdout: "{}", stderr: "refused", error: Object.assign(new Error("EPERM"), { code: "EPERM" }) }) });
++    assert.equal(started.error.faultCode, "spawn-failed");
++    assert.equal(started.hostRoute, undefined, "an exit status means the child started; that is not a route problem");
++  } finally { dispose(root); }
++});
++
++// Friction 3: the first question names EVERY field with its default where one exists, so one answer completes the round.
++test("C28-ONBOARDING-QUESTIONS: the first round lists every field it needs with its default, so one answer completes it", () => {
++  const root = freshRoot();
++  try {
++    const result = driveOnboardingInit({ rootDir: root, runner: "claude" });
++    const ask = result.pendingAsks.find((entry) => entry.inputs?.some((input) => input.name === "humanApprovalMode"));
++    assert.ok(ask, "the first-answer round is published");
++    const names = ask.inputs.map((input) => input.name);
++    assert.deepEqual(ask.fieldsAtOnce.map((field) => field.name), names, "every input is named, in order, once");
++    const byName = new Map(ask.fieldsAtOnce.map((field) => [field.name, field]));
++    assert.equal(byName.get("language").default, "en");
++    assert.equal(byName.get("advisorExportConsent")?.default ?? "declined", "declined");
++    assert.ok(["signature", "chat"].includes(byName.get("humanApprovalMode").default));
++    assert.equal(byName.get("pipelineActorLabel").default, "none");
++    for (const name of ["gitAuthorName", "gitAuthorEmail", "profile"]) assert.equal(byName.get(name).default, null, `${name} has no default: the PO must answer`);
++    assert.match(ask.guidance, /every field/iu);
++    assert.match(ask.guidance, /fieldsAtOnce/u);
++  } finally { dispose(root); }
++});
++
++test("C28-ONBOARDING-QUESTIONS: the signature follow-up fields are named in the first question, not discovered in a second round", () => {
++  const stripped = [];
++  const root = freshRoot();
++  try {
++    // The driver strips the trust-anchor inputs from the first round (separate action after a signature answer); the first question must still name them.
++    const action = { kind: "collect-input", inputs: [{ name: "gitAuthorName" }, { name: "humanApprovalMode" }, { name: "language" }, { name: "trustAnchorMode" }, { name: "trustAnchorDirectory" }, { name: "trustAnchorHumanName" }, { name: "trustAnchorExistingKey" }],
++      reviewedDefaults: { language: { value: "en" }, humanApproval: { value: "signature" } },
++      applyAction: { argv: ["onboarding-init.mjs", "--human-approval", "<signature|chat>", "--trust-anchor-mode", "<m>", "--trust-anchor-directory", "<d>", "--trust-anchor-human-name", "<n>", "--trust-anchor-existing-key", "<k>"] } };
++    const result = driveOnboardingInit({ rootDir: root, runner: "claude", run: () => respond({ schema: "pipeline.project-onboarding.v4", status: "in-progress", nextAction: { kind: "command", executable: "node", argv: ["tool"], mutation: false, pendingAsks: [action] } }) });
++    const ask = result.pendingAsks[0];
++    assert.deepEqual(ask.inputs.map((input) => input.name), ["gitAuthorName", "humanApprovalMode", "language", "pipelineActorLabel"], "the driver adds the optional actor label to the round");
++    assert.deepEqual(ask.followUpIfSignature.map((field) => field.name), ["trustAnchorMode", "trustAnchorDirectory", "trustAnchorHumanName", "trustAnchorExistingKey"]);
++    assert.match(ask.guidance, /followUpIfSignature/u);
++    stripped.push(ask);
++  } finally { dispose(root); }
++  assert.equal(stripped.length, 1);
++});
++
++// Friction 1: PO decision 2026-11-10 -- the Advisor export consent is part of the FIRST Pipeline consent question; the first round no longer asks it again.
++// A record without the Advisor scope (v1, an older v2, a no) never reads as approved, so the question is still asked there (existing records stay valid).
++function consentRecordFile(root, body) {
++  mkdirSync(join(root, ".claude"), { recursive: true });
++  writeFileSync(join(root, ".claude", ".pipeline-install-consent-onboarding.json"), `${JSON.stringify(body)}\n`);
++}
++const firstRoundAsk = (result) => result.pendingAsks.find((entry) => entry.inputs?.some((input) => input.name === "humanApprovalMode"));
++
++test("C28-ONBOARDING-QUESTIONS: a recorded first consent that names the Advisor export removes the separate Advisor question from the first round", () => {
++  const root = freshRoot();
++  try {
++    const before = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude" }));
++    assert.ok(before.inputs.some((input) => input.name === "advisorExportConsent"), "without a record the question is still asked (nothing is approved unasked)");
++    assert.ok(before.applyAction.argv.includes("<approved|declined>"));
++    consentRecordFile(root, { schema: "pipeline.onboarding-consent-mark.v2", sessionId: "onboarding", answer: "yes", recordedAt: "2026-11-11T10:00:00.000Z",
++      scope: ["install", "advisor-export"], notCovered: ["push"], quote: "ja" });
++    const ask = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude" }));
++    assert.equal(ask.inputs.some((input) => input.name === "advisorExportConsent"), false, "not asked a second time");
++    assert.equal(ask.fieldsAtOnce.some((field) => field.name === "advisorExportConsent"), false);
++    const flagAt = ask.applyAction.argv.indexOf("--advisor-export-consent");
++    assert.ok(flagAt >= 0, "the argv shape the guard admits is unchanged");
++    assert.equal(ask.applyAction.argv[flagAt + 1], "approved");
++    assert.equal(ask.applyAction.argv.includes("<approved|declined>"), false);
++    assert.equal(ask.reviewedDefaults.advisorExportConsent.source, "onboarding-consent-record");
++    assert.equal(ask.reviewedDefaults.advisorExportConsent.value, "approved");
++    assert.doesNotMatch(ask.guidance, /Ask separately/u);
++    assert.match(ask.guidance, /first Pipeline consent/u);
++    // The folded argv, answered for the remaining placeholders, is still the sanctioned command (the guard lane is unchanged).
++    const answers = new Map([["<PO_GIT_AUTHOR_NAME>", "Pin PO"], ["<PO_GIT_AUTHOR_EMAIL>", "pin@example.invalid"], ["<signature|chat>", "chat"], ["<de|en>", "en"]]);
++    const argv = ask.applyAction.argv.map((value) => answers.get(value) ?? value);
++    const quoted = [ask.applyAction.executable, ...argv].map((value) => `'${String(value).replaceAll("'", "'\\''")}'`).join(" ");
++    assert.equal(isSanctionedLifecycleCommand(quoted, root), true);
++  } finally { dispose(root); }
++});
++
++test("C28-ONBOARDING-QUESTIONS: a v1 record, an older v2 record without the Advisor scope and a recorded no keep the Advisor question", () => {
++  for (const [name, body] of [
++    ["v1 yes", { schema: "pipeline.onboarding-consent-mark.v1", sessionId: "onboarding", answer: "yes", recordedAt: "2026-08-20T00:00:00.000Z" }],
++    ["older v2 yes", { schema: "pipeline.onboarding-consent-mark.v2", sessionId: "onboarding", answer: "yes", recordedAt: "2026-11-01T00:00:00.000Z", scope: ["install", "hooks"], notCovered: ["push"], quote: "ja" }],
++    ["v2 no", { schema: "pipeline.onboarding-consent-mark.v2", sessionId: "onboarding", answer: "no", recordedAt: "2026-11-01T00:00:00.000Z", scope: [], notCovered: [], quote: null }],
++  ]) {
++    const root = freshRoot();
++    try {
++      driveOnboardingInit({ rootDir: root, runner: "claude" });
++      consentRecordFile(root, body);
++      const ask = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude" }));
++      assert.ok(ask.inputs.some((input) => input.name === "advisorExportConsent"), name);
++      assert.ok(ask.applyAction.argv.includes("<approved|declined>"), name);
++      assert.equal(ask.reviewedDefaults.advisorExportConsent.value, "declined", name);
++    } finally { dispose(root); }
++  }
++});
++
+ test("DEFAULT_STEP_CAP is a small, positive constant", () => {
+   assert.ok(Number.isInteger(DEFAULT_STEP_CAP));
+   assert.ok(DEFAULT_STEP_CAP > 0);
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 4de8b4307..49225e8c7 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -1136,7 +1136,7 @@ function onboardingConsentFields({ rootDir, scriptUrl }) {
+       requiresConfirmation: false,
+       executionBoundary: "host",
+       expected: { schema: "pipeline.onboarding-consent-mark.v2", answer: "yes" },
+-      guidance: "Relay consentQuestion.textByLanguage for the user's language (consentQuestion.text when it has no entry) verbatim, never paraphrased, as the only consent question: no question of your own before it or beside it. After an affirmative answer, run this record command once the first onboarding apply (the portable seed) has completed, replacing <the-user-answer-verbatim> with the user's answer word for word; a file written into .claude/ earlier makes a fresh root read as partial. The record is what lets later actions print coveredBy instead of asking again. A decline is recorded with --answer no and leaves the project inactive.",
++      guidance: "Relay consentQuestion.textByLanguage for the user's language (consentQuestion.text when it has no entry) verbatim, never paraphrased, as the only consent question: no question of your own before it or beside it. After an affirmative answer, run this record command once the first onboarding apply (the portable seed) has completed, replacing <the-user-answer-verbatim> with the user's answer word for word; a file written into .claude/ earlier makes a fresh root read as partial. The record is what lets later actions print coveredBy instead of asking again. A decline is recorded with --answer no and leaves the project inactive. The recorded yes also carries the Advisor export consent the question named: after recording it, run the same onboarding-init command once more so the first round is read after the record and does not ask the Advisor export consent a second time.",
+     },
+   };
+ }
+diff --git a/plugins/pipeline-core/scripts/push-init.mjs b/plugins/pipeline-core/scripts/push-init.mjs
+index e9c437b11..38f77d646 100644
+--- a/plugins/pipeline-core/scripts/push-init.mjs
++++ b/plugins/pipeline-core/scripts/push-init.mjs
+@@ -122,6 +122,7 @@ import { gateConfig, loadManifest } from "../lib/manifest.mjs";
+ import { classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
+ import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
++import { PUSH_TRANSPORT_KINDS, readPushTransport, recordPushTransport } from "../lib/machine-plane.mjs";
+ import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from "./push-gate-satisfiability.mjs";
+ import { pushPrepareReport as realPushPrepareReport, resolveEvidenceProjectDir } from "./push-prepare.mjs";
+ import { buildLateVerifyRecoveryAction } from "./pipeline-state.mjs";
+@@ -137,7 +138,7 @@ export const PUSH_INIT_SCRIPT_PATH = fileURLToPath(import.meta.url);
+ export const RECONCILIATION_SCRIPT_RELATIVE_PATH = "harness/scripts/check-doc-reconciliation.mjs";
+ 
+ export function usage() {
+-  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]]";
++  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]] [--transport-kind ssh-key|credential-helper|configured-default [--transport-reference <key path or helper name>]]";
+ }
+ 
+ export function parseArgs(argv) {
+@@ -151,6 +152,11 @@ export function parseArgs(argv) {
+       if (typeof value !== "string" || value === "" || value.startsWith("--")) return { error: `${arg} requires a value` };
+       output[arg.slice(2)] = value;
+       index += 1;
++    } else if (arg === "--transport-kind" || arg === "--transport-reference") {
++      const value = argv[index + 1];
++      if (typeof value !== "string" || value === "" || value.startsWith("--")) return { error: `${arg} requires a value` };
++      output[arg.slice(2)] = value;
++      index += 1;
+     } else if (arg === "--help" || arg === "-h") {
+       output.help = true;
+     } else {
+@@ -158,6 +164,14 @@ export function parseArgs(argv) {
+     }
+   }
+   if (output.help) return output;
++  // C28-ONBOARDING-QUESTIONS: the transport answer is one pair or nothing (configured-default takes no reference).
++  if (output["transport-kind"] !== undefined || output["transport-reference"] !== undefined) {
++    const kind = output["transport-kind"];
++    const reference = output["transport-reference"] ?? null;
++    if (!PUSH_TRANSPORT_KINDS.includes(kind)) return { error: `--transport-kind requires one of: ${PUSH_TRANSPORT_KINDS.join(", ")}` };
++    if ((kind === "configured-default") !== (reference === null)) return { error: kind === "configured-default" ? "configured-default takes no --transport-reference" : `${kind} requires --transport-reference` };
++    output.transport = { kind, reference };
++  }
+   for (const required of ["root", "by", "remote", "destination"]) {
+     if (typeof output[required] !== "string" || output[required] === "") return { error: `--${required} is required` };
+   }
+@@ -402,9 +416,34 @@ function inspectPushCriticCoverage({ root, base, remote, destination }) {
+  * blocker: the outcome, the exit status and the recovery block are those of the core, and the close gate stays the only refusing gate.
+  * `inspectCriticCoverage` is the injection seam (default: the real inspection above).
+  */
++/**
++ * C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10): the transport of the push (which SSH key, or the credential helper) is asked ONCE, here at the first push
++ * setup, and remembered in the machine-local file (lib/machine-plane.mjs `pushTransport`), never in a tracked file; every later push-init reads it back. Advice only:
++ * it moves neither the outcome nor the checks. A name or path is stored, never a key's content; a refused answer writes nothing.
++ */
++function pushTransportField({ root, by, remote, destination, base, candidate, recordRef, transport, transportDeps }) {
++  if (transport !== null && transport !== undefined) {
++    try { recordPushTransport(remote, transport, transportDeps); } catch { return { status: "refused", remote, code: "PUSH-TRANSPORT-REFUSED" }; }
++    return { status: "recorded-now", remote, kind: transport.kind, reference: transport.reference };
++  }
++  const recorded = readPushTransport(remote, transportDeps);
++  if (recorded !== null) return { status: "recorded", remote, kind: recorded.kind, reference: recorded.reference };
++  return {
++    status: "unasked", remote,
++    question: `Ask the PO once, now, before the first push is prepared, how a push to "${remote}" reaches the remote: the SSH key it should use (the PO names it), the Git credential helper, or the configured default when the default route already works. The answer is remembered in this machine's own Pipeline file, never in a tracked file, and read by every later push. Never list a key directory or guess key names; a name the PO gives is stored, a key's content never is.`,
++    applyAction: {
++      kind: "command", executable: process.execPath,
++      argv: [PUSH_INIT_SCRIPT_PATH, ...buildPushInitArgv({ root, by, remote, destination, base, candidate, recordRef }), "--transport-kind", "<ssh-key|credential-helper|configured-default>", "--transport-reference", "<key path or helper name; drop this pair's reference for configured-default>"],
++      mutation: true, requiresConfirmation: false, executionBoundary: "local-process",
++    },
++  };
++}
++
+ export function drivePushInit(options = {}) {
+-  const { inspectCriticCoverage = inspectPushCriticCoverage, ...rest } = options;
+-  const result = drivePushInitCore(rest);
++  const { inspectCriticCoverage = inspectPushCriticCoverage, transport = null, transportDeps = {}, ...rest } = options;
++  const core = drivePushInitCore(rest);
++  const result = rest.checkpoint === true || typeof core?.root !== "string" || core.outcome === "usage-error" ? core
++    : { ...core, transport: pushTransportField({ root: core.root, by: rest.by, remote: rest.remote, destination: rest.destination, base: rest.base ?? null, candidate: rest.candidate ?? null, recordRef: rest.recordRef ?? null, transport, transportDeps }) };
+   if (rest.checkpoint === true || typeof result?.root !== "string" || result.outcome === "usage-error") return result;
+   let listing;
+   try { listing = inspectCriticCoverage({ root: result.root, base: rest.base ?? null, remote: rest.remote, destination: rest.destination }); }
+@@ -648,6 +687,7 @@ export function main(args = process.argv.slice(2), {
+   const result = drive({
+     rootDir: options.root, by: options.by, remote: options.remote, destination: options.destination,
+     base: options.base ?? null, candidate: options.candidate ?? null, recordRef: options["record-ref"] ?? null, checkpoint: options.checkpoint === true,
++    transport: options.transport ?? null,
+   });
+   const ready = ["chat-ready", "signature-required", "checkpoint-ready", "deliver-verified-candidate"].includes(result.outcome);
+   // C19-G5: the typed runbook link (push path, the driver step) is added last, once per session, and always on a refusal.
+diff --git a/plugins/pipeline-core/scripts/push-init.test.mjs b/plugins/pipeline-core/scripts/push-init.test.mjs
+index 806d6efdc..89dc1b6de 100644
+--- a/plugins/pipeline-core/scripts/push-init.test.mjs
++++ b/plugins/pipeline-core/scripts/push-init.test.mjs
+@@ -40,7 +40,7 @@ import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
+ import * as po from "../lib/po-gate-authority.mjs";
+ import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+ import { createWindowsOwnedAuthorityDirectory, createWindowsOwnedAuthorityExclusiveFile } from "../lib/windows-owned-authority-backend.mjs";
+-import { chmodSync } from "node:fs";
++import { chmodSync, existsSync } from "node:fs";
+ import { renderImpl, renderShim } from "./pre-push-hook-install.mjs";
+ import { canonicalJson as packetCanonicalJson } from "./critic-packet-preflight.mjs";
+ 
+@@ -580,6 +580,65 @@ test("drivePushInit: the prepare report's notices are carried into the result an
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// C28-ONBOARDING-QUESTIONS (AC-108), friction 4 (PO decision 2026-11-10): the transport of the push (which SSH key, or the credential helper) is asked ONCE at the
++// first push setup and remembered in the machine-local file, never in a tracked file; every later push-init reads it. Fixture values are fake.
++test("C28-ONBOARDING-QUESTIONS: the push transport is asked once, remembered machine-locally and read back by later pushes; the outcome never moves", async () => {
++  const { readMachinePlane } = await import("../lib/machine-plane.mjs");
++  const root = freshFixtureRoot();
++  const home = realpathSync(mkdtempSync(join(tmpdir(), "c28-transport-home-")));
++  try {
++    const transportDeps = { homedirFn: () => home };
++    const drive = (extra = {}) => drivePushInit({
++      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
++      satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(), transportDeps, ...extra,
++    });
++    const asked = drive();
++    assert.equal(asked.outcome, "signature-required", "advice: the outcome is the one it was");
++    assert.equal(asked.transport.status, "unasked");
++    assert.equal(asked.transport.remote, "origin");
++    assert.match(asked.transport.question, /once/u);
++    assert.match(asked.transport.question, /SSH key|credential helper/u);
++    const flagAt = asked.transport.applyAction.argv.indexOf("--transport-kind");
++    assert.ok(flagAt > 0 && asked.transport.applyAction.argv[0].endsWith("push-init.mjs"), "the answer is one run of this same driver");
++    assert.ok(asked.transport.applyAction.argv.includes("--transport-reference"));
++    assert.equal(asked.transport.applyAction.mutation, true);
++    assert.equal(readMachinePlane(transportDeps).status, "absent", "asking writes nothing");
++    const answered = drive({ transport: { kind: "ssh-key", reference: "/home/fixture/.ssh/id_fixture_key" } });
++    assert.equal(answered.outcome, "signature-required");
++    assert.equal(answered.transport.status, "recorded-now");
++    assert.deepEqual(readMachinePlane(transportDeps).plane.pushTransport.origin, { kind: "ssh-key", reference: "/home/fixture/.ssh/id_fixture_key" });
++    const later = drive();
++    assert.equal(later.transport.status, "recorded");
++    assert.equal(later.transport.kind, "ssh-key");
++    assert.equal(later.transport.reference, "/home/fixture/.ssh/id_fixture_key");
++    assert.equal(Object.hasOwn(later.transport, "question"), false, "asked once, never again");
++    assert.equal(drive({ transport: { kind: "ssh-key", reference: "" } }).transport.status, "refused", "a refused answer is typed and writes nothing");
++    assert.equal(readMachinePlane(transportDeps).plane.pushTransport.origin.reference, "/home/fixture/.ssh/id_fixture_key");
++    // The fixture root has no .git; whatever repository files exist must not carry the transport (it lives only in the machine file).
++    const gitConfig = join(root, ".git", "config");
++    if (existsSync(gitConfig)) assert.doesNotMatch(readFileSync(gitConfig, "utf8"), /id_fixture_key/u, "nothing about the transport lands in the repository");
++    assert.equal(readFileSync(join(home, ".agent-pipeline", "machine.json"), "utf8").includes("id_fixture_key"), true, "it lives in the machine-local file");
++    // The checkpoint lane does not carry the question.
++    assert.equal(Object.hasOwn(driveCheckpointPushInit({ rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/x", run: () => ({ status: 0, stdout: "" }) }), "transport"), false);
++  } finally { rmSync(root, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }); }
++});
++
++test("C28-ONBOARDING-QUESTIONS: --transport-kind / --transport-reference parse as one answer or not at all", () => {
++  const base = ["--root", "/x", "--by", "t", "--remote", "origin", "--destination", "refs/heads/main"];
++  const ok = parseArgs([...base, "--transport-kind", "ssh-key", "--transport-reference", "/home/f/.ssh/id_fixture"]);
++  assert.deepEqual(ok.transport, { kind: "ssh-key", reference: "/home/f/.ssh/id_fixture" });
++  assert.deepEqual(parseArgs([...base, "--transport-kind", "configured-default"]).transport, { kind: "configured-default", reference: null });
++  assert.deepEqual(parseArgs([...base, "--transport-kind", "credential-helper", "--transport-reference", "manager"]).transport, { kind: "credential-helper", reference: "manager" });
++  assert.equal(parseArgs(base).transport, undefined);
++  for (const extra of [["--transport-kind", "ssh-key"], ["--transport-reference", "k"], ["--transport-kind", "password", "--transport-reference", "k"],
++    ["--transport-kind", "configured-default", "--transport-reference", "k"], ["--transport-kind", "ssh-key", "--transport-reference", "--root"]]) {
++    assert.ok(parseArgs([...base, ...extra]).error, JSON.stringify(extra));
++  }
++  const seen = [];
++  main([...base, "--transport-kind", "ssh-key", "--transport-reference", "id_fixture"], { write: () => {}, writeError: () => {}, drive: (options) => { seen.push(options); return { outcome: "usage-error" }; } });
++  assert.deepEqual(seen[0].transport, { kind: "ssh-key", reference: "id_fixture" });
++});
++
+ test("drivePushInit: a proof that can be watched is handed over with its wait action, so the human reports nothing back; without one the turn ends", async () => {
+   const { pushPrepareReport: real } = await import("./push-prepare.mjs");
+   const waitAction = { executable: "node", argv: ["proof-wait.mjs"] };
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index b14fa6040..08d78844a 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -377,8 +377,21 @@ export function repositoryModeNotice(dir, { remote, destination }, deps = {}) {
+     message: `the calibration (${file}) declares repositoryMode "local-only" (written once at onboarding), but this push targets the configured remote "${remote}" (${destination}). `
+       + `Correct the calibration: set "repositoryMode" to "remote-tracked" in ${file}${mirror} with the one narrow command node <plugin-root>/scripts/repository-mode-promote.mjs --root <project-root> --to remote-tracked `
+       + "(it changes only that one value, needs a configured remote and prints the paths to commit; the pre-commit hook admits exactly that change without a signature). "
+-      + "It is routine agent work and needs no separate PO decision; the push itself stays behind its signature. It is a commit, so it belongs before the last Critic round; then run push-prepare again. If that round has already passed, leave it for this push (a calibration commit would end the Critic carry, CVL-CARRY-CONTENT-CHANGED) and make it the first commit of the next feature. Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
++      + "It is routine agent work, its own recorded step, and needs no separate PO decision or signature; the push itself stays behind its signature. The push continues in the same feature: commit the printed paths as their own commit, run Verify again (its evidence is bound to the new HEAD), then run push-init again. The Critic evidence of the reviewed candidate carries across this one commit, because the carry admits exactly this one-token change and nothing else in the calibration (any other calibration change ends it, CVL-CARRY-CONTENT-CHANGED). Any other change to the calibration stays on the signed route (a PO-approved guard override: node <plugin-root>/scripts/guard-human-override.mjs plan). "
+       + "Nothing was written now and nothing is refused; if \"local-only\" is the truth, the push target is what is wrong.",
++    // C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10): the same correction as a typed agent step, no signature, recorded as its own commit.
++    action: {
++      kind: "command", executable: process.execPath,
++      argv: [fileURLToPath(new URL("./repository-mode-promote.mjs", import.meta.url)), "--root", dir, "--to", "remote-tracked"],
++      mutation: true, requiresConfirmation: false, requiresSignature: false, recordedAs: "its own commit", executionBoundary: "local-process",
++      expected: { schema: "pipeline.repository-mode-promotion.v1", statuses: ["promoted", "unchanged"] },
++    },
++    then: [
++      "stage exactly the paths the command prints (git add -- <paths>) and commit them as their own commit; the pre-commit hook admits the one-token change without a signature",
++      "run Verify again: its evidence is bound to the new HEAD",
++      "run push-init again: the Critic carry admits exactly this commit, so the review of this feature still binds the candidate",
++      "continue to the signature as before",
++    ],
+   };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/push-prepare.test.mjs b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+index a6f8993d2..4191d7150 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.test.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.test.mjs
+@@ -1923,6 +1923,42 @@ test("CGR-19: a calibrated local-only mode against a configured push remote is n
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// C28-ONBOARDING-QUESTIONS (AC-108), friction 4 (PO decision 2026-11-10): the first push setup that finds a remote under local-only OFFERS the switch as its
++// own agent step (no signature) and the push continues in the same feature. It used to say "leave it for the next feature": the promotion commit ended the
++// Critic carry. The carry now admits that exact one-token change (lib/critic-evidence-carry.mjs), so the notice carries the typed action and the way on.
++test("C28-ONBOARDING-QUESTIONS: the repository-mode notice offers the switch as an agent step without a signature and continues the push in the same feature", () => {
++  const root = mkdtempSync(join(tmpdir(), "c28-mode-"));
++  try {
++    for (const args of [["init", "-q", "-b", "main"], ["remote", "add", "origin", "https://example.invalid/project.git"]]) {
++      assert.equal(spawnSync("git", ["-C", root, ...args], { encoding: "utf8" }).status, 0);
++    }
++    mkdirSync(join(root, "project"), { recursive: true });
++    writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({ project: "p", repositoryMode: "local-only" }, null, 2)}\n`);
++    const report = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({ dir: root }), { foldPendingApprovalWrite: false }).report;
++    const [notice] = report.notices;
++    assert.equal(notice.code, "PUSH-REPOSITORY-MODE-MISMATCH");
++    assert.equal(notice.action.kind, "command");
++    assert.equal(notice.action.executable, process.execPath);
++    assert.equal(notice.action.argv[0].endsWith(join("scripts", "repository-mode-promote.mjs")), true);
++    assert.deepEqual(notice.action.argv.slice(1), ["--root", root, "--to", "remote-tracked"]);
++    assert.equal(notice.action.mutation, true);
++    assert.equal(notice.action.requiresSignature, false, "an ordinary agent step, not a signed one");
++    assert.equal(notice.action.requiresConfirmation, false);
++    assert.equal(notice.action.recordedAs, "its own commit", "the step is recorded as its own commit");
++    assert.equal(notice.then.length >= 3, true);
++    assert.match(notice.then.join(" "), /own commit/u);
++    assert.match(notice.then.join(" "), /Verify/u, "the Verify evidence is bound to the new HEAD, so it runs again");
++    assert.match(notice.then.join(" "), /push-init/u);
++    assert.match(notice.message, /same feature/u);
++    assert.doesNotMatch(notice.message, /next feature|first commit of the next/u, "no longer deferred to the next feature");
++    assert.match(notice.message, /Critic/u, "the Critic carry across this one commit is named");
++    // QG-04 restated pins above stay true: the one narrow command and the signed route for every other change.
++    assert.match(notice.message, /repository-mode-promote\.mjs --root <project-root> --to remote-tracked/u);
++    assert.match(notice.message, /override/u);
++    assert.equal(report.ready, true, "advice: ready does not move");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ // AC-108 (closest accepted criterion), CGR-18 / CGF-19: the unchanged shipped template passed the push threat-model gate; it is now named
+ // template-unchanged everywhere the gate result is shown, and blocks only in the critical profile (as a scanner that did not execute does).
+ test("CGF-19: an unchanged threat-model template is named template-unchanged in the check and the notices; it blocks only in the critical profile", () => {
+diff --git a/plugins/pipeline-core/skills/advisor-consult/SKILL.md b/plugins/pipeline-core/skills/advisor-consult/SKILL.md
+index ee8424d40..76054d94b 100644
+--- a/plugins/pipeline-core/skills/advisor-consult/SKILL.md
++++ b/plugins/pipeline-core/skills/advisor-consult/SKILL.md
+@@ -17,7 +17,9 @@ Advisory is a duty, never a profile phase or a Critic verdict.
+ Before any child, model request, prompt export or timeout:
+ 
+ 1. Confirm project-onboarding readiness FIRST, before requesting or recording
+-   any Advisor-export consent from the human: this is the same check
++   any Advisor-export consent from the human (the first Pipeline consent
++   question already carries it; a project without that recorded consent keeps
++   its own recorded `advisor_export.consent`): this is the same check
+    `codex-advisory-bootstrap.mjs` already performs internally via
+    `requireProjectOnboardingReady` (its first statement, ~line 85, ahead of
+    even its own consent check). If that check fails (`PORG-NOT-READY`), do not
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index ea33ab774..83398c76b 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -33,7 +33,10 @@ read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
+ mutations; then run `consentRecordAction`. When an escalation review asks why a
+ covered action runs, give its `escalationJustification` line verbatim; the
+ design approval, push, release and any human-guard override are never covered.
+-A decline leaves the project inactive.
++A decline leaves the project inactive. That one question also carries the Advisor
++export consent (agreeing is part of using the Pipeline), so no separate Advisor
++question follows: after `consentRecordAction`, run the same `onboarding-init.mjs`
++command once more so the first round is read after the record.
+ 
+ Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
+ carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+index 2d7126b86..730e60f3a 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+@@ -274,9 +274,12 @@ which credential or remote this repository should push with. Then retry once
+ with what the PO named.
+ 
+ Resolve this before the first push is prepared, not after it fails, and ask at
+-most once per repository. Record the answer (the credential's name or the
+-remote, never its content) in the calibrated handover so that a later session
+-reads it there instead of asking again.
++most once per repository. `push-init.mjs` asks it once at the first push setup
++and remembers the answer (the credential's name or the remote, never its content)
++in this machine's own Pipeline file (`push-init.mjs --transport-kind
++ssh-key|credential-helper|configured-default [--transport-reference <name>]`),
++never in a tracked file or the calibrated handover; every later `push-init.mjs`
++reads it back as `transport` instead of asking again.
+ 
+ ### The two-step shape (superseded as a human step, still supported)
+ 
