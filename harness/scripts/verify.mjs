@@ -839,6 +839,9 @@ const TEST_SUITES = [
   // Landed after both merge sides diverged (commit ab347a74); registered here per PHX-VERIFY 1b.
   { name: "pipeline-start-preflight-antigravity-hard-enforcement-tests", file: join(pluginScriptsDir, "pipeline-start-preflight-antigravity-hard-enforcement.test.mjs") },
   { name: "guard-dispatch-budget-tests", file: join(hooksDir, "guard-dispatch-budget.test.mjs") },
+  // Candidate 28: the recursive delete rule (18-cd619050b) and the answered Git author (19-3299ba547) landed without a Verify entry.
+  { name: "recursive-delete-policy-tests", file: join(hooksDir, "recursive-delete-policy.test.mjs") },
+  { name: "held-git-author-tests", file: join(libDir, "held-git-author.test.mjs") },
   { name: "dispatch-budget-binding-tests", file: join(libDir, "dispatch-budget-binding.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `DBB${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "wire-dispatch-budget-hook-tests", file: join(repoRoot, "harness", "scripts", "wire-dispatch-budget-hook.test.mjs") },
   { name: "pipeline-user-v3-drift-tests", file: join(libDir, "pipeline-user-v3-drift.test.mjs") },
