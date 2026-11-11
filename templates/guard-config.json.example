@@ -29,5 +29,8 @@
       "reason": "db:reset wipes the local dev database - run it by hand, deliberately."
     }
   ],
-  "$extraDenyPatterns": "git-guard field: project-specific Bash/PowerShell deny rules added ON TOP of the built-in union (config, never a fork of the hook). Each entry has 'pattern' (a JS regex body, matched case-insensitively against the quote-stripped command), a 'reason' (shown to the agent when the command is blocked), and an optional 'id' (defaults to PX-<n> by list position). A blocked command can still be run through the double-confirmation override procedure, or by the PO in their own terminal."
+  "$extraDenyPatterns": "git-guard field: project-specific Bash/PowerShell deny rules added ON TOP of the built-in union (config, never a fork of the hook). Each entry has 'pattern' (a JS regex body, matched case-insensitively against the quote-stripped command), a 'reason' (shown to the agent when the command is blocked), and an optional 'id' (defaults to PX-<n> by list position). A blocked command can still be run through the double-confirmation override procedure, or by the PO in their own terminal.",
+
+  "throwawayDirs": ["dist", "node_modules"],
+  "$throwawayDirs": "git-guard field: folders in which a recursive delete (rm -r, find -delete, find -exec rm, Remove-Item -Recurse) is allowed besides scratch/, which is always open. Each entry is a literal relative path below the project root; the root itself, a parent, a glob, .git, .claude and project are ignored. Everywhere else the delete is refused (GG-21)."
 }

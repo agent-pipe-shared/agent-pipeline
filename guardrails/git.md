@@ -153,6 +153,13 @@ Existing explicitly approved fixed registration exceptions remain unchanged.
 - **Why:** A ruleset that claims more than the guard technically enforces is worse than no rule at all — a false sense of protection invites exactly the bypass it claims to prevent (`docs/operating-model.md`, *What the model protects* — rule 3, "Prefer deterministic checks", gate honesty).
 - **Verification:** `plugins/pipeline-core/hooks/guard-git.test.mjs` carries a BLOCK case and an ALLOW counter-case per rule id (`GG-17`…`GG-20`); `node harness/scripts/verify.mjs` runs the full suite.
 
+## GIT-07a — Recursive deletes run only in throwaway folders
+
+- **MUST NOT** delete recursively (`rm -r`, `find -delete`, `find -exec rm`, `xargs rm -r`, `Remove-Item -Recurse`, `rd /s`, also inside `sh -c` or a Python or Node one-liner) outside `scratch/` and the folders the project lists under `throwawayDirs` in its guard config. The git-guard blocks it (`GG-21`), as well as a target holding a variable or any expansion, because an unset variable turns a scoped delete into a delete of the whole worktree.
+- Remove tracked files by name with `git rm <file>`.
+- **Not covered:** a script that deletes on its own; the guard reads command text only.
+- **Verification:** `plugins/pipeline-core/hooks/recursive-delete-policy.test.mjs`.
+
 ## GIT-08 — Standing push approval does NOT cover a deploy-triggering ref
 
 - **MUST NOT** treat the standing push approval (GIT-05) as covering a push to a deploy-triggering ref (a release tag/branch pattern declared under a manifest `release` section, e.g. `refs/tags/v*`). `standing-approved` covers ORDINARY commits to `main`; it is explicitly carved out for deploy triggers.
