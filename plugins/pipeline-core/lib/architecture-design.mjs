@@ -731,8 +731,10 @@ export function materializeArchitectureDesign(rootDir, { lock, ...inspectDeps } 
       const retained = retainApprovedDesignArchitectureReference(subset.handle);
       if (!retained.ok) return { ok: false, status: "blocked", code: retained.code };
     }
-    return inventory.prospective.required && readback.inspected.status === "not-required"
-      ? { ...readback.inspected, required: true, status: "materialized", materializationKind: "prospective-adr-only", referencePath: inventory.prospective.referencePath }
-      : readback.inspected;
+    if (inventory.prospective.required && readback.inspected.status === "not-required") {
+      return { ...readback.inspected, required: true, status: "materialized", materializationKind: "prospective-adr-only", referencePath: inventory.prospective.referencePath };
+    }
+    // Live on native Windows, 2026-11-10: the commit step left the retained approval reference out, and implementation entry then refused for it.
+    return inventory.prospective.required ? { ...readback.inspected, referencePath: inventory.prospective.referencePath } : readback.inspected;
   } catch (error) { return { ok: false, status: "blocked", code: error.message }; }
 }

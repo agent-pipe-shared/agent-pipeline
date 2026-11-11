@@ -548,6 +548,21 @@ test("a deferred architecture decision remains visible without changing lifecycl
   assert.equal(result.code, "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED");
 });
 
+test("a blocked architecture decision names its finding in the repair guidance", () => {
+  const result = inspectArchitectureEntryReadiness({
+    rootDir: repoRoot,
+    planningSurface: { planPath: "specs/architecture-entry.md",
+      paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
+    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt,
+      checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "adopted", scope: [ARCHITECTURE_ENTRY_SCOPE] }),
+      inspectDecisions: ({ area }) => ({ area, status: "blocked", code: "ARCH-DECISION-EFFECTIVE-UNRESOLVED", decisions: [],
+        findings: [{ code: "aggregate-design-authority-unverified", path: "project/aggregate-design-architecture-references" }] }),
+    },
+  });
+  assert.equal(result.code, "ARCHITECTURE-DECISION-APPLICABILITY-BLOCKED", JSON.stringify(result));
+  assert.match(result.nextAction.guidance, /Blocking: [^.]*aggregate-design-authority-unverified \(project\/aggregate-design-architecture-references\)/u);
+});
+
 test("an unavailable optional decision clock remains diagnostic", () => {
   const result = inspectPlanningDecisionApplicability(repoRoot,
     { paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },

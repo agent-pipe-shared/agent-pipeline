@@ -289,6 +289,15 @@ export function inspectPlanningDecisionApplicability(root, surface, now,
   };
 }
 
+/** Live on native Windows, 2026-11-10: the bare refusal sent the agent into the plugin's source to learn which finding blocked it. */
+function blockedDecisionFindings(applicability) {
+  const named = [...new Set(applicability.areas.filter(item => item.status === "blocked").flatMap(item => (Array.isArray(item.findings) && item.findings.length
+    ? item.findings.map(entry => `${item.area}: ${entry.code}${entry.path ? ` (${entry.path})` : ""}`)
+    : [`${item.area}: ${item.code ?? "no finding recorded"}`])))];
+  if (named.length === 0) return "";
+  return ` Blocking: ${named.slice(0, 6).join("; ")}${named.length > 6 ? `; and ${named.length - 6} more` : ""}.`;
+}
+
 export function summarizePlanningDecisionApplicability(value) {
   if (!value || !Array.isArray(value.areas) || !Array.isArray(value.unresolvedPaths)) return null;
   return {
@@ -455,7 +464,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
       artifacts, disposition, null, {
         kind: "repair-required",
         code: "ARCHITECTURE-DECISION-APPLICABILITY-REPAIR",
-        guidance: "Resolve the blocked area's decision findings through its owning authority, restore any required authenticated inherited source, and re-run architecture entry readiness. Preserve the original decision/source evidence; do not substitute a map, adoption approval, or fitness PASS for it.",
+        guidance: `Resolve the blocked area's decision findings through its owning authority, restore any required authenticated inherited source, and re-run architecture entry readiness. Preserve the original decision/source evidence; do not substitute a map, adoption approval, or fitness PASS for it.${blockedDecisionFindings(artifacts.decisionApplicability)}`,
       });
   }
 
