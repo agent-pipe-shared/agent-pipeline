@@ -164,9 +164,12 @@ test("plan without a stop-failure record is ready with stopFailure null and says
 test("refusal: HEAD moved away from the pending candidate", () => {
   const { root, head } = fixture();
   try {
+    // QG-04, C28-HOST-COMMIT-RECOVERY (PO decision 2026-11-10): HEAD that moved FORWARD from the candidate is now this command's own recovery route (RHC-1 in
+    // orchestrator-commit-record.test.mjs). The intent of this case, a HEAD that is not the candidate and does not descend from it still refuses, is unchanged:
+    // the move is now a rewrite of the candidate commit instead of a commit on top of it.
     writeFileSync(join(root, "elsewhere.txt"), "x\n");
     git(root, "add", "--", "elsewhere.txt");
-    git(root, "commit", "-q", "-m", "elsewhere");
+    git(root, "commit", "-q", "--amend", "-m", "elsewhere");
     const moved = git(root, "rev-parse", "HEAD");
     const { status, json } = run(root, "plan");
     assert.equal(status, 2);
@@ -176,7 +179,7 @@ test("refusal: HEAD moved away from the pending candidate", () => {
     assert.notEqual(moved, head);
     const applied = run(root, "apply", "--expect-sha256", "0".repeat(64));
     assert.equal(applied.status, 2);
-    assert.equal(commitCount(root), 2);
+    assert.equal(commitCount(root), 1, "QG-04 restatement: the rewrite replaced the one commit (it used to add a second); the refused apply added none");
   } finally { cleanup(root); }
 });
 

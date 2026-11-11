@@ -4,8 +4,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { courseEvidenceGapText, criticCourseRepair, locateCourseEvidenceGap, resolveRegisteredCriticCourseHistory } from "../lib/critic-course-admission.mjs";
@@ -147,4 +146,51 @@ test("K98 row 7/7: a refusal for any other foreign file keeps the plain reason",
   assert.equal(result.code, "CPO-FOREIGN-CHANGES");
   assert.doesNotMatch(result.reason, /push-prepare/u);
   assert.match(result.reason, /commits only the Pipeline's own state files/u);
+});
+
+// C28-HOST-COMMIT-RECOVERY (AC-108, PO decision 2026-11-10): this command commits from Node, so no Bash guard sees it as a commit. It makes the same
+// check as the commit guard itself: a commit touching a running Goldfish's write scope is refused once with the warning, unless the caller acknowledges
+// that dispatch (`--acknowledge-goldfish <id>`, recorded as a `Concurrent-Goldfish:` trailer; no PO signature); a commit outside the scope only warns.
+function runningFixture(allowed) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "cpo-running-")));
+  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  git("init", "-q");
+  for (const [name, value] of [["user.name", "Fixture"], ["user.email", "fixture@example.invalid"], ["commit.gpgsign", "false"], ["core.hooksPath", "/dev/null"]]) git("config", name, value);
+  mkdirSync(join(root, "specs", "feat"), { recursive: true });
+  writeFileSync(join(root, "specs", "feat", "slice-queue.json"), "{}\n");
+  git("add", "--", "specs/feat/slice-queue.json");
+  git("commit", "-q", "-m", "base");
+  writeFileSync(join(root, "specs", "feat", "slice-queue.json"), "{\"changed\":true}\n");
+  const dir = join(root, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "pending-claude-RGC-ONE.json"), JSON.stringify({ createdAtMs: Date.now(), runner: "claude", binding: { dispatchId: "RGC-ONE", candidateCommit: git("rev-parse", "HEAD").trim(), allowedPaths: allowed } }));
+  return { root, git };
+}
+
+test("RGC: an owned path inside a running Goldfish's scope is refused once with the dispatch named, and the acknowledgement admits it and is recorded in the commit", () => {
+  const { root, git } = runningFixture(["specs/feat/slice-queue.json"]);
+  try {
+    const head = git("rev-parse", "HEAD").trim();
+    const refused = commitPipelineOwned(["--root", root, "--agent"]);
+    assert.equal(refused.status, "refused");
+    assert.equal(refused.code, "CPO-RUNNING-GOLDFISH");
+    assert.match(refused.reason, /RGC-ONE/u);
+    assert.match(refused.reason, /specs\/feat\/slice-queue\.json/u);
+    assert.match(refused.reason, /--acknowledge-goldfish RGC-ONE/u);
+    assert.equal(git("rev-parse", "HEAD").trim(), head, "the refusal committed nothing");
+    const admitted = commitPipelineOwned(["--root", root, "--agent", "--acknowledge-goldfish", "RGC-ONE"]);
+    assert.equal(admitted.status, "committed", JSON.stringify(admitted));
+    assert.match(git("log", "-1", "--format=%B"), /^Concurrent-Goldfish: RGC-ONE$/mu);
+    assert.match(admitted.warnings?.[0] ?? "", /RGC-ONE/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("RGC: an owned path outside a running Goldfish's scope commits with the warning only", () => {
+  const { root, git } = runningFixture(["src/elsewhere.txt"]);
+  try {
+    const result = commitPipelineOwned(["--root", root, "--agent"]);
+    assert.equal(result.status, "committed", JSON.stringify(result));
+    assert.match(result.warnings?.[0] ?? "", /RGC-ONE/u);
+    assert.doesNotMatch(git("log", "-1", "--format=%B"), /Concurrent-Goldfish/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

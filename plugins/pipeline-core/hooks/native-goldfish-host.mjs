@@ -14,7 +14,8 @@ import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 import { admissionProgress } from "../lib/admission-progress.mjs";
 import { observeEffectiveEffort } from "../lib/dispatch-model-enforcement.mjs";
-import { hostCommitWaitCommand, writeNativeGoldfishStopOutcome } from "../lib/native-goldfish-stop-outcome.mjs";
+import { hostCommitWaitCommand, readNativeGoldfishStopOutcome, writeNativeGoldfishStopOutcome } from "../lib/native-goldfish-stop-outcome.mjs";
+import { fileURLToPath } from "node:url";
 
 /**
  * C23 (draft ADR "a project's pipeline.user.yaml owns its routing", decision 6): beside a recorded Claude Goldfish commit the stop names the
@@ -96,9 +97,12 @@ const STOP_FAILURE_SCHEMA ="pipeline.native-goldfish-host-stop-failure.v1";
  * dispatch (its newest) wins over a newer record of another dispatch; without one, or without a match, the newest record wins. `others`
  * lists up to 3 further records, newest first (dispatch id, code, stage), so a second unresolved failure is never invisible.
  */
-export function readNativeGoldfishStopFailure({ commonDir, dispatchId = null } = {}) {
+export function readNativeGoldfishStopFailure({ commonDir, dispatchId = null, strict = false } = {}) {
   try {
     if (typeof commonDir !== "string" || commonDir.length === 0) return null;
+    // C28 (PO decision 2026-11-10): a hint attached to a PostToolUse is bound to its own dispatch. `strict` never falls back to the newest record of another
+    // dispatch (a stale hint of one dispatch reached three unrelated read-only dispatches 1.5 hours later) and lists no other dispatch's failure.
+    if (strict && (typeof dispatchId !== "string" || dispatchId === "")) return null;
     const directory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
     const records = [];
     for (const name of readdirSync(directory)) {
@@ -109,11 +113,19 @@ export function readNativeGoldfishStopFailure({ commonDir, dispatchId = null } =
       const observedAt = typeof entry.observedAt === "string" ? entry.observedAt : "";
       {
         records.push({ code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt,
+          commit: typeof entry.commit === "string" ? entry.commit : null,
           stage: typeof entry.stage === "string" ? entry.stage : null, reason: typeof entry.reason === "string" ? entry.reason : null,
           detail: sanitizeStopFailureDetail(entry.detail), lock: sanitizeStopFailureLock(entry.lock) });
       }
     }
     records.sort((a, b) => (a.observedAt < b.observedAt ? 1 : a.observedAt > b.observedAt ? -1 : 0));
+    if (strict) {
+      const own = records.find((r) => r.dispatchId === dispatchId) ?? null;
+      if (!own) return null;
+      // Bound to its status as well: once the dispatch's stop later ended with a recorded host commit, the failure is history, not a hint.
+      const later = readNativeGoldfishStopOutcome({ commonDir, dispatchId, after: own.observedAt });
+      return later?.status === "authored-commit-recorded" ? null : own;
+    }
     const chosen = (typeof dispatchId === "string" && dispatchId !== "" ? records.find((r) => r.dispatchId === dispatchId) : null) ?? records[0] ?? null;
     if (!chosen) return null;
     const others = records.filter((r) => r !== chosen).slice(0, 3).map((r) => ({ dispatchId: r.dispatchId, code: r.code, stage: r.stage }));
@@ -167,8 +179,22 @@ function describeLock(lock) {
 }
 
 /** E1: the one recovery sentence every failed host commit names -- the helper that verifies, commits and records in one step. */
-function recoverySentence(dispatchId) {
-  return `run scripts/goldfish-host-commit-recover.mjs plan --root <root>${dispatchId ? ` --dispatch-id ${dispatchId}` : ""} --briefing <briefing file> --handback <hand-back file> (the briefing is the file dispatch-briefing.mjs wrote for this dispatch, the hand-back file holds the text the Goldfish returned), check the planned paths, then run the same command as apply with the --expect-sha256 digest the plan printed; apply makes one ordinary commit with the dispatch trailer and writes the typed orchestrator-attested dispatch record, which is not host-observed evidence.`;
+const RECOVER_SCRIPT = fileURLToPath(new URL("../scripts/goldfish-host-commit-recover.mjs", import.meta.url));
+/**
+ * C28-HOST-COMMIT-RECOVERY: the recovery command complete, with the real script path, root and dispatch id (null when the root or the id is unknown or cannot be quoted
+ * the one way Bash and PowerShell read alike). The briefing and hand-back names are the conventional ones the recovery helper itself suggests.
+ */
+export function hostCommitRecoverCommand({ root, dispatchId } = {}) {
+  if (typeof root !== "string" || root === "" || `${RECOVER_SCRIPT}${root}`.includes("'") || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u.test(dispatchId ?? "")) return null;
+  return `node '${RECOVER_SCRIPT}' plan --root '${root}' --dispatch-id ${dispatchId} --briefing scratch/briefing-${dispatchId}.md --handback scratch/handback-${dispatchId}.txt`;
+}
+function recoverySentence(dispatchId, { root = null, commit = null } = {}) {
+  const exact = hostCommitRecoverCommand({ root, dispatchId });
+  const landed = typeof commit === "string" && /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(commit)
+    ? ` The host commit already exists (${commit.slice(0, 12)}): the recovery commits nothing again and writes only the record that was lost.` : "";
+  return `run scripts/goldfish-host-commit-recover.mjs plan --root <root>${dispatchId ? ` --dispatch-id ${dispatchId}` : ""} --briefing <briefing file> --handback <hand-back file> (the briefing is the file dispatch-briefing.mjs wrote for this dispatch, the hand-back file holds the text the Goldfish returned), check the planned paths, then run the same command as apply with the --expect-sha256 digest the plan printed; apply makes one ordinary commit with the dispatch trailer and writes the typed orchestrator-attested dispatch record, which is not host-observed evidence.`
+    + (exact ? ` Exact command (write the briefing and the hand-back text to those two files first): ${exact}` : "")
+    + landed + (exact ? " It is safe to run again: a second run says already-recovered and changes nothing." : "");
 }
 /**
  * The slug reason of a failure, wherever the finalizer put it: a stage failure carries `causeReason`, a commit exception carries it
@@ -189,26 +215,27 @@ function describeOthers(others) {
   return ` Other unresolved stop-failure records, newest first: ${text}.`;
 }
 
-function stopFailureNotice(failure) {
+function stopFailureNotice(failure, root = null) {
   if (!failure || typeof failure.code !== "string") return null;
   // PF-70: the stage and the slug reason, when recorded, name where and why the stop failed.
   const cause = [failure.stage ? `stage ${failure.stage}` : null, failure.reason ? `reason ${failure.reason}` : null].filter(Boolean).join(", ");
   // E1 (Claude Windows greenfield): a stop failure with no pending state named neither why nor the command that recovers it.
+  // C28: every other failed host commit (an authority refusal, a commit or post-commit stage failure, an invalid record) names the same recovery.
   const recover = failure.code === "NGHF-PENDING-UNAVAILABLE"
-    ? ` Cause: at its stop the child's pending host-commit state could not be read${typeof failure.reason === "string" && failure.reason !== "" ? "" : " (this record carries no reason; it may predate the reason field)"}. Recovery: ${recoverySentence(failure.dispatchId)}`
+    ? ` Cause: at its stop the child's pending host-commit state could not be read${typeof failure.reason === "string" && failure.reason !== "" ? "" : " (this record carries no reason; it may predate the reason field)"}. Recovery: ${recoverySentence(failure.dispatchId, { root })}`
     : failure.code === "NGHF-COMMIT-EXCEPTION"
-      ? `${healSentence(failureReason(failure))} Recovery: ${recoverySentence(failure.dispatchId)}`
-      : "";
+      ? `${healSentence(failureReason(failure))} Recovery: ${recoverySentence(failure.dispatchId, { root, commit: failure.commit })}`
+      : ` Recovery: ${recoverySentence(failure.dispatchId, { root, commit: failure.commit })}`;
   return `A background Goldfish host commit failed at its stop (${failure.code}${cause ? `; ${cause}` : ""})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.${recover}${describeLock(failure.lock)}${describeFailureDetail(failure.detail)}${describeOthers(failure.others)}`;
 }
 
-export function nativeGoldfishHookMessage(result, { stopFailure = null, waitCommand = null } = {}) {
-  const base = nativeGoldfishHookBaseMessage(result, waitCommand);
-  const notice = stopFailureNotice(stopFailure);
+export function nativeGoldfishHookMessage(result, { stopFailure = null, waitCommand = null, root = null } = {}) {
+  const base = nativeGoldfishHookBaseMessage(result, waitCommand, root);
+  const notice = stopFailureNotice(stopFailure, root);
   return base && notice ? `${base} ${notice}` : base ?? notice;
 }
 
-function nativeGoldfishHookBaseMessage(result, waitCommand = null) {
+function nativeGoldfishHookBaseMessage(result, waitCommand = null, root = null) {
   if (!result || result.status === "not-applicable" || result.status === "agent-bound") return null;
   if (result.status === "authored-commit-recorded") {
     return `Goldfish host commit verified: ${result.commit}; v4 dispatch record: ${result.record?.target ?? "written"}.${result.delivery?` Item checks ${result.delivery.checkStatus?.verdict??"unqualified"}; Main integration ${result.integration?.status??"pending"} (${result.integration?.code??"held"}).`:""}`;
@@ -225,15 +252,19 @@ function nativeGoldfishHookBaseMessage(result, waitCommand = null) {
       : "no pending host-commit state was prepared for this launch (the PreToolUse WARNING names the preparation code)";
     // PF-26B: when the PreToolUse guard recorded why preparation failed, name that exact code instead of pointing at a warning.
     const prepared = typeof result.preparationCode === "string" ? ` The pre-launch preparation failed with ${result.preparationCode}.` : "";
-    return `Goldfish host commit was not completed (${result.code}): ${why}.${prepared} No commit or authorship record is claimed. Recovery: ${recoverySentence(result.dispatchId)} scripts/dispatch-record-write.mjs still refuses a v4 authored-commit Claude record without host observation.`;
+    return `Goldfish host commit was not completed (${result.code}): ${why}.${prepared} No commit or authorship record is claimed. Recovery: ${recoverySentence(result.dispatchId, { root })} scripts/dispatch-record-write.mjs still refuses a v4 authored-commit Claude record without host observation.`;
   }
   if (result.code === "NGHF-COMMIT-EXCEPTION") {
-    return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree (Git may have changed).${healSentence(failureReason(result))} Recovery: ${recoverySentence(result.dispatchId)}${describeFailureDetail(result.detail)}`;
+    return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree (Git may have changed).${healSentence(failureReason(result))} Recovery: ${recoverySentence(result.dispatchId ?? result.stopDispatchId, { root })}${describeFailureDetail(result.detail)}`;
   }
   if (result.code === "AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED") {
     return `Goldfish host commit was not completed (${result.code}): the Pipeline's own working files (evidence/dispatch-route-*.json, scratch/) are not ignored by this project's .gitignore, so they count as changes the child never made. No commit or authorship record is claimed. Repair: add the lines /evidence/ and /scratch/ to the project's .gitignore and commit that change. Orchestrator route for this dispatch: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;
   }
-  return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree and recover explicitly if Git may have changed.${describeFailureDetail(result.detail)}`;
+  // C28: a failure after the host commit (an invalid record, a Critic path disposition, a stage exception) and an authority refusal (SDC-AUTHORITY-UNAVAILABLE) both end here;
+  // each names the one recovery command instead of "recover explicitly". The code of a failure that has nothing to recover (not-applicable) never reaches this line.
+  const recovery = result.status === "recovery-required" || result.status === "not-finalized"
+    ? ` Recovery: ${recoverySentence(result.dispatchId ?? result.stopDispatchId, { root, commit: result.commit })}` : "";
+  return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree and recover explicitly if Git may have changed.${recovery}${describeFailureDetail(result.detail)}`;
 }
 
 /** G20-39: the self-describing line a Critic subagent stop prints (stderr; a stop hook's stdout is read as a decision). */
@@ -309,7 +340,7 @@ if (isDirectInvocation(import.meta.url)) {
   // Slice C: a PostToolUse call is the one channel the Elephant reads, so a failed background stop is shown there.
   let stopFailure = null;
   if (runner === "claude" && input.hook_event_name === "PostToolUse" && ["Agent", "Task"].includes(input.tool_name)) {
-    try { stopFailure = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), dispatchId: result?.dispatchId ?? null }); }
+    try { stopFailure = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), dispatchId: result?.dispatchId ?? null, strict: true }); }
     catch { stopFailure = null; }
   }
   // C19L-W250: a stop that just left an unresolved stop-failure record names it here, only when the newest record is that dispatch's own.
@@ -328,7 +359,7 @@ if (isDirectInvocation(import.meta.url)) {
   }
   const projectRoot = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
   const waitCommand = result?.status === "awaiting-subagent-stop" ? hostCommitWaitCommand({ root: projectRoot, dispatchId: result.dispatchId, after: new Date().toISOString() }) : null;
-  const message = nativeGoldfishHookMessage(result, { stopFailure, waitCommand });
+  const message = nativeGoldfishHookMessage(result, { stopFailure, waitCommand, root: projectRoot });
   // Last step of a Goldfish stop: the commit, the record and the integration are done, so whoever waits for this may start the next step.
   if (input.hook_event_name === "SubagentStop" && typeof result?.stopDispatchId === "string") {
     try { writeNativeGoldfishStopOutcome({ commonDir: resolveGitCommonDir(projectRoot), dispatchId: result.stopDispatchId, result, message }); }

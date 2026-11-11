@@ -425,6 +425,43 @@ check(
   BLOCK,
 );
 
+// ---- C28-HOST-COMMIT-RECOVERY RGC: an Elephant commit while a Goldfish runs (AC-108, PO decision 2026-11-10) -----
+// A commit that touches the running dispatch's write scope is refused with the warning unless its message carries `Concurrent-Goldfish: <id>`
+// (the Elephant's own acknowledgement, recorded in the commit itself, no PO signature); a commit outside the scope passes with the warning only.
+// Added to this registered suite because it already owns the real-Git guard fixtures (a new file would need verify-suites registration).
+function rgcFixture(prefix, { createdAtMs = Date.now(), allowed = ["src/owned.txt"], ended = null } = {}) {
+  const root = gitRepoFixture(prefix);
+  commitFile(root, "seed.txt", "seed\n");
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "off" }));
+  const dir = join(root, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "pending-claude-RGC-ONE.json"), JSON.stringify({ createdAtMs, runner: "claude", binding: { dispatchId: "RGC-ONE", candidateCommit: "a".repeat(40), allowedPaths: allowed } }));
+  if (ended === "record") { mkdirSync(join(root, "evidence"), { recursive: true }); writeFileSync(join(root, "evidence", "dispatch-record-RGC-ONE.json"), "{}\n"); }
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src", "owned.txt"), "owned\n");
+  writeFileSync(join(root, "notes.txt"), "notes\n");
+  gitIn(root)("add", "--", "src/owned.txt", "notes.txt");
+  writeFileSync(join(root, "ack.txt"), "chore: touch the scope\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\nConcurrent-Goldfish: RGC-ONE\n");
+  writeFileSync(join(root, "own.txt"), "feat: the dispatch's own commit\n\nAI-Assisted: true\nDispatch: RGC-ONE (goldfish)\n");
+  return root;
+}
+const RGC_ROOT = rgcFixture("guard-test-rgc-");
+check("RGC-1 block  a commit touching the running dispatch's scope is refused with the dispatch, the scope, the risk and the override", 'git commit -m "chore: touch scope" -- src/owned.txt', BLOCK,
+  { projectDir: RGC_ROOT, stderrIncludes: ["RGC-ONE", "src/owned.txt", "host commit", "Concurrent-Goldfish: RGC-ONE"] });
+check("RGC-2 block  a bare commit whose staged paths touch the scope is refused too", 'git commit -m "chore: touch scope"', BLOCK,
+  { projectDir: RGC_ROOT, stderrIncludes: ["RGC-ONE", "src/owned.txt"] });
+check("RGC-3 admit  the Elephant's own acknowledgement trailer admits the commit and is stated on stderr", "git commit -F ack.txt -- src/owned.txt", 1,
+  { projectDir: RGC_ROOT, stderrIncludes: ["RGC-ONE", "acknowledged"] });
+check("RGC-4 warn   a commit outside the scope passes with the warning naming the running dispatch", 'git commit -m "chore: notes" -- notes.txt', 1,
+  { projectDir: RGC_ROOT, stderrIncludes: ["WARNING", "RGC-ONE"], stderrExcludes: ["BLOCKED"] });
+check("RGC-5 admit  the dispatch's own commit (its Dispatch trailer) is not held against it", "git commit -F own.txt -- src/owned.txt", ALLOW,
+  { projectDir: RGC_ROOT, stderrEmpty: true });
+check("RGC-6 allow  a pending state older than six hours is no running dispatch", 'git commit -m "chore: touch scope" -- src/owned.txt', ALLOW,
+  { projectDir: rgcFixture("guard-test-rgc-old-", { createdAtMs: Date.now() - 7 * 3600 * 1000 }), stderrEmpty: true });
+check("RGC-7 allow  a dispatch whose record exists has ended", 'git commit -m "chore: touch scope" -- src/owned.txt', ALLOW,
+  { projectDir: rgcFixture("guard-test-rgc-rec-", { ended: "record" }), stderrEmpty: true });
+
 // ---- Summary -------------------------------------------------------------------------------------
 for (const dir of [EMPTY_DIR, ...SIGNED_ROOTS]) {
   try {

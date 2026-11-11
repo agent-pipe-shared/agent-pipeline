@@ -29,6 +29,8 @@ import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { readNativeGoldfishStopFailure } from "../hooks/native-goldfish-host.mjs";
+import { clearNativeGoldfishStopFailures } from "../lib/native-goldfish-host-finalizer.mjs";
+import { scopesTouch } from "../lib/running-goldfish-scope.mjs";
 import { attestedInputPath, readAttestedBriefingBlock, runAttestedRequest } from "./dispatch-record-write.mjs";
 import { integratedResultCovers } from "./agy-native-integrate.mjs";
 
@@ -142,6 +144,19 @@ function untrackedPaths(root) {
   return r.ok ? r.out.split("\0").filter(Boolean) : [];
 }
 
+/**
+ * C28: the newest commit that carries this dispatch's own `Dispatch: <id> (goldfish)` trailer between its candidate and HEAD (the host commit, or an earlier run of this
+ * command), or null. The candidate must be an ancestor of HEAD, so an older delivery under a reused id is never mistaken for this one.
+ */
+function findLandedCommit(root, dispatchId, startCommit) {
+  if (!dispatchId || !OID.test(startCommit ?? "")) return null;
+  if (!git(root, ["merge-base", "--is-ancestor", startCommit, "HEAD"]).ok) return null;
+  const escaped = dispatchId.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const found = git(root, ["log", "-1", "--format=%H", "-E", `--grep=^Dispatch: ${escaped} \\(goldfish\\)$`, `${startCommit}..HEAD`]);
+  const commit = found.ok ? found.out.trim() : "";
+  return OID.test(commit) ? commit : null;
+}
+
 export function buildMessage({ dispatchId, stopFailure }) {
   const pointer = stopFailure
     ? `Stop failure record: ${stopFailure.file} (code ${stopFailure.code}).`
@@ -251,7 +266,7 @@ export function plan(options) {
     if (clean) allowed.push(clean);
   }
   const allowedSet = new Set(allowed);
-  let paths = [];
+  let paths = [], landed = null;
   if (source) {
     const changed = changedPaths(root);
     if (changed === null) refusals.push(refuse("GHCR-STATUS-UNREADABLE", "git status failed", "re-run in the repository root"));
@@ -261,12 +276,18 @@ export function plan(options) {
       if (claimed.includes(null) || !unique.every((p) => allowedSet.has(p))) {
         refusals.push(refuse("GHCR-PATH-OUTSIDE-ALLOWED", "a claimed path is not inside the briefed allowed paths", "claim only paths from the briefed write scope"));
       } else if (!unique.every((p) => changed.has(p))) {
-        refusals.push(refuse("GHCR-PATH-UNCHANGED", "a claimed path has no change in the tree", "drop the unchanged path from --path"));
+        // C28: the same claim repeated after the recovery landed (nothing in the tree is changed any more) is the dispatch's own commit, not a mistake.
+        landed = unique.some((p) => changed.has(p)) ? null : findLandedCommit(root, dispatchId, candidateCommit ?? inputs?.block.candidateCommit ?? null);
+        if (!landed) refusals.push(refuse("GHCR-PATH-UNCHANGED", "a claimed path has no change in the tree", "drop the unchanged path from --path"));
       } else paths = unique.sort();
     } else {
       paths = allowed.filter((p) => changed.has(p));
       paths = [...new Set(paths)].sort();
-      if (paths.length === 0) refusals.push(refuse("GHCR-NO-CHANGES", "none of the briefed allowed paths has a change in the tree", "nothing to land; check whether the result was already committed"));
+      // C28: nothing to commit is no refusal when the dispatch's own commit already exists; the lost steps after it are what is left to recover.
+      if (paths.length === 0) {
+        landed = findLandedCommit(root, dispatchId, candidateCommit ?? inputs?.block.candidateCommit ?? null);
+        if (!landed) refusals.push(refuse("GHCR-NO-CHANGES", "none of the briefed allowed paths has a change in the tree and no commit of this dispatch exists in the history since its candidate", "nothing to land; check whether the result was already committed"));
+      }
     }
   }
   // On Antigravity a code-writing child commits on its own branch and agy-native-integrate carries the result here. Without that take-over the
@@ -275,7 +296,18 @@ export function plan(options) {
     refusals.push(refuse("GHCR-NO-NATIVE-RESULT", "these paths do not hold what a taken-over Antigravity child branch delivered, so no Goldfish result exists to land",
       "run the dispatch and take its branch over with scripts/agy-native-integrate.mjs plan|apply, leaving the result unchanged. If the host refuses the dispatch, follow references/antigravity-native-dispatch.md; the slice is not written in this session"));
   }
-  if (candidateCommit && candidateCommit !== headSha) refusals.push(refuse("GHCR-HEAD-MOVED", "HEAD differs from the pending binding's candidateCommit", `restore HEAD to ${candidateCommit} or land the result by the ordinary commit route`));
+  // C28: HEAD that moved FORWARD from the candidate (the Elephant committed while the Goldfish ran, even inside its scope) is what the host commit refuses with
+  // native-concurrent-advance-touches-scope; this command is its recovery route, so it plans on that HEAD and names the advance. HEAD anywhere else still refuses.
+  let headAdvance = null;
+  if (candidateCommit && candidateCommit !== headSha) {
+    const descends = git(root, ["merge-base", "--is-ancestor", candidateCommit, headSha]).ok;
+    if (!descends) refusals.push(refuse("GHCR-HEAD-MOVED", "HEAD differs from the pending binding's candidateCommit and does not descend from it", `restore HEAD to ${candidateCommit} or land the result by the ordinary commit route`));
+    else {
+      const advanced = git(root, ["diff", "--name-only", "-z", candidateCommit, headSha]);
+      const scopePaths = advanced.ok ? advanced.out.split("\0").filter(Boolean).filter((file) => allowed.some((entry) => scopesTouch(entry, file))).sort() : [];
+      headAdvance = { from: candidateCommit, to: headSha, touchesScope: scopePaths.length > 0, scopePaths: scopePaths.slice(0, MAX_OUTSIDE_LISTED) };
+    }
+  }
   const staged = git(root, ["diff", "--cached", "--name-only"]);
   if (!staged.ok || staged.out.trim() !== "") {
     const names = staged.ok ? staged.out.split("\n").map((name) => name.trim()).filter(Boolean) : [];
@@ -300,16 +332,24 @@ export function plan(options) {
   // Informational only: dirt outside the allowed paths never rides along (the commit names exact paths), but it is shown.
   const outsideAllowed = source === null ? [] : [...(changedPaths(root) ?? [])].filter((path) => !allowedSet.has(path) && !path.startsWith("scratch/") && !path.startsWith("evidence/")).sort();
   const recordTarget = dispatchId ? `evidence/dispatch-record-${dispatchId}.json` : null;
+  let recordPresent = false;
   if (inputs && recordTarget) {
-    let present = false;
-    try { present = statSync(join(root, recordTarget)).isFile(); } catch { present = false; }
-    if (present) refusals.push(refuse("GHCR-RECORD-EXISTS", `${recordTarget} already exists and is never overwritten`, "inspect it; if it already records this delivery there is nothing to land, otherwise remove only your own failed attempt and plan again"));
+    try { recordPresent = statSync(join(root, recordTarget)).isFile(); } catch { recordPresent = false; }
+    // C28: a record that already exists beside the dispatch's own commit means the recovery was done; it is said, not refused, and nothing is rewritten.
+    if (recordPresent && !landed) refusals.push(refuse("GHCR-RECORD-EXISTS", `${recordTarget} already exists and is never overwritten`, "inspect it; if it already records this delivery there is nothing to land, otherwise remove only your own failed attempt and plan again"));
   }
 
   const stopFailure = stop && (!dispatchId || stop.dispatchId === dispatchId) ? { file: stop.file, code: stop.code, ...stopFailureCause(stop) } : null;
-  const result = { schema: PLAN_SCHEMA, status: refusals.length === 0 ? "ready" : "refused", code: refusals[0]?.code ?? "GHCR-READY",
-    dispatchId, source, candidateCommit, head: headSha, stopFailure, paths: refusals.length === 0 ? paths : [], refusals,
+  // C28: the dispatch's own commit exists. With the record route's inputs and no record yet, the only step left is the record (`record-only`); otherwise
+  // everything is done and the answer is `already-recovered` (exit 0, nothing written).
+  const recordOnly = refusals.length === 0 && landed !== null && inputs !== null && !recordPresent;
+  const recovered = refusals.length === 0 && landed !== null && !recordOnly;
+  const result = { schema: PLAN_SCHEMA, status: refusals.length > 0 ? "refused" : recovered ? "already-recovered" : "ready", code: refusals[0]?.code ?? (recovered ? "GHCR-ALREADY-RECOVERED" : "GHCR-READY"),
+    dispatchId, source, candidateCommit, head: headSha, stopFailure, paths: refusals.length === 0 && !landed ? paths : [], refusals,
     ...(stopFailure ? {} : { stopFailureNote: "no stop-failure record for this dispatch; the stop left no diagnostic" }) };
+  if (headAdvance && !landed) result.headAdvance = headAdvance;
+  if (landed) result.commit = landed;
+  if (recordOnly) result.mode = "record-only";
   if (outsideAllowed.length > 0) result.outsideAllowed = outsideAllowed.slice(0, MAX_OUTSIDE_LISTED);
   if (inputs) {
     result.checkFiles = checkFiles;
@@ -322,11 +362,13 @@ export function plan(options) {
   }
   if (result.status === "ready") {
     result.messagePath = `scratch/commit-msg/${dispatchId}.txt`;
-    result.planSha256 = sha(JSON.stringify({ dispatchId, head: headSha, paths, stopFailure, message: buildMessage({ dispatchId, stopFailure }),
+    const sealed = recordOnly ? [] : paths;
+    result.planSha256 = sha(JSON.stringify({ dispatchId, head: headSha, paths: sealed, stopFailure, message: buildMessage({ dispatchId, stopFailure }),
+      ...(recordOnly ? { landed } : {}),
       ...(inputs ? { briefingSha256: inputs.briefing.sha256, handbackSha256: inputs.handback.sha256 } : {}) }));
     result.next = ["node", SELF, "apply", "--root", root, "--dispatch-id", dispatchId,
       ...(inputs ? ["--briefing", inputs.briefing.rel, "--handback", inputs.handback.rel] : []),
-      ...paths.flatMap((p) => ["--path", p]), ...(source === "explicit-flags" ? allowed.flatMap((p) => ["--allowed-path", p]) : []),
+      ...sealed.flatMap((p) => ["--path", p]), ...(source === "explicit-flags" ? allowed.flatMap((p) => ["--allowed-path", p]) : []),
       "--expect-sha256", result.planSha256];
   }
   result.root = root;
@@ -339,12 +381,17 @@ export function apply(options) {
       refusals: [refuse("GHCR-EXPECT-SHA256-REQUIRED", "apply commits only what plan showed", "run plan and pass its planSha256 as --expect-sha256")] };
   }
   const planned = plan(options);
+  // C28: a second run of a recovery that is done says so, changes nothing but the now-stale hint of that dispatch, and exits 0.
+  if (planned.status === "already-recovered") { clearHints(planned); return planned; }
   if (planned.status !== "ready") return planned;
   if (planned.planSha256 !== options.expect) {
     return { ...planned, status: "refused", code: "GHCR-PLAN-DIGEST-MISMATCH", paths: [],
       refusals: [refuse("GHCR-PLAN-DIGEST-MISMATCH", "HEAD, the paths, the stop-failure record or a briefing/hand-back input changed since plan",
         `run plan again and use its new planSha256: ${commandLine("plan", planned.root, options, planned.dispatchId)}`)] };
   }
+  // C28: the dispatch's own commit exists and only the record after it was lost: no commit is made, the record is written for exactly that commit.
+  if (planned.mode === "record-only") return landRecord(planned, planned.commit, { schema: PLAN_SCHEMA, status: "recorded", code: "GHCR-RECORDED", dispatchId: planned.dispatchId, commit: planned.commit,
+    paths: [], stopFailure: planned.stopFailure, messagePath: null, refusals: [] });
   const messageFile = join(planned.root, planned.messagePath);
   mkdirSync(join(planned.root, "scratch", "commit-msg"), { recursive: true });
   writeFileSync(messageFile, buildMessage({ dispatchId: planned.dispatchId, stopFailure: planned.stopFailure }), "utf8");
@@ -358,9 +405,17 @@ export function apply(options) {
       "fix what the hook reported and run plan again; the message file is left in place")] };
   }
   const commit = git(planned.root, ["rev-parse", "HEAD"]).out.trim();
-  const committedResult = { schema: PLAN_SCHEMA, status: "committed", code: "GHCR-COMMITTED", dispatchId: planned.dispatchId, commit,
-    paths: planned.paths, stopFailure: planned.stopFailure, messagePath: planned.messagePath, refusals: [] };
-  if (!planned.record) return committedResult;
+  return landRecord(planned, commit, { schema: PLAN_SCHEMA, status: "committed", code: "GHCR-COMMITTED", dispatchId: planned.dispatchId, commit,
+    paths: planned.paths, stopFailure: planned.stopFailure, messagePath: planned.messagePath, refusals: [] });
+}
+
+/** The hint of a dispatch whose recovery is done is cleared (C28); records of other dispatches stay. */
+function clearHints(planned) {
+  try { clearNativeGoldfishStopFailures({ commonDir: resolveGitCommonDir(planned.root), dispatchId: planned.dispatchId }); } catch { /* a stale hint is never worth failing a recovery */ }
+}
+
+function landRecord(planned, commit, committedResult) {
+  if (!planned.record) { clearHints(planned); return committedResult; }
 
   // Record route: the commit exists now, so the typed record is written for exactly that commit by the one writer that
   // re-opens the Git objects (trailer, single parent, files equal to the report). A fault here leaves the commit alone.
@@ -369,6 +424,7 @@ export function apply(options) {
     writeFileSync(join(planned.root, requestPath), `${JSON.stringify({ schema: "pipeline.dispatch-attested-request.v1",
       briefingPath: planned.briefing, handbackPath: planned.handback, commits: [commit] }, null, 2)}\n`, "utf8");
     const receipt = runAttestedRequest({ repoRoot: planned.root, attestedRequestPath: requestPath });
+    clearHints(planned);
     return { ...committedResult, record: { kind: "orchestrator-attested", hostObserved: false, target: receipt.target, sha256: receipt.sha256 },
       ...(receipt.criticCoverageAdvisory ? { criticCoverageAdvisory: receipt.criticCoverageAdvisory } : {}) };
   } catch (error) {

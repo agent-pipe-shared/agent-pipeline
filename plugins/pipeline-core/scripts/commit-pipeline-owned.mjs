@@ -21,6 +21,7 @@ import { join, resolve } from "node:path";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { classifyDirtyTree, porcelainPaths } from "../lib/pipeline-owned-files.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { ACKNOWLEDGE_TRAILER, runningGoldfishCommitNotice } from "../lib/running-goldfish-scope.mjs";
 
 const SCHEMA = "pipeline.commit-pipeline-owned.v1";
 const BODY = "chore(pipeline): commit the Pipeline's own state files\n\n"
@@ -32,16 +33,19 @@ const AGENT_TRAILERS = "\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n";
 const CARRIED_NOTE = "\nThe feature manifest in this commit lists candidate evidence that was not committed yet;\n"
   + "those files, with exactly the listed bytes, are committed with it.\n";
 
-export function commitPipelineOwnedMessage({ agent, carried = false }) {
+export function commitPipelineOwnedMessage({ agent, carried = false, acknowledged = [] }) {
   const body = carried ? BODY + CARRIED_NOTE : BODY;
-  return agent ? body + AGENT_TRAILERS : body;
+  const trailers = acknowledged.map((id) => `${ACKNOWLEDGE_TRAILER}: ${id}\n`).join("");
+  return (agent ? body + AGENT_TRAILERS : body) + (agent ? "" : trailers ? "\n" : "") + trailers;
 }
 
 function parse(argv) {
-  const usage = "usage: commit-pipeline-owned.mjs --root <root> (--agent | --human) [--dry-run]";
-  const flags = { dryRun: false, agent: undefined };
+  const usage = "usage: commit-pipeline-owned.mjs --root <root> (--agent | --human) [--dry-run] [--acknowledge-goldfish <dispatch id>]...";
+  const flags = { dryRun: false, agent: undefined, acknowledge: [] };
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--dry-run" && !flags.dryRun) { flags.dryRun = true; continue; }
+    // C28 RGC: the acknowledgement of a running Goldfish whose write scope this commit touches (the same step the commit guard takes as a message trailer).
+    if (argv[index] === "--acknowledge-goldfish" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(argv[index + 1] ?? "") && !flags.acknowledge.includes(argv[index + 1])) { flags.acknowledge.push(argv[index + 1]); index += 1; continue; }
     if ((argv[index] === "--agent" || argv[index] === "--human") && flags.agent === undefined) { flags.agent = argv[index] === "--agent"; continue; }
     if (argv[index] === "--root" && flags.root === undefined && typeof argv[index + 1] === "string" && !argv[index + 1].startsWith("--")) { flags.root = argv[index + 1]; index += 1; continue; }
     return { error: usage };
@@ -87,14 +91,22 @@ export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
   const rest = untouched.filter((path) => !carried.includes(path));
   const left = { ...(rest.length ? { untouched: rest } : {}), ...(carried.length ? { carried } : {}) };
   if (!owned.length) return { status: "nothing-to-commit", owned: [], ...left };
-  if (parsed.dryRun) return { status: "dry-run", owned, ...left };
   const paths = [...owned, ...carried];
+  // C28 RGC: the same running-Goldfish check the commit guard makes; this command runs git from Node, so no Bash guard sees it as a commit.
+  const running = runningGoldfishCommitNotice({ root, paths, acknowledged: parsed.acknowledge });
+  if (running.block) {
+    const ids = running.dispatches.filter((entry) => entry.touched.length > 0 && !parsed.acknowledge.includes(entry.dispatchId)).map((entry) => entry.dispatchId);
+    return { status: "refused", code: "CPO-RUNNING-GOLDFISH", owned, reason: `${running.block} For this command the acknowledgement is: ${ids.map((id) => `--acknowledge-goldfish ${id}`).join(" ")}.` };
+  }
+  const warnings = running.warnings.length ? { warnings: running.warnings } : {};
+  if (parsed.dryRun) return { status: "dry-run", owned, ...left, ...warnings };
+  const acknowledged = running.dispatches.filter((entry) => entry.touched.length > 0 && parsed.acknowledge.includes(entry.dispatchId)).map((entry) => entry.dispatchId);
   const add = git(["add", "--", ...paths]);
   if (!isSuccessfulSpawn(add)) return { status: "refused", code: "CPO-GIT", reason: "git add failed", owned };
-  const commit = git(["commit", "-m", commitPipelineOwnedMessage({ agent: parsed.agent, carried: carried.length > 0 }), "--", ...paths]);
+  const commit = git(["commit", "-m", commitPipelineOwnedMessage({ agent: parsed.agent, carried: carried.length > 0, acknowledged }), "--", ...paths]);
   if (!isSuccessfulSpawn(commit)) return { status: "refused", code: "CPO-GIT", reason: `git commit failed: ${String(commit.stderr ?? "").trim().slice(0, 300)}`, owned };
   const head = git(["rev-parse", "HEAD"]);
-  return { status: "committed", owned, commit: isSuccessfulSpawn(head) ? head.stdout.trim() : null, ...left };
+  return { status: "committed", owned, commit: isSuccessfulSpawn(head) ? head.stdout.trim() : null, ...left, ...warnings };
 }
 
 // Codex greenfield, candidate 27 (2026-11-10): the close route sent the agent here with a feature manifest that already

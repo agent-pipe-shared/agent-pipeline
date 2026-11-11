@@ -8,6 +8,8 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { devNull } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { nativeGoldfishHookMessage } from "../hooks/native-goldfish-host.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { prepareNativeGoldfishHostState, resolveGovernedItemQueue, restoreWrittenQueueRows } from "./native-goldfish-host-state.mjs";
 import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
@@ -188,6 +190,38 @@ const cases = [
     assert.notEqual(result.status, "authored-commit-recorded", JSON.stringify(result));
     assert.equal(result.commit === "unknown" || result.commit === null || result.commit === undefined, true, JSON.stringify(result));
     assert.equal(result.detail?.reason, "native-concurrent-advance-touches-scope", JSON.stringify(result));
+  }) },
+
+  { id: "NGSP2R", name: "C28-HOST-COMMIT-RECOVERY (AC-108): after that refusal the failure text names the recovery command with the real root and dispatch id, the command lands the result on the advanced HEAD from the real pending state, and a second run changes nothing", run: () => fixture(({ root }) => {
+    const { runtime, launch } = setup(root);
+    const one = launch(0);
+    assert.equal(runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })).ok, true);
+    writeFileSync(join(root, one.file), "export const value='expected'; // the Elephant's evidence commit inside the running scope\n");
+    git(root, "add", "--", one.file); git(root, "commit", "-q", "-m", "docs: evidence written while the Goldfish ran");
+    const advanced = git(root, "rev-parse", "HEAD");
+    writeFileSync(join(root, one.file), one.content);
+    const result = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: one.returned }));
+    assert.notEqual(result.status, "authored-commit-recorded", JSON.stringify(result));
+    assert.equal(result.detail?.reason, "native-concurrent-advance-touches-scope", JSON.stringify(result));
+    // The text of that very failure names the one sanctioned command, complete.
+    const dispatchId = one.input.tool_input.prompt.match(/"dispatchId":"([^"]+)"/u)?.[1];
+    assert.ok(dispatchId, "the launch prompt names its dispatch");
+    assert.match(nativeGoldfishHookMessage({ ...result, stopDispatchId: dispatchId }, { root }), new RegExp(`goldfish-host-commit-recover\\.mjs' plan --root '${root.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}' --dispatch-id ${dispatchId}`, "u"));
+    // The recovery from the real pending state: plan, apply, apply again.
+    const script = fileURLToPath(new URL("../scripts/goldfish-host-commit-recover.mjs", import.meta.url));
+    const recover = (verb, ...rest) => { const out = spawnSync(process.execPath, [script, verb, "--root", root, ...rest], { encoding: "utf8" }); return { status: out.status, json: JSON.parse(out.stdout) }; };
+    const plan = recover("plan").json;
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    assert.equal(plan.headAdvance?.touchesScope, true, JSON.stringify(plan));
+    assert.equal(plan.headAdvance.to, advanced);
+    const args = ["--dispatch-id", plan.dispatchId, ...plan.paths.flatMap((path) => ["--path", path]), "--expect-sha256", plan.planSha256];
+    const applied = recover("apply", ...args);
+    assert.equal(applied.json.status, "committed", JSON.stringify(applied.json));
+    assert.equal(git(root, "rev-parse", `${applied.json.commit}^`), advanced);
+    const again = recover("apply", ...args);
+    assert.equal(again.status, 0, JSON.stringify(again.json));
+    assert.equal(again.json.status, "already-recovered", JSON.stringify(again.json));
+    assert.equal(git(root, "rev-parse", "HEAD"), applied.json.commit, "the second run made no commit");
   }) },
 
   { id: "NGSP3", name: "C19J-W242 (B): an admission refused at candidate-git after its queue row was written leaves the queue bytes unchanged, and a successor with an overlapping scope is admitted", run: () => fixture(({ root }) => {

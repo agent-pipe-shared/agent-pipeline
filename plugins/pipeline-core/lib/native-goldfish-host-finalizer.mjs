@@ -210,6 +210,29 @@ export function checkSubagentHandbackBeforeStop({ root, input } = {}) {
   } catch { return allow; }
 }
 
+/**
+ * C28-HOST-COMMIT-RECOVERY: removes every stop-failure and handback-refusal diagnostic recorded for one dispatch (whatever tool use id or route wrote it) and
+ * returns how many it removed. A successful host commit calls it, and so does the recovery command once it has landed that dispatch's result, so a hint
+ * never outlives the failure it described. Records of other dispatches, and unreadable ones, are left alone; any fault reads as "none removed".
+ */
+export function clearNativeGoldfishStopFailures({ commonDir, dispatchId } = {}) {
+  let removed = 0;
+  try {
+    if (typeof commonDir !== "string" || typeof dispatchId !== "string" || dispatchId === "") return 0;
+    const directory = stopDiagnosticsDirectory(commonDir);
+    let entries = [];
+    try { entries = stopReaddir(directory); } catch { /* none to remove */ }
+    for (const entry of entries) {
+      if (!/^(?:stop-failure|handback-refusals)-.+\.json$/u.test(entry)) continue;
+      try {
+        const recorded = JSON.parse(stopRead(join(directory, entry), "utf8"));
+        if (typeof recorded?.dispatchId === "string" && recorded.dispatchId === dispatchId) { stopUnlink(join(directory, entry)); removed += 1; }
+      } catch { /* unreadable or foreign: left alone */ }
+    }
+  } catch { /* diagnostic only */ }
+  return removed;
+}
+
 // PF-61 visibility: SubagentStop has no channel the Coordinator reads, so a failed completion of a marked Goldfish also
 // leaves a small diagnostic next to its pending state, naming the exact code. A later success removes every diagnostic
 // recorded for that dispatch (whatever tool use id or route wrote it). Diagnostic only:
@@ -232,16 +255,7 @@ function recordSubagentStopOutcome({ stop, dispatch, unresolved }, result) {
       return;
     }
     if (result?.status === "authored-commit-recorded") {
-      const dispatchId = stop ? stop.state.binding.dispatchId : dispatch.dispatchId;
-      let entries = [];
-      try { entries = stopReaddir(directory); } catch { /* none to remove */ }
-      for (const entry of entries) {
-        if (!/^(?:stop-failure|handback-refusals)-.+\.json$/u.test(entry)) continue;
-        try {
-          const recorded = JSON.parse(stopRead(join(directory, entry), "utf8"));
-          if (typeof recorded?.dispatchId === "string" && recorded.dispatchId === dispatchId) stopUnlink(join(directory, entry));
-        } catch { /* unreadable or foreign: left alone */ }
-      }
+      clearNativeGoldfishStopFailures({ commonDir, dispatchId: stop ? stop.state.binding.dispatchId : dispatch.dispatchId });
       return;
     }
     if (!stop) return;

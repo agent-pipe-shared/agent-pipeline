@@ -273,6 +273,7 @@ import { fileURLToPath } from "node:url";
 
 import { commitMessageFindings, commitTypeFindings, markerPolicyMode, parseIntegrationTrailerBlock, finishedCommitMessageFindings } from "../lib/commit-message-policy.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv } from "../lib/git-cmd.mjs";
+import { commitCommandPaths, runningGoldfishCommitNotice } from "../lib/running-goldfish-scope.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { verifyQualityPackageIntegrationPreCommit } from "../lib/signed-quality-package.mjs";
 import { hasAdministrativeDispatch, inspectAdministrativeCommit, administrativeCommitPathspec } from "../lib/administrative-commit-policy.mjs";
@@ -1418,6 +1419,25 @@ if (inspection.message !== null) {
     // any spawnSync error, timeout, or unexpected git output must never itself become a source
     // of an unrecoverable stuck repository.
   }
+}
+
+// ---- C28 RGC: a commit while a Goldfish runs (AC-108, PO decision 2026-11-10) -----------------------
+// A native Goldfish's host commit fails when a commit touches its write scope while it runs. The commit that is about to be made is checked against the
+// running dispatches' scopes (lib/running-goldfish-scope.mjs, shared with commit-pipeline-owned.mjs, which commits from Node and passes no Bash guard):
+// inside a scope it is refused ONCE with the warning, until the message acknowledges the dispatch (`Concurrent-Goldfish: <id>`, the Elephant's own step,
+// recorded in the commit); outside every scope it passes with the warning only. Fail-open: an unreadable state is "no running dispatch".
+if (inspection.message !== null) {
+  let running = null;
+  try {
+    const root = resolve(projectDir);
+    const run = (args) => { const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000 }); return isSuccessfulSpawn(r) ? String(r.stdout ?? "") : null; };
+    const paths = commitCommandPaths(tokenizeArgv(cmd), run);
+    if (paths !== null) running = runningGoldfishCommitNotice({ root, paths, message: inspection.message });
+  } catch { running = null; }
+  if (running?.block) {
+    emit(2, [`[git-guard] ${running.block}`, ...running.warnings.map((line) => `[git-guard] ${line}`)]);
+  }
+  for (const line of running?.warnings ?? []) notices.push(`[git-guard] ${line}`);
 }
 
 const matched = [];
