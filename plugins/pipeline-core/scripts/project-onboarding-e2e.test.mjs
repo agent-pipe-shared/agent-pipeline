@@ -866,6 +866,8 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       run,
       env,
     });
+    // Antigravity stops once when this onboarding created the repository (PO decision 2026-11-08); the same command after the restart continues.
+    if (driven.outcome === "runner-restart-required") driven = driveOnboardingInit({ rootDir: cwd, runner, run, env });
     // The fixture already supplied the initial PO identity. Feed that same
     // test value into the returned plan-submission action, then re-enter the
     // generic driver. This is the one human value in this otherwise automatic

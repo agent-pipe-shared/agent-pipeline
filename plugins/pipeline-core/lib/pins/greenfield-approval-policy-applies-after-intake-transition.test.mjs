@@ -74,7 +74,9 @@ function fresh(runner) {
   const root = tmp("approval-policy-pin-root-");
   const home = tmp("approval-policy-pin-home-");
   const env = envFor(home, runner);
-  const first = driveOnboardingInit({ rootDir: root, runner, env, runBudgetMs: WIDE_BUDGET_MS });
+  let first = driveOnboardingInit({ rootDir: root, runner, env, runBudgetMs: WIDE_BUDGET_MS });
+  // Antigravity stops once when this onboarding created the repository (PO decision 2026-11-08); the same command after the restart reaches the first round.
+  if (first.outcome === "runner-restart-required") first = driveOnboardingInit({ rootDir: root, runner, env, runBudgetMs: WIDE_BUDGET_MS });
   return { root, home, env, runner, first };
 }
 // The first-round action is published either as a pending ask or as the collect-input itself.

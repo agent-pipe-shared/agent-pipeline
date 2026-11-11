@@ -55,7 +55,9 @@ for (const runner of RUNNERS) {
     const env = envFor(home, runner);
 
     // 1. Seed: declined before any answer; nothing approved without being asked.
-    const first = driveOnboardingInit({ rootDir: root, runner, env });
+    let first = driveOnboardingInit({ rootDir: root, runner, env });
+    // Antigravity stops once when this onboarding created the repository (PO decision 2026-11-08); the same command after the restart reaches the first round.
+    if (first.outcome === "runner-restart-required") first = driveOnboardingInit({ rootDir: root, runner, env });
     assert.equal(first.pendingAsks.length, 1, "one bundled first-answer round");
     assert.equal(parseYaml(sourceOf(root)).advisor_export.consent, "declined");
     assert.doesNotMatch(sourceOf(root), /consent:\s*"?approved/u);
