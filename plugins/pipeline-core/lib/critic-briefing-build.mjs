@@ -1,0 +1,165 @@
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * Fills the Critic template from a packet-ready preflight result (PO tile 2026-11-10: one command prepares the Critic dispatch
+ * including its briefing). Two greenfield runs on 2026-11-10 hand-wrote their Critic prompts: one dropped the correction input
+ * bindings and resumed the Critic with a message naming the earlier round's outcome, which made it withhold its verdict.
+ *
+ * Rules this module keeps:
+ * - The template is read at run time (templates/prompts/critic-review.md); no template text lives here. A missing marker, or a
+ *   placeholder this module does not know, refuses with a code instead of passing an unfilled template on.
+ * - Only the reviewer projection is used: the reviewer input (or a split entry's reviewer input), the correction input bindings
+ *   path, the review ordinal, the trigger and the generated MP-07 lines. Never the admit request, the packet id, coordinator-only
+ *   material, a prior Critic path or the delta request path.
+ * - Values only the dispatcher knows stay `<FILL NAME: hint>` and are listed, the same way the admit request lists its placeholders.
+ * - Antigravity gets the template's paths-only envelope with absolute paths (PO tile 2026-11-10), never the body.
+ */
+import { posix } from "node:path";
+
+export const CRITIC_BRIEFING_SCHEMA = "pipeline.critic-briefing.v1";
+const COPY_MARKER = "COPY EVERYTHING BELOW THIS LINE\n-->\n";
+const COORDINATOR_HEADING = "\n## Generic exact-range batch registration (Coordinator only)";
+const ENVELOPE_START = "<!-- AGY-CRITIC-PROMPT-ENVELOPE:START -->";
+const ENVELOPE_END = "<!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->";
+const PLACEHOLDER = /\{\{([A-Z0-9_]+)(?:\|[^}]*)?(?:[ :][^}]*)?\}\}/gsu;
+
+export class CriticBriefingError extends Error {
+  constructor(code, message) { super(`${code}: ${message}`); this.code = code; }
+}
+const refuse = (code, message) => { throw new CriticBriefingError(code, message); };
+const fill = (name, hint) => `<FILL ${name}: ${hint}>`;
+
+/** The body a Critic receives: everything after the copy marker, without the Coordinator-only section at the end. */
+export function criticTemplateBody(templateText) {
+  const text = String(templateText ?? "").replace(/\r\n/gu, "\n");
+  const start = text.indexOf(COPY_MARKER);
+  if (start < 0) refuse("CBB-TEMPLATE-MARKER", "the Critic template has no copy marker; the template changed shape, repair the builder before dispatching");
+  const end = text.indexOf(COORDINATOR_HEADING, start);
+  if (end < 0) refuse("CBB-TEMPLATE-MARKER", "the Critic template has no Coordinator-only section heading; the cut would hand Coordinator material to the Critic");
+  return text.slice(start + COPY_MARKER.length, end).replace(/^\n+/u, "");
+}
+
+/** The Antigravity envelope lines between its markers, without the code fence and indentation. */
+export function criticTemplateEnvelope(templateText) {
+  const text = String(templateText ?? "").replace(/\r\n/gu, "\n");
+  const start = text.indexOf(ENVELOPE_START), end = text.indexOf(ENVELOPE_END);
+  if (start < 0 || end < start) refuse("CBB-TEMPLATE-MARKER", "the Critic template has no Antigravity envelope markers");
+  const lines = text.slice(start + ENVELOPE_START.length, end).split("\n").map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("```"));
+  if (lines.length === 0) refuse("CBB-TEMPLATE-MARKER", "the Antigravity envelope is empty");
+  return lines;
+}
+
+function reviewFacts(preflight, entry) {
+  const input = entry?.reviewerInput ?? preflight?.dispatch?.reviewerInput;
+  if (input === null || typeof input !== "object") refuse("CBB-PREFLIGHT-SHAPE", "the preflight result carries no reviewer input");
+  for (const key of ["baseCommit", "candidateCommit", "rulesetSha", "specPath"]) {
+    if (typeof input[key] !== "string" || input[key] === "") refuse("CBB-PREFLIGHT-SHAPE", `the reviewer input has no ${key}`);
+  }
+  return {
+    base: input.baseCommit, candidate: input.candidateCommit, rulesetSha: input.rulesetSha, spec: input.specPath,
+    guardrails: [...(input.governanceConstraintPaths ?? []), ...(input.guardrailPaths ?? [])],
+    evidence: [...(input.evidencePaths ?? [])],
+  };
+}
+
+const ordinalOf = (preflight) => {
+  const round = preflight?.coordinatorOnly?.courseAdmission?.round;
+  return Number.isInteger(round) && round >= 2 ? round : null;
+};
+
+/**
+ * Renders the Critic briefing(s). Input:
+ * - preflight: the packet-ready preflight result (printed form, with split / criticDispatchPromptLines when present)
+ * - templateText: the text of templates/prompts/critic-review.md
+ * - commits: the enumerated commit ids of the reviewed range, oldest first
+ * - bindingsPath: repository-relative path of the written correction input bindings file, or null
+ * - runner: "claude" | "codex" | "antigravity" | "unknown"; root: absolute repository root (used for Antigravity only)
+ * - projectName: the project name for the confirmation line
+ * Returns { schema, briefings: [{ entryId, text, placeholders }] }.
+ */
+export function renderCriticBriefings({ preflight, templateText, commits, bindingsPath = null, runner = "claude", root = null, projectName }) {
+  if (preflight?.status !== "packet-ready") refuse("CBB-PREFLIGHT-SHAPE", "a briefing is built only from a packet-ready preflight result");
+  if (!Array.isArray(commits) || commits.length === 0 || commits.some((sha) => !/^[a-f0-9]{40,64}$/u.test(sha))) refuse("CBB-COMMITS", "the enumerated commit list is empty or malformed");
+  const entries = Array.isArray(preflight.split?.entries) && preflight.split.entries.length > 0 ? preflight.split.entries : [null];
+  const ordinal = ordinalOf(preflight);
+  const trigger = typeof preflight.admitRequest?.trigger === "string" ? preflight.admitRequest.trigger : "T1";
+  const promptLines = Array.isArray(preflight.criticDispatchPromptLines) ? preflight.criticDispatchPromptLines : null;
+  const briefings = entries.map((entry) => {
+    const facts = reviewFacts(preflight, entry);
+    if (facts.candidate !== commits[commits.length - 1]) refuse("CBB-COMMITS", "the enumerated commits do not end at the reviewed candidate");
+    return runner === "antigravity"
+      ? renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, root, entry })
+      : renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner });
+  });
+  return { schema: CRITIC_BRIEFING_SCHEMA, briefings };
+}
+
+function renderBody({ templateText, facts, commits, bindingsPath, ordinal, promptLines, projectName, entry, runner }) {
+  const placeholders = [];
+  const open = (name, hint) => { placeholders.push(name); return fill(name, hint); };
+  const scope = entry?.batchScopeLine ?? promptLines?.[0] ?? `Batch scope (MP-07): the reviewed range ${facts.base.slice(0, 12)}..${facts.candidate.slice(0, 12)}, one batch.`;
+  const scopeValue = scope.replace(/^Batch scope \(MP-07\):\s*/u, "")
+    + (entry ? ` Paths of this part: ${(entry.reviewerInput?.changedPaths ?? entry.paths ?? []).map((path) => `\`${path}\``).join(", ")}. Begin trajectory_evidence with "${entry.scopeMarker} ".` : "");
+  const rationale = promptLines?.[1] ?? null;
+  const list = (paths, none) => (paths.length === 0 ? none : paths.map((path) => `\`${path}\``).join(", "));
+  const values = {
+    SPEC_PATH: facts.spec,
+    COMMIT_SHAS: commits.join(", "),
+    FIRST_SHA: commits[0],
+    LAST_SHA: commits[commits.length - 1],
+    REVIEWED_DIFF_SNAPSHOT_PATH: "not applicable (committed range)",
+    CORRECTION_INPUT_BINDINGS_PATH_OR_NOT_APPLICABLE: bindingsPath ?? "not applicable",
+    DISPATCH_LIST_PATH: "none (no stripped dispatch record is among the evidence paths)",
+    GUARDRAILS_PATHS: list(facts.guardrails, "none named for this review"),
+    EVIDENCE_PATHS: list(facts.evidence, "none"),
+    CLAIMS_EVIDENCE_PATH: "none beyond the evidence artifacts above",
+    RULESET_SHA: facts.rulesetSha,
+    CRITICALITY_MODEL: rationale === null ? "standard → review-tier model" : "genuinely critical architecture or security change, ONE batched Critic → higher-capability review model",
+    BATCH_SCOPE: scopeValue,
+    MODEL_ID: open("MODEL_ID", "the concrete model id the dispatch call passes as model"),
+    EFFORT: open("EFFORT", "the effort the dispatch call requests"),
+    T1_ASSURANCE: runner === "codex" ? open("T1_ASSURANCE", "the Codex Critic lane and its assurance") : "functional-equivalent-read-only; OS isolation not asserted",
+    TOOL_BUDGET: "≤30 tool uses",
+    PROJECT_NAME: projectName,
+    CALIBRATION_FILE: "n/a",
+    AC_IDS: "all in the spec",
+    RISK_ZONES: "per calibration",
+    VERDICT_REQUESTED: "yes — pass/fail required",
+  };
+  let text = criticTemplateBody(templateText);
+  // Whole-line placeholders: the re-critic pair for a correction round, nothing for a full review; the Advisor line only on demand.
+  const lineOf = (name) => new RegExp(`^- \\{\\{${name}:[^}]*\\}\\}\\n`, "mu");
+  for (const name of ["RECRITIC_LINE", "REVIEW_ORDINAL_LINE", "ADVISOR_DEMAND_LINE"]) {
+    if (!lineOf(name).test(text)) refuse("CBB-TEMPLATE-MARKER", `the template has no ${name} line`);
+  }
+  text = text.replace(lineOf("RECRITIC_LINE"), ordinal === null ? "" : `- Re-critic (MP-07): ${facts.base}..${facts.candidate}\n`);
+  text = text.replace(lineOf("REVIEW_ORDINAL_LINE"), ordinal === null ? "" : `- Review ordinal: ${ordinal}\n`);
+  text = text.replace(lineOf("ADVISOR_DEMAND_LINE"), "");
+  text = text.replace(PLACEHOLDER, (whole, name) => {
+    if (!Object.hasOwn(values, name)) refuse("CBB-TEMPLATE-PLACEHOLDER", `the template holds a placeholder this builder does not know: ${name}`);
+    return values[name];
+  });
+  if (rationale !== null) text = text.replace(/^(- Batch scope \(MP-07\): .*)$/mu, `$1\n- ${rationale}`);
+  if (/\{\{/u.test(text)) refuse("CBB-TEMPLATE-PLACEHOLDER", "an unfilled placeholder is left in the briefing");
+  return { entryId: entry?.id ?? null, text, placeholders };
+}
+
+function renderEnvelope({ templateText, facts, commits, bindingsPath, trigger, root, entry }) {
+  if (typeof root !== "string" || !posix.isAbsolute(root.replace(/\\/gu, "/")) && !/^[A-Za-z]:[\\/]/u.test(root)) refuse("CBB-ROOT", "an Antigravity envelope needs the absolute repository root");
+  const abs = (path) => `${root.replace(/[\\/]+$/u, "")}/${path}`;
+  const placeholders = [];
+  const lines = [];
+  for (const line of criticTemplateEnvelope(templateText)) {
+    const name = /\{\{([A-Z0-9_]+)\}\}/u.exec(line)?.[1] ?? null;
+    if (name === null) { lines.push(line); continue; }
+    if (name === "SPEC_PATH") lines.push(line.replace(`{{${name}}}`, abs(facts.spec)));
+    else if (name === "COMMIT_SHA") for (const sha of commits) lines.push(line.replace(`{{${name}}}`, sha));
+    else if (name === "GUARDRAIL_PATH") for (const path of facts.guardrails) lines.push(line.replace(`{{${name}}}`, abs(path)));
+    // The correction input bindings travel as an evidence row: the envelope has no row of its own for them.
+    else if (name === "EVIDENCE_PATH") for (const path of [...facts.evidence, ...(bindingsPath === null ? [] : [bindingsPath])]) lines.push(line.replace(`{{${name}}}`, abs(path)));
+    else if (name === "TRIGGER_ROW") lines.push(line.replace(`{{${name}}}`, trigger));
+    else if (name === "RULESET_SHA") lines.push(line.replace(`{{${name}}}`, facts.rulesetSha));
+    else if (name === "MODEL") { placeholders.push("MODEL"); lines.push(line.replace(`{{${name}}}`, fill("MODEL", "the Antigravity route model of the Critic duty"))); }
+    else refuse("CBB-TEMPLATE-PLACEHOLDER", `the Antigravity envelope holds a placeholder this builder does not know: ${name}`);
+  }
+  return { entryId: entry?.id ?? null, text: `${lines.join("\n")}\n`, placeholders, ...(entry ? { limitation: `a split entry on Antigravity: the envelope cannot carry the instruction to begin trajectory_evidence with "${entry.scopeMarker} "` } : {}) };
+}

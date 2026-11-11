@@ -12,6 +12,8 @@ import { basename, dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { admitRequestPlaceholderPaths } from "../lib/session-critic-finalizer-read.mjs";
+import { renderCriticBriefings } from "../lib/critic-briefing-build.mjs";
+import { criticRunnerFromEnv } from "../lib/critic-route-assurance.mjs";
 
 export const DISPATCH_PREPARATION_SCHEMA = "pipeline.dispatch-preparation.v1";
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -166,19 +168,66 @@ export function prepareCriticDispatch(input, deps = {}) {
   const value = preflight.value;
   // A current-artifact review scope prints no admit request; the preflight's own result then says what follows.
   if (value.admitRequest === undefined) return outcome(verb, "ready", { preflight: value, next: { nextStep: value.nextStep ?? "the preflight returned packet-ready without an admit request; follow its result" } });
+  // The briefing is built before anything is written, so a refusal here leaves no half-prepared state behind.
+  const briefing = buildCriticBriefingFiles({ root, value, run, step, deps });
+  if (briefing.stop !== undefined) return stopped(verb, "briefing", briefing.stop, "PREP-BRIEFING-FAILED");
   const target = resolve(root, ADMIT_REQUEST_FILE);
   const previousRequest = setAsideFilledRequest(target, deps);
   (deps.mkdir ?? mkdirSync)(dirname(target), { recursive: true });
   (deps.writeFile ?? writeFileSync)(target, `${JSON.stringify(value.admitRequest, null, 2)}\n`, "utf8");
+  for (const file of briefing.files) {
+    (deps.mkdir ?? mkdirSync)(dirname(resolve(root, file.path)), { recursive: true });
+    (deps.writeFile ?? writeFileSync)(resolve(root, file.path), file.text, "utf8");
+  }
   const admitCommand = (value.admitCommand ?? []).map((part) => part.replace("${PIPELINE_PLUGIN_ROOT}/scripts/", `${HERE.replace(/\\/gu, "/")}/`));
   return outcome(verb, "ready", {
     packetId: value.admitRequest.packetId, candidate: value.candidate?.commit ?? candidate,
     ...(previousRequest === null ? {} : { previousRequest }),
-    next: { requestPath: ADMIT_REQUEST_FILE, placeholders: admitRequestPlaceholderPaths(value.admitRequest), admitCommand, nextStep: value.nextStep,
-      ...(value.criticDispatchPromptLines === undefined ? {} : { criticDispatchPromptLines: value.criticDispatchPromptLines }),
-      ...(value.criticRunnerPromptLines === undefined ? {} : { criticRunnerPromptLines: value.criticRunnerPromptLines }),
+    next: { requestPath: ADMIT_REQUEST_FILE, placeholders: admitRequestPlaceholderPaths(value.admitRequest), admitCommand,
+      briefings: briefing.files.map(({ path, entryId, placeholders, limitation }) => ({ path, entryId, placeholders, ...(limitation === undefined ? {} : { limitation }) })),
+      ...(briefing.bindingsPath === null ? {} : { correctionInputBindings: briefing.bindingsPath }),
+      briefingUse: briefing.runner === "antigravity"
+        ? "After admit, each briefing file is the Prompt of one invoke_subagent call (TypeName critic, no Model), verbatim; replace only its <FILL ...> values. It holds paths and refs only: add nothing."
+        : "After admit, each briefing file is the prompt of one fresh Critic dispatch, verbatim; replace only its <FILL ...> values. Add nothing to it: no earlier round, no verdict, no explanation (critic-review.md, fail-closed reference boundary).",
+      nextStep: value.nextStep,
       ...(value.taskIdResolution === undefined ? {} : { taskIdResolution: value.taskIdResolution }), ...(value.split === undefined ? {} : { split: value.split }) },
   });
+}
+
+const TEMPLATE_PATH = join(HERE, "..", "templates", "prompts", "critic-review.md");
+
+/** Correction input bindings file (derived once, never overwritten), the enumerated commits and the filled briefing text(s). */
+function buildCriticBriefingFiles({ root, value, run, step, deps }) {
+  const read = deps.readFile ?? readFileSync;
+  const exists = deps.exists ?? existsSync;
+  const base = value.base?.commit ?? value.dispatch?.reviewerInput?.baseCommit;
+  const head = value.candidate?.commit;
+  const folder = `scratch/critic-briefing/${String(base).slice(0, 12)}-${String(head).slice(0, 12)}`;
+  let bindingsPath = null;
+  const bound = value.correctionInputBindings;
+  if (typeof bound?.path === "string" && bound.path !== "") bindingsPath = bound.path;
+  else if (bound?.derived === true) {
+    bindingsPath = `${folder}/correction-input-bindings.json`;
+    let onDisk = null;
+    if (exists(resolve(root, bindingsPath))) { try { onDisk = JSON.parse(read(resolve(root, bindingsPath), "utf8")).digestSha256 ?? null; } catch { onDisk = null; } }
+    if (onDisk === null) {
+      const derived = step("critic-correction-input-bindings.mjs", ["derive", "--root", root, "--base", base, "--head", head, "--out", bindingsPath]);
+      if (derived.exit !== 0) return { stop: asReason(derived) };
+      onDisk = derived.value?.digestSha256 ?? null;
+    }
+    if (onDisk !== bound.digestSha256) return { stop: { code: "PREP-BINDINGS-DIGEST", reason: `${bindingsPath} does not carry the digest the preflight bound (${bound.digestSha256})`, repair: `remove ${bindingsPath} and run the identical command again` } };
+  }
+  const listed = gitOutput(run, ["rev-list", "--reverse", `${base}..${head}`]);
+  const commits = listed === "" ? [] : listed.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
+  const runner = criticRunnerFromEnv(deps.env ?? process.env);
+  let rendered;
+  try {
+    rendered = renderCriticBriefings({ preflight: value, templateText: (deps.readTemplate ?? (() => readFileSync(TEMPLATE_PATH, "utf8")))(), commits, bindingsPath, runner, root, projectName: basename(root) });
+  } catch (error) {
+    return { stop: { code: error?.code ?? "PREP-BRIEFING-FAILED", reason: String(error?.message ?? error), repair: "the Critic template or the preflight result changed shape; report this code, do not hand-write the briefing" } };
+  }
+  const files = rendered.briefings.map((entry) => ({ ...entry, path: `${folder}/critic${entry.entryId === null ? "" : `-${entry.entryId}`}.briefing.md` }));
+  return { files, bindingsPath, runner };
 }
 
 function criticArgv(input) {

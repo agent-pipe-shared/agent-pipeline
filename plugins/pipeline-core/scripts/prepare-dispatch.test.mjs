@@ -2,11 +2,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parsePrepareDispatchArgv, prepareCriticDispatch, prepareGoldfishDispatch } from "./prepare-dispatch.mjs";
+import * as criticBriefingLib from "../lib/critic-briefing-build.mjs";
+import { dispatchFindings } from "../lib/dispatch-policy.mjs";
+import { CRITIC_DISPATCH_PROSE } from "../hooks/antigravity-pretool-guard.mjs";
+
+const TEMPLATE = readFileSync(fileURLToPath(new URL("../templates/prompts/critic-review.md", import.meta.url)), "utf8");
 
 const SCRIPT = fileURLToPath(new URL("./prepare-dispatch.mjs", import.meta.url));
 const ROOT = join(tmpdir(), "prepare-dispatch-root");
@@ -108,8 +113,11 @@ test("--no-goldfish-running heals once, probes again and clears the named comman
 });
 
 const CRITIC = { root: ROOT, spec: "specs/f/spec.md", base: "b".repeat(40), candidate: CANDIDATE, guardrails: ["guardrails/git.md"], label: "suite", command: ["node", "--test", "x.test.mjs"] };
-const PACKET_READY = { status: "packet-ready", candidate: { commit: CANDIDATE }, nextStep: "write and admit",
+const BASE = "b".repeat(40);
+const PACKET_READY = { status: "packet-ready", base: { commit: BASE }, candidate: { commit: CANDIDATE }, nextStep: "write and admit",
+  dispatch: { reviewerInput: { baseCommit: BASE, candidateCommit: CANDIDATE, rulesetSha: CANDIDATE, specPath: "specs/f/spec.md", governanceConstraintPaths: [], guardrailPaths: ["guardrails/git.md"], evidencePaths: ["specs/f/evidence/suite.json"] } },
   admitRequest: { packetId: "c".repeat(32), sessionId: "<FILL sessionId: hint>", taskId: "T1" }, admitCommand: ["node", "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs", "admit"] };
+const REV_LIST = { status: 0, stdout: `${CANDIDATE}\n`, stderr: "" };
 const noFiles = { exists: () => false, mkdir: () => {}, writeFile: () => {} };
 const SAME_CANDIDATE = JSON.stringify({ candidate: { commit: CANDIDATE } });
 
@@ -140,7 +148,7 @@ test("a label that recorded another candidate is refused before anything runs", 
 
 test("a rerun keeps a request the agent already filled and replaces an untouched draft", () => {
   const commit = "d".repeat(40);
-  const answers = { "git log": { status: 0, stdout: `${commit}\n`, stderr: "" }, "critic-dispatch-preflight.mjs": ok(PACKET_READY) };
+  const answers = { "git log": { status: 0, stdout: `${commit}\n`, stderr: "" }, "critic-dispatch-preflight.mjs": ok(PACKET_READY), "git rev-list": REV_LIST };
   const requestOr = (request) => (path) => (String(path).endsWith("session-critic-finalization-request.json") ? JSON.stringify(request) : SAME_CANDIDATE);
   const renamed = [];
   const files = { mkdir: () => {}, writeFile: () => {}, exists: () => true, rename: (from, to) => renamed.push([from, to]) };
@@ -155,18 +163,20 @@ test("a rerun keeps a request the agent already filled and replaces an untouched
 test("the identical rerun finds the evidence commit, reaches packet-ready and writes the admit request", () => {
   const commit = "d".repeat(40);
   const written = [];
-  const steps = stub({ "git log": { status: 0, stdout: `${commit}\n`, stderr: "" }, "critic-dispatch-preflight.mjs": ok(PACKET_READY) });
+  const steps = stub({ "git log": { status: 0, stdout: `${commit}\n`, stderr: "" }, "critic-dispatch-preflight.mjs": ok(PACKET_READY), "git rev-list": REV_LIST });
   const result = prepareCriticDispatch(CRITIC, { mkdir: () => {}, writeFile: (path, text) => written.push([path, text]), exists: (path) => !String(path).endsWith("finalization-request.json"), readFile: () => SAME_CANDIDATE, runCommand: steps.runCommand });
   assert.equal(result.status, "ready");
   assert.equal(result.packetId, "c".repeat(32));
   assert.deepEqual(result.next.placeholders, ["sessionId"]);
   assert.match(result.next.admitCommand[1], /session-critic-finalizer\.mjs$/u);
   assert.doesNotMatch(result.next.admitCommand[1], /PIPELINE_PLUGIN_ROOT/u);
-  const argv = steps.calls.at(-1).argv;
+  const argv = steps.calls.find((call) => call.key === "critic-dispatch-preflight.mjs").argv;
   assert.equal(argv.includes("--registration-commit"), false, "the preflight derives it: in a correction round it is the later delta registration, not the evidence commit");
   assert.equal(argv[argv.indexOf("--evidence") + 1], "specs/f/evidence/suite.json");
-  assert.equal(written.length, 1);
+  assert.equal(written.length, 2, "the admit request and one Critic briefing");
   assert.deepEqual(JSON.parse(written[0][1]), PACKET_READY.admitRequest);
+  assert.match(written[1][0].replace(/\\/gu, "/"), /scratch\/critic-briefing\/bbbbbbbbbbbb-aaaaaaaaaaaa\/critic\.briefing\.md$/u);
+  assert.deepEqual(result.next.briefings.map(({ path, entryId }) => [path, entryId]), [["scratch/critic-briefing/bbbbbbbbbbbb-aaaaaaaaaaaa/critic.briefing.md", null]]);
 });
 
 test("a preflight refusal keeps its own code and reason", () => {
@@ -177,9 +187,9 @@ test("a preflight refusal keeps its own code and reason", () => {
 
 test("an explicit registration commit passes through, and a step with a code but no words shows its output", () => {
   const given = "9".repeat(40);
-  const passed = stub({ "critic-dispatch-preflight.mjs": ok(PACKET_READY) });
+  const passed = stub({ "critic-dispatch-preflight.mjs": ok(PACKET_READY), "git rev-list": REV_LIST });
   prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"], registrationCommit: given }, { ...noFiles, runCommand: passed.runCommand });
-  const argv = passed.calls.at(-1).argv;
+  const argv = passed.calls.find((call) => call.key === "critic-dispatch-preflight.mjs").argv;
   assert.equal(argv[argv.indexOf("--registration-commit") + 1], given);
   const silent = stub({ "critic-dispatch-preflight.mjs": no({ code: "CDP-GIT" }, 1) });
   const result = prepareCriticDispatch({ ...CRITIC, label: null, command: [], evidence: ["e.json"] }, { ...noFiles, runCommand: silent.runCommand });
@@ -200,6 +210,106 @@ test("the argument parser takes the check command after the separator and refuse
   assert.deepEqual(parsed.options.command, ["node", "--test"]);
   assert.match(parsePrepareDispatchArgv(["goldfish", "--root", ROOT, "--nope", "x"]).error, /unknown flag/u);
   assert.match(parsePrepareDispatchArgv(["goldfish"]).error, /--root is required/u);
+});
+
+// --- PO tile 2026-11-10: the Critic preparation writes the filled briefing. Two greenfield runs hand-wrote it the same day: one Critic got no
+// correction input bindings and was then resumed with a message naming the earlier round's outcome, which made it withhold its verdict. ---
+
+const PREV = "1".repeat(40), MID = "2".repeat(40), HEAD = "3".repeat(40);
+const REGISTRATION = "4".repeat(40), SOURCE_SHA = "5".repeat(64), DECISION_SHA = "6".repeat(64), PACKET = "7".repeat(32);
+const DELTA_REQUEST = "specs/f/evidence/critic-delta-request-x.json", PRIOR = "specs/f/evidence/critic-prior.json";
+const reviewerInput = (over = {}) => ({ baseCommit: PREV, candidateCommit: HEAD, candidateTree: "8".repeat(40), rulesetSha: HEAD, specPath: "specs/f/spec.md",
+  governanceConstraintPaths: [], guardrailPaths: ["guardrails/git.md"], evidencePaths: ["specs/f/evidence/suite-2.json"], ...over });
+function deltaSplitPreflight() {
+  const entry = (id, paths) => ({ id, moduleId: null, paths, scopeMarker: `scope:${id}`, reviewerInput: reviewerInput({ changedPaths: paths }),
+    batchScopeLine: `Batch scope (MP-07): path group ${id} of the reviewed range ${PREV.slice(0, 12)}..${HEAD.slice(0, 12)} (1 of 2 changed files), part 1 of 2 of one split review round.` });
+  return { status: "packet-ready", base: { commit: PREV }, candidate: { commit: HEAD },
+    correctionInputBindings: { path: null, derived: true, digestSha256: "9".repeat(64) },
+    coordinatorOnly: { priorCriticEvidence: { path: PRIOR }, courseAdmission: { featureId: "f", registrationCommit: REGISTRATION, sourceSha256: SOURCE_SHA, decisionSha256: DECISION_SHA, round: 2, correctionCommits: 1 } },
+    dispatch: { reviewerInput: reviewerInput() },
+    admitRequest: { packetId: PACKET, trigger: "T1", review: { priorCriticEvidencePath: PRIOR, deltaRequest: DELTA_REQUEST } },
+    criticDispatchPromptLines: [`Batch scope (MP-07): the reviewed range ${PREV.slice(0, 12)}..${HEAD.slice(0, 12)} (2 changed files in 2 top-level paths), one batch.`,
+      "Rationale (MP-07): the registered Critic route duty.critic_high_risk requests opus at effort max; it is used for critical architecture or security checks of this one batch only."],
+    split: { entries: [entry("group-1", ["a.mjs"]), entry("group-2", ["b.mjs"])] } };
+}
+const BINDINGS_FILE = `scratch/critic-briefing/${PREV.slice(0, 12)}-${HEAD.slice(0, 12)}/correction-input-bindings.json`;
+const FORBIDDEN = [PACKET, REGISTRATION, SOURCE_SHA, DECISION_SHA, DELTA_REQUEST, PRIOR];
+
+test("a split correction round gets one filled briefing per entry with its scope, ordinal, range and bindings, and nothing from earlier rounds", () => {
+  const { renderCriticBriefings } = criticBriefingLib;
+  const { briefings } = renderCriticBriefings({ preflight: deltaSplitPreflight(), templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "claude", root: ROOT, projectName: "p" });
+  assert.deepEqual(briefings.map((entry) => entry.entryId), ["group-1", "group-2"]);
+  for (const [index, { text, placeholders }] of briefings.entries()) {
+    const id = `group-${index + 1}`;
+    assert.match(text, new RegExp(`^- Batch scope \\(MP-07\\): path group ${id} of the reviewed range .* Paths of this part: \`${index === 0 ? "a" : "b"}\\.mjs\`\\. Begin trajectory_evidence with "scope:${id} "\\.$`, "mu"));
+    assert.match(text, /^- Rationale \(MP-07\): .*critical architecture or security/mu, "the Opus MP-07 rationale sits in the briefing");
+    assert.match(text, new RegExp(`^- Re-critic \\(MP-07\\): ${PREV}\\.\\.${HEAD}$`, "mu"));
+    assert.match(text, /^- Review ordinal: 2$/mu);
+    assert.ok(text.includes(BINDINGS_FILE), "the correction input bindings are named");
+    assert.ok(text.includes(`${MID}, ${HEAD}`), "the enumerated commits");
+    assert.ok(text.includes("- Spec (the contract): specs/f/spec.md"));
+    assert.doesNotMatch(text, /\{\{/u, "no template placeholder is left");
+    assert.doesNotMatch(text, /Generic exact-range batch registration \(Coordinator only\)/u, "the Coordinator-only section is cut off");
+    for (const value of FORBIDDEN) assert.equal(text.includes(value), false, `the briefing carries ${value}`);
+    assert.deepEqual(placeholders, ["MODEL_ID", "EFFORT"]);
+    // What the dispatcher sends: the briefing with its two values filled. The dispatch policy admits it as a clean Opus Critic prompt.
+    const prompt = text.replace("<FILL MODEL_ID: the concrete model id the dispatch call passes as model>", "claude-opus-4-1").replace("<FILL EFFORT: the effort the dispatch call requests>", "max");
+    const codes = dispatchFindings({ subagentType: "critic", prompt: `Model/effort for this run: claude-opus-4-1 / max\n${prompt}` }).findings.map(({ code }) => code);
+    assert.deepEqual(codes.filter((code) => code.startsWith("DISPATCH-CONTAMINATION") || code === "DISPATCH-OPUS-NO-BATCH-RATIONALE" || code.startsWith("DISPATCH-RECRITIC")), [], codes.join(", "));
+  }
+});
+
+test("a first full review gets no re-critic or ordinal line and states that no bindings apply", () => {
+  const preflight = { ...deltaSplitPreflight(), coordinatorOnly: { priorCriticEvidence: null, courseAdmission: { round: 1 } }, correctionInputBindings: undefined, split: undefined, criticDispatchPromptLines: undefined };
+  const [{ text, entryId }] = criticBriefingLib.renderCriticBriefings({ preflight, templateText: TEMPLATE, commits: [MID, HEAD], runner: "claude", root: ROOT, projectName: "p" }).briefings;
+  assert.equal(entryId, null);
+  assert.doesNotMatch(text, /^- Re-critic/mu);
+  assert.doesNotMatch(text, /^- Review ordinal/mu);
+  assert.doesNotMatch(text, /^- Rationale \(MP-07\)/mu);
+  assert.match(text, /Correction input bindings \(when retained prior results occur in the range\):\n\s+not applicable\./u);
+  assert.match(text, /^- Batch scope \(MP-07\): the reviewed range 111111111111\.\.333333333333, one batch\.$/mu);
+});
+
+test("Antigravity gets the template's paths-only envelope with absolute paths, which the Contamination Rule admits", () => {
+  const { briefings } = criticBriefingLib.renderCriticBriefings({ preflight: { ...deltaSplitPreflight(), split: undefined }, templateText: TEMPLATE, commits: [MID, HEAD], bindingsPath: BINDINGS_FILE, runner: "antigravity", root: "/repo/root", projectName: "p" });
+  const [{ text, placeholders }] = briefings;
+  const lines = text.trimEnd().split("\n");
+  assert.equal(lines[0], "templates/prompts/critic-review.md", "the first line stays the canonical template path");
+  assert.ok(lines.includes("spec: /repo/root/specs/f/spec.md"));
+  assert.ok(lines.includes(`commit: ${MID}`) && lines.includes(`commit: ${HEAD}`), "one commit row per enumerated commit");
+  assert.ok(lines.includes("guardrail: /repo/root/guardrails/git.md"));
+  assert.ok(lines.includes(`evidence: /repo/root/${BINDINGS_FILE}`), "the bindings travel as an evidence row");
+  assert.ok(lines.includes("route: T1") && lines.includes(`ruleset-sha: ${HEAD}`));
+  assert.deepEqual(placeholders, ["MODEL"]);
+  assert.doesNotMatch(text, CRITIC_DISPATCH_PROSE);
+  assert.doesNotMatch(text, /Repository root|Rationale|Batch scope/u, "no prose and no Claude MP-07 line in the envelope");
+  for (const value of FORBIDDEN) assert.equal(text.includes(value), false, `the envelope carries ${value}`);
+});
+
+test("a template that lost its copy marker or holds an unknown placeholder refuses instead of handing on an unfilled briefing", () => {
+  const render = (templateText) => () => criticBriefingLib.renderCriticBriefings({ preflight: { ...deltaSplitPreflight(), split: undefined }, templateText, commits: [MID, HEAD], runner: "claude", root: ROOT, projectName: "p" });
+  assert.throws(render(TEMPLATE.replace("COPY EVERYTHING BELOW THIS LINE", "COPY BELOW")), { code: "CBB-TEMPLATE-MARKER" });
+  assert.throws(render(TEMPLATE.replace("- Spec (the contract): {{SPEC_PATH}}", "- Spec (the contract): {{NEW_FIELD}}")), { code: "CBB-TEMPLATE-PLACEHOLDER" });
+});
+
+test("prepare-dispatch derives the bindings file once, writes one briefing per split entry and names them in next", () => {
+  const written = [];
+  const steps = stub({ "critic-dispatch-preflight.mjs": ok(deltaSplitPreflight()), "critic-correction-input-bindings.mjs derive": ok({ digestSha256: "9".repeat(64), path: BINDINGS_FILE }), "git rev-list": { status: 0, stdout: `${MID}\n${HEAD}\n`, stderr: "" } });
+  const result = prepareCriticDispatch({ root: ROOT, spec: "specs/f/spec.md", base: PREV, candidate: HEAD, evidence: ["specs/f/evidence/suite-2.json"] },
+    { exists: () => false, mkdir: () => {}, writeFile: (path, text) => written.push([path.replace(/\\/gu, "/"), text]), env: { CLAUDE_CODE_SESSION_ID: "s" }, runCommand: steps.runCommand });
+  assert.equal(result.status, "ready", JSON.stringify(result.stop ?? null));
+  const derive = steps.calls.find((call) => call.key === "critic-correction-input-bindings.mjs derive").argv;
+  assert.equal(derive[derive.indexOf("--out") + 1], BINDINGS_FILE);
+  assert.deepEqual(result.next.briefings.map(({ entryId }) => entryId), ["group-1", "group-2"]);
+  assert.equal(result.next.correctionInputBindings, BINDINGS_FILE);
+  assert.match(result.next.briefingUse, /Add nothing to it: no earlier round, no verdict/u);
+  assert.equal(Object.hasOwn(result.next, "criticDispatchPromptLines"), false, "the MP-07 lines live in the briefings, not beside them");
+  assert.equal(written.filter(([path]) => path.endsWith(".briefing.md")).length, 2);
+  // A bindings file on disk with another digest is refused, never silently used.
+  const stale = stub({ "critic-dispatch-preflight.mjs": ok(deltaSplitPreflight()), "git rev-list": { status: 0, stdout: `${MID}\n${HEAD}\n`, stderr: "" } });
+  const refused = prepareCriticDispatch({ root: ROOT, spec: "specs/f/spec.md", base: PREV, candidate: HEAD, evidence: ["e.json"] },
+    { exists: (path) => String(path).endsWith("correction-input-bindings.json"), readFile: () => JSON.stringify({ digestSha256: "0".repeat(64) }), mkdir: () => {}, writeFile: () => {}, runCommand: stale.runCommand });
+  assert.equal(refused.stop.code, "PREP-BINDINGS-DIGEST");
 });
 
 test("--help works in an empty directory and names both verbs", () => {

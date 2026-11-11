@@ -2137,18 +2137,18 @@ test("R9: a local-only calibration beside a real remote is named before the Crit
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
-test("AGY report: an Antigravity Critic gets one generated line naming the repository root, the dispatch policy admits it, other runners get none", () => {
+// PO tile 2026-11-10: the prose "Repository root" line contradicted the paths-only envelope and is gone; prepare-dispatch.mjs critic writes the
+// envelope with absolute paths instead, and the preflight's nextStep sends an Antigravity session there.
+test("AGY report: an Antigravity session is sent to the absolute-path envelope, no prose root line is printed for any runner", () => {
   const fx = fixture();
   try {
     const printed = g2069Printed(fx, {}, { env: { ANTIGRAVITY_AGENT: "antigravity" } });
-    assert.equal(printed.criticRunnerPromptLines.length, 1);
-    assert.ok(printed.criticRunnerPromptLines[0].startsWith(`Repository root: ${fs.realpathSync(fx.root)}. `), printed.criticRunnerPromptLines[0]);
-    assert.match(printed.criticRunnerPromptLines[0], /absolute paths only/u);
-    assert.match(printed.nextStep, /criticRunnerPromptLines/u);
-    const findings = (extra) => dispatchFindings({ subagentType: "critic", prompt: [`Ruleset SHA: ${fx.candidate}`, ...extra].join("\n") }).findings.map(({ code }) => code).sort();
-    assert.deepEqual(findings(printed.criticRunnerPromptLines), findings([]), "the whole dispatch policy reads the prompt the same with and without the line");
+    assert.equal(Object.hasOwn(printed, "criticRunnerPromptLines"), false);
+    assert.match(printed.nextStep, /prepare-dispatch\.mjs critic: on Antigravity it writes the template's paths-only envelope with absolute paths/u);
     for (const env of [{ CLAUDE_CODE_SESSION_ID: "s" }, { CODEX_SESSION_ID: "s" }, {}]) {
-      assert.equal(Object.hasOwn(g2069Printed(fx, {}, { env }), "criticRunnerPromptLines"), false, JSON.stringify(env));
+      const other = g2069Printed(fx, {}, { env });
+      assert.equal(Object.hasOwn(other, "criticRunnerPromptLines"), false, JSON.stringify(env));
+      assert.doesNotMatch(other.nextStep, /paths-only envelope/u, JSON.stringify(env));
     }
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
@@ -2163,7 +2163,6 @@ test("AGY report: an Antigravity session gets no Claude Opus lines, and every ge
     const agy = { env: { ANTIGRAVITY_AGENT: "antigravity" } };
     const printed = g2069Printed(fx, {}, agy);
     assert.equal(Object.hasOwn(printed, "criticDispatchPromptLines"), false, "the registered Antigravity Critic route is not Opus");
-    for (const line of printed.criticRunnerPromptLines) assert.doesNotMatch(line, CRITIC_DISPATCH_PROSE, line);
     // An Antigravity route configured to Opus does get the lines, and they pass the rule too.
     const registry = structuredClone(loadRunnerProfilesV3Registry());
     registry.duties.critic_high_risk.antigravity = { ...registry.duties.critic_high_risk.claude };
