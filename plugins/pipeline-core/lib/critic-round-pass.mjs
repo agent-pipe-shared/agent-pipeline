@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Whether one Critic round passed. The one rule every route that writes a Critic receipt applies (PO decision, 2026-11-10).
  *

@@ -163,7 +163,7 @@ const GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH = pathJoin(dirname(fileURLToPath(impor
  */
 export function resolveGitleaksConfigPath() {
   // C21B: four directories above an INSTALLED plugin is the runner's own cache or marketplace folder, and a `.gitleaks.toml` found there replaced the shipped ruleset, so the
-  // Pipeline's own artefact exemptions never applied and a consumer's close failed on its own Critic lineage. Only the Agent-Pipeline source checkout (which has harness/) uses the repo-root file.
+  // Pipeline's own artefact exemptions never applied and a consumer's close failed on its own Critic lineage. Only the Agent-Pipeline source checkout (recognised by its own Verify script) uses the repo-root file.
   if (existsSync(GITLEAKS_CONFIG_PATH) && existsSync(pathJoin(dirname(GITLEAKS_CONFIG_PATH), "harness", "scripts", "verify.mjs"))) return GITLEAKS_CONFIG_PATH;
   if (existsSync(GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH)) return GITLEAKS_PLUGIN_DEFAULT_CONFIG_PATH;
   return null;

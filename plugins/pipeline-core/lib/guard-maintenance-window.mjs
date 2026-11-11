@@ -940,6 +940,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // ALF-K39 (GMWKC01): guard-dispatch.mjs spawns the liveness script, which imports the readback module.
   "plugins/pipeline-core/lib/dispatch-record-liveness.mjs", "plugins/pipeline-core/scripts/dispatch-record-liveness.mjs",
   "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs", "plugins/pipeline-core/lib/project-onboarding-v3-author-identity.mjs", "plugins/pipeline-core/lib/plan-handoff-readiness.mjs", "plugins/pipeline-core/lib/authority-restore.mjs",
+  // Candidate 28 (GMWKC01): imports added by candidates 26 and 27.
+  "plugins/pipeline-core/lib/observation-governance-bootstrap.mjs", "plugins/pipeline-core/lib/critic-round-pass.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

@@ -784,6 +784,11 @@ of an edited, bound PRD/Spec; `scripts/pipeline-state.mjs inspect` calls it to n
 `scripts/authority-restore.mjs` command as the first repair). It reads State and git blobs, writes
 nothing, and imports only node built-ins (no first-party module, so it adds no kernel import edge).
 
+Candidates 26 and 27 add two more first-party modules that kernel files import and that execute with
+kernel authority: `plugins/pipeline-core/lib/observation-governance-bootstrap.mjs` (the bootstrap
+readback of the observation governance status) and `plugins/pipeline-core/lib/critic-round-pass.mjs`
+(the one rule deciding whether a Critic round passed). Both are kernel paths now.
+
 ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
 and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
 (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
