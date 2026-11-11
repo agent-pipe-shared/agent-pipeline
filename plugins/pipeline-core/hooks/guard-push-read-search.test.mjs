@@ -116,3 +116,17 @@ test("a push anywhere in the command, or a substitution that would run one, stay
     assert.ok(marker.stderr.includes(REFUSAL), marker.stderr);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("a git read refused for a backslash says so, and the spelling it names passes", () => {
+  const dir = activeGateRepo();
+  try {
+    const refused = run("git config --local --get-regexp ^user\\.", dir);
+    assert.equal(refused.code, 2, refused.stderr);
+    assert.match(refused.stderr, /a backslash next to git counts as a possible hidden push/u);
+    const respelled = run("git config --local --get-regexp ^user[.]", dir);
+    assert.equal(respelled.code, 0, respelled.stderr);
+    const push = run("git push origin main\\:refs/heads/x", dir);
+    assert.equal(push.code, 2, push.stderr);
+    assert.doesNotMatch(push.stderr, /a backslash next to git/u);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
