@@ -304,6 +304,14 @@ export function smallestChangeParagraph(pkg) {
   return `\n\nSmallest complete change (role rule GF-10): before the first edit, list what the change must reach (callers, tests, fixtures, configuration, exports). Deliver the briefed outcome with the smallest change that fully works: reuse what exists, keep the structure, prefer removing code to adding it, and add no abstraction, wrapper, option, dependency or code for later that the briefing did not ask for. Fix a defect once at its shared cause. Moved code keeps its validation and error handling; never shorten validation at a trust boundary, data-loss handling, security or anything the briefing names. Report what you left out on purpose, and any risk, under "Deliberately not changed".`;
 }
 
+// Antigravity greenfield 2026-11-10: the briefing said "shared checkout" while the Antigravity guard refuses a code-writing child
+// without Workspace "branch" (AGY-NATIVE-WORKSPACE-NOT-ISOLATED, agy-native-goldfish.mjs), so the run followed the briefing into a refusal.
+export function worktreeLine(runner) {
+  return runner === "antigravity"
+    ? "Worktree: own branch workspace — the code-writing child is dispatched with Workspace: \"branch\" (its own git worktree on its own branch); the write scope is disjoint from every other running dispatch."
+    : "Worktree: no — shared checkout; the write scope is disjoint from every other running dispatch.";
+}
+
 /** Renders the full briefing; `generated` is the binding builder's result for this package. */
 // G20-75: the build knows whether the project carries its own copy of the obligations file. Naming the one that exists saves
 // every dispatched Goldfish a refused read (GUARD-READ-TARGET-MISSING) of the repository-root path in a consumer project.
@@ -391,7 +399,7 @@ ${pkg.forbidden ? `${bullets(pkg.forbidden)}\n` : ""}
 ${pkg.stops ? `${bullets(pkg.stops)}\n` : ""}
 ### 6. Dispatch metadata
 
-${meta.replace("Worktree: {{WORKTREE}}.", "Worktree: no — shared checkout; the write scope is disjoint from every other running dispatch.")}- Model justification: ${pkg.modelWhy ?? "n/a — role default"}.
+${meta.replace("Worktree: {{WORKTREE}}.", worktreeLine(pkg.runner))}- Model justification: ${pkg.modelWhy ?? "n/a — role default"}.
 ${estimateLines}- Profile: standard. Closing allowance +5 for closing only.
 - Never end a turn voluntarily while budget remains and work is unfinished; never background a job and end the turn before holding its result.
 - Critic is a batch gate, not an item-completion gate: report \`targeted delivery: green|blocked\`; batch review and acceptance stay pending.

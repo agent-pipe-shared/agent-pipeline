@@ -2432,6 +2432,9 @@ test("A18-M1C build --runner antigravity renders a verified briefing that names 
   assert.match(built.text, /"runner":"antigravity"/u);
   assert.match(built.text, /route model `gemini-[0-9a-z.-]+`/u, "the alias alone names no model, so the admission rule MP-05 needs the registered id");
   assert.deepEqual(verifyGeneratedBriefing(built.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
+  // Antigravity greenfield 2026-11-10: the briefing must not tell an Antigravity child it shares the checkout; its guard demands Workspace "branch".
+  assert.match(built.text, /Worktree: own branch workspace — the code-writing child is dispatched with Workspace: "branch"/u);
+  assert.doesNotMatch(built.text, /shared checkout/u);
   const optIn = parseNativeGoldfishBriefing(built.text, { runners: ["claude", "codex", "antigravity"] });
   assert.equal(optIn.ok, true, optIn.code);
   assert.equal(optIn.binding.runner, "antigravity");
@@ -2446,6 +2449,8 @@ test("A18-M1C build --runner antigravity renders a verified briefing that names 
   const claude = packageFixture();
   const claudeProbed = runDispatchBriefing(["probe", ...claude.argv.slice(1)], depsOf(claude.fx));
   assert.deepEqual(codesOf(probed), codesOf(claudeProbed));
+  const claudeBuilt = runDispatchBriefing(claude.argv, depsOf(claude.fx));
+  assert.match(claudeBuilt.text ?? "", /Worktree: no — shared checkout/u, "the Claude briefing keeps the shared-checkout line");
   assert.equal(codesOf(probed).some((code) => /^(DBG-SELFCHECK|DBG-MODEL|NGHR)/u.test(code)), false);
 });
 
