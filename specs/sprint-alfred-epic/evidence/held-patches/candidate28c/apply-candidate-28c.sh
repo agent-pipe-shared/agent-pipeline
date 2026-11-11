@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28c: 10 held patches exported from the build clone chain 8438dac43..f6788c525
+# PO apply script for candidate 28c: 11 held patches exported from the build clone chain 8438dac43..6d1aacfdb
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -24,6 +24,7 @@ step 07-3fdb7bacd 'docs(backlog): record that a follow-up epic cannot extend the
 step 08-3a40cf073 'feat(architecture): let a follow-up epic add modules to the design a closed epic materialized'
 step 09-82daeb687 'docs(backlog): state that the K-13 extension route is built and what is still open'
 step 10-f6788c525 'docs(architecture): bring the concept map up to date for the follow-up extension of a closed design'
+step 11-6d1aacfdb 'feat(architecture): let a predecessor module grow its dependencies, contracts and test entry points in a follow-up extension of a closed design'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
