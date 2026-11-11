@@ -1,0 +1,15 @@
+diff --git a/backlog/items/2026-11-11-a-follow-up-epic-cannot-extend-the-closed-architecture-design.md b/backlog/items/2026-11-11-a-follow-up-epic-cannot-extend-the-closed-architecture-design.md
+index e4394e97c535172fd9db179df86ed06a1e668597..466f0bf79485072de8335f1b31a750328491bbd3 100644
+--- a/backlog/items/2026-11-11-a-follow-up-epic-cannot-extend-the-closed-architecture-design.md
++++ b/backlog/items/2026-11-11-a-follow-up-epic-cannot-extend-the-closed-architecture-design.md
+@@ -24,8 +24,8 @@ What the source does (`plugins/pipeline-core/lib/architecture-design.mjs`):
+ 
+ ## Decision
+ 
+-Open for the PO. The option under consideration is an additive extension route: the predecessor is closed, every predecessor module is present with an identical definition, each target the receipt recorded still holds its recorded bytes (the existing preimage binding), and only added modules and targets are new. The new plan signature stays the authority; the receipt records what is materialized. Anything that removes or changes a predecessor module keeps the refusal.
++PO tile 2026-11-11: build the additive extension route. Built in candidate 28c in `architecture-design.mjs` with two tests (an addition is accepted and published over the recorded bytes; a removed or changed predecessor module, an open predecessor, an edited predecessor plan and a drifted target keep the refusal). Still open: the documented way for a follow-up epic in the architecture guide, and a run on a real consumer repository. The route as built is an additive extension route: the predecessor is closed, every predecessor module is present with an identical definition, each target the receipt recorded still holds its recorded bytes (the existing preimage binding), and only added modules and targets are new. The new plan signature stays the authority; the receipt records what is materialized. Anything that removes or changes a predecessor module keeps the refusal.
+ 
+ ## Done when
+ 
+-The PO has chosen. If the extension route is built: a test runs a follow-up design with an added module through to materialization, and a test shows that a removed or changed predecessor module and a drifted target still end in the refusal. The documented way for a follow-up epic is written into the architecture guide.
++The documented way for a follow-up epic is written into the architecture guide, and a follow-up epic with an added module has been materialized once in a real consumer repository.
