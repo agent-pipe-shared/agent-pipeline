@@ -1,6 +1,6 @@
 diff --git a/backlog/items/2026-11-11-a-follow-up-epic-cannot-extend-the-closed-architecture-design.md b/backlog/items/2026-11-11-a-follow-up-epic-cannot-extend-the-closed-architecture-design.md
 new file mode 100644
-index 0000000000000000000000000000000000000000..72d5b02449f20a4aa1e7e7dd9cf6ae0ffb81ccbd
+index 0000000000000000000000000000000000000000..e4394e97c535172fd9db179df86ed06a1e668597
 --- /dev/null
 +++ b/backlog/items/2026-11-11-a-follow-up-epic-cannot-extend-the-closed-architecture-design.md
 @@ -0,0 +1,31 @@
@@ -11,7 +11,7 @@ index 0000000000000000000000000000000000000000..72d5b02449f20a4aa1e7e7dd9cf6ae0f
 +owner: pipeline
 +status: open
 +created: 2026-11-11
-+source: Consumer session finding K-13 (a consumer project's second epic); confirmed against the source 2026-11-11, not executed
++source: Consumer session finding K-13 for a second epic; confirmed against the source and not executed
 +sprint: alfred
 +done_when: manual
 +---
