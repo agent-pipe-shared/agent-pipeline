@@ -1,0 +1,34 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 9ef09ef3ccf8f2c16b97fa91e92c3b789dd6659e..1d467b129cca6c34e0c8b60d047094152264f262 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -569,6 +569,7 @@
+         "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
+         "verify-phase:harness/scripts/verify.mjs:handover-rotation-tests",
+         "verify-phase:harness/scripts/verify.mjs:hardened-private-directory-tests",
++        "verify-phase:harness/scripts/verify.mjs:held-git-author-tests",
+         "verify-phase:harness/scripts/verify.mjs:harness-lib-plan-spec-state-v2-tests",
+         "verify-phase:harness/scripts/verify.mjs:hook-governance-scope-tests",
+         "verify-phase:harness/scripts/verify.mjs:hook-refresh-detection-tests",
+@@ -1042,6 +1043,7 @@
+         "verify-phase:harness/scripts/verify.mjs:record-only-paths-tests",
+         "verify-phase:harness/scripts/verify.mjs:recovery-bridge-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
++        "verify-phase:harness/scripts/verify.mjs:recursive-delete-policy-tests",
+         "verify-phase:harness/scripts/verify.mjs:reference-catalog-tests",
+         "verify-phase:harness/scripts/verify.mjs:reference-catalog-views-tests",
+         "verify-phase:harness/scripts/verify.mjs:reference-path-check",
+diff --git a/harness/scripts/verify.mjs b/harness/scripts/verify.mjs
+index f166eb9a73c5f8e6ba4267c9c7384517f3834fd9..cb61f13e9291913648d6cce22387feb02bcba090 100644
+--- a/harness/scripts/verify.mjs
++++ b/harness/scripts/verify.mjs
+@@ -839,6 +839,9 @@ const TEST_SUITES = [
+   // Landed after both merge sides diverged (commit ab347a74); registered here per PHX-VERIFY 1b.
+   { name: "pipeline-start-preflight-antigravity-hard-enforcement-tests", file: join(pluginScriptsDir, "pipeline-start-preflight-antigravity-hard-enforcement.test.mjs") },
+   { name: "guard-dispatch-budget-tests", file: join(hooksDir, "guard-dispatch-budget.test.mjs") },
++  // Candidate 28: the recursive delete rule (18-cd619050b) and the answered Git author (19-3299ba547) landed without a Verify entry.
++  { name: "recursive-delete-policy-tests", file: join(hooksDir, "recursive-delete-policy.test.mjs") },
++  { name: "held-git-author-tests", file: join(libDir, "held-git-author.test.mjs") },
+   { name: "dispatch-budget-binding-tests", file: join(libDir, "dispatch-budget-binding.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `DBB${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+   { name: "wire-dispatch-budget-hook-tests", file: join(repoRoot, "harness", "scripts", "wire-dispatch-budget-hook.test.mjs") },
+   { name: "pipeline-user-v3-drift-tests", file: join(libDir, "pipeline-user-v3-drift.test.mjs") },

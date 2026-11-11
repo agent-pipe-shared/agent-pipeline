@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28: 43 held patches exported from the build clone chain c9f50c10c..a795c822e
+# PO apply script for candidate 28: 44 held patches exported from the build clone chain c9f50c10c..946dd2ea2
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -57,6 +57,7 @@ step 40-7f39c7ab1 'feat(close): route a declined acceptance back into a correcti
 step 41-2b418bede 'feat(security): widen the default rule pack and report scans honestly'
 step 42-ae025902f 'feat(critic): size parts to the budget and keep reviews to their sources'
 step 43-a795c822e 'feat(host-commit): warn on commits into a running Goldfish'"'"'s scope and recover idempotently'
+step 44-946dd2ea2 'test(verify): register the recursive delete and Git author suites'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
