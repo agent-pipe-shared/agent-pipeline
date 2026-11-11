@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28b: 24 held patches exported from the build clone chain 946dd2ea2..fc36ab5b7
+# PO apply script for candidate 28b: 25 held patches exported from the build clone chain 946dd2ea2..b3d90fa5f
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -38,6 +38,7 @@ step 21-99fb5af20 'fix(security): assemble the secret-shaped fixture values of t
 step 22-8cf9d3ab8 'feat(security): exempt held-patch evidence copies from four fixture rules and prove the exemption stays path-scoped'
 step 23-b1d52938e 'test(security): restate the scanner config pin for the held-patch exemption'
 step 24-fc36ab5b7 'fix(verify): declare the two missing case ids of the quoted pipeline reads suite through the case completion augmentation'
+step 25-b3d90fa5f 'docs(architecture): cover the public contract changes since the last map pass in the concept maps'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
