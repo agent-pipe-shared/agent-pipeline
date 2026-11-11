@@ -1,0 +1,15 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 1690761fd9e6d8ae13076018c14cee64ccd93862..5d6eefa440fec7fbfd09abcf762cfdc7316e9488 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4197,7 +4197,9 @@
+           "G23Q002",
+           "G23Q003",
+           "G23Q004",
+-          "G23Q005"
++          "G23Q005",
++          "G23Q006",
++          "G23Q007"
+         ],
+         "maxBytes": 65536
+       }
