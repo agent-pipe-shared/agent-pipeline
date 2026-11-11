@@ -1,0 +1,105 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index cbb8e17cc9ffb62fdc6696a6d31db8c49bd2bb6f..bc035168091a62d7960449ad0210c21f1eea7a84 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -4448,6 +4448,12 @@ test("NVA-V4-PUSHDRIVER: push-init.mjs is admitted in exactly its own argv shape
+       admit(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main' --base 'HEAD~5'`);
+       // Flag-order-insensitive, same discipline as DRIVER_SCRIPT's own admit() pairs above.
+       admit(`node '${PUSH_INIT_SCRIPT}' --destination 'refs/heads/main' --by 'tester' --root '${path}' --remote 'origin'`);
++      // C28 (onboarding questions): the transport answer is one pair; the kind is closed, configured-default takes no reference.
++      const pushBase = `node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main'`;
++      admit(`${pushBase} --transport-kind 'ssh-key' --transport-reference '~/keys/push_ed25519'`);
++      admit(`${pushBase} --transport-kind 'credential-helper' --transport-reference 'store'`);
++      admit(`${pushBase} --transport-kind 'configured-default'`);
++      admit(`${pushBase} --base 'HEAD~2' --transport-reference 'a b' --transport-kind 'ssh-key'`);
+ 
+       // Near misses: no argv, wrong root, an empty/flag-shaped value, an unsafe --remote, a
+       // --destination outside refs/heads/*, a flag push-init.mjs's own parseArgs() does not
+@@ -4460,6 +4466,16 @@ test("NVA-V4-PUSHDRIVER: push-init.mjs is admitted in exactly its own argv shape
+       refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'main'`);
+       refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main' --step-cap 5`);
+       refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main'`);
++      refuse(`${pushBase} --transport-kind 'ssh-key'`);
++      refuse(`${pushBase} --transport-kind 'credential-helper'`);
++      refuse(`${pushBase} --transport-kind 'configured-default' --transport-reference 'x'`);
++      refuse(`${pushBase} --transport-reference 'x'`);
++      refuse(`${pushBase} --transport-kind 'agent-forward' --transport-reference 'x'`);
++      refuse(`${pushBase} --transport-kind 'ssh-key' --transport-reference '--root'`);
++      refuse(`${pushBase} --transport-kind 'ssh-key' --transport-reference '$(id)'`);
++      refuse(`${pushBase} --transport-kind 'ssh-key' --transport-reference 'a;b'`);
++      refuse(`${pushBase} --transport-kind 'ssh-key' --transport-reference '${"x".repeat(301)}'`);
++      refuse(`${pushBase} --transport-kind 'ssh-key' --transport-kind 'ssh-key' --transport-reference 'x'`);
+ 
+       refuse("touch output.txt");
+     }
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index ed991f57899faaf6b6bd80bd9f1cacc31f51c2d4..4d3aeb93ee2519f0fc51c2fd797b51e3560a4182 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -337,6 +337,14 @@ const CREATE_ADR_TITLE = (value) => typeof value === "string" && value.length >
+   && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value);
+ function sanctionedCreateAdrArgs(args, root) {
+   const rooted = { "--root": (value) => value === root, "--slug": (value) => CREATE_ADR_SLUG.test(value) };
++  // C28 (plan gates): `--discard --reason "<why>"` writes ONE record under docs/adr/discarded/ and leaves the draft as history. Exactly --root,
++  // --slug, --discard and a one-line reason of 1 to 300 characters; it never mixes with --refresh or any title/scope flag.
++  if (args.includes("--discard")) {
++    return !args.includes("--refresh") && matchFlagSpec(args, {
++      required: { "--discard": true },
++      requiredValue: { ...rooted, "--reason": (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value) },
++    });
++  }
+   if (args.includes("--refresh") && !args.includes("--slug")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: { "--root": rooted["--root"] } });
+   if (args.includes("--refresh")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: rooted });
+   return matchFlagSpec(args, {
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index 2927ffadbeac56c279bf1c229d96bded75d56cfa..b53c836f9049e4c36f30291a764069f52798d7a5 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -167,11 +167,21 @@ export function sanctionedPushInitArgs(args, root) {
+       "--base": nonEmptyNotFlagValue,
+       "--candidate": nonEmptyNotFlagValue,
+       "--record-ref": nonEmptyNotFlagValue,
++      // C28 (onboarding questions): the push transport answer, asked once and remembered locally. The kind is the script's closed set; the
++      // reference is a key path or a helper name, one line of printable characters, never a flag, and no shell metacharacter or quote.
++      "--transport-kind": (value) => ["ssh-key", "credential-helper", "configured-default"].includes(value),
++      "--transport-reference": (value) => nonEmptyNotFlagValue(value) && value.length <= 300 && /^[A-Za-z0-9._\/~:@+=,-][A-Za-z0-9._\/~:@+=, -]*$/u.test(value),
+     },
+   });
+   // push-init.mjs usage: [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]]. Its parseArgs() accepts each flag, and
+   // buildPushInitArgv() emits all of them; the two modes never combine, so the guard admits no mix either.
+-  return matched && !(args.includes("--checkpoint") && ["--base", "--candidate", "--record-ref"].some((flag) => args.includes(flag)));
++  if (!matched || (args.includes("--checkpoint") && ["--base", "--candidate", "--record-ref"].some((flag) => args.includes(flag)))) return false;
++  // The transport answer is one pair or nothing, as the script's own parseArgs() requires: a reference needs a kind other than
++  // configured-default, and configured-default takes no reference.
++  const kindIndex = args.indexOf("--transport-kind");
++  const hasReference = args.includes("--transport-reference");
++  if (kindIndex === -1) return !hasReference;
++  return (args[kindIndex + 1] === "configured-default") !== hasReference;
+ }
+ 
+ export function sanctionedTranscriptRecoveryArgs(args, root) {
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 46c0c885f197fdd2afe9c7b536ce9c6cada9cdaf..37e80a57b0fcdb9c1d16b60bc2bce273acbfbd8e 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -657,7 +657,20 @@ test("C20 w253 create-adr: the create and refresh shapes are admitted, every nea
+     bothAdmit(make("--date", "2026-11-07", "--title", "T", "--slug", "s"), f, "flag order is free");
+     bothAdmit(make("--slug", "storage-adapter", "--refresh"), f, "refresh");
+     bothAdmit(make("--refresh"), f, "refresh of every draft");
++    // C28 (plan gates): the discard shape is exactly --root, --slug, --discard and one reason line of 1 to 300 characters, in any order.
++    bothAdmit(make("--slug", "storage-adapter", "--discard", "--reason", "The PO chose a different storage design"), f, "discard with a reason");
++    bothAdmit(make("--reason", "Superseded", "--discard", "--slug", "storage-adapter"), f, "discard, flag order is free");
+     for (const [label, action] of [
++      ["discard without a reason", make("--slug", "s", "--discard")],
++      ["discard with an empty reason", make("--slug", "s", "--discard", "--reason", "")],
++      ["discard with a multi-line reason", make("--slug", "s", "--discard", "--reason", "a\nb")],
++      ["discard with an overlong reason", make("--slug", "s", "--discard", "--reason", "x".repeat(301))],
++      ["discard with a padded reason", make("--slug", "s", "--discard", "--reason", " why")],
++      ["discard without a slug", make("--discard", "--reason", "why")],
++      ["discard with a title", make("--slug", "s", "--discard", "--reason", "why", "--title", "T")],
++      ["discard with refresh", make("--slug", "s", "--discard", "--refresh", "--reason", "why")],
++      ["discard of a foreign root", scriptAction(script, "--root", join(f.root, ".."), "--slug", "s", "--discard", "--reason", "why")],
++      ["reason without discard", make("--slug", "s", "--title", "T", "--reason", "why")],
+       ["refresh of a foreign root", scriptAction(script, "--root", join(f.root, ".."), "--refresh")],
+       ["foreign root", scriptAction(script, "--root", join(f.root, ".."), "--slug", "s", "--title", "T")],
+       ["relative root", scriptAction(script, "--root", ".", "--slug", "s", "--title", "T")],

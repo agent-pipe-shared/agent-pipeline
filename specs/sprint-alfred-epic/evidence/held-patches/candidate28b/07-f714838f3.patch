@@ -1,0 +1,65 @@
+diff --git a/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs b/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
+index 4db6360dbdf33729dc9fceca2b4e7fbd395db24d..2a1459bbbb9e7b048be32598f8cea269628f46ec 100644
+--- a/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
++++ b/plugins/pipeline-core/lib/feature-close-audit-preflight.mjs
+@@ -44,7 +44,8 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
+       return blocked("FCA-PACKAGE", `Complete and reconcile the exact feature package, Result and candidate evidence before snapshot planning. Observed: ${why}.`);
+     }
+     const git = args => {
+-      const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10000 });
++      // C28: `ls-tree -r` of a feature directory is far above the 1 MiB default buffer once the evidence has grown; a failed call returned null and the audit index was silently left out.
++      const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10000, maxBuffer: 64 * 1024 * 1024 });
+       return result.status === 0 ? result.stdout.trim() : null;
+     };
+     if (git(["rev-parse", "HEAD"]) !== candidate.commit || git(["rev-parse", "HEAD^{tree}"]) !== candidate.tree) return blocked("FCA-CANDIDATE-CHANGED", "Requalify the actual current candidate and re-plan; never relabel historical evidence.");
+diff --git a/plugins/pipeline-core/scripts/check-evidence-drift.test.mjs b/plugins/pipeline-core/scripts/check-evidence-drift.test.mjs
+index ca4c9c2b323fc5880a4329e81d9cb6e6c7962297..a782d80a36e95896f324245082e3538087539cb7 100644
+--- a/plugins/pipeline-core/scripts/check-evidence-drift.test.mjs
++++ b/plugins/pipeline-core/scripts/check-evidence-drift.test.mjs
+@@ -485,6 +485,27 @@ test("AUTHORITY-WORKTREE-HEAD-DIVERGENCE emitted when worktree and HEAD diverge"
+   assert.ok(missingInWorktree, "old PRD must be reported as missing in worktree");
+ });
+ 
++// C28: a feature directory that holds its evidence outgrew the 1 MiB default buffer of the recursive HEAD listing (9308 files, 1.06 MB in this repository):
++// the call failed, HEAD counted no PRD and the check answered "PRD cardinality in HEAD is 0", which stopped every dispatch with CVCT-AUTHORITY-STALE.
++test("the PRD cardinality in HEAD does not depend on how much evidence the feature directory holds", () => {
++  const root = setupGitRepo("cardinality-large-feature");
++  const featureDir = "specs/feat-big";
++  const planPath = `${featureDir}/prd_feat-big.md`;
++  mkdirSync(join(root, featureDir, "evidence"), { recursive: true });
++  writeFileSync(join(root, planPath), "# PRD\n");
++  writeFileSync(join(root, `${featureDir}/spec.md`), "# Spec\n");
++  const longName = "e".repeat(200);
++  for (let index = 0; index < 4800; index += 1) writeFileSync(join(root, featureDir, "evidence", `${longName}-${String(index).padStart(5, "0")}.json`), "{}\n");
++  writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "feat-big", planPath, phase: "design" }, planApproved: false, updatedAt: "2026-11-11T06:00:00.000Z" }, null, 2) + "\n");
++  commitAll(root, "Commit a feature with a large evidence tree");
++  const listing = spawnSync("git", ["ls-tree", "-r", "--name-only", "HEAD", featureDir], { cwd: root, encoding: "utf8" });
++  assert.equal(listing.error?.code, "ENOBUFS", "the fixture must be large enough to have broken the recursive listing with the default buffer");
++  const check = checkPoGateAuthority({ repoRoot: root });
++  assert.equal(check.prdCardinality.head.count, 1);
++  assert.equal(check.prdCardinality.head.ok, true);
++  assert.deepEqual(check.divergences.filter((d) => d.divergence === "prd-cardinality-divergence"), []);
++});
++
+ test("check-evidence-drift CLI inspects and reports drift across closedFeatures", () => {
+   const root = setupGitRepo("cli-test");
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index cad213857f16d4611ab6de0d71a7346a5f9e8a45..9ffd39a99a09564cd9318c103b6fd0654d898de2 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11615,9 +11615,13 @@ export function checkPoGateAuthority(request = {}, deps = {}) {
+       };
+ 
+       let headPrds = [];
+-      const gitLs = spawn("git", ["ls-tree", "-r", "--name-only", "HEAD", featureDir], {
++      // C28: the PRD sits directly in the feature directory, exactly as the worktree read above takes it, so only the direct entries are listed.
++      // A recursive list of a feature directory that holds its evidence (thousands of files after a few candidates) outgrew the 1 MiB default
++      // buffer of spawnSync: the call failed with ENOBUFS, HEAD counted no PRD and every dispatch and close stopped with CVCT-AUTHORITY-STALE.
++      const gitLs = spawn("git", ["ls-tree", "--name-only", "HEAD", `${featureDir}/`], {
+         cwd: dir,
+         encoding: "utf8",
++        maxBuffer: 16 * 1024 * 1024,
+       });
+       if (gitLs.status === 0 && typeof gitLs.stdout === "string") {
+         const lines = gitLs.stdout.split("\n").map((l) => l.trim()).filter(Boolean);

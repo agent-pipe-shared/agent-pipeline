@@ -1,0 +1,660 @@
+diff --git a/plugins/pipeline-core/hooks/post-compact-reground.mjs b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+index 0735fbc1144f467d23c63132f24474e8c44a64ca..f587a02bcb7e416fc258f665dbbebcce57655a3f 100644
+--- a/plugins/pipeline-core/hooks/post-compact-reground.mjs
++++ b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+@@ -7,6 +7,7 @@ import { join } from "node:path";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import {
+   continuityDispatchAllowed,
++  queueHeadLag,
+   validateContinuityState,
+ } from "../lib/continuity-state.mjs";
+ import { buildContinuationLine } from "../lib/interaction-continuity.mjs";
+@@ -249,6 +250,8 @@ export function resolveRegroundProjection(state, input = null, { rootDir = null
+   const code = continuity.decisionTxn !== null
+     ? "PCR-DECISION-PENDING"
+     : continuity.blocker !== null ? "PCR-BLOCKED" : "PCR-READY";
++  // C28: a head that names a planning entry after the feature left design is printed as lagging, and is not offered as the next action.
++  const lag = queueHeadLag(continuity, phase);
+   return {
+     code,
+     workResumptionAllowed: code === "PCR-READY",
+@@ -258,8 +261,9 @@ export function resolveRegroundProjection(state, input = null, { rootDir = null
+     runtime: structuredClone(continuity.runtime),
+     authority: structuredClone(continuity.authority),
+     queueHead: structuredClone(continuity.queueHead),
++    queueHeadStatus: lag ?? { status: "current" },
+     blocker: structuredClone(continuity.blocker),
+-    nextAction: continuity.queueHead?.nextAction ?? null,
++    nextAction: lag === null ? continuity.queueHead?.nextAction ?? null : null,
+     resume: structuredClone(continuity.resume),
+     dispatchEligibility: { allowed: dispatch.allowed, code: dispatch.code, scope: "continuity-only" },
+     decisionTxn: structuredClone(continuity.decisionTxn),
+@@ -296,14 +300,20 @@ export function buildRegroundMessage(stateOrProjection, { stateNarrative = null
+     ? stateOrProjection
+     : resolveRegroundProjection(stateOrProjection);
+   const canonical = JSON.stringify(projection);
+-  const continuation = projection.workResumptionAllowed
+-    ? buildContinuationLine({
+-      featureId: projection.featureId,
+-      phase: projection.phase,
+-      queueRevision: projection.revision,
+-      nextAction: projection.nextAction,
+-    })
+-    : null;
++  const lagging = projection.queueHeadStatus?.status === "lagging" ? projection.queueHeadStatus : null;
++  const language0 = projection.runtime?.humanFacingLanguage ?? "en";
++  const continuation = lagging !== null
++    ? `QUEUE-HEAD-LAGGING feature=${JSON.stringify(projection.featureId)} phase=${JSON.stringify(projection.phase)} head=${JSON.stringify(`${lagging.packageId}/${lagging.actionId}`)} · ${language0 === "de"
++      ? "Dieser Queue-Kopf ist ein Planungseintrag, der nach dem Design nie weitergesetzt wurde: er ist nicht die nächste Aktion. Nimm die nächste Aktion aus docs/state.md und aus pipeline-state.mjs inspect."
++      : "This queue head is a planning entry that was never advanced after design: it is not the next action. Take the next action from docs/state.md and from pipeline-state.mjs inspect."}`
++    : projection.workResumptionAllowed
++      ? buildContinuationLine({
++        featureId: projection.featureId,
++        phase: projection.phase,
++        queueRevision: projection.revision,
++        nextAction: projection.nextAction,
++      })
++      : null;
+   if (!projection.workResumptionAllowed && projection.runtime === null) {
+     return `POST_COMPACT_REGROUND ${canonical}`;
+   }
+diff --git a/plugins/pipeline-core/hooks/post-compact-reground.test.mjs b/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
+index e9d1dcd2fa4d7fce3cce234148a3166f01d61761..0c293449197678f1e39dd363c1f5eedc70c1cbb7 100644
+--- a/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
++++ b/plugins/pipeline-core/hooks/post-compact-reground.test.mjs
+@@ -172,6 +172,32 @@ check("German runtime renders German without an inferred language", () => {
+   assert.doesNotMatch(message, /Active duty|Validated continuity/);
+ });
+ 
++// C28 (AC-108, WSL run): the compact projection printed the planning entry initial-planning/review-goal as the next action while the feature was in implementation.
++check("a queue head that still names a planning entry is labelled as lagging, never presented as the next action", () => {
++  const stale = { packageId: "initial-planning", actionId: "review-goal", nextAction: "review" };
++  const projection = resolveRegroundProjection(outer({ queueHead: queueHead(stale) }));
++  assert.equal(projection.code, "PCR-READY");
++  assert.deepEqual(projection.queueHeadStatus, { status: "lagging", packageId: "initial-planning", actionId: "review-goal", phase: "implementation" });
++  assert.equal(projection.nextAction, null, "a lagging head is not the next action");
++  const message = buildRegroundMessage(projection);
++  assert.doesNotMatch(message, /CONTINUATION feature=.*nextAction="review"/);
++  assert.match(message, /QUEUE-HEAD-LAGGING feature="phase26-test" phase="implementation" head="initial-planning\/review-goal"/);
++  assert.match(message, /not the next action/);
++  const german = buildRegroundMessage(resolveRegroundProjection(outer({ runtime: { humanFacingLanguage: "de", activeDuty: "Koordinator", sessionCleanup: null }, queueHead: queueHead(stale) })));
++  assert.match(german, /QUEUE-HEAD-LAGGING/);
++  assert.match(german, /nicht die nächste Aktion/);
++});
++
++check("a current queue head, and a planning head while the feature is still in design, keep the continuation line", () => {
++  const current = resolveRegroundProjection(outer());
++  assert.deepEqual(current.queueHeadStatus, { status: "current" });
++  assert.match(buildRegroundMessage(current), /CONTINUATION feature="phase26-test" phase="implementation" queueRevision=4 nextAction="dispatch"/);
++  const design = resolveRegroundProjection(outer({ queueHead: queueHead({ packageId: "initial-planning", actionId: "review-goal", nextAction: "review" }) }, { activeFeature: { id: FEATURE, planPath: "specs/prd.md", phase: "design" } }));
++  assert.deepEqual(design.queueHeadStatus, { status: "current" });
++  assert.equal(design.nextAction, "review");
++  assert.match(buildRegroundMessage(design), /nextAction="review"/);
++});
++
+ check("extractLiveStateNarrative finds the top-of-file-to-heading boundary", () => {
+   const withHeading = "# Title\n\nLive paragraph one.\n\nLive paragraph two.\n\n## Archived history\n\n| Date | Summary |\n|---|---|\n";
+   const extracted = extractLiveStateNarrative(withHeading);
+diff --git a/plugins/pipeline-core/lib/audit-bundle.mjs b/plugins/pipeline-core/lib/audit-bundle.mjs
+index 3e892332b71b6618a65bb5f1f7973c78f3bea65b..a5055c37399e2d2b052f70ea14de04622117078e 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.mjs
+@@ -4,6 +4,7 @@ import { createHash, verify as cryptoVerify } from "node:crypto";
+ import { readFileSync, readdirSync } from "node:fs";
+ import { copyFile, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+ import { isAbsolute, join, relative, resolve, sep } from "node:path";
++import { denyPrivateAbsolutePaths } from "./dispatch-record.mjs";
+ import { canonicalSha256, canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
+ import { validateFeaturePackage } from "./feature-package-topology.mjs";
+ import { resolveEffectiveOrganizationPolicy } from "./organization-policy.mjs";
+@@ -18,10 +19,13 @@ function evidenceSection(manifest) {
+   if (!Object.hasOwn(manifest, "evidence")) return "";
+   const line = (entry) => `- ${entry.item}: ${entry.status}${entry.code ? ` (${entry.code})` : ""}${entry.bundlePath ? ` at \`${entry.bundlePath}\`` : ""}`;
+   // C22 (CGR-12): the Critic round reports are their own section; a round without a report names what is missing instead of being left out.
+-  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:")); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
++  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:") && entry.item !== "dispatch-projection"); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
++  // C28: the dispatch projection is its own section, printed after the reports.
++  const projections = manifest.evidence.items.filter((entry) => entry.item === "dispatch-projection");
++  const projectionText = projections.length === 0 ? "" : `\n## Dispatch projection\n\nThe tracked, redacted projection of the feature's dispatches: each briefing's text with its digest and each completed dispatch record. \`redacted\` means an absolute host path was masked (the digest of the original bytes is kept next to the digest of the text carried); a \`gap\` names why a text is not carried (a typed gap with the original digest, never an omission). A private key or secret-shaped value is never copied.\n\n${projections.map(line).join("\n")}\n`;
+   const approvalText = approval.length === 0 ? "" : `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${approval.map(line).join("\n")}\n`;
+   const reportText = reports.length === 0 ? "" : `\n## Critic round reports\n\nOne entry per Critic round of the feature. \`REPORT-NOT-EXPORTED\` means the round's report was never exported into the repository's tracked evidence (it lived outside the tracked tree), and \`UNREADABLE\` that the named file was missing or empty at the close: the report is NOT part of this bundle.\n\n${reports.map(line).join("\n")}\n`;
+-  return `${approvalText}${reportText}`;
++  return `${approvalText}${reportText}${projectionText}`;
+ }
+ // C22B (CGR-13): printed prose only, from a build input that is NOT a manifest field (the manifest and its keys are hashed by the verifier and the bindings).
+ // The README digest is recorded in the manifest at build time, so the extra text is bound like the rest of the README.
+@@ -190,8 +194,19 @@ function followUpFindings(root, manifest) {
+   return findings;
+ }
+ function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
+-const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report"]);
+-const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report" });
++const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection"]);
++const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection" });
++// C28: the projection the close writes (lib/durable-evidence.mjs `projectCloseDispatches`). The verifier re-checks it offline: every carried text hashes to the digest it names, nothing is a gap with a text,
++// and no absolute host path or private key is anywhere in the file, so a producer that skipped the redaction is found even when the artifact digest is consistent with the manifest.
++const DISPATCH_PROJECTION_SCHEMA = "pipeline.close-dispatch-projection.v1"; const BRIEFING_STATUSES = new Set(["carried", "redacted", "gap"]);
++function dispatchProjectionHolds(bytes) {
++  const value = jsonOrNull(bytes);
++  if (value === null || typeof value !== "object" || value.schema !== DISPATCH_PROJECTION_SCHEMA || !Array.isArray(value.dispatches) || !Array.isArray(value.gaps)) return false;
++  try { denyPrivateAbsolutePaths(value, "projection"); } catch { return false; }
++  if (/PRIVATE KEY/u.test(bytes.toString("utf8"))) return false;
++  return value.dispatches.every((entry) => entry !== null && typeof entry === "object" && typeof entry.taskId === "string" && entry.record !== null && typeof entry.record === "object" && entry.briefing !== null && typeof entry.briefing === "object"
++    && BRIEFING_STATUSES.has(entry.briefing.status) && (entry.briefing.status === "gap" ? entry.briefing.text === null && entry.briefing.textSha256 === null : typeof entry.briefing.text === "string" && entry.briefing.textSha256 === digest(Buffer.from(entry.briefing.text, "utf8"))));
++}
+ const TRACE_SCHEMA = "pipeline.human-approval-trace.v1"; const TRACE_STATUSES = new Set(["traced", "attribution-only", "untraceable"]);
+ const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
+ function evidenceShape(value) {
+@@ -218,7 +233,7 @@ const sameCandidate = (value, candidate) => value !== null && typeof value === "
+  */
+ function collectEvidence(root, candidate, evidence, firstIndex) {
+   if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) fail("AB-EVIDENCE-INPUT");
+-  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports"]);
++  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath"]);
+   if (Object.keys(evidence).some((key) => !known.has(key)) || (evidence.proofPaths !== undefined && (!Array.isArray(evidence.proofPaths) || evidence.proofPaths.length > 16))) fail("AB-EVIDENCE-INPUT");
+   // C22 (CGR-12): one entry per Critic round of the feature; a null path is a round whose report was never exported.
+   const reports = evidence.criticReports;
+@@ -229,7 +244,9 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
+   const gap = (item, code) => items.push({ item, status: "gap", code, bundlePath: null });
+   let traceBundlePath = null;
+   // Only reports named (the close's own request): no approval item is invented, so a gap there is not a claim this request made.
+-  if (approvalNamed || reports === undefined) {
++  // C28: a request that names only the dispatch projection (the close's own) invents no approval item either.
++  if (evidence.dispatchProjectionPath !== undefined && typeof evidence.dispatchProjectionPath !== "string") fail("AB-EVIDENCE-INPUT");
++  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined)) {
+   if (evidence.traceReportPath === undefined) gap("approval-trace", "NOT-REFERENCED");
+   else {
+     const file = readEvidenceFile(root, evidence.traceReportPath); const report = file && jsonOrNull(file.bytes);
+@@ -273,6 +290,11 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
+     if (file === null || file.bytes.length === 0) gap(item, "UNREADABLE");
+     else items.push({ item, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.critic, entry.path, file.sha256) });
+   }
++  if (evidence.dispatchProjectionPath !== undefined) {
++    const file = readEvidenceFile(root, evidence.dispatchProjectionPath);
++    if (file === null || file.bytes.length === 0) gap("dispatch-projection", "UNREADABLE");
++    else items.push({ item: "dispatch-projection", status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.dispatch, evidence.dispatchProjectionPath, file.sha256) });
++  }
+   return { artifacts, evidence: Object.freeze({ schema: "pipeline.audit-bundle-evidence.v1", candidateBound: true, traceStatus, items: Object.freeze(items.map((entry) => Object.freeze(entry))) }) };
+ }
+ 
+@@ -330,6 +352,10 @@ function evidenceFindings(root, manifest) {
+   const findings = []; const listed = new Set(Array.isArray(manifest.artifacts) ? manifest.artifacts.filter((entry) => entry !== null && typeof entry === "object").map((entry) => entry.path) : []);
+   for (const item of manifest.evidence.items) {
+     if (item.bundlePath !== null && !listed.has(item.bundlePath)) { findings.push(`AB-EVIDENCE-ITEM ${item.item}`); continue; }
++    if (item.item === "dispatch-projection" && item.bundlePath !== null) {
++      let bytes = null; try { bytes = readFileSync(join(root, item.bundlePath)); } catch { bytes = null; }
++      if (bytes === null || !dispatchProjectionHolds(bytes)) findings.push("AB-DISPATCH-PROJECTION");
++    }
+     if (item.item === "approval-trace" && item.bundlePath !== null) {
+       let report = null; try { report = parseStrictJson(readFileSync(join(root, item.bundlePath))); } catch { report = null; }
+       if (report?.schema !== TRACE_SCHEMA || !sameCandidate(report.candidate, manifest.candidate ?? {}) || report.status !== manifest.evidence.traceStatus) findings.push("AB-EVIDENCE-TRACE-CANDIDATE");
+diff --git a/plugins/pipeline-core/lib/audit-bundle.test.mjs b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+index 169fda04e3bbf19a7a1cc192a6b7f049dab35bac..e07dc880a1e19eb0dafc3181ce826dc771ca4afe 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.test.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+@@ -8,6 +8,8 @@ import { join } from "node:path";
+ import test from "node:test";
+ import { buildAuditBundle, evidenceIndexFromLsTree, planAuditBundle,planAuditBundleSignature, signAuditBundle, verifyAuditBundle, verifyAuditBundleSignature } from "./audit-bundle.mjs";
+ import { canonicalSha256 } from "./governance-event.mjs";
++import { closeDispatchProjectionBytes, projectCloseDispatches } from "./durable-evidence.mjs";
++import { denyPrivateAbsolutePaths } from "./dispatch-record.mjs";
+ import { planVerifySelection } from "./verify-selection.mjs";
+ 
+ const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+@@ -224,6 +226,64 @@ test("C22 CGR-12 the bundle carries every Critic round report, names a round wit
+   assert.ok((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).findings.some((finding) => finding.startsWith("AB-DIGEST")));
+   assert.throws(() => planWith(fixture(), { evidence: { criticReports: [{ packetId: "../x", path: null }] } }), (error) => error.code === "AB-EVIDENCE-INPUT");
+ });
++// C28 (AC-108, WSL run): briefings, dispatch records and the security result stayed untracked, so the tracked bundle could not show them. What already existed: the signed proofs, the
++// final Verify and Security records (follow-up lists under proofs/) and the Critic reports. The gap built here: each dispatch briefing's text with its digest and the dispatch records,
++// redacted, as ONE bundle artifact (one evidence item, so no item limit is reachable), written by the close before the audit request.
++const sha = (value) => createHash("sha256").update(value).digest("hex");
++function dispatchRecord(taskId, extra = {}) {
++  return { record: { taskId, schema: "pipeline.dispatch-record.v4", runner: "claude", agentType: "goldfish-deep", model: "claude-sonnet-5-5", effort: "high", rulesetSha: "r".repeat(64), dispatcher: "elephant", candidateCommit: "a".repeat(40), commits: [], outcome: "succeeded", outcomeClassification: { kind: "authored-commit" }, resultSha256: null, report: { changedFiles: ["plugins/pipeline-core/lib/x.mjs"] }, ...extra } };
++}
++const FEATURE_ID = "release-evidence";
++test("C28 the projection carries each briefing text with its digest, redacts what must not travel, and names every gap per dispatch", () => {
++  const plain = "## Briefing\nTouch only plugins/pipeline-core/lib/x.mjs.\n"; const pathy = "Read /home/someone/src/repo/file.md and C:\\Users\\someone\\x.txt first.\n"; const secret = `token ghp_${"A".repeat(30)} here\n`;
++  const briefings = new Map([
++    ["D-PLAIN", [{ sha256: sha(plain), path: "scratch/a.md", text: plain, itemId: `${FEATURE_ID}.one` }]],
++    ["D-PATH", [{ sha256: sha(pathy), path: "scratch/b.md", text: pathy, itemId: null }]],
++    ["D-SECRET", [{ sha256: sha(secret), path: "scratch/c.md", text: secret, itemId: null }]],
++    ["D-OTHER", [{ sha256: sha("o"), path: "scratch/d.md", text: "o", itemId: "another-feature.item" }]],
++  ]);
++  const records = [dispatchRecord("D-PLAIN"), dispatchRecord("D-PATH"), dispatchRecord("D-SECRET"), dispatchRecord("D-OTHER"), dispatchRecord("D-ATTESTED", { attestation: { briefingSha256: "9".repeat(64) } }), dispatchRecord("D-NONE")];
++  const projection = projectCloseDispatches({ featureId: FEATURE_ID, records, briefings });
++  const by = Object.fromEntries(projection.dispatches.map((entry) => [entry.taskId, entry]));
++  assert.deepEqual(Object.keys(by).sort(), ["D-ATTESTED", "D-NONE", "D-PATH", "D-PLAIN", "D-SECRET"], "a dispatch whose briefing names another feature's item is not this feature's");
++  assert.deepEqual({ status: by["D-PLAIN"].briefing.status, text: by["D-PLAIN"].briefing.text, sourceSha256: by["D-PLAIN"].briefing.sourceSha256, textSha256: by["D-PLAIN"].briefing.textSha256 }, { status: "carried", text: plain, sourceSha256: sha(plain), textSha256: sha(plain) });
++  const masked = by["D-PATH"].briefing;
++  assert.equal(masked.status, "redacted"); assert.equal(masked.sourceSha256, sha(pathy), "the digest of the original bytes is kept"); assert.equal(masked.textSha256, sha(masked.text), "the digest of what is carried is its own");
++  assert.notEqual(masked.sourceSha256, masked.textSha256); assert.doesNotMatch(masked.text, /home\/someone|Users/u); assert.match(masked.text, /<host-path>/u);
++  assert.deepEqual({ status: by["D-SECRET"].briefing.status, code: by["D-SECRET"].briefing.code, text: by["D-SECRET"].briefing.text, sourceSha256: by["D-SECRET"].briefing.sourceSha256 }, { status: "gap", code: "BRIEFING-CREDENTIAL-SHAPE", text: null, sourceSha256: sha(secret) });
++  assert.deepEqual({ status: by["D-ATTESTED"].briefing.status, code: by["D-ATTESTED"].briefing.code, sourceSha256: by["D-ATTESTED"].briefing.sourceSha256 }, { status: "gap", code: "BRIEFING-TEXT-UNAVAILABLE", sourceSha256: "9".repeat(64) });
++  assert.deepEqual({ status: by["D-NONE"].briefing.status, code: by["D-NONE"].briefing.code }, { status: "gap", code: "BRIEFING-NOT-FOUND" });
++  assert.doesNotThrow(() => denyPrivateAbsolutePaths(projection, "projection"), "no absolute host path is anywhere in the projection");
++  assert.ok(!JSON.stringify(projection).includes("ghp_"), "no secret-shaped value is anywhere in the projection");
++  assert.equal(by["D-PLAIN"].record.taskId, "D-PLAIN"); assert.equal(by["D-PLAIN"].record.outcome, "succeeded");
++  const many = projectCloseDispatches({ featureId: FEATURE_ID, records: Array.from({ length: 250 }, (_, index) => dispatchRecord(`D-${String(index).padStart(3, "0")}`)), briefings: new Map() });
++  assert.equal(many.dispatches.length, 200); assert.ok(many.gaps.some((gap) => gap.code === "DISPATCH-LIST-TRUNCATED" && gap.count === 50), "the cut is a typed gap, not silence");
++  assert.ok(closeDispatchProjectionBytes(projection).toString("utf8").endsWith("\n"));
++});
++function projectionBundle(input, projection) {
++  mkdirSync(join(input.root, "evidence"), { recursive: true }); writeFileSync(join(input.root, "evidence/dispatch-projection.json"), closeDispatchProjectionBytes(projection));
++  return planWith(input, { candidate: CANDIDATE, evidence: { dispatchProjectionPath: "evidence/dispatch-projection.json" } });
++}
++test("C28 the bundle carries the dispatch projection as one evidence item, verifies offline, and refuses an inconsistent or unredacted projection", async () => {
++  const input = fixture(); const text = "Briefing text.\n";
++  const projection = projectCloseDispatches({ featureId: FEATURE_ID, records: [dispatchRecord("D-ONE")], briefings: new Map([["D-ONE", [{ sha256: sha(text), path: "scratch/a.md", text, itemId: null }]]]) });
++  const plan = projectionBundle(input, projection);
++  assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["dispatch-projection:carried:null"], "only the named item: no approval item is invented");
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
++  assert.match(readFileSync(join(input.root, "bundle", "README.md"), "utf8"), /Dispatch projection/u);
++  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
++  // A producer that bound a text to a digest it does not hash to, or carried an absolute path, is caught offline even though the artifact digest is consistent with the manifest.
++  const broken = structuredClone(projection); broken.dispatches[0].briefing.text = "Another text.\n";
++  const inconsistent = projectionBundle(fixture(), broken); const second = fixture(); const badPlan = projectionBundle(second, broken);
++  assert.ok(inconsistent.evidence.items.length === 1 && badPlan.evidence.items.length === 1);
++  await buildAuditBundle({ repositoryRoot: second.root, outputPath: "bundle", plan: badPlan });
++  assert.deepEqual((await verifyAuditBundle({ bundleRoot: join(second.root, "bundle") })).findings, ["AB-DISPATCH-PROJECTION"]);
++  const leaky = structuredClone(projection); leaky.dispatches[0].record.changedFiles = ["/home/someone/x.mjs"];
++  const third = fixture(); await buildAuditBundle({ repositoryRoot: third.root, outputPath: "bundle", plan: projectionBundle(third, leaky) });
++  assert.deepEqual((await verifyAuditBundle({ bundleRoot: join(third.root, "bundle") })).findings, ["AB-DISPATCH-PROJECTION"]);
++  const unreadable = planWith(fixture(), { candidate: CANDIDATE, evidence: { dispatchProjectionPath: "evidence/absent.json" } });
++  assert.deepEqual(unreadable.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["dispatch-projection:gap:UNREADABLE"]);
++});
+ test("Q3 evidence bound to another candidate or not passing is a typed gap and is not carried", () => {
+   const other = { commit: "e".repeat(40), tree: "f".repeat(40) }; const input = fixture();
+   const plan = planWith(input, { evidence: { ...evidenceFiles(input.root, { traceCandidate: other, verifyCandidate: other, securityCandidate: other }) } });
+diff --git a/plugins/pipeline-core/lib/close-acceptance-record.mjs b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+index d5fc19106c918f7918346690b64a19ff6fa701a5..271dc14cfc091c1a7c4082b4740e879d72819413 100644
+--- a/plugins/pipeline-core/lib/close-acceptance-record.mjs
++++ b/plugins/pipeline-core/lib/close-acceptance-record.mjs
+@@ -127,6 +127,32 @@ export function readAcceptanceRecord(root, featureId) {
+   return null;
+ }
+ 
++/**
++ * C28 (AC-108, Codex run): ONE status vocabulary, four facts shown apart where the State inspector and the close print status. After a design reopen the package's lifecycle record
++ * still said `completed` next to State design/draft, and reports mixed 'package registered', 'implementation delivered', 'technically qualified' and 'human-accepted'.
++ * Every projection derives from this one function, so a reopen (phase design) or a declined acceptance (the bound Result retired: `resultBound` false) moves all of them together:
++ * a reopened or declined feature is never delivered, qualified or human-accepted. `packageState` is what the package's lifecycle record says (null: none).
++ * `headCandidate` is the commit an acceptance must name: null skips the comparison (a closed feature: the acceptance names the candidate it was given for); the empty string
++ * (HEAD unreadable) can never match, so an acceptance that cannot be shown to name this candidate is not reported as one. `resultBound` null: no Continuity binding to read.
++ */
++export function featureStatusVocabulary({ packageState = null, phase = null, resultBound = null, closed = false, acceptedCandidate = null, headCandidate = null } = {}) {
++  const registered = typeof packageState === "string" && packageState !== "";
++  const delivered = registered && (closed === true || phase !== "design") && ["verifying", "completed"].includes(packageState) && resultBound !== false;
++  const qualified = delivered && packageState === "completed";
++  const accepted = qualified && typeof acceptedCandidate === "string" && (headCandidate === null || acceptedCandidate === headCandidate);
++  const recordLag = packageState === "completed" && !delivered
++    ? { packageState, reason: `the package's lifecycle record still says completed, but the feature is ${phase === "design" ? "back in design (reopened)" : resultBound === false ? "back in a correction round (the acceptance was declined and the Result retired)" : "not delivered"}; read the four statuses, not the record` }
++    : null;
++  const yn = (value) => (value ? "yes" : "no");
++  return { schema: "pipeline.feature-status.v1",
++    packageRegistered: { reached: registered, state: registered ? packageState : null },
++    implementationDelivered: { reached: delivered },
++    technicallyQualified: { reached: qualified },
++    humanAccepted: { reached: accepted, candidate: accepted ? acceptedCandidate : null },
++    recordLag,
++    summary: `package registered: ${registered ? packageState : "no"}; implementation delivered: ${yn(delivered)}; technically qualified: ${yn(qualified)}; human-accepted: ${yn(accepted)}` };
++}
++
+ /** Writes (idempotently) the record and, for a registered non-authority entry, rebinds its digest with the package's amendment record. Returns the paths written. */
+ export function writeAcceptanceRecord({ root, featureId, record, now = () => new Date().toISOString() }) {
+   const target = acceptanceTarget(root, featureId); const file = resolve(root, target.path); const written = [];
+diff --git a/plugins/pipeline-core/lib/continuity-state.mjs b/plugins/pipeline-core/lib/continuity-state.mjs
+index 223559a4302d2babbae5d6091c21eab1f145c87c..3eed8c2fbe34b047a527e4594bd32fe646ed17b9 100644
+--- a/plugins/pipeline-core/lib/continuity-state.mjs
++++ b/plugins/pipeline-core/lib/continuity-state.mjs
+@@ -1551,3 +1551,12 @@ export const CONTINUITY_STATE_CODES = Object.freeze([
+   "CS-CLOSE-DELIVERY-RECORDED", "CS-CLOSE-READBACK-BLOCKED",
+   "CS-CLOSE-READBACK-RECORDED", "CS-CLOSE-COMPLETE-BLOCKED", "CS-CLOSE-CLOSED",
+ ]);
++
++// C28 (AC-108, WSL run): the three heads the Pipeline itself creates when it opens a feature (onboarding, kickoff promotion, adoption) are planning entries. No transition advances them on plan
++// approval, so one can legitimately lag once the feature has left design. A reader labels such a head instead of presenting it as the next action; a head with a live dispatch never lags.
++export const PLANNING_ENTRY_PACKAGES = Object.freeze(["initial-planning", "kickoff-promotion", "continuity-adoption"]);
++export function queueHeadLag(continuity, phase) {
++  const head = continuity?.queueHead;
++  if (head === null || typeof head !== "object" || typeof phase !== "string" || phase === "design" || head.dispatch !== null) return null;
++  return PLANNING_ENTRY_PACKAGES.includes(head.packageId) ? { status: "lagging", packageId: head.packageId, actionId: head.actionId, phase } : null;
++}
+diff --git a/plugins/pipeline-core/lib/continuity-state.test.mjs b/plugins/pipeline-core/lib/continuity-state.test.mjs
+index 9a784f75ac915587ed26fc47449ddbd2310a0932..d681f818a2205b3753bb4a69d73131c9afa67f94 100644
+--- a/plugins/pipeline-core/lib/continuity-state.test.mjs
++++ b/plugins/pipeline-core/lib/continuity-state.test.mjs
+@@ -33,6 +33,7 @@ import { computeContinuityFinalDigest } from "./continuity-host-adapter.mjs";
+ import { computePoGoalDecisionReceiptDigest, computeRunnerNativeContinuationDigest } from "./runner-native-continuation.mjs";
+ import { validateAgainstSchema } from "./schema-lite.mjs";
+ 
++import * as CS from "./continuity-state.mjs";
+ let passed = 0;
+ function check(name, fn) {
+   fn();
+@@ -1638,4 +1639,18 @@ check("a retired Result stays in the history: resultRetirements validates agains
+   }
+ });
+ 
++// C28 (AC-108, WSL run): the SessionStart projection printed the planning entry `initial-planning`/`review-goal` as the queue head while the feature was in
++// implementation. No transition advances that head on plan approval, so a head may legitimately lag; the reader labels it instead of presenting it as the next action.
++check("C28 a queue head that still names a planning entry lags once the feature has left design, and only then", () => {
++  const head = (packageId, extra = {}) => ({ packageId, actionId: "review-goal", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null, ...extra });
++  for (const packageId of ["initial-planning", "kickoff-promotion", "continuity-adoption"]) {
++    const lag = CS.queueHeadLag({ queueHead: head(packageId) }, "implementation");
++    assert.deepEqual(lag, { status: "lagging", packageId, actionId: "review-goal", phase: "implementation" }, packageId);
++    assert.equal(CS.queueHeadLag({ queueHead: head(packageId) }, "design"), null, `${packageId} is current while the feature is in design`);
++    assert.equal(CS.queueHeadLag({ queueHead: head(packageId, { dispatch: { dispatchId: "d" } }) }, "implementation"), null, `${packageId} with a live dispatch is not lagging`);
++  }
++  assert.equal(CS.queueHeadLag({ queueHead: head("P1") }, "implementation"), null, "a working package head is current");
++  assert.equal(CS.queueHeadLag({ queueHead: null }, "implementation"), null, "no head, nothing to label");
++});
++
+ process.stdout.write(`1..${passed}\n# pass ${passed}\n`);
+diff --git a/plugins/pipeline-core/lib/dispatch-record.mjs b/plugins/pipeline-core/lib/dispatch-record.mjs
+index 8b166f7016a5af2eba44311be0489af578a9bc09..79d1325d8ba36278b2463b7498a36c8042904786 100644
+--- a/plugins/pipeline-core/lib/dispatch-record.mjs
++++ b/plugins/pipeline-core/lib/dispatch-record.mjs
+@@ -65,6 +65,9 @@ export function denyPrivateAbsolutePaths(value, label, seen = new WeakSet()) {
+   else Object.entries(value).forEach(([key, entry]) => denyPrivateAbsolutePaths(entry, `${label}.${key}`, seen));
+   seen.delete(value);
+ }
++// C28 (AC-108): the SAME rule as the denial above, applied as a mask: a projection that must keep the text around a host path replaces exactly what the denial would refuse.
++const PRIVATE_ABSOLUTE_PATH_EVERYWHERE = new RegExp(PRIVATE_ABSOLUTE_PATH.source, "giu");
++export function maskPrivateAbsolutePaths(text) { return String(text).replace(PRIVATE_ABSOLUTE_PATH_EVERYWHERE, "<host-path>"); }
+ export function isSafeTaskId(value) { return typeof value === "string" && SAFE_TASK_ID.test(value); }
+ export function isTerminalOutcome(outcome) {
+   if (typeof outcome !== "string") return false;
+diff --git a/plugins/pipeline-core/lib/durable-evidence.mjs b/plugins/pipeline-core/lib/durable-evidence.mjs
+index 7d9a4fb90f789b736a7f872c189463aa1ee0e01f..0db8ca7475e332b97484be74acc35160f56651cb 100644
+--- a/plugins/pipeline-core/lib/durable-evidence.mjs
++++ b/plugins/pipeline-core/lib/durable-evidence.mjs
+@@ -22,7 +22,8 @@ import { lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, wr
+ import { spawnSync } from "node:child_process";
+ import { join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { denyPrivateAbsolutePaths, isTerminalOutcome, validateDispatchRecord } from "./dispatch-record.mjs";
++import { denyPrivateAbsolutePaths, isTerminalOutcome, maskPrivateAbsolutePaths, validateDispatchRecord } from "./dispatch-record.mjs";
++import { evaluateCredentialHygiene } from "./provenance-attestation.mjs";
+ import { traceHumanApprovals } from "./human-approval-trace.mjs";
+ import { canonical } from "./po-approval-proof.mjs";
+ 
+@@ -141,12 +142,52 @@ function scanBriefings(root) {
+     try {
+       const bytes = readBounded(join(root, "scratch", name));
+       const block = BRIEFING_BLOCK.exec(bytes.toString("utf8"));
+-      const id = block ? JSON.parse(block[1])?.dispatchId : null;
+-      if (typeof id === "string") found.set(id, [...(found.get(id) ?? []), { sha256: sha(bytes), path: `scratch/${name}` }]);
++      const marker = block ? JSON.parse(block[1]) : null; const id = marker?.dispatchId;
++      // C28: the text and the item the marker binds travel with the digest, for the close's own projection (the mirror above uses digest and path only).
++      if (typeof id === "string") found.set(id, [...(found.get(id) ?? []), { sha256: sha(bytes), path: `scratch/${name}`, text: bytes.toString("utf8"), itemId: typeof marker?.itemDelivery?.itemId === "string" ? marker.itemDelivery.itemId : null }]);
+     } catch { /* an unreadable or foreign scratch file is simply not a briefing */ }
+   }
+   return found;
+ }
++
++// ---- C28 (AC-108, WSL run): the close's tracked, redacted projection of the dispatches ---------------------------------------------------
++// Briefings and dispatch records stay untracked (scratch/ and evidence/ are ignored), so the tracked audit bundle could not show them. The close writes this ONE file into the
++// feature's evidence directory; the audit bundle carries it as one artifact (one evidence item, so no item limit is reachable however many dispatches ran).
++// Redaction reuses the existing rules and invents none: an absolute host path is masked by the dispatch-record rule, a credential-shaped text is left out by the provenance credential check.
++// A text that cannot be carried is a typed gap per dispatch with the digest of the original bytes, never an omission. The private-identifier deny set of the neutral-leakage policy is built
++// from the local machine by a script of its own and is not reachable here: the notes name that as not covered.
++export const CLOSE_DISPATCH_PROJECTION_SCHEMA = "pipeline.close-dispatch-projection.v1";
++const PROJECTION_MAX_DISPATCHES = 200; const BRIEFING_TEXT_MAX_BYTES = 200_000;
++const maskDeep = (value) => (typeof value === "string" ? maskPrivateAbsolutePaths(value) : Array.isArray(value) ? value.map(maskDeep) : value !== null && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, maskDeep(entry)])) : value);
++function projectedBriefing(record, hits) {
++  if (hits.length > 1) return { status: "gap", code: "BRIEFING-AMBIGUOUS", sourceSha256: null, textSha256: null, text: null };
++  const hit = hits[0];
++  if (hit === undefined) { const attested = digest(record.attestation?.briefingSha256); return { status: "gap", code: attested === null ? "BRIEFING-NOT-FOUND" : "BRIEFING-TEXT-UNAVAILABLE", sourceSha256: attested, textSha256: null, text: null }; }
++  const gap = (code) => ({ status: "gap", code, sourceSha256: hit.sha256, textSha256: null, text: null });
++  if (Buffer.byteLength(hit.text, "utf8") > BRIEFING_TEXT_MAX_BYTES) return gap("BRIEFING-TOO-LARGE");
++  if (!evaluateCredentialHygiene(hit.text).ok) return gap("BRIEFING-CREDENTIAL-SHAPE");
++  const text = maskPrivateAbsolutePaths(hit.text);
++  try { denyPrivateAbsolutePaths(text, "briefing"); } catch { return gap("BRIEFING-PRIVATE-PATH-REMAINS"); }
++  return { status: text === hit.text ? "carried" : "redacted", code: null, sourceSha256: hit.sha256, textSha256: sha(text), text };
++}
++/** `records` are validated terminal dispatch records (`{ record }`), `briefings` the map `scanBriefings` returns. A dispatch whose briefing names another feature's item is not this feature's. */
++export function projectCloseDispatches({ featureId, records = [], briefings = new Map() } = {}) {
++  const dispatches = []; const gaps = []; let omitted = 0;
++  for (const { record } of [...records].sort((left, right) => (left.record.taskId < right.record.taskId ? -1 : left.record.taskId > right.record.taskId ? 1 : 0))) {
++    const hits = briefings.get(record.taskId) ?? [];
++    if (hits.some((hit) => typeof hit.itemId === "string" && !hit.itemId.startsWith(`${featureId}.`))) continue;
++    if (dispatches.length >= PROJECTION_MAX_DISPATCHES) { omitted += 1; continue; }
++    const { briefing: unusedBriefing, source: unusedSource, ...fields } = dispatchEntry(record, null, null);
++    dispatches.push({ taskId: record.taskId, record: maskDeep(fields), briefing: projectedBriefing(record, hits) });
++  }
++  if (omitted > 0) gaps.push({ code: "DISPATCH-LIST-TRUNCATED", count: omitted });
++  return { schema: CLOSE_DISPATCH_PROJECTION_SCHEMA, featureId, dispatches, gaps };
++}
++export function closeDispatchProjectionBytes(projection) { return jsonBytes(projection); }
++/** The completed dispatch records and the briefings found in scratch/, for `projectCloseDispatches` (read-only). */
++export function readCloseDispatchInputs(root) {
++  return { records: readDispatchSources(resolve(root)).completed.map(({ record }) => ({ record })), briefings: scanBriefings(resolve(root)) };
++}
+ function briefingFor(record, scanned) {
+   if (digest(record.attestation?.briefingSha256) !== null) return { sha256: record.attestation.briefingSha256, path: null, source: "attestation" };
+   const hits = scanned.get(record.taskId) ?? [];
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 9a9e8caedd604ed7d9324e53c9b2c84c849aa19e..b3dc993ce5530094b8e29a198062c662b9fca80e 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
+ import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
+ import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+-import { acceptanceQuestion, acceptanceTarget, acceptanceYesForm, isAcceptanceYes, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord, writeDeclineRecord } from "../lib/close-acceptance-record.mjs";
++import { acceptanceQuestion, acceptanceTarget, acceptanceYesForm, featureStatusVocabulary, isAcceptanceYes, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord, writeDeclineRecord } from "../lib/close-acceptance-record.mjs";
+ import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
+ import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
+ import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
+@@ -24,6 +24,7 @@ import { closeSecurityScope, describeCloseSecurityScope } from "../lib/security-
+ import { declaredRepositoryMode } from "./repository-freshness.mjs";
+ import { exportCriticRoundFromJournal } from "./session-critic-finalizer.mjs";
+ import { FOLLOWUP_EVIDENCE } from "../lib/critical-action-authorization.mjs";
++import { closeDispatchProjectionBytes, projectCloseDispatches, readCloseDispatchInputs } from "../lib/durable-evidence.mjs";
+ 
+ const HERE = new URL(".", import.meta.url);
+ const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
+@@ -457,7 +458,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+       // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward
+       // (VEP-CVL-CARRY-RANGE; a human had to reset). Only a tree whose every dirty path is such an output, with an evidence file proving an earlier attempt, is rolled back; the stages write the same again.
+       // C22: the acceptance record is such an output too (the answer is already held in `accepted`, and written again after the package moves below).
+-      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath, acceptanceTarget(root, featureId).path, `specs/${featureId}/acceptance.md`, `${evidenceDir}/human-acceptance.md`]);
++      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath, acceptanceTarget(root, featureId).path, `specs/${featureId}/acceptance.md`, `${evidenceDir}/human-acceptance.md`, `${evidenceDir}/dispatch-projection.json`]);
+       const leftovers = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
+       const dirtyOutputs = leftovers?.status === 0 ? String(leftovers.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => ({ tracked: !line.startsWith("??"), path: line.slice(3) })) : [];
+       if (dirtyOutputs.some(({ tracked, path }) => !tracked && (path === auditRequestPath || path === verifyPath)) && dirtyOutputs.every(({ path }) => ownOutputs.has(path))) {
+@@ -516,8 +517,19 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+         try { (deps.exportCriticRoundFn ?? exportCriticRoundFromJournal)({ root, packetId, outDir }); rounds.set(packetId, `${outDir}/report.md`); } catch { /* named in the bundle README as not exported */ }
+       }
+       const criticReports = [...rounds].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([packetId, path]) => ({ packetId, path }));
++      // C28 (AC-108, WSL run): the tracked, redacted projection of the feature's dispatches (briefing texts with digests, dispatch records) goes into the feature's evidence directory, so it travels in the
++      // one close commit and the bundle carries it. Nothing to project, or a source that cannot be read, writes nothing and never stops the close.
++      let dispatchProjectionPath = null;
++      try {
++        const projection = projectCloseDispatches({ featureId, ...(deps.closeDispatchInputsFn ?? readCloseDispatchInputs)(root) });
++        if (projection.dispatches.length > 0 || projection.gaps.length > 0) {
++          const target = `${evidenceDir}/dispatch-projection.json`;
++          mkdirSync(dirname(resolve(root, target)), { recursive: true }); writeFileSync(resolve(root, target), closeDispatchProjectionBytes(projection));
++          dispatchProjectionPath = target; stages.push("dispatch-projection");
++        }
++      } catch { dispatchProjectionPath = null; }
+       stages.push("audit-request");
+-      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports } });
++      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports, ...(dispatchProjectionPath === null ? {} : { dispatchProjectionPath }) } });
+       if (state.continuity !== null && typeof state.continuity === "object") {
+         let current = state;
+         if (state.continuity.queueHead?.nextAction !== "close") {
+@@ -660,6 +672,9 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     const closeStatus = { technicalClose: { status: phase, source: "close coordinator phase" },
+       productAcceptance: acceptance === null ? { status: "not-recorded", source: "the feature's acceptance record" } : { status: "recorded", candidate: acceptance.candidate, openChecks: acceptance.openChecks, source: acceptance.path },
+       push: { status: "not-done-by-the-close", source: "the close never pushes; publication and push are separate human-gated steps" } };
++    // C28: the same four-fact vocabulary the State inspector prints (a closed feature: the acceptance names the candidate it was given for, so no HEAD comparison).
++    let closedPackageState = null; try { const value = JSON.parse(readFileSync(resolve(root, `specs/${closedFeatureId}/lifecycle.json`), "utf8")).state; closedPackageState = typeof value === "string" ? value : null; } catch { closedPackageState = null; }
++    closeStatus.statuses = featureStatusVocabulary({ packageState: closedPackageState, closed: true, acceptedCandidate: acceptance?.candidate ?? null });
+     let securityDocument = null; try { securityDocument = JSON.parse(readFileSync(resolve(root, "evidence/security-latest.v2.verdict.json"), "utf8")); } catch { securityDocument = null; }
+     const securityScope = closeSecurityScope(securityDocument);
+     const securitySentence = describeCloseSecurityScope(securityScope);
+@@ -668,7 +683,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+     const remotes = declaredMode === "local-only" ? String(rawGit(["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
+     const repositoryMode = remotes.length === 0 ? null : { declared: "local-only", remotes, status: "calibration-behind-the-remote", next: "Leave it for this close: a calibration commit now ends the Critic carry of the push. Correct it as the first commit of the next feature with repository-mode-promote.mjs." };
+     return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, securityScope, commits, ...(repositoryMode === null ? {} : { repositoryMode }), ...pushEvidenceStep(closedFeatureId),
+-      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. ${describeCommitSplit(commits)}${securitySentence === "" ? "" : ` ${securitySentence}`}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
++      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. Status: ${closeStatus.statuses.summary}. ${describeCommitSplit(commits)}${securitySentence === "" ? "" : ` ${securitySentence}`}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
+   }
+   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
+ }
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index fa3682ef0b14d728f104286fed76776e6378587d..b8cb3d6ccbd40a01a660e256c7f1c1c7c6078e65 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -900,6 +900,35 @@ test("C22 CGR-12: the audit request carries every Critic round report of the fea
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
++// C28 (AC-108, WSL run): briefings and dispatch records stayed untracked. The close writes their redacted projection into the feature's evidence directory (so it travels in the
++// one close commit) and names it in the audit request; with nothing to project, or an unreadable source, nothing is written and the close is not blocked.
++test("C28: the close writes the redacted dispatch projection into the feature's evidence, names it in the audit request and commits it with the close", () => {
++  const f = oneShotFixture();
++  try {
++    const text = "Briefing for /home/someone/src/repo and the plain parts.\n";
++    const closeDispatchInputsFn = () => ({ records: [{ record: { taskId: "D-ONE", schema: "pipeline.dispatch-record.v4", runner: "claude", agentType: "goldfish-deep", model: "m", effort: "high", rulesetSha: "r".repeat(64), dispatcher: "elephant", candidateCommit: "a".repeat(40), commits: [], outcome: "succeeded", outcomeClassification: { kind: "authored-commit" }, resultSha256: null, report: { changedFiles: [] } } }],
++      briefings: new Map([["D-ONE", [{ sha256: "e".repeat(64), path: "scratch/x.md", text, itemId: null }]]]) });
++    const closed = oneShotClose(f.input, { runCommand: f.runner, closeDispatchInputsFn });
++    assert.equal(closed.status, "commit-required");
++    const path = "specs/feature-abc/evidence/dispatch-projection.json";
++    const projection = JSON.parse(readFileSync(join(f.root, path), "utf8"));
++    assert.equal(projection.schema, "pipeline.close-dispatch-projection.v1"); assert.equal(projection.dispatches[0].briefing.status, "redacted"); assert.ok(!JSON.stringify(projection).includes("/home/someone"));
++    assert.equal(JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), "utf8")).evidence.dispatchProjectionPath, path);
++    assert.ok(closed.commit.paths.includes(path), `the projection travels in the one close commit: ${closed.commit.paths}`);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++test("C28: nothing to project, or a source that cannot be read, writes no projection and never stops the close", () => {
++  for (const closeDispatchInputsFn of [() => ({ records: [], briefings: new Map() }), () => { throw new Error("unreadable evidence directory"); }]) {
++    const f = oneShotFixture();
++    try {
++      assert.equal(oneShotClose(f.input, { runCommand: f.runner, closeDispatchInputsFn }).status, "commit-required");
++      assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/dispatch-projection.json")), false);
++      assert.equal(Object.hasOwn(JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), "utf8")).evidence, "dispatchProjectionPath"), false);
++    } finally { rmSync(f.root, { recursive: true, force: true }); }
++  }
++});
++
+ test("the close fetches a missing Critic report itself, inside its own evidence directory, and a failing export only leaves the round named", () => {
+   const f = oneShotFixture();
+   try {
+@@ -1079,7 +1108,11 @@ test("C22B CGF-12: the closed-local status separates product acceptance, technic
+   try {
+     const none = oneShotClose(f.resumed, { runCommand: f.runner });
+     assert.equal(none.status, "closed-local", JSON.stringify(none).slice(0, 400));
+-    assert.deepEqual(Object.keys(none.closeStatus).sort(), ["productAcceptance", "push", "technicalClose"]);
++    // C28 (QG-04, restated in place): the three statuses stay as they were; `statuses` is the new fourth key, the one four-fact vocabulary the State inspector prints too.
++    assert.deepEqual(Object.keys(none.closeStatus).sort(), ["productAcceptance", "push", "statuses", "technicalClose"]);
++    assert.equal(none.closeStatus.statuses.schema, "pipeline.feature-status.v1");
++    assert.equal(none.closeStatus.statuses.humanAccepted.reached, false, "no acceptance record, no human-accepted");
++    assert.match(none.message, /Status: package registered: [^;]+; implementation delivered: (?:yes|no); technically qualified: (?:yes|no); human-accepted: no\./u);
+     assert.equal(none.closeStatus.technicalClose.status, "closed-local");
+     assert.equal(none.closeStatus.productAcceptance.status, "not-recorded");
+     assert.equal(none.closeStatus.push.status, "not-done-by-the-close");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
+index 5e8f36cff7ab7972327933c07b5300dfe113bece..f19f6a43ed65594acda0e806d4b4d8df3dca86c8 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs
+@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
+ 
+ import { run, SCHEMA_ID, statePath as resolveStatePath } from "./pipeline-state.mjs";
+ import { applyOnboardingIntakeConsent, nextActionSection } from "../lib/onboarding-continuity.mjs";
++import { renderAcceptanceSection } from "../lib/close-acceptance-record.mjs";
+ import { isolateFromStoredOperatorLabel, mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
+ isolateFromStoredOperatorLabel();
+ import { MACHINE_PLANE_SCHEMA, writeMachinePlane } from "../lib/machine-plane.mjs";
+@@ -439,6 +440,47 @@ test("inspect classifies prior push approval without disclosing proof or destina
+   assert.deepEqual(JSON.parse(malformed.out).pushApproval, { present: true, relevance: "malformed" });
+ });
+ 
++// C28 (AC-108, Codex run): after a design reopen the lifecycle record still said `completed` next to State design/draft, and the reports mixed 'package registered',
++// 'implementation delivered', 'technically qualified' and 'human-accepted'. The inspector states the four apart, from one function, and a reopen or a decline moves all of them.
++function statusFixture(name, { packageState = "completed", accepted = "a".repeat(40), mutate = () => {} } = {}) {
++  const root = implementingFixture(name);
++  mkdirSync(join(root, "specs", "widget"), { recursive: true });
++  if (packageState !== null) writeFileSync(join(root, "specs", "widget", "lifecycle.json"), `${JSON.stringify({ state: packageState })}\n`);
++  if (accepted !== null) writeFileSync(join(root, "specs", "widget", "acceptance.md"), `# Human acceptance\n\n${renderAcceptanceSection({ candidate: accepted, answer: "yes, I accept", openChecks: [] })}\n`);
++  const file = resolveStatePath(root); const state = JSON.parse(readFileSync(file, "utf8")); mutate(state);
++  writeFileSync(file, `${JSON.stringify(state, null, 2)}\n`);
++  return root;
++}
++const statusOf = (root, head = "a".repeat(40)) => { const result = invoke(root, ["inspect"], { gitHead: () => ({ ok: true, commit: head }) }); assert.equal(result.status, 0, result.err); return JSON.parse(result.out).featureStatus; };
++const reached = (status) => [status.packageRegistered, status.implementationDelivered, status.technicallyQualified, status.humanAccepted].map((entry) => entry.reached);
++
++test("C28 inspect states package registered, implementation delivered, technically qualified and human-accepted as four separate facts", () => {
++  const root = statusFixture("status-four");
++  assert.deepEqual(reached(statusOf(root)), [true, true, true, true]);
++  assert.equal(statusOf(root).packageRegistered.state, "completed");
++  assert.equal(statusOf(root).recordLag, null);
++  // The acceptance is bound to the candidate it was given for: a later HEAD is not accepted by an older answer.
++  assert.deepEqual(reached(statusOf(root, "b".repeat(40))), [true, true, true, false]);
++  assert.deepEqual(reached(statusOf(statusFixture("status-no-accept", { accepted: null }))), [true, true, true, false]);
++  assert.deepEqual(reached(statusOf(statusFixture("status-verifying", { packageState: "verifying" }))), [true, true, false, false]);
++  assert.deepEqual(reached(statusOf(statusFixture("status-unregistered", { packageState: null, accepted: null }))), [false, false, false, false]);
++});
++
++test("C28 a reopened design is never delivered, qualified or human-accepted, and the stale `completed` record is named as lagging", () => {
++  const root = statusFixture("status-reopened", { mutate: (state) => { state.activeFeature.phase = "design"; state.planApproved = false; } });
++  const status = statusOf(root);
++  assert.deepEqual(reached(status), [true, false, false, false]);
++  assert.equal(status.recordLag.packageState, "completed");
++  assert.match(status.recordLag.reason, /lifecycle record still says completed/u);
++});
++
++test("C28 a declined acceptance (the Result retired) is never delivered, qualified or human-accepted either", () => {
++  const root = statusFixture("status-declined", { mutate: (state) => { state.continuity = { authority: { prd: { path: "specs/widget/prd.md", sha256: "b".repeat(64) }, spec: { path: "specs/widget/spec.md", sha256: "c".repeat(64) }, result: null } }; } });
++  const status = statusOf(root);
++  assert.deepEqual(reached(status), [true, false, false, false]);
++  assert.equal(status.recordLag.packageState, "completed");
++});
++
+ test("inspect without push history does not probe Git for approval freshness", () => {
+   const root = implementingFixture("no-push-approval");
+   const result = invoke(root, ["inspect"], { gitHead: () => { throw new Error("unnecessary Git read"); } });
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 7fea9126ca776d819a6a6b5860df7c00bb80717f..cad213857f16d4611ab6de0d71a7346a5f9e8a45 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -389,6 +389,7 @@ import { attachRunbookLink, runbookLine } from "../lib/runbook-link.mjs";
+ import { resolveCanonicalArtifactIdentity as acceptedContractArtifactIdentity } from "../lib/feature-package-topology.mjs";
+ import { verifyAgainstTrustAnchors as verifyAcceptedTrustAnchors } from "../lib/critical-human-proof-policy.mjs";
+ import { basename, dirname, isAbsolute, join, posix as posixPath, relative, resolve, sep, win32 as win32Path } from "node:path";
++import { featureStatusVocabulary, readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
+ import { spawnSync } from "node:child_process";
+ import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
+ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+@@ -4336,6 +4337,19 @@ function inspectPlanLifecycle(dir, state) {
+   });
+ }
+ 
++// C28 (AC-108): the four statuses of the active feature, read from the package's lifecycle record, the State and the acceptance record through the one vocabulary function.
++function inspectFeatureStatus(dir, state, headOf) {
++  const feature = state.activeFeature;
++  if (feature === null || typeof feature !== "object" || typeof feature.id !== "string" || typeof feature.planPath !== "string" || isAbsolute(feature.planPath) || feature.planPath.split(/[\\/]/u).includes("..")) return null;
++  let packageState = null;
++  try { const value = JSON.parse(readFileSync(join(dir, dirname(feature.planPath), "lifecycle.json"), "utf8")).state; packageState = typeof value === "string" ? value : null; } catch { packageState = null; }
++  let acceptedCandidate = null;
++  try { acceptedCandidate = readAcceptanceRecord(dir, feature.id)?.candidate ?? null; } catch { acceptedCandidate = null; }
++  // HEAD is read only when an acceptance exists to compare it with (a project without one is never probed).
++  const head = acceptedCandidate === null ? null : headOf(dir);
++  return featureStatusVocabulary({ packageState, phase: feature.phase ?? null, resultBound: state.continuity?.authority ? state.continuity.authority.result != null : null, acceptedCandidate, headCandidate: head === null ? null : head?.ok === true ? head.commit : "" });
++}
++
+ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+   const mixed = mixedPlanRecoveryObservation(state);
+   if (mixed !== null) {
+@@ -14756,6 +14770,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         activeFeature: base.activeFeature ?? null,
+         phase: base.activeFeature?.phase ?? null,
+         planApproved: base.planApproved === true,
++        featureStatus: inspectFeatureStatus(dir, base, gitHead),
+         lifecycle: { ok: lifecycle.ok, code: lifecycle.code, status: lifecycle.status },
+         mixedPlanRecovery: mixedPlanRecoveryObservation(base),
+         // D206: the approval is read through the private store (legacy tracked record as the fallback).

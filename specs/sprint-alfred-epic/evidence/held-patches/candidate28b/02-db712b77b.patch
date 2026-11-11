@@ -1,0 +1,779 @@
+diff --git a/plugins/pipeline-core/lib/architecture-effective-decisions.mjs b/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
+index edd93631565e600af3b736ab20b9e495dc3b9a83..aae57cabea1a7933869bb3b9ff4810e58c322f73 100644
+--- a/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
++++ b/plugins/pipeline-core/lib/architecture-effective-decisions.mjs
+@@ -265,3 +265,81 @@ export function compareEffectiveArchitectureDecisions(left, right) {
+ 
+ /** Reuse the closed physical sidecar syntax; this grants no adoption authority. */
+ export const validateArchitectureDecisionSidecar = validDecision;
++
++// --- C28-PLAN-GATES (AC-108): which ADR proposals of a feature were never bound into its design package ---
++// `create-adr.mjs` writes docs/adr/draft-<slug>.{md,json}; only `bind-adr-proposals.mjs` turns them into something the PO's design approval
++// signs. A proposal nobody binds is invisible to every later check (only an accepted record is read as a decision), so submit-plan asks this
++// reader before the PO is asked to sign. Read-only; it grants nothing.
++export const ADR_DRAFT_DISCARD_SCHEMA = "pipeline.adr-draft-discard.v1";
++const PROSPECTIVE_MANIFEST_SCHEMA = "pipeline.architecture-prospective-materialization.v1";
++const PROSPECTIVE_MANIFEST_FILE = "prospective-architecture.json";
++/** The discard record lives in a SUBFOLDER on purpose: a `.json` or `.md` directly in docs/adr would be read as an orphan decision sidecar. */
++export const adrDraftDiscardPath = (slug) => `docs/adr/discarded/draft-${slug}.json`;
++const DRAFT_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
++const MAX_MANIFEST_WALK = 2000;
++
++function readJsonFile(path) {
++  try { return JSON.parse(physicalFile(path).toString("utf8")); } catch { return null; }
++}
++
++/** The binding manifests (the file bind-adr-proposals writes next to its carrier) below the given repository-relative folders. */
++function boundManifestRows(root, featureDirs) {
++  const rows = [];
++  let seen = 0;
++  const walk = (relative, depth) => {
++    let entries;
++    try { entries = readdirSync(join(root, ...relative.split("/").filter(Boolean)), { withFileTypes: true }); } catch { return; }
++    for (const entry of entries) {
++      if (++seen > MAX_MANIFEST_WALK || entry.name.startsWith(".") || entry.name === "node_modules" || entry.isSymbolicLink()) continue;
++      const child = relative === "" ? entry.name : `${relative}/${entry.name}`;
++      if (entry.isDirectory()) { if (depth < 4) walk(child, depth + 1); continue; }
++      if (entry.name !== PROSPECTIVE_MANIFEST_FILE) continue;
++      const value = readJsonFile(join(root, ...child.split("/")));
++      if (value?.schema !== PROSPECTIVE_MANIFEST_SCHEMA || !Array.isArray(value.decisions)) continue;
++      for (const row of value.decisions) {
++        if (typeof row?.id === "string" && typeof row.proposedMarkdown?.path === "string" && typeof row.proposedMarkdown.sha256 === "string") {
++          rows.push({ id: row.id, path: row.proposedMarkdown.path, sha256: row.proposedMarkdown.sha256 });
++        }
++      }
++    }
++  };
++  for (const folder of featureDirs) if (typeof folder === "string") walk(folder.replace(/\\/gu, "/").replace(/^\.\//u, "").replace(/\/+$/u, ""), 0);
++  return rows;
++}
++
++/**
++ * The ADR proposals under docs/adr and what became of each: `{ slug, path, state, acceptedId }`. A proposal is a draft-<slug>.md whose sidecar is a valid
++ * `proposed` record of the same id (hand-written notes and accepted drafts are not proposals). State:
++ *   materialized  an accepted or superseded docs/adr/NNNN-<slug> record exists (the draft stays on disk as history; never unbound again)
++ *   bound         a binding manifest below `featureDirs` lists the draft with its CURRENT digest (an edit after binding means unbound)
++ *   discarded     docs/adr/discarded/draft-<slug>.json records a discard of the CURRENT draft bytes (an edited or recreated draft is not exempt)
++ *   unbound       none of the above
++ */
++export function inspectAdrDraftBindings({ rootDir, featureDirs = [] } = {}) {
++  if (typeof rootDir !== "string" || !isAbsolute(rootDir)) return [];
++  const root = resolve(rootDir);
++  const dir = join(root, "docs", "adr");
++  let names;
++  try { names = readdirSync(dir); } catch { return []; }
++  const manifest = boundManifestRows(root, Array.isArray(featureDirs) ? featureDirs : []);
++  const result = [];
++  for (const name of names.sort()) {
++    const slug = /^draft-(.+)\.md$/u.exec(name)?.[1];
++    if (slug === undefined || !DRAFT_SLUG.test(slug)) continue;
++    let markdown;
++    try { markdown = physicalFile(join(dir, name)); } catch { continue; }
++    const sidecar = readJsonFile(join(dir, `draft-${slug}.json`));
++    if (!validDecision(sidecar) || sidecar.id !== `draft-${slug}` || sidecar.status !== "proposed") continue;
++    const path = `docs/adr/${name}`;
++    const current = digest(markdown);
++    const accepted = names.filter((entry) => new RegExp(`^\\d{4}-${slug}\\.json$`, "u").test(entry))
++      .find((entry) => ["accepted", "superseded"].includes(readJsonFile(join(dir, entry))?.status));
++    const row = manifest.find((entry) => entry.path === path && entry.sha256 === current);
++    const discard = readJsonFile(join(root, ...adrDraftDiscardPath(slug).split("/")));
++    if (accepted !== undefined) result.push({ slug, path, state: "materialized", acceptedId: accepted.slice(0, -5) });
++    else if (row !== undefined) result.push({ slug, path, state: "bound", acceptedId: row.id });
++    else if (discard?.schema === ADR_DRAFT_DISCARD_SCHEMA && discard.id === `draft-${slug}` && discard.markdownSha256 === current) result.push({ slug, path, state: "discarded", acceptedId: null });
++    else result.push({ slug, path, state: "unbound", acceptedId: null });
++  }
++  return result;
++}
+diff --git a/plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs b/plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs
+index b6d602d51e7d5cb42fac2b286740fd7748dd2cab..2b42875114e2abacff3271dc0def949bdd41fafa 100644
+--- a/plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs
+@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
+ import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+-import { compareEffectiveArchitectureDecisions, inspectEffectiveArchitectureDecisions, inspectArchitectureDecisionAuthoringSources } from "./architecture-effective-decisions.mjs";
++import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, compareEffectiveArchitectureDecisions, inspectAdrDraftBindings, inspectEffectiveArchitectureDecisions, inspectArchitectureDecisionAuthoringSources } from "./architecture-effective-decisions.mjs";
+ import { runArchitectureEffectiveCli } from "../scripts/architecture-effective-decisions.mjs";
+ 
+ const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+@@ -292,3 +292,83 @@ test("D179 docs/adr as a symlink to a directory still blocks and names docs/adr"
+   assert.equal(result.code, "ARCH-DECISION-SOURCE-UNAVAILABLE");
+   assert.ok(result.findings.some(({ path }) => path === "docs/adr"));
+ });
++
++// --- C28-PLAN-GATES (AC-108): which ADR drafts of a feature were never bound into the design package ---
++// WSL Claude greenfield 2026-11: the drafts were written, bind-adr-proposals never ran, and the design approval still passed because only an
++// `accepted` record is ever read as a decision. The reader below is what submit-plan asks before the PO is asked to sign.
++function draftPair(root, slug, { status = "proposed", body = `# ${slug}\n\nThe real decision text.\n` } = {}) {
++  const dir = join(root, "docs", "adr");
++  writeFileSync(join(dir, `draft-${slug}.md`), body);
++  writeFileSync(join(dir, `draft-${slug}.json`), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: `draft-${slug}`, title: slug, status, digest: sha(body), scope: "project", date: "2026-11-10" })}\n`);
++  return sha(body);
++}
++function boundManifest(root, dir, rows) {
++  mkdirSync(join(root, dir), { recursive: true });
++  writeFileSync(join(root, dir, "prospective-architecture.json"), `${JSON.stringify({ schema: "pipeline.architecture-prospective-materialization.v1",
++    decisions: rows.map(({ id, slug, digest }) => ({ id, proposedMarkdown: { path: `docs/adr/draft-${slug}.md`, sha256: digest } })) })}\n`);
++}
++const bindingStates = (root, featureDirs = ["specs/f"]) => Object.fromEntries(inspectAdrDraftBindings({ rootDir: root, featureDirs }).map((entry) => [entry.slug, entry.state]));
++
++test("C28 ADR drafts: a proposal that no manifest, accepted record or discard names is unbound; no drafts means nothing to bind", (t) => {
++  const root = fixture(t);
++  assert.deepEqual(inspectAdrDraftBindings({ rootDir: root, featureDirs: ["specs/f"] }), []);
++  draftPair(root, "storage-adapter");
++  const [only] = inspectAdrDraftBindings({ rootDir: root, featureDirs: ["specs/f"] });
++  assert.deepEqual({ slug: only.slug, path: only.path, state: only.state }, { slug: "storage-adapter", path: "docs/adr/draft-storage-adapter.md", state: "unbound" });
++});
++
++test("C28 ADR drafts: only a real proposal counts (Markdown plus a proposed sidecar), never an accepted draft or a bare Markdown", (t) => {
++  const root = fixture(t);
++  draftPair(root, "wanted");
++  draftPair(root, "already-accepted", { status: "accepted" });
++  writeFileSync(join(root, "docs", "adr", "draft-notes-only.md"), "# notes\n");
++  assert.deepEqual(bindingStates(root), { wanted: "unbound" });
++});
++
++test("C28 ADR drafts: a draft listed in a manifest of the feature folder with its current digest is bound and names its accepted id", (t) => {
++  const root = fixture(t);
++  const digest = draftPair(root, "storage-adapter");
++  boundManifest(root, "specs/f", [{ id: "0001-storage-adapter", slug: "storage-adapter", digest }]);
++  assert.deepEqual(bindingStates(root), { "storage-adapter": "bound" });
++  assert.equal(inspectAdrDraftBindings({ rootDir: root, featureDirs: ["specs/f"] })[0].acceptedId, "0001-storage-adapter");
++  assert.deepEqual(bindingStates(root, ["specs/other"]), { "storage-adapter": "unbound" }, "a manifest outside the feature folders is not this feature's binding");
++  writeFileSync(join(root, "docs", "adr", "draft-storage-adapter.md"), "# changed after binding\n");
++  assert.deepEqual(bindingStates(root), { "storage-adapter": "unbound" }, "a draft edited after it was bound must be bound again");
++});
++
++test("C28 ADR drafts: a manifest in a nested folder of the feature is found; one that is not a binding manifest is ignored", (t) => {
++  const root = fixture(t);
++  const digest = draftPair(root, "nested");
++  boundManifest(root, "specs/f/design", [{ id: "0002-nested", slug: "nested", digest }]);
++  assert.deepEqual(bindingStates(root), { nested: "bound" });
++  writeFileSync(join(root, "specs", "f", "design", "prospective-architecture.json"), `${JSON.stringify({ schema: "something-else", decisions: [] })}\n`);
++  assert.deepEqual(bindingStates(root), { nested: "unbound" });
++});
++
++test("C28 ADR drafts: a draft that was materialized earlier (accepted NNNN record exists) is never unbound again, so later features are not refused", (t) => {
++  const root = fixture(t);
++  draftPair(root, "storage-adapter");
++  decision(root, "0004-storage-adapter", { status: "accepted" });
++  assert.deepEqual(bindingStates(root, ["specs/another-feature"]), { "storage-adapter": "materialized" });
++  assert.equal(inspectAdrDraftBindings({ rootDir: root, featureDirs: [] })[0].acceptedId, "0004-storage-adapter");
++});
++
++test("C28 ADR drafts: a discard record for the exact draft bytes resolves it; an edited draft is not silently exempt", (t) => {
++  const root = fixture(t);
++  const digest = draftPair(root, "unwanted");
++  mkdirSync(join(root, "docs", "adr", "discarded"), { recursive: true });
++  const record = { schema: ADR_DRAFT_DISCARD_SCHEMA, id: "draft-unwanted", markdownSha256: digest, reason: "superseded by the storage decision", discardedAt: NOW };
++  writeFileSync(join(root, adrDraftDiscardPath("unwanted")), `${JSON.stringify(record)}\n`);
++  assert.deepEqual(bindingStates(root), { unwanted: "discarded" });
++  writeFileSync(join(root, "docs", "adr", "draft-unwanted.md"), "# the slug was reused for a new proposal\n");
++  assert.deepEqual(bindingStates(root), { unwanted: "unbound" });
++  assert.equal(adrDraftDiscardPath("unwanted"), "docs/adr/discarded/draft-unwanted.json");
++});
++
++test("C28 ADR drafts: the discard record directory raises no decision finding (an orphan sidecar would block submit-plan)", (t) => {
++  const root = fixture(t);
++  const digest = draftPair(root, "unwanted");
++  mkdirSync(join(root, "docs", "adr", "discarded"), { recursive: true });
++  writeFileSync(join(root, adrDraftDiscardPath("unwanted")), `${JSON.stringify({ schema: ADR_DRAFT_DISCARD_SCHEMA, id: "draft-unwanted", markdownSha256: digest, reason: "no longer needed", discardedAt: NOW })}\n`);
++  assert.deepEqual(inspect(root).findings, []);
++});
+diff --git a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+index ec1e0b17b591c3e061672e3939ccd3e9e06e578c..029f5ae4750aced3d3b6724e1d558a1a6ce8a174 100644
+--- a/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
++++ b/plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs
+@@ -325,6 +325,93 @@ test("G20-15 control: a feature submission with no ADR sidecar problem is not re
+   assert.doesNotMatch(result.err, /ARCH-DECISION-EFFECTIVE-UNRESOLVED/u);
+ });
+ 
++// --- C28-PLAN-GATES (AC-108; WSL Claude greenfield 2026-11): ADR drafts that were never bound into the design package ---
++// create-adr wrote docs/adr/draft-*, bind-adr-proposals never ran, the PRD carried no binding block, and the design approval and the
++// architecture check passed all the same, because only an accepted record is ever read. submit-plan is the last point before the PO signs.
++function adrDraftFixture(featureId, slug = "storage-adapter") {
++  const f = fixture(featureId);
++  mkdirSync(join(f.root, "docs", "adr"), { recursive: true });
++  const body = `# Use a storage adapter\n\n## Decision\n\nThe adapter owns persistence.\n`;
++  writeFileSync(join(f.root, "docs", "adr", `draft-${slug}.md`), body);
++  writeFileSync(join(f.root, "docs", "adr", `draft-${slug}.json`), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: `draft-${slug}`,
++    title: "Use a storage adapter", status: "proposed", digest: sha256Hex(body), scope: "project", date: "2026-11-10" })}\n`);
++  const designDeps = { ...f.deps, architectureDesignDraft: () => ({ ok: true, required: true, status: "draft" }) };
++  return { ...f, slug, body, designDeps, digest: sha256Hex(body) };
++}
++const writeManifest = (f, rows) => {
++  mkdirSync(join(f.root, "specs", f.featureId), { recursive: true });
++  writeFileSync(join(f.root, "specs", f.featureId, "prospective-architecture.json"), `${JSON.stringify({ schema: "pipeline.architecture-prospective-materialization.v1",
++    decisions: rows.map(({ id, slug, digest }) => ({ id, proposedMarkdown: { path: `docs/adr/draft-${slug}.md`, sha256: digest } })) })}\n`);
++};
++
++test("C28 ADR gate: an unbound draft refuses submit-plan before the PO signs, names the exact bind command and the discard command, and records nothing", () => {
++  const f = adrDraftFixture("pin-adr-unbound");
++  const before = readFileSync(statePath(f.root), "utf8");
++  const refused = capture(submitArgs("feature"), f.designDeps);
++  assert.equal(refused.status, 2, refused.err);
++  assert.match(refused.err, /submit-plan blocked by ADR-DRAFT-UNBOUND \(docs\/adr\/draft-storage-adapter\.md\)/u);
++  assert.ok(refused.err.includes(`bind-adr-proposals.mjs --root ${f.root} --feature pin-adr-unbound --carrier specs/pin-adr-unbound/design.md --selection specs/pin-adr-unbound/po-selection.json --draft storage-adapter`), refused.err);
++  assert.ok(refused.err.includes(`create-adr.mjs --root ${f.root} --slug storage-adapter --discard --reason "<why it is not wanted>"`), refused.err);
++  assert.match(refused.err, /No submission or signature request was recorded\./u);
++  assert.equal(readFileSync(statePath(f.root), "utf8"), before, "nothing is recorded");
++});
++
++test("C28 ADR gate: every unbound draft is listed once, in one refusal, with one --draft each", () => {
++  const f = adrDraftFixture("pin-adr-two");
++  const body = "# Second\n";
++  writeFileSync(join(f.root, "docs/adr/draft-second-choice.md"), body);
++  writeFileSync(join(f.root, "docs/adr/draft-second-choice.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "draft-second-choice", title: "Second", status: "proposed", digest: sha256Hex(body), scope: "project", date: "2026-11-10" })}\n`);
++  const refused = capture(submitArgs("feature"), f.designDeps);
++  assert.equal(refused.status, 2, refused.err);
++  assert.match(refused.err, /ADR-DRAFT-UNBOUND \(docs\/adr\/draft-second-choice\.md, docs\/adr\/draft-storage-adapter\.md\)/u);
++  assert.match(refused.err, /--draft second-choice --draft storage-adapter/u);
++});
++
++test("C28 ADR gate: a bound draft, a discarded draft and an earlier-materialized draft do not refuse; a draft edited after binding does", () => {
++  const bound = adrDraftFixture("pin-adr-bound");
++  writeManifest({ ...bound, featureId: "pin-adr-bound" }, [{ id: "0001-storage-adapter", slug: "storage-adapter", digest: bound.digest }]);
++  assert.doesNotMatch(capture(submitArgs("feature"), bound.designDeps).err, /ADR-DRAFT/u, "bound through the manifest of the feature folder");
++  // The edit plus `create-adr.mjs --refresh` (the sidecar digest follows the Markdown): the sidecar check passes, the binding is what is stale.
++  writeFileSync(join(bound.root, "docs/adr/draft-storage-adapter.md"), "# edited after binding\n");
++  writeFileSync(join(bound.root, "docs/adr/draft-storage-adapter.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "draft-storage-adapter",
++    title: "Use a storage adapter", status: "proposed", digest: sha256Hex("# edited after binding\n"), scope: "project", date: "2026-11-10" })}\n`);
++  assert.match(capture(submitArgs("feature"), bound.designDeps).err, /ADR-DRAFT-UNBOUND/u, "a bound draft that changed must be bound again");
++
++  const discarded = adrDraftFixture("pin-adr-discarded");
++  mkdirSync(join(discarded.root, "docs/adr/discarded"), { recursive: true });
++  writeFileSync(join(discarded.root, "docs/adr/discarded/draft-storage-adapter.json"), `${JSON.stringify({ schema: "pipeline.adr-draft-discard.v1", id: "draft-storage-adapter",
++    markdownSha256: discarded.digest, sidecarSha256: "0".repeat(64), reason: "not wanted", discardedAt: NOW })}\n`);
++  assert.doesNotMatch(capture(submitArgs("feature"), discarded.designDeps).err, /ADR-DRAFT/u);
++
++  const earlier = adrDraftFixture("pin-adr-earlier");
++  const accepted = "# Accepted\n";
++  writeFileSync(join(earlier.root, "docs/adr/0004-storage-adapter.md"), accepted);
++  writeFileSync(join(earlier.root, "docs/adr/0004-storage-adapter.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "0004-storage-adapter", title: "Storage", status: "accepted", digest: sha256Hex(accepted), scope: "project", date: "2026-11-10" })}\n`);
++  assert.doesNotMatch(capture(submitArgs("feature"), earlier.designDeps).err, /ADR-DRAFT/u, "a consumer project's earlier, materialized proposal is never refused again");
++});
++
++test("C28 ADR gate: it applies where a design package applies; the mini profile and a repository without one are not refused", () => {
++  const mini = adrDraftFixture("pin-adr-mini");
++  assert.doesNotMatch(capture(submitArgs("mini"), mini.designDeps).err, /ADR-DRAFT/u);
++  const none = adrDraftFixture("pin-adr-none");
++  const noDesign = { ...none.deps, architectureDesignDraft: () => ({ ok: true, required: false }) };
++  assert.doesNotMatch(capture(submitArgs("feature"), noDesign).err, /ADR-DRAFT/u);
++});
++
++test("C28 ADR gate: a module that cites the draft path instead of the accepted record is refused with the accepted path to cite", () => {
++  const f = adrDraftFixture("pin-adr-cites-draft");
++  writeManifest({ ...f, featureId: "pin-adr-cites-draft" }, [{ id: "0001-storage-adapter", slug: "storage-adapter", digest: f.digest }]);
++  const design = { modules: [{ id: "persistence", adrReferences: ["docs/adr/draft-storage-adapter.md"] }, { id: "ui", adrReferences: [] }] };
++  const citing = { ...f.deps, architectureDesignDraft: () => ({ ok: true, required: true, status: "draft", design }) };
++  const refused = capture(submitArgs("feature"), citing);
++  assert.equal(refused.status, 2, refused.err);
++  assert.match(refused.err, /submit-plan blocked by ADR-DRAFT-CITED-AS-ACCEPTED \(module persistence: docs\/adr\/draft-storage-adapter\.md -> docs\/adr\/0001-storage-adapter\.md\)/u);
++  assert.match(refused.err, /No submission or signature request was recorded\./u);
++  const fixed = { ...f.deps, architectureDesignDraft: () => ({ ok: true, required: true, status: "draft",
++    design: { modules: [{ id: "persistence", adrReferences: ["docs/adr/0001-storage-adapter.md"] }] } }) };
++  assert.doesNotMatch(capture(submitArgs("feature"), fixed).err, /ADR-DRAFT/u);
++});
++
+ test("AC2: a plan still carrying framing placeholder text cannot be submitted", () => {
+   const f = fixture("pin-framing");
+   writeFileSync(join(f.root, f.planPath), "# PRD\n\n## Why\n<Problem/benefit/trigger; how success is measured.>\n");
+diff --git a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+index 606a93e01d3dac58eb75e9f840464e248f3bc8db..1a3e6769f0c4e6ebe4f3353d801e95007c8319dd 100644
+--- a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+@@ -21,7 +21,7 @@ import {
+   SCHEMA_DECISION
+ } from "./architecture-baseline.mjs";
+ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+-import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
++import { inspectAdrDraftBindings, inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
+ import { inspectProspectiveArchitectureManifest } from "../lib/architecture-prospective-materialization.mjs";
+ 
+ // C20 G20-23 (c): fileURLToPath, not a string replace of "file://" (wrong on Windows); the path it names is unchanged.
+@@ -492,6 +492,62 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+       assert.equal(record.digest, sha(fs.readFileSync(path.join(root, "docs", "adr", "draft-two.md"))));
+     });
+ 
++    // C28-PLAN-GATES (AC-108): a draft that is deliberately not wanted is discarded with a reason, as an auditable record and no signature.
++    it("7.6b create-adr --discard --reason records the discard for the exact draft bytes, leaves the draft in place and resolves it for submit-plan", () => {
++      const root = makeRoot();
++      assert.equal(create(root, "--slug", "unwanted", "--title", "Unwanted", "--date", "2026-11-07").status, 0);
++      const before = { md: fs.readFileSync(path.join(root, "docs", "adr", "draft-unwanted.md")), json: fs.readFileSync(path.join(root, "docs", "adr", "draft-unwanted.json")) };
++      const out = create(root, "--slug", "unwanted", "--discard", "--reason", "the storage decision replaced it");
++      assert.equal(out.status, 0, out.stderr);
++      const result = JSON.parse(out.stdout);
++      assert.equal(result.ok, true);
++      assert.equal(result.discarded, "docs/adr/draft-unwanted.md");
++      assert.equal(result.record, "docs/adr/discarded/draft-unwanted.json");
++      const record = JSON.parse(fs.readFileSync(path.join(root, result.record), "utf8"));
++      assert.deepEqual(Object.keys(record).sort(), ["discardedAt", "id", "markdownSha256", "reason", "schema", "sidecarSha256"]);
++      assert.equal(record.schema, "pipeline.adr-draft-discard.v1");
++      assert.equal(record.id, "draft-unwanted");
++      assert.equal(record.markdownSha256, sha(before.md));
++      assert.equal(record.sidecarSha256, sha(before.json));
++      assert.equal(record.reason, "the storage decision replaced it");
++      assert.equal(new Date(record.discardedAt).toISOString(), record.discardedAt);
++      assert.ok(fs.readFileSync(path.join(root, "docs", "adr", "draft-unwanted.md")).equals(before.md), "ADRs are history: the draft stays");
++      assert.ok(fs.readFileSync(path.join(root, "docs", "adr", "draft-unwanted.json")).equals(before.json));
++      assert.deepEqual(inspectAdrDraftBindings({ rootDir: root, featureDirs: ["specs/f"] }).map((entry) => entry.state), ["discarded"]);
++      assert.deepEqual(inspectArchitectureDecisionAuthoringSources({ rootDir: root, area: "project" }).findings, [], "the record raises no decision finding");
++      assert.equal(create(root, "--refresh").status, 0, "a draft-wide refresh still works with a discard record present");
++    });
++
++    it("7.6c create-adr --discard refuses without a one-line reason, for an unknown, already discarded or materialized draft, and mixed with create flags; nothing is written", () => {
++      const root = makeRoot();
++      assert.equal(create(root, "--slug", "unwanted", "--title", "Unwanted", "--date", "2026-11-07").status, 0);
++      const noRecord = () => assert.equal(fs.existsSync(path.join(root, "docs", "adr", "discarded")), false, "no record directory was created");
++      for (const args of [["--discard"], ["--discard", "--reason"], ["--discard", "--reason", ""], ["--discard", "--reason", "two\nlines"], ["--discard", "--reason", "x".repeat(301)],
++        ["--discard", "--reason", "ok", "--title", "Mixed"], ["--reason", "alone"]]) {
++        const refused = create(root, "--slug", "unwanted", ...args);
++        assert.notEqual(refused.status, 0, args.join(" "));
++        assert.match(refused.stderr, /create-adr refused|create-adr:/u);
++      }
++      noRecord();
++      const unknown = create(root, "--slug", "nothing-here", "--discard", "--reason", "x");
++      assert.notEqual(unknown.status, 0);
++      assert.match(unknown.stderr, /docs\/adr\/draft-nothing-here\.md/u);
++      noRecord();
++      fs.writeFileSync(path.join(root, "docs", "adr", "0001-unwanted.md"), "# accepted\n");
++      fs.writeFileSync(path.join(root, "docs", "adr", "0001-unwanted.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "0001-unwanted", title: "Unwanted", status: "accepted", digest: sha("# accepted\n"), scope: "project", date: "2026-11-07" })}\n`);
++      const materialized = create(root, "--slug", "unwanted", "--discard", "--reason", "x");
++      assert.notEqual(materialized.status, 0);
++      assert.match(materialized.stderr, /0001-unwanted/u, "names the accepted record that makes a discard meaningless");
++      noRecord();
++      fs.rmSync(path.join(root, "docs", "adr", "0001-unwanted.md"));
++      fs.rmSync(path.join(root, "docs", "adr", "0001-unwanted.json"));
++      assert.equal(create(root, "--slug", "unwanted", "--discard", "--reason", "first").status, 0);
++      const twice = create(root, "--slug", "unwanted", "--discard", "--reason", "second");
++      assert.notEqual(twice.status, 0);
++      assert.match(twice.stderr, /already discarded/u);
++      assert.equal(JSON.parse(fs.readFileSync(path.join(root, "docs", "adr", "discarded", "draft-unwanted.json"), "utf8")).reason, "first", "the first record is never rewritten");
++    });
++
+     it("7.7 create-adr writes a v2 record for named modules, sorted and unique, only when the physical map has them", () => {
+       const root = makeRoot();
+       makeMap(root, ["alpha", "beta"]);
+@@ -649,6 +705,12 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+         drafts = ["docs/adr/draft-method-egm.md", "docs/adr/draft-method-egm.json"].map((name) => [name, fs.readFileSync(path.join(fixture.dir, name))]);
+       } });
+       assert.equal(bound.bound[0].id, "9998-method-egm");
++      // C28-PLAN-GATES (AC-108): the binding names the accepted path the modules cite in adrReferences, never the draft (Codex greenfield 2026-11).
++      assert.deepEqual(bound.adrReferences, ["docs/adr/9998-method-egm.md"]);
++      assert.match(bound.next, /adrReferences/u);
++      assert.match(bound.next, /never a docs\/adr\/draft-/u);
++      assert.deepEqual(inspectAdrDraftBindings({ rootDir: f.dir, featureDirs: ["specs/e2e"] }).map((entry) => `${entry.slug}:${entry.state}:${entry.acceptedId}`), ["method-egm:bound:9998-method-egm"],
++        "the real binding output is what submit-plan recognizes as bound");
+       for (const name of ["docs/adr/9998-method-egm.md", "docs/adr/9998-method-egm.json", "project/architecture-chat-selections/9998-method-egm.json"]) {
+         assert.equal(fs.existsSync(path.join(f.dir, name)), false, `${name} must not exist before the PO's approval is consumed`);
+       }
+diff --git a/plugins/pipeline-core/scripts/bind-adr-proposals.mjs b/plugins/pipeline-core/scripts/bind-adr-proposals.mjs
+index 421a5e1d1e1eb4e49d768a7ba031885346dd35f4..9ae7a690eb9a748df77efcd2e6158ad82e09d7b4 100644
+--- a/plugins/pipeline-core/scripts/bind-adr-proposals.mjs
++++ b/plugins/pipeline-core/scripts/bind-adr-proposals.mjs
+@@ -256,7 +256,10 @@ function bind(root, values, slugs) {
+   const written = writes.map(({ rel }) => rel).sort();
+   return { ok: true, bound, manifest: { path: manifestPath, sha256: manifest.sha256 }, carrier: carrierPath, written,
+     companions: [...companions].sort(),
+-    next: "Stage and commit the written files together with the drafts; then create the design review receipt with design-review-receipt.mjs create and one --companion <path> for EVERY path in `companions` "
++    // C28-PLAN-GATES (Codex greenfield 2026-11): the map listed docs/adr/draft-*.md instead of the accepted ADR. The accepted path is known here.
++    adrReferences: bound.map(({ id }) => `docs/adr/${id}.md`),
++    next: "In the design's modules, cite the accepted record in adrReferences (the paths in `adrReferences`), never a docs/adr/draft-* path: submit-plan refuses a draft citation. "
++      + "Stage and commit the written files together with the drafts; then create the design review receipt with design-review-receipt.mjs create and one --companion <path> for EVERY path in `companions` "
+       + "(plus the other companions of the package), and continue with submit-plan, present-plan and approve-plan. "
+       + "If a draft changes later, run create-adr.mjs --refresh and then this command again with the same arguments; it replaces its own files in place." };
+ }
+diff --git a/plugins/pipeline-core/scripts/create-adr.mjs b/plugins/pipeline-core/scripts/create-adr.mjs
+index 94a1c897a8cabfe6e14ad88fcc0543ff3ec577fc..729925145816a9e887374d0adeb72c107b308f56 100644
+--- a/plugins/pipeline-core/scripts/create-adr.mjs
++++ b/plugins/pipeline-core/scripts/create-adr.mjs
+@@ -8,6 +8,8 @@
+  *                  [--supersedes <adr-id>] [--date YYYY-MM-DD]
+  *   create-adr.mjs --root <root> --slug <slug> --refresh
+  *   create-adr.mjs --root <root> --refresh    (every docs/adr/draft-*.md at once)
++ *   create-adr.mjs --root <root> --slug <slug> --discard --reason "<why the draft is not wanted>"
++ *                                              (records the discard in docs/adr/discarded/draft-<slug>.json; the draft stays as history)
+  *
+  * Writes docs/adr/draft-<slug>.md and docs/adr/draft-<slug>.json: a PROPOSAL (status `proposed`, schema
+  * pipeline.architecture-decision.v1, or .v2 when module ids are named) whose `digest` is already the SHA-256 of the Markdown bytes.
+@@ -21,14 +23,14 @@
+  */
+ import { createHash } from "node:crypto";
+ import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeSync } from "node:fs";
+-import { isAbsolute, join, resolve } from "node:path";
++import { dirname, isAbsolute, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { loadPhysicalArchitectureMap, validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
++import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, loadPhysicalArchitectureMap, validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
+ 
+ const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
+ const MODULE_ID = /^[a-z][a-z0-9-]{0,79}$/u;
+ const ADR_ID = /^[A-Za-z0-9._-]+$/u;
+-const FLAGS = new Set(["--root", "--slug", "--title", "--scope", "--modules", "--supersedes", "--date", "--refresh"]);
++const FLAGS = new Set(["--root", "--slug", "--title", "--scope", "--modules", "--supersedes", "--date", "--refresh", "--discard", "--reason"]);
+ const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ 
+ class Refusal extends Error {}
+@@ -40,7 +42,7 @@ function parseArgs(argv) {
+     const flag = argv[index];
+     if (!FLAGS.has(flag)) refuse(`unknown argument ${JSON.stringify(flag)}; allowed: ${[...FLAGS].join(" ")}`);
+     if (values.has(flag)) refuse(`${flag} may be given only once`);
+-    if (flag === "--refresh") { values.set(flag, true); continue; }
++    if (flag === "--refresh" || flag === "--discard") { values.set(flag, true); continue; }
+     const value = argv[index + 1];
+     if (typeof value !== "string" || (value.startsWith("--") && FLAGS.has(value))) refuse(`${flag} needs a value`);
+     values.set(flag, value);
+@@ -104,6 +106,36 @@ function refreshAllDigests(root) {
+   return { ok: true, refreshed, changed: refreshed.filter((entry) => entry.changed).map((entry) => entry.id) };
+ }
+ 
++/**
++ * C28-PLAN-GATES: a draft that is deliberately not wanted is discarded with a reason, so that submit-plan stops asking for its binding.
++ * It writes ONE record (docs/adr/discarded/draft-<slug>.json: who/what/why, bound to the exact draft bytes) and leaves the draft on disk,
++ * because ADRs are history. No signature: the record is an audit trail, not an approval, and it never makes anything accepted.
++ */
++function discardDraft(root, values) {
++  const slug = values.get("--slug");
++  const reason = values.get("--reason");
++  if (typeof reason !== "string" || reason.trim() === "" || reason.length > 300 || /[\u0000-\u001f\u007f]/u.test(reason)) {
++    refuse("--discard needs --reason \"<why the draft is not wanted>\": 1 to 300 characters on one line");
++  }
++  const dir = adrDirectory(root, false);
++  const id = `draft-${slug}`;
++  const markdownPath = join(dir, `${id}.md`), sidecarPath = join(dir, `${id}.json`);
++  if (!existsSync(markdownPath) || !existsSync(sidecarPath)) refuse(`docs/adr/${id}.md and docs/adr/${id}.json must both exist (nothing to discard for --slug ${slug})`);
++  const accepted = readdirSync(dir).find((name) => new RegExp(`^\\d{4}-${slug}\\.json$`, "u").test(name));
++  if (accepted !== undefined) refuse(`docs/adr/${accepted} already exists: this proposal was materialized, ADRs are immutable history and a discard record would mean nothing`);
++  if (existsSync(join(root, ...adrDraftDiscardPath(slug).split("/")))) refuse(`docs/adr/discarded/${id}.json: this draft is already discarded (the first record is never rewritten)`);
++  const body = {
++    schema: ADR_DRAFT_DISCARD_SCHEMA, id, markdownSha256: sha256(readFileSync(markdownPath)), sidecarSha256: sha256(readFileSync(sidecarPath)),
++    reason, discardedAt: new Date().toISOString(),
++  };
++  const target = join(root, ...adrDraftDiscardPath(slug).split("/"));
++  mkdirSync(dirname(target), { recursive: true });
++  const fd = openSync(target, "wx", 0o644);
++  try { writeSync(fd, `${JSON.stringify(body, null, 2)}\n`); } finally { closeSync(fd); }
++  return { ok: true, discarded: `docs/adr/${id}.md`, record: adrDraftDiscardPath(slug), reason,
++    next: "Commit the discard record. The draft files stay as history; submit-plan no longer asks for this proposal's binding. If the draft changes later it counts as a new proposal and must be bound or discarded again." };
++}
++
+ function pendingDraftSlugs(dir) {
+   if (!existsSync(dir)) return [];
+   return readdirSync(dir).map((name) => /^draft-(.+)\.md$/u.exec(name)?.[1]).filter((slug) => typeof slug === "string" && SLUG.test(slug)).sort();
+@@ -182,6 +214,11 @@ export function main(argv = process.argv.slice(2)) {
+       return 0;
+     }
+     if (typeof slug !== "string" || !SLUG.test(slug)) refuse("--slug must be 1 to 64 characters of a-z, 0-9 and '-', starting with a letter or digit");
++    if (values.has("--discard") || values.has("--reason")) {
++      if (!values.has("--discard") || refresh || values.size !== 4) refuse("--discard takes exactly --root, --slug and --reason \"<why the draft is not wanted>\"");
++      console.log(JSON.stringify(discardDraft(root, values), null, 2));
++      return 0;
++    }
+     if (refresh && values.size !== 3) refuse("--refresh takes only --root and, for one draft, --slug");
+     const result = refresh ? refreshDigest(root, slug) : createProposal(root, values);
+     console.log(JSON.stringify(result, null, 2));
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index c2c33e1840d8fb8bf98a4b544b38b85ceabe8547..87638f897df5c591e7c864393495b4a5586e329d 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -149,6 +149,7 @@ const sessionAuthorityRegistry = cliHelp ? {} : await import("../lib/session-aut
+ const { inspectSignedDescriptorCustodyRepository } = cliHelp ? {} : await import("../lib/worktree-lifecycle.mjs");
+ const { deliversModuleSlice, moduleDispatchScope, readPrdModules } = cliHelp ? {} : await import("../lib/module-dispatch-scope.mjs");
+ const { loadMapBundle } = cliHelp ? {} : await import("./module-inventory.mjs");
++const { inspectSpecJourneys } = cliHelp ? {} : await import("../lib/spec-journey-coverage.mjs");
+ const { owningModules } = cliHelp ? {} : await import("./architecture-boundary-check.mjs");
+ 
+ export const DISPATCH_BINDING_SCHEMA = "pipeline.dispatch-briefing.binding.v1";
+@@ -1265,7 +1266,11 @@ function resolveModulePackage(root, pkg, deps) {
+   }
+   // G20-65: the binding learns from the cut that the module is documentation-only (the generator itself cannot see the module).
+   const withDocumentation = (value) => (checked.documentationOnly === true ? { ...value, documentationModule: pkg.module } : value);
+-  if (pkg.paths !== undefined) return { pkg: withDocumentation(pkg), warnings: [] };
++  const specBytes = (() => { try { return readRepoFile(root, pkg.spec); } catch { return null; } })();
++  const vertical = verticalSliceFirstWarning({ moduleId: pkg.module, moduleCount: read.modules.length, planSliceIds: checked.planSliceIds, integrated,
++    specText: specBytes === null ? null : specBytes.toString("utf8") });
++  const verticalWarnings = vertical === null ? [] : [vertical];
++  if (pkg.paths !== undefined) return { pkg: withDocumentation(pkg), warnings: verticalWarnings };
+   const derived = declared.length === 0 ? checked : moduleDispatchScope(input);
+   const files = expandModuleScope(root, derived.writeScope);
+   if (files.length === 0 && (pkg.newFiles ?? []).length === 0) {
+@@ -1273,10 +1278,32 @@ function resolveModulePackage(root, pkg, deps) {
+   }
+   return {
+     pkg: withDocumentation({ ...pkg, paths: files }),
+-    warnings: [{ code: "DBG-MODULE-SCOPE-DERIVED", moduleId: pkg.module, ownedPaths: derived.writeScope, files, message: `the write scope of module ${pkg.module} (${derived.writeScope.join(", ")}) is listed as the ${files.length} regular file(s) it holds now. A file created there later is outside the scope; add it under "newFiles" in a new briefing, never by widening the match` }],
++    warnings: [{ code: "DBG-MODULE-SCOPE-DERIVED", moduleId: pkg.module, ownedPaths: derived.writeScope, files, message: `the write scope of module ${pkg.module} (${derived.writeScope.join(", ")}) is listed as the ${files.length} regular file(s) it holds now. A file created there later is outside the scope; add it under "newFiles" in a new briefing, never by widening the match` }, ...verticalWarnings],
+   };
+ }
+ 
++/**
++ * C28-PLAN-GATES (AC-108; Codex and WSL greenfield 2026-11): the Spec's plan is sliced vertical first (kickoff-design.md), yet the dispatches went
++ * module by module and nothing noticed. PO decision 2026-11-10: a WARNING only, never a refusal. The measurable signal the Pipeline already holds,
++ * and nothing more: this is a module dispatch, the design has two or more modules, the Spec names at least one user journey (a criterion with
++ * `Journeys:` and `Asserts:`), and no integrated dispatch outside the module cut exists yet. It is a proxy: the Spec has no field that names the
++ * planned thin path, so a design that deliberately builds a foundation module first is told it may ignore the warning. Pure; null when it does not apply.
++ */
++export function verticalSliceFirstWarning({ moduleId, moduleCount, planSliceIds, integrated, specText } = {}) {
++  if (!(moduleCount >= 2) || typeof specText !== "string") return null;
++  const slices = Array.isArray(planSliceIds) ? planSliceIds : [];
++  const done = Array.isArray(integrated) ? integrated : [];
++  if (done.some((id) => !slices.some((slice) => deliversModuleSlice(id, slice, slices)))) return null;
++  const journeys = inspectSpecJourneys(specText).covered;
++  if (journeys.length === 0) return null;
++  const named = journeys.slice(0, 5);
++  return { code: "DBG-VERTICAL-SLICE-FIRST", moduleId, journeyCriteria: named,
++    message: `module ${moduleId} is a module dispatch, the design has ${moduleCount} modules, and no integrated dispatch outside the module cut exists yet (${done.length} module slice(s) integrated so far), although the Spec names a user journey (${named.join(", ")}${journeys.length > named.length ? ", ..." : ""}). `
++      + `The plan is sliced vertical first: one thin end-to-end path for the most important journey, then widened, never all of one layer before the next. This is a warning, nothing is refused. `
++      + `Next step: if the plan's first slice is that thin path, brief it first as its own package without "module" (paths that run through the modules it needs, the criterion of that journey) and integrate it before the next module; `
++      + `if the design deliberately builds this module first (a foundation the path cannot run without), ignore this warning.` };
++}
++
+ /** The binding options one closed package yields for an agent type (shared by build and probe). */
+ function packageBindingOptions(root, pkg, agentType) {
+   return {
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 9537d38efb48ff4a364942b55c7444733db2e009..53277b6fd6315e01258d31ee330aefc6895a3494 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -2545,6 +2545,58 @@ test("G20-59: a further attempt on a dependency releases the waiting module like
+     "an unrelated id never stands in for the module's slice");
+ });
+ 
++// --- C28-PLAN-GATES (AC-108; Codex and WSL greenfield 2026-11): the Spec planned one thin end-to-end path first, the dispatches went module by module ---
++// PO decision 2026-11-10: a WARNING only (no refusal, no PO look). The measurable signal the Pipeline already holds: a module dispatch of a design
++// with two or more modules, a Spec that names a user journey, and no integrated dispatch outside the module cut yet.
++const JOURNEY_ROW = "| AC-4 | The user reloads the page and sees the saved game. Journeys: entry from the menu; reload in the middle of a save; a second save after an error. Asserts: the stored save slot holds the game state. | backlog/items/2026-01-02-sample-slug.md |\n";
++function withJourneySpec(made) {
++  const file = join(made.fx.root, made.fx.specRel);
++  writeFileSync(file, `${readFileSync(file, "utf8")}${JOURNEY_ROW}`);
++  return made;
++}
++const verticalWarning = (result) => (result.warnings ?? []).find((warning) => warning.code === "DBG-VERTICAL-SLICE-FIRST");
++
++test("C28 vertical slice: a module dispatch with no end-to-end dispatch integrated yet warns, names the figures and a next step, and never refuses", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = withJourneySpec(modulePackage());
++  const built = runDispatchBriefing(argv, depsOf(fx, { integratedSliceIds: () => [] }));
++  assert.equal(built.ok, true, JSON.stringify(built));
++  const warning = verticalWarning(built);
++  assert.ok(warning, JSON.stringify(built.warnings.map((entry) => entry.code)));
++  assert.match(warning.message, /module core/u);
++  assert.match(warning.message, /2 modules/u);
++  assert.match(warning.message, /AC-4/u, "names the criterion whose journey a thin path would prove");
++  assert.match(warning.message, /no integrated dispatch outside the module cut/u, "states the measured fact, not a verdict");
++  assert.match(warning.message, /Next step: /u);
++  assert.match(warning.message, /without "module"/u, "the next step names how the thin path is briefed");
++  const probed = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx));
++  assert.ok(verticalWarning(probed), "the readiness probe carries the same warning");
++});
++
++test("C28 vertical slice: the second module of a component-by-component run warns as well; a further attempt on a module slice counts as the module cut", async () => {
++  const { runDispatchBriefing } = await lib();
++  const second = withJourneySpec(modulePackage({ module: "api" }));
++  assert.ok(verticalWarning(runDispatchBriefing(second.argv, depsOf(second.fx, { integratedSliceIds: () => ["slice-core"] }))));
++  const retry = withJourneySpec(modulePackage({ id: "slice-core-r2" }));
++  assert.ok(verticalWarning(runDispatchBriefing(retry.argv, depsOf(retry.fx, { integratedSliceIds: () => ["slice-core"] }))));
++});
++
++test("C28 vertical slice: silent once a dispatch outside the module cut is integrated, without a Spec journey, for one module, and for a package without a module", async () => {
++  const { runDispatchBriefing, verticalSliceFirstWarning } = await lib();
++  const thin = withJourneySpec(modulePackage({ module: "api" }));
++  assert.equal(verticalWarning(runDispatchBriefing(thin.argv, depsOf(thin.fx, { integratedSliceIds: () => ["slice-core", "thin-end-to-end"] }))), undefined);
++  const noJourney = modulePackage();
++  assert.equal(verticalWarning(runDispatchBriefing(noJourney.argv, depsOf(noJourney.fx, { integratedSliceIds: () => [] }))), undefined, "the default Spec names no journey to cut a path through");
++  const plain = packageFixture();
++  withJourneySpec(plain);
++  assert.equal(verticalWarning(runDispatchBriefing(plain.argv, depsOf(plain.fx))), undefined, "a package without a module is no module dispatch");
++  const specText = `## Acceptance criteria\n\n| # | Criterion | Evidence |\n| --- | --- | --- |\n| AC-4 | The user reloads the page and sees the saved game. Journeys: entry from the menu; reload in the middle of a save. Asserts: the stored save slot holds the game state. | x |\n`;
++  const input = { moduleId: "core", moduleCount: 1, planSliceIds: ["slice-core"], integrated: [], specText };
++  assert.equal(verticalSliceFirstWarning(input), null, "one module has no layers to cut across");
++  assert.equal(verticalSliceFirstWarning({ ...input, moduleCount: 2 })?.code, "DBG-VERTICAL-SLICE-FIRST");
++  assert.equal(verticalSliceFirstWarning({ ...input, moduleCount: 2, specText: null }), null, "an unreadable Spec yields no warning");
++});
++
+ test("module package: the two reference keys come together, and a package without them keeps the old shape and the old paths rule", async () => {
+   const { runDispatchBriefing } = await lib();
+   const half = packageFixture({ module: "core" });
+diff --git a/plugins/pipeline-core/scripts/generate-architecture-overview.mjs b/plugins/pipeline-core/scripts/generate-architecture-overview.mjs
+index 2dc38549b64ef2651d7df2a62637f239fed38e1b..7c7e6bbb8e262b867767f38a8d708cfa5fac5010 100644
+--- a/plugins/pipeline-core/scripts/generate-architecture-overview.mjs
++++ b/plugins/pipeline-core/scripts/generate-architecture-overview.mjs
+@@ -5,7 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
+ import { closeSync, fsyncSync, lstatSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+ import { dirname, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { loadMapBundle } from "./module-inventory.mjs";
++import { adrDraftReferenceWarnings, loadMapBundle } from "./module-inventory.mjs";
+ 
+ // The tool ships in an installed plugin; its default target is the consuming
+ // repository, never the plugin or marketplace installation directory.
+@@ -149,7 +149,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
+     else { process.stderr.write("Usage: generate-architecture-overview.mjs [--root <repo>] [--check|--write]\n"); process.exit(2); }
+   }
+   try {
+-    const rendered = architectureOverview(root);
++    architectureOverview(root);
++    // C28-PLAN-GATES: the view prints what the design said, so a cited draft is named here instead of rewritten (the bytes are a signed target).
++    for (const line of adrDraftReferenceWarnings(loadMapBundle(root).modules)) process.stderr.write(`${line}\n`);
+     if (mode === "--write") {
+       writeArchitectureOverview(root);
+       process.stdout.write(`Generated ${OUTPUT}\n`);
+diff --git a/plugins/pipeline-core/scripts/module-inventory.mjs b/plugins/pipeline-core/scripts/module-inventory.mjs
+index ddcdb0a7de4cf71a46059c8320adc913b156e321..e97ace4ce7d05e2b741bd309b1124d9ec4e4cdd6 100644
+--- a/plugins/pipeline-core/scripts/module-inventory.mjs
++++ b/plugins/pipeline-core/scripts/module-inventory.mjs
+@@ -177,6 +177,31 @@ export function loadMapBundle(rootDir = process.cwd(), schema = getModuleInvento
+   };
+ }
+ 
++const ADR_DRAFT_REFERENCE = /^(?:\.\/)?docs\/adr\/draft-([a-z0-9][a-z0-9-]{0,63})\.(?:md|json)$/u;
++
++/** C28-PLAN-GATES: the slug when `ref` names an ADR proposal (docs/adr/draft-<slug>.md|json), else null. A draft is never an accepted decision. */
++export function adrDraftReferenceSlug(ref) {
++  return typeof ref === "string" ? ADR_DRAFT_REFERENCE.exec(ref)?.[1] ?? null : null;
++}
++
++/** The adrReferences of `modules` that cite a draft: `{ moduleId, reference, slug }`. Read-only; the map bytes are signed design targets and are never rewritten. */
++export function adrDraftReferenceFindings(modules) {
++  const found = [];
++  for (const module of Array.isArray(modules) ? modules : []) {
++    for (const reference of Array.isArray(module?.adrReferences) ? module.adrReferences : []) {
++      const slug = adrDraftReferenceSlug(reference);
++      if (slug !== null) found.push({ moduleId: module.id, reference, slug });
++    }
++  }
++  return found;
++}
++
++/** One line per finding for a reader that must not fail on it (the map stays valid; the citation is what is wrong). */
++export function adrDraftReferenceWarnings(modules) {
++  return adrDraftReferenceFindings(modules).map(({ moduleId, reference, slug }) => `Warning: module ${moduleId} lists the ADR draft ${reference} in adrReferences; a draft is a proposal, not an accepted decision. `
++    + `Cite the accepted record docs/adr/NNNN-${slug}.md once the proposal is bound (bind-adr-proposals.mjs prints the exact path as adrReferences), or remove the reference if the draft was discarded.`);
++}
++
+ /**
+  * Matches a relative file path against a pattern like 'plugins/pipeline-core/**'
+  */
+@@ -352,6 +377,7 @@ function runCli() {
+   }
+ 
+   const result = loadMapBundle(rootDir);
++  for (const line of adrDraftReferenceWarnings(result.modules)) console.error(line);
+ 
+   if (json) {
+     const output = {
+diff --git a/plugins/pipeline-core/scripts/module-inventory.test.mjs b/plugins/pipeline-core/scripts/module-inventory.test.mjs
+index 0932cbbdd7f8ecfc0ff0a11d696755cd66e83fbc..6c570631a617b0722220cd56689f28c3a4f1ba67 100644
+--- a/plugins/pipeline-core/scripts/module-inventory.test.mjs
++++ b/plugins/pipeline-core/scripts/module-inventory.test.mjs
+@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
+ import { architectureOverview, checkArchitectureOverview, renderArchitectureOverview } from "./generate-architecture-overview.mjs";
+ 
+ import {
++  adrDraftReferenceFindings,
++  adrDraftReferenceSlug,
+   extractFrontmatter,
+   loadConceptFile,
+   loadMapBundle,
+@@ -413,6 +415,45 @@ describe("generated architecture overview", () => {
+     assert.throws(() => renderArchitectureOverview(modules, new Map(), SHA), /unsafe path/u);
+   });
+ 
++  // C28-PLAN-GATES (AC-108; Codex greenfield 2026-11): the map listed docs/adr/draft-*.md in adrReferences instead of the accepted ADR.
++  // The overview and the concept files are byte-pinned design targets, so nothing is rewritten here: the readers name the problem instead.
++  it("classifies an ADR draft reference and finds it among the modules of a map", () => {
++    assert.equal(adrDraftReferenceSlug("docs/adr/draft-storage-adapter.md"), "storage-adapter");
++    assert.equal(adrDraftReferenceSlug("./docs/adr/draft-storage-adapter.json"), "storage-adapter");
++    for (const accepted of ["docs/adr/0003-storage-adapter.md", "docs/adr/draft-.md", "docs/adr/discarded/draft-x.json", "docs/other/draft-x.md", 7, null]) {
++      assert.equal(adrDraftReferenceSlug(accepted), null, String(accepted));
++    }
++    assert.deepEqual(adrDraftReferenceFindings([
++      { id: "alpha", adrReferences: ["docs/adr/0001-first.md", "docs/adr/draft-storage-adapter.md"] },
++      { id: "beta", adrReferences: [] },
++    ]), [{ moduleId: "alpha", reference: "docs/adr/draft-storage-adapter.md", slug: "storage-adapter" }]);
++    assert.deepEqual(adrDraftReferenceFindings(loadMapBundle(REPO_ROOT).modules), [], "the live map cites accepted records only");
++  });
++
++  it("the overview generator and the inventory check warn about a draft reference on stderr without failing or changing the bytes", () => {
++    const root = fs.mkdtempSync(path.join(os.tmpdir(), "architecture-overview-draft-"));
++    try {
++      const mapDir = path.join(root, "architecture/map");
++      fs.mkdirSync(mapDir, { recursive: true });
++      fs.writeFileSync(path.join(mapDir, "index.md"), "# Map\n\nOKF v0.1 concept bundle.\n\n- [alpha](alpha.md)\n");
++      const concept = (ref) => `---\ntype: Governed Module\nid: alpha\nresponsibility: First\nnonResponsibilities: []\nownedPaths:\n  - src/**\npublicContracts:\n  - src/main.mjs\nallowedDependencies: []\nauthorityEffects: []\nverificationEntryPoints:\n  - tests/main.test.mjs\nadrReferences:\n  - ${ref}\n---\n# Alpha\n`;
++      fs.writeFileSync(path.join(mapDir, "alpha.md"), concept("docs/adr/draft-storage-adapter.md"));
++      const overview = spawnSync(process.execPath, [fileURLToPath(new URL("./generate-architecture-overview.mjs", import.meta.url)), "--write"], { cwd: root, encoding: "utf8" });
++      assert.equal(overview.status, 0, overview.stderr);
++      assert.match(overview.stderr, /module alpha lists the ADR draft docs\/adr\/draft-storage-adapter\.md/u);
++      assert.match(overview.stderr, /accepted record docs\/adr\/NNNN-storage-adapter\.md/u, "names what to cite instead");
++      const generated = architectureOverview(root);
++      assert.match(generated.html, /docs\/adr\/draft-storage-adapter\.md/u, "the signed bytes keep what the design said");
++      const inventory = spawnSync(process.execPath, [fileURLToPath(new URL("./module-inventory.mjs", import.meta.url)), "--check", "--root", root], { encoding: "utf8" });
++      assert.equal(inventory.status, 0, inventory.stderr);
++      assert.match(inventory.stderr, /module alpha lists the ADR draft docs\/adr\/draft-storage-adapter\.md/u);
++      fs.writeFileSync(path.join(mapDir, "alpha.md"), concept("docs/adr/0001-storage-adapter.md"));
++      const clean = spawnSync(process.execPath, [fileURLToPath(new URL("./module-inventory.mjs", import.meta.url)), "--check", "--root", root], { encoding: "utf8" });
++      assert.equal(clean.status, 0, clean.stderr);
++      assert.equal(clean.stderr, "");
++    } finally { fs.rmSync(root, { recursive: true, force: true }); }
++  });
++
+   it("detects a source mutation until the generated view is refreshed", () => {
+     const root = fs.mkdtempSync(path.join(os.tmpdir(), "architecture-overview-"));
+     try {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 4352137339f947ba180a8fc7cde2a7b470095c48..7fea9126ca776d819a6a6b5860df7c00bb80717f 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -473,7 +473,8 @@ import {coverOnboardingOutput} from '../lib/onboarding-consent-scope.mjs';
+ import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
+ import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
+ import { locateCourseEvidenceGap } from "../lib/course-evidence-gap.mjs";
+-import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
++import { inspectAdrDraftBindings, inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
++import { adrDraftReferenceSlug } from "./module-inventory.mjs";
+ import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
+ import { rebindApproval } from "../lib/rebind-approval.mjs";
+ import { profileSourceChangedKeys } from "../lib/plan-approval-device-rebind.mjs";
+@@ -12461,6 +12462,40 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+           console.error(`Error: submit-plan blocked by ${submitDecisions.code} (${listed || "no detail"}); fix each named ADR sidecar now (node <plugin-root>/scripts/architecture-baseline.mjs --validate docs/adr/<name>.json validates one), so the signed approval never has to be reopened for it. No submission or signature request was recorded.`);
+           return 2;
+         }
++        // C28-PLAN-GATES (AC-108; WSL Claude greenfield 2026-11): the ADR proposals were written, never bound, and the design approval still passed
++        // because only an accepted record is read as a decision. Where a design package applies, an unbound proposal is refused here, before the PO
++        // signs. A proposal already materialized (accepted record exists), bound in this feature's folder or discarded with a reason does not count,
++        // so a consumer project's earlier approvals and bound ADRs stay valid. Codex greenfield: a module cited the draft path as an accepted ADR.
++        if (submitDesignDraft.required === true) {
++          const featureDirs = [...new Set([authority.value.planPath, authority.value.specPath].filter((value) => typeof value === "string")
++            .map((value) => posixPath.dirname(value.replace(/\\/gu, "/"))))];
++          const adrDrafts = (deps.adrDraftBindings ?? inspectAdrDraftBindings)({ rootDir: dir, featureDirs });
++          const unbound = adrDrafts.filter((entry) => entry.state === "unbound");
++          const scripts = (name) => fileURLToPath(new URL(`./${name}`, import.meta.url));
++          if (unbound.length > 0) {
++            const featureFolder = featureDirs[0] ?? "specs";
++            console.error(`Error: submit-plan blocked by ADR-DRAFT-UNBOUND (${unbound.map((entry) => entry.path).join(", ")}); ${unbound.length === 1 ? "this ADR proposal was" : "these ADR proposals were"} written but never bound into the design package, `
++              + `so the design approval would pass and no decision would ever become an accepted ADR. Bind ${unbound.length === 1 ? "it" : "them"}: node ${scripts("bind-adr-proposals.mjs")} --root ${dir} --feature ${base.activeFeature.id} `
++              + `--carrier ${featureFolder}/design.md --selection ${featureFolder}/po-selection.json ${unbound.map((entry) => `--draft ${entry.slug}`).join(" ")} (the selection file holds the PO's own words as JSON; skills/architecture-decision/SKILL.md shows its shape), `
++              + `commit the written files, then run submit-plan again. A proposal that is deliberately not wanted is discarded with a reason instead, one command per draft (an audit record, no signature): `
++              + `${unbound.map((entry) => `node ${scripts("create-adr.mjs")} --root ${dir} --slug ${entry.slug} --discard --reason "<why it is not wanted>"`).join(" ; ")}. No submission or signature request was recorded.`);
++            return 2;
++          }
++          const cited = [];
++          for (const module of Array.isArray(submitDesignDraft.design?.modules) ? submitDesignDraft.design.modules : []) {
++            for (const reference of Array.isArray(module?.adrReferences) ? module.adrReferences : []) {
++              const slug = adrDraftReferenceSlug(reference);
++              if (slug === null) continue;
++              const accepted = adrDrafts.find((entry) => entry.slug === slug)?.acceptedId ?? null;
++              cited.push(`module ${module.id}: ${reference} -> ${accepted === null ? "remove it, no accepted record exists for this proposal" : `docs/adr/${accepted}.md`}`);
++            }
++          }
++          if (cited.length > 0) {
++            console.error(`Error: submit-plan blocked by ADR-DRAFT-CITED-AS-ACCEPTED (${cited.join("; ")}); a draft is a proposal, not an accepted decision, so the module's adrReferences must cite the accepted record that binding publishes. `
++              + `Correct the architecture design block in the PRD, commit it, and run submit-plan again. No submission or signature request was recorded.`);
++            return 2;
++          }
++        }
+       }
+       // D165 D4: when no design package applies, a brownfield architecture hurdle
+       // (missing map, open debt, adoption, ...) would only surface at set-phase
