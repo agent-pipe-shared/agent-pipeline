@@ -206,6 +206,38 @@ test("D165-D1 (c) class 10 unavailable with a different evidence shape is still 
   denied(d1Verdict(d1Fitness([telemetry])), "telemetryUnavailable");
 });
 
+test("Claude Windows report: the denial names the findings and the readiness block that keeps the pending allowance shut", () => {
+  const cycle = { classId: 3, propertyId: D1_CLASSES[2], outcome: "finding",
+    violations: [{ ruleId: "dependency-cycle", module: "core", target: "core -> ui -> core", details: "Dependency cycle detected: core -> ui -> core" }] };
+  const verdict = architectureFitnessAuthorityVerdict(repoRoot, COMMAND, {
+    activeFeaturePlanningSurfaceFn: () => ({ planPath: PLAN, paths: [IMPLEMENTATION] }),
+    activeFeaturePlanningScopeFn: () => PLAN,
+    evaluateArchitectureFitnessFn: () => d1Fitness([D1_UNCALIBRATED, cycle], "blocked"),
+    inspectArchitectureEntryReadinessFn: () => ({ status: "blocked", code: "ARCHITECTURE-DECISION-APPLICABILITY-BLOCKED",
+      message: "a required architecture decision for the declared implementation surface is unresolved or blocked",
+      nextAction: { guidance: "Resolve the blocked area's decision findings. Blocking: src/core: DECISION-MISSING (docs/adr/0002.md)." } }),
+  });
+  denied(verdict, "readiness blocked");
+  assert.match(verdict.stderr, /^Findings: dependency-direction-cycles: Dependency cycle detected: core -> ui -> core\.$/mu);
+  assert.match(verdict.stderr, /^The greenfield pending-surface allowance does not apply \(PENDING-FITNESS-READINESS-NOT-READY\)\.$/mu);
+  assert.match(verdict.stderr, /^Entry readiness is blocked first: ARCHITECTURE-DECISION-APPLICABILITY-BLOCKED: a required architecture decision .* Blocking: src\/core: DECISION-MISSING \(docs\/adr\/0002\.md\)\. Fixing fitness findings alone does not clear this\.$/mu);
+});
+
+test("Claude Windows report: a ready readiness names only the allowance code, not a readiness block", () => {
+  const cycle = { classId: 3, propertyId: D1_CLASSES[2], outcome: "finding", violations: [{ ruleId: "dependency-cycle", module: "core", target: "core -> core" }] };
+  const verdict = architectureFitnessAuthorityVerdict(repoRoot, COMMAND, {
+    activeFeaturePlanningSurfaceFn: () => ({ planPath: PLAN, paths: [IMPLEMENTATION] }),
+    activeFeaturePlanningScopeFn: () => PLAN,
+    evaluateArchitectureFitnessFn: () => d1Fitness([D1_UNCALIBRATED, cycle], "blocked"),
+    inspectArchitectureEntryReadinessFn: () => ({ status: "ready", code: null,
+      fitness: { source: "approved-design-package", overallStatus: "deferred", pendingPhysicalSurfaces: [ENTRY_POINT] } }),
+  });
+  denied(verdict, "other class");
+  assert.match(verdict.stderr, /^Findings: dependency-direction-cycles: dependency-cycle core -> core -> core\.$/mu);
+  assert.match(verdict.stderr, /\(PENDING-FITNESS-OTHER-CLASS\)/u);
+  assert.doesNotMatch(verdict.stderr, /Entry readiness is/u);
+});
+
 test("D165-D1 (d) a malformed nine-outcome set is denied", () => {
   const fitness = d1Fitness([D1_UNCALIBRATED]);
   fitness.outcomes = fitness.outcomes.slice(0, 9);

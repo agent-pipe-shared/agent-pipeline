@@ -191,6 +191,8 @@ export function architectureFitnessAuthorityVerdict(root, command, dependencies 
     } catch { /* unchanged denial below */ }
   }
   // Only the greenfield pending allowance below can lift a non-green fitness result.
+  let pendingEntry = null;
+  let allowance = null;
   if (fitness !== null && typeof fitness === "object"
     && typeof fitness.overallStatus === "string"
     && fitness.overallStatus !== "unavailable" && fitness.overallStatus !== "unknown"
@@ -202,11 +204,12 @@ export function architectureFitnessAuthorityVerdict(root, command, dependencies 
         // ALF-H1-PF20 (AC-127): a materialized greenfield tree is approved-scoped, never deferred, so the allowance above
         // cannot cover it. The library decides whether the only non-green evaluator outcomes are the tree's own planned,
         // not yet written contracts and verification entry points; any other finding, and navigation currency, still deny.
-        const pendingEntry = (dependencies.inspectArchitectureEntryReadinessFn ?? inspectArchitectureEntryReadiness)({
+        pendingEntry = (dependencies.inspectArchitectureEntryReadinessFn ?? inspectArchitectureEntryReadiness)({
           rootDir: root,
           taskScope: scope,
         });
-        if (greenfieldPendingFitnessAllowance({ readiness: pendingEntry, fitness }).allowed) return null;
+        allowance = greenfieldPendingFitnessAllowance({ readiness: pendingEntry, fitness });
+        if (allowance.allowed) return null;
       }
     } catch { /* unchanged denial below */ }
   }
@@ -228,9 +231,37 @@ export function architectureFitnessAuthorityVerdict(root, command, dependencies 
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
       + `${ARCHITECTURE_FITNESS_DENIAL_CODE}: planning architecture fitness is ${status}.\n`
+      + fitnessFindingLines(fitness)
       + remedyGuidance
+      + pendingAllowanceLines(pendingEntry, allowance)
       + "Resolve new or worsened findings, record a valid exception, or repair the evaluator/profile evidence before requesting implementation authority.\n",
   );
+}
+
+// Claude Windows greenfield 2026-11-10: the denial named only remedy ids, so the run spent about an hour on fitness
+// remedies (a deleted dist/, a re-materialization, a design reopen with a PO signature) while the entry readiness that
+// decides the greenfield allowance was blocked for a different reason. Name the findings and that reason.
+const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 3)}...` : text);
+const oneLine = (value) => String(value ?? "").replace(/\s+/gu, " ").trim();
+
+function fitnessFindingLines(fitness) {
+  const rows = (Array.isArray(fitness?.outcomes) ? fitness.outcomes : [])
+    .filter((outcome) => outcome?.outcome === "finding")
+    .flatMap((outcome) => (Array.isArray(outcome.violations) ? outcome.violations : [])
+      .map((violation) => `${oneLine(outcome.propertyId)}: ${clip(oneLine(violation?.details ?? `${violation?.ruleId ?? "finding"} ${violation?.module ?? ""} -> ${violation?.target ?? ""}`), 220)}`));
+  if (rows.length === 0) return "";
+  return `Findings: ${rows.slice(0, 6).join("; ")}${rows.length > 6 ? `; and ${rows.length - 6} more` : ""}.\n`;
+}
+
+function pendingAllowanceLines(pendingEntry, allowance) {
+  if (allowance === null || allowance.allowed) return "";
+  const lines = [`The greenfield pending-surface allowance does not apply (${allowance.code}).`];
+  if (pendingEntry !== null && typeof pendingEntry === "object" && pendingEntry.status !== "ready") {
+    const guidance = oneLine(pendingEntry.nextAction?.guidance);
+    lines.push(`Entry readiness is ${oneLine(pendingEntry.status)} first: ${oneLine(pendingEntry.code)}: ${oneLine(pendingEntry.message)}.${guidance === "" ? "" : ` ${clip(guidance, 900)}`}`
+      + " Fixing fitness findings alone does not clear this.");
+  }
+  return `${lines.join("\n")}\n`;
 }
 
 export const FITNESS_MODEL_NOT_QUALIFIED_CODE = "GUARD-FITNESS-MODEL-NOT-QUALIFIED";
