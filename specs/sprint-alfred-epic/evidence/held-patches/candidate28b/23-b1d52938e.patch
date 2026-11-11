@@ -1,0 +1,44 @@
+diff --git a/.gitleaks.toml b/.gitleaks.toml
+index 0e1707dd11f207be78014f27a682cffba9417542..0bcbb701fc7c73f12d556268cfab1f6365333f83 100644
+--- a/.gitleaks.toml
++++ b/.gitleaks.toml
+@@ -107,7 +107,7 @@ regexes = [
+   '''^[0-9a-f]{32,64}$'''
+ ]
+ 
+-# Candidate 28b (PO decision pending, optional patch): the held patches under specs/<feature>/evidence/held-patches/ are unified diffs of
++# Candidate 28b (PO decision 2026-11-11, option C): the held patches under specs/<feature>/evidence/held-patches/ are unified diffs of
+ # source files that are scanned at their own paths. A diff that removes or changes a secret-shaped test fixture carries that text again as a
+ # `-`/`+` line, so the evidence copy re-trips the same four rules forever and cannot be edited (evidence). Exempted ONLY for `.patch` files
+ # inside a held-patches folder and ONLY for these four rule ids: the same text in any other file, every other rule and every other path
+diff --git a/plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs b/plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs
+index 53877a1e00b730d7c18da30cf3b0102b4870345e..8cd2956d3a03190a06aea908ddede5621527f133 100644
+--- a/plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs
++++ b/plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs
+@@ -177,10 +177,25 @@ test("C: shipped scanner config has no secret-prefix whitelist, stopwords, globa
+       "# same file, a hex digest anywhere else and every other rule stay fully armed.",
+       "",
+     ].join("\n");
++    // Candidate 28b (PO decision 2026-11-11, option C): the one further sanctioned stanza is the path-only exemption of the held-patch evidence copies
++    // (`specs/<feature>/evidence/held-patches/*.patch`), once per rule for exactly four rules (private-key, github-pat, generic-api-key, sentry-access-token), in the repo-root file only (the plugin-shipped default
++    // carries none). Removed byte-for-byte before the checks, so any other or any widened allowlist still fails exactly as before.
++    const HELD_PATCH_STANZA = [
++      "[[rules.allowlists]]",
++      "description = \"held-patch evidence copies of source diffs\"",
++      "paths = [",
++      "  '''.*/specs/[^/]+/evidence/held-patches/.*\\.patch$'''",
++      "]",
++      "",
++    ].join("\n");
++    const HELD_PATCH_ONLY_RULES = ["private-key", "github-pat"].map((id) => `[[rules]]\nid = "${id}"\n\n${HELD_PATCH_STANZA}\n`);
+     const raw = readFileSync(p, "utf8");
+     assert.equal(raw.split(PF99_ALLOWLIST).length, 2, `the course-key exemption is present exactly once, byte-for-byte: ${p}`);
+     assert.equal(raw.split(CLOSE_DIGEST_COMMENT + CLOSE_DIGEST_STANZA).length, 2, `the commented close-digest exemption is present exactly once: ${p}`);
+-    const withoutFirst = raw.replace(CLOSE_DIGEST_COMMENT + CLOSE_DIGEST_STANZA, "");
++    const heldPatchCount = raw.split(HELD_PATCH_STANZA).length - 1;
++    assert.equal(heldPatchCount, p === resolveGitleaksConfigPath() ? 4 : 0, `the held-patch exemption is in the repo-root file (private-key, github-pat, generic-api-key, sentry-access-token) and nowhere else: ${p}`);
++    const withoutHeld = HELD_PATCH_ONLY_RULES.reduce((value, block) => value.replace(block, ""), raw).split(`${HELD_PATCH_STANZA}\n`).join("");
++    const withoutFirst = withoutHeld.replace(CLOSE_DIGEST_COMMENT + CLOSE_DIGEST_STANZA, "");
+     assert.equal(withoutFirst.split(CLOSE_DIGEST_STANZA).length, 2, `the second close-digest exemption is present exactly once: ${p}`);
+     const text = withoutFirst.replace(CLOSE_DIGEST_STANZA, "").replace(K98_ALLOWLIST, "").replace(PF99_ALLOWLIST, "");
+     assert.doesNotMatch(text, /^\s*(regexes|stopwords|entropy|tags|commits)\s*=/mu);

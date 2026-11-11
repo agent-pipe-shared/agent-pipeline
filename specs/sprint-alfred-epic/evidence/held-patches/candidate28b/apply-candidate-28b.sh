@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28b: 23 held patches exported from the build clone chain 946dd2ea2..0dc358108
+# PO apply script for candidate 28b: 24 held patches exported from the build clone chain 946dd2ea2..fc36ab5b7
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -35,8 +35,9 @@ step 18-f2b2bc9c8 'feat(architecture): preview the boundary check against the pr
 step 19-9028fa9c1 'fix(verify): restate four checks the 28b chain made stale and keep two texts clear of source-only paths and flags'
 step 20-4d74f2385 'fix(inventory): keep the hook surfaces sorted after the dispatch-budget matcher change'
 step 21-99fb5af20 'fix(security): assemble the secret-shaped fixture values of two tests at run time so the repository scan stays clean'
-step 22-da5f9463f 'fix(verify): declare the two missing case ids of the quoted pipeline reads suite'
-step 23-0dc358108 'feat(security): exempt held-patch evidence copies from four fixture rules and prove the exemption stays path-scoped'
+step 22-8cf9d3ab8 'feat(security): exempt held-patch evidence copies from four fixture rules and prove the exemption stays path-scoped'
+step 23-b1d52938e 'test(security): restate the scanner config pin for the held-patch exemption'
+step 24-fc36ab5b7 'fix(verify): declare the two missing case ids of the quoted pipeline reads suite through the case completion augmentation'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
