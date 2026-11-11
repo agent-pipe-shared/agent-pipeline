@@ -30,6 +30,10 @@ node "${PIPELINE_PLUGIN_ROOT}/scripts/push-init.mjs" --root <repo> --by <name> -
 `--by` is an actor attribution, not a substitute for approval. Fill it only with
 a value the PO supplied for this exact command, never with a name you inferred.
 
+A calibration that still says `repositoryMode: local-only` on a project that now
+has a remote is corrected with `node "${PIPELINE_PLUGIN_ROOT}/scripts/repository-mode-promote.mjs" --root <repo> --to remote-tracked`.
+`push-prepare` names it when it applies.
+
 Use the absolute `pluginRoot` from the current ready start-preflight result for
 `PIPELINE_PLUGIN_ROOT`. Never substitute a project source-tree
 `plugins/pipeline-core` path: the lifecycle guard admits the loaded runtime
