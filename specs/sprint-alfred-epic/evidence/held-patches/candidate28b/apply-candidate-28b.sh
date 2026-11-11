@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28b: 12 held patches exported from the build clone chain 946dd2ea2..6dd71fcb6
+# PO apply script for candidate 28b: 13 held patches exported from the build clone chain 946dd2ea2..35e1b768a
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -26,6 +26,7 @@ step 09-dbf5c42b3 'test(verify): extend case-completion policies and restate obs
 step 10-41b1124fa 'fix(skills): bring the start skill back under its size pin and name the four status facts and the lagging queue head in the close-feature skill'
 step 11-6e1f3ea40 'fix(docs): regenerate the obligations document with the cd allowlist entry and the enforcement page after the hook matcher change'
 step 12-6dd71fcb6 'fix(docs): carry the recursive-delete guardrail into the vendored guardrails copy'
+step 13-35e1b768a 'docs(backlog): record the missing read-only preview of the architecture check before the design signature'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

@@ -1,0 +1,43 @@
+diff --git a/backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md b/backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..03d0b0275bf3c453cf5c8248e878d92609e2c419
+--- /dev/null
++++ b/backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md
+@@ -0,0 +1,37 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.no-read-only-preview-of-the-architecture-check-before-the-design-signature
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-11
++source: "Windows greenfield run on candidate 27, monitoring note 2026-11-11 (transcript read only, no run report yet)"
++sprint: none
++done_when: manual
++---
++
++# No read-only preview of the architecture check before the design signature
++
++## Description
++
++The architecture dependency permission a feature may use is read from the architecture map,
++and the map exists only after the PO has signed the design. A session that wants to know
++whether a design change is enough therefore cannot ask the Pipeline: in the observed run the
++agent rebuilt the guard's rule by hand ("according to my rebuild of the guard") to predict
++whether a signature would suffice. Each wrong prediction costs a full signature round (the run
++needed four design signatures, three of them for real design changes and the rest for rejected
++rules).
++
++## Acceptance
++
++- A read-only command evaluates the tracked tree against the PROPOSED architecture design of
++  the PRD (the modules, `ownedPaths` and `allowedDependencies` in the unsigned package) with
++  the same rules as `architecture-boundary-check.mjs`, and prints each violation with the file,
++  the module and the rule. It writes nothing and needs no signature.
++- The design-approval stop and the preflight of `present-plan` name that command.
++
++## To verify when the run report arrives
++
++The architecture check at the phase change is reported to take every path that appears
++anywhere in the PRD text, and its reason does not name the violated rule. Confirm against the
++code and the report before building; if true, the refusal must name the rule and the path.
