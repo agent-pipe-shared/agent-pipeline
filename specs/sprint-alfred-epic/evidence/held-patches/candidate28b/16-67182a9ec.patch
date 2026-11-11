@@ -1,0 +1,76 @@
+diff --git a/docs/security-controls.md b/docs/security-controls.md
+index 020ac5548e063e8b58857b4bf5390893f5b3b208..9dc4a1b4a90073740914ce6acfb04092fe9fbced 100644
+--- a/docs/security-controls.md
++++ b/docs/security-controls.md
+@@ -18,7 +18,7 @@ configuration. Identify the runtime before treating a guard as live. The
+ portable methodology and host-specific hooks; [runner support](runner-support.md)
+ states the separate runner and platform limits.
+ 
+-A read of a protected credential location is refused with the typed code `GUARD-READ-CREDENTIAL-TARGET`, which names the path itself as the cause: no change to the command, its options or its wording lifts it. The shell route, the Claude native read tools and the Antigravity native read tools print this code. The repair is for a human to put the content you need into a non-credential file inside the project (for example under `docs/` or `scratch/`) and for you to read that copy. Where the human override planner offers a route for the exact path, a signed one-time override can release that one read in a shell command; native read tools have no override route, and for secret-named files the refusal says that no override route is offered.
++A read of a protected credential location is refused with the typed code `GUARD-READ-CREDENTIAL-TARGET`, which names the path itself as the cause: no change to the command, its options or its wording lifts it. The shell route, the Claude native read tools and the Antigravity native read tools print this code. The repair is for a human to put the content you need into a non-credential file inside the project (for example under `docs/` or `scratch/`) and for you to read that copy. No human override is offered on any lane (PO decision 2026-11-11): a read never gets a signature, so the shell route states that none is offered and plans none, and the native read tools have no override route either.
+ 
+ ## Authority is separate from consent
+ 
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index c3a63f7761ef553f9fa7ee2473f8c222630a1fb4..17d35a84cd2c93ed7a55aea267c39b146e68862d 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -14,7 +14,7 @@ import { writeTargetPath } from "../tool-write-target.mjs";
+ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { observeGovernanceScope } from "../governance-scope.mjs";
+ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
+-import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
++import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+ import { EXTERNAL_DIRECTORY_FILTER_HINT, filterRefusedOnExternalDirectory, firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, recursiveGrepHint, repeatedFlagHint } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+ import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+@@ -535,12 +535,9 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       }
+     } catch { outsideRoot = false; credentialTarget = false; }
+     if (credentialTarget) {
+-      // Same override route as the other human-liftable read refusals: a consumed one-time capability lifts exactly this command; otherwise
+-      // the guidance is the plan command, or the planner's own statement that no route is offered for this path.
+-      const reason = `${READ_CREDENTIAL_TARGET_CODE}: ${READ_CREDENTIAL_TARGET_GUIDANCE}`;
+-      const route = humanOverrideRoute(READ_CREDENTIAL_TARGET_CODE, reason, "command", root, toolName, input.tool_input, dependencies);
+-      if (!route.admitted) return withLifts(lifts, blocked(READ_CREDENTIAL_TARGET_CODE, null, [], route.overrideGuidance));
+-      lifts.push(route.admitted);
++      // C28 (PO decision 2026-11-11, replaces the K96 override route): a read never gets a signature, so a credential target offers NO human
++      // override at all, not even a planned one; the typed refusal states the copy repair and that none is offered. No override request is seeded.
++      return withLifts(lifts, blocked(READ_CREDENTIAL_TARGET_CODE, null, [], ""));
+     } else {
+       // Name the one flag the grammar objects to when a single flag is the whole reason (null otherwise; nothing is granted).
+       let flag = null;
+diff --git a/plugins/pipeline-core/lib/guard/grammar-denials.mjs b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+index b1f1ed11e898ee002197182a917eb5aef97ade09..394e3cd7c92d6e11d146611bb9b75c79d02e70ee 100644
+--- a/plugins/pipeline-core/lib/guard/grammar-denials.mjs
++++ b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+@@ -69,7 +69,7 @@ const READ_CREDENTIAL_TARGET_COPY_REPAIR = "Repair: ask the human to put the con
+ export const READ_CREDENTIAL_TARGET_REMEDY = [
+   READ_CREDENTIAL_TARGET_CAUSE,
+   READ_CREDENTIAL_TARGET_COPY_REPAIR,
+-  "Alternatively the human can release this one exact read with a signed one-time override; the route is printed below when the override planner offers one for this path, and when it reports that none is offered, the copy above is the repair.",
++  "A read needs no human override and none is offered: there is never a signature for a read, so the copy above is the only repair.",
+ ];
+ 
+ /** Native read tools (no shell command, no override route for a native tool call): the same cause and the same runnable repair. */
+diff --git a/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs b/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+index 827673678a3909e85a5779282a32474321eb1757..81de4c0bd58e7ff627f86b053952431a0ac51eef 100644
+--- a/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
++++ b/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+@@ -420,9 +420,13 @@ test("M7b an in-root credential read on every shell runner carries GUARD-READ-CR
+   }
+ }));
+ 
+-test("M7c the claude lane's credential refusal also offers the override route text of the other human-liftable refusals, and says plainly when none is offered", { timeout: 300000 }, () => withRunnerFixture((path) => {
+-  const decision = runnerDecision("claude", shellCall("cat vault/id_rsa", path), path);
+-  assert.match(decision.text, /Human override available for this exact command|No human override route is offered for this exact command/u, decision.text);
++// C28 (PO decision 2026-11-11, replaces the K96 override route): a credential read never gets a signature, on any lane.
++test("M7c a credential read offers no human override on any shell runner: the refusal says none is offered and plans none", { timeout: 300000 }, () => withRunnerFixture((path) => {
++  for (const runner of RUNNERS) {
++    const decision = runnerDecision(runner, shellCall("cat vault/id_rsa", path), path);
++    assert.match(decision.text, /A read needs no human override and none is offered/u, `${runner}\n${decision.text}`);
++    assert.doesNotMatch(decision.text, /Human override available|signed one-time override|prepare-authorization|plan --request/u, `${runner}: no override route is printed\n${decision.text}`);
++  }
+ }));
+ 
+ test("M7d negative control: refusals that are not about a credential keep their codes (a flag the grammar does not know, an unsupported recursive grep, a missing file)", { timeout: 300000 }, () => withRunnerFixture((path) => {

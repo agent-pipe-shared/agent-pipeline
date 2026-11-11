@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28b: 14 held patches exported from the build clone chain 946dd2ea2..752ca4e5d
+# PO apply script for candidate 28b: 17 held patches exported from the build clone chain 946dd2ea2..6b48dce37
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -28,6 +28,9 @@ step 11-6e1f3ea40 'fix(docs): regenerate the obligations document with the cd al
 step 12-6dd71fcb6 'fix(docs): carry the recursive-delete guardrail into the vendored guardrails copy'
 step 13-35e1b768a 'docs(backlog): record the missing read-only preview of the architecture check before the design signature'
 step 14-752ca4e5d 'docs(backlog): state what the code already covers of the architecture check findings and keep only the preview open'
+step 15-621a46155 'fix(critic): name the shipped maxTurns 100 and its working cap of 85 in the Critic briefing template and re-pin the template once'
+step 16-67182a9ec 'fix(guard): offer no human override for a credential-target read on any lane'
+step 17-6b48dce37 'feat(package): admit completed back to implementing for a proven correction round and let the declined acceptance write the record back'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

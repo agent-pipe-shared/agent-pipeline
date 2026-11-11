@@ -1,0 +1,162 @@
+diff --git a/plugins/pipeline-core/lib/feature-package-topology.mjs b/plugins/pipeline-core/lib/feature-package-topology.mjs
+index cbb941cfccd5709d05ecd7c4c65b25225d36200a..b1dfccbbcc3e1a2bb42a37e9e99143e72c2c9c10 100644
+--- a/plugins/pipeline-core/lib/feature-package-topology.mjs
++++ b/plugins/pipeline-core/lib/feature-package-topology.mjs
+@@ -236,6 +236,11 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
+     && (checked.receipt.candidate.commit !== head.commit || checked.receipt.candidate.tree !== head.tree);
+   const requalifies = from === "completed" && nextState === "verifying" && candidateMoved
+     && typeof options?.activeFeatureId === "string" && options.activeFeatureId === checked.receipt.featureId;
++  // C28 (PO decision 2026-11-11): a declined acceptance retires the bound Result and returns the feature to a correction round; the package record must not keep saying
++  // `completed`. The one new exit of `completed`: the active feature, whose Continuity binding says a declined acceptance retired its Result and binds none now
++  // (the caller proves that from State, `options.correctionRoundFeatureId`). It goes to `implementing`; the second move to `verifying` rebinds the candidate as always.
++  const returnsToCorrection = from === "completed" && nextState === "implementing"
++    && typeof options?.correctionRoundFeatureId === "string" && options.correctionRoundFeatureId === checked.receipt.featureId;
+   const admitted = new Set([
+     "draft:awaiting-approval",
+     "awaiting-approval:draft",
+@@ -247,11 +252,11 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
+     "verifying:completed",
+     "verifying:implementing",
+   ]);
+-  if (!admitted.has(`${from}:${nextState}`) && !requalifies) {
++  if (!admitted.has(`${from}:${nextState}`) && !requalifies && !returnsToCorrection) {
+     // 17 (AGY greenfield): the agent asked for implementing -> completed in one step and had to read this file to learn the chain.
+     const next = [...admitted].filter((key) => key.startsWith(`${from}:`)).map((key) => key.slice(from.length + 1));
+     return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", from, to: nextState,
+-      repair: `a package moves one admitted step at a time (draft > awaiting-approval > approved > implementing > verifying > completed); from ${from} the admitted next states are ${next.length === 0 ? "none" : next.join(", ")}; plan and apply each step in turn${from === "completed" ? "; a completed package of the active feature returns to verifying only when HEAD has moved past its candidate" : ""}`, findings: [] };
++      repair: `a package moves one admitted step at a time (draft > awaiting-approval > approved > implementing > verifying > completed); from ${from} the admitted next states are ${next.length === 0 ? "none" : next.join(", ")}; plan and apply each step in turn${from === "completed" ? "; a completed package of the active feature returns to verifying only when HEAD has moved past its candidate, and to implementing only after a declined acceptance retired its Result (the close's decline route writes that step itself)" : ""}`, findings: [] };
+   }
+   // The first move into `verifying` binds the package candidate: no other verb writes it, and `verifying`/`completed`
+   // require one (FTP-CANDIDATE). It is the current HEAD, and only when a registered, passing Verify evidence for exactly
+diff --git a/plugins/pipeline-core/lib/feature-package-topology.test.mjs b/plugins/pipeline-core/lib/feature-package-topology.test.mjs
+index c572c11f068cae87156daa80e66c5795b82fdd26..58e9583c127b0f1c7b3ce5214d2b09b893d5a6cb 100644
+--- a/plugins/pipeline-core/lib/feature-package-topology.test.mjs
++++ b/plugins/pipeline-core/lib/feature-package-topology.test.mjs
+@@ -46,6 +46,15 @@ try {
+     assert.match(plan({ head: newHead }).repair, /returns to verifying only when HEAD has moved/u);
+     write(oldCandidate);
+     assert.equal(plan({ head: newHead, activeFeatureId: c21 }).reason, "verify-evidence-required", "no Verify for the new HEAD, no rebinding");
++    // C28 (PO decision 2026-11-11): the second exit of `completed`, to `implementing`, only for a feature State proves to be in a correction round (a declined acceptance retired its Result).
++    const correction = (options) => planFeaturePackageTransition(root, `${c21Base}/lifecycle.json`, "implementing", options);
++    const returned = correction({ correctionRoundFeatureId: c21 });
++    assert.equal(returned.status, "preview", JSON.stringify(returned)); assert.equal(returned.from, "completed"); assert.equal(returned.to, "implementing");
++    assert.equal(returned.candidate, undefined, "no candidate is bound on the way back; the move to verifying rebinds it");
++    assert.equal(correction({}).reason, "invalid-transition", "without the proof of a correction round a completed package stays completed");
++    assert.equal(correction({ correctionRoundFeatureId: "another-feature" }).reason, "invalid-transition", "a foreign feature is not in a correction round");
++    assert.equal(correction({ activeFeatureId: c21 }).reason, "invalid-transition", "an active feature alone is not a correction round");
++    assert.match(correction({}).repair, /to implementing only after a declined acceptance/u);
+   }
+   const bootstrapId = "bootstrap-feature";
+   const bootstrapBase = `specs/${bootstrapId}`;
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 69334a6f3ecd72c432d1584275ee2d4f75bd5209..6c767fc5935aa0928eb6f44397b08c7213e140d6 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -508,6 +508,10 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+           assert.equal(declined.status, 0, JSON.stringify(declined.result).slice(0, 1200)); assert.equal(declined.code, "declined", JSON.stringify(declined.result).slice(0, 1200));
+           const after = stateJson();
+           assert.equal(after.continuity.authority.result, null, "the bound Result is retired");
++          // C28 (PO decision 2026-11-11, measured here): on the real chain the acceptance question comes BEFORE the package moves to verifying/completed, so the record already says
++          // implementing at the decline and nothing is written (packageBack null). The exit completed -> implementing is the safety net for a package that is further along (see feature-package-topology.test.mjs).
++          assert.equal(JSON.parse(readFileSync(join(fx.root, MANIFEST), "utf8")).state, "implementing", "the package record says implementing during the correction round");
++          assert.equal(declined.result.packageBack, null, JSON.stringify(declined.result.packageBack));
+           assert.equal(after.continuity.revision, JSON.parse(stateBeforeAnswer).continuity.revision + 1, "one revision step");
+           const retirement = after.continuity.resultRetirements.at(-1);
+           assert.deepEqual({ path: retirement.path, sha256: retirement.sha256 }, boundResult, "the retired binding stays in history");
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index 84bdfd907272a75da48c2dcd8c527ac958bb703c..ce915d1957c3cc49a789f901e56014e31dbed998 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -426,6 +426,26 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+             retired = { path: bound.path, sha256: bound.sha256, apply: applyAction };
+           } catch (error) { return stopResult("retire-result", error.refusalCode ?? error.code, error.message, declineRepair(error), { decline: { path: decline.path, sha256: decline.sha256, candidate: candidateHead } }); }
+         }
++        // C28 (PO decision 2026-11-11, replaces the label-only handling of the record lag): the package record must not keep saying `verifying` or `completed` while the feature is back in a
++        // correction round. State now proves the round (a retirement of the reason declined-acceptance, no Result bound), so the planner admits the move to `implementing`; the second
++        // move to `verifying` rebinds the candidate as always. Idempotent: a package that is already past this step (implementing, draft, ...) is left alone.
++        let packageBack = null;
++        try {
++          const packageManifest = `specs/${featureId}/lifecycle.json`;
++          let packageState = null;
++          try { const value = JSON.parse(readFileSync(resolve(root, packageManifest), "utf8")).state; packageState = typeof value === "string" ? value : null; } catch { packageState = null; }
++          if (packageState === "verifying" || packageState === "completed") {
++            stages.push("package-correction-round");
++            const plan = command(runner, process.execPath, [STATE_WRITER, "feature-package-plan", "--root", root, "--manifest", packageManifest, "--next-state", "implementing"], "ONESHOT-PACKAGE-PLAN");
++            if (typeof plan.planSha256 !== "string") fail("ONESHOT-PACKAGE-PLAN", "The package plan for the correction round returned no plan digest.");
++            command(runner, process.execPath, [STATE_WRITER, "feature-package-apply", "--root", root, "--manifest", packageManifest, "--next-state", "implementing", "--plan-sha256", plan.planSha256], "ONESHOT-PACKAGE-APPLY");
++            packageBack = { manifest: packageManifest, from: packageState, to: "implementing" };
++          }
++        } catch (error) {
++          // Never a stop: the decline itself (the record and the retired Result) is done and must not be blocked by this side step. The failure is reported in the result, and the four-status
++          // projection (`featureStatus.recordLag`) keeps the lagging record visible until the move to `implementing` is made by hand (feature-package-plan / feature-package-apply).
++          packageBack = { manifest: `specs/${featureId}/lifecycle.json`, to: "implementing", error: String(error.refusalCode ?? error.code ?? "ONESHOT-PACKAGE"), detail: String(error.message ?? "").slice(0, 300) };
++        }
+         // The decline's own outputs travel in one commit through the writer-commit capability the close uses; none of them is an output the leftover rollback below names.
+         const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${featureId}`]);
+         const tokens = (status?.status === 0 ? String(status.stdout ?? "") : "").split("\0").filter((token) => token !== "");
+@@ -441,7 +461,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+           `Critic delta round on the new candidate: node ${PREPARE_DISPATCH} critic --delta-request <the delta request path> --root ${root} (see the critic-review skill); the packet it consumes is the new packet`,
+           `then run the identical close command with the new packet: ${rerunBase} --critic-packet-id <new-packet-id>; it runs the Result bootstrap again and asks the acceptance question again for the new candidate`,
+         ];
+-        return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "declined", featureId, lifecycleId: lifecycle ?? null, resumeLifecycleId: lifecycle ?? null, stages: [...stages], decline: { path: decline.path, sha256: decline.sha256, candidate: candidateHead }, retired, commit, next,
++        return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "declined", featureId, lifecycleId: lifecycle ?? null, resumeLifecycleId: lifecycle ?? null, stages: [...stages], decline: { path: decline.path, sha256: decline.sha256, candidate: candidateHead }, retired, packageBack, commit, next,
+           message: "The acceptance was declined: the human's words are recorded (not as an acceptance), the bound Result is retired and the feature returns to a correction round without reopening the design. Nothing was verified, closed, signed or pushed. Follow `next` in order." });
+       }
+       if (humanAcceptance !== null && !isAcceptanceYes(humanAcceptance, yesForm)) {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 9ffd39a99a09564cd9318c103b6fd0654d898de2..1999b328066a3171827c4494ef7ca48c3f80e638 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -9114,7 +9114,7 @@ function runFeaturePackageReadCommand(sub, argv) {
+     if (flags.proposal !== undefined) {
+       return refuseFeaturePackageRead(sub, `argument "--proposal" applies only to an absent manifest, and ${manifest} exists`);
+     }
+-    const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root), activeFeatureId: featurePackageActiveFeatureId(root) });
++    const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root), activeFeatureId: featurePackageActiveFeatureId(root), correctionRoundFeatureId: featurePackageCorrectionFeatureId(root) });
+     // A previewed transition prints the digest `feature-package-apply --plan-sha256` expects (the digest of the plan object itself,
+     // computed before this field is added), so a consumer does not have to re-derive it.
+     console.log(JSON.stringify(plan.status === "preview" ? { ...plan, planSha256: sha256CanonicalJson(plan) } : plan, null, 2));
+@@ -9347,6 +9347,21 @@ function featurePackageActiveFeatureId(root) {
+   return current.status === "ok" ? current.state.activeFeature?.id ?? null : null;
+ }
+ 
++/**
++ * C28 (PO decision 2026-11-11): the active feature id when State proves a CORRECTION ROUND, null otherwise. A correction round is: an active feature, no Result bound in Continuity
++ * now, and at least one retirement of the reason `declined-acceptance` in `continuity.resultRetirements`. The planner admits `completed` back to `implementing` for exactly that feature.
++ */
++function featurePackageCorrectionFeatureId(root) {
++  const current = readStateRaw(root);
++  if (current.status !== "ok") return null;
++  const id = current.state.activeFeature?.id ?? null;
++  const continuity = current.state.continuity;
++  if (typeof id !== "string" || continuity === null || typeof continuity !== "object") return null;
++  const retirements = Array.isArray(continuity.resultRetirements) ? continuity.resultRetirements : [];
++  const unbound = continuity.authority?.result === null;
++  return unbound && retirements.some((entry) => entry?.reason === "declined-acceptance") ? id : null;
++}
++
+ function buildFeaturePackageApplyPreview(flags, deps = {}) {
+   if (flags.root === undefined) return { ok: false, error: 'argument "--root <dir>" is required' };
+   const root = resolve(flags.root);
+@@ -9368,7 +9383,7 @@ function buildFeaturePackageApplyPreview(flags, deps = {}) {
+   if (manifestExists) {
+     if (nextState === undefined) return { ok: false, error: 'argument "--next-state <state>" is required for an existing manifest' };
+     if (flags.proposal !== undefined) return { ok: false, error: `argument "--proposal" applies only to an absent manifest, and ${manifest} exists` };
+-    plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root, deps), activeFeatureId: featurePackageActiveFeatureId(root) });
++    plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root, deps), activeFeatureId: featurePackageActiveFeatureId(root), correctionRoundFeatureId: featurePackageCorrectionFeatureId(root) });
+     kind = "transition";
+   } else {
+     if (flags.proposal === undefined) return { ok: false, error: `argument "--proposal <repo-relative-path>" is required because ${manifest} is absent; the bootstrap preview validates the proposed manifest bytes in memory and creates nothing` };
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 8b7e7a5b2dd615ffab6a94eba04377b050334738..1f2e7a40a7fa555a314524da518137b6ee5a32c7 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -27,7 +27,7 @@ The command stops at `commit-required` and prints the paths and the commit messa
+ 
+ **The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. In the same message say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why (never a gate; a result you could not run also goes into `--open-checks`). Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. The sentence ends with ONE fixed answer form for yes (in the project's human-facing language: `yes, I accept`; `ja, ich akzeptiere` for a German project; English for any other language). If the human answers exactly that form (case, surrounding space and a closing `.` or `!` do not matter), rerun the identical command with `--human-acceptance "<the human's literal answer>"`. `--human-acceptance` records an acceptance for that form only: any other answer (a bug report, a change request, a doubt, a bare "yes") stops with `ONESHOT-ACCEPTANCE-NOT-YES`, records nothing and names both ways on; never search the answer for a keyword and never turn it into a yes yourself. **A decline is not the end of the feature:** rerun the identical command with `--human-decline "<the human's literal answer>"` (exclusive with `--human-acceptance`). The close records the human's words with the candidate and the time in `specs/<feature>/evidence/human-decline-<candidate>-<answer>.md` (never read as an acceptance), retires the bound Result (the State transition `continuity-result-retire-plan` / `-apply`: `continuity.authority.result` becomes null, the retired binding stays in `continuity.resultRetirements`, `result.md` is restored to the text before the bootstrap block, and the package is reconciled result-only, without a signature; in a project with a session-authority catalogue this runs on the owner route like the Result bootstrap, on the Close lifecycle the one-shot already opened) and returns status `declined` with `next` in order: the commit of exactly those outputs, a correction dispatch (`prepare-dispatch.mjs goldfish`, the human's words are the correction request), a Critic delta round on the new candidate (`prepare-dispatch.mjs critic --delta-request`), then the identical close command with `--critic-packet-id <new-packet-id>`. That second close runs the Result bootstrap again and asks the acceptance question again for the new candidate. Do not run `reopen-design` for a declined acceptance: with a bound Result it refuses (`PLAN-REOPEN-RESULT-BOUND`) and names this route, because `submit-plan` would refuse `PLAN-SUBMIT-CONTINUITY-BUSY` while a Result is bound. The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
+ 
+-**Four status facts, never the package record alone.** The State inspector's `featureStatus` and the close's `statuses` print the same four facts apart (`featureStatusVocabulary`): package registered, implementation delivered, technically qualified, human-accepted. Report them in that order and quote the `summary` line; do not call a feature "completed" or "accepted" from the package's `lifecycle.json` state alone. After a `reopen-design` or a declined acceptance (the Result retired) the record can still say `completed` while the feature is back in design or in a correction round: the status then carries `recordLag` with the reason, and delivered, qualified and human-accepted all read `no` until the new candidate passes the close again. A planning-entry queue head that lags behind the phase (`initial-planning`, `kickoff-promotion`, `continuity-adoption`, no live dispatch) is labelled `QUEUE-HEAD-LAGGING` by the re-ground notice after a Compact; it is not the next action, so take the next step from the phase and the typed stop, not from that head.
++**Four status facts, never the package record alone.** The State inspector's `featureStatus` and the close's `statuses` print the same four facts apart (`featureStatusVocabulary`): package registered, implementation delivered, technically qualified, human-accepted. Report them in that order and quote the `summary` line; do not call a feature "completed" or "accepted" from the package's `lifecycle.json` state alone. A declined acceptance writes the record back itself when it is further along than `implementing` (`verifying` or `completed`; the result's `packageBack` names the move, and a failure there never blocks the decline); on the usual chain the record already says `implementing` at that point. A record that still lags after a reopen or a decline carries `recordLag` with the reason, and delivered, qualified and human-accepted all read `no` until the new candidate passes the close again. A planning-entry queue head that lags behind the phase (`initial-planning`, `kickoff-promotion`, `continuity-adoption`, no live dispatch) is labelled `QUEUE-HEAD-LAGGING` by the re-ground notice after a Compact; it is not the next action, so take the next step from the phase and the typed stop, not from that head.
+ 
+ **What the close touches.** The tracked-effects digests hash what exists: the calibrated handover (`project/pipeline.json` `handover`, first brought to the closed state by `pipeline-state.mjs update-public-handover`, the existing writer: closed-local, the verified candidate, and technical close, product acceptance and push as three separate facts) and `telemetry/costs.md`; backlog, history and retrospective have no defined project file and keep the marked empty digest. The audit request names every Critic round of the feature (`evidence.criticReports`); the bundle under `audit-bundles/<feature>/<commit>/` carries each exported round report (`specs/<feature>/evidence/critic/<packet>/report.md`) and its README section "Critic round reports" names a round whose report could not be exported instead of omitting it. The close fetches every missing report itself from the private Critic journal (the verdict and its findings, checked against the digest in the receipt; working notes stay out) and carries it in the one close commit; a hand export with `session-critic-finalizer.mjs export` is only needed to publish richer notes, and a round it cannot read never stops the close. The minors of the Critic round this close is bound to go into the handover under "Open minor findings", and the result's `openMinors` line says how many are open and where: put that line in the close report.
+ 
