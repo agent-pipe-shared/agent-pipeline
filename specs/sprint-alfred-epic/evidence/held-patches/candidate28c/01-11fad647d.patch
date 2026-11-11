@@ -1,0 +1,180 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 4d3aeb93ee2519f0fc51c2fd797b51e3560a4182..055baa93ee83e05299e3595c1ddcec36d1999a69 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -611,15 +611,18 @@ function sanctionedHostCommitRecoverArgs(args, root) {
+ // C20 G20-8 B (M4b): scripts/agy-native-integrate.mjs takes over a native Goldfish's branch worktree result. Exact argv only:
+ // `plan --root <root> --branch <subagent-...> --allowed-path <p>...` or the same with `apply` and one `--expect-sha256 <64 hex>`.
+ // plan writes nothing; apply changes the working tree only (never the index, HEAD or a ref), all-or-nothing.
++// C28C: `apply` may add one `--commit-dispatch-id <id>`: it then also runs the recovery route's own plan and apply (the ordinary dispatch-trailer commit of
++// exactly the paths this apply wrote). That is the only way this lane reaches HEAD; plan never does.
+ function sanctionedAgyNativeIntegrateArgs(args, root) {
+   if ((args[0] !== "plan" && args[0] !== "apply") || !exactRoot(args, root, 1)) return false;
+   const pathValue = (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && !value.startsWith("-") && !value.startsWith("/")
+     && !/[\u0000-\u001f\u007f\\]/u.test(value) && !value.split("/").some((part) => part === "" || part === "." || part === "..");
+-  let branch = false, expect = false, allowedCount = 0;
++  let branch = false, expect = false, commit = false, allowedCount = 0;
+   for (let index = 3; index < args.length; index += 2) {
+     const flag = args[index], value = args[index + 1];
+     if (flag === "--branch" && !branch && /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u.test(value ?? "")) branch = true;
+     else if (flag === "--expect-sha256" && !expect && args[0] === "apply" && /^[a-f0-9]{64}$/u.test(value ?? "")) expect = true;
++    else if (flag === "--commit-dispatch-id" && !commit && args[0] === "apply" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u.test(value ?? "")) commit = true;
+     else if (flag === "--allowed-path" && pathValue(value) && allowedCount < 50) allowedCount += 1;
+     else return false;
+   }
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+index 490ea983ac94781b69dc172431d5ff61ef4fb239..473d28876f9d764148975fc292b5a08ae0cbc401 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+@@ -538,6 +538,56 @@ test("M4b: the take-over refuses with a typed repair and leaves no state: unknow
+   } finally { rmSync(fx.base, { recursive: true, force: true }); }
+ });
+ 
++// C28C: five of six Antigravity take-overs were followed by the recovery route's plan and apply for exactly the paths the take-over wrote. `apply` can now do
++// both in one call when it is given the briefed dispatch id; the recovery route's own checks run unchanged and its refusal never undoes the applied change.
++test("C28C: apply with a dispatch id lands the dispatch-trailer commit of exactly the applied paths in the same call", async () => {
++  const fx = brainFixture();
++  try {
++    const integrate = await import("../../scripts/agy-native-integrate.mjs");
++    const wt = worktreeFixture(fx);
++    childWork(fx, wt, { "src/a.mjs": "export const a = 1;\n" });
++    const options = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs"], expect: null };
++    const planned = integrate.plan(options);
++    const head = git(fx.workspace, "rev-parse", "HEAD");
++    // The fixture repository has no identity of its own and the test HOME has none either.
++    git(fx.workspace, "config", "user.name", "Fixture");
++    git(fx.workspace, "config", "user.email", "fixture@example.invalid");
++    const applied = integrate.apply({ ...options, expect: planned.planSha256, commitDispatchId: "C28C-AGY-COMMIT" });
++    assert.equal(applied.status, "applied", JSON.stringify(applied));
++    assert.equal(applied.commit.status, "committed", JSON.stringify(applied.commit));
++    assert.notEqual(git(fx.workspace, "rev-parse", "HEAD"), head, "HEAD moved by exactly one commit");
++    assert.equal(git(fx.workspace, "rev-list", "--count", `${head}..HEAD`), "1");
++    assert.match(git(fx.workspace, "log", "-1", "--format=%B"), /Dispatch: C28C-AGY-COMMIT \(goldfish\)/u);
++    assert.equal(git(fx.workspace, "show", "--name-only", "--format=", "HEAD"), "src/a.mjs", "only the applied path is committed");
++    assert.match(applied.next, /nothing left to do/u);
++  } finally { rmSync(fx.base, { recursive: true, force: true }); }
++});
++
++test("C28C: a refused commit step keeps the applied change and names the manual route; parse rules for the new flag", async () => {
++  const fx = brainFixture();
++  try {
++    const integrate = await import("../../scripts/agy-native-integrate.mjs");
++    const wt = worktreeFixture(fx);
++    childWork(fx, wt, { "src/a.mjs": "export const a = 1;\n" });
++    const options = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs"], expect: null };
++    const planned = integrate.plan(options);
++    const head = git(fx.workspace, "rev-parse", "HEAD");
++    // An id the recovery route does not accept (the command line refuses it earlier, a direct call does not): the commit step refuses, the take-over itself stays applied.
++    const applied = integrate.apply({ ...options, expect: planned.planSha256, commitDispatchId: "x".repeat(100) });
++    assert.equal(applied.status, "applied", JSON.stringify(applied));
++    assert.equal(applied.commit.status, "refused", JSON.stringify(applied.commit));
++    assert.equal(git(fx.workspace, "rev-parse", "HEAD"), head, "nothing committed");
++    assert.equal(readFileSync(join(fx.workspace, "src", "a.mjs"), "utf8"), "export const a = 1;\n", "the applied change stays");
++    assert.match(applied.next, /goldfish-host-commit-recover\.mjs plan/u);
++    const parsed = (...args) => integrate.parseArgs(args);
++    const common = ["--root", "/r", "--branch", "subagent-x", "--allowed-path", "a"];
++    assert.equal(parsed("apply", ...common, "--expect-sha256", "a".repeat(64), "--commit-dispatch-id", "C28C-X").commitDispatchId, "C28C-X");
++    assert.match(parsed("plan", ...common, "--commit-dispatch-id", "C28C-X").error, /belongs to apply/u);
++    assert.match(parsed("apply", ...common, "--commit-dispatch-id", "C28C-X", "--commit-dispatch-id", "C28C-Y").error, /repeated/u);
++    assert.match(parsed("apply", ...common, "--commit-dispatch-id", "bad id").error, /unexpected/u);
++  } finally { rmSync(fx.base, { recursive: true, force: true }); }
++});
++
+ test("M4b: the guard admits the take-over command as an exact argv shape, nothing looser", async () => {
+   const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
+   const root = realpathSync(resolve(libDir, "..", "..", ".."));
+@@ -547,7 +597,13 @@ test("M4b: the guard admits the take-over command as an exact argv shape, nothin
+   assert.equal(admitted(`plan --root '${root}' --branch ${branch} --allowed-path a/b.txt`), true);
+   assert.equal(admitted(`plan --root '${root}' --branch ${branch} --allowed-path a/b.txt --allowed-path c.md`), true);
+   assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)}`), true);
++  // C28C: apply (never plan) may carry one dispatch id for the commit step.
++  assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C28C-AGY-COMMIT`), true);
+   for (const args of [
++    `plan --root '${root}' --branch ${branch} --allowed-path a --commit-dispatch-id C28C-X`,
++    `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C28C-X --commit-dispatch-id C28C-Y`,
++    `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id 'bad id'`,
++    `apply --root '${root}' --branch ${branch} --allowed-path a --commit-dispatch-id C28C-X`,
+     "", "plan", `plan --root '${root}'`, `plan --root '${root}/x' --branch ${branch} --allowed-path a`, `plan --root '${root}' --branch main --allowed-path a`,
+     `plan --root '${root}' --branch ${branch}`, `plan --root '${root}' --branch ${branch} --allowed-path ../x`,
+     `apply --root '${root}' --branch ${branch} --allowed-path a`, `plan --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)}`,
+diff --git a/plugins/pipeline-core/scripts/agy-native-integrate.mjs b/plugins/pipeline-core/scripts/agy-native-integrate.mjs
+index 1af0eacf30577704dbb868e2baef5c84fcbf813a..96d5ebacce5597755a4e6ca2b355664ba9302d1d 100644
+--- a/plugins/pipeline-core/scripts/agy-native-integrate.mjs
++++ b/plugins/pipeline-core/scripts/agy-native-integrate.mjs
+@@ -9,6 +9,9 @@
+  *
+  *   plan  --root <root> --branch <subagent-...> --allowed-path <p>...                              read-only
+  *   apply --root <root> --branch <subagent-...> --allowed-path <p>... --expect-sha256 <digest>     writes the working tree only
++ *   apply ... --commit-dispatch-id <id>   (C28C) the same, then the recovery route's own plan and apply commit exactly those paths with the dispatch trailer
++ *
++ * A refusal of the commit step never undoes the applied change: the result carries `commit: {status: "refused", ...}` and `next` names the manual route.
+  *
+  * --allowed-path (at least one, repeated) is the briefed write scope; a branch that changed any other path is refused. The digest binds HEAD,
+  * the branch tip, the merge base, the paths and the patch bytes, so a moved HEAD or branch makes `apply` refuse before writing. `git apply`
+@@ -27,7 +30,8 @@ const integratedDirectory = (commonDir) => join(commonDir, "agent-pipeline", "ru
+ const SELF = fileURLToPath(import.meta.url);
+ const RECOVER = fileURLToPath(new URL("./goldfish-host-commit-recover.mjs", import.meta.url));
+ const BRANCH = /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u;
+-const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>]";
++const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>] [--commit-dispatch-id <briefed dispatch id>, apply only]";
++const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u; // the same token the recovery route accepts
+ const MAX_COMMITS = 200;
+ 
+ const git = (cwd, args, input) => {
+@@ -41,7 +45,7 @@ const shellWord = (value) => (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(value) ? value :
+ export function parseArgs(argv) {
+   const [verb, ...rest] = argv;
+   if (verb !== "plan" && verb !== "apply") return { error: `unknown verb; usage: ${SYNTAX}` };
+-  const out = { verb, root: null, branch: null, allowed: [], expect: null };
++  const out = { verb, root: null, branch: null, allowed: [], expect: null, commitDispatchId: null };
+   for (let i = 0; i < rest.length; i += 2) {
+     const flag = rest[i], value = rest[i + 1];
+     if (typeof value !== "string" || value === "" || /[\u0000-\u001f\u007f]/u.test(value)) return { error: `flag ${flag} needs one value; usage: ${SYNTAX}` };
+@@ -49,8 +53,11 @@ export function parseArgs(argv) {
+     else if (flag === "--branch" && out.branch === null) out.branch = value;
+     else if (flag === "--allowed-path") out.allowed.push(value);
+     else if (flag === "--expect-sha256" && out.expect === null) out.expect = value;
++    // C28C: apply may also land the ordinary dispatch-trailer commit through the recovery route in the same call (one path, no extra decision).
++    else if (flag === "--commit-dispatch-id" && out.commitDispatchId === null && DISPATCH_ID.test(value)) out.commitDispatchId = value;
+     else return { error: `unexpected or repeated flag ${flag}; usage: ${SYNTAX}` };
+   }
++  if (out.commitDispatchId !== null && verb !== "apply") return { error: `--commit-dispatch-id belongs to apply; usage: ${SYNTAX}` };
+   return out;
+ }
+ 
+@@ -182,8 +189,33 @@ export function apply(options) {
+     return { ...planned, status: "refused", code: "AGYI-APPLY-FAILED", paths: [],
+       refusals: [refuse("AGYI-APPLY-FAILED", String(applied.err).trim().split("\n").slice(-2).join(" | "), "nothing was written (git apply is all-or-nothing); plan again")] };
+   }
+-  return { ...planned, status: "applied", code: "AGYI-APPLIED",
+-    next: `the child's change is now in the working tree, uncommitted: commit it with the existing recovery route: node ${shellWord(RECOVER)} plan --root ${shellWord(planned.root)} --dispatch-id <the briefed dispatch id> ${planned.paths.map((p) => `--allowed-path ${shellWord(p)}`).join(" ")}, then the same command as apply with the --expect-sha256 digest it printed` };
++  const next = `the child's change is now in the working tree, uncommitted: commit it with the existing recovery route: node ${shellWord(RECOVER)} plan --root ${shellWord(planned.root)} --dispatch-id <the briefed dispatch id> ${planned.paths.map((p) => `--allowed-path ${shellWord(p)}`).join(" ")}, then the same command as apply with the --expect-sha256 digest it printed`;
++  if (options.commitDispatchId == null) return { ...planned, status: "applied", code: "AGYI-APPLIED", next };
++  const commit = commitThroughRecovery(planned, options.commitDispatchId);
++  return { ...planned, status: "applied", code: "AGYI-APPLIED", commit,
++    next: commit.status === "committed" ? "nothing left to do for this child: its change is committed with the dispatch trailer" : next };
++}
++
++/**
++ * C28C: the recovery route's own plan, then its apply with the digest that plan printed, run back to back for exactly the paths this take-over wrote. The
++ * paths are the integrate plan's own, so there is nothing new to review between the two pairs; every refusal of the recovery route is returned as it is and the
++ * working tree keeps the applied change (the manual route in `next` still works).
++ */
++function commitThroughRecovery(planned, dispatchId) {
++  const run = (args) => {
++    const res = spawnSync(process.execPath, [RECOVER, ...args], { encoding: "utf8", shell: false, timeout: 120_000, maxBuffer: 1 << 26 });
++    let json = null;
++    try { json = JSON.parse(String(res.stdout ?? "")); } catch { /* typed below */ }
++    return { json };
++  };
++  const planArgs = ["plan", "--root", planned.root, "--dispatch-id", dispatchId, ...planned.paths.flatMap((p) => ["--allowed-path", p])];
++  const recoveryPlan = run(planArgs).json;
++  if (recoveryPlan?.status !== "ready" || !Array.isArray(recoveryPlan.next) || recoveryPlan.next[2] !== "apply" || !recoveryPlan.next.every((word) => typeof word === "string")) {
++    return { status: "refused", code: recoveryPlan?.code ?? "AGYI-COMMIT-PLAN-UNREADABLE", refusals: recoveryPlan?.refusals ?? [] };
++  }
++  const committed = run(recoveryPlan.next.slice(2)).json;
++  if (committed?.status !== "committed") return { status: "refused", code: committed?.code ?? "AGYI-COMMIT-APPLY-UNREADABLE", refusals: committed?.refusals ?? [] };
++  return { status: "committed", commit: committed.commit, dispatchId };
+ }
+ 
+ if (process.argv[1] && resolve(process.argv[1]) === SELF) {

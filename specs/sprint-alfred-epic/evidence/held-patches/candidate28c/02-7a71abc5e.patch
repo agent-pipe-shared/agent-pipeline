@@ -1,0 +1,411 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 1205726b81b4672f396c885227975019feaab9fe..bd8ba40198fdf53c6420a6982d5ac90df3cbfe35 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -796,6 +796,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-escaped-and-powershell-redirects-to-a-protected-path-are-writes-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-every-dispatch-pays-a-bootstrap-receipt-detour-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-evidence-artifacts-carry-no-commit-identity-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-evidence-commands-stage-their-own-paths-and-never-commit-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-existing-signing-key-reuse-deadlocks-onboarding-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-feature-branch-push-admitted-without-signature-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-first-enrollment-enters-retirement-before-consent-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 1690761fd9e6d8ae13076018c14cee64ccd93862..14ea3e4d965741a20a11296dc69f31cf10bf3519 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4837,6 +4837,12 @@
+       "file": "plugins/pipeline-core/scripts/wait-host-commit.test.mjs",
+       "invariantPinned": "The wait for a background Goldfish's stop answers from the stop's own last record: committed, checkpoint, stop-failed with the stop's recovery, or still-waiting; another dispatch or an earlier attempt under the same id never answers for this one, and it changes nothing",
+       "nonOverlapNote": "Unique cases: the waiter and the launch notice command; claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs pins it once against the real stop hook"
++    },
++    {
++      "name": "pin-evidence-commands-stage-their-own-paths-and-never-commit-tests",
++      "file": "plugins/pipeline-core/lib/pins/evidence-commands-stage-their-own-paths-and-never-commit.test.mjs",
++      "invariantPinned": "With the last argument --stage the registration command, the Critic finalizer and the one-shot close stage exactly the paths they print and make no commit; a refused result, an unstageable path or a climbing path stages nothing further, and the guard admits the flag only in that position",
++      "nonOverlapNote": "Unique test suite for the staging option of register-feature-package.mjs, session-critic-finalizer.mjs and finish-feature.mjs"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 055baa93ee83e05299e3595c1ddcec36d1999a69..d80c87e1315cfb49339585a844e0652d81768f51 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -234,9 +234,11 @@ function sanctionedModelRoleDispatchSelectArgs(args, root) {
+     && (!antigravity || (args[6] === "--host-session-id" && NATIVE_SESSION_ID.test(args[7])));
+ }
+ 
+-function sanctionedRegisterFeaturePackageArgs(args, root) {
++function sanctionedRegisterFeaturePackageArgs(allArgs, root) {
+   // D41: a sole `--help` prints the evidence route; it takes no root and combines with nothing.
+-  if (args.length === 1 && args[0] === "--help") return true;
++  if (allArgs.length === 1 && allArgs[0] === "--help") return true;
++  // C28c: a trailing `--stage` (stage exactly the printed commitPaths, never commit) combines with every root form; the form before it is judged as before.
++  const args = allArgs.length > 2 && allArgs.at(-1) === "--stage" ? allArgs.slice(0, -1) : allArgs;
+   if (!exactRoot(args, root, 0)) return false;
+   if (args.length === 2) return true;
+   if (args.length === 3) return args[2] === "--add-review-unit";
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index b53c836f9049e4c36f30291a764069f52798d7a5..cec180e85bc8ae95474ec8574a33d6f93cf65f91 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -14,7 +14,9 @@ import * as SANCTIONED_CONSTANTS from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { isNodeInterpreterWord, relativeUnderRoot, sameNativePath } from "../path-spelling.mjs";
+ 
+-export function sanctionedSessionCriticFinalizerArgs(args, root) {
++export function sanctionedSessionCriticFinalizerArgs(allArgs, root) {
++  // C28c: a trailing `--stage` on `finalize` (stage exactly the printed lineage commitPaths, never commit) is judged on the form before it.
++  const args = allArgs[0] === "finalize" && allArgs.length === 6 && allArgs.at(-1) === "--stage" ? allArgs.slice(0, -1) : allArgs;
+   const exactProjectRoot = exactRoot(args, root, 1)
+     || (args[1] === "--root" && args[2] === "."
+       && resolve(root, args[2]) === resolve(root)
+diff --git a/plugins/pipeline-core/lib/pins/evidence-commands-stage-their-own-paths-and-never-commit.test.mjs b/plugins/pipeline-core/lib/pins/evidence-commands-stage-their-own-paths-and-never-commit.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..5b66401c6b6d85feccdaafe5cf03e8ab18081e68
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/evidence-commands-stage-their-own-paths-and-never-commit.test.mjs
+@@ -0,0 +1,144 @@
++// SPDX-License-Identifier: SUL-1.0
++// C28c (PO decision 2026-11-11, routine b): `register-feature-package` and `session-critic-finalizer finalize|export` print `commitPaths`; the agent then staged
++// exactly those paths and committed. With the last argument `--stage` the command stages exactly the paths it names and nothing else; it still never commits, so the
++// trust model is unchanged (the commit stays the caller's one `git commit -F <message file>`).
++import assert from "node:assert/strict";
++import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join, resolve } from "node:path";
++import { test } from "node:test";
++import { fileURLToPath } from "node:url";
++import { spawnSync } from "node:child_process";
++
++import { stageCommitPaths } from "../../scripts/register-feature-package.mjs";
++import { stageExactPaths } from "../../scripts/session-critic-finalizer.mjs";
++import { stageOneShotCommit } from "../../scripts/finish-feature.mjs";
++
++const libDir = dirname(dirname(fileURLToPath(import.meta.url)));
++
++function repo() {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "stage-")));
++  const git = (...args) => spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", ...args], { encoding: "utf8" });
++  git("init", "-q");
++  writeFileSync(join(root, "seed.txt"), "seed\n");
++  git("add", "seed.txt");
++  git("commit", "-q", "-m", "seed");
++  return { root, git, cleanup: () => rmSync(root, { recursive: true, force: true }) };
++}
++
++test("S1: --stage stages exactly the printed commitPaths, leaves every other change alone and makes no commit", () => {
++  const fx = repo();
++  try {
++    mkdirSync(join(fx.root, "specs/f"), { recursive: true });
++    writeFileSync(join(fx.root, "specs/f/lifecycle.json"), "{}\n");
++    writeFileSync(join(fx.root, "specs/f/envelope.json"), "{}\n");
++    writeFileSync(join(fx.root, "unrelated.txt"), "keep out\n");
++    const before = fx.git("rev-parse", "HEAD").stdout;
++    const result = stageCommitPaths(fx.root, { status: "registered", manifestPath: "specs/f/lifecycle.json", envelopePath: "specs/f/envelope.json", commitPaths: ["specs/f/lifecycle.json", "specs/f/envelope.json"] });
++    assert.deepEqual(result.staged, ["specs/f/lifecycle.json", "specs/f/envelope.json"]);
++    assert.equal(fx.git("diff", "--cached", "--name-only").stdout.trim(), "specs/f/envelope.json\nspecs/f/lifecycle.json");
++    assert.equal(fx.git("rev-parse", "HEAD").stdout, before, "no commit was made");
++    assert.match(fx.git("status", "--short").stdout, /\?\? unrelated\.txt/u, "the unrelated file stays untracked");
++  } finally { fx.cleanup(); }
++});
++
++test("S2: a refused result and a result without commitPaths are returned unchanged and nothing is staged", () => {
++  const fx = repo();
++  try {
++    writeFileSync(join(fx.root, "a.txt"), "a\n");
++    const refused = { status: "refused", code: "FPR-X", commitPaths: ["a.txt"] };
++    assert.equal(stageCommitPaths(fx.root, refused), refused);
++    const none = { status: "registered" };
++    assert.equal(stageCommitPaths(fx.root, none), none);
++    assert.equal(fx.git("diff", "--cached", "--name-only").stdout, "");
++  } finally { fx.cleanup(); }
++});
++
++test("S3: an ignored envelope is staged with -f, as the commit plan always said; another ignored path is not", () => {
++  const fx = repo();
++  try {
++    writeFileSync(join(fx.root, ".gitignore"), "ignored/\n");
++    fx.git("add", ".gitignore");
++    fx.git("commit", "-q", "-m", "ignore");
++    mkdirSync(join(fx.root, "ignored"), { recursive: true });
++    writeFileSync(join(fx.root, "ignored/envelope.json"), "{}\n");
++    writeFileSync(join(fx.root, "ignored/other.json"), "{}\n");
++    const result = stageCommitPaths(fx.root, { status: "registered", envelopePath: "ignored/envelope.json", commitPaths: ["ignored/envelope.json", "ignored/other.json"] });
++    assert.deepEqual(result.staged, ["ignored/envelope.json"]);
++    assert.equal(result.stageRefused, "ignored/other.json");
++    assert.equal(fx.git("diff", "--cached", "--name-only").stdout.trim(), "ignored/envelope.json");
++  } finally { fx.cleanup(); }
++});
++
++test("S4: the Critic finalizer helper stages the exact paths once each and refuses an absolute or climbing path before touching the index", () => {
++  const fx = repo();
++  try {
++    writeFileSync(join(fx.root, "report.md"), "r\n");
++    writeFileSync(join(fx.root, "lineage.json"), "{}\n");
++    const ok = stageExactPaths(fx.root, ["report.md", "lineage.json", "report.md"]);
++    assert.deepEqual(ok, { staged: ["report.md", "lineage.json"] });
++    assert.equal(fx.git("diff", "--cached", "--name-only").stdout.trim(), "lineage.json\nreport.md");
++    for (const bad of ["/etc/hosts", "../outside.txt", "a/../../b", ""]) assert.equal(stageExactPaths(fx.root, [bad]).stageRefused, bad);
++    assert.equal(stageExactPaths(fx.root, ["missing.txt"]).stageRefused, "missing.txt");
++  } finally { fx.cleanup(); }
++});
++
++test("S5: the guard admits --stage only as the last argument of the registration forms and of finalize, and never alone or elsewhere", async () => {
++  const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
++  const root = realpathSync(resolve(libDir, "..", "..", ".."));
++  const register = resolve(root, "plugins/pipeline-core/scripts/register-feature-package.mjs");
++  const finalizer = resolve(root, "plugins/pipeline-core/scripts/session-critic-finalizer.mjs");
++  const admitted = (script, args) => isSanctionedLifecycleCommand(`node '${script}' ${args}`, root);
++  assert.equal(admitted(register, `--root '${root}'`), true);
++  assert.equal(admitted(register, `--root '${root}' --stage`), true);
++  assert.equal(admitted(register, `--root '${root}' --add-review-unit --stage`), true);
++  assert.equal(admitted(register, `--root '${root}' --add-diagnostic-evidence specs/f/evidence/x.json --stage`), true);
++  assert.equal(admitted(register, `--root '${root}' --add-review-lineage --packet ${"a".repeat(32)} --stage`), true);
++  assert.equal(admitted(register, `--root '${root}' --stage --add-review-unit`), false);
++  assert.equal(admitted(register, `--stage`), false);
++  assert.equal(admitted(register, `--root '${root}' --stage --stage`), false);
++  assert.equal(admitted(register, `--root '${root}' --add-diagnostic-evidence ../x.json --stage`), false);
++  assert.equal(admitted(finalizer, `finalize --root '${root}' --request scratch/request.json`), true);
++  assert.equal(admitted(finalizer, `finalize --root '${root}' --request scratch/request.json --stage`), true);
++  assert.equal(admitted(finalizer, `admit --root '${root}' --request scratch/request.json --stage`), false);
++  assert.equal(admitted(finalizer, `finalize --root '${root}' --stage --request scratch/request.json`), false);
++});
++
++test("S6: the one-shot close stages exactly the commit it asks for, with the add form its own first step names, and never commits or stages for any other result", () => {
++  const fx = repo();
++  try {
++    mkdirSync(join(fx.root, "specs/f/evidence"), { recursive: true });
++    writeFileSync(join(fx.root, "specs/f/evidence/a.json"), "{}\n");
++    writeFileSync(join(fx.root, "specs/f/result.md"), "r\n");
++    writeFileSync(join(fx.root, "other.txt"), "keep out\n");
++    const before = fx.git("rev-parse", "HEAD").stdout;
++    const required = { status: "commit-required", commit: { paths: ["specs/f/evidence/a.json", "specs/f/result.md"], steps: ["git add -- specs/f/evidence/a.json specs/f/result.md", "git commit -F m"] } };
++    const staged = stageOneShotCommit(fx.root, required);
++    assert.deepEqual(staged.staged, ["specs/f/evidence/a.json", "specs/f/result.md"]);
++    assert.equal(fx.git("diff", "--cached", "--name-only").stdout.trim(), "specs/f/evidence/a.json\nspecs/f/result.md");
++    assert.equal(fx.git("rev-parse", "HEAD").stdout, before, "no commit was made");
++    assert.match(fx.git("status", "--short").stdout, /\?\? other\.txt/u);
++    const pending = { status: "stopped", stop: { code: "ONESHOT-COMMIT-PENDING" }, commit: { paths: ["other.txt"], steps: ["git add -- other.txt"] } };
++    assert.deepEqual(stageOneShotCommit(fx.root, pending).staged, ["other.txt"]);
++    const unrelated = { status: "stopped", stop: { code: "ONESHOT-VERIFY-RED" }, commit: { paths: ["never.txt"], steps: [] } };
++    assert.equal(stageOneShotCommit(fx.root, unrelated), unrelated);
++    const none = { status: "commit-required", commit: { paths: [], steps: [] } };
++    assert.equal(stageOneShotCommit(fx.root, none), none);
++    assert.equal(stageOneShotCommit(fx.root, { status: "commit-required", commit: { paths: ["../x"], steps: [] } }).stageRefused, "../x");
++  } finally { fx.cleanup(); }
++});
++
++test("S7: a commit step that says git add -f is staged with -f, and any other step is not", () => {
++  const fx = repo();
++  try {
++    writeFileSync(join(fx.root, ".gitignore"), "specs/\n");
++    fx.git("add", ".gitignore");
++    fx.git("commit", "-q", "-m", "ignore");
++    mkdirSync(join(fx.root, "specs/f"), { recursive: true });
++    writeFileSync(join(fx.root, "specs/f/addendum.json"), "{}\n");
++    const plain = stageOneShotCommit(fx.root, { status: "commit-required", commit: { paths: ["specs/f/addendum.json"], steps: ["git add -- specs/f/addendum.json"] } });
++    assert.equal(plain.stageRefused, "specs/f/addendum.json", "an ignored path is refused by a plain add");
++    const forced = stageOneShotCommit(fx.root, { status: "commit-required", commit: { paths: ["specs/f/addendum.json"], steps: ["git add -f -- specs/f/addendum.json"] } });
++    assert.deepEqual(forced.staged, ["specs/f/addendum.json"]);
++  } finally { fx.cleanup(); }
++});
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index ce915d1957c3cc49a789f901e56014e31dbed998..3ebbd0e41f26daae8f7e87e03fff75706f296c0e 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -708,14 +708,35 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact,
+   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
+ }
+ 
+-function parseOneShot(argv) {
++/**
++ * `--stage` (C28c, PO decision 2026-11-11), the last argument of `--one-shot`: when the result names the commit the close needs (status commit-required, or the commit-pending stop),
++ * stage exactly `commit.paths` with the add form its own first step prescribes (`git add -f --` when it says so), and report them in `staged`. It never commits: the commit
++ * stays the caller's one step (the pre-commit hook admits exactly these bytes), and nothing else in the tree is staged. A path that cannot be staged stops the staging and is named.
++ */
++export function stageOneShotCommit(root, result) {
++  const paths = result?.commit?.paths;
++  if (!Array.isArray(paths) || paths.length === 0 || (result.status !== "commit-required" && result.stop?.code !== "ONESHOT-COMMIT-PENDING")) return result;
++  const force = typeof result.commit.steps?.[0] === "string" && result.commit.steps[0].startsWith("git add -f --");
++  const staged = [];
++  for (const path of paths) {
++    if (typeof path !== "string" || path === "" || isAbsolute(path) || path.split("/").includes("..")) return { ...result, staged, stageRefused: String(path) };
++    const added = spawnSync("git", ["-C", root, "add", ...(force ? ["-f"] : []), "--", path], { encoding: "utf8", shell: false, timeout: 10000 });
++    if (added.status !== 0) return { ...result, staged, stageRefused: path };
++    staged.push(path);
++  }
++  return { ...result, staged };
++}
++
++function parseOneShot(argvWithStage) {
++  const stage = argvWithStage.length > 0 && argvWithStage.at(-1) === "--stage";
++  const argv = stage ? argvWithStage.slice(0, -1) : argvWithStage;
+   const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--human-decline", "--open-checks"]; const value = {};
+   for (let i = 0; i < argv.length; i += 2) {
+     const flag = argv[i]; const next = argv[i + 1];
+-    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] (the first call stops once with the acceptance question for the human)");
++    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] [--stage] (the first call stops once with the acceptance question for the human; --stage, last, stages exactly the paths of the commit the result asks for and never commits)");
+     value[flag] = next;
+   }
+-  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, humanDecline: value["--human-decline"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";") };
++  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, humanDecline: value["--human-decline"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";"), stage };
+ }
+ 
+ function parse(argv) {
+@@ -731,7 +752,9 @@ function parse(argv) {
+ if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === "--one-shot") {
+   // P3: the one agent command. JSON on stdout; the commit steps or the stop with its repair on stderr; exit 2 when stopped.
+   try {
+-    const result = oneShotClose(parseOneShot(process.argv.slice(3)));
++    const parsed = parseOneShot(process.argv.slice(3));
++    const closed = oneShotClose(parsed);
++    const result = parsed.stage ? stageOneShotCommit(realpathSync(resolve(parsed.rootDir)), closed) : closed;
+     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+     if (result.status === "stopped") { process.stderr.write(`finish-feature --one-shot: stopped at ${result.stage}: ${result.stop.code}: ${result.stop.reason}\nrepair: ${result.stop.repair}\n`); process.exitCode = 2; }
+     else if (result.status === "commit-required") process.stderr.write(`finish-feature --one-shot: run the commit, then the next command.\n${(result.commit.steps ?? []).join("\n")}\nnext: ${result.next}\n`);
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 5b5d3284b1ffa9ef31cb93dcb182dc4d058759fd..2b469fd2dbc5eb189eed56a482be221d16a9115b 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -1,7 +1,9 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ //
+-// register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]
++// register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>] [--stage]
++//
++// `--stage` (last argument) stages exactly the `commitPaths` of the result; it never commits.
+ //
+ // `--add-diagnostic-evidence <path>` (D165-CDR) registers a Critic diagnostic (a file under
+ // `specs/<feature>/evidence/`, produced by critic-diagnostic-evidence.mjs) and the log it names as
+@@ -70,7 +72,10 @@ export function pushThreatModelReadback(root) {
+ }
+ 
+ export const REGISTER_FEATURE_PACKAGE_HELP = [
+-  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>]",
++  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>] [--stage]",
++  "",
++  "Add --stage as the LAST argument to stage exactly the paths the result names in commitPaths (the result then carries staged: [...]). It never commits and stages nothing else:",
++  "  your commit stays one `git commit -F <message file>` of what is staged.",
+   "",
+   "Feature-close audit route, package side (run in this order, nothing committed in between: the package candidate must equal HEAD):",
+   "  1. Produce passing Verify evidence for HEAD: verify-evidence-producer.mjs --root <root> --mode candidate --critic-packet-id <id> --out specs/<feature>/evidence/<name>.json",
+@@ -113,8 +118,29 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "",
+ ].join("\n");
+ 
++/**
++ * `--stage` (C28c, PO decision 2026-11-11): stage exactly the paths this run names in `commitPaths`, nothing else. The tool still never commits:
++ * the commit stays the caller's one `git commit -F <message file>`. An ignored envelope is staged with `-f`, as the plan above says; a path that
++ * cannot be staged stops the staging and is named, with the paths staged so far.
++ */
++export function stageCommitPaths(root, result) {
++  if (result === null || typeof result !== "object" || result.status === "refused" || !Array.isArray(result.commitPaths)) return result;
++  const staged = [];
++  for (const path of result.commitPaths) {
++    const ignored = path === result.envelopePath && git(root, ["check-ignore", "-q", "--", path]).status === 0;
++    const added = git(root, ["add", ...(ignored ? ["-f"] : []), "--", path]);
++    if (added.status !== 0) return { ...result, staged, stageRefused: path };
++    staged.push(path);
++  }
++  return { ...result, staged };
++}
++
+ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.write(text)) {
+   if (argv.length === 1 && argv[0] === "--help") { out(REGISTER_FEATURE_PACKAGE_HELP); return 0; }
++  const stage = argv.length > 2 && argv.at(-1) === "--stage";
++  if (stage) argv = argv.slice(0, -1);
++  let stagingRoot = null;
++  const emit = (value) => `${JSON.stringify(stage && stagingRoot !== null ? stageCommitPaths(stagingRoot, value) : value)}\n`;
+   const rootIndex = argv.indexOf("--root");
+   const rootValue = rootIndex >= 0 ? argv[rootIndex + 1] : undefined;
+   // PF-34: `--add-review-unit` adds the Critic review unit to a feature registered before it existed.
+@@ -137,6 +163,7 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+     out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "--root does not resolve to a directory" })}\n`);
+     return 2;
+   }
++  stagingRoot = root;
+   const read = readState(root);
+   if (read?.status !== "ok") {
+     out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-NO-APPROVED-PLAN", reason: "the project authority State is unavailable; run set-feature, submit-plan, present-plan and approve-plan first", stateStatus: read?.status ?? null })}\n`);
+@@ -144,32 +171,32 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+   }
+   if (addDelta) {
+     const added = addCriticDeltaRequest({ root, inputPath: argv[3], readAcceptedDeliveryContract });
+-    out(`${JSON.stringify(added)}\n`);
++    out(emit(added));
+     return added.status === "refused" ? 2 : 0;
+   }
+   if (addLineage) {
+     const added = addCriticReviewLineage({ root, packetId: argv[4], readAcceptedDeliveryContract });
+-    out(`${JSON.stringify(added)}\n`);
++    out(emit(added));
+     return added.status === "refused" ? 2 : 0;
+   }
+   if (addDiagnostic) {
+     const added = addCriticDiagnosticEvidence({ root, state: read.state, path: argv[3], readAcceptedDeliveryContract });
+-    out(`${JSON.stringify(added)}\n`);
++    out(emit(added));
+     return added.status === "refused" ? 2 : 0;
+   }
+   if (addVerify) {
+     const added = addVerifyEvidence({ root, state: read.state, path: argv[3], readAcceptedDeliveryContract });
+-    out(`${JSON.stringify(added)}\n`);
++    out(emit(added));
+     return added.status === "refused" ? 2 : 0;
+   }
+   if (addReviewUnit) {
+     const added = addCriticReviewUnit({ root, state: read.state, readAcceptedDeliveryContract });
+-    out(`${JSON.stringify(added)}\n`);
++    out(emit(added));
+     return added.status === "refused" ? 2 : 0;
+   }
+   const result = registerFeaturePackage({ root, state: read.state, readAcceptedDeliveryContract });
+   const printed = result.status === "registered" || result.status === "already-registered" ? { ...result, ...commitPlan(root, result) } : result;
+-  out(`${JSON.stringify(printed)}\n`);
++  out(emit(printed));
+   return result.status === "refused" ? 2 : 0;
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index a86bd2ecaff0c996bd83495b54fd94701d33fbfa..aabedc820e79425c2ae8b3560b2f18aa7144c81c 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -973,8 +973,36 @@ function runSessionCriticExportCli(argv, deps) {
+     root, packetId: raw.packetId, reportPath: raw.reportPath, outDir: raw.outDir }, deps) });
+ }
+ 
++/**
++ * `--stage` (C28c, PO decision 2026-11-11), the last argument of `export` and `finalize`: stage exactly the paths the verb prints (the exported
++ * evidence and the lineage commitPaths), nothing else. The verb still never commits: the commit stays the caller's one `git commit -F`. A path that
++ * cannot be staged stops the staging and is named in `stageRefused`, with the paths staged so far in `staged`.
++ */
++export function stageExactPaths(root, paths) {
++  const run = (args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 10_000 });
++  const staged = [];
++  for (const path of [...new Set(paths)]) {
++    if (typeof path !== "string" || path === "" || isAbsolute(path) || path.split("/").includes("..")) return { staged, stageRefused: String(path) };
++    const ignored = run(["check-ignore", "-q", "--", path]).status === 0;
++    if (run(["add", ...(ignored ? ["-f"] : []), "--", path]).status !== 0) return { staged, stageRefused: path };
++    staged.push(path);
++  }
++  return { staged };
++}
++
++function runStagedFinalizerCli(argv, deps) {
++  const result = runSessionCriticFinalizerCli(argv, deps);
++  if (result.exitCode !== 0 || result.output === null || typeof result.output !== "object") return result;
++  const root = realpathSync(resolve(argv[2]));
++  const paths = [...(Array.isArray(result.output.paths) ? result.output.paths : []), ...(Array.isArray(result.output.lineage?.commitPaths) ? result.output.lineage.commitPaths : [])];
++  return Object.freeze({ ...result, output: Object.freeze({ ...result.output, ...stageExactPaths(root, paths) }) });
++}
++
+ /** Closed CLI adapter. The request and verdict stay as bounded local files. */
+ export function runSessionCriticFinalizerCli(argv, deps = {}) {
++  if (Array.isArray(argv) && argv.length > 1 && argv.at(-1) === "--stage" && (argv[0] === "export" || argv[0] === "finalize")) {
++    return runStagedFinalizerCli(argv.slice(0, -1), deps);
++  }
+   try {
+     // The opt-in is a sixth argv token on `finalize` only; it is never read from the request file.
+     const optIn = Array.isArray(argv) && argv.length === 6 && argv[0] === "finalize" && argv[5] === "--allow-caller-authored-fallback";

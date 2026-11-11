@@ -1,0 +1,142 @@
+diff --git a/docs/adr/0032-project-doc-structure.md b/docs/adr/0032-project-doc-structure.md
+index bc950b3fc4ae1bb74bf34f9bbbff5c5a20bf486c..fd06b879daa6821e598ea7b7ffd7d077346c4281 100644
+--- a/docs/adr/0032-project-doc-structure.md
++++ b/docs/adr/0032-project-doc-structure.md
+@@ -6,7 +6,7 @@
+ 
+ **Status:** accepted (2026-07-07, PO directive from the AP1-TUNING session + plan approval "retro-speed") · **Basis:** PO directive (verbatim), `.claude/plans/2026-07-07-retro-speed.md` package G-E
+ 
+-**Governs:** templates/release-manifest.md, templates/architecture-doc.md, templates/prompts/kickoff-new-project.md, third-party-licenses.json, plugins/pipeline-core/scripts/security-scan.mjs, plugins/pipeline-core/scripts/security-scan.test.mjs, plugins/pipeline-core/lib/sbom-manifest.mjs, plugins/pipeline-core/lib/sbom-manifest.test.mjs, plugins/pipeline-core/lib/sbom-lifecycle.test.mjs, plugins/pipeline-core/lib/sbom-release-binding.mjs, plugins/pipeline-core/lib/sbom-release-binding.test.mjs
++**Governs:** templates/release-manifest.md, templates/architecture-doc.md, templates/prompts/kickoff-new-project.md, third-party-licenses.json, plugins/pipeline-core/scripts/security-scan.mjs, plugins/pipeline-core/scripts/security-scan.test.mjs, plugins/pipeline-core/lib/sbom-manifest.mjs, plugins/pipeline-core/lib/sbom-manifest.test.mjs, plugins/pipeline-core/lib/sbom-lifecycle.test.mjs, plugins/pipeline-core/lib/sbom-release-binding.mjs, plugins/pipeline-core/lib/sbom-release-binding.test.mjs, plugins/pipeline-core/lib/sbom-close.mjs, plugins/pipeline-core/lib/sbom-close.test.mjs
+ 
+ ## Context
+ 
+@@ -47,6 +47,10 @@ This amendment retains the greenfield decision and the prohibition on automatic
+ 
+ An SBOM is inventory evidence only: findings, VEX disposition, risk acceptance and release approval remain separately typed. The lifecycle states are closed as `complete`, `stale`, `invalid`, `partial`, `unsupported`, `unavailable` and `not-applicable`; only a fresh, complete, validated record can later be bound to a release. CycloneDX remains a project-selected adapter, not a universal tooling mandate. Existing baseline artifacts remain byte-stable until an explicit, preview-first migration is separately approved.
+ 
++## Amendment 2026-11-11 — the close writes the SBOM
++
++[ADR-0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) (PO tiles, register D240) makes the SBOM part of every feature close and of its audit bundle. The rejected alternative "Full CycloneDX mandatory for all projects" and the sentence that the full SBOM is not mandatory are superseded for the lockfiles the close can read (npm, Python, Go, Rust): the close reads them without installing any tool and records both formats, or an explicit `not-applicable`, and a blocking state needs a human's recorded override. Everything else in this ADR stays.
++
+ <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+ 
+ # ADR-0032: Projekt-Doku-Struktur — Release-Traceability, SBOM-Konvention, lebendes Architektur-Dokument (GREENFIELD)
+@@ -93,3 +97,7 @@ Adoption durch ein Bestandsprojekt: auf the PO-Initiative, projekt-individuell (
+ Diese Ergänzung erhält die Greenfield-Entscheidung und das Verbot automatischer historischer Migration. Nach ausdrücklicher Projektadoption ist `pipeline.sbom-manifest.v1` der einzige kanonische, unveränderliche Inventarnachweis. Er bindet exakten Kandidaten, Source-Input-Digests, Adapteridentität/-konfiguration, festgelegte CycloneDX-1.6- und SPDX-2.3-Payloads, Komponentenherkunft/-beziehungen, Vollständigkeit, Frische, Export-Privacy und den kanonischen Digest.
+ 
+ Eine SBOM ist ausschließlich Inventar: Findings, VEX, Risikoakzeptanz und Release-Freigabe bleiben getrennte Records. Die Zustände sind geschlossen (`complete`, `stale`, `invalid`, `partial`, `unsupported`, `unavailable`, `not-applicable`); eine spätere Release-Bindung darf nur einen frischen, vollständigen und validierten Record verwenden. Bestehende Baseline-Artefakte bleiben bis zu einer ausdrücklich genehmigten, preview-basierten Migration byte-stabil.
++
++## Ergänzung 2026-11-11 — der Close schreibt die SBOM
++
++[ADR-0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) (PO-Kacheln, Register D240) macht die SBOM zum Teil jedes Feature-Close und seines Audit-Bundles. Die verworfene Alternative „Volles CycloneDX für alle Projekte verpflichtend“ und der Satz, die volle SBOM sei nicht verpflichtend, gelten für die Lockfiles, die der Close lesen kann (npm, Python, Go, Rust), nicht mehr: der Close liest sie ohne Werkzeuginstallation und hält beide Formate fest, oder ein ausdrückliches `not-applicable`; ein sperrender Zustand braucht die festgehaltene Übersteuerung eines Menschen. Alles Übrige dieses ADR bleibt.
+diff --git a/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md b/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7532a19adae50dae294e8df7b454e77fec547e14
+--- /dev/null
++++ b/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+@@ -0,0 +1,28 @@
++# ADR-0091: The software bill of materials is part of every feature close
++
++> Agent-Pipeline · Sprint Alfred · 2026-11-11
++
++**Status:** accepted (2026-11-11, PO tiles, register D240). Built in candidate 28c. Not yet run on a real repository.
++
++**Context source (PO direction, 2026-11-11, from the tile answers):** the SBOM is a standard part of the audit bundle and is written by the close; a stale or invalid one blocks the close; more languages than Node in the first version; no component means an explicit `not-applicable` with a reason; an existing SBOM is checked and otherwise generated; `partial` and `unsupported` block as well, with an override and a help text on how an adapter can be added.
++
++## Context
++
++ADR-0032 made the full CycloneDX SBOM an option and rejected it as a mandate, because it forced new stack tooling without a demonstrated need. Its amendment of 2026-08-01 then built the lifecycle: `pipeline.sbom-manifest.v1`, the CycloneDX 1.6 and SPDX 2.3 views, the Node adapter and the closed lifecycle states. None of it was wired into the close, so the audit bundle of a closed feature never carried a bill of materials, and a project that wanted one had to produce it by hand outside the close.
++
++## Decision
++
++1. **The close checks or writes the SBOM, always.** `finish-feature.mjs --one-shot` reads the lockfiles tracked in the repository and writes `specs/<feature>/evidence/sbom/` with `record.json` (`pipeline.sbom-close-record.v1`), `cyclonedx.json` and `spdx.json`. An existing record whose lockfile digests still match is reused; otherwise one is generated. Nothing runs a package manager and nothing uses the network: only pinned lockfiles are read.
++2. **First readers:** npm (`package-lock.json`, `npm-shrinkwrap.json`), Python (`poetry.lock`, `Pipfile.lock`, `requirements.txt` with `==` pins), Go (`go.mod`) and Rust (`Cargo.lock`). A reader is one row in `SBOM_READERS` and one test, so an adapter for another ecosystem is an addition, not a redesign. The inventory has no dependency edges (`edges: "not-recorded"`): a document never claims a graph it did not read.
++3. **No component is an explicit record, never an absent file.** A repository with no manifest, or lockfiles that list nothing, gets `status: not-applicable` with its reason.
++4. **Four states block the close,** before the acceptance question and before anything is written: `stale` (the lockfiles changed after the record), `invalid` (an unreadable or damaged file or record), `partial` (a manifest without a lockfile, an unpinned requirement) and `unsupported` (a manifest or lockfile with no reader yet). The stop names each finding and says how to repair it, including how a reader is added.
++5. **Only a human's literal override passes a block.** `--sbom-override "<the human's literal words>"` records those words, the actor and every finding it covers in the record (`status: overridden`). The bundle carries it under the code `SBOM-OVERRIDDEN` and its README states that the SBOM is then incomplete by that decision. A resumed close needs no second override for the findings the record names; a new finding blocks again. The flag is recorded as given, like the acceptance answer: an attribution record, not a signature.
++6. **The audit bundle carries it.** The close names the record in its audit request; the bundle copies the record and the two documents as artifacts, prints a section for them, and the offline verifier re-checks the record's shape, that the carried documents are exactly the ones it names by digest, and that each document holds its profile.
++
++## Consequences
++
++Every closed feature has an inventory in its evidence, in two standard formats, without a tool the project must install. A project with a stack the readers do not know is stopped once, with the way forward named, and can pass by a recorded human decision. The override is visible to whoever reads the bundle. Paths under `node_modules`, `vendor`, fixture, example, `docs`, `specs` and similar directories are not observed.
++
++## Affected contracts
++
++ADR-0032 stays for everything else (release manifests, the living architecture document, the greenfield scope); its option "full CycloneDX per stack tooling" is now met inside the close for the supported lockfiles. The lifecycle states of its 2026-08-01 amendment are reused as typed finding states; `pipeline.sbom-manifest.v1` still binds a release candidate and is not replaced by the close record, which binds the feature's evidence.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index c19f5425152f916c056fc01a1eaef40068c28525..bc8b33dfdb6e89405d26dd39bda8e1d5d3d1cdc6 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -97,6 +97,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0088](0088-test-economy.md) | Test economy: a fast gate, a fresh full run, and a test surface that shrinks with the product | accepted | 2026-10-20 |
+ | [0089](0089-project-routing-is-user-owned.md) | A project's `pipeline.user.yaml` owns its model and effort routing | accepted | 2026-11-10 |
+ | [0090](0090-evidence-follows-every-push-and-a-release-includes-its-push.md) | The evidence follows every push, and a release includes its push | accepted | 2026-11-10 |
++| [0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) | The software bill of materials is part of every feature close | accepted | 2026-11-11 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+diff --git a/docs/operating-model.md b/docs/operating-model.md
+index 4dc4f0e18b7cac3e73e0523d758bb981ddc6c2e0..765541975604091a91dae275eeddef841e92ec67 100644
+--- a/docs/operating-model.md
++++ b/docs/operating-model.md
+@@ -582,9 +582,13 @@ your project's authority settings before using one.
+ <!-- capability:supply-chain-provenance -->
+ <a id="capability-supply-chain-provenance"></a>
+ 
+-- **SBOM and provenance contracts (optional, host-only):** inspect component
+-  inputs and validate local provenance structures; they do not install
+-  scanners or create an external attestation.
++- **SBOM and provenance contracts (provenance optional, host-only; the SBOM
++  is part of every feature close, [ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md)):**
++  the close reads the pinned lockfiles (npm, Python, Go, Rust) and records the
++  components in CycloneDX 1.6 and SPDX 2.3, or an explicit `not-applicable`;
++  `stale`, `invalid`, `partial` and `unsupported` stop the close unless a
++  human's override is recorded. Provenance structures are validated locally;
++  nothing here installs scanners or creates an external attestation.
+ 
+ <!-- capability:ai-assisted-hardening -->
+ <a id="capability-ai-assisted-hardening"></a>
+@@ -1194,9 +1198,14 @@ externe Freigabe oder die Aktivierung in einem Nutzer-Repository.
+ - **Security-Control-Katalog (optional, nur Host):** prüft Anwendbarkeit,
+   Receipts und Waiver-Ablauf; er ist weder ein automatisch laufender Scanner
+   noch Ersatz für das konfigurierte Security-Gate.
+-- **SBOM- und Provenienzverträge (optional, nur Host):** prüfen lokale
+-  Komponenten- und Provenienzangaben, installieren aber keine Scanner und
+-  erstellen keine externe Attestierung.
++- **SBOM- und Provenienzverträge (Provenienz optional, nur Host; die SBOM ist
++  Teil jedes Feature-Close, [ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md)):**
++  der Close liest die gepinnten Lockfiles (npm, Python, Go, Rust) und hält die
++  Komponenten in CycloneDX 1.6 und SPDX 2.3 fest, oder ein ausdrückliches
++  `not-applicable`; `stale`, `invalid`, `partial` und `unsupported` stoppen den
++  Close, solange keine Übersteuerung eines Menschen festgehalten ist.
++  Provenienzstrukturen werden lokal geprüft; nichts davon installiert Scanner
++  oder erstellt eine externe Attestierung.
+ - **KI-gestützte Härtung (optional, nur Host):** bewertet nicht vertrauenswürdige
+   Änderungseingaben explizit; ein vorhandener Test bedeutet keinen aktiven
+   Runner-Hook.
+diff --git a/docs/state.md b/docs/state.md
+index f4e3982fc1f49dd4bfcbb1e74fd72c9f8261bc37..62835aed4f115cd1f4cb95debf87aa4f3fe1c5fe 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -25,6 +25,7 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **Candidate 22 installed 2026-11-09** (40 patches, stamp `ef16e1b86`); 22b installed (stamp `b92ff8a46`). No 22c: live findings and the three reports go into 23. Full Verify, Critic, native Windows proof, acceptance pending. [Open follow-ups](../backlog/items/2026-11-09-candidate-22-open-follow-ups.md).
+ **[ADR-0089](adr/0089-project-routing-is-user-owned.md) accepted 2026-11-10 (PO tile, D234):** a project's `pipeline.user.yaml` owns its model and effort routing. Built in candidate 23; a live dispatch on a changed route is still unobserved.
+ **[ADR-0090](adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md) accepted 2026-11-10 (PO tiles, D237 to D239):** the close exports the Critic reports, one follow-up commit carries the proof and the final records after any signed push, and a release includes its push. Built in candidate 27; never run on a real repository or a real signature.
++**[ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) accepted 2026-11-11 (PO tiles, D240):** the feature close checks or writes the SBOM (CycloneDX 1.6 and SPDX 2.3 from pinned npm, Python, Go and Rust lockfiles, or an explicit `not-applicable`) and the audit bundle carries it; `stale`, `invalid`, `partial` and `unsupported` stop the close unless a human's literal override is recorded. Built in candidate 28c; never run on a real repository.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 1f2e7a40a7fa555a314524da518137b6ee5a32c7..b6907d420837d98edfa04b37f3e000c67cad258f 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -27,6 +27,8 @@ The command stops at `commit-required` and prints the paths and the commit messa
+ 
+ **The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. In the same message say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why (never a gate; a result you could not run also goes into `--open-checks`). Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. The sentence ends with ONE fixed answer form for yes (in the project's human-facing language: `yes, I accept`; `ja, ich akzeptiere` for a German project; English for any other language). If the human answers exactly that form (case, surrounding space and a closing `.` or `!` do not matter), rerun the identical command with `--human-acceptance "<the human's literal answer>"`. `--human-acceptance` records an acceptance for that form only: any other answer (a bug report, a change request, a doubt, a bare "yes") stops with `ONESHOT-ACCEPTANCE-NOT-YES`, records nothing and names both ways on; never search the answer for a keyword and never turn it into a yes yourself. **A decline is not the end of the feature:** rerun the identical command with `--human-decline "<the human's literal answer>"` (exclusive with `--human-acceptance`). The close records the human's words with the candidate and the time in `specs/<feature>/evidence/human-decline-<candidate>-<answer>.md` (never read as an acceptance), retires the bound Result (the State transition `continuity-result-retire-plan` / `-apply`: `continuity.authority.result` becomes null, the retired binding stays in `continuity.resultRetirements`, `result.md` is restored to the text before the bootstrap block, and the package is reconciled result-only, without a signature; in a project with a session-authority catalogue this runs on the owner route like the Result bootstrap, on the Close lifecycle the one-shot already opened) and returns status `declined` with `next` in order: the commit of exactly those outputs, a correction dispatch (`prepare-dispatch.mjs goldfish`, the human's words are the correction request), a Critic delta round on the new candidate (`prepare-dispatch.mjs critic --delta-request`), then the identical close command with `--critic-packet-id <new-packet-id>`. That second close runs the Result bootstrap again and asks the acceptance question again for the new candidate. Do not run `reopen-design` for a declined acceptance: with a bound Result it refuses (`PLAN-REOPEN-RESULT-BOUND`) and names this route, because `submit-plan` would refuse `PLAN-SUBMIT-CONTINUITY-BUSY` while a Result is bound. The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
+ 
++**The SBOM (a standard part of the close, ADR-0091).** Before the acceptance question the close reads the lockfiles tracked in the repository (npm, Python, Go, Rust) and checks or writes `specs/<feature>/evidence/sbom/` (`record.json`, `cyclonedx.json`, `spdx.json`); a repository with no component gets an explicit `not-applicable` record. A finding of the state `stale`, `invalid`, `partial` or `unsupported` stops the close with its code (`SBOM-SOURCE-INPUTS-STALE`, `SBOM-RECORD-INVALID`, `SBOM-PARTIAL`, `SBOM-ADAPTER-UNSUPPORTED`) and the repair, before anything is written. Repair the cause (pin the dependencies in a lockfile, remove a stale `sbom` directory, add a reader to `SBOM_READERS` for another ecosystem) and rerun the identical command. Only if the human accepts the gap, rerun with `--sbom-override "<the human's literal words>"`: never compose those words yourself, never pass the flag unasked. The record then carries the words, the actor and every finding it covers, and the audit bundle names it `SBOM-OVERRIDDEN`.
++
+ **Four status facts, never the package record alone.** The State inspector's `featureStatus` and the close's `statuses` print the same four facts apart (`featureStatusVocabulary`): package registered, implementation delivered, technically qualified, human-accepted. Report them in that order and quote the `summary` line; do not call a feature "completed" or "accepted" from the package's `lifecycle.json` state alone. A declined acceptance writes the record back itself when it is further along than `implementing` (`verifying` or `completed`; the result's `packageBack` names the move, and a failure there never blocks the decline); on the usual chain the record already says `implementing` at that point. A record that still lags after a reopen or a decline carries `recordLag` with the reason, and delivered, qualified and human-accepted all read `no` until the new candidate passes the close again. A planning-entry queue head that lags behind the phase (`initial-planning`, `kickoff-promotion`, `continuity-adoption`, no live dispatch) is labelled `QUEUE-HEAD-LAGGING` by the re-ground notice after a Compact; it is not the next action, so take the next step from the phase and the typed stop, not from that head.
+ 
+ **What the close touches.** The tracked-effects digests hash what exists: the calibrated handover (`project/pipeline.json` `handover`, first brought to the closed state by `pipeline-state.mjs update-public-handover`, the existing writer: closed-local, the verified candidate, and technical close, product acceptance and push as three separate facts) and `telemetry/costs.md`; backlog, history and retrospective have no defined project file and keep the marked empty digest. The audit request names every Critic round of the feature (`evidence.criticReports`); the bundle under `audit-bundles/<feature>/<commit>/` carries each exported round report (`specs/<feature>/evidence/critic/<packet>/report.md`) and its README section "Critic round reports" names a round whose report could not be exported instead of omitting it. The close fetches every missing report itself from the private Critic journal (the verdict and its findings, checked against the digest in the receipt; working notes stay out) and carries it in the one close commit; a hand export with `session-critic-finalizer.mjs export` is only needed to publish richer notes, and a round it cannot read never stops the close. The minors of the Critic round this close is bound to go into the handover under "Open minor findings", and the result's `openMinors` line says how many are open and where: put that line in the close report.
