@@ -1,0 +1,14 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index d3bee27e008ab9d3635112239fbb25d56601a9e1..e6b6672c63ce4f90cfae86b173861be874845d39 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -32,8 +32,8 @@
+         "guard:plugins/pipeline-core/hooks/guard-worktree-isolation.mjs:guard-worktree-isolation",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PostToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/claude-task-output-scope-posttool.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PostToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
+-        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|Agent|TodoWrite|WebFetch|WebSearch|Write|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|SendMessage|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
++        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|Agent|TodoWrite|WebFetch|WebSearch|Write|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell|Read|Grep|Glob:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",

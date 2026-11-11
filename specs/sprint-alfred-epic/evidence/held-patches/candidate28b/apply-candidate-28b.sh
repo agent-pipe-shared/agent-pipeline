@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28b: 21 held patches exported from the build clone chain 946dd2ea2..597c2a82c
+# PO apply script for candidate 28b: 20 held patches exported from the build clone chain 946dd2ea2..4d74f2385
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -33,8 +33,7 @@ step 16-67182a9ec 'fix(guard): offer no human override for a credential-target r
 step 17-6b48dce37 'feat(package): admit completed back to implementing for a proven correction round and let the declined acceptance write the record back'
 step 18-f2b2bc9c8 'feat(architecture): preview the boundary check against the proposed design of a PRD before the design signature'
 step 19-9028fa9c1 'fix(verify): restate four checks the 28b chain made stale and keep two texts clear of source-only paths and flags'
-step 20-a80fbeb63 'chore(inventory): rebaseline the inventory and sync the Reader inputs'
-step 21-597c2a82c 'fix(inventory): keep the hook surfaces sorted after the dispatch-budget matcher change'
+step 20-4d74f2385 'fix(inventory): keep the hook surfaces sorted after the dispatch-budget matcher change'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
