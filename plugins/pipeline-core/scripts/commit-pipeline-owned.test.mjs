@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { resolveRegisteredCriticCourseHistory } from "../lib/critic-course-admission.mjs";
+import { courseEvidenceGapText, criticCourseRepair, locateCourseEvidenceGap, resolveRegisteredCriticCourseHistory } from "../lib/critic-course-admission.mjs";
 import { commitPipelineOwned } from "./commit-pipeline-owned.mjs";
 
 function refusedFor(statusOut) {
@@ -111,8 +111,20 @@ test("Codex report: the manifest committed alone is the gap the course reader ca
     run("commit", "-q", "-m", "manifest alone", "--", "specs/feat-1/lifecycle.json");
     run("add", "-A");
     run("commit", "-q", "-m", "evidence later");
-    assert.throws(() => resolveRegisteredCriticCourseHistory({ repoRoot: root, featureId: "feat-1", candidateCommit: run("rev-parse", "HEAD").trim() }),
+    const head = run("rev-parse", "HEAD").trim();
+    assert.throws(() => resolveRegisteredCriticCourseHistory({ repoRoot: root, featureId: "feat-1", candidateCommit: head }),
       (error) => error.code === "CCA-EVIDENCE-READ");
+    // An already damaged history is named, not repaired: the commit, the path and the one way on (PO tile 2026-11-10).
+    const gapCommit = run("rev-parse", "HEAD~1").trim();
+    const gap = locateCourseEvidenceGap({ repoRoot: root, featureId: "feat-1", commit: head });
+    assert.deepEqual(gap, { commit: gapCommit, path: "specs/feat-1/evidence/final-candidate-verify.json" });
+    const text = criticCourseRepair("CCA-EVIDENCE-MODE", gap);
+    assert.equal(typeof text, "string");
+    assert.ok(text.includes(gapCommit) && text.includes("specs/feat-1/evidence/final-candidate-verify.json"), text);
+    assert.match(text, /new feature of rigor 1/u);
+    assert.match(courseEvidenceGapText("CCA-EVIDENCE-READ", null), /a revision of the feature manifest lists an evidence file/u);
+    assert.equal(courseEvidenceGapText("CCA-PARENT", gap), null, "other codes keep their own repair");
+    assert.equal(locateCourseEvidenceGap({ repoRoot: root, featureId: "feat-1", commit: gapCommit.replace(/.$/u, "x") }), null, "a malformed commit yields null");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

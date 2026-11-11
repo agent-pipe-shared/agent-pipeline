@@ -20,7 +20,7 @@ import { SPLIT_NEXT_ROUND_REPAIR, attributeVerdict, buildCriticSplit, criticSpli
 import { GOVERNANCE_REVIEW_SOURCE_SCHEMA, buildGovernanceReviewAction, buildGovernanceReviewRetry, preflightGovernanceReviewActionOutput, writeGovernanceReviewAction } from "../lib/governance-review-action.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
-import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admission.mjs";
+import { COURSE_EVIDENCE_GAP_CODES, courseEvidenceGapText, locateCourseEvidenceGap, resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admission.mjs";
 import { addCriticReviewLineage } from "../lib/feature-package-registration.mjs";
 import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import { registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission, SESSION_PACKET_BINDING_SCHEMA, canonicalJson, claimCandidatePacket, cleanupCandidatePacket, consumeCandidatePacket, inspectClaimedSessionAdmission, inspectClaimedCandidatePacket, inspectCandidatePacket, packetDigestMatches, prepareCandidatePacket, publishClaimedSessionAdmission, readConsumedCandidateReceipt, recordCandidateResult, sha256 } from "./critic-packet-preflight.mjs";
@@ -78,6 +78,10 @@ function takeoverTarget(root, featureId, supersede = false) {
   const unit = readCriticReviewUnit({ repoRoot: root, baseCommit: base, candidateCommit: head, specPath: declaration.specPath,
     logicalWorkIds: declaration.logicalWorkIds, reviewUnitPath: unitPath, ...(introduced !== base ? { declarationCommit: introduced } : {}) });
   const resolved = resolveRegisteredCriticCourseIdentity({ repoRoot: root, featureId, baseCommit: base, candidateCommit: head, registrationCommit: head, acceptedReference: null });
+  // A manifest revision that names evidence its own commit lacks: name that gap and the one way on (new feature), not the two other situations.
+  if (!resolved.ok && COURSE_EVIDENCE_GAP_CODES.includes(resolved.code)) {
+    fail("SCF-TAKEOVER-IDENTITY", courseEvidenceGapText(resolved.code, locateCourseEvidenceGap({ repoRoot: root, featureId, commit: head })));
+  }
   if (!resolved.ok) fail("SCF-TAKEOVER-IDENTITY", takeoverIdentityDetail(featureId, resolved.code));
   return { courseKey: resolved.value.courseIdentity.courseKey, logicalWorkIds: unit.declaration.logicalWorkIds,
     courseHistoryRegistered: resolved.value.registeredHistory.length > 0, registeredRounds: resolved.value.registeredHistory.length };

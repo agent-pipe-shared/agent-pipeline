@@ -28,13 +28,54 @@ const exact = (value, keys) => object(value)
   && keys.every((key) => Object.hasOwn(value, key));
 
 export class CriticCourseAdmissionError extends Error {
-  constructor(code) {
+  constructor(code, detail = null) {
     super("Critic course admission is invalid.");
     this.name = "CriticCourseAdmissionError";
     this.code = code;
+    // Where an evidence read failed ({ commit, path }), so a refusal can name the gap instead of only its code.
+    if (detail !== null) this.detail = detail;
   }
 }
-const fail = (code) => { throw new CriticCourseAdmissionError(code); };
+const fail = (code, detail = null) => { throw new CriticCourseAdmissionError(code, detail); };
+
+/**
+ * Codex greenfield, candidate 27: a manifest revision named an evidence file its own commit did not hold, and every course read
+ * failed with a bare CCA-EVIDENCE-MODE / CCA-EVIDENCE-READ. History is never rewritten and the reader stays strict (PO tile
+ * 2026-11-10), so the one way on is a new feature. This text says so, with the commit and the path.
+ */
+export const COURSE_EVIDENCE_GAP_CODES = Object.freeze(["CCA-EVIDENCE-MODE", "CCA-EVIDENCE-READ"]);
+/**
+ * Read-only: the first manifest revision (oldest first, up to `commit`) that lists a candidate-evidence path its own commit
+ * does not hold as a regular file, as { commit, path }, or null. Used only to name the gap in a refusal text; it decides nothing.
+ */
+export function locateCourseEvidenceGap({ repoRoot, featureId, commit }) {
+  try {
+    if (typeof repoRoot !== "string" || !FEATURE_ID.test(featureId ?? "") || !OID.test(commit ?? "")) return null;
+    const manifestPath = `specs/${featureId}/lifecycle.json`;
+    const run = (args) => execFileSync("git", ["-C", repoRoot, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 * 1024 * 1024 });
+    const revisions = run(["rev-list", "--reverse", commit, "--", manifestPath]).split("\n").filter(Boolean).slice(0, 512);
+    for (const revision of revisions) {
+      let manifest;
+      try { manifest = JSON.parse(run(["show", `${revision}:${manifestPath}`])); } catch { continue; }
+      for (const entry of Array.isArray(manifest?.artifacts) ? manifest.artifacts : []) {
+        if (entry?.class !== "candidate-evidence" || typeof entry.path !== "string") continue;
+        const row = run(["ls-tree", "-z", revision, "--", entry.path]);
+        if (!/^100644 blob [a-f0-9]{40,64}\t/u.test(row) || !row.endsWith(`\t${entry.path}\0`)) return { commit: revision, path: entry.path };
+      }
+    }
+    return null;
+  } catch { return null; }
+}
+
+export function courseEvidenceGapText(code, detail) {
+  if (!COURSE_EVIDENCE_GAP_CODES.includes(code)) return null;
+  const where = detail && typeof detail.commit === "string" && typeof detail.path === "string"
+    ? `commit ${detail.commit} lists ${detail.path} in the feature manifest, but that commit does not hold it as a regular file`
+    : "a revision of the feature manifest lists an evidence file that its own commit does not hold as a regular file";
+  return `The Critic course of this feature cannot be read (${code}): ${where}. `
+    + "Every course read checks each manifest revision, so this stays true for every later round and takeover of this feature, and history is not rewritten. "
+    + "Continue the remaining work as a new feature of rigor 1 (its own PRD and Spec) and run a full Critic over its commits.";
+}
 
 // PF-34: the one refusal whose repair is a sanctioned command. The decision object's keys stay
 // closed, so the route travels beside the decision; ${PIPELINE_PLUGIN_ROOT} is a literal placeholder.
@@ -53,8 +94,10 @@ Object.assign(REPAIRS_EXTRA, {
 });
 const PO_DECIDES = new Set(["CCA-REVIEW-BUDGET-EXHAUSTED", "CCA-ACCEPTANCE", "CCA-ACCEPTANCE-REFERENCE", "CCA-ACCEPTANCE-BINDING", "CCA-GENESIS", "CCA-GENESIS-BINDING", "CCA-ALIAS-GENESIS", "CCA-ALIAS-GENESIS-UNAVAILABLE", "CCA-ALIAS-V1-GENESIS-UNAVAILABLE"]);
 /** Repair text for a CCA refusal code, an explicit no-route object naming who decides, or null for non-CCA input. */
-export function criticCourseRepair(code) {
+export function criticCourseRepair(code, detail = null) {
   if (typeof code !== "string") return null;
+  const gap = courseEvidenceGapText(code, detail);
+  if (gap !== null) return gap;
   if (Object.hasOwn(REPAIRS, code)) return REPAIRS[code];
   if (Object.hasOwn(REPAIRS_EXTRA, code)) return REPAIRS_EXTRA[code];
   if (!code.startsWith("CCA-")) return null;
@@ -109,12 +152,12 @@ export function criticCourseParentRepair({ detail, candidate, specPath }) {
   });
 }
 
-function gitBytes(root, args, code) {
+function gitBytes(root, args, code, detail = null) {
   try {
     return execFileSync("git", ["-C", root, ...args], {
       encoding: "buffer", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1024 * 1024,
     });
-  } catch { fail(code); }
+  } catch { fail(code, detail); }
 }
 
 function manifestAt(root, commit, path) {
@@ -128,9 +171,9 @@ function manifestAt(root, commit, path) {
 }
 
 function regularBlobAt(root, commit, path) {
-  const row = gitBytes(root, ["ls-tree", "-z", commit, "--", path], "CCA-EVIDENCE-READ").toString("utf8");
+  const row = gitBytes(root, ["ls-tree", "-z", commit, "--", path], "CCA-EVIDENCE-READ", { commit, path }).toString("utf8");
   if (!/^100644 blob [a-f0-9]{40,64}\t[^\0]+\0$/u.test(row)
-    || !row.endsWith(`\t${path}\0`)) fail("CCA-EVIDENCE-MODE");
+    || !row.endsWith(`\t${path}\0`)) fail("CCA-EVIDENCE-MODE", { commit, path });
 }
 
 /**
@@ -169,7 +212,7 @@ export function resolveRegisteredCriticCourseHistory({ repoRoot, featureId, cand
         if (prior.critic) fail("CCA-REGISTRATION-DRIFT");
       }
       if (++inspected > 4096) fail("CCA-SOURCE-BOUND");
-      const bytes = gitBytes(root, ["show", `${commit}:${artifact.path}`], "CCA-EVIDENCE-READ");
+      const bytes = gitBytes(root, ["show", `${commit}:${artifact.path}`], "CCA-EVIDENCE-READ", { commit, path: artifact.path });
       if (digest(bytes) !== artifact.sha256) fail("CCA-EVIDENCE-DIGEST");
       let value;
       try { value = JSON.parse(bytes.toString("utf8")); } catch { value = null; }

@@ -41,7 +41,7 @@ import { CRITIC_DIAGNOSTIC_SCHEMA, diagnosticEvidenceLocation, readDiagnosticArt
 import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { compileRegisteredCriticReviewLineage } from "./critic-review-lineage.mjs";
-import { prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
+import { COURSE_EVIDENCE_GAP_CODES, courseEvidenceGapText, locateCourseEvidenceGap, prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
 import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
 import { readConsumedCourseClaimBinding } from "./critic-verify-lifecycle.mjs";
 import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
@@ -880,6 +880,10 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
     if (code === "CCA-REVIEW-BUDGET-EXHAUSTED") return refused("FPR-DELTA-BUDGET", "the round budget or the correction-commit budget of the course is exhausted; no further Critic round can be requested without the PO gate", extra2);
     if (code === "CCA-CORRECTION-RANGE") return refused("FPR-DELTA-NO-CORRECTION", "no correction commit exists since the last round", extra2);
     if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (registrations, or the tracked export of a consumed review; ${code}); commit only the registration paths between the correction and this command. This command chose the candidate ${candidate} (the newest first-parent commit that is not evidence-only by the candidate-choice test: it changes beyond the manifest and specs/${featureId}/evidence/), the base ${tail.commit} and HEAD ${head}. A commit between ${candidate} and HEAD that is neither a registration nor a change outside the manifest core breaks the transport (a commit that changes the manifest core, for example a feature-package-reconcile commit, is itself taken as the candidate)`, { ...extra2, candidateCommit: candidate, baseCommit: tail.commit, headCommit: head });
+    if (COURSE_EVIDENCE_GAP_CODES.includes(code)) {
+      const gap = locateCourseEvidenceGap({ repoRoot: root, featureId, commit: head });
+      return refused("FPR-DELTA-COURSE-GAP", courseEvidenceGapText(code, gap), { ...extra2, ...(gap === null ? {} : { gapCommit: gap.commit, gapPath: gap.path }) });
+    }
     return refused("FPR-DELTA-COMPILE", `the delta request does not compile (${code})`, extra2);
   }
   const { descriptor, artifact } = compiled.value;

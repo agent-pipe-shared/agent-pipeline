@@ -37,7 +37,7 @@ import {
   RequirementTraceabilityError,
   evaluateRequirementTraceability,
 } from "../lib/requirement-traceability.mjs";
-import { criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+import { COURSE_EVIDENCE_GAP_CODES, criticCourseParentDetail, criticCourseParentRepair, criticCourseRepair, deriveCriticCourseRegistrationCommit, locateCourseEvidenceGap, readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
 import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
 import { criticRunnerFromEnv, describeCriticRouteAssurance } from "../lib/critic-route-assurance.mjs";
 
@@ -454,7 +454,9 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       deltaRequestPath: context.deltaRequestPath });
     if (admission?.decision?.status !== "admitted") {
       observeSource(observer, stage, "rejected", admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE", sourceCandidate, sourceSpecSha256);
-      let repair = criticCourseRepair(admission?.decision?.code);
+      const gapCode = COURSE_EVIDENCE_GAP_CODES.includes(admission?.decision?.code);
+      let repair = criticCourseRepair(admission?.decision?.code,
+        gapCode ? locateCourseEvidenceGap({ repoRoot: realRoot, featureId: context.featureId, commit: context.registrationCommit }) : null);
       // CCA-PARENT: name the last registered round and the base this preflight accepts, and the route that admits from here.
       const parentDetail = admission?.decision?.code === "CCA-PARENT"
         ? criticCourseParentDetail({ repoRoot: realRoot, featureId, candidateCommit, givenBase: baseCommit ?? baseTree }) : null;
