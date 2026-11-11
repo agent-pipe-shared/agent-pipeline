@@ -1,0 +1,220 @@
+diff --git a/backlog/items/2026-11-11-the-signed-sbom-override-is-not-yet-verified-in-the-audit-bundle.md b/backlog/items/2026-11-11-the-signed-sbom-override-is-not-yet-verified-in-the-audit-bundle.md
+deleted file mode 100644
+index 0d8b57ec6cf9912f7a033e4af993217df0e534d8..0000000000000000000000000000000000000000
+--- a/backlog/items/2026-11-11-the-signed-sbom-override-is-not-yet-verified-in-the-audit-bundle.md
++++ /dev/null
+@@ -1,31 +0,0 @@
+----
+-schema: pipeline.backlog-item.v1
+-id: pipeline.the-signed-sbom-override-is-not-yet-verified-in-the-audit-bundle
+-type: workflow-improvement
+-owner: pipeline
+-status: open
+-created: 2026-11-11
+-source: Candidate 28c design; ADR-0091 decision 5; PO tile 2026-11-11 asked for a signature
+-sprint: alfred
+-done_when: manual
+----
+-
+-# The signed SBOM override is verified at the close but not yet by the audit bundle
+-
+-## Description
+-
+-A blocked SBOM (`stale`, `invalid`, `partial`, `unsupported`) passes the close only with the PO's signature (PO tile 2026-11-11, replacing the first draft that took the human's literal words). The close writes a request naming the feature, every finding and HEAD, the PO signs it with `po-human-approval.mjs sign-intent --request`, and the close verifies the proof against the trust anchors of `project/critical-human-proof.json`. The record names the signing key, the intent and proof digests and the candidate, and the signed request and proof stay in `specs/<feature>/evidence/sbom/`.
+-
+-Three things are not built yet:
+-
+-- The audit bundle checks the record's shape only. It does not copy the signed request and proof as verified proofs, and the offline verifier does not re-check the signature.
+-- A project without a trust anchor in `project/critical-human-proof.json` cannot pass a blocked SBOM at all; it can only repair it. The way to add the first anchor is the existing human-gated edit of that file.
+-- The anchor file is committed in the repository: a human-gated and audited route, not an unwritable one.
+-
+-## Decision
+-
+-The close-time signature is built in candidate 28c with tests (a proof of another key, another finding set, another commit or another feature is refused; a project without an anchor is refused; the signing command shows the findings). Whether the bundle should verify the proof offline is open.
+-
+-## Done when
+-
+-The bundle carries the signed request and proof of an override as proofs and its offline verifier checks the signature and the binding to the carried record, with a test that a tampered proof or a record that names other findings is refused.
+diff --git a/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md b/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+index a98a0a7fc5fac107d5d82892a62940109f467527..067edef2f91f637d45dfe4c37db356af880683d3 100644
+--- a/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
++++ b/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+@@ -17,11 +17,11 @@ ADR-0032 made the full CycloneDX SBOM an option and rejected it as a mandate, be
+ 3. **No component is an explicit record, never an absent file.** A repository with no manifest, or lockfiles that list nothing, gets `status: not-applicable` with its reason.
+ 4. **Four states block the close,** before the acceptance question and before anything is written: `stale` (the lockfiles changed after the record), `invalid` (an unreadable or damaged file or record), `partial` (a manifest without a lockfile, an unpinned requirement) and `unsupported` (a manifest or lockfile with no reader yet). The stop names each finding and says how to repair it, including how a reader is added.
+ 5. **Only the PO's signature passes a block** (PO tile 2026-11-11: require a signature; the first draft took the human's literal words as an attribution record, which nothing proved). When a finding blocks, the stop writes a request (`pipeline.sbom-override-request.v1`, under `scratch/`) that names the feature, every blocked finding and HEAD (commit and tree), and prints the command the PO runs in their own terminal: `po-human-approval.mjs sign-intent --request <the request>`. The signing command shows the findings, signs the request's intent digest and writes the proof next to the request. The close then runs again with `--sbom-override-proof <that file>`, verifies the proof with `verifyPoApprovalProof` against the trust anchors of `project/critical-human-proof.json` and records the override (`status: overridden`: the findings, the actor, and the authority: key reference, intent digest, proof digest, candidate commit) together with the signed request and proof in `specs/<feature>/evidence/sbom/`. A proof for other findings, another commit, another feature or a key the project does not name is refused; a project without a trust anchor cannot pass a block at all, it can only repair it. The bundle carries the record under the code `SBOM-OVERRIDDEN` and its README states that the SBOM is then incomplete by that decision. A resumed close needs no second override for the findings the record names; a new finding blocks again. The old `--sbom-override "<words>"` flag no longer exists.
+-6. **The audit bundle carries it.** The close names the record in its audit request; the bundle copies the record and the two documents as artifacts, prints a section for them, and the offline verifier re-checks the record's shape, that the carried documents are exactly the ones it names by digest, and that each document holds its profile.
++6. **The audit bundle carries it.** The close names the record in its audit request; the bundle copies the record and the two documents as artifacts, prints a section for them, and the offline verifier re-checks the record's shape, that the carried documents are exactly the ones it names by digest, and that each document holds its profile. For a signed override it also copies the signed request and the proof (`sbom-override:request`, `sbom-override:proof`) and the verifier (`AB-SBOM-OVERRIDE`) re-derives the request from its own fields, checks that it names exactly the findings the record covered and that the proof is a valid Ed25519 signature over its intent whose key reference and digests are the record's.
+ 
+ ## Consequences
+ 
+-Every closed feature has an inventory in its evidence, in two standard formats, without a tool the project must install. A project with a stack the readers do not know is stopped once, with the way forward named, and can pass only by the PO's signed decision. The override is visible to whoever reads the bundle. What stays open (backlog): the bundle does not yet carry the signed request and proof as verified proofs, the trust anchors are the project's committed policy file (human-gated and audited, not unwritable), and a project without an anchor has no override route. Paths under `node_modules`, `vendor`, fixture, example, `docs`, `specs` and similar directories are not observed.
++Every closed feature has an inventory in its evidence, in two standard formats, without a tool the project must install. A project with a stack the readers do not know is stopped once, with the way forward named, and can pass only by the PO's signed decision. The override is visible to whoever reads the bundle. Known limits, by design: the trust anchors are the project's committed policy file (human-gated and audited, not unwritable), and a project without an anchor has no override route. The offline verifier holds no anchors: it checks the signature and its binding, and the record names the key so a reader can compare it with the project's policy. Paths under `node_modules`, `vendor`, fixture, example, `docs`, `specs` and similar directories are not observed.
+ 
+ ## Affected contracts
+ 
+diff --git a/plugins/pipeline-core/lib/audit-bundle.mjs b/plugins/pipeline-core/lib/audit-bundle.mjs
+index 55bc42bb734f0a779a464828f8cfb087638088a8..f7ec582a75a738b52c2e594c4e20fd7d5187ee64 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.mjs
+@@ -11,6 +11,7 @@ import { resolveEffectiveOrganizationPolicy } from "./organization-policy.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "./verify-selection.mjs";
+ import { SBOM_CLOSE_CODES, SBOM_DOCUMENT_FORMATS, sbomCloseRecordShape } from "./sbom-close.mjs";
+ import { validateSbomPayload } from "./sbom-manifest.mjs";
++import { verifySbomOverrideEvidence } from "./sbom-override-authority.mjs";
+ 
+ const SHA = /^[a-f0-9]{64}$/u; const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u; const BUNDLE_ID = /^[a-z][a-z0-9-]{2,63}$/u;
+ const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u; const SIGNATURE = /^[A-Za-z0-9_-]{16,16384}$/u;
+@@ -27,7 +28,7 @@ function evidenceSection(manifest) {
+   const projectionText = projections.length === 0 ? "" : `\n## Dispatch projection\n\nThe tracked, redacted projection of the feature's dispatches: each briefing's text with its digest and each completed dispatch record. \`redacted\` means an absolute host path was masked (the digest of the original bytes is kept next to the digest of the text carried); a \`gap\` names why a text is not carried (a typed gap with the original digest, never an omission). A private key or secret-shaped value is never copied.\n\n${projections.map(line).join("\n")}\n`;
+   // C28c: the software bill of materials is its own section: the close's record, then the two documents it names.
+   const sboms = manifest.evidence.items.filter((entry) => entry.item.startsWith("sbom"));
+-  const sbomText = sboms.length === 0 ? "" : `\n## Software bill of materials\n\nThe close reads the lockfiles pinned in the repository (npm, Python, Go, Rust) and records the components in CycloneDX 1.6 and SPDX 2.3; the component list carries no dependency edges. \`SBOM-NOT-APPLICABLE\` means no component was found, with the reason in the record. \`SBOM-OVERRIDDEN\` means the PO signed an override of a blocked state; the record names every finding it covered and the signing key: the SBOM is then incomplete by that decision, not by accident.\n\n${sboms.map(line).join("\n")}\n`;
++  const sbomText = sboms.length === 0 ? "" : `\n## Software bill of materials\n\nThe close reads the lockfiles pinned in the repository (npm, Python, Go, Rust) and records the components in CycloneDX 1.6 and SPDX 2.3; the component list carries no dependency edges. \`SBOM-NOT-APPLICABLE\` means no component was found, with the reason in the record. \`SBOM-OVERRIDDEN\` means the PO signed an override of a blocked state; the record names every finding it covered and the signing key, and the signed request and proof travel in the bundle (\`AB-SBOM-OVERRIDE\` is the verifier's finding when the signature or its binding does not hold; whether the key is the project's is decided at the close, so compare the key reference with the project's policy): the SBOM is then incomplete by that decision, not by accident.\n\n${sboms.map(line).join("\n")}\n`;
+   const approvalText = approval.length === 0 ? "" : `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${approval.map(line).join("\n")}\n`;
+   const reportText = reports.length === 0 ? "" : `\n## Critic round reports\n\nOne entry per Critic round of the feature. \`REPORT-NOT-EXPORTED\` means the round's report was never exported into the repository's tracked evidence (it lived outside the tracked tree), and \`UNREADABLE\` that the named file was missing or empty at the close: the report is NOT part of this bundle.\n\n${reports.map(line).join("\n")}\n`;
+   return `${approvalText}${reportText}${projectionText}${sbomText}`;
+@@ -199,8 +200,8 @@ function followUpFindings(root, manifest) {
+   return findings;
+ }
+ function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
+-const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection", "sbom", "sbom-document"]);
+-const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection", sbom: "sbom-record", sbomDocument: "sbom-document" });
++const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection", "sbom", "sbom-document", "sbom-override"]);
++const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection", sbom: "sbom-record", sbomDocument: "sbom-document", sbomOverride: "sbom-override" });
+ // C28: the projection the close writes (lib/durable-evidence.mjs `projectCloseDispatches`). The verifier re-checks it offline: every carried text hashes to the digest it names, nothing is a gap with a text,
+ // and no absolute host path or private key is anywhere in the file, so a producer that skipped the redaction is found even when the artifact digest is consistent with the manifest.
+ const DISPATCH_PROJECTION_SCHEMA = "pipeline.close-dispatch-projection.v1"; const BRIEFING_STATUSES = new Set(["carried", "redacted", "gap"]);
+@@ -314,6 +315,12 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
+         if (documentFile === null || documentFile.sha256 !== document.sha256) gap(item, "UNREADABLE");
+         else items.push({ item, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.sbomDocument, document.path, documentFile.sha256) });
+       }
++      // A signed override carries the request the PO signed and the proof next to the record, so a reader can check the signature offline.
++      if (record.status === "overridden") for (const part of ["request", "proof"]) {
++        const item = `sbom-override:${part}`; const file = readEvidenceFile(root, `${directory}override-${part}.json`);
++        if (file === null || file.bytes.length === 0) gap(item, "UNREADABLE");
++        else items.push({ item, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.sbomOverride, `${directory}override-${part}.json`, file.sha256) });
++      }
+     }
+   }
+   return { artifacts, evidence: Object.freeze({ schema: "pipeline.audit-bundle-evidence.v1", candidateBound: true, traceStatus, items: Object.freeze(items.map((entry) => Object.freeze(entry))) }) };
+@@ -386,6 +393,11 @@ function evidenceFindings(root, manifest) {
+         const named = manifest.evidence.items.find((entry) => entry.item === `sbom-document:${document.format}`);
+         if (named === undefined || named.bundlePath === null || artifactDigest(named.bundlePath) !== document.sha256) findings.push(`AB-SBOM-DOCUMENT ${document.format}`);
+       }
++      // A signed override: the carried request and proof must verify offline and bind exactly the findings and the key the record names.
++      if (sbomCloseRecordShape(record) && record.status === "overridden") {
++        const carried = (part) => { const entry = manifest.evidence.items.find((candidateItem) => candidateItem.item === `sbom-override:${part}`); try { return entry?.bundlePath ? parseStrictJson(readFileSync(join(root, entry.bundlePath))) : null; } catch { return null; } };
++        if (verifySbomOverrideEvidence({ record, request: carried("request"), proof: carried("proof") }) !== true) findings.push("AB-SBOM-OVERRIDE");
++      }
+     }
+     if (item.item.startsWith("sbom-document:") && item.bundlePath !== null) {
+       const format = item.item.slice("sbom-document:".length); let payload = null; try { payload = parseStrictJson(readFileSync(join(root, item.bundlePath))); } catch { payload = null; }
+diff --git a/plugins/pipeline-core/lib/audit-bundle.test.mjs b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+index c4d7564b08dd82d208e6535164930909f21ec55f..5f0a7e7bdb8d069d0bb362fc64f00d752e0af109 100644
+--- a/plugins/pipeline-core/lib/audit-bundle.test.mjs
++++ b/plugins/pipeline-core/lib/audit-bundle.test.mjs
+@@ -12,6 +12,8 @@ import { closeDispatchProjectionBytes, projectCloseDispatches } from "./durable-
+ import { denyPrivateAbsolutePaths } from "./dispatch-record.mjs";
+ import { planVerifySelection } from "./verify-selection.mjs";
+ import { closeSbom } from "./sbom-close.mjs";
++import { createSbomOverrideRequest } from "./sbom-override-authority.mjs";
++import { verifyPoApprovalProof } from "./po-approval-proof.mjs";
+ 
+ const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ // E-AC-20 fixtures: a governance export adapter profile and a delivery receipt, matching the
+@@ -305,12 +307,49 @@ test("C28c a not-applicable and an overridden record are carried with their code
+   assert.deepEqual(empty.plan.evidence.items.map((entry) => `${entry.item}:${entry.code}`), ["sbom:SBOM-NOT-APPLICABLE"]);
+   await buildAuditBundle({ repositoryRoot: none.root, outputPath: "bundle", plan: empty.plan });
+   assert.equal((await verifyAuditBundle({ bundleRoot: join(none.root, "bundle") })).status, "verified");
+-  const over = fixture(); const gap = sbomBundle(over, { "package-lock.json": LOCK, "yarn.lock": "x" }, () => ({ override: "weiter", authority: { kind: "po-signature", keyReference: "po-key", intentSha256: "a".repeat(64), proofSha256: "b".repeat(64), candidateCommit: "c".repeat(40) }, actor: "po" }));
+-  assert.equal(gap.plan.evidence.items[0].code, "SBOM-OVERRIDDEN");
++  const over = fixture(); const gap = signedOverrideBundle(over, { "package-lock.json": LOCK, "yarn.lock": "x" });
++  assert.deepEqual(gap.plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["sbom:carried:SBOM-OVERRIDDEN", "sbom-document:cyclonedx-json:carried:null", "sbom-document:spdx-json:carried:null", "sbom-override:request:carried:null", "sbom-override:proof:carried:null"]);
+   await buildAuditBundle({ repositoryRoot: over.root, outputPath: "bundle", plan: gap.plan });
+   assert.equal((await verifyAuditBundle({ bundleRoot: join(over.root, "bundle") })).status, "verified");
+   assert.match(readFileSync(join(over.root, "bundle", "README.md"), "utf8"), /SBOM-OVERRIDDEN/u);
+ });
++// The PO's signed override: the bundle carries the request and the proof and the offline verifier checks the signature and what it binds.
++function signedOverrideBundle(input, files, { keyReference = "po-key", edit = (request) => request } = {}) {
++  const read = (path) => files[path] ?? null; const base = { featureId: FEATURE_ID, evidenceDir: "evidence", tracked: Object.keys(files), read };
++  const blocked = closeSbom(base).blocks;
++  const request = edit(createSbomOverrideRequest({ featureId: FEATURE_ID, blocked, candidate: { commit: "1".repeat(40), tree: "2".repeat(40) } }));
++  const { publicKey, privateKey } = generateKeyPairSync("ed25519"); const pem = publicKey.export({ type: "spki", format: "pem" });
++  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference, publicKey: pem, signatureBase64: cryptoSign(null, Buffer.from(request.approvalIntent.sha256, "utf8"), privateKey).toString("base64") };
++  const authority = { kind: "po-signature", keyReference, intentSha256: request.intentSha256, proofSha256: verifyPoApprovalProof({ intent: request.approvalIntent, trustPolicy: { keyReference, publicKeySha256: hash(pem) }, proof }).proofSha256, candidateCommit: "1".repeat(40) };
++  const closed = closeSbom({ ...base, override: "accepted by signature", authority, actor: "po" });
++  mkdirSync(join(input.root, "evidence/sbom"), { recursive: true });
++  for (const file of closed.files) writeFileSync(join(input.root, file.path), file.text);
++  writeFileSync(join(input.root, "evidence/sbom/override-request.json"), `${JSON.stringify(request, null, 2)}\n`); writeFileSync(join(input.root, "evidence/sbom/override-proof.json"), `${JSON.stringify(proof, null, 2)}\n`);
++  return { closed, plan: planWith(input, { candidate: CANDIDATE, evidence: { sbomRecordPath: "evidence/sbom/record.json" } }) };
++}
++test("C28c a signed override that does not hold offline is found: other findings in the request, a key the record does not name, a missing proof", async () => {
++  const files = { "package-lock.json": LOCK, "yarn.lock": "x" };
++  const tampered = async (options, mutate = () => {}) => {
++    const input = fixture(); signedOverrideBundle(input, files, options); mutate(input);
++    const plan = planWith(input, { candidate: CANDIDATE, evidence: { sbomRecordPath: "evidence/sbom/record.json" } });
++    await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
++    return (await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).findings;
++  };
++  assert.deepEqual(await tampered({}), [], "an honest signed override verifies");
++  // A request that names other findings than the record covered (it re-derives, so only the binding to the record catches it).
++  assert.ok((await tampered({ edit: (request) => createSbomOverrideRequest({ featureId: FEATURE_ID, blocked: [{ ...request.blocked[0], path: "other.lock" }], candidate: request.candidate }) })).includes("AB-SBOM-OVERRIDE"));
++  // A request that no longer re-derives from its own fields.
++  assert.ok((await tampered({ edit: (request) => ({ ...request, featureId: "another-feature" }) })).includes("AB-SBOM-OVERRIDE"));
++  // A proof whose signature does not match: replace the carried proof file's signature before the bundle is built.
++  const forged = await tampered({}, (input) => { const path = join(input.root, "evidence/sbom/override-proof.json"); const proof = JSON.parse(readFileSync(path, "utf8")); writeFileSync(path, `${JSON.stringify({ ...proof, signatureBase64: Buffer.from("forged").toString("base64") }, null, 2)}\n`); });
++  assert.ok(forged.includes("AB-SBOM-OVERRIDE"));
++  // A missing proof file is a typed gap in the plan, never a silent pass.
++  const input = fixture(); signedOverrideBundle(input, files); rmSync(join(input.root, "evidence/sbom/override-proof.json"));
++  const plan = planWith(input, { candidate: CANDIDATE, evidence: { sbomRecordPath: "evidence/sbom/record.json" } });
++  assert.ok(plan.evidence.items.some((entry) => entry.item === "sbom-override:proof" && entry.status === "gap" && entry.code === "UNREADABLE"));
++  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
++  assert.ok((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).findings.includes("AB-SBOM-OVERRIDE"));
++});
+ test("C28c an unreadable record or a document that does not match its recorded digest is a typed gap; a damaged carried document is found offline", async () => {
+   const absent = planWith(fixture(), { candidate: CANDIDATE, evidence: { sbomRecordPath: "evidence/sbom/absent.json" } });
+   assert.deepEqual(absent.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["sbom:gap:UNREADABLE"]);
+diff --git a/plugins/pipeline-core/lib/sbom-override-authority.mjs b/plugins/pipeline-core/lib/sbom-override-authority.mjs
+index 099ffca00f2376f1fbc395d7c60dadc24a7e0fe8..2fc96e2bd98f30cc5b1e219e9fb218152412e2d8 100644
+--- a/plugins/pipeline-core/lib/sbom-override-authority.mjs
++++ b/plugins/pipeline-core/lib/sbom-override-authority.mjs
+@@ -53,6 +53,25 @@ export function describeSbomOverrideRequest(record, intentSha256) {
+   };
+ }
+ 
++/**
++ * Offline check used by the audit bundle verifier: the carried request re-derives from its own fields, names exactly the findings the close record covered, and the carried proof is a valid Ed25519
++ * signature over that request's intent whose digests and key reference are the ones the record names. It holds no trust anchors: that the key is the project's was decided at the close, and the
++ * record names the key so a reader can compare it with the project's policy.
++ */
++export function verifySbomOverrideEvidence({ record, request, proof } = {}) {
++  const override = record?.override;
++  if (record?.status !== "overridden" || override === null || typeof override !== "object" || !exact(override.authority, ["kind", "keyReference", "intentSha256", "proofSha256", "candidateCommit"])) return false;
++  if (!exact(request, ["schema", "intentSha256", "approvalIntent", "featureId", "blocked", "candidate"]) || !exact(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"])) return false;
++  let rebuilt = null;
++  try { rebuilt = createSbomOverrideRequest({ featureId: request.featureId, blocked: request.blocked, candidate: request.candidate }); } catch { return false; }
++  if (rebuilt === null || canonical(rebuilt) !== canonical(request)) return false;
++  if (canonical(normalizeBlocked(override.blocked)) !== canonical(request.blocked)) return false;
++  if (override.authority.intentSha256 !== request.intentSha256 || override.authority.candidateCommit !== request.candidate.commit || override.authority.keyReference !== proof.keyReference) return false;
++  if (typeof proof.publicKey !== "string") return false;
++  const checked = verifyPoApprovalProof({ intent: request.approvalIntent, trustPolicy: { keyReference: proof.keyReference, publicKeySha256: createHash("sha256").update(proof.publicKey).digest("hex") }, proof });
++  return checked.verified === true && checked.proofSha256 === override.authority.proofSha256;
++}
++
+ /**
+  * Verifies a detached proof for exactly this feature, these findings and this candidate. `trustAnchors` comes from the project's configured policy, never from the proof.
+  * Returns { verified: true, authority } with the record fields the close keeps, or { verified: false, code }.
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 84495fbc7efe655a6a3285c199795a5a1ad7df33..ba0ace3afe70ede002f10c5d5215fef5b5f9728b 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -27,7 +27,7 @@ The command stops at `commit-required` and prints the paths and the commit messa
+ 
+ **The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. In the same message say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why (never a gate; a result you could not run also goes into `--open-checks`). Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. The sentence ends with ONE fixed answer form for yes (in the project's human-facing language: `yes, I accept`; `ja, ich akzeptiere` for a German project; English for any other language). If the human answers exactly that form (case, surrounding space and a closing `.` or `!` do not matter), rerun the identical command with `--human-acceptance "<the human's literal answer>"`. `--human-acceptance` records an acceptance for that form only: any other answer (a bug report, a change request, a doubt, a bare "yes") stops with `ONESHOT-ACCEPTANCE-NOT-YES`, records nothing and names both ways on; never search the answer for a keyword and never turn it into a yes yourself. **A decline is not the end of the feature:** rerun the identical command with `--human-decline "<the human's literal answer>"` (exclusive with `--human-acceptance`). The close records the human's words with the candidate and the time in `specs/<feature>/evidence/human-decline-<candidate>-<answer>.md` (never read as an acceptance), retires the bound Result (the State transition `continuity-result-retire-plan` / `-apply`: `continuity.authority.result` becomes null, the retired binding stays in `continuity.resultRetirements`, `result.md` is restored to the text before the bootstrap block, and the package is reconciled result-only, without a signature; in a project with a session-authority catalogue this runs on the owner route like the Result bootstrap, on the Close lifecycle the one-shot already opened) and returns status `declined` with `next` in order: the commit of exactly those outputs, a correction dispatch (`prepare-dispatch.mjs goldfish`, the human's words are the correction request), a Critic delta round on the new candidate (`prepare-dispatch.mjs critic --delta-request`), then the identical close command with `--critic-packet-id <new-packet-id>`. That second close runs the Result bootstrap again and asks the acceptance question again for the new candidate. Do not run `reopen-design` for a declined acceptance: with a bound Result it refuses (`PLAN-REOPEN-RESULT-BOUND`) and names this route, because `submit-plan` would refuse `PLAN-SUBMIT-CONTINUITY-BUSY` while a Result is bound. The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
+ 
+-**The SBOM (a standard part of the close, ADR-0091).** Before the acceptance question the close reads the lockfiles tracked in the repository (npm, Python, Go, Rust) and checks or writes `specs/<feature>/evidence/sbom/` (`record.json`, `cyclonedx.json`, `spdx.json`); a repository with no component gets an explicit `not-applicable` record. A finding of the state `stale`, `invalid`, `partial` or `unsupported` stops the close with its code (`SBOM-SOURCE-INPUTS-STALE`, `SBOM-RECORD-INVALID`, `SBOM-PARTIAL`, `SBOM-ADAPTER-UNSUPPORTED`) and the repair, before anything is written. Repair the cause (pin the dependencies in a lockfile, remove a stale `sbom` directory, add a reader to `SBOM_READERS` for another ecosystem) and rerun the identical command. Only the PO can accept the gap, and only by signature: the stop prints a request under `scratch/` and the one command the PO runs in their own terminal (`po-human-approval.mjs sign-intent --request <the request>`, which shows the findings and writes the proof next to the request). Hand the PO that command when they can run it at once, change nothing in the tree in between (the request names HEAD), then rerun the identical command with `--sbom-override-proof <the proof file>`. The close verifies the proof against the trust anchors of `project/critical-human-proof.json` (without an anchor the gap cannot be accepted, only repaired), records the findings, the actor and the signing key, keeps the signed request and proof in `specs/<feature>/evidence/sbom/`, and the audit bundle names it `SBOM-OVERRIDDEN`. A sentence in chat is never an override, and the agent never signs.
++**The SBOM (a standard part of the close, ADR-0091).** Before the acceptance question the close reads the lockfiles tracked in the repository (npm, Python, Go, Rust) and checks or writes `specs/<feature>/evidence/sbom/` (`record.json`, `cyclonedx.json`, `spdx.json`); a repository with no component gets an explicit `not-applicable` record. A finding of the state `stale`, `invalid`, `partial` or `unsupported` stops the close with its code (`SBOM-SOURCE-INPUTS-STALE`, `SBOM-RECORD-INVALID`, `SBOM-PARTIAL`, `SBOM-ADAPTER-UNSUPPORTED`) and the repair, before anything is written. Repair the cause (pin the dependencies in a lockfile, remove a stale `sbom` directory, add a reader to `SBOM_READERS` for another ecosystem) and rerun the identical command. Only the PO can accept the gap, and only by signature: the stop prints a request under `scratch/` and the one command the PO runs in their own terminal (`po-human-approval.mjs sign-intent --request <the request>`, which shows the findings and writes the proof next to the request). Hand the PO that command when they can run it at once, change nothing in the tree in between (the request names HEAD), then rerun the identical command with `--sbom-override-proof <the proof file>`. The close verifies the proof against the trust anchors of `project/critical-human-proof.json` (without an anchor the gap cannot be accepted, only repaired), records the findings, the actor and the signing key, keeps the signed request and proof in `specs/<feature>/evidence/sbom/`, and the audit bundle names it `SBOM-OVERRIDDEN`, carries the signed request and proof and re-checks the signature offline (`AB-SBOM-OVERRIDE`). A sentence in chat is never an override, and the agent never signs.
+ 
+ **Four status facts, never the package record alone.** The State inspector's `featureStatus` and the close's `statuses` print the same four facts apart (`featureStatusVocabulary`): package registered, implementation delivered, technically qualified, human-accepted. Report them in that order and quote the `summary` line; do not call a feature "completed" or "accepted" from the package's `lifecycle.json` state alone. A declined acceptance writes the record back itself when it is further along than `implementing` (`verifying` or `completed`; the result's `packageBack` names the move, and a failure there never blocks the decline); on the usual chain the record already says `implementing` at that point. A record that still lags after a reopen or a decline carries `recordLag` with the reason, and delivered, qualified and human-accepted all read `no` until the new candidate passes the close again. A planning-entry queue head that lags behind the phase (`initial-planning`, `kickoff-promotion`, `continuity-adoption`, no live dispatch) is labelled `QUEUE-HEAD-LAGGING` by the re-ground notice after a Compact; it is not the next action, so take the next step from the phase and the typed stop, not from that head.
+ 
