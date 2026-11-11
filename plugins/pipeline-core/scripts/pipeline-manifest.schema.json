@@ -90,6 +90,11 @@
             "block_on": { "type": "array", "items": { "type": "string" } }
           }
         },
+        "required_capabilities": {
+          "type": "array",
+          "description": "OPTIONAL. Security capabilities this project declares mandatory at the close: secrets (gitleaks), sast (semgrep), sca (osv-scanner), license (license-check). A declared capability whose scanner is not installed, loaded zero rules or did not run is refused at the close (SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN); without a declaration the same state is a warning.",
+          "items": { "type": "string", "enum": ["secrets", "sast", "sca", "license"] }
+        },
         "scanners": {
           "type": "object",
           "description": "Keys are arbitrary scanner names (gitleaks, osv-scanner, semgrep, ...).",

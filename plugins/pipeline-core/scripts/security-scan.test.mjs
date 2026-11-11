@@ -2193,7 +2193,14 @@ security:
   const byTool = (tool) => evidence.scanners.find((s) => s.tool === tool);
   const semgrep = byTool("semgrep")?.ruleSet;
   assertEqual("rule provenance: semgrep names the plugin default rule file it really passed to --config", [semgrep?.source, semgrep?.ref], ["plugin-default", "plugin:security/semgrep/pipeline.yml"]);
-  assertEqual("rule provenance: semgrep lists the rule ids of that file", semgrep?.ruleIds, ["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval"]);
+  // QG-04 restated in place (C28, AC-108): the file listed two ids; it now also carries the default web/Node pack. The original two stay first and unchanged,
+  // and the provenance still lists exactly the ids of the file, in file order.
+  assertEqual("rule provenance: semgrep lists the rule ids of that file", semgrep?.ruleIds, [
+    "pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval",
+    "pipeline-default-dom-injection-sink", "pipeline-default-eval-like-call", "pipeline-default-unsafe-url-scheme", "pipeline-default-unvalidated-redirect",
+    "pipeline-default-postmessage-no-origin-check", "pipeline-default-prototype-pollution", "pipeline-default-child-process-shell-string",
+    "pipeline-default-hardcoded-secret", "pipeline-default-hardcoded-credential-assignment",
+  ]);
   assertTrue("rule provenance: semgrep binds the rule file bytes by digest", /^[0-9a-f]{64}$/u.test(semgrep?.sha256 ?? ""), JSON.stringify(semgrep));
   assertEqual("rule provenance: gitleaks names its config and says it extends the built-in default ruleset", [byTool("gitleaks")?.ruleSet?.ref?.endsWith("gitleaks-default.toml") || byTool("gitleaks")?.ruleSet?.ref === ".gitleaks.toml", /built-in default/u.test(byTool("gitleaks")?.ruleSet?.description ?? "")], [true, true]);
   assertEqual("rule provenance: osv-scanner says it uses the advisory database of the detected package sources, not a rule file", byTool("osv-scanner")?.ruleSet?.source, "builtin");

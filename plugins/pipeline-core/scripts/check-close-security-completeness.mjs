@@ -39,8 +39,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
-  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions, securityCloseElements,
-  securityGateNotConfiguredRefusal, unexcusedNotExecuted,
+  SECURITY_ELEMENTS, SECURITY_RUN_COMMAND, declaredSecurityCapabilities, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions,
+  requiredCapabilityRefusals, securityCloseElements, securityCloseWarnings, securityGateNotConfiguredRefusal, unexcusedNotExecuted,
 } from "../lib/security-close-status.mjs";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
@@ -58,7 +58,10 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 export function checkCloseSecurityCompleteness(root) {
   const manifestResult = loadManifest(root);
   const securityGate = gateConfig(manifestResult.manifest, "security");
+  const declared = declaredSecurityCapabilities(manifestResult.manifest);
   if (manifestResult.status === "absent" || !securityGate || securityGate.mode === "off") {
+    // C28: a project that declared mandatory capabilities does not skip the check because its gate is absent or off: no scan runs, so each one is refused.
+    if (declared.length > 0) return { skipped: false, commit: null, failures: requiredCapabilityRefusals({ declared, gateActive: false }), elements: [], warnings: [] };
     return { skipped: true };
   }
 
@@ -78,7 +81,11 @@ export function checkCloseSecurityCompleteness(root) {
   const enabled = Object.fromEntries(SECURITY_ELEMENTS.map((key) => [key, manifestResult.manifest?.security?.scanners?.[key]?.enabled ?? true]));
   // Candidate 21h: the critical reading and the named exceptions, so the printed lines match what the completeness check above decided.
   const critical = isCriticalStakes(readCalibrationStakes(root));
-  return { skipped: false, commit, failures, elements: securityCloseElements({ scanners, enabled, critical, exceptions: critical ? readScannerExceptions(root) : null }) };
+  const exceptions = critical ? readScannerExceptions(root) : null;
+  // C28: a declared mandatory capability that did not run is a typed refusal; every other skipped or partial scanner is a warning with its next step.
+  failures.push(...requiredCapabilityRefusals({ scanners, declared, exceptions }));
+  const elements = securityCloseElements({ scanners, enabled, critical, exceptions });
+  return { skipped: false, commit, failures, elements, warnings: securityCloseWarnings(elements) };
 }
 
 if (isDirectInvocation(import.meta.url)) {
@@ -93,6 +100,7 @@ if (isDirectInvocation(import.meta.url)) {
     process.exit(0);
   }
   for (const line of formatSecurityCloseStatus(result.elements)) console.log(`  ${line}`);
+  for (const warning of result.warnings) console.log(`  ${warning}`);
   if (result.failures.length > 0) {
     for (const failure of result.failures) console.error(`CLOSE SECURITY COMPLETENESS FAILED: ${failure}`);
     process.exit(2);
@@ -102,6 +110,11 @@ if (isDirectInvocation(import.meta.url)) {
   if (notExecuted.length === 0 && excepted.length > 0) {
     // Never GREEN: the scanners named here did not run and are admitted only by a recorded, unexpired, human-confirmed exception.
     console.log(`CLOSE SECURITY COMPLETENESS ADMITTED BY NAMED EXCEPTION: HEAD ${result.commit} is bound; not executed but excepted: ${excepted.join(", ")} (see the lines above for reason, expiry and confirmer).`);
+    process.exit(0);
+  }
+  // C28: a skipped or partial scanner is a warning, never a clean close.
+  if (notExecuted.length === 0 && result.warnings.length > 0) {
+    console.log(`CLOSE SECURITY COMPLETENESS ADMITTED WITH WARNINGS: HEAD ${result.commit} is bound; ${result.warnings.length} warning(s) above name what would run each skipped or partial scanner (the project did not declare them mandatory, so they do not block).`);
     process.exit(0);
   }
   console.log(notExecuted.length === 0

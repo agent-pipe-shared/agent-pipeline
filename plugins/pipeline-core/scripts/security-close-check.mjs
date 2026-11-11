@@ -13,7 +13,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import {
-  elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, readScannerExceptions, scannerNotExecutedRefusal, securityGateNotConfiguredRefusal, unexcusedNotExecuted,
+  SECURITY_CAPABILITY_ELEMENT, declaredSecurityCapabilities, elementsOfCompletedScan, isCriticalStakes, readCalibrationStakes, readScannerExceptions, requiredCapabilityRefusals,
+  scannerNotExecutedRefusal, securityGateNotConfiguredRefusal, unexcusedNotExecuted,
 } from "../lib/security-close-status.mjs";
 import { gateConfig, loadManifest } from "../lib/manifest.mjs";
 
@@ -22,7 +23,10 @@ export const SECURITY_SCAN_SCRIPT = fileURLToPath(new URL("./security-scan.mjs",
 export function runSecurityCloseCheck(root, env = process.env) {
   const loaded = loadManifest(root);
   const gate = gateConfig(loaded.manifest, "security");
+  // C28: the capabilities the project declared mandatory (security.required_capabilities); without a declaration a skipped scanner stays a warning in the scan output.
+  const declared = declaredSecurityCapabilities(loaded.manifest);
   if (loaded.status === "absent" || !gate || gate.mode === "off") {
+    if (declared.length > 0) { for (const line of requiredCapabilityRefusals({ declared, gateActive: false })) console.error(line); return 1; }
     const refusal = securityGateNotConfiguredRefusal(root, "this Verify run");
     if (refusal) { console.error(refusal); return 1; }
     console.log("security close chain: not applicable -- the security gate is not configured for this project (no manifest, no gate, or mode off)");
@@ -30,15 +34,19 @@ export function runSecurityCloseCheck(root, env = process.env) {
   }
   const scan = spawnSync(process.execPath, [SECURITY_SCAN_SCRIPT, "--root", root, "--scan-mode", "snapshot"], { cwd: root, stdio: "inherit", env });
   if (scan.status !== 0 && scan.status !== 1) return 1; // 1 is the scan's own warn-mode exit, which the gate mode already decided
-  if (!isCriticalStakes(readCalibrationStakes(root))) return 0;
+  const critical = isCriticalStakes(readCalibrationStakes(root));
+  if (!critical && declared.length === 0) return 0;
   let scanners = null;
   try { scanners = JSON.parse(readFileSync(join(root, "evidence", "security-latest.json"), "utf8")).scanners; } catch { /* unreadable evidence: every configured element is not executed */ }
   // Candidate 21h: the critical reading (a skipped license-check did not run) and the named exceptions, the same as the close gate. The scan
   // above already printed each applied exception in its "Security close status" lines.
-  const exceptions = readScannerExceptions(root);
-  const notExecuted = unexcusedNotExecuted(elementsOfCompletedScan(scanners, { critical: true, exceptions }));
+  const exceptions = critical ? readScannerExceptions(root) : null;
+  const refused = requiredCapabilityRefusals({ scanners, declared, exceptions });
+  const declaredElements = new Set(declared.map((capability) => SECURITY_CAPABILITY_ELEMENT[capability])); // already refused above, by the declaration's own code
+  const notExecuted = critical ? unexcusedNotExecuted(elementsOfCompletedScan(scanners, { critical: true, exceptions })).filter((entry) => !declaredElements.has(entry.element)) : [];
+  for (const line of refused) console.error(line);
   for (const entry of notExecuted) console.error(scannerNotExecutedRefusal(entry.element, "this Verify run", { rejected: exceptions.rejected }));
-  return notExecuted.length === 0 ? 0 : 1;
+  return refused.length + notExecuted.length === 0 ? 0 : 1;
 }
 
 // The consumer adapter contract (lib/consumer-verify.mjs CONSUMER_VERIFY_ADAPTER): `runConsumerVerifyCheck(check, ...args)`.

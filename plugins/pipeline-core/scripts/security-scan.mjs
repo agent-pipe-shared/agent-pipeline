@@ -112,7 +112,8 @@ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 // why "blocking" was chosen and why it moved rather than staying duplicated here.
 import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
 import {
-  deriveReportStatus, elementsOfCompletedScan, formatRuleSetLine, formatSecurityCloseStatus, isCriticalStakes, readCalibrationStakes, readScannerExceptions,
+  deriveReportStatus, elementsOfCompletedScan, formatRuleSetLine, formatSecurityCloseStatus, isCriticalStakes, markNotRunScans, readCalibrationStakes, readScannerExceptions,
+  securityCloseWarnings,
 } from "../lib/security-close-status.mjs";
 import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
 import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
@@ -1094,6 +1095,8 @@ export async function runSecurityScan({
   const candidateBound = snapshot.ok && sameCandidate(candidateBefore, candidateAfter)
     && sameCandidate(candidateBefore, snapshotAfter);
   const candidateUncertain = candidateBefore.status !== "unavailable" && !candidateBound;
+  // C28: a PASS on an unbound/dirty candidate, or from semgrep with zero loaded rules, is not a result (reportStatus "not-run"); status and the exit decision stay as they are.
+  markNotRunScans(scanners, { candidateUncertain });
   const blockingClass = hasErrorClass || hasBlockingFinding || candidateUncertain;
 
   let exitCode;
@@ -1224,9 +1227,12 @@ export function deriveSummaryVerdict(evidence, { critical = false } = {}) {
   const scanners = Array.isArray(evidence?.scanners) ? evidence.scanners : [];
   if (scanners.length === 0) return "NO SCANNERS ENABLED";
 
-  const successful = scanners.filter((scanner) => scanner.status === "PASS" || scanner.status === "FINDINGS");
+  // C28: a PASS marked "not-run" (dirty worktree, zero loaded rules) is not a result: it neither counts as successful nor resolves its scanner.
+  const notRun = (scanner) => scanner.status === "PASS" && scanner.reportStatus === "not-run";
+  const successful = scanners.filter((scanner) => (scanner.status === "PASS" || scanner.status === "FINDINGS") && !notRun(scanner));
   // Candidate 21h (CGF-05): in a critical calibration a skipped license-check ("not-configured") did not run, so it is not resolved.
   const unresolved = scanners.some((scanner) => {
+    if (notRun(scanner)) return true;
     if (scanner.status === "PASS" || scanner.status === "FINDINGS") return false;
     if (scanner.status === "SKIPPED"
       && (scanner.reportStatus === "not-applicable" || (scanner.reportStatus === "not-configured" && !critical))) return false;
@@ -1254,7 +1260,10 @@ function printSummary(evidence, critical = false, exceptions = null) {
   // reads like a passed scan next to a "policy exit 0". Candidate 21h: a critical calibration reads a skipped license-check as not
   // executed and shows every applied named exception on its line.
   console.log("Security close status:");
-  for (const line of formatSecurityCloseStatus(elementsOfCompletedScan(evidence.scanners, { critical, exceptions }))) console.log(`  ${line}`);
+  const elements = elementsOfCompletedScan(evidence.scanners, { critical, exceptions });
+  for (const line of formatSecurityCloseStatus(elements)) console.log(`  ${line}`);
+  // C28: a skipped or partial capability is a WARNING that names the step that would run it; the close refuses only what the project declared mandatory.
+  for (const line of securityCloseWarnings(elements)) console.log(`  ${line}`);
   const verdict = deriveSummaryVerdict(evidence, { critical });
   const policyNote = evidence.exitCode === 0 && verdict !== "CLEAN" ? ` (policy exit ${evidence.exitCode})` : "";
   if (evidence.candidate?.destination === "local-only") {

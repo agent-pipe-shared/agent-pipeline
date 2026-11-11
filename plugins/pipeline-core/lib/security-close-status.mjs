@@ -56,7 +56,8 @@ export function securityScannerState(entry, { critical = false } = {}) {
   if (label === "findings") return "failed";
   if (label === "not-configured") return critical ? "not executed" : "not applicable";
   if (label === "not-applicable") return "not applicable";
-  return "not executed"; // tool-unavailable, error, or an unrecognised status: the scanner did not complete a scan
+  // "not-run" (C28, markNotRunScans): a scan that ran on a dirty worktree or loaded zero rules is not a result; it reads like a scanner that did not run.
+  return "not executed"; // not-run, tool-unavailable, error, or an unrecognised status: the scanner did not complete a scan
 }
 
 /** True for a critical calibration: the first word of `stakes` is critical/high/kritisch/hoch. Absent or unknown is not critical. */
@@ -159,7 +160,7 @@ export function ruleSetSummary(ruleSet) {
 
 /** One line per scanner entry for the scan output: the rule set of a scanner that ran, else the plain statement that no rules ran. */
 export function formatRuleSetLine(entry) {
-  const ran = entry?.status === "PASS" || entry?.status === "FINDINGS";
+  const ran = (entry?.status === "PASS" || entry?.status === "FINDINGS") && entry?.reportStatus !== "not-run"; // C28: a not-run scan is not a result
   const summary = ran ? ruleSetSummary(entry.ruleSet) : null;
   return `${entry?.tool ?? "unknown"}: ${ran ? (summary ?? "ran, rule set not recorded") : "no rules ran (scanner did not execute)"}`;
 }
@@ -183,7 +184,14 @@ export function securityCloseElements({ scanners = null, enabled = {}, critical 
     if (entry) {
       const state = securityScannerState(entry, { critical });
       const rules = state === "passed" || state === "failed" ? ruleSetSummary(entry.ruleSet) : null;
-      return excepted({ element, state, reason: entry.reason ?? null, ...(rules === null ? {} : { rules }) });
+      // C28: additive facts for the warnings -- why a scan is not a result (`notRun`), a partial scan (`coverage`), a skipped not-configured check (`skipped`).
+      const label = entry.reportStatus ?? deriveReportStatus(entry);
+      return excepted({
+        element, state, reason: entry.reason ?? null, ...(rules === null ? {} : { rules }),
+        ...(typeof entry.notRun === "string" ? { notRun: entry.notRun } : {}),
+        ...(entry.coverage?.status === "degraded" ? { coverage: { reason: String(entry.coverage.reason), files: Array.isArray(entry.coverage.files) ? entry.coverage.files.length : 0 } } : {}),
+        ...(label === "not-configured" && state === "not applicable" ? { skipped: true } : {}),
+      });
     }
     if (enabled?.[element] === false) return { element, state: "not applicable", reason: "not configured for this project" };
     return excepted({ element, state: "not executed", reason: "no scan evidence for this scanner" });
@@ -199,6 +207,82 @@ export function elementsOfCompletedScan(scanners, options = {}) {
 
 /** The elements that did not execute and no named exception covers: these are what a critical calibration refuses. */
 export const unexcusedNotExecuted = (elements) => elements.filter((e) => e.state === "not executed" && !e.exception);
+
+/**
+ * C28 (AC-108, honest states): a scan that PASSED but ran on a dirty or unbound worktree (`candidateUncertain`), or that loaded zero rules, is never counted
+ * as a result. Marks such an entry `reportStatus: "not-run"` with `notRun` (dirty-worktree | zero-rules) and the reason, so every reader (state lines, scan
+ * verdict, warnings, the declared requirement) sees a scanner that did not run. `status` and the scan's exit decision are untouched, so no gate becomes
+ * newly blocking by this; a scan that reported findings is never hidden, and SKIPPED/ERROR entries already read as not executed. Mutates and returns `scanners`.
+ */
+export function markNotRunScans(scanners, { candidateUncertain = false } = {}) {
+  for (const entry of Array.isArray(scanners) ? scanners : []) {
+    if (entry?.status !== "PASS") continue;
+    const dirty = candidateUncertain === true;
+    const zeroRules = entry.tool === "semgrep" && Number.isInteger(entry.ruleSet?.ruleCount) && entry.ruleSet.ruleCount === 0;
+    if (!dirty && !zeroRules) continue;
+    entry.reportStatus = "not-run";
+    entry.notRun = dirty ? "dirty-worktree" : "zero-rules";
+    entry.reason = dirty
+      ? "the scan ran on a dirty or unbound worktree and is not counted as a result"
+      : "semgrep loaded zero rules from the configured rule set; a scan without rules is not a result";
+  }
+  return scanners;
+}
+
+// C28: a project may declare mandatory security capabilities in its manifest (security.required_capabilities); each maps to the scanner that provides it.
+export const REQUIRED_CAPABILITY_CODE = "SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN";
+export const SECURITY_CAPABILITY_ELEMENT = Object.freeze({ secrets: "gitleaks", sast: "semgrep", sca: "osv-scanner", license: "license-check" });
+
+/** The known capabilities the manifest declares mandatory (de-duplicated, in declared order); anything else is ignored here (the manifest validator rejects it). */
+export function declaredSecurityCapabilities(manifest) {
+  const list = manifest?.security?.required_capabilities;
+  return Array.isArray(list) ? [...new Set(list.filter((c) => typeof c === "string" && Object.hasOwn(SECURITY_CAPABILITY_ELEMENT, c)))] : [];
+}
+
+/**
+ * One typed refusal per declared capability whose scanner has no installed binary, loaded zero rules, errored, did not run or left no evidence (the critical
+ * reading: a skipped license-check did not run). Without a declaration nothing here applies, so the same state stays a warning. `gateActive: false` (the manifest
+ * configures no security gate, or mode off) means no scan runs at all, so every declared capability is refused. A valid named exception (`exceptions`, critical
+ * calibrations only) answers it as everywhere else. "No package sources" is nothing to scan, not a missing capability.
+ */
+export function requiredCapabilityRefusals({ scanners = null, declared = [], exceptions = null, gateActive = true } = {}) {
+  if (declared.length === 0) return [];
+  const elements = gateActive ? securityCloseElements({ scanners, enabled: {}, critical: true, exceptions }) : [];
+  return declared.flatMap((capability) => {
+    const element = SECURITY_CAPABILITY_ELEMENT[capability];
+    const found = elements.find((e) => e.element === element);
+    if (gateActive && !(found?.state === "not executed" && !found.exception)) return [];
+    const why = gateActive ? (found?.reason ?? "it did not run") : "the security gate is not configured (no gates.security, or mode off), so no scan runs";
+    const step = gateActive
+      ? `Install or configure ${element} (platform guidance: ${SECURITY_PREFLIGHT_COMMAND}), then run: ${SECURITY_RUN_COMMAND}`
+      : `Set gates.security (mode blocking or warn, type automated) in the project manifest, then run: ${SECURITY_RUN_COMMAND}`;
+    return [`${REQUIRED_CAPABILITY_CODE}: the project declared the ${capability} capability mandatory (security.required_capabilities in its manifest) and ${element} did not run (${oneLine(why)}). ${step}.`];
+  });
+}
+
+const RUN_STEP = `then run: ${SECURITY_RUN_COMMAND}`;
+function warningNextStep(entry) {
+  if (entry.notRun === "dirty-worktree") return `commit or stash the working-tree changes (a scan needs a clean candidate), ${RUN_STEP}`;
+  if (entry.notRun === "zero-rules") return `point security.scanners.semgrep.rules_dir at a directory that holds rule files, or remove it to use the plugin's default rule pack, ${RUN_STEP}`;
+  if (entry.element === "license-check") return `provide the licence declaration third-party-licenses.json (or a policy under governance/policies/), ${RUN_STEP}`;
+  return `install or configure ${entry.element} (platform guidance: ${SECURITY_PREFLIGHT_COMMAND}), ${RUN_STEP}`;
+}
+
+/**
+ * C28: one `WARNING: ...` line per element that did not run, was skipped as not configured, or covered only part of the tree, each with the next step that would
+ * run it. Passed, failed, "no package sources" and excepted elements raise none. Never blocking: only a declared capability refuses (requiredCapabilityRefusals).
+ */
+export function securityCloseWarnings(elements) {
+  const lines = [];
+  for (const entry of Array.isArray(elements) ? elements : []) {
+    if (entry.exception) continue;
+    const reason = entry.reason ? ` (${oneLine(entry.reason)})` : "";
+    if (entry.state === "not executed") lines.push(`WARNING: ${entry.element} did not run${reason}. Next step: ${warningNextStep(entry)}.`);
+    else if (entry.skipped) lines.push(`WARNING: ${entry.element} was skipped${reason}. Next step: ${warningNextStep(entry)}.`);
+    else if (entry.coverage) lines.push(`WARNING: ${entry.element} covered only part of the tree (${oneLine(entry.coverage.reason)}, ${entry.coverage.files} file(s) only partly read). Next step: fix the syntax the scanner could not parse, ${RUN_STEP}.`);
+  }
+  return lines;
+}
 
 // One line per exception: never contains a newline, and the " -- " that separates the reason from the label stays unique.
 const oneLine = (value) => String(value).replace(/\s+/gu, " ").replace(/ -- /gu, " - ").trim();

@@ -28,6 +28,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import * as statusLib from "../security-close-status.mjs"; // C28 cases read the new exports through the namespace, so a missing export fails only those cases
 import { checkSecurityCompleteness } from "../security-completeness-gate.mjs";
 import { gateConfig, loadManifest } from "../manifest.mjs";
 import {
@@ -616,4 +617,183 @@ test("C19 the close quality readback names an applied exception in its security 
   const noException = closeQualityReadback({ root: "<root>", featureId: "feature", readers: { ...readers, readBytes: (p) => { if (p === EXCEPTIONS_PATH || !(p in files)) throw new Error("absent"); return Buffer.from(files[p]); } } }).find((r) => r.id === "security-scan");
   assert.match(noException.evidence, /license-check: not executed/u);
   assert.ok(!noException.evidence.includes("named exception"));
+});
+
+// C28 (AC-108, PO decisions 2026-11-10 on the greenfield reports): honest not-run states, warnings with a next step, and the declared
+// requirement. Acceptance, written from the criterion and the PO decision, not from the code:
+//   C22 a scan that ran on a dirty worktree or with zero loaded rules is never counted as a result: it reads "not executed" with its reason,
+//       in the elements, in the scan verdict, and in the scope the close prints; a finding is never hidden by it;
+//   C23 a skipped (also a not-configured license check) or partial capability is a WARNING that names what would run it; a passed one,
+//       "no package sources" and an excepted one raise none; the close entry prints it and never prints GREEN;
+//   C24 a capability the project declared in security.required_capabilities that has no scanner, loaded zero rules or did not run is
+//       refused with a typed code naming the capability, the scanner and the install or run step; the same state without a declaration
+//       stays a warning; a gate that is off or absent does not hide the declaration;
+//   C25 the Verify security check applies the same declared reading.
+const gateManifest = (required = null, mode = "blocking") => `schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: ${mode}\n    type: automated\n${required ? `security:\n  required_capabilities:\n${required.map((c) => `    - ${c}\n`).join("")}` : ""}`;
+function declaredClose({ required = null, mode = "blocking", scannerList, stakes = "standard" }) {
+  const fixture = closeFixture({ gate: "blocking", stakes });
+  writeFileSync(join(fixture.dir, ".claude/pipeline.yaml"), gateManifest(required, mode));
+  evidence(fixture.dir, { status: "PASS", classification: "success", outcome: "pass" });
+  const envelopePath = join(fixture.dir, "evidence/security-latest.v2.json");
+  const envelope = JSON.parse(readFileSync(envelopePath, "utf8"));
+  envelope.input.commit = fixture.commit;
+  envelope.input.tree = fixture.tree;
+  writeFileSync(envelopePath, JSON.stringify(envelope));
+  writeJson(fixture.dir, "evidence/security-latest.json", { scanners: scannerList });
+  return fixture.dir;
+}
+const pass = (tool) => ({ tool, status: "PASS", classification: "success" });
+const skippedLicenseEntry = { tool: "license-check", status: "SKIPPED", classification: "success", reason: "no license policy or declaration is configured" };
+// A real scan lists every scanner the project enables, so the close fixtures do too (a missing entry then reads "not executed").
+const fullScan = (over = {}) => ["gitleaks", "osv-scanner", "semgrep", "license-check"].map((tool) => over[tool] ?? pass(tool));
+const noSourcesEntry = { tool: "osv-scanner", status: "SKIPPED", classification: "success", reason: "no package sources in project" };
+const notRunSemgrep = { tool: "semgrep", status: "PASS", classification: "success", reportStatus: "not-run", notRun: "zero-rules", reason: "semgrep loaded zero rules from the configured rule set; a scan without rules is not a result" };
+
+test("C22 a PASS on a dirty worktree or with zero loaded rules is marked not-run with its reason; findings, skips and real scans are untouched", () => {
+  assert.equal(typeof statusLib.markNotRunScans, "function");
+  const rules = (ruleCount) => ({ ruleCount, ruleIds: [] });
+  const list = [
+    { tool: "gitleaks", status: "PASS", classification: "success" },
+    { tool: "osv-scanner", status: "FINDINGS", classification: "findings" },
+    { tool: "license-check", status: "SKIPPED", classification: "success" },
+    { tool: "semgrep", status: "PASS", classification: "success", ruleSet: rules(0) },
+  ];
+  const dirty = statusLib.markNotRunScans(structuredClone(list), { candidateUncertain: true });
+  assert.deepEqual(dirty.map((e) => e.reportStatus), ["not-run", undefined, undefined, "not-run"]);
+  assert.match(dirty[0].reason, /dirty|unbound/u);
+  assert.equal(dirty[0].notRun, "dirty-worktree");
+  assert.equal(dirty[3].notRun, "dirty-worktree"); // the worktree reason is named first; both are honest
+  const clean = statusLib.markNotRunScans(structuredClone(list), { candidateUncertain: false });
+  assert.deepEqual(clean.map((e) => e.reportStatus), [undefined, undefined, undefined, "not-run"]);
+  assert.equal(clean[3].notRun, "zero-rules");
+  assert.match(clean[3].reason, /zero rules/u);
+  const real = statusLib.markNotRunScans([{ tool: "semgrep", status: "PASS", classification: "success", ruleSet: rules(9) }], { candidateUncertain: false });
+  assert.equal(real[0].reportStatus, undefined);
+  const elements = securityCloseElements({ scanners: clean });
+  const state = Object.fromEntries(elements.map((e) => [e.element, e.state]));
+  assert.equal(state.semgrep, "not executed");
+  assert.match(elements.find((e) => e.element === "semgrep").reason, /zero rules/u);
+  assert.equal(state["osv-scanner"], "failed");
+});
+
+test("C22b the scan verdict and the close scope never read a not-run scan as clean or as having run", async () => {
+  const { deriveSummaryVerdict } = await import("../../scripts/security-scan.mjs");
+  const evidenceOf = (scannerList) => ({ exitCode: 0, scanners: scannerList });
+  assert.equal(deriveSummaryVerdict(evidenceOf([pass("gitleaks"), { ...pass("semgrep"), reportStatus: "not-run" }])), "PARTIAL");
+  assert.equal(deriveSummaryVerdict(evidenceOf([{ ...pass("semgrep"), reportStatus: "not-run" }])), "INCOMPLETE");
+  assert.equal(deriveSummaryVerdict(evidenceOf([pass("gitleaks"), pass("semgrep")])), "CLEAN");
+});
+
+test("C23 warnings: a skipped, not-configured or partial capability is a WARNING naming what would run it; passed, no-package-sources and excepted raise none", () => {
+  assert.equal(typeof statusLib.securityCloseWarnings, "function");
+  const elements = securityCloseElements({
+    scanners: [
+      pass("gitleaks"),
+      { tool: "osv-scanner", status: "SKIPPED", classification: "binary_missing", reason: "osv-scanner not found on PATH" },
+      { tool: "semgrep", status: "PASS", classification: "success", coverage: { status: "degraded", reason: "partial-parsing", files: ["a.js", "b.js"] } },
+      skippedLicenseEntry,
+    ],
+  });
+  const warnings = statusLib.securityCloseWarnings(elements);
+  assert.equal(warnings.length, 3, warnings.join("\n"));
+  for (const line of warnings) assert.match(line, /^WARNING: /u);
+  assert.ok(warnings.some((l) => /osv-scanner/u.test(l) && /toolchain-preflight\.mjs/u.test(l) && /security-scan\.mjs/u.test(l)), warnings.join("\n"));
+  assert.ok(warnings.some((l) => /semgrep/u.test(l) && /partial/u.test(l) && /2 file/u.test(l)), warnings.join("\n"));
+  assert.ok(warnings.some((l) => /license-check/u.test(l) && /third-party-licenses\.json/u.test(l)), warnings.join("\n"));
+  assert.ok(!warnings.some((l) => /gitleaks/u.test(l)));
+  const noSources = statusLib.elementsOfCompletedScan([pass("gitleaks"), { tool: "osv-scanner", status: "SKIPPED", classification: "success", reason: "no package sources in project" }]);
+  assert.deepEqual(statusLib.securityCloseWarnings(noSources), []);
+  const excepted = securityCloseElements({ scanners: [skippedLicenseEntry], critical: true, exceptions: { valid: [{ scanner: "license-check", reason: "r", expires: "2999-01-01", confirmedBy: "c" }], rejected: [] } });
+  assert.ok(!statusLib.securityCloseWarnings(excepted).some((l) => /license-check/u.test(l)));
+  const dirty = securityCloseElements({ scanners: [{ tool: "gitleaks", status: "PASS", classification: "success", reportStatus: "not-run", notRun: "dirty-worktree", reason: "the scan ran on a dirty or unbound worktree" }] });
+  assert.ok(statusLib.securityCloseWarnings(dirty).some((l) => /gitleaks/u.test(l) && /commit or stash/u.test(l)));
+});
+
+test("C22c the scan summary itself prints a WARNING with the next step for every scanner that did not run (no scanner on PATH)", () => {
+  const root = project("standard");
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  const run = spawnSync(process.execPath, [scanScript, "--root", root, "--out-dir", "scratch/analysis"], { encoding: "utf8", timeout: 50_000, env: { PATH: "", Path: "", HOME: root } });
+  // The fixture's license-check is the one scanner without a binary: it is skipped on every machine, whatever scanners are installed there.
+  assert.match(run.stdout, /WARNING: license-check was skipped/u, `${run.stdout}\n${run.stderr}`);
+  assert.match(run.stdout, /Next step: .*third-party-licenses\.json.*security-scan\.mjs/u);
+  assert.doesNotMatch(run.stdout, /Verdict: CLEAN/u);
+});
+
+test("C23b the close entry prints each warning and never GREEN: a skipped license check reads ADMITTED WITH WARNINGS, not complete", () => {
+  const dir = declaredClose({ scannerList: fullScan({ "license-check": skippedLicenseEntry, "osv-scanner": noSourcesEntry }) });
+  const run = runClose(dir);
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /WARNING: license-check/u);
+  assert.match(run.stdout, /third-party-licenses\.json/u);
+  assert.doesNotMatch(run.stdout, /GREEN/u);
+  assert.match(run.stdout, /ADMITTED WITH WARNINGS/u);
+  const clean = runClose(declaredClose({ scannerList: fullScan() }));
+  assert.equal(clean.status, 0, clean.stderr);
+  assert.match(clean.stdout, /GREEN/u);
+  assert.doesNotMatch(clean.stdout, /WARNING/u);
+});
+
+test("C24 a declared capability that has no scanner, loaded zero rules or did not run is refused with a typed code; undeclared stays a warning", () => {
+  assert.equal(typeof statusLib.declaredSecurityCapabilities, "function");
+  assert.deepEqual(statusLib.declaredSecurityCapabilities({ security: { required_capabilities: ["secrets", "sast", "sast", "bogus"] } }), ["secrets", "sast"]);
+  assert.deepEqual(statusLib.declaredSecurityCapabilities(null), []);
+  const declared = ["secrets", "license"];
+  const refused = runClose(declaredClose({ required: declared, scannerList: fullScan({ "license-check": skippedLicenseEntry }) }));
+  assert.equal(refused.status, 2);
+  assert.match(refused.stderr, /SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN/u);
+  assert.match(refused.stderr, /license/u);
+  assert.match(refused.stderr, /license-check/u);
+  assert.match(refused.stderr, /security-scan\.mjs/u);
+  assert.doesNotMatch(refused.stderr, /secrets/u);
+  const missing = runClose(declaredClose({ required: ["sast"], scannerList: fullScan().filter((entry) => entry.tool !== "semgrep") })); // no semgrep entry at all
+  assert.equal(missing.status, 2);
+  assert.match(missing.stderr, /SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN.*sast|sast.*semgrep/su);
+  const zero = runClose(declaredClose({ required: ["sast"], scannerList: fullScan({ semgrep: notRunSemgrep }) }));
+  assert.equal(zero.status, 2);
+  assert.match(zero.stderr, /zero rules/u);
+  const sca = runClose(declaredClose({ required: ["sca"], scannerList: fullScan({ "osv-scanner": noSourcesEntry }) }));
+  assert.equal(sca.status, 0, sca.stderr); // nothing to scan is the honest reading of "no package sources"
+  const met = runClose(declaredClose({ required: ["secrets", "sast"], scannerList: fullScan() }));
+  assert.equal(met.status, 0, met.stderr);
+  assert.match(met.stdout, /GREEN/u);
+  const undeclared = runClose(declaredClose({ scannerList: fullScan({ semgrep: notRunSemgrep }) }));
+  assert.equal(undeclared.status, 0, undeclared.stderr);
+  assert.match(undeclared.stdout, /WARNING: semgrep/u);
+  assert.doesNotMatch(undeclared.stdout, /GREEN/u);
+});
+
+test("C24b a declared capability is not hidden by a gate that is off or absent from the manifest", () => {
+  for (const mode of ["off"]) {
+    const run = runClose(declaredClose({ required: ["secrets"], mode, scannerList: [pass("gitleaks")] }));
+    assert.equal(run.status, 2, `${mode}: ${run.stdout}${run.stderr}`);
+    assert.match(run.stderr, /SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN/u);
+    assert.match(run.stderr, /gates\.security/u);
+  }
+  const noGate = closeFixture({ gate: "blocking", stakes: "standard" });
+  writeFileSync(join(noGate.dir, ".claude/pipeline.yaml"), "schema: pipeline.manifest.v0\nsecurity:\n  required_capabilities:\n    - sast\n");
+  const run = runClose(noGate.dir);
+  assert.equal(run.status, 2, `${run.stdout}${run.stderr}`);
+  assert.match(run.stderr, /SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN/u);
+});
+
+test("C25 the Verify security check applies the declared reading: a declared capability without a scanner refuses with the typed code; undeclared stays admitted", async () => {
+  const { runSecurityCloseCheck } = await import("../../scripts/security-close-check.mjs");
+  const run = (root) => {
+    const lines = [];
+    const log = console.log; const error = console.error;
+    console.log = (...a) => lines.push(a.join(" ")); console.error = (...a) => lines.push(a.join(" "));
+    try { return { code: runSecurityCloseCheck(root, { PATH: "", Path: "", HOME: root }), text: lines.join("\n") }; } finally { console.log = log; console.error = error; }
+  };
+  const make = (required) => {
+    const root = project("standard");
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(join(root, ".claude/pipeline.yaml"), gateManifest(required));
+    return root;
+  };
+  const declared = run(make(["license"])); // license-check has no binary, so it is skipped on every machine
+  assert.equal(declared.code, 1, declared.text);
+  assert.match(declared.text, /SEC-CLOSE-REQUIRED-CAPABILITY-NOT-RUN/u);
+  assert.match(declared.text, /license-check/u);
+  const undeclared = run(make(null));
+  assert.equal(undeclared.code, 0, undeclared.text); // its warnings are printed by the scan child process itself (security-scan.mjs, C22c)
 });

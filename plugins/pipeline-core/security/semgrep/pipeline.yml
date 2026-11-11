@@ -48,3 +48,182 @@ rules:
       - pattern-either:
           - pattern: eval(...)
           - pattern: exec(...)
+
+  # ---------------------------------------------------------------------------
+  # C28 (AC-108, PO decision 2026-11-10): the default web/Node pack -- the common OWASP classes for browser and Node code. Plain Semgrep rules, no new
+  # tool. Every heuristic rule is WARNING (medium, non-blocking under the default block_on): a default pack must never newly block a project that did not
+  # choose it. Only a provider-shaped hard-coded secret is ERROR, like the private-key rule above. Each rule has a positive and a negative fixture in
+  # config/security/semgrep-default-rules.test.mjs.
+  # ---------------------------------------------------------------------------
+  - id: pipeline-default-dom-injection-sink
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A non-literal value reaches a DOM injection sink (innerHTML, outerHTML, insertAdjacentHTML, document.write). Use textContent or build nodes
+      explicitly, or sanitise the value first.
+    metadata:
+      category: security
+      cwe: "CWE-79: Cross-site Scripting"
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: $EL.innerHTML = $X
+          - pattern: $EL.outerHTML = $X
+          - pattern: $EL.insertAdjacentHTML($POS, $X)
+          - pattern: document.write($X)
+          - pattern: document.writeln($X)
+      - metavariable-regex:
+          metavariable: $X
+          regex: '^(?!\s*["''][^"'']*["'']\s*$)'
+  - id: pipeline-default-eval-like-call
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      Dynamic code from a string (new Function, a string passed to setTimeout/setInterval, window.eval) is an injection vector. Pass a function instead.
+    metadata:
+      category: security
+      cwe: "CWE-95: Eval Injection"
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: new Function(...)
+          - pattern: setTimeout("...", ...)
+          - pattern: setInterval("...", ...)
+          - pattern: $G.eval(...)
+  - id: pipeline-default-unsafe-url-scheme
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A javascript: or vbscript: URL is assigned to a link, source or location. Such a scheme runs script when followed; use an https or relative URL.
+    metadata:
+      category: security
+      cwe: "CWE-79: Cross-site Scripting"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: $EL.href = $V
+          - pattern: $EL.src = $V
+          - pattern: window.location = $V
+          - pattern: location = $V
+          - pattern: location.assign($V)
+          - pattern: location.replace($V)
+          - pattern: window.open($V, ...)
+      - metavariable-regex:
+          metavariable: $V
+          regex: '(?i)^\s*["''`]\s*(javascript|vbscript):'
+  - id: pipeline-default-unvalidated-redirect
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A non-literal value decides where the browser or the server redirects. Validate it against an allowlist of paths or origins, so that neither an
+      open redirect nor a javascript: URL can be injected.
+    metadata:
+      category: security
+      cwe: "CWE-601: Open Redirect"
+      confidence: LOW
+    patterns:
+      - pattern-either:
+          - pattern: location.href = $U
+          - pattern: window.location.href = $U
+          - pattern: window.location = $U
+          - pattern: location.assign($U)
+          - pattern: location.replace($U)
+          - pattern: $RES.redirect($U)
+      - metavariable-regex:
+          metavariable: $U
+          regex: '^(?!\s*["''][^"'']*["'']\s*$)'
+  - id: pipeline-default-postmessage-no-origin-check
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A message handler never reads the sender's origin. Check event.origin against the exact expected origin before trusting event.data.
+    metadata:
+      category: security
+      cwe: "CWE-345: Insufficient Verification of Data Authenticity"
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: $W.addEventListener("message", $HANDLER, ...)
+          - pattern: $W.onmessage = $HANDLER
+      - metavariable-pattern:
+          metavariable: $HANDLER
+          pattern-either:
+            - pattern: ($E) => ...
+            - pattern: async ($E) => ...
+            - pattern: function ($E) { ... }
+            - pattern: async function ($E) { ... }
+      - metavariable-regex:
+          metavariable: $HANDLER
+          regex: '(?s)^(?!.*\.origin\b)'
+  - id: pipeline-default-prototype-pollution
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A write to __proto__ or constructor.prototype, or a dynamic nested key written while iterating over an object's keys, can pollute Object.prototype.
+      Reject the keys __proto__, constructor and prototype, or build the target with Object.create(null).
+    metadata:
+      category: security
+      cwe: "CWE-1321: Prototype Pollution"
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: $O.__proto__ = $V
+      - pattern: $O["__proto__"] = $V
+      - pattern: $O.constructor.prototype.$P = $V
+      - pattern: $O.constructor.prototype[$P] = $V
+      - patterns:
+          - pattern: $T[$K][$K2] = $V
+          - pattern-either:
+              - pattern-inside: |
+                  for ($K in $S) { ... }
+              - pattern-inside: |
+                  for (const $K in $S) { ... }
+              - pattern-inside: |
+                  for (let $K in $S) { ... }
+              - pattern-inside: |
+                  for (var $K in $S) { ... }
+  - id: pipeline-default-child-process-shell-string
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A command built from a runtime string runs through a shell (child_process exec/execSync, or spawn with shell: true), so input in it becomes a
+      command. Use execFile or spawn with an argument array and no shell.
+    metadata:
+      category: security
+      cwe: "CWE-78: OS Command Injection"
+      confidence: MEDIUM
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: child_process.exec($CMD, ...)
+              - pattern: child_process.execSync($CMD, ...)
+          - metavariable-regex:
+              metavariable: $CMD
+              regex: '^(?!\s*["''][^"'']*["'']\s*$)'
+      - pattern: |
+          child_process.spawn($CMD, $ARGS, { ..., shell: true, ... })
+      - pattern: |
+          child_process.spawnSync($CMD, $ARGS, { ..., shell: true, ... })
+  - id: pipeline-default-hardcoded-secret
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      A provider-shaped credential (cloud access key id, source-host token, chat token, payment key) appears to be committed. Revoke it, remove it from
+      history and read it from the environment or a secret store.
+    metadata:
+      category: security
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+      confidence: HIGH
+    pattern-regex: '\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{36}|xox[baprs]-[A-Za-z0-9-]{10,}|sk_live_[A-Za-z0-9]{24,}|AIza[0-9A-Za-z_-]{35})\b'
+  - id: pipeline-default-hardcoded-credential-assignment
+    languages: [generic]
+    severity: WARNING
+    message: >-
+      A literal value is assigned to a name that reads like a credential (password, secret, api key, access or auth token). Read it from the environment
+      or a secret store instead.
+    metadata:
+      category: security
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+      confidence: LOW
+    patterns:
+      - pattern-regex: '(?i)\b(?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["'']?\s*[:=]\s*["''][^"''\s$<>{}]{8,}["'']'
+      - pattern-not-regex: '(?i)(changeme|example|placeholder|your[_-]|dummy|xxxx|process\.env|\*{3,})'

@@ -232,6 +232,26 @@ checkCli(
   { stdoutIncludes: "Manifest valid" },
 );
 
+// ---- C28 (AC-108): security.required_capabilities, the project's declared mandatory security capabilities -------------
+checkCli(
+  "SECURITY required_capabilities ACCEPT  a list of the four known capabilities is valid",
+  fixture("security-required-valid.yaml", "schema: pipeline.manifest.v0\nsecurity:\n  required_capabilities:\n    - secrets\n    - sast\n    - sca\n    - license\n"),
+  0,
+  { stdoutIncludes: "Manifest valid" },
+);
+checkCli(
+  "SECURITY required_capabilities REJECT unknown  a capability outside secrets|sast|sca|license is rejected, naming the field",
+  fixture("security-required-unknown.yaml", "schema: pipeline.manifest.v0\nsecurity:\n  required_capabilities:\n    - secrets\n    - dast\n"),
+  2,
+  { stderrIncludes: "security.required_capabilities" },
+);
+checkCli(
+  "SECURITY required_capabilities REJECT string  a plain string instead of a list is rejected",
+  fixture("security-required-string.yaml", "schema: pipeline.manifest.v0\nsecurity:\n  required_capabilities: sast\n"),
+  2,
+  { stderrIncludes: "security.required_capabilities" },
+);
+
 // ---- ENUM VIOLATION (gate type: human|automated) ----------------------------------------------------
 checkCli(
   "ENUM gate type  an out-of-enum gates.<name>.type value is rejected (human|automated)",

@@ -13,7 +13,7 @@
  * Run:   node plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
  * Exit:  0 = every case passed or was honestly skipped, 1 = a real semgrep run disagreed.
  */
-import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -36,8 +36,59 @@ function findSemgrep() {
   return probe.error ? null : "semgrep";
 }
 
+// C28 (AC-108): the default web/Node rule pack. Positive and negative fixtures per rule; secret-shaped values are assembled here.
+const AWS_KEY = ["AKIA", "IOSFODNN7EXAMPLE"].join("");
+const GH_TOKEN = `ghp_${"a1B2c3D4e5".repeat(3)}a1B2c3`;
+const CREDENTIAL = ["Tr0ub4dor", "Xk29qLm"].join("");
+const NEW_RULES = [
+  "pipeline-default-dom-injection-sink", "pipeline-default-eval-like-call", "pipeline-default-unsafe-url-scheme", "pipeline-default-unvalidated-redirect",
+  "pipeline-default-postmessage-no-origin-check", "pipeline-default-prototype-pollution", "pipeline-default-child-process-shell-string",
+  "pipeline-default-hardcoded-secret", "pipeline-default-hardcoded-credential-assignment",
+];
+const FIXTURES = [
+  { rule: "pipeline-default-dom-injection-sink", name: "innerHTML from a variable", fires: true, code: "el.innerHTML = userInput;" },
+  { rule: "pipeline-default-dom-injection-sink", name: "outerHTML from a variable", fires: true, code: "el.outerHTML = userInput;" },
+  { rule: "pipeline-default-dom-injection-sink", name: "insertAdjacentHTML from a variable", fires: true, code: "el.insertAdjacentHTML('beforeend', userInput);" },
+  { rule: "pipeline-default-dom-injection-sink", name: "document.write from a variable", fires: true, code: "document.write(userInput);" },
+  { rule: "pipeline-default-dom-injection-sink", name: "textContent and literal HTML", fires: false, code: "el.textContent = userInput;\nel.innerHTML = '<b>static</b>';\nel.insertAdjacentHTML('beforeend', '<i>x</i>');" },
+  { rule: "pipeline-default-eval-like-call", name: "new Function", fires: true, code: "const f = new Function('a', body);" },
+  { rule: "pipeline-default-eval-like-call", name: "string timer", fires: true, code: "setTimeout('tick()', 100);" },
+  { rule: "pipeline-default-eval-like-call", name: "window.eval", fires: true, code: "window.eval(src);" },
+  { rule: "pipeline-default-eval-like-call", name: "function timer", fires: false, code: "setTimeout(() => tick(), 100);\nsetInterval(tick, 100);" },
+  { rule: "pipeline-default-unsafe-url-scheme", name: "javascript: href", fires: true, code: "link.href = 'javascript:alert(1)';" },
+  { rule: "pipeline-default-unsafe-url-scheme", name: "javascript: location", fires: true, code: "window.location.href = \"javascript:void(0)\";" },
+  { rule: "pipeline-default-unsafe-url-scheme", name: "https href", fires: false, code: "link.href = 'https://example.com/';" },
+  { rule: "pipeline-default-unvalidated-redirect", name: "location from a variable", fires: true, code: "window.location.href = target;" },
+  { rule: "pipeline-default-unvalidated-redirect", name: "location.assign from a variable", fires: true, code: "location.assign(target);" },
+  { rule: "pipeline-default-unvalidated-redirect", name: "res.redirect from the query", fires: true, code: "res.redirect(req.query.next);" },
+  { rule: "pipeline-default-unvalidated-redirect", name: "literal targets", fires: false, code: "window.location.href = '/home';\nres.redirect('/login');" },
+  { rule: "pipeline-default-postmessage-no-origin-check", name: "arrow handler without an origin check", fires: true, code: "window.addEventListener('message', (e) => { render(e.data); });" },
+  { rule: "pipeline-default-postmessage-no-origin-check", name: "function handler without an origin check", fires: true, code: "window.addEventListener('message', function (e) { render(e.data); });" },
+  { rule: "pipeline-default-postmessage-no-origin-check", name: "handler that checks the origin", fires: false, code: "window.addEventListener('message', (e) => {\n  if (e.origin !== 'https://app.example') return;\n  render(e.data);\n});" },
+  { rule: "pipeline-default-prototype-pollution", name: "__proto__ assignment", fires: true, code: "target.__proto__ = payload;" },
+  { rule: "pipeline-default-prototype-pollution", name: "constructor.prototype write", fires: true, code: "target.constructor.prototype.admin = true;" },
+  { rule: "pipeline-default-prototype-pollution", name: "nested dynamic write inside for-in", fires: true, code: "function merge(t, s) { for (const k in s) { t[k][s[k]] = s; } }" },
+  { rule: "pipeline-default-prototype-pollution", name: "plain property writes and a numeric grid loop", fires: false, code: "target.name = source.name;\nfor (let i = 0; i < n; i++) { grid[i][i] = 0; }" },
+  { rule: "pipeline-default-child-process-shell-string", name: "exec with a built string", fires: true, code: "const cp = require('child_process');\ncp.exec('ls ' + dir);" },
+  { rule: "pipeline-default-child-process-shell-string", name: "imported execSync with a variable", fires: true, code: "import { execSync } from 'child_process';\nexecSync(cmd);" },
+  { rule: "pipeline-default-child-process-shell-string", name: "spawn with shell true", fires: true, code: "const cp = require('child_process');\ncp.spawn(cmd, args, { shell: true });" },
+  { rule: "pipeline-default-child-process-shell-string", name: "execFile, a literal command and a regex exec", fires: false, code: "const cp = require('child_process');\ncp.execFile('ls', [dir]);\ncp.exec('ls -la');\n/a+/.exec(text);" },
+  { rule: "pipeline-default-hardcoded-secret", name: "an AWS-shaped access key id", fires: true, code: `const id = "${AWS_KEY}";` },
+  { rule: "pipeline-default-hardcoded-secret", name: "a GitHub-token-shaped value", fires: true, code: `const t = "${GH_TOKEN}";` },
+  { rule: "pipeline-default-hardcoded-secret", name: "values read from the environment", fires: false, code: "const id = process.env.AWS_ACCESS_KEY_ID;" },
+  { rule: "pipeline-default-hardcoded-credential-assignment", name: "a literal password", fires: true, code: `const password = "${CREDENTIAL}";` },
+  { rule: "pipeline-default-hardcoded-credential-assignment", name: "an api key property", fires: true, code: `const cfg = { apiKey: "${CREDENTIAL}" };` },
+  { rule: "pipeline-default-hardcoded-credential-assignment", name: "environment reads and placeholders", fires: false, code: "const password = process.env.DB_PASSWORD;\nconst apiKey = '<your-api-key>';\nconst token = '';" },
+];
+
 const binary = findSemgrep();
 record("semgrep-default-rules.yml exists on disk", existsSync(RULES_PATH), RULES_PATH);
+{
+  const rulesText = existsSync(RULES_PATH) ? readFileSync(RULES_PATH, "utf8") : "";
+  const listed = new Set([...rulesText.matchAll(/^\s*-\s+id:\s*(\S+)/gmu)].map((m) => m[1]));
+  record("default pack lists both original rules and every new rule id (no semgrep binary needed)", ["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval", ...NEW_RULES].every((id) => listed.has(id)), `missing: ${JSON.stringify(["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval", ...NEW_RULES].filter((id) => !listed.has(id)))}`);
+  record("default pack: every new rule has at least one positive and one negative fixture", NEW_RULES.every((id) => FIXTURES.some((f) => f.rule === id && f.fires) && FIXTURES.some((f) => f.rule === id && !f.fires)), "fixture table incomplete");
+}
 
 if (!binary) {
   console.log("SKIP  no real semgrep binary on PATH -- ruleset syntax is not independently verifiable in this environment (not verifiable, not faked)");
@@ -92,6 +143,21 @@ if (!binary) {
   record("shipped ruleset produces parseable JSON (clean fixture)", cleanParsed !== null, cleanRun.stdout?.slice(0, 300));
   record("shipped ruleset reports zero findings on a clean fixture", Array.isArray(cleanParsed?.results) && cleanParsed.results.length === 0, JSON.stringify(cleanParsed?.results));
   record("shipped ruleset carries no error payload on a clean fixture", !Array.isArray(cleanParsed?.errors) || cleanParsed.errors.length === 0, JSON.stringify(cleanParsed?.errors));
+
+  // Case 3 (C28, AC-108): the default web/Node pack. Every new rule has at least one positive and one negative fixture; all fixtures are
+  // scanned in ONE semgrep spawn and read back per file. Secret-shaped values are assembled at run time, so no literal token is committed.
+  const packDir = join(scratch, "pack");
+  mkdirSync(packDir, { recursive: true });
+  FIXTURES.forEach((fixture, index) => writeFileSync(join(packDir, `f${index}.js`), `${fixture.code}\n`));
+  const packRun = spawnSync(binary, ["scan", "--json", "--config", RULES_PATH, packDir], { encoding: "utf8", env, shell: false });
+  let packParsed = null;
+  try { packParsed = JSON.parse(packRun.stdout ?? ""); } catch { /* asserted below */ }
+  record("default pack: the whole fixture directory scans to parseable JSON with no error payload", packParsed !== null && (packParsed.errors ?? []).length === 0, `${packRun.stderr?.slice(0, 300)} ${JSON.stringify(packParsed?.errors)?.slice(0, 300)}`);
+  const firedIn = (index) => new Set((packParsed?.results ?? []).filter((r) => r.path.endsWith(`f${index}.js`)).map((r) => r.check_id.split(".").pop()));
+  FIXTURES.forEach((fixture, index) => {
+    const fired = firedIn(index).has(fixture.rule);
+    record(`default pack: ${fixture.rule} ${fixture.fires ? "fires on" : "stays quiet on"} ${fixture.name}`, fired === fixture.fires, `fired: ${JSON.stringify([...firedIn(index)])}`);
+  });
 
   try { rmSync(scratch, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
 }
