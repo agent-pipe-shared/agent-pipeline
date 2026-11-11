@@ -166,4 +166,13 @@ test('APM018','greenfield exact inventory combines ADR and map publication with 
   assert.equal(inventory.targets.at(-1).path,inventory.prospective.referencePath);
   fxt.must(f,['materialize-architecture']);assert.equal(inspectArchitectureMaterializationTargets(f.dir).targets.length,0);
 });
+test('APM019','a reopened design reads only the newest approval of its feature, and a forged newer one still fails verification',()=>{
+  const f=fxt.makeAggregateFixture();fxt.must(f,['materialize-architecture']);
+  const directory=join(f.dir,'project/aggregate-design-architecture-references'),[name]=readdirSync(directory),current=JSON.parse(readFileSync(join(directory,name),'utf8'));
+  const plant=(digit,approvedAt)=>{const path=join(directory,`${digit.repeat(64)}.json`);writeFileSync(path,json({...current,approvalBasis:{...current.approvalBasis,requestSha256:digit.repeat(64)},approval:{...current.approval,approvedAt}}));return path;};
+  const older=plant('0','2000-01-01T00:00:00.000Z');
+  const read=readEffectiveDesignArchitectureAuthority({rootDir:f.dir});assert(read.ok,JSON.stringify(read));assert.equal(read.decisions.length,1);
+  unlinkSync(older);plant('f','2999-01-01T00:00:00.000Z');
+  refuse(readEffectiveDesignArchitectureAuthority({rootDir:f.dir}));
+});
 registerTestCaseCompletion({cases,fd:3,maxBytes:8192});

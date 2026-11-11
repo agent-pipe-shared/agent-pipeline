@@ -619,13 +619,30 @@ function retainedArchitecture(root, path) {
   requireValue(result.required && canonicalizeJson(result.approvalBasis) === canonicalizeJson(record.approvalBasis), 'DDB-RETENTION-DRIFT');
   result.files.push(file); reopen(root, result.files); return result;
 }
+/**
+ * A reopened design is signed again under the same feature. The earlier approval's sources changed, so it can no longer verify and must not
+ * block the current one (live on native Windows, 2026-11-10). Only the newest approval of a feature is read: skipping removes authority,
+ * never adds it, and a forged newer entry still has to pass full verification.
+ */
+function latestReferencePerFeature(root, names) {
+  const latest = new Map();
+  for (const name of names) {
+    const path = `${ARCHITECTURE_REFERENCES}/${name}`;
+    const record = parseStrictJson(physical(root, path).bytes);
+    const featureId = record?.approvalBasis?.featureId, approvedAt = record?.approval?.approvedAt;
+    requireValue(typeof featureId === 'string' && typeof approvedAt === 'string', 'DDB-RETENTION-SHAPE');
+    const earlier = latest.get(featureId);
+    if (!earlier || earlier.approvedAt < approvedAt) latest.set(featureId, { path, approvedAt });
+  }
+  return [...latest.values()].map(entry => entry.path);
+}
 export function readEffectiveDesignArchitectureAuthority({ rootDir } = {}) {
   try {
     const root = rootPath(rootDir), results = [];
     const directory = architectureReferenceDirectory(root);
     const directoryIdentity = directory ? locator(lstatSync(directory, { bigint: true })) : null;
     const names = directory ? architectureReferenceNames(directory) : [];
-    for (const name of names) results.push(retainedArchitecture(root, `${ARCHITECTURE_REFERENCES}/${name}`));
+    for (const path of latestReferencePerFeature(root, names)) results.push(retainedArchitecture(root, path));
     // Absence/staleness of a current feature never creates authority and does
     // not erase an independently reverified original retained approval.
     try { const current = approved(root, 'architecture'); if (current.required) results.push(current); } catch { /* no current grant */ }
