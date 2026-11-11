@@ -533,6 +533,25 @@ test("draft next-action becomes a runnable submit-plan command once submitter an
   assert.deepEqual(payload.nextAction.argv.slice(2), ["--by", "Jordan Example", "--profile", "feature"]);
 });
 
+test("C28: a draft state whose Continuity still binds an Implementation Result names the decline route, not submit-plan, which would refuse PLAN-SUBMIT-CONTINUITY-BUSY", () => {
+  const root = freshRoot("draft-bound-result");
+  gitInitRoot(root);
+  setLocalGitUserName(root, "Jordan Example");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, profile: "feature", activate: true });
+  assert.equal(run(["set-feature", "--id", "widget", "--plan-path", "specs/widget/prd.md"], { dir: root, now: () => NOW }), 0);
+  // The state of the observed failure: the design was reopened (draft) while the Continuity authority still binds the Result.
+  const file = resolveStatePath(root); const state = JSON.parse(readFileSync(file, "utf8"));
+  state.continuity = { authority: { prd: { path: "specs/widget/prd.md", sha256: "b".repeat(64) }, spec: { path: "specs/widget/spec.md", sha256: "c".repeat(64) }, result: { path: "specs/widget/result.md", sha256: "a".repeat(64) } } };
+  writeFileSync(file, `${JSON.stringify(state, null, 2)}\n`);
+  const result = invoke(root, ["inspect"]);
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.status, "draft");
+  assert.notEqual(payload.nextAction?.argv?.[1], "submit-plan", "submit-plan would refuse PLAN-SUBMIT-CONTINUITY-BUSY while the Result is bound");
+  assert.equal(payload.nextAction.kind, "repair-required");
+  assert.match(JSON.stringify(payload.nextAction), /PLAN-SUBMIT-CONTINUITY-BUSY[\s\S]*--human-decline/u);
+});
+
 test("draft next-action stays collect-input asking only for the missing profile when the submitter is derivable", () => {
   const root = freshRoot("profile-missing");
   gitInitRoot(root);

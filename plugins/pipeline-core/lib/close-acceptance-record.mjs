@@ -29,9 +29,56 @@ export function openChecksOf(named) {
   return [...own, STANDING_OPEN_CHECK];
 }
 
-/** The one sentence the agent asks the human in the chat. */
-export function acceptanceQuestion({ featureId, candidate, openChecks }) {
-  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}.`;
+/**
+ * C28 (AC-108): the ONE fixed answer form of a yes. The words come from the project's human-facing language as Continuity records it
+ * (`continuity.runtime.humanFacingLanguage`), so a German-speaking human answers in German; every other language, and a project without a
+ * Continuity binding, falls back to the English form. Only the form of the project's own language is a yes.
+ */
+export const ACCEPTANCE_YES_FORMS = Object.freeze({ en: "yes, I accept", de: "ja, ich akzeptiere" });
+export function acceptanceYesForm(language) {
+  const key = typeof language === "string" ? language.trim().toLowerCase().split(/[-_]/u)[0] : "";
+  return Object.hasOwn(ACCEPTANCE_YES_FORMS, key) ? ACCEPTANCE_YES_FORMS[key] : ACCEPTANCE_YES_FORMS.en;
+}
+const yesKey = (value) => String(value).trim().replace(/[.!]+$/u, "").trim().toLowerCase();
+/** An acceptance only for exactly the fixed form, normalised for case, surrounding space and closing `.` or `!`. No keyword search in free text. */
+export function isAcceptanceYes(answer, form) { return typeof answer === "string" && yesKey(answer) === yesKey(form); }
+
+/** The one sentence the agent asks the human in the chat; it ends with the fixed yes form. */
+export function acceptanceQuestion({ featureId, candidate, openChecks, form = ACCEPTANCE_YES_FORMS.en }) {
+  return `Do you accept the feature package ${featureId} at candidate ${candidate}? The performed close counts as the human acceptance of this feature package. Checks still open: ${openChecks.join("; ")}. To accept, answer exactly "${form}"; any other answer is not an acceptance.`;
+}
+
+export const DECLINE_BEGIN = "<!-- close-decline:begin -->";
+export const DECLINE_END = "<!-- close-decline:end -->";
+/** Where the decline of this candidate with this answer is recorded: evidence, never one of the places `readAcceptanceRecord` reads. */
+export function declineRecordPath({ featureId, candidate, answer }) {
+  return `specs/${featureId}/evidence/human-decline-${candidate.slice(0, 12)}-${sha256Hex(Buffer.from(answer, "utf8")).slice(0, 8)}.md`;
+}
+export function renderDeclineRecord({ candidate, answer, openChecks, declinedAt }) {
+  return [DECLINE_BEGIN, "## Human decline of this feature package", "",
+    `- Candidate: \`${candidate}\``, `- Declined at: ${declinedAt}`, `- Answer (literal): ${JSON.stringify(answer)}`, "- Open checks:", ...openChecks.map((check) => `  - ${check}`),
+    "- Record type: an attribution record of the human's answer in the chat. It is not an acceptance and not a signature; the feature returns to a correction round (correction dispatch, Critic delta round, then the close again) without reopening the design.",
+    DECLINE_END, ""].join("\n");
+}
+/** The decline a text carries, or null. */
+export function parseDeclineRecord(text) {
+  const all = lines(text); const from = all.findIndex((line) => line.trim() === DECLINE_BEGIN); const to = all.findIndex((line, index) => index > from && line.trim() === DECLINE_END);
+  if (from < 0 || to < 0) return null;
+  const block = all.slice(from, to); let candidate = null; let answer = null;
+  for (const line of block) {
+    const found = /^- Candidate: `([0-9a-f]{40}|[0-9a-f]{64})`\s*$/u.exec(line); if (found) candidate = found[1];
+    const literal = /^- Answer \(literal\): (".*")\s*$/u.exec(line); if (literal) { try { answer = JSON.parse(literal[1]); } catch { answer = null; } }
+  }
+  return candidate === null || typeof answer !== "string" ? null : { candidate, answer };
+}
+/** Writes (idempotently: the same candidate and answer keep their first record and time) the decline record. Returns its path and digest. */
+export function writeDeclineRecord({ root, featureId, record, now = () => new Date().toISOString() }) {
+  const path = declineRecordPath({ featureId, candidate: record.candidate, answer: record.answer }); const file = resolve(root, path);
+  let existing = null; try { existing = parseDeclineRecord(readFileSync(file, "utf8")); } catch { existing = null; }
+  if (existing === null || existing.candidate !== record.candidate || existing.answer !== record.answer) {
+    mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, renderDeclineRecord({ ...record, declinedAt: now() }));
+  }
+  return { path, sha256: sha256Hex(readFileSync(file)) };
 }
 
 export function renderAcceptanceSection({ candidate, answer, openChecks }) {

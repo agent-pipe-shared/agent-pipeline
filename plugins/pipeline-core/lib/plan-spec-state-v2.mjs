@@ -1179,6 +1179,9 @@ export function reopenPlanDesign({
     || !isNonBlankString(by)
     || !isCanonicalIso(at)
     || !INVALIDATION_REASONS.has(reason)) return fail("PLAN-REOPEN-REQUEST-INVALID");
+  // C28 (AC-108): a bound Implementation Result makes a reopened design a dead end (submit-plan refuses PLAN-SUBMIT-CONTINUITY-BUSY and nothing retires the binding);
+  // the way back to a correction round is the decline route of the one-shot close, which retires the Result first.
+  if (reason === "reopen-design" && state.continuity?.authority?.result != null) return fail("PLAN-REOPEN-RESULT-BOUND");
   const submission = state.planSubmission;
   if (!validPlanSubmission(submission)) {
     if (reason === "enrollment-retirement" && state.planSubmission === undefined) {

@@ -10369,7 +10369,7 @@ export function readOnboardingContinuityReleasedSettledImage({repository, record
 // the process's own direct binding. close-feature is NOT on it (it needs the owner-descriptor retirement and the retired terminal
 // for physical-readback, a separate slice): it keeps its present refusal here as well as in scripts/continuity-owner-route.mjs.
 const CONTINUITY_OWNER_ROUTE_ENTRIES = new Set([
-  'continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-close-plan','continuity-result-close-apply',
+  'continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-retire-plan','continuity-result-retire-apply','continuity-result-close-plan','continuity-result-close-apply',
 ]);
 /**
  * Runs exactly one allowlisted entry through the existing port.executeCompanionOperation for the CURRENT process's direct binding
@@ -10733,7 +10733,8 @@ const CONTINUITY_COMPANION_ENTRIES = new Set([
   'afk-project',
   'approve-plan','materialize-architecture','continuity-result-bootstrap-plan',
   'continuity-result-bootstrap-apply','continuity-result-rebind-plan',
-  'continuity-result-rebind-apply','continuity-result-close-plan','continuity-result-close-apply',
+  'continuity-result-rebind-apply','continuity-result-retire-plan','continuity-result-retire-apply',
+  'continuity-result-close-plan','continuity-result-close-apply',
   'close-feature',
 ]);
 

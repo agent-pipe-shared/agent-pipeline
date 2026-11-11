@@ -814,6 +814,7 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
   "continuity-record-course-brief", "continuity-select-course", "continuity-apply-decision",
   "continuity-clear-decision", "continuity-result-bootstrap-plan", "continuity-result-bootstrap-apply",
   "continuity-result-rebind-plan", "continuity-result-rebind-apply",
+  "continuity-result-retire-plan", "continuity-result-retire-apply",
   "continuity-result-case-migration-plan", "continuity-result-case-migration-apply",
   "continuity-result-close-plan", "continuity-result-close-apply",
   "continuity-authority-revision-plan", "continuity-authority-revision-apply", "continuity-authority-revision-recover",
@@ -4383,6 +4384,15 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     };
   }
   if (!lifecycle.ok || lifecycle.status === null) return null;
+  if (lifecycle.status === "draft" && state.continuity?.authority?.result != null) {
+    // C28 (AC-108): submit-plan would refuse PLAN-SUBMIT-CONTINUITY-BUSY while a Result is bound, so it is not the next action.
+    return {
+      kind: "repair-required",
+      code: "PLAN-SUBMIT-CONTINUITY-BUSY",
+      guidance: "The design is open but Continuity still binds an Implementation Result, so submit-plan would refuse PLAN-SUBMIT-CONTINUITY-BUSY. "
+        + "If the acceptance was declined, run the one-shot close with --human-decline \"<the human's literal answer>\" (finish-feature.mjs --one-shot): it records the answer and retires the bound Result (continuity-result-retire-plan/-apply), then submit-plan applies.",
+    };
+  }
   if (lifecycle.status === "draft") {
     const draftProfile = resolveDraftPlanSubmissionDefaults(dir).profile;
     if (["epic", "feature"].includes(draftProfile)) {
@@ -5317,6 +5327,182 @@ function runResultRebindCommand(sub, rest, deps) {
     const unchanged = after !== null && before.every((entry) => [after.upper, after.lower].some((candidate) => candidate.path === entry.path && candidate.sha256 === entry.sha256 && sameJson(candidate.identity, entry.identity)));
     if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== apply.expectedPostStateSha256 || !sameJson(persisted.state, planned.nextState) || !unchanged) { console.error("Error: Result rebind postimage readback is unresolved; inspect persisted State before retry."); return 2; }
     console.log(JSON.stringify({ schema: RESULT_REBIND_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true })); return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
+// ---- C28 (AC-108): retire the bound Result of a declined acceptance ----
+// The one-shot close asks the human for the acceptance AFTER the Result bootstrap, so every decline happens with a bound Result, and nothing else could
+// retire it: the bootstrap requires null, `continuity-result-rebind-*` only switches between Result.md and result.md, and submit-plan refuses
+// PLAN-SUBMIT-CONTINUITY-BUSY while one is bound. This pair (modelled on the rebind pair) sets continuity.authority.result to null, keeps the retired binding in
+// continuity.resultRetirements and restores result.md to the text the bootstrap accepts (it refuses a Result that already holds a pipeline-result block).
+// The State is written first and the file second; an identical apply replays and completes the file step.
+
+const RESULT_RETIRE_PLAN_SCHEMA = "pipeline.continuity-result-retire-plan.v1";
+const RESULT_RETIRE_APPLY_SCHEMA = "pipeline.continuity-result-retire-apply.v1";
+const RESULT_RETIRE_LOCK_TOKEN = "pipeline-result-retire-v1";
+const RESULT_RETIRE_REASON = "declined-acceptance";
+const DECLINE_RECORD_MARKER = "<!-- close-decline:begin -->";
+
+function resultRetireDeclineRecord(dir, featureId, declinePath) {
+  const prefix = `specs/${featureId}/evidence/`;
+  if (typeof declinePath !== "string" || !declinePath.startsWith(prefix) || !/^human-decline-[0-9a-f]{12}-[0-9a-f]{8}\.md$/u.test(declinePath.slice(prefix.length))) return null;
+  const file = physicalRebindFile(dir, declinePath);
+  return file === null || !file.bytes.toString("utf8").includes(DECLINE_RECORD_MARKER) ? null : { path: file.path, sha256: file.sha256 };
+}
+
+/** The bound Result without the canonical bootstrap block, or null when it carries anything else (course decisions, integrations) or the rest would not be accepted by the bootstrap again. */
+function resultRetireRestoredBytes(bytes) {
+  const suffix = canonicalResultBootstrapBytes();
+  if (bytes.byteLength <= suffix.byteLength || !bytes.subarray(bytes.byteLength - suffix.byteLength).equals(suffix)) return null;
+  const restored = bytes.subarray(0, bytes.byteLength - suffix.byteLength);
+  const text = restored.toString("utf8");
+  if (!Buffer.from(text, "utf8").equals(restored) || text.startsWith("﻿") || text.includes("\r") || !text.endsWith("\n") || /^```pipeline-result(?:\n|$)/mu.test(text)) return null;
+  return restored;
+}
+
+function resultRetireEligible(state, prd, spec, result) {
+  const continuity = state?.continuity;
+  const lifecycle = derivePlanLifecycle(state, { planSha256: prd.sha256, specSha256: spec.sha256 });
+  return Boolean(state?.activeFeature && state.schema === SCHEMA_ID && state.gateEstimate === undefined && lifecycle.ok && lifecycle.status === "implementing"
+    && validateContinuityState(continuity, state.activeFeature.id).ok && continuity.featureId === state.activeFeature.id && !isDraftAuthority(continuity)
+    && continuity.queueHead !== null && continuity.queueHead.dispatch === null && continuity.queueHead.nextAction !== "close"
+    && continuity.blocker === null && continuity.acknowledgedFinal === null && continuity.recovery === null && continuity.decisionTxn === null && continuity.closeTransition == null
+    && continuity.revision < Number.MAX_SAFE_INTEGER && state.activeFeature.planPath === prd.path
+    && continuity.authority.result !== null && continuity.authority.result.path === result.path && continuity.authority.result.sha256 === result.sha256
+    && (continuity.resultRetirements?.length ?? 0) < 16);
+}
+
+function resultRetireNextState(state, result, decline, updatedAt) {
+  const next = structuredClone(state);
+  next.continuity.revision += 1;
+  next.continuity.authority.result = null;
+  next.continuity.resultRetirements = [...(state.continuity.resultRetirements ?? []), { path: result.path, sha256: result.sha256, retiredAt: updatedAt, reason: RESULT_RETIRE_REASON, declineRecord: { path: decline.path, sha256: decline.sha256 } }];
+  next.continuity.resume = { ...next.continuity.resume, sourceRevision: next.continuity.revision };
+  next.updatedAt = updatedAt;
+  return next;
+}
+
+function buildResultRetirePlan(dir, existing, resultPath, declinePath, updatedAt) {
+  if (existing.status !== "ok" || !canonicalIso(updatedAt) || typeof resultPath !== "string") return { ok: false, code: "PS-RESULT-RETIRE-STATE" };
+  const state = existing.state;
+  const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
+  if (stateFile === null || stateFile.sha256 !== sha256Bytes(existing.raw)) return { ok: false, code: "PS-RESULT-RETIRE-STATE-IDENTITY" };
+  const prd = physicalRebindFile(dir, state?.continuity?.authority?.prd?.path);
+  const spec = physicalRebindFile(dir, state?.continuity?.authority?.spec?.path);
+  if (prd === null || spec === null) return { ok: false, code: "PS-RESULT-RETIRE-AUTHORITY" };
+  let prdText;
+  try { prdText = new TextDecoder("utf-8", { fatal: true }).decode(prd.bytes); } catch { return { ok: false, code: "PS-RESULT-RETIRE-PRD-MARKER" }; }
+  const marker = rebindMarker(prdText);
+  if (marker === null || marker.digest !== spec.sha256) return { ok: false, code: "PS-RESULT-RETIRE-PRD-MARKER" };
+  const result = physicalRebindFile(dir, state.continuity?.authority?.result?.path);
+  if (result === null || result.path !== resultPath || result.path !== resultBootstrapPath(dir, prd.path)) return { ok: false, code: "PS-RESULT-RETIRE-TARGET" };
+  // The rebind inventory also rejects any registered lifecycle.json (its case-collision topology does not apply here: the retire touches one Result file and the package is reconciled afterwards), so that entry is not part of this closure.
+  const inventory = resultRebindInventory(dir, state, prd, spec).filter((entry) => entry.artifact !== "lifecycle.json");
+  if (inventory.some((entry) => entry.status === "rejected")) return { ok: false, code: "PS-RESULT-RETIRE-AUTHORITY-CLOSURE", inventory };
+  if (!resultRetireEligible(state, prd, spec, result)) return { ok: false, code: "PS-RESULT-RETIRE-CONTINUITY", inventory };
+  const restored = resultRetireRestoredBytes(result.bytes);
+  if (restored === null) return { ok: false, code: "PS-RESULT-RETIRE-RESULT-BYTES", inventory };
+  const decline = resultRetireDeclineRecord(dir, state.activeFeature.id, declinePath);
+  if (decline === null) return { ok: false, code: "PS-RESULT-RETIRE-DECLINE-RECORD", inventory };
+  const nextState = resultRetireNextState(state, result, decline, updatedAt);
+  if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok) return { ok: false, code: "PS-RESULT-RETIRE-POSTIMAGE", inventory };
+  const restoredSha256 = sha256Bytes(restored);
+  const manifest = resultRetireManifest(dir, prd, result.sha256, restoredSha256, true);
+  if (!manifest.ok) return { ok: false, code: "PS-RESULT-RETIRE-PACKAGE", inventory };
+  const payload = {
+    schema: RESULT_RETIRE_PLAN_SCHEMA, root: realpathSync(resolve(dir)), featureId: state.activeFeature.id,
+    retired: { path: result.path, sha256: result.sha256, restoredSha256, identity: result.identity }, declineRecord: decline, authorityClosure: inventory,
+    package: manifest.value === null ? null : { manifest: manifest.value.path, sha256: manifest.value.sha256, postSha256: manifest.value.postSha256, identity: manifest.value.file.identity },
+    preimage: { state: { sha256: sha256Bytes(existing.raw), identity: stateFile.identity, updatedAt: state.updatedAt ?? null }, continuity: { revision: state.continuity.revision, authority: state.continuity.authority, resume: state.continuity.resume }, prd: { path: prd.path, sha256: prd.sha256, identity: prd.identity, technicalSpecSha256: marker.digest }, spec: { path: spec.path, sha256: spec.sha256, identity: spec.identity } },
+    postimage: { stateSha256: sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8")), revision: nextState.continuity.revision, updatedAt, resultSha256: restoredSha256 },
+    assurance: { regularFilesOnly: true, singleLinkOnly: true, stateWrittenBeforeResultFile: true, resultRestoredToTextBeforeBootstrapBlock: true, archiveMoveDelete: false },
+  };
+  return { ok: true, payload, planSha256: sha256CanonicalJson(payload), nextState, result, restored, manifest: manifest.value };
+}
+
+/**
+ * The package manifest side of the retire. The reconcile planner only moves a Result digest FORWARD (the fence before the bootstrap block must hash to the stale digest), so it
+ * cannot take the manifest back to the restored text. The retire does exactly that inverse step itself: the one result entry that binds the retired Result gets the digest of the
+ * restored text (which is the text the entry bound before the bootstrap), nothing else in the manifest changes, and no authority is lifted or granted. `value` is null for a project
+ * with no registered package. With `validate`, the package must be valid before the step (the plan); the replay reads it half-done and does not.
+ */
+function resultRetireManifest(dir, prd, retiredSha256, restoredSha256, validate) {
+  const path = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
+  const file = physicalRebindFile(dir, path);
+  if (file === null) { try { lstatSync(resolve(dir, path)); return { ok: false }; } catch (error) { return error?.code === "ENOENT" ? { ok: true, value: null } : { ok: false }; } }
+  if (validate && !validateFeaturePackage(dir, path).ok) return { ok: false };
+  let value; try { value = JSON.parse(file.bytes.toString("utf8")); } catch { return { ok: false }; }
+  const results = Array.isArray(value?.artifacts) ? value.artifacts.filter((entry) => entry?.class === "result") : [];
+  const entry = results.find((candidate) => candidate.authority === true && candidate.sha256 === retiredSha256);
+  if (results.length !== 1 || entry === undefined) return { ok: false };
+  const next = structuredClone(value); next.artifacts[value.artifacts.indexOf(entry)] = { ...entry, sha256: restoredSha256 };
+  const postBytes = Buffer.from(JSON.stringify(next, null, 2) + "\n", "utf8");
+  return { ok: true, value: { path, file, sha256: file.sha256, postBytes, postSha256: sha256Bytes(postBytes) } };
+}
+
+function parseResultRetirePlan(argv) {
+  const parsed = parseExactFlags(argv, new Set(["result-path", "decline-record"]));
+  return parsed.ok && typeof parsed.value["result-path"] === "string" && !isBlank(parsed.value["result-path"]) && typeof parsed.value["decline-record"] === "string" && !isBlank(parsed.value["decline-record"])
+    ? { resultPath: parsed.value["result-path"], declinePath: parsed.value["decline-record"] } : null;
+}
+
+function parseResultRetireApply(argv) {
+  if (argv.length !== 17 || argv[0] !== "--feature-id" || isBlank(argv[1]) || argv[2] !== "--result-path" || isBlank(argv[3]) || argv[4] !== "--decline-record" || isBlank(argv[5]) || argv[6] !== "--expected-revision" || !parseExpectedRevision(argv[7]).ok || argv[8] !== "--expected-state-sha256" || !SHA256_RE.test(argv[9]) || argv[10] !== "--expected-post-state-sha256" || !SHA256_RE.test(argv[11]) || argv[12] !== "--updated-at" || !canonicalIso(argv[13]) || argv[14] !== "--plan-sha256" || !SHA256_RE.test(argv[15]) || argv[16] !== "--activate") return null;
+  return { featureId: argv[1], resultPath: argv[3], declinePath: argv[5], expectedRevision: Number(argv[7]), expectedStateSha256: argv[9], expectedPostStateSha256: argv[11], updatedAt: argv[13], planSha256: argv[15] };
+}
+
+function runResultRetireCommand(sub, rest, deps) {
+  if (sub === "continuity-result-retire-plan") {
+    const selected = parseResultRetirePlan(rest);
+    if (selected === null) { console.error("Error: Result retire plan requires exactly --result-path <the bound result.md> and --decline-record <the decline record>."); return 2; }
+    const planned = buildResultRetirePlan(deps.dir, readStateRaw(deps.dir), selected.resultPath, selected.declinePath, deps.now());
+    if (!planned.ok) { console.error(`Error: Result retire plan refused (${planned.code}); zero mutation.`); return 2; }
+    const writer = fileURLToPath(import.meta.url);
+    console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: { executable: process.execPath, argv: [writer, "continuity-result-retire-apply", "--feature-id", planned.payload.featureId, "--result-path", selected.resultPath, "--decline-record", selected.declinePath, "--expected-revision", String(planned.payload.preimage.continuity.revision), "--expected-state-sha256", planned.payload.preimage.state.sha256, "--expected-post-state-sha256", planned.payload.postimage.stateSha256, "--updated-at", planned.payload.postimage.updatedAt, "--plan-sha256", planned.planSha256, "--activate"], mutation: true, requiresConfirmation: true, executionBoundary: "host-authorized-wsl", expected: { schema: RESULT_RETIRE_APPLY_SCHEMA, statuses: ["applied", "replayed"] } } }, null, 2));
+    return 0;
+  }
+  const apply = parseResultRetireApply(rest);
+  if (apply === null) { console.error("Error: Result retire apply requires the complete returned action and --activate confirmation."); return 2; }
+  const lock = acquireContinuityLock(deps.dir, RESULT_RETIRE_LOCK_TOKEN, deps);
+  if (!lock.ok) { console.error(`Error: Result retire apply refused (${lock.code}); zero mutation.`); return 2; }
+  try {
+    const current = readStateRaw(deps.dir);
+    if (current.status !== "ok") { console.error("Error: Result retire State is unavailable or malformed; zero mutation."); return 2; }
+    const root = realpathSync(resolve(deps.dir));
+    const restoreFile = (file, restored) => atomicRepairLegacyResult({ ...file, root, parent: dirname(file.absolute) }, file.bytes, restored, lock, deps);
+    if (sha256Bytes(current.raw) === apply.expectedPostStateSha256) {
+      const last = current.state.continuity?.resultRetirements?.at(-1);
+      if (current.state.activeFeature?.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity?.revision !== apply.expectedRevision + 1 || current.state.continuity?.authority?.result !== null || last?.path !== apply.resultPath || last?.declineRecord?.path !== apply.declinePath) { console.error("Error: Result retire replay postimage is invalid; zero mutation."); return 2; }
+      const file = physicalRebindFile(deps.dir, apply.resultPath);
+      let mutated = false;
+      if (file !== null && file.sha256 === last.sha256) {
+        const restored = resultRetireRestoredBytes(file.bytes);
+        if (restored === null || !restoreFile(file, restored).ok) { console.error("Error: Result retire replay could not complete the Result file step; inspect result.md before retry."); return 2; }
+        mutated = true;
+      }
+      const after = physicalRebindFile(deps.dir, apply.resultPath);
+      const prdFile = physicalRebindFile(deps.dir, current.state.continuity.authority.prd.path);
+      const pending = after === null || prdFile === null ? { ok: false } : resultRetireManifest(deps.dir, prdFile, last.sha256, after.sha256, false);
+      if (pending.ok && pending.value !== null) {
+        if (!restoreFile(pending.value.file, pending.value.postBytes).ok) { console.error("Error: Result retire replay could not complete the package manifest step; inspect the manifest before retry."); return 2; }
+        mutated = true;
+      }
+      const manifestPath = prdFile === null ? null : `${dirname(prdFile.path).split(sep).join("/")}/lifecycle.json`;
+      if (after === null || after.sha256 === last.sha256 || (manifestPath !== null && physicalRebindFile(deps.dir, manifestPath) !== null && !validateFeaturePackage(deps.dir, manifestPath).ok)) { console.error("Error: Result retire replay found the Result file or the package manifest half-done and could not complete it; inspect both before retry."); return 2; }
+      console.log(JSON.stringify({ schema: RESULT_RETIRE_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, retired: last, mutated }, null, 2)); return 0;
+    }
+    const planned = buildResultRetirePlan(deps.dir, current, apply.resultPath, apply.declinePath, apply.updatedAt);
+    if (sha256Bytes(current.raw) !== apply.expectedStateSha256 || !planned.ok || planned.planSha256 !== apply.planSha256 || planned.payload.featureId !== apply.featureId || planned.payload.preimage.continuity.revision !== apply.expectedRevision || planned.payload.postimage.stateSha256 !== apply.expectedPostStateSha256) { console.error("Error: Result retire apply inputs are stale or conflicting; zero mutation."); return 2; }
+    const written = atomicWriteContinuityState(deps.dir, planned.nextState, lock, deps);
+    if (!written.ok) { console.error(`Error: Result retire State write unresolved (${written.code}); mutation disposition is not success.`); return 2; }
+    const wroteFile = restoreFile(planned.result, planned.restored);
+    const wroteManifest = !wroteFile.ok ? wroteFile : planned.manifest === null ? { ok: true } : restoreFile(planned.manifest.file, planned.manifest.postBytes);
+    const persisted = readStateRaw(deps.dir);
+    const after = physicalRebindFile(deps.dir, apply.resultPath);
+    const manifestAfter = planned.manifest === null ? null : physicalRebindFile(deps.dir, planned.manifest.path);
+    if (!wroteFile.ok || !wroteManifest.ok || persisted.status !== "ok" || sha256Bytes(persisted.raw) !== apply.expectedPostStateSha256 || !sameJson(persisted.state, planned.nextState) || after === null || after.sha256 !== planned.payload.retired.restoredSha256
+      || (planned.manifest !== null && (manifestAfter === null || manifestAfter.sha256 !== planned.manifest.postSha256))) { console.error("Error: Result retire is unresolved after the State write (the Result file step or the readback failed); run the identical apply again to complete it."); return 2; }
+    console.log(JSON.stringify({ schema: RESULT_RETIRE_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, retired: persisted.state.continuity.resultRetirements.at(-1), mutated: true }, null, 2)); return 0;
   } finally { releaseContinuityLock(lock); }
 }
 
@@ -11744,6 +11930,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
   if (sub === "continuity-result-rebind-plan" || sub === "continuity-result-rebind-apply") {
     return runResultRebindCommand(sub, rest, { ...deps, dir, now });
   }
+  if (sub === "continuity-result-retire-plan" || sub === "continuity-result-retire-apply") {
+    return runResultRetireCommand(sub, rest, { ...deps, dir, now, gitCandidate });
+  }
   if (sub === "continuity-result-case-migration-plan" || sub === "continuity-result-case-migration-apply") {
     return runResultCaseMigrationCommand(sub, rest, { ...deps, dir, now });
   }
@@ -12653,6 +12842,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       const by = flags.by;
       if (isBlank(by)) {
         console.error("Error: reopen-design requires --by <name>.");
+        return 2;
+      }
+      // C28 (AC-108): refused before any write, naming the way back to a correction round.
+      if (base.continuity?.authority?.result != null) {
+        console.error("Error: reopen-design refused (PLAN-REOPEN-RESULT-BOUND); nothing was written. This feature has a bound Implementation Result, so a reopened design could not be submitted again (submit-plan refuses PLAN-SUBMIT-CONTINUITY-BUSY). "
+          + "If the human declined the acceptance, rerun the one-shot close with --human-decline \"<the human's literal answer>\" (finish-feature.mjs --one-shot): it records the answer, retires the Result and returns the correction steps without reopening the design.");
         return 2;
       }
       let reopenedAt;
@@ -15411,12 +15606,13 @@ const STATE_COMPANION_ENTRIES = new Set([
   "discard-feature", "set-feature", "continuity-init", "submit-plan", "present-plan", "afk-project",
   "approve-plan", "materialize-architecture", "continuity-result-bootstrap-plan",
   "continuity-result-bootstrap-apply", "continuity-result-rebind-plan",
-  "continuity-result-rebind-apply", "continuity-result-close-plan",
-  "continuity-result-close-apply", "close-feature",
+  "continuity-result-rebind-apply", "continuity-result-retire-plan", "continuity-result-retire-apply",
+  "continuity-result-close-plan", "continuity-result-close-apply", "close-feature",
 ]);
 const STATE_COMPANION_RESULT_SELECTED_ONLY = new Set([
   "continuity-result-bootstrap-plan", "continuity-result-rebind-plan",
-  "continuity-result-rebind-apply", "continuity-result-close-plan", "continuity-result-close-apply",
+  "continuity-result-rebind-apply", "continuity-result-retire-plan", "continuity-result-retire-apply",
+  "continuity-result-close-plan", "continuity-result-close-apply",
 ]);
 const STATE_COMPANION_SUPPORTED = new Set(["set-feature","submit-plan","present-plan","materialize-architecture","continuity-init","close-feature","discard-feature","afk-project","continuity-result-bootstrap-apply",...STATE_COMPANION_RESULT_SELECTED_ONLY]);
 function stateCompanionImage(repository, effect) {
@@ -15513,6 +15709,18 @@ function prepareStateCompanion(frame, argv) {
     // write only selected State through the original sealed atomic writer.
     // Original Result/request bytes and all lifecycle gates remain unchanged.
     sourceEffects=sourceEffects.filter(effect=>effect.scope === "repository");
+  }
+  if(frame.sub === "continuity-result-retire-apply") {
+    // C28: the apply writes the selected State and restores result.md; both are declared, nothing else.
+    const retire=parseResultRetireApply(argv.slice(1));
+    if(!retire || !physicalRebindFile(frame.repository.primaryRoot,retire.resultPath)) {
+      stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-retire-original-source-scope-unavailable");
+    }
+    const declared=readStateRaw(frame.repository.primaryRoot);
+    const prdPath=declared.status === "ok" ? declared.state.continuity?.authority?.prd?.path : null;
+    const manifestPath=typeof prdPath === "string" ? `${dirname(prdPath).split(sep).join("/")}/lifecycle.json` : null;
+    sourceEffects=[sourceEffects[0],{scope:"repository",path:retire.resultPath},
+      ...(manifestPath !== null && physicalRebindFile(frame.repository.primaryRoot,manifestPath) !== null ? [{scope:"repository",path:manifestPath}] : [])];
   }
   if(frame.sub === "continuity-result-bootstrap-apply") {
     const apply=parseResultBootstrapApply(argv.slice(1));

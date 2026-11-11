@@ -261,7 +261,7 @@ const WALKS = Object.freeze([
 ]);
 
 // C22 (CGF-04): the walk body is one function so the same fixture, Critic course and close prerequisites serve the manual coordinator walks (below) and the one-shot close walk.
-async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false, route = "push-then-release" }) {
+async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false, decline = false, route = "push-then-release" }) {
   {
     const log = [];
     const fx = consumerFixture(log, identity);
@@ -446,6 +446,8 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         if (catalogue) ownerLifecycle = /continuity-owner-route\.mjs run --root \S+ --lifecycle (\S+) --/u.exec(unbound.result.stop.repair)?.[1] ?? assert.fail(`the stop names the owner route: ${unbound.result.stop.repair}`);
       }
       const ownerRoute = (label, entryArgv) => step(log, `${identity.runner}: owner route ${label}`, process.execPath, [script("continuity-owner-route.mjs"), "run", "--root", fx.root, "--lifecycle", ownerLifecycle, "--", ...entryArgv], { cwd: fx.root });
+      // C28 (QG-04, restated in place): the Result binding is one function because a declined acceptance retires the bound Result and the second close binds it again through the very same verbs.
+      const bindResult = (first) => {
       const bootstrap = ownerLifecycle === null ? json(stateWriter("continuity-result-bootstrap-plan", "continuity-result-bootstrap-plan")) : json(ownerRoute("continuity-result-bootstrap-plan", ["continuity-result-bootstrap-plan"]));
       const bootstrapApplied = ownerLifecycle === null
         ? step(log, `${identity.runner}: continuity-result-bootstrap-apply (the action the plan returned)`, bootstrap.applyAction.executable, bootstrap.applyAction.argv, { cwd: fx.root })
@@ -458,8 +460,9 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
       assert.equal(completion.preview.requiredAuthority, "agent");
       assert.equal(completion.signatureCommand, undefined, "no signing command is printed for an unchanged approved package");
       assert.deepEqual(completion.reconcileCommand.requiredInputs, []);
-      // The other side of the rule: when a non-result entry also drifted, the plan names the PO and the same command without a proof is refused.
       const manifestRel = completion.manifest;
+      if (first) {
+      // The other side of the rule: when a non-result entry also drifted, the plan names the PO and the same command without a proof is refused.
       const driftEntry = JSON.parse(readFileSync(join(fx.root, manifestRel), "utf8")).artifacts.find((entry) => !["result", "prd", "spec"].includes(entry.class));
       assert.ok(driftEntry, "the registered package holds a non-result, non-authority artifact to drift");
       const driftPath = join(fx.root, driftEntry.path); const driftOriginal = readFileSync(driftPath);
@@ -473,10 +476,68 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         [script("pipeline-state.mjs"), "feature-package-reconcile", "--root", fx.root, "--manifest", manifestRel, "--plan-sha256", mixed.planSha256], { cwd: fx.root, expectedStatus: 2 });
       assert.match(unsigned.stderr, /FTP-RECONCILE-APPROVAL-REJECTED/);
       writeFileSync(driftPath, driftOriginal); // the approved bytes are back: the plan is the result-only one again
+      }
       const reconciled = step(log, `${identity.runner}: feature-package-reconcile (agent-run, result-only)`, completion.reconcileCommand.executable, completion.reconcileCommand.argv, { cwd: fx.root });
       assert.deepEqual(JSON.parse(reconciled.stdout).approval, { basis: "agent-result-only-reconcile-no-po-proof", poProof: false });
       commit(log, fx.root, "chore: bind the Result and reconcile the feature package");
+      };
+      bindResult(true);
       if (oneShot) {
+        if (decline) {
+          // C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): the whole chain of a declined acceptance on the real fixture, real Git and the real State writer. The Critic round is the fixture's own
+          // (its stop hook ran above); a correction here is an evidence-only commit, which the Critic-bound Verify carries, because a new Critic delta round cannot run in a test (stated in the notes).
+          const stateText = () => readFileSync(join(fx.root, "project", "pipeline-state.json"), "utf8");
+          const stateJson = () => JSON.parse(stateText());
+          const bug = "Man kann die raeder in level 2 nicht drehen. sonst gut"; // the answer the Codex greenfield human gave, in German
+          const question = oneShotCli();
+          assert.equal(question.code, "ONESHOT-ACCEPTANCE-REQUIRED", JSON.stringify(question.result).slice(0, 600));
+          assert.match(question.result.stop.reason, /"yes, I accept"/u); assert.match(question.result.stop.repair, /--human-decline/u);
+          const boundResult = stateJson().continuity.authority.result;
+          assert.ok(boundResult !== null, "the Result is bound at the acceptance question: every decline happens with a bound Result");
+          // a non-yes answer through --human-acceptance stops and records nothing
+          const treeBeforeAnswer = porcelain(); const stateBeforeAnswer = stateText();
+          const notYes = oneShotCli(["--human-acceptance", bug]);
+          assert.equal(notYes.status, 2, JSON.stringify(notYes.result).slice(0, 600)); assert.equal(notYes.code, "ONESHOT-ACCEPTANCE-NOT-YES", JSON.stringify(notYes.result).slice(0, 600));
+          assert.equal(porcelain(), treeBeforeAnswer, "a non-yes answer wrote nothing"); assert.equal(stateText(), stateBeforeAnswer); assert.equal(readAcceptanceRecord(fx.root, FEATURE_ID), null);
+          // reopen-design with a bound Result refuses before any write and names the decline route
+          const reopen = step(log, `${identity.runner}: reopen-design with a bound Result is refused`, process.execPath, [script("pipeline-state.mjs"), "reopen-design", "--by", "Fixture PO"], { cwd: fx.root, expectedStatus: 2 });
+          assert.match(reopen.stderr, /PLAN-REOPEN-RESULT-BOUND[\s\S]*--human-decline/u, reopen.stderr);
+          assert.equal(stateText(), stateBeforeAnswer, "the refused reopen wrote nothing"); assert.equal(porcelain(), treeBeforeAnswer);
+          // the decline records, retires the Result and returns the correction steps
+          const declined = oneShotCli(["--human-decline", bug]);
+          assert.equal(declined.status, 0, JSON.stringify(declined.result).slice(0, 1200)); assert.equal(declined.code, "declined", JSON.stringify(declined.result).slice(0, 1200));
+          const after = stateJson();
+          assert.equal(after.continuity.authority.result, null, "the bound Result is retired");
+          assert.equal(after.continuity.revision, JSON.parse(stateBeforeAnswer).continuity.revision + 1, "one revision step");
+          const retirement = after.continuity.resultRetirements.at(-1);
+          assert.deepEqual({ path: retirement.path, sha256: retirement.sha256 }, boundResult, "the retired binding stays in history");
+          assert.equal(retirement.reason, "declined-acceptance"); assert.equal(typeof retirement.retiredAt, "string");
+          assert.equal(retirement.declineRecord.path, declined.result.decline.path); assert.equal(retirement.declineRecord.sha256, sha256(readFileSync(join(fx.root, declined.result.decline.path))));
+          assert.ok(readFileSync(join(fx.root, declined.result.decline.path), "utf8").includes(JSON.stringify(bug)), "the literal words");
+          assert.equal(readAcceptanceRecord(fx.root, FEATURE_ID), null, "a decline is never an acceptance");
+          assert.deepEqual(declined.result.next.length >= 4, true, JSON.stringify(declined.result.next));
+          assert.match(declined.result.next[1], /prepare-dispatch\.mjs goldfish/u); assert.match(declined.result.next[2], /prepare-dispatch\.mjs critic --delta-request/u); assert.match(declined.result.next[3], /--critic-packet-id <new-packet-id>/u);
+          // zero mutation on a stale plan, a replay changes nothing
+          const afterBytes = stateText();
+          const action = declined.result.retired.apply;
+          // like the rebind pair, an apply whose expected post-state digest is the persisted one replays; any other digest matches neither the replay nor a plan, so it is refused with zero mutation
+          const stale = action.argv.map((token, index) => (action.argv[index - 1] === "--expected-post-state-sha256" ? `${token.slice(0, -1)}${token.endsWith("0") ? "1" : "0"}` : token));
+          step(log, `${identity.runner}: retire apply with a stale post-state digest is refused`, action.executable, stale, { cwd: fx.root, expectedStatus: 2 });
+          assert.equal(stateText(), afterBytes, "a mismatch changes nothing");
+          const replay = step(log, `${identity.runner}: retire apply replays`, action.executable, action.argv, { cwd: fx.root });
+          assert.equal(json(replay).status, "replayed"); assert.equal(stateText(), afterBytes);
+          // the declined outputs are committed by the paths the decline named, then the correction commit
+          commitPaths(declined.result.commit.message, declined.result.commit.paths);
+          assert.equal(porcelain(), "", "everything the decline wrote is committed");
+          const correction = `specs/${FEATURE_ID}/evidence/correction-note.md`;
+          writeFileSync(join(fx.root, correction), "# Correction of the declined acceptance\n");
+          commitPaths("fix: correct the declined acceptance", [correction]);
+          // the second close runs the Result bootstrap again for the new candidate
+          const again = oneShotCli();
+          assert.equal(again.code, "ONESHOT-RESULT-NOT-BOUND", JSON.stringify(again.result).slice(0, 800));
+          bindResult(false);
+          assert.notEqual(stateJson().continuity.authority.result.sha256, undefined, "a freshly bound Result");
+        }
         // C22 (CGF-04): the whole close through the real one-shot CLI, one call per stop. The question for the human comes once and writes nothing; the answer is recorded for exactly the HEAD it was
         // given at; every commit the close asks for is made from the paths it names (so the close's own evidence commits are part of the walk); a resume never asks again and never lands in
         // FCA-PACKAGE or in a second commit request for the same outputs. The final gates (freeze, Verify, scan) are read from the typed codes the CLI ends on.
@@ -489,7 +550,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
         assert.equal(readAcceptanceRecord(fx.root, FEATURE_ID), null);
         assert.deepEqual(stateOf().closedFeatures ?? [], [], "the close has not started");
         const candidateAsked = git(log, fx.root, ["rev-parse", "HEAD"]);
-        const answer = "Fixture PO: accepted for this candidate";
+        const answer = "yes, I accept"; // C28 (QG-04, restated in place): the acceptance is recorded only for the one fixed yes form.
         const seen = [asked.code];
         let args = ["--human-acceptance", answer];
         let last = null;
@@ -803,6 +864,14 @@ test("PO tile 2026-11-10: a push to a feature branch is followed by the one evid
 
 test("C22 CGF-04: the one-shot close CLI walks the whole close on the real fixture: its stops, the acceptance question, the commits the close asks for, and the resume", { timeout: 600_000 }, async () => {
   await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true });
+});
+
+test("C28 AC-108: a declined acceptance returns the feature to a correction round: a non-yes answer records nothing, the decline retires the bound Result, and the second close binds a Result again, asks again for the new candidate, and closes on a yes", { timeout: 900_000 }, async () => {
+  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, decline: true });
+});
+
+test("C28 AC-108: the same declined-acceptance chain in a project with a session-authority catalogue runs the State entry on the owner route and reuses the Close lifecycle the one-shot opened", { timeout: 900_000 }, async () => {
+  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, catalogue: true, decline: true });
 });
 
 test("C23 F25: in a project with a catalogue from the start the one-shot close binds the Result on the owner route and closes without a detour", { timeout: 600_000 }, async () => {

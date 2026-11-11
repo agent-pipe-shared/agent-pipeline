@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
-// D231 owner route (PO decision 2026-11-01, option A). A plain-terminal process may own the State write of EXACTLY FOUR Close-route
-// entries, and only here. For a project WITH a session-authority catalogue those entries refuse on the direct route
+// D231 owner route (PO decision 2026-11-01, option A). A plain-terminal process may own the State write of EXACTLY SIX Close-route
+// entries (C28 added the retire pair of a declined acceptance to the original four), and only here. For a project WITH a session-authority catalogue those entries refuse on the direct route
 // (SDC-AUTHORITY-UNAVAILABLE) because the State write must be owner-bound to an armed onboarding-continuity member.
 //
 //   node continuity-owner-route.mjs run --root <root> --lifecycle <close lifecycle id> -- <entry> [<entry flags>]
@@ -9,7 +9,7 @@
 //
 // ONE `run` call = bind, exactly one entry through the existing port.executeCompanionOperation (every gate unchanged), release, all in
 // this process (the handles are process-local capabilities). Allowlist: continuity-result-bootstrap-plan, continuity-result-bootstrap-apply,
-// continuity-result-close-plan, continuity-result-close-apply. close-feature is NOT on it (separate slice); the entry itself writes State,
+// continuity-result-retire-plan, continuity-result-retire-apply, continuity-result-close-plan, continuity-result-close-apply. close-feature is NOT on it (separate slice); the entry itself writes State,
 // this script never does, and it never forces the registry or a member. The entry's own stdout passes through; the one-line result
 // envelope (pipeline.continuity-owner-route-result.v1) goes to stderr. Exit: 0 completed, 2 refused, 3 held (a binding remains: run heal).
 import { existsSync, realpathSync, readFileSync } from 'node:fs';
@@ -29,7 +29,8 @@ const PIPELINE_STATE = fileURLToPath(new URL('./pipeline-state.mjs', import.meta
 const CLOSE_COORDINATOR = fileURLToPath(new URL('./close-coordinator.mjs', import.meta.url));
 export const OWNER_ROUTE_RESULT_SCHEMA = 'pipeline.continuity-owner-route-result.v1';
 export const OWNER_ROUTE_ORPHAN_SCHEMA = 'pipeline.continuity-owner-route-orphan-release.v1';
-const ALLOWLIST = Object.freeze(['continuity-result-bootstrap-plan', 'continuity-result-bootstrap-apply', 'continuity-result-close-plan', 'continuity-result-close-apply']);
+// C28 (AC-108): the declined-acceptance route retires the bound Result on the same route the bootstrap binds it (continuity-result-retire-plan, -apply).
+const ALLOWLIST = Object.freeze(['continuity-result-bootstrap-plan', 'continuity-result-bootstrap-apply', 'continuity-result-retire-plan', 'continuity-result-retire-apply', 'continuity-result-close-plan', 'continuity-result-close-apply']);
 const USAGE = `node ${SELF} run --root <root> --lifecycle <close lifecycle id> -- <entry> [<entry flags>] (entries: ${ALLOWLIST.join(', ')})`;
 const healCommand = (root) => `node ${ROUTINE_REPAIR} run heal --root ${root} --reason "<why the owner-route call was interrupted>"`;
 

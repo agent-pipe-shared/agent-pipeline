@@ -1304,7 +1304,7 @@ export function executeSourceOwnedControlledContinuityTicketProbe(input) {
 }
 
 const companionRefreshTickets=new WeakMap();
-const companionEntries=new Set(['discard-feature','set-feature','continuity-init','submit-plan','present-plan','approve-plan','materialize-architecture','continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-rebind-plan','continuity-result-rebind-apply','continuity-result-close-plan','continuity-result-close-apply','close-feature','afk-project']);
+const companionEntries=new Set(['discard-feature','set-feature','continuity-init','submit-plan','present-plan','approve-plan','materialize-architecture','continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-rebind-plan','continuity-result-rebind-apply','continuity-result-retire-plan','continuity-result-retire-apply','continuity-result-close-plan','continuity-result-close-apply','close-feature','afk-project']);
 function companionEffectImage(repo,effect) {
   exact(effect,['scope','path','preimage','postimage'],'companion-effect');
   if(!['repository','common'].includes(effect.scope)||typeof effect.path!=='string'||isAbsolute(effect.path)||effect.path.includes('\\')||effect.path.split('/').some(p=>!p||p==='.'||p==='..')||(effect.scope==='repository'&&effect.path.split('/')[0]==='.git'))fail('SDC-PRIVATE-PATH','companion-effect-path');

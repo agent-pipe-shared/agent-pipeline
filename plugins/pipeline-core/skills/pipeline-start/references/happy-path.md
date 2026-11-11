@@ -25,6 +25,8 @@ start or open it the way the PO will and look at what it really shows. Then tell
 see it and why. This holds for every kind of result (an app, a page, a command-line tool, a library, a document) and for every hand-over, not
 only the acceptance question at the close. It is not a gate: the Pipeline cannot check what you saw, only you can.
 
+The acceptance question of the one-shot close ends with ONE fixed yes form (`yes, I accept`; `ja, ich akzeptiere` in a German project; English for any other language). Only exactly that form (case, surrounding space and a closing `.` or `!` aside) is recorded as the acceptance through `--human-acceptance`; any other answer stops with `ONESHOT-ACCEPTANCE-NOT-YES` and records nothing. If the human answers anything else (a bug, a change request), rerun the identical command with `--human-decline "<the human's literal answer>"`: the words are recorded (never as an acceptance), the bound Result is retired, and the close returns `declined` with the correction steps in order: commit, correction dispatch, Critic delta round, then the identical close command with the new packet. Do not reopen the design for a declined acceptance (`reopen-design` refuses with a bound Result and names this route).
+
 ## 1. Design
 
 1. `pipeline-state.mjs set-feature --id <id> --plan-path <path>` (agent). Both flags are required.

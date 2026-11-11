@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { finishFeature, oneShotClose } from "./finish-feature.mjs";
 import { canonical } from "../lib/po-approval-proof.mjs";
 import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
-import { applyAcceptanceSection, renderAcceptanceSection } from "../lib/close-acceptance-record.mjs";
+import { applyAcceptanceSection, readAcceptanceRecord, renderAcceptanceSection } from "../lib/close-acceptance-record.mjs";
 import { syncPublicCurrentState } from "./pipeline-state.mjs";
 
 function response(value) { return { status: 0, stdout: JSON.stringify(value), stderr: "" }; }
@@ -258,8 +258,8 @@ const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
 // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
 // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
 // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false } = {}) {
-  const independenceChecks = [];
+function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null } = {}) {
+  const independenceChecks = []; let retired = false;
   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
   git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
@@ -267,7 +267,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
   writeFileSync(join(root, "specs/feature-abc/result.md"), "# Result\n");
   const resultSha = sha256Of("# Result\n");
   const stateValue = (nextAction) => ({ schema: "pipeline.state.v0", activeFeature: { id: "feature-abc" }, ...(residualOnRecord ? { residualAcceptance: { lastAccepted: { findings: [] } } } : {}),
-    ...(continuity ? { continuity: { revision: 3, queueHead: { nextAction }, authority: { result: resultBound ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
+    ...(continuity ? { continuity: { revision: retired ? 4 : 3, ...(language === null ? {} : { runtime: { humanFacingLanguage: language } }), queueHead: { nextAction }, authority: { result: resultBound && !retired ? { path: "specs/feature-abc/result.md", sha256: resultSha } : null } } } : {}) });
   const writeState = (value) => writeFileSync(join(root, STATE_PATH), `${JSON.stringify(value)}\n`);
   writeState(closed ? { schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] } : stateValue("review"));
   if (handover) { mkdirSync(join(root, "project")); mkdirSync(join(root, "docs")); writeFileSync(join(root, "project/pipeline.json"), `${JSON.stringify({ handover: "docs/state.md" })}\n`); writeFileSync(join(root, "docs/state.md"), "# State\n\n## Current state\n\nFeature `feature-abc` is active in implementation.\n"); }
@@ -302,6 +302,9 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
       if (sub === "update-public-handover") { writeFileSync(join(root, "docs/state.md"), "# State\n\n## Current state\n\n**Lifecycle phase:** no active feature\nFeature `feature-abc` is closed locally.\n"); return json({ status: "current", path: "docs/state.md", currentState: "updated" }); }
       if (sub === "continuity-result-close-plan") return json({ applyAction: { executable: process.execPath, argv: [STATE_WRITER, "continuity-result-close-apply", "--feature-id", "feature-abc"] } });
       if (sub === "continuity-result-close-apply") { writeState(stateValue("close")); return json({ status: "applied" }); }
+      // C28: the decline route's stand-ins for the State transition that retires the bound Result and for the result-only package reconcile it names.
+      if (sub === "continuity-result-retire-plan") return json({ planSha256: "7".repeat(64), applyAction: { executable: process.execPath, argv: [STATE_WRITER, "continuity-result-retire-apply", "--feature-id", "feature-abc", "--decline-record", flag(argv, "--decline-record")] } });
+      if (sub === "continuity-result-retire-apply") { retired = true; writeState(stateValue("review")); return json({ status: "applied" }); }
       if (sub === "close-feature") { writeState({ schema: "pipeline.state.v0", closedFeatures: [{ id: "feature-abc" }] }); return { status: 0, stdout: "Feature \"feature-abc\" closed", stderr: "" }; }
     }
     if (script === "close-coordinator.mjs") {
@@ -318,7 +321,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
     }
     throw new Error(`unexpected ${script} ${sub}`);
   };
-  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept this feature package" } : {}) } };
+  return { root, git, calls, independenceChecks, runner, resultSha, packetId, lifecycleId, setPhase: (value) => { phase = value; }, addendaCommitted: () => { addendaPending = false; }, input: { rootDir: root, by: "PO", architectureImpact: "no-architecture-impact", criticPacketId: packetId, ...(acceptance ? { humanAcceptance: "yes, I accept" } : {}) } }; // C28 (QG-04, restated in place): the acceptance is recorded only for the one fixed yes form, so the default answer is exactly that form.
 }
 const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
 
@@ -687,7 +690,7 @@ test("C22 CGR-06: the one-shot stops once, before anything is written, with the 
 test("C22 CGR-06: the answer is recorded in the feature's acceptance.md with the literal answer, the candidate commit and the open checks, labelled as an attribution record and not a signature", () => {
   const f = oneShotFixture({ acceptance: false });
   try {
-    const head = headOf(f); const answer = "Yes, I accept \"this\" package";
+    const head = headOf(f); const answer = "Yes, I accept."; // C28 (QG-04, restated in place): the fixed yes form, normalised for case and closing punctuation; the literal answer is recorded as given.
     const result = oneShotClose({ ...f.input, humanAcceptance: answer, openChecks: ["real device check"] }, { runCommand: f.runner });
     assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 400));
     const text = readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8");
@@ -701,7 +704,7 @@ test("C22 CGR-06: the answer is recorded in the feature's acceptance.md with the
 test("C22 CGR-06: a rerun with an acceptance recorded for the same candidate does not ask again, and a changed candidate asks again", () => {
   const f = oneShotFixture({ acceptance: false });
   try {
-    const answer = "accepted, as asked";
+    const answer = "yes, I accept"; // C28 (QG-04, restated in place): the fixed yes form.
     assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required");
     f.git("checkout", "--", STATE_PATH);
     const again = oneShotClose(f.input, { runCommand: f.runner });
@@ -720,12 +723,113 @@ test("C22 CGR-06: a resumed close never asks (the question belongs to the eviden
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+// ---- C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): one fixed yes form, and a decline route that returns the feature to a correction round ----
+const GERMAN_BUG_REPORT = "Man kann die raeder in level 2 nicht drehen. sonst gut"; // the answer a Codex greenfield human gave to the acceptance question
+test("C28: the acceptance question states the one fixed yes form and the stop names both ways on", () => {
+  const f = oneShotFixture({ acceptance: false });
+  try {
+    const stopped = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-REQUIRED");
+    assert.ok(stopped.stop.reason.includes("\"yes, I accept\""), `the question states the fixed form: ${stopped.stop.reason}`);
+    assert.match(stopped.stop.repair, /--human-acceptance "yes, I accept"/u); assert.match(stopped.stop.repair, /--human-decline "<the human's literal answer>"/u);
+    assert.deepEqual(f.calls, []); assert.equal(f.git("status", "--porcelain").trim(), "");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C28: an answer that is not the fixed yes form is never recorded as an acceptance: it is a typed stop that names both ways on and writes nothing, whatever it says", () => {
+  for (const answer of [GERMAN_BUG_REPORT, "yes, but the wheels do not turn", "yes", "ok", "no", "yes, I accept, but fix level 2", "yes, I accept?"]) {
+    const f = oneShotFixture({ acceptance: false });
+    try {
+      const stopped = oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner });
+      assert.equal(stopped.status, "stopped", JSON.stringify(stopped).slice(0, 300)); assert.equal(stopped.stage, "acceptance"); assert.equal(stopped.stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", answer);
+      assert.match(stopped.stop.repair, /--human-acceptance "yes, I accept"/u); assert.match(stopped.stop.repair, /--human-decline/u);
+      assert.deepEqual(f.calls, [], "no Verify, package or close stage ran"); assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false); assert.equal(f.git("status", "--porcelain").trim(), "", `nothing was written for ${JSON.stringify(answer)}`);
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+});
+
+test("C28: the fixed yes form is read normalised for case, surrounding space and closing punctuation, and the literal answer is recorded as given", () => {
+  for (const answer of ["  YES, I accept!  ", "Yes, I accept.", "yes, i ACCEPT"]) {
+    const f = oneShotFixture({ acceptance: false });
+    try {
+      assert.equal(oneShotClose({ ...f.input, humanAcceptance: answer }, { runCommand: f.runner }).status, "commit-required", answer);
+      assert.ok(readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8").includes(JSON.stringify(answer)), "the literal answer");
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+});
+
+test("C28: the fixed form follows the project's human-facing language so a German-speaking human answers in German, and falls back to English for any other language", () => {
+  const de = oneShotFixture({ acceptance: false, continuity: true, language: "de" });
+  try {
+    const stopped = oneShotClose(de.input, { runCommand: de.runner });
+    assert.ok(stopped.stop.reason.includes("\"ja, ich akzeptiere\""), stopped.stop.reason);
+    assert.equal(oneShotClose({ ...de.input, humanAcceptance: "yes, I accept" }, { runCommand: de.runner }).stop.code, "ONESHOT-ACCEPTANCE-NOT-YES", "the English form is not the German project's form");
+    assert.equal(oneShotClose({ ...de.input, humanAcceptance: "Ja, ich akzeptiere." }, { runCommand: de.runner }).status, "commit-required");
+  } finally { rmSync(de.root, { recursive: true, force: true }); }
+  const fr = oneShotFixture({ acceptance: false, continuity: true, language: "fr" });
+  try { assert.ok(oneShotClose(fr.input, { runCommand: fr.runner }).stop.reason.includes("\"yes, I accept\"")); } finally { rmSync(fr.root, { recursive: true, force: true }); }
+});
+
+test("C28: --human-acceptance and --human-decline are exclusive, and a decline needs the human's literal words", () => {
+  const f = oneShotFixture({ acceptance: false });
+  try {
+    for (const input of [{ humanAcceptance: "yes, I accept", humanDecline: GERMAN_BUG_REPORT }, { humanDecline: "  " }, { humanDecline: "x".repeat(501) }]) {
+      assert.throws(() => oneShotClose({ ...f.input, ...input }, { runCommand: f.runner }), (error) => error.code === "FINISH-ACCEPTANCE");
+    }
+    assert.deepEqual(f.calls, []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C28: a decline records the literal words with the candidate and the time where an acceptance can never be read from, retires the bound Result through the State transition, runs no Verify and returns the correction steps in order", () => {
+  const f = oneShotFixture({ acceptance: false, continuity: true });
+  try {
+    const head = headOf(f); const stateBefore = readFileSync(join(f.root, STATE_PATH), "utf8");
+    const result = oneShotClose({ ...f.input, humanDecline: GERMAN_BUG_REPORT, openChecks: ["real device check"] }, { runCommand: f.runner, nowFn: () => "2026-11-10T12:00:00.000Z" });
+    assert.equal(result.status, "declined", JSON.stringify(result).slice(0, 600)); assert.equal(result.featureId, "feature-abc");
+    assert.match(result.decline.path, /^specs\/feature-abc\/evidence\/human-decline-[0-9a-f]{12}-[0-9a-f]{8}\.md$/u); assert.equal(result.decline.candidate, head);
+    const text = readFileSync(join(f.root, result.decline.path), "utf8");
+    assert.ok(text.includes(JSON.stringify(GERMAN_BUG_REPORT)), "the literal words"); assert.ok(text.includes(head), "the candidate commit"); assert.ok(text.includes("2026-11-10T12:00:00.000Z"), "the time"); assert.match(text, /not an acceptance/u);
+    assert.equal(result.decline.sha256, sha256Of(text), "the digest the State history carries");
+    assert.equal(readAcceptanceRecord(f.root, "feature-abc"), null, "a decline is never read as an acceptance, in either place");
+    assert.equal(existsSync(join(f.root, ACCEPTANCE_FILE)), false);
+    assert.deepEqual(f.calls.filter((call) => call.startsWith("pipeline-state")), ["pipeline-state continuity-result-retire-plan", "pipeline-state continuity-result-retire-apply"], "plan, then apply: the transition restores the Result and the package digest itself, so nothing is left to reconcile");
+    assert.ok(!f.calls.includes("verify-evidence-producer.mjs") && !f.calls.some((call) => call.startsWith("close-coordinator")), "no Verify and no close stage ran");
+    assert.notEqual(readFileSync(join(f.root, STATE_PATH), "utf8"), stateBefore); assert.equal(JSON.parse(readFileSync(join(f.root, STATE_PATH), "utf8")).continuity.authority.result, null);
+    assert.ok(result.commit.paths.includes(result.decline.path), `the decline record travels in its own commit: ${result.commit.paths}`); assert.equal(result.commit.message.includes("git"), false);
+    assert.ok(Array.isArray(result.next) && result.next.length >= 4, JSON.stringify(result.next));
+    const [commitStep, correction, delta, closeAgain] = result.next;
+    assert.match(commitStep, /commit/u); assert.match(correction, /prepare-dispatch\.mjs goldfish/u); assert.match(delta, /prepare-dispatch\.mjs critic --delta-request/u);
+    assert.match(closeAgain, /--one-shot[\s\S]*--critic-packet-id <new-packet-id>/u); assert.doesNotMatch(closeAgain, new RegExp(f.packetId, "u"), "the new packet replaces the old one");
+    assert.deepEqual(forbidden(f.calls), []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C28: a decline in a project with no Continuity binding has no Result to retire and runs no State transition", () => {
+  const plain = oneShotFixture({ acceptance: false });
+  try {
+    const result = oneShotClose({ ...plain.input, humanDecline: GERMAN_BUG_REPORT }, { runCommand: plain.runner });
+    assert.equal(result.status, "declined", JSON.stringify(result).slice(0, 400)); assert.equal(result.retired, null);
+    assert.deepEqual(plain.calls, [], "no State transition, no Verify");
+  } finally { rmSync(plain.root, { recursive: true, force: true }); }
+});
+
+test("C28: the decline record is committed by the close's own commit route and is never rolled back by the leftover rule of a later close", () => {
+  const f = oneShotFixture({ acceptance: false, continuity: true });
+  try {
+    const declined = oneShotClose({ ...f.input, humanDecline: GERMAN_BUG_REPORT }, { runCommand: f.runner });
+    assert.equal(declined.status, "declined");
+    f.git("add", "--", ...declined.commit.paths); f.git("commit", "-q", "-m", "decline outputs");
+    assert.equal(f.git("status", "--porcelain").trim(), "", "everything the decline wrote is in the commit");
+    assert.ok(readFileSync(join(f.root, declined.decline.path), "utf8").includes(JSON.stringify(GERMAN_BUG_REPORT)));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("C22 CGR-06: the generated immutable pointer is replaced by the record WITHOUT a signature: the package entry is rebound with an amendment and the package still validates; an authority entry is never edited", () => {
   const f = oneShotFixture({ acceptance: false });
   try {
     const { manifestPath, pointerSha } = packageFixture(f);
-    assert.equal(oneShotClose({ ...f.input, humanAcceptance: "yes" }, { runCommand: f.runner }).status, "commit-required");
-    const text = readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8"); assert.ok(text.includes("# Acceptance pointer: feature-abc") && text.includes("\"yes\""));
+    assert.equal(oneShotClose({ ...f.input, humanAcceptance: "yes, I accept" }, { runCommand: f.runner }).status, "commit-required"); // C28 (QG-04, restated in place): the fixed yes form instead of a bare "yes".
+    const text = readFileSync(join(f.root, ACCEPTANCE_FILE), "utf8"); assert.ok(text.includes("# Acceptance pointer: feature-abc") && text.includes("\"yes, I accept\""));
     const entry = JSON.parse(readFileSync(join(f.root, manifestPath), "utf8")).artifacts.find((item) => item.class === "acceptance");
     assert.equal(entry.sha256, sha256Of(text)); assert.equal(entry.amendment.previousSha256, pointerSha); assert.equal(entry.mutability, "immutable"); assert.equal(entry.authority, false);
     assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true, JSON.stringify(validateFeaturePackage(f.root, manifestPath).findings));
@@ -733,9 +837,9 @@ test("C22 CGR-06: the generated immutable pointer is replaced by the record WITH
   const g = oneShotFixture({ acceptance: false });
   try {
     const { manifestPath } = packageFixture(g, { acceptanceAuthority: true }); const before = readFileSync(join(g.root, manifestPath), "utf8");
-    assert.equal(oneShotClose({ ...g.input, humanAcceptance: "yes" }, { runCommand: g.runner }).status, "commit-required");
+    assert.equal(oneShotClose({ ...g.input, humanAcceptance: "yes, I accept" }, { runCommand: g.runner }).status, "commit-required");
     assert.equal(readFileSync(join(g.root, ACCEPTANCE_FILE), "utf8"), SPEC_POINTER, "a bound authority acceptance stays byte for byte"); assert.equal(readFileSync(join(g.root, manifestPath), "utf8"), before);
-    assert.match(readFileSync(join(g.root, "specs/feature-abc/evidence/human-acceptance.md"), "utf8"), /"yes"/u);
+    assert.match(readFileSync(join(g.root, "specs/feature-abc/evidence/human-acceptance.md"), "utf8"), /"yes, I accept"/u);
   } finally { rmSync(g.root, { recursive: true, force: true }); }
 });
 

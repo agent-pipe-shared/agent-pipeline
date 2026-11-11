@@ -1617,4 +1617,25 @@ await asyncCheck("generic CAS cannot forge or replace native readback evidence",
   assert.equal(compareAndSwapContinuity(current, { expectedRevision: 3, next: forged }, FEATURE).code, "CS-PROTECTED-NATIVE-CONTINUATION");
 });
 
+// C28 (AC-108): a Result retired by a declined acceptance stays in the history of the Continuity state.
+check("a retired Result stays in the history: resultRetirements validates against the validator and the schema, and a malformed history is refused", () => {
+  const entry = { path: "specs/x/result.md", sha256: A, retiredAt: "2026-11-10T12:00:00.000Z", reason: "declined-acceptance", declineRecord: { path: "specs/x/evidence/human-decline-aaaaaaaaaaaa-bbbbbbbb.md", sha256: B } };
+  const withHistory = { ...structuredClone(state()), resultRetirements: [entry] };
+  assert.equal(validateContinuityState(state()).ok, true, "the base state of this case is valid without a history");
+  assert.equal(validateContinuityState(withHistory).ok, true);
+  assert.equal(validateAgainstSchema(withHistory, schemaLiteSchema).valid, true);
+  for (const [label, mutate] of [
+    ["not a list", (value) => { value.resultRetirements = entry; }],
+    ["an unknown key", (value) => { value.resultRetirements[0].extra = true; }],
+    ["a bad digest", (value) => { value.resultRetirements[0].sha256 = "zz"; }],
+    ["an unknown reason", (value) => { value.resultRetirements[0].reason = "other"; }],
+    ["a missing decline record", (value) => { delete value.resultRetirements[0].declineRecord; }],
+    ["an unsafe path", (value) => { value.resultRetirements[0].path = "../outside.md"; }],
+    ["too many entries", (value) => { value.resultRetirements = Array.from({ length: 17 }, () => structuredClone(entry)); }],
+  ]) {
+    const broken = structuredClone(withHistory); mutate(broken);
+    assert.equal(validateContinuityState(broken).ok, false, label);
+  }
+});
+
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

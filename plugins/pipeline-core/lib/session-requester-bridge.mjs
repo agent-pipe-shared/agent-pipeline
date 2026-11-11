@@ -1672,10 +1672,10 @@ export function inspectSourceOwnedApprovedControllerCourse(input){
 
 // ---- Continuity owner route (PO decision D231, option A, 2026-11-01) --------------------------------------------------
 // A second fixed production issuer, mirroring the approved-controller precedent above. A plain-terminal process may own the
-// State write of exactly four Close-route entries, in exactly one closed script, only AFTER the Close lifecycle has started.
+// State write of exactly six Close-route entries (C28 added the retire pair of a declined acceptance), in exactly one closed script, only AFTER the Close lifecycle has started.
 // Owner identity is a FRESH per-invocation descriptor (controller-<random>): neither the host session nor the hook-observed
 // owner (documented as unauthenticated). The issuer admits nothing else: it reads no caller JSON, takes no session/PID input.
-const OWNER_ROUTE_ENTRIES=Object.freeze(['continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-close-plan','continuity-result-close-apply']);
+const OWNER_ROUTE_ENTRIES=Object.freeze(['continuity-result-bootstrap-plan','continuity-result-bootstrap-apply','continuity-result-retire-plan','continuity-result-retire-apply','continuity-result-close-plan','continuity-result-close-apply']);
 const OWNER_ROUTE_SCHEMA='pipeline.continuity-owner-route-invocation.v1';
 const OWNER_ROUTE_PRODUCER='continuity-owner-route';
 const ownerRouteRuntimes=new Map();
@@ -1705,7 +1705,7 @@ function ownerRouteCourse(rootDir,lifecycleId,currentStatePath=null){
   catch{ownerRouteRefuse('COR-LIFECYCLE-NOT-STARTED','no Close coordinator record exists for lifecycle '+lifecycleId);}
   if(coordinator.featureId!==state.activeFeature.id||ownerRouteCoordinatorPhases.indexOf(coordinator.phase)<ownerRouteCoordinatorPhases.indexOf('checkpointed'))
     ownerRouteRefuse('COR-LIFECYCLE-NOT-STARTED','the Close lifecycle of this feature has not reached checkpointed');
-  // Each of the four entries is legal only before the Close transition exists; the entry's own gates decide everything finer.
+  // Each of the six entries is legal only before the Close transition exists; the entry's own gates decide everything finer.
   if(state.continuity.closeTransition!==null&&state.continuity.closeTransition!==undefined)ownerRouteRefuse('COR-STATE-PHASE','the Close transition already exists, so these entries are past their phase');
   const selectedStateRef=osvPhysicalRef(observed.path);
   if(currentStatePath===null){const again=continuityVerificationIssuer.observeSessionCleanupState(rootDir);

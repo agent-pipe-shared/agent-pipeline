@@ -20,7 +20,11 @@ const ROOT_KEYS = new Set([
   "closeTransition",
   "nativeContinuation",
   "retryBudget",
+  "resultRetirements",
 ]);
+// C28 (AC-108): the history of Results a declined acceptance retired, newest last. Bounded; the declined feature is corrected, not retired again and again.
+const RESULT_RETIREMENT_KEYS = new Set(["path", "sha256", "retiredAt", "reason", "declineRecord"]);
+const MAX_RESULT_RETIREMENTS = 16;
 const RUNTIME_KEYS = new Set(["humanFacingLanguage", "activeDuty", "sessionCleanup", "documentLanguage"]);
 const SESSION_CLEANUP_KEYS = new Set(["sessionId", "descriptorSha256"]);
 const ARTIFACT_KEYS = new Set(["path", "sha256"]);
@@ -475,9 +479,16 @@ function result(ok, code, state = null, mutated = false) {
   return { ok, code, mutated, state };
 }
 
+function validResultRetirements(value) {
+  return value === undefined || (Array.isArray(value) && value.length <= MAX_RESULT_RETIREMENTS && value.every((entry) => exactKeys(entry, RESULT_RETIREMENT_KEYS)
+    && safePath(entry.path) && digest(entry.sha256) && typeof entry.retiredAt === "string" && Number.isFinite(Date.parse(entry.retiredAt))
+    && entry.reason === "declined-acceptance" && validArtifact(entry.declineRecord)));
+}
+
 /** Validate one bounded continuity object. */
 export function validateContinuityState(value, activeFeatureId = undefined) {
-  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => !["closeTransition", "nativeContinuation", "retryBudget"].includes(key)))
+  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => !["closeTransition", "nativeContinuation", "retryBudget", "resultRetirements"].includes(key)))
+    || !validResultRetirements(value.resultRetirements)
     || value.schema !== "pipeline.continuity.v0"
     || !safeId(value.featureId)
     || !safeInteger(value.revision)

@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
-import { acceptanceQuestion, acceptanceTarget, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
+import { acceptanceQuestion, acceptanceTarget, acceptanceYesForm, isAcceptanceYes, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord, writeDeclineRecord } from "../lib/close-acceptance-record.mjs";
 import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
 import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
 import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
@@ -29,6 +29,7 @@ const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
 const STATE_WRITER = fileURLToPath(new URL("./pipeline-state.mjs", HERE));
 const OWNER_ROUTE = fileURLToPath(new URL("./continuity-owner-route.mjs", HERE));
+const PREPARE_DISPATCH = fileURLToPath(new URL("./prepare-dispatch.mjs", HERE));
 const VERIFY_PRODUCER = fileURLToPath(new URL("./verify-evidence-producer.mjs", HERE));
 const REGISTER_PACKAGE = fileURLToPath(new URL("./register-feature-package.mjs", HERE));
 const SECURITY_SCAN = fileURLToPath(new URL("./security-scan.mjs", HERE));
@@ -226,7 +227,7 @@ const HEX32 = /^[a-f0-9]{32}$/u;
 function stopResult(stage, code, reason, repair, extra = {}) { return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "stopped", stage, stop: Object.freeze({ code, reason: String(reason).slice(0, 1200), repair }), ...extra }); }
 function writeRepoJson(root, path, value) { const target = resolve(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`); return path; }
 
-export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, openChecks = null } = {}, deps = {}) {
+export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, humanDecline = null, openChecks = null } = {}, deps = {}) {
   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
   if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", `Feature close requires a known architecture impact; allowed --architecture-impact values: ${[...IMPACT].join(", ")}.`);
@@ -234,6 +235,9 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   if (resumeLifecycleId !== null && !/^[A-Za-z0-9._-]{1,100}$/u.test(resumeLifecycleId)) fail("FINISH-LIFECYCLE", "Lifecycle ID is invalid.");
   // C22 (CGR-06): the human's literal answer to the acceptance question is recorded as given, so only its presence and size are checked.
   if (humanAcceptance !== null && (typeof humanAcceptance !== "string" || humanAcceptance.trim() === "" || humanAcceptance.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(humanAcceptance))) fail("FINISH-ACCEPTANCE", "The human acceptance must be the human's literal answer: non-empty, at most 500 characters, no control characters.");
+  // C28: the human's literal words of a decline, held to the same bounds; the two answers exclude each other.
+  if (humanDecline !== null && (typeof humanDecline !== "string" || humanDecline.trim() === "" || humanDecline.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(humanDecline))) fail("FINISH-ACCEPTANCE", "The human decline must be the human's literal answer: non-empty, at most 500 characters, no control characters.");
+  if (humanAcceptance !== null && humanDecline !== null) fail("FINISH-ACCEPTANCE", "--human-acceptance and --human-decline are exclusive: the human either accepted (exactly the fixed yes form) or did not.");
   if (openChecks !== null && (!Array.isArray(openChecks) || openChecks.some((value) => typeof value !== "string"))) fail("FINISH-ACCEPTANCE", "The open checks must be a list of texts.");
   const runner = deps.runCommand ?? ((executable, argv) => spawnSync(executable, argv, { cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root } }));
   const actor = by.trim();
@@ -388,13 +392,67 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       // this very candidate (committed or still uncommitted) is kept; a changed candidate asks again. Nothing is signed: the answer is an attribution record in the feature's acceptance.md.
       const candidateHead = rawGit(["rev-parse", "HEAD"]);
       if (candidateHead === null) return stopResult("acceptance", "ONESHOT-HEAD-UNREADABLE", "The candidate commit (HEAD) could not be read, so the acceptance cannot be bound to it.", `repair the repository, then rerun the identical command: ${rerun(again)}`);
+      // C28 (AC-108, PO decision 2026-11-10 'Ablehnung im Close'): one fixed yes form. An answer that is not exactly that form is never an acceptance and no keyword is searched in it; the way out is the decline.
+      const yesForm = acceptanceYesForm(state.continuity?.runtime?.humanFacingLanguage);
+      const named = openChecks === null ? "" : ` --open-checks ${JSON.stringify(openChecks.join("; "))}`;
+      const bothWays = `if the human answered exactly "${yesForm}", rerun the identical command: ${rerun(again)}${named} --human-acceptance "${yesForm}". Any other answer (a bug, a change request, a doubt, a question) is a decline, not an acceptance: rerun the identical command with ${rerun(again)}${named} --human-decline "<the human's literal answer>"; the feature then returns to a correction round without reopening the design.`;
+      if (humanDecline !== null) {
+        const declineRepair = (error) => `${error.refusalMessage ? `${error.refusalMessage} -- then` : "repair the refusal above, then"} rerun the identical command with --human-decline "<the human's literal answer>": ${rerun(again)}${named}`;
+        stages.push("decline-record");
+        let decline;
+        try { decline = writeDeclineRecord({ root, featureId, record: { candidate: candidateHead, answer: humanDecline, openChecks: openChecksOf(openChecks) }, ...(deps.nowFn === undefined ? {} : { now: deps.nowFn }) }); }
+        catch (error) { return stopResult("decline", "ONESHOT-DECLINE-RECORD", error.message, declineRepair(error)); }
+        const bound = state.continuity !== null && typeof state.continuity === "object" ? state.continuity.authority?.result ?? null : null;
+        let retired = null; let lifecycle = again;
+        if (bound !== null) {
+          stages.push("retire-result");
+          try {
+            const flags = ["--result-path", bound.path, "--decline-record", decline.path];
+            let applyAction;
+            if (ownerRouteRequired) {
+              lifecycle = ensureOwnerLifecycle();
+              const route = [OWNER_ROUTE, "run", "--root", root, "--lifecycle", lifecycle, "--"];
+              const plan = command(runner, process.execPath, [...route, "continuity-result-retire-plan", ...flags], "ONESHOT-RETIRE-PLAN");
+              if (!Array.isArray(plan.applyAction?.argv)) fail("ONESHOT-RETIRE-PLAN", "The Result retire plan returned no apply action.");
+              applyAction = { executable: process.execPath, argv: [...route, ...plan.applyAction.argv.slice(1)] };
+            } else {
+              const plan = command(runner, process.execPath, [STATE_WRITER, "continuity-result-retire-plan", ...flags], "ONESHOT-RETIRE-PLAN");
+              if (!Array.isArray(plan.applyAction?.argv)) fail("ONESHOT-RETIRE-PLAN", "The Result retire plan returned no apply action.");
+              applyAction = { executable: plan.applyAction.executable, argv: plan.applyAction.argv };
+            }
+            // The transition also restores result.md to the text before the bootstrap block and takes the package manifest's Result digest back with it: nothing is left to reconcile.
+            command(runner, applyAction.executable, applyAction.argv, "ONESHOT-RETIRE-APPLY");
+            retired = { path: bound.path, sha256: bound.sha256, apply: applyAction };
+          } catch (error) { return stopResult("retire-result", error.refusalCode ?? error.code, error.message, declineRepair(error), { decline: { path: decline.path, sha256: decline.sha256, candidate: candidateHead } }); }
+        }
+        // The decline's own outputs travel in one commit through the writer-commit capability the close uses; none of them is an output the leftover rollback below names.
+        const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${featureId}`]);
+        const tokens = (status?.status === 0 ? String(status.stdout ?? "") : "").split("\0").filter((token) => token !== "");
+        const paths = []; for (let index = 0; index < tokens.length; index += 1) { const code = tokens[index].slice(0, 2); paths.push(tokens[index].slice(3)); if (/[RC]/u.test(code)) index += 1; }
+        paths.sort();
+        const message = `chore(close): record the declined acceptance of ${featureId}`;
+        let armed = null;
+        if (paths.length > 0) { try { armed = armWriterCommitCapability({ rootDir: root, writer: "finish-feature.mjs --one-shot", rerun: rerun(lifecycle), files: paths.filter((path) => existsSync(resolve(root, path))).map((path) => ({ path, sha256: sha256Hex(readFileSync(resolve(root, path))) })) }); } catch { armed = null; } }
+        const commit = { paths, excluded: armed?.excluded ?? [], capability: armed?.id ?? null, message, steps: paths.length > 0 ? writerCommitSteps(paths, message) : [] };
+        const next = [
+          commit.paths.length > 0 ? `commit the decline outputs, nothing else (the pre-commit hook admits exactly these bytes): ${commit.steps.join(" && ")}` : "nothing to commit: the decline wrote no tracked output",
+          `correction dispatch: build the Goldfish briefing with node ${PREPARE_DISPATCH} goldfish --root ${root} (the human's literal words, recorded in ${decline.path}, are the correction request), run it, and commit its result`,
+          `Critic delta round on the new candidate: node ${PREPARE_DISPATCH} critic --delta-request <the delta request path> --root ${root} (see the critic-review skill); the packet it consumes is the new packet`,
+          `then run the identical close command with the new packet: ${rerunBase} --critic-packet-id <new-packet-id>; it runs the Result bootstrap again and asks the acceptance question again for the new candidate`,
+        ];
+        return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "declined", featureId, lifecycleId: lifecycle ?? null, resumeLifecycleId: lifecycle ?? null, stages: [...stages], decline: { path: decline.path, sha256: decline.sha256, candidate: candidateHead }, retired, commit, next,
+          message: "The acceptance was declined: the human's words are recorded (not as an acceptance), the bound Result is retired and the feature returns to a correction round without reopening the design. Nothing was verified, closed, signed or pushed. Follow `next` in order." });
+      }
+      if (humanAcceptance !== null && !isAcceptanceYes(humanAcceptance, yesForm)) {
+        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-NOT-YES", `The answer given with --human-acceptance is not the fixed yes form "${yesForm}" (case, surrounding space and a closing . or ! do not matter), so it is not recorded as an acceptance.`,
+          `nothing was written. ${bothWays} The answer is recorded as an attribution record in the feature's acceptance record only for the yes form; nothing is signed.`);
+      }
       const recorded = readAcceptanceRecord(root, featureId);
       if (recorded !== null && recorded.candidate === candidateHead) accepted = { candidate: candidateHead, answer: recorded.answer, openChecks: recorded.openChecks };
       else if (humanAcceptance !== null) accepted = { candidate: candidateHead, answer: humanAcceptance, openChecks: openChecksOf(openChecks) };
       else {
-        const named = openChecks === null ? "" : ` --open-checks ${JSON.stringify(openChecks.join("; "))}`;
-        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-REQUIRED", acceptanceQuestion({ featureId, candidate: candidateHead, openChecks: openChecksOf(openChecks) }),
-          `nothing was written. In the same message, say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why, and then also name it with --open-checks. Ask the human exactly this one sentence in the chat (reason above), then rerun the identical command with the answer exactly as given: ${rerun(again)}${named} --human-acceptance "<the human's literal answer>". If a check you know about is missing from the sentence (for example a real device check), first rerun with --open-checks "<check; check>" so the sentence names it, then ask. The answer is recorded in the feature's acceptance record as an attribution record; nothing is signed.`);
+        return stopResult("acceptance", "ONESHOT-ACCEPTANCE-REQUIRED", acceptanceQuestion({ featureId, candidate: candidateHead, openChecks: openChecksOf(openChecks), form: yesForm }),
+          `nothing was written. In the same message, say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why, and then also name it with --open-checks. Ask the human exactly this one sentence in the chat (reason above), then ${bothWays} If a check you know about is missing from the sentence (for example a real device check), first rerun with --open-checks "<check; check>" so the sentence names it, then ask. The answer is recorded in the feature's acceptance record as an attribution record; nothing is signed.`);
       }
       // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward
       // (VEP-CVL-CARRY-RANGE; a human had to reset). Only a tree whose every dirty path is such an output, with an evidence file proving an earlier attempt, is rolled back; the stages write the same again.
@@ -616,13 +674,13 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
 }
 
 function parseOneShot(argv) {
-  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--open-checks"]; const value = {};
+  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--human-decline", "--open-checks"]; const value = {};
   for (let i = 0; i < argv.length; i += 2) {
     const flag = argv[i]; const next = argv[i + 1];
-    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<the human's literal answer>\"] (the first call stops once with the acceptance question for the human)");
+    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] (the first call stops once with the acceptance question for the human)");
     value[flag] = next;
   }
-  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";") };
+  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, humanDecline: value["--human-decline"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";") };
 }
 
 function parse(argv) {
@@ -642,6 +700,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === "-
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     if (result.status === "stopped") { process.stderr.write(`finish-feature --one-shot: stopped at ${result.stage}: ${result.stop.code}: ${result.stop.reason}\nrepair: ${result.stop.repair}\n`); process.exitCode = 2; }
     else if (result.status === "commit-required") process.stderr.write(`finish-feature --one-shot: run the commit, then the next command.\n${(result.commit.steps ?? []).join("\n")}\nnext: ${result.next}\n`);
+    else if (result.status === "declined") process.stderr.write(`finish-feature --one-shot: the acceptance was declined; the feature returns to a correction round. Next, in order:\n${result.next.map((line, index) => `${index + 1}. ${line}`).join("\n")}\n`);
   } catch (error) { process.stderr.write(`finish-feature: ${error?.code ?? "FINISH-ERROR"}: ${error.message}\n`); process.exitCode = 2; }
 } else if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {

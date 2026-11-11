@@ -101,6 +101,30 @@
         }
       }
     },
+    "resultRetirements": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "retiredAt", "reason", "declineRecord"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "retiredAt": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "enum": ["declined-acceptance"] },
+          "declineRecord": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            }
+          }
+        }
+      }
+    },
     "retryBudget": {
       "type": "object",
       "additionalProperties": false,
