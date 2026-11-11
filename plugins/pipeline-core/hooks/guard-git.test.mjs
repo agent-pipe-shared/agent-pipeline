@@ -87,7 +87,8 @@ function runGuard(command, projectDir, envOverride = {}, toolCwd = undefined, na
 // case is intended to exercise.
 const EMPTY_DIR = mkdtempSync(join(tmpdir(), "guard-test-empty-"));
 mkdirSync(join(EMPTY_DIR, ".claude"), { recursive: true });
-writeFileSync(join(EMPTY_DIR, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "off" }));
+// The harmless targets of R12, R13 and R16 pin those rules' word boundaries; since the 2026-11-10 narrowing they are named as throwaway folders here.
+writeFileSync(join(EMPTY_DIR, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "off", throwawayDirs: ["build", "node_modules", ".github", "temp"] }));
 const NO_CONFIG_DIR = mkdtempSync(join(tmpdir(), "guard-test-no-config-"));
 
 let pass = 0;

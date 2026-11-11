@@ -288,6 +288,7 @@ import {
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { appendGuardOverrideLedgerEntry, guardOverrideLedger, readGuardOverrideLedgerEntries } from "../lib/guard-override-ledger.mjs";
 import { UNION_BLOCKERS, RAW_BLOCKERS, PRENORM_BLOCKERS, dangerousGitFindings } from "./git-dangerous-policy.mjs";
+import { RECURSIVE_DELETE_RULE_ID, recursiveDeleteFinding } from "./recursive-delete-policy.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 import { msysToWindows, relativeUnderRoot, sameNativePath } from "../lib/path-spelling.mjs";
 
@@ -445,6 +446,7 @@ const KNOWN_RULE_IDS = new Set([
   ...RAW_BLOCKERS.map((r) => r.id),
   ...PRENORM_BLOCKERS.map((r) => r.id),
   ...EXTRA_BLOCKERS.map((r) => r.id),
+  RECURSIVE_DELETE_RULE_ID,
 ]);
 
 // ---- override mechanism: arming parse ------------------------------------------------
@@ -1423,6 +1425,8 @@ for (const rule of UNION_BLOCKERS) if (rule.re.test(normalizedC)) matched.push(r
 for (const rule of RAW_BLOCKERS) if (rule.re.test(rawForQuoteRules)) matched.push(rule);
 for (const rule of PRENORM_BLOCKERS) if (rule.re.test(c)) matched.push(rule);
 for (const rule of EXTRA_BLOCKERS) if (rule.re.test(normalizedStripped)) matched.push(rule);
+const recursiveDelete = recursiveDeleteFinding(cmd, { root: projectDir, cwd: toolCwd ?? process.cwd(), throwawayDirs: projectConfig?.throwawayDirs, guardConfigPath: guardConfigRelPath });
+if (recursiveDelete) matched.push(recursiveDelete);
 
 if (matched.length > 0) {
   // ADR-0079: hook-bypass rules protect the mechanism that evaluates every
