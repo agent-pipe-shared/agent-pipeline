@@ -91,6 +91,15 @@ test("with the catalogue the first Goldfish created, a reopened design walks sub
       assert.equal(run(args, deps), 0, args[0]);
     }
     assert.equal(JSON.parse(readFileSync(statePath, "utf8")).planApproved, true);
+    // Source defaults only: the authority route refuses an injected dependency, so this is the route a real run takes. The fixture has no
+    // architecture map, so reaching that check shows the catalogue does not stop the route; a full success on real data stays a live check.
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...parts) => errors.push(parts.join(" "));
+    let setPhaseStatus;
+    try { setPhaseStatus = run(["set-phase", "--phase", "implementation"], { dir: root }); } finally { console.error = originalError; }
+    assert.equal(setPhaseStatus, 2);
+    assert.match(errors.join("\n"), /ARCHITECTURE-MAP-MISSING/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
