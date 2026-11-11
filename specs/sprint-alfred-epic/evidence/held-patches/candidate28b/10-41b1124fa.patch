@@ -1,0 +1,72 @@
+diff --git a/plugins/pipeline-core/skills/close-feature/SKILL.md b/plugins/pipeline-core/skills/close-feature/SKILL.md
+index 9e03694faaba3f01d2df3640b185ee612434d7dd..8b7e7a5b2dd615ffab6a94eba04377b050334738 100644
+--- a/plugins/pipeline-core/skills/close-feature/SKILL.md
++++ b/plugins/pipeline-core/skills/close-feature/SKILL.md
+@@ -27,6 +27,8 @@ The command stops at `commit-required` and prints the paths and the commit messa
+ 
+ **The human acceptance question (one stop, no signature).** The first call stops once, before it writes anything, with `ONESHOT-ACCEPTANCE-REQUIRED`: the stop's reason is ONE generated sentence. In the same message say in one line how you really started or opened the delivered result and what it showed, whatever kind of result it is, or say plainly that you could not and why (never a gate; a result you could not run also goes into `--open-checks`). Ask the human exactly that sentence in the chat: whether they accept this feature package at the candidate, that the performed close counts as the human acceptance of this feature package, and the checks still open. If you know a project-specific open check (for example a real device check) that the sentence lacks, rerun first with `--open-checks "<check; check>"` so the sentence names it, then ask. The sentence ends with ONE fixed answer form for yes (in the project's human-facing language: `yes, I accept`; `ja, ich akzeptiere` for a German project; English for any other language). If the human answers exactly that form (case, surrounding space and a closing `.` or `!` do not matter), rerun the identical command with `--human-acceptance "<the human's literal answer>"`. `--human-acceptance` records an acceptance for that form only: any other answer (a bug report, a change request, a doubt, a bare "yes") stops with `ONESHOT-ACCEPTANCE-NOT-YES`, records nothing and names both ways on; never search the answer for a keyword and never turn it into a yes yourself. **A decline is not the end of the feature:** rerun the identical command with `--human-decline "<the human's literal answer>"` (exclusive with `--human-acceptance`). The close records the human's words with the candidate and the time in `specs/<feature>/evidence/human-decline-<candidate>-<answer>.md` (never read as an acceptance), retires the bound Result (the State transition `continuity-result-retire-plan` / `-apply`: `continuity.authority.result` becomes null, the retired binding stays in `continuity.resultRetirements`, `result.md` is restored to the text before the bootstrap block, and the package is reconciled result-only, without a signature; in a project with a session-authority catalogue this runs on the owner route like the Result bootstrap, on the Close lifecycle the one-shot already opened) and returns status `declined` with `next` in order: the commit of exactly those outputs, a correction dispatch (`prepare-dispatch.mjs goldfish`, the human's words are the correction request), a Critic delta round on the new candidate (`prepare-dispatch.mjs critic --delta-request`), then the identical close command with `--critic-packet-id <new-packet-id>`. That second close runs the Result bootstrap again and asks the acceptance question again for the new candidate. Do not run `reopen-design` for a declined acceptance: with a bound Result it refuses (`PLAN-REOPEN-RESULT-BOUND`) and names this route, because `submit-plan` would refuse `PLAN-SUBMIT-CONTINUITY-BUSY` while a Result is bound. The answer is recorded in the feature's tracked `acceptance.md` (a managed section: the literal answer, the candidate commit, the open checks), labelled as an attribution record and not a signature, and travels in the one close commit. A rerun for the same candidate does not ask again, a changed candidate asks again, and a resumed close (`--resume-lifecycle-id`) never asks. The Pipeline-generated pointer in `acceptance.md` is registered immutable: the close keeps its registered digest honest with the package's own amendment record (no signature). An `acceptance.md` that the plan approval binds is never edited; its record goes to `specs/<feature>/evidence/human-acceptance.md`.
+ 
++**Four status facts, never the package record alone.** The State inspector's `featureStatus` and the close's `statuses` print the same four facts apart (`featureStatusVocabulary`): package registered, implementation delivered, technically qualified, human-accepted. Report them in that order and quote the `summary` line; do not call a feature "completed" or "accepted" from the package's `lifecycle.json` state alone. After a `reopen-design` or a declined acceptance (the Result retired) the record can still say `completed` while the feature is back in design or in a correction round: the status then carries `recordLag` with the reason, and delivered, qualified and human-accepted all read `no` until the new candidate passes the close again. A planning-entry queue head that lags behind the phase (`initial-planning`, `kickoff-promotion`, `continuity-adoption`, no live dispatch) is labelled `QUEUE-HEAD-LAGGING` by the re-ground notice after a Compact; it is not the next action, so take the next step from the phase and the typed stop, not from that head.
++
+ **What the close touches.** The tracked-effects digests hash what exists: the calibrated handover (`project/pipeline.json` `handover`, first brought to the closed state by `pipeline-state.mjs update-public-handover`, the existing writer: closed-local, the verified candidate, and technical close, product acceptance and push as three separate facts) and `telemetry/costs.md`; backlog, history and retrospective have no defined project file and keep the marked empty digest. The audit request names every Critic round of the feature (`evidence.criticReports`); the bundle under `audit-bundles/<feature>/<commit>/` carries each exported round report (`specs/<feature>/evidence/critic/<packet>/report.md`) and its README section "Critic round reports" names a round whose report could not be exported instead of omitting it. The close fetches every missing report itself from the private Critic journal (the verdict and its findings, checked against the digest in the receipt; working notes stay out) and carries it in the one close commit; a hand export with `session-critic-finalizer.mjs export` is only needed to publish richer notes, and a round it cannot read never stops the close. The minors of the Critic round this close is bound to go into the handover under "Open minor findings", and the result's `openMinors` line says how many are open and where: put that line in the close report.
+ 
+ Everything below is the per-stage recovery reference: use it when the one command stops and the repair needs a single stage by hand.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 83398c76b97fb32c6133bccf636544b8c6b833f4..bf428f873ab35cf48a541ce6bc90628ad4c33ff6 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -33,10 +33,9 @@ read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
+ mutations; then run `consentRecordAction`. When an escalation review asks why a
+ covered action runs, give its `escalationJustification` line verbatim; the
+ design approval, push, release and any human-guard override are never covered.
+-A decline leaves the project inactive. That one question also carries the Advisor
+-export consent (agreeing is part of using the Pipeline), so no separate Advisor
+-question follows: after `consentRecordAction`, run the same `onboarding-init.mjs`
+-command once more so the first round is read after the record.
++A decline leaves the project inactive. That question also carries the Advisor
++consent (no separate Advisor question); after `consentRecordAction`, rerun the
++same `onboarding-init.mjs` command once.
+ 
+ Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
+ carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`
+@@ -285,7 +284,7 @@ names, the promotion transaction, the source-evidence rules, and the PRD/Spec
+ quality bar.
+ 
+ A pristine project's `v4Inspection` status is not always `kickoff-required`:
+-since commit `10e1b6a0`, a genuinely fresh repository (no prior kickoff
++a genuinely fresh repository (no prior kickoff
+ transaction) is routed instead to `intake-required`,
+ `intake-design-questions-required`, or `bootstrap-binding-required` — load
+ `references/intake-generate-design.md` for that path instead of
+@@ -335,9 +334,8 @@ step; later implementation or Critic work loads its reference when reached:
+ - `references/kickoff-design.md` for kickoff intake questions, the durable
+   design package, promotion, and the PRD/Spec quality bar;
+ - `references/intake-generate-design.md` for the `intake-*`/
+-  `bootstrap-binding-required` coordinator path a genuinely fresh repository
+-  now actually routes toward, its staging output, and its handoff into the
+-  same promotion transaction `kickoff-design.md` documents;
++  `bootstrap-binding-required` coordinator path of a fresh repository and its
++  handoff into the promotion transaction `kickoff-design.md` documents;
+ - `references/push-approval.md` for the point a session constructs,
+   explains, or discusses the push-approval gate (`gates.push_approval`),
+   before a human clears it;
+@@ -345,14 +343,13 @@ step; later implementation or Critic work loads its reference when reached:
+   session transcript after a live test run.
+ - `references/workflow-dispatch.md` for using the Workflow tool or
+   `isolation: "worktree"` to fan out Goldfish/Critic work: the
+-  Elephant-only orchestration rule, the worktree self-heal briefing, the
+-  ~50-tool-call termination cliff with its budget language, and recovery of
+-  a truncated dispatch's real work.
++  Elephant-only rule, the worktree self-heal briefing, the ~50-tool-call
++  cliff with its budget language, and recovery of a truncated dispatch's work.
+ - `references/antigravity-native-dispatch.md` before an Elephant or other
+   authorized dispatcher constructs an Antigravity `invoke_subagent` call that
+-  includes a Pipeline role, with or without Workflow or worktrees.
+-- `references/antigravity-feature-close.md` when an Antigravity session is
+-  actually closing an approved feature, not for a normal restart.
++  includes a Pipeline role.
++- `references/antigravity-feature-close.md` when an Antigravity session closes
++  an approved feature, not for a normal restart.
+ 
+ Lazy loading never widens authority and must preserve lifecycle, V3 authority,
+ calibration, handover, Verify and continuation checks.
