@@ -14894,6 +14894,12 @@ All commands: ${PIPELINE_STATE_COMMANDS.join(", ")}.`);
         refuseWhileStateOperationInFlight(repository);
         return runStateSource(argv,deps);
       }
+      // The same dead end for the design verbs: once a native Goldfish created the catalogue, a reopened design could never be submitted again and no later feature could
+      // start (live on native Windows, 2026-11-10). No production route supplies an owning context for them there, so they take the PF-54 route too; each writer re-proves its own gate.
+      if(STATE_DIRECT_WITHOUT_OWNING_CONTEXT.has(sub) && readSourceOwnedOnboardingContinuityCompanionContext({repository,entry:sub}) === null) {
+        refuseWhileStateOperationInFlight(repository);
+        return runStateSource(argv,deps);
+      }
       if(sub === "approve-plan") {
         const frame={repository,boundary:null,cataloguePresent,sub,deps,sourceDefaults:Object.keys(deps).every(key=>key === "dir" || key === "now"),deferredCompanion:true,validatingCompanion:false,executingWrite:null,executingCompanion:null};
         if(!frame.sourceDefaults) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-injected-approval-route");
@@ -15383,6 +15389,9 @@ function runStatePushSource(argv,repository) {
 
 // Private source invocation custody; public observations cannot mint this handle.
 const stateCompanionBrands = new WeakMap();
+const STATE_DIRECT_WITHOUT_OWNING_CONTEXT = new Set([
+  "set-feature", "continuity-init", "submit-plan", "present-plan", "approve-plan", "materialize-architecture",
+]);
 const STATE_COMPANION_ENTRIES = new Set([
   "discard-feature", "set-feature", "continuity-init", "submit-plan", "present-plan", "afk-project",
   "approve-plan", "materialize-architecture", "continuity-result-bootstrap-plan",

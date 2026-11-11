@@ -3,12 +3,16 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 import { run } from "./pipeline-state.mjs";
+import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
+import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
 
 const NOW = "2026-07-31T09:00:00.000Z";
 const LATER = "2026-07-31T09:05:00.000Z";
@@ -55,6 +59,42 @@ function fixture(state) {
 function readState(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
+
+// Live on native Windows, 2026-11-10: the first native Goldfish creates the session-authority catalogue, and from then on a reopened design could not be submitted again.
+test("with the catalogue the first Goldfish created, a reopened design walks submit, present and approve, and a State operation in flight holds it", () => {
+  const parent = nativeContractFixtureParent();
+  mkdirSync(parent, { recursive: true, mode: 0o700 });
+  const root = realpathSync(mkdtempSync(join(parent, "reopen-after-goldfish-")));
+  try {
+    prepareApprovedItemCourseFixture({ root });
+    const statePath = join(root, ".claude", "pipeline-state.json");
+    const deps = { dir: root, architectureEntryReadiness: () => ({ status: "ready" }) };
+    // This fixture keeps its State outside the neutral folder, where the registry route refuses reopen-design. The order does not change what is pinned: the catalogue is present for every verb below.
+    assert.equal(run(["reopen-design", "--by", "Synthetic fixture PO"], { dir: root }), 0);
+    const repository = inspectSignedDescriptorCustodyRepository(root);
+    const registry = initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository }));
+    assert.equal(registry.status, "initialized", JSON.stringify(registry));
+
+    const producerPath = join(repository.commonDir, "agent-pipeline/session-authority/producers/onboarding-continuity.json");
+    const producerBytes = readFileSync(producerPath);
+    const memberDir = join(repository.commonDir, "agent-pipeline/session-authority/members/onboarding-continuity");
+    mkdirSync(memberDir, { recursive: true });
+    const memberPath = join(memberDir, "fixture-in-flight.json");
+    writeFileSync(memberPath, JSON.stringify({ association: { state: "bound" }, phase: "armed" }));
+    const producer = JSON.parse(producerBytes);
+    writeFileSync(producerPath, JSON.stringify({ ...producer, members: [...producer.members, { memberRef: { path: ".git/agent-pipeline/session-authority/members/onboarding-continuity/fixture-in-flight.json" } }] }));
+    assert.equal(run(["submit-plan", "--by", "Synthetic fixture", "--profile", "mini"], deps), 2, "a State operation in flight holds the submission");
+    writeFileSync(producerPath, producerBytes);
+    rmSync(memberPath);
+
+    for (const args of [["submit-plan", "--by", "Synthetic fixture", "--profile", "mini"], ["present-plan", "--by", "Synthetic fixture"], ["approve-plan", "--by", "Synthetic fixture PO"]]) {
+      assert.equal(run(args, deps), 0, args[0]);
+    }
+    assert.equal(JSON.parse(readFileSync(statePath, "utf8")).planApproved, true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("writer reopens pre-submission V2 approvals without inventing V3 state", () => {
   for (const profile of ["epic", "feature", "mini"]) {
