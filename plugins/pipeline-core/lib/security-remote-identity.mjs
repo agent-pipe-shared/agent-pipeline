@@ -2,6 +2,20 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
+/**
+ * The configured remote Git pushes the current branch to, in Git's own order, or null when no such remote is configured
+ * (a detached HEAD, a branch with no upstream, or a value that names no remote of this repository).
+ */
+function pushRemoteOfCurrentBranch(run, remotes) {
+  const branch = (run(["symbolic-ref", "--quiet", "--short", "HEAD"]) ?? "").trim();
+  if (branch === "") return null;
+  for (const key of [`branch.${branch}.pushRemote`, "remote.pushDefault", `branch.${branch}.remote`]) {
+    const value = (run(["config", "--get", key]) ?? "").trim();
+    if (value !== "") return remotes.includes(value) ? value : null;
+  }
+  return null;
+}
+
 /** Resolve one effective Git push destination without publishing its URL. */
 export function resolveSecurityRemoteIdentity(rootDir, remoteName = null, spawn = spawnSync) {
   const run = (args) => {
@@ -18,10 +32,12 @@ export function resolveSecurityRemoteIdentity(rootDir, remoteName = null, spawn 
   if (remoteName !== null && (typeof remoteName !== "string" || !remotes.includes(remoteName))) {
     return { ok: false, reason: "remote-not-configured" };
   }
-  if (remoteName === null && remotes.length !== 1) {
+  // PO decision 2026-11-10: with several remotes and no name given, the remote the current branch pushes to decides; without one the scan refuses.
+  const branchRemote = remoteName === null && remotes.length > 1 ? pushRemoteOfCurrentBranch(run, remotes) : null;
+  if (remoteName === null && remotes.length !== 1 && branchRemote === null) {
     return { ok: false, reason: remotes.length === 0 ? "remote-missing" : "remote-ambiguous" };
   }
-  const selected = remoteName ?? remotes[0];
+  const selected = remoteName ?? branchRemote ?? remotes[0];
   const output = run(["remote", "get-url", "--push", "--all", selected]);
   if (output === null) return { ok: false, reason: "push-destination-unavailable" };
   const urls = output.split(/\r?\n/u).filter(Boolean);

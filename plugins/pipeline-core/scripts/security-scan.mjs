@@ -1198,8 +1198,11 @@ function statusLabel(status) {
   }
 }
 
+// PO decision 2026-11-10: the refusal names how to get past it.
+const REMOTE_AMBIGUOUS_HINT = "several remotes and the current branch pushes to none of them: run git branch --set-upstream-to=<remote>/<branch>, or pass --remote <name>";
+
 export function formatScannerLine(s) {
-  const reasonSuffix = s.reason ? ` -- ${s.reason}` : "";
+  const reasonSuffix = s.reason ? ` -- ${s.reason === "remote-ambiguous" ? `${s.reason}: ${REMOTE_AMBIGUOUS_HINT}` : s.reason}` : "";
   const coverageSuffix = s.coverage?.status === "degraded" && Array.isArray(s.coverage.files)
     ? ` -- coverage: degraded (${s.coverage.files.length} files partially parsed)`
     : "";

@@ -2104,6 +2104,20 @@ security:
     status: ambiguous.evidence.candidate.status, reason: ambiguous.evidence.candidate.reason,
     destination: ambiguous.evidence.candidate.destination, repositorySha256: ambiguous.evidence.candidate.repositorySha256,
   }, { status: "unsupported", reason: "remote-ambiguous", destination: "remote", repositorySha256: null });
+  assertTrue("local-only: the ambiguous refusal names how to get past it", /set-upstream-to=.*--remote <name>/u.test(scanModule.formatScannerLine({ tool: "t", status: "ERROR", classification: "candidate_snapshot", findingCount: 0, reason: "remote-ambiguous" })), "no hint");
+
+  // PO decision 2026-11-10: with several remotes and no name given, the remote the current branch pushes to decides.
+  const trackedRoot = makeRemoteFixture("runner-tracked-remote-root", ["origin", "mirror"]);
+  git(trackedRoot, "checkout", "-q", "-b", "tracked");
+  git(trackedRoot, "config", "branch.tracked.remote", "mirror");
+  const tracked = await runSecurityScan({ rootDir: trackedRoot, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  const named = await runSecurityScan({ rootDir: trackedRoot, remoteName: "mirror", env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("local-only: two remotes and a tracked one bind the candidate to the tracked remote", {
+    status: tracked.evidence.candidate.status, destination: tracked.evidence.candidate.destination, sameIdentity: tracked.evidence.candidate.repositorySha256 === named.evidence.candidate.repositorySha256,
+  }, { status: "clean", destination: "remote", sameIdentity: true });
+  git(trackedRoot, "config", "branch.tracked.remote", "nowhere");
+  const dangling = await runSecurityScan({ rootDir: trackedRoot, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("local-only: a tracked value that names no remote stays remote-ambiguous", dangling.evidence.candidate.reason, "remote-ambiguous");
 
   const unknown = await runSecurityScan({ rootDir: localRoot, remoteName: "nowhere", env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
   assertEqual("local-only: a given unknown remote name stays unsupported remote-not-configured even with zero remotes", {
