@@ -1,0 +1,209 @@
+diff --git a/backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md b/backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md
+index 8a90cdba977c7070e6e7b492fc0e7ac2714bfd8f..333e5a74986fa47f5d6a6d423acfe7719580f4a8 100644
+--- a/backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md
++++ b/backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md
+@@ -30,6 +30,13 @@ rules).
+   the module and the rule. It writes nothing and needs no signature.
+ - The design-approval stop and the preflight of `present-plan` name that command.
+ 
++## Status (2026-11-11): built in candidate 28b, not accepted
++
++`architecture-boundary-check.mjs --root <root> --preview-prd <repo-relative PRD path>` (read-only) checks the tracked tree against the modules of the PRD's proposed design block with the
++same observation as the real check (ownership, forbidden dependency, line bound), writes nothing and needs no signature (`previewArchitectureBoundaries`; tests ABC14 and ABC15 with injected
++modules, ABC16 through a real PRD design block and the real design parser; not run against a live project yet). The happy-path reference names it before
++the design signature. Not built: a mention inside the `present-plan` output itself. Accepted only after a real run on a project with code and a design change.
++
+ ## Checked against the code (2026-11-11)
+ 
+ The same run reported that the planning-time architecture check takes every path that appears
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+index 36ff9fd61442e525dcad6deff23f8f99a77f92b9..c1bc1fd768a31139aa2613f5d020572df47dc5e8 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.mjs
+@@ -23,7 +23,8 @@
+  * none exists. A project without `architecture/map` is `not-applicable`, never failed. The fitness
+  * evaluator, whose outcomes the rigor lifecycle binds by digest, is not changed.
+  *
+- * Usage: node architecture-boundary-check.mjs [--root <dir>] [--json] [--write-policy]
++ * Usage: node architecture-boundary-check.mjs [--root <dir>] [--json] [--write-policy | --preview-prd <repo-relative PRD path>]
++ * `--preview-prd` (read-only, no signature) checks the tree against the PROPOSED design of a PRD before the PO signs it.
+  * Exit: 0 pass or not-applicable, 1 findings or an invalid map/policy, 2 unavailable or usage.
+  */
+ 
+@@ -35,6 +36,7 @@ import { loadMapBundle, pathMatchesPattern } from "./module-inventory.mjs";
+ import { evaluateSizeBudgets, extractJsImports, loadFitnessModel } from "./architecture-fitness.mjs";
+ import { CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/consumer-verify.mjs";
+ import { architectureVerdictLabel } from "../lib/architecture-verdict-label.mjs";
++import { readPrdModules } from "../lib/module-dispatch-scope.mjs";
+ 
+ export const BOUNDARY_CHECK_SCHEMA = "pipeline.architecture-boundary-check.v1";
+ export const BOUNDARY_POLICY_SCHEMA = "pipeline.architecture-boundary-policy.v1";
+@@ -248,6 +250,32 @@ export function checkArchitectureBoundaries({ rootDir = process.cwd(), sourceExt
+   };
+ }
+ 
++export const BOUNDARY_PREVIEW_SCHEMA = "pipeline.architecture-boundary-preview.v1";
++
++/**
++ * C28 (Windows greenfield run, backlog: 2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature): the tracked tree checked against the PROPOSED
++ * architecture design of a PRD, before the PO signs it. The real check reads the map, which exists only after the signature, so a session had to rebuild the guard's rule by hand to
++ * know whether a design change would be enough, and every wrong guess cost a signature round. This uses the very same observation (`observe`: ownership, forbidden dependency, line bound)
++ * with the modules of the PRD's design block, writes nothing and needs no signature. It is a preview, never an approval; an accepted-exceptions policy is not applied (the raw findings show).
++ * `deps.readPrdModules(root, prd)`, `deps.readPolicy`, `deps.listFiles` and `deps.readFile` are injectable for tests.
++ */
++export function previewArchitectureBoundaries({ rootDir = process.cwd(), prd, sourceExtensions = DEFAULT_SOURCE_EXTENSIONS } = {}, deps = {}) {
++  const root = path.resolve(rootDir);
++  const base = { schema: BOUNDARY_PREVIEW_SCHEMA, rules: BOUNDARY_RULES, coverage: BOUNDARY_COVERAGE, scope: "preview against the PROPOSED architecture design of the PRD: not an approval, nothing is written, no signature is needed", prd: typeof prd === "string" ? prd : null };
++  const design = (deps.readPrdModules ?? readPrdModules)(root, prd);
++  if (design?.ok !== true || !Array.isArray(design.modules)) {
++    return { ...base, status: "design-unavailable", code: design?.code ?? "PREVIEW-DESIGN-UNAVAILABLE", message: design?.message ?? "the PRD holds no readable architecture design block", violations: [] };
++  }
++  const policyRead = (deps.readPolicy ?? readBoundaryPolicy)(root);
++  if (!policyRead.ok) return { ...base, status: "policy-invalid", errors: policyRead.errors, violations: [] };
++  const policy = { ...policyRead.policy, excludedPaths: [...policyRead.policy.excludedPaths, ...MANAGED_EXCLUSIONS] };
++  const listed = (deps.listFiles ?? trackedFiles)(root);
++  if (listed === null) return { ...base, status: "unavailable", reason: "git ls-files failed; the preview needs a Git work tree", violations: [] };
++  const readFile = deps.readFile ?? ((abs) => readFileSync(abs, "utf8"));
++  const { sources, violations } = observe(root, design.modules, policy, listed, readFile, new Set(sourceExtensions));
++  return { ...base, status: violations.length ? "findings" : "pass", counts: { sourceFiles: sources.length, modules: design.modules.length, violations: violations.length }, violations };
++}
++
+ // G20-36 (AC-108): what the Verify path measures on top of the check -- the real cross-module imports and the size of every
+ // module, next to the observation budgets. Files the Pipeline itself keeps in a consumer project belong to no module.
+ export const ARCHITECTURE_MEASUREMENT_SCHEMA = "pipeline.architecture-measurement.v1";
+@@ -314,7 +342,7 @@ export function proposeBoundaryPolicy(result, { lineBound = DEFAULT_LINE_BOUND,
+ 
+ export function exitCodeForBoundaryCheck(result) {
+   if (result.status === "pass" || result.status === "not-applicable") return 0;
+-  if (result.status === "unavailable") return 2;
++  if (result.status === "unavailable" || result.status === "design-unavailable") return 2;
+   return 1;
+ }
+ 
+@@ -344,15 +372,32 @@ function runCli(argv) {
+   let rootDir = process.cwd();
+   let json = false;
+   let writePolicy = false;
++  let previewPrd = null;
+   for (let index = 0; index < argv.length; index += 1) {
+     if (argv[index] === "--root" && argv[index + 1]) rootDir = argv[++index];
+     else if (argv[index] === "--json") json = true;
+     else if (argv[index] === "--write-policy") writePolicy = true;
++    else if (argv[index] === "--preview-prd" && argv[index + 1]) previewPrd = argv[++index];
+     else {
+-      process.stderr.write("usage: architecture-boundary-check.mjs [--root <dir>] [--json] [--write-policy]\n");
++      process.stderr.write("usage: architecture-boundary-check.mjs [--root <dir>] [--json] [--write-policy | --preview-prd <repo-relative PRD path>]\n");
+       return 2;
+     }
+   }
++  if (previewPrd !== null) {
++    if (writePolicy) { process.stderr.write("--preview-prd writes nothing and excludes --write-policy\n"); return 2; }
++    const preview = previewArchitectureBoundaries({ rootDir, prd: previewPrd });
++    if (json) process.stdout.write(`${JSON.stringify(preview, null, 2)}\n`);
++    else {
++      process.stdout.write(`Architecture boundary PREVIEW against the proposed design of ${previewPrd}: ${preview.status}${preview.counts ? ` (${preview.counts.sourceFiles} source files, ${preview.counts.modules} modules, ${preview.counts.violations} violations)` : ""}\n`);
++      process.stdout.write(`  ${preview.scope}\n`);
++      if (preview.message) process.stdout.write(`  - ${preview.code}: ${preview.message}\n`);
++      for (const line of preview.errors ?? []) process.stdout.write(`  - ${line}\n`);
++      if (preview.reason) process.stdout.write(`  - ${preview.reason}\n`);
++      for (const violation of preview.violations) process.stdout.write(`  - [${violation.rule}] ${violation.detail}\n`);
++      process.stdout.write(`  ${BOUNDARY_COVERAGE}\n`);
++    }
++    return exitCodeForBoundaryCheck(preview);
++  }
+   if (writePolicy) {
+     const target = path.join(path.resolve(rootDir), BOUNDARY_POLICY_PATH);
+     if (existsSync(target)) {
+diff --git a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+index a0d29ad94c932ec8cf3a0591f7db87c13d531ec3..41d3f92241effb4a47640567d1eadc9ca0ce66b4 100644
+--- a/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs
+@@ -17,6 +17,7 @@ import {
+   exitCodeForBoundaryCheck,
+   measureArchitecture,
+   owningModules,
++  previewArchitectureBoundaries,
+ } from "./architecture-boundary-check.mjs";
+ 
+ const SCRIPT = fileURLToPath(new URL("./architecture-boundary-check.mjs", import.meta.url));
+@@ -237,3 +238,68 @@ test("ABC11 budgets carried by the fitness model are reported per module and sta
+   assert.deepEqual(lib.overBudget, [{ scope: "file", path: "src/lib/x.mjs", lines: 5, budget: 3 }, { scope: "module", path: null, lines: 5, budget: 4 }]);
+   assert.deepEqual(result.measurement.modules.find((entry) => entry.id === "app").overBudget, []);
+ });
++
++test("ABC14 the preview checks the tracked tree against the PROPOSED design, names file, module and rule, and writes nothing", () => {
++  // No architecture/map exists yet (it appears only after the PO signs the design): that is exactly the state the preview is for.
++  const root = fixture({ map: false, files: {
++    "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\n',
++    "src/lib/x.mjs": "export const x = 1;\n",
++    "tools/loose.mjs": "export {};\n",
++  } });
++  const proposal = (allowed) => ({ ok: true, modules: [{ id: "app", ownedPaths: ["src/app/**"], allowedDependencies: allowed }, { id: "lib", ownedPaths: ["src/lib/**"], allowedDependencies: [] }] });
++  const before = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).stdout;
++  const closed = previewArchitectureBoundaries({ rootDir: root, prd: "specs/f/prd.md" }, { readPrdModules: () => proposal([]) });
++  assert.equal(closed.schema, "pipeline.architecture-boundary-preview.v1");
++  assert.equal(closed.status, "findings");
++  assert.deepEqual(rules(closed), [["forbidden-dependency", "src/app/main.mjs", "src/lib/x.mjs"], ["unowned-path", "tools/loose.mjs", null]]);
++  assert.match(closed.violations[0].detail, /module app imports src\/lib\/x\.mjs of module lib, which is not in its allowedDependencies \[\]/u);
++  assert.match(closed.scope, /not an approval, nothing is written, no signature is needed/u);
++  assert.equal(exitCodeForBoundaryCheck(closed), 1);
++  // The same tree passes once the proposed design lets app depend on lib and owns the loose file; the permission is read from the proposal, never from a map.
++  const open = previewArchitectureBoundaries({ rootDir: root, prd: "specs/f/prd.md" }, { readPrdModules: () => ({ ok: true, modules: [{ id: "app", ownedPaths: ["src/app/**", "tools/**"], allowedDependencies: ["lib"] }, { id: "lib", ownedPaths: ["src/lib/**"], allowedDependencies: [] }] }) });
++  assert.equal(open.status, "pass", JSON.stringify(open.violations));
++  assert.equal(exitCodeForBoundaryCheck(open), 0);
++  assert.equal(existsSync(path.join(root, "architecture")), false, "the preview creates no map");
++  assert.equal(spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).stdout, before, "the preview changes nothing in the tree");
++});
++
++test("ABC16 the preview reads the proposed modules from a real PRD design block and finds an import its allowedDependencies do not permit", () => {
++  const module = (id, allowedDependencies) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`], allowedDependencies, authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [] });
++  const prd = (allowedForApi) => `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify({
++    schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
++    disposition: { decision: "approved-scoped", scope: ["specs/", "src/", "tests/", "architecture/"], rationale: "fixture" },
++    modules: [module("core", []), module("api", allowedForApi)],
++    implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
++    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } },
++  }, null, 2)}\n\`\`\`\n`;
++  const root = fixture({ map: false, files: {
++    "src/core/index.mjs": "export const core = 1;\n",
++    "src/api/index.mjs": 'import { core } from "../core/index.mjs";\nexport const api = core;\n',
++    "specs/prd.md": prd([]),
++    "specs/prd-open.md": prd(["core"]),
++  } });
++  const closed = previewArchitectureBoundaries({ rootDir: root, prd: "specs/prd.md" });
++  assert.equal(closed.status, "findings", JSON.stringify(closed));
++  assert.deepEqual(rules(closed), [["forbidden-dependency", "src/api/index.mjs", "src/core/index.mjs"]]);
++  assert.equal(closed.counts.modules, 2);
++  const open = previewArchitectureBoundaries({ rootDir: root, prd: "specs/prd-open.md" });
++  assert.equal(open.status, "pass", JSON.stringify(open));
++  const cli = spawnSync(process.execPath, [SCRIPT, "--root", root, "--preview-prd", "specs/prd.md"], { encoding: "utf8" });
++  assert.equal(cli.status, 1, cli.stdout + cli.stderr);
++  assert.match(cli.stdout, /\[forbidden-dependency\] module api imports src\/core\/index\.mjs of module core/u);
++});
++
++test("ABC15 the preview names a PRD it cannot read as a typed refusal, never a pass, and --preview-prd excludes --write-policy", () => {
++  const root = fixture({ map: false, files: { "src/app/main.mjs": "export {};\n" } });
++  const missing = previewArchitectureBoundaries({ rootDir: root, prd: "specs/none/prd.md" });
++  assert.equal(missing.status, "design-unavailable");
++  assert.equal(missing.code, "DBG-MODULE-PLAN-UNREADABLE");
++  assert.equal(exitCodeForBoundaryCheck(missing), 2);
++  const cli = spawnSync(process.execPath, [SCRIPT, "--root", root, "--preview-prd", "specs/none/prd.md"], { encoding: "utf8" });
++  assert.equal(cli.status, 2, cli.stdout + cli.stderr);
++  assert.match(cli.stdout, /Architecture boundary PREVIEW against the proposed design of specs\/none\/prd\.md: design-unavailable/u);
++  assert.match(cli.stdout, /DBG-MODULE-PLAN-UNREADABLE/u);
++  const both = spawnSync(process.execPath, [SCRIPT, "--root", root, "--preview-prd", "specs/none/prd.md", "--write-policy"], { encoding: "utf8" });
++  assert.equal(both.status, 2);
++  assert.equal(existsSync(path.join(root, BOUNDARY_POLICY_PATH)), false, "nothing is written");
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index e47c3336860c838844e4094d405e698457fdd111..52dab4a6156dc35493c9add7865fc4eafc2dced4 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -45,6 +45,7 @@ The acceptance question of the one-shot close ends with ONE fixed yes form (`yes
+    names the next command in every state (`none`, `draft`, `bound-unapproved`, `sealed`).
+ 4. `pipeline-state.mjs present-plan --by <name> [--review-receipt <repo-relative-json>]` (agent). Needs the exact current submission from step 3 and, for a draft, the prepared seal plan (step 3b):
+    present the plan to the PO; its digest is part of what the one signature covers. This step and `set-phase implementation` also check the scanners the close will need: in a critical calibration a missing one is refused here with its install guidance or the named exception route, otherwise it prints a notice. Ask the PO to install it now, while nothing waits on it. The first `pipeline-start-preflight` output carries the same facts in `environmentReadiness` once the project's manifest enables scanners.
++   Before asking for a signature on a design that changes the architecture rules of code that already exists, preview what the check will say: `architecture-boundary-check.mjs --root <root> --preview-prd <repo-relative PRD path>` (read-only, no signature, writes nothing). It checks the tracked tree against the modules of the PRD's PROPOSED design block, with the same rules as the real check (ownership, forbidden dependency, line bound); the map that the real check reads exists only after the signature. Fix the PRD, not the code, when it names a finding the design should have allowed. A pass is a preview, not an approval.
+ 5. `pipeline-state.mjs approve-plan` (PO ceremony): in `signature` mode the flag `--by` is forbidden; in `chat` mode the PO's explicit actor name is
+    required. A bootstrap acknowledgement receipt and a prior `present-plan` for this exact submission are required. **No further syntax documented**: follow
+    the action `pipeline-state.mjs inspect` returns. Whenever you wait for a PO signature (this one, a push, a residual acceptance), the
