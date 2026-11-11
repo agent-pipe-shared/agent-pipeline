@@ -124,7 +124,9 @@ test("AC-194 flag combination: several flags together and the -e/--regexp patter
 });
 
 test("a refused commit-tree read names the spelling that passes, and that spelling is admitted", () => {
-  const { code, stderr } = runGuard(`git rev-parse ${head}^{tree}`);
+  // QG-04 restated: the bare `git rev-parse <commit>^{tree}` read is admitted since REV_PARSE_TREE_READ_RE; any wider spelling stays refused and names the alternative.
+  assertAllowed(`git rev-parse ${head}^{tree}`);
+  const { code, stderr } = runGuard(`git rev-parse --verify ${head}^{tree}`);
   assert.equal(code, 2);
   assert.match(stderr, /git log -1 --format=%H%x20%T <commit>/u);
   assertAllowed(`git log -1 --format=%H%x20%T ${head}`);

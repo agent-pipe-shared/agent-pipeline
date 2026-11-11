@@ -44,14 +44,18 @@ test('Codex model-id and high-risk Critic resolution retain registered source an
 });
 test('unknown kind or substituted registry selector is refused by full default validation',t=>{
   const f=fixture(t);
-  for(const change of [{kind:'unknown',value:'sonnet'},{kind:'model-id',value:'sonnet'},{kind:'alias',value:'unregistered-alias'}]){
-    const bad=structuredClone(f.config);bad.routing.duties.readiness.claude.selector=change;assert.equal(validatePipelineUserV3(bad).ok,false);
-    const candidateCommit=f.commit(bad);assert.throws(()=>resolveV3DutyRoute({rootDir:f.root,dutyId:'readiness',runner:'claude',candidateCommit}),/did not pass V3 validation/);
+  // QG-04 restated (PO 2026-11-09, e931a315d): pipeline.user.yaml owns the routing, so any non-empty selector value is the project's choice; the selector KIND stays enumerated.
+  const bad=structuredClone(f.config);bad.routing.duties.readiness.claude.selector={kind:'unknown',value:'sonnet'};assert.equal(validatePipelineUserV3(bad).ok,false);
+  const candidateCommit=f.commit(bad);assert.throws(()=>resolveV3DutyRoute({rootDir:f.root,dutyId:'readiness',runner:'claude',candidateCommit}),/did not pass V3 validation/);
+  for(const change of [{kind:'model-id',value:'sonnet'},{kind:'alias',value:'unregistered-alias'}]){
+    const chosen=structuredClone(f.config);chosen.routing.duties.readiness.claude.selector=change;assert.equal(validatePipelineUserV3(chosen).ok,true);
+    assert.equal(resolveV3DutyRoute({rootDir:f.root,dutyId:'readiness',runner:'claude',candidateCommit:f.commit(chosen)}).model,change.value);
   }
 });
 test('Codex cannot gain an alias through a changed committed cell',t=>{
   const f=fixture(t),bad=structuredClone(f.config);bad.routing.duties.critic_high_risk.codex.selector={kind:'alias',value:'opus'};
-  const candidateCommit=f.commit(bad);assert.throws(()=>resolveCriticHighRiskRoute({rootDir:f.root,candidateCommit}),/did not pass V3 validation/);
+  // QG-04 restated: the file itself validates since the project owns its routing; the alias on Codex is refused by the route lookup.
+  const candidateCommit=f.commit(bad);assert.throws(()=>resolveCriticHighRiskRoute({rootDir:f.root,candidateCommit}),/requested duty route is unavailable/);
 });
 test('malformed committed source and unavailable duty lookup fail without fallback',t=>{
   const f=fixture(t);assert.throws(()=>resolveV3DutyRoute({rootDir:f.root,dutyId:'absent',runner:'claude',candidateCommit:f.candidateCommit}),/requested duty route is unavailable/);

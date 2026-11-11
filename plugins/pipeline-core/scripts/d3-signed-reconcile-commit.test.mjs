@@ -335,7 +335,8 @@ test("G20-66: approve-plan and close-feature are the wired writers; the wrapper 
     assert.equal(status, 0);
     const out = printed.join("\n");
     assert.match(out, new RegExp(`git add -- ${MANIFEST.replace(/[.]/g, "\\.")}`));
-    assert.match(out, /git commit -m "chore\(pipeline\): /);
+    assert.match(out, /the line "chore\(pipeline\): /); // QG-04 restated: the push guard refuses parentheses on a command line, so the route is a message file
+    assert.match(out, /git commit -F /);
     assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST) === null, false, "the record exists");
     f.git("add", MANIFEST); assert.equal(ptp.writerCommitAdmission(f.root, MANIFEST).admitted, true);
   }

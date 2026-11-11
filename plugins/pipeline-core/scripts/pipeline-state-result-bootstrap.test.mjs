@@ -737,7 +737,7 @@ test("N31r: the reconcile command marks --by as the PO's own value and names whe
   const placeholders = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"], { gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) }).out).reconcileCommand.placeholders;
   const by = placeholders.find((entry) => entry.flag === "--by");
   assert.equal(by.token, "<po-name>");
-  assert.match(by.from, /PO/u); assert.match(by.from, /never the agent/u);
+  assert.match(by.from, /PO/u); assert.match(by.from, /never invented by the agent/u); // QG-04 restated: the label may come from this machine's operatorLabel (PO 2026-11-10)
   for (const [flag, field] of [["--proof-request", "requestPath"], ["--proof-authority", "authorityPath"], ["--proof", "proofPath"]]) {
     assert.match(placeholders.find((entry) => entry.flag === flag).from, new RegExp(field, "u"), `${flag} names the ${field} the signing terminal prints`);
   }

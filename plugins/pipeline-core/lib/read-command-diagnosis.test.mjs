@@ -112,12 +112,13 @@ test("RCD13: an attached flag value gets the separate-argument spelling, other f
 });
 
 test("RCD14: the refusal of an attached value prints the spelling to use, and both spellings stay judged by the grammar", async () => {
-  const attached = "rg -n -A8 needle README.md";
+  // QG-04 restated (C22B admits the attached context flags -A/-B/-C): -m is the value flag that stays separate.
+  const attached = "rg -n -m8 needle README.md";
   assert.equal(isReadOnlyDiagnosticCommand(attached, root), false, "fixture must be refused");
-  assert.equal(isReadOnlyDiagnosticCommand("rg -n -A 8 needle README.md", root), true, "the suggested spelling is admitted");
+  assert.equal(isReadOnlyDiagnosticCommand("rg -n -m 8 needle README.md", root), true, "the suggested spelling is admitted");
   const result = await refusal(attached);
   assert.equal(result.exitCode, 2);
-  assert.match(String(result.stderr), /Rejected element: the flag "-A8" \(an attached value is not admitted; give it as a separate argument: -A 8\)\./u);
+  assert.match(String(result.stderr), /Rejected element: the flag "-m8" \(an attached value is not admitted; give it as a separate argument: -m 8\)\./u);
 });
 
 test("RCD-R6: a repeated option is named, with or without a value, and only when the repeat is the whole fault", async () => {

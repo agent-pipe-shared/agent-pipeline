@@ -116,7 +116,8 @@ test("sanctioned scripts: --help and the plan, inspect and binding verbs are adm
   for (const command of admittedWhenReady) assert.equal(ps(command).exitCode, 0, command);
   // readiness is what differs: the Bash grammar table admits `pipeline-state inspect` and `pipeline-state --help` before readiness too (and so does the
   // dialect, through the same isSanctionedLifecycleCommand); every other route above exists only in a ready session
-  const beforeReadiness = [state("inspect"), state("--help")];
+  // QG-04 restated (PO 2026-11-09): a sanctioned script's --help is admitted before onboarding too; a verb's own --help stays ready-only.
+  const beforeReadiness = [state("inspect"), state("--help"), `node ${scripts("dispatch-briefing.mjs")} --help`, `node ${HUMAN_OVERRIDE_SCRIPT} --help`];
   for (const command of beforeReadiness) assert.equal(ps(command, NOT_READY).exitCode, 0, `not ready: ${command}`);
   for (const command of admittedWhenReady.filter((entry) => !beforeReadiness.includes(entry))) assert.equal(ps(command, NOT_READY).exitCode, 2, `not ready: ${command}`);
   for (const refused of [
@@ -152,7 +153,10 @@ test("every PowerShell grammar refusal names the admitted alternative for the sh
 }));
 
 test("a native read of a project directory that is not a protected root states what is protected and which spelling is admitted", () => withRoot(({ root, run, ps }) => {
-  const grep = run("Grep", { pattern: "x", path: join(root, "project") });
+  // QG-04 restated (PO 2026-11-10): native Grep on a non-hidden project directory is admitted like rg; a hidden one stays refused and carries the text.
+  assert.equal(run("Grep", { pattern: "x", path: join(root, "project") }).exitCode, 0);
+  mkdirSync(join(root, ".hidden"));
+  const grep = run("Grep", { pattern: "x", path: join(root, ".hidden") });
   assert.equal(grep.exitCode, 2);
   assert.match(grep.stderr, /GUARD-READ-TARGET:/u);
   assert.match(grep.stderr, /Protected roots:/u, grep.stderr);

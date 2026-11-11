@@ -33,7 +33,8 @@ test("NRS01 refusals with no override route seed no request", () => {
   for (const [toolName, toolInput, code] of [
     ["Bash", { command: "cat /etc/hostname" }, "GUARD-READ-SCOPE-OUTSIDE-ROOT"],
     ["Bash", { command: "cat .aws/credentials" }, "GUARD-READ-CREDENTIAL-TARGET"],
-    ["Bash", { command: "rg -A3 x a.txt" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
+    // QG-04 restated (C22B admits the attached context flag -A3): -m3 is the attached value that stays refused.
+    ["Bash", { command: "rg -m3 x a.txt" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
     ["Bash", { command: "cat a.txt | wc -l" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
     ["Bash", { command: "nl -ba a.txt | wc -l" }, "GUARD-READ-COMMAND-UNSUPPORTED"],
     ["Bash", { command: "rm -rf scratch" }, "GUARD-LIFECYCLE-NOT-READY"],
