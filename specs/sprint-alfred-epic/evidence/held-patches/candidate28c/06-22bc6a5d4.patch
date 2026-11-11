@@ -1,0 +1,85 @@
+diff --git a/backlog/items/2026-11-11-audit-pack-does-not-carry-the-sbom.md b/backlog/items/2026-11-11-audit-pack-does-not-carry-the-sbom.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..a73489d0ef67e314f14407b6d79f088350906f03
+--- /dev/null
++++ b/backlog/items/2026-11-11-audit-pack-does-not-carry-the-sbom.md
+@@ -0,0 +1,21 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.audit-pack-does-not-carry-the-sbom
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-11
++source: Candidate 28c design; ADR-0091 wires the SBOM into the feature close and its audit bundle only
++sprint: alfred
++done_when: manual
++---
++
++# The portable audit pack does not carry the SBOM record
++
++## Description
++
++Since candidate 28c the feature close writes `specs/<feature>/evidence/sbom/` and the audit bundle (`audit-bundle.mjs`) carries the record and both documents, re-checked by the offline verifier. The separate portable auditor pack (`audit-pack.mjs`) has a closed key set and a closed list of source kinds, and names no SBOM, so a pack built from a closed feature leaves it out. The pack is a different artifact with its own schema, so extending it was not folded into the close change.
++
++## Done when
++
++`planAuditPack` accepts the feature's SBOM record as one more source kind with its two documents, the pack manifest and verifier bind them by digest, a missing or damaged one is a typed finding, and a test builds and verifies a pack that carries it.
+diff --git a/backlog/items/2026-11-11-sbom-readers-for-more-lockfile-formats-and-dependency-edges.md b/backlog/items/2026-11-11-sbom-readers-for-more-lockfile-formats-and-dependency-edges.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..9b3d220e71941b57a9d820477c459a5853e255d9
+--- /dev/null
++++ b/backlog/items/2026-11-11-sbom-readers-for-more-lockfile-formats-and-dependency-edges.md
+@@ -0,0 +1,21 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.sbom-readers-for-more-lockfile-formats-and-dependency-edges
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-11
++source: Candidate 28c design; ADR-0091 decisions 2 and 4
++sprint: alfred
++done_when: manual
++---
++
++# SBOM readers for more lockfile formats, and dependency edges
++
++## Description
++
++The close reads npm, Python (poetry, Pipfile, pinned requirements), Go and Rust lockfiles. `yarn.lock`, `pnpm-lock.yaml`, `uv.lock`, Maven, Gradle, Gemfile, Composer, NuGet and similar files are named as `unsupported` and stop the close until a human overrides it. The component list is flat: dependency edges are not recorded (`edges: "not-recorded"`). Paths under fixture, vendor and example directories are not observed, which a monorepo may need to configure.
++
++## Done when
++
++Rows for the most used further formats are added to `SBOM_READERS` with tests, and a decision is taken on recording edges and on a configurable set of observed paths.
+diff --git a/backlog/items/2026-11-11-the-sbom-override-is-an-attribution-record-not-a-signature.md b/backlog/items/2026-11-11-the-sbom-override-is-an-attribution-record-not-a-signature.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3456f4395fa4b6e70016bcf3260e2bb23336a76f
+--- /dev/null
++++ b/backlog/items/2026-11-11-the-sbom-override-is-an-attribution-record-not-a-signature.md
+@@ -0,0 +1,25 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.the-sbom-override-is-an-attribution-record-not-a-signature
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-11
++source: Candidate 28c design; ADR-0091 decision 5
++sprint: alfred
++done_when: manual
++---
++
++# The SBOM override is an attribution record, not a signature
++
++## Description
++
++A blocked SBOM (`stale`, `invalid`, `partial`, `unsupported`) passes the close only with `--sbom-override "<the human's literal words>"`. The words, the actor and every covered finding are recorded in the SBOM record and the audit bundle names it `SBOM-OVERRIDDEN`. Like the human acceptance answer, this is an attribution record: the flag is something an agent could pass on its own, and the close skill forbids that, but nothing proves a human said it.
++
++## Decision
++
++Open for the PO. The options are to keep it as an attribution record, to bind it to the existing human acceptance record, or to require a signed approval for the override.
++
++## Done when
++
++The PO has chosen, and the chosen binding is built with a test that an unsigned or unbound override is refused.
