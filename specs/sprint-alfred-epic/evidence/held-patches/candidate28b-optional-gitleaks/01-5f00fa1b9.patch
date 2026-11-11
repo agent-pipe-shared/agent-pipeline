@@ -1,0 +1,95 @@
+diff --git a/.gitleaks.toml b/.gitleaks.toml
+index acc84c6b69b58df09382b7f15f6094ef757ca274..0e1707dd11f207be78014f27a682cffba9417542 100644
+--- a/.gitleaks.toml
++++ b/.gitleaks.toml
+@@ -77,6 +77,12 @@ paths = [
+ [[rules]]
+ id = "sentry-access-token"
+ 
++[[rules.allowlists]]
++description = "held-patch evidence copies of source diffs"
++paths = [
++  '''.*/specs/[^/]+/evidence/held-patches/.*\.patch$'''
++]
++
+ [[rules.allowlists]]
+ paths = [
+   '''.*/backlog/transitions\.ndjson$''',
+@@ -101,9 +107,39 @@ regexes = [
+   '''^[0-9a-f]{32,64}$'''
+ ]
+ 
++# Candidate 28b (PO decision pending, optional patch): the held patches under specs/<feature>/evidence/held-patches/ are unified diffs of
++# source files that are scanned at their own paths. A diff that removes or changes a secret-shaped test fixture carries that text again as a
++# `-`/`+` line, so the evidence copy re-trips the same four rules forever and cannot be edited (evidence). Exempted ONLY for `.patch` files
++# inside a held-patches folder and ONLY for these four rule ids: the same text in any other file, every other rule and every other path
++# stay fully armed, including a real credential pasted into a held patch under any OTHER rule. Known limit (same class as the notes above):
++# gitleaks reports the absolute path, so a nested `.../specs/x/evidence/held-patches/` anywhere matches, not only the top-level one.
++[[rules]]
++id = "private-key"
++
++[[rules.allowlists]]
++description = "held-patch evidence copies of source diffs"
++paths = [
++  '''.*/specs/[^/]+/evidence/held-patches/.*\.patch$'''
++]
++
++[[rules]]
++id = "github-pat"
++
++[[rules.allowlists]]
++description = "held-patch evidence copies of source diffs"
++paths = [
++  '''.*/specs/[^/]+/evidence/held-patches/.*\.patch$'''
++]
++
+ [[rules]]
+ id = "generic-api-key"
+ 
++[[rules.allowlists]]
++description = "held-patch evidence copies of source diffs"
++paths = [
++  '''.*/specs/[^/]+/evidence/held-patches/.*\.patch$'''
++]
++
+ [[rules.allowlists]]
+ description = "bare hex digests in the audit bundle and the State file written by the close"
+ condition = "AND"
+diff --git a/plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs b/plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs
+index c7c027cfe1c6e4605908d488e530bd1628ed43e1..1bdf0ed50108c9dfac1b845923b5772d662c884e 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs
+@@ -594,6 +594,33 @@ test(
+   },
+ );
+ 
++test(
++  "run() wires the repo's .gitleaks.toml: a held-patch evidence copy is exempt for the four fixture rules, the same text in a non-patch file there and in a patch elsewhere keeps its finding (candidate 28b, real gitleaks binary)",
++  { skip: gitleaksOnlySkip },
++  async () => {
++    // The token is assembled at run time so the repository scan does not see it in this file.
++    const tokenLine = `+${JSON.stringify({ token: ["gh", "p_aB3dE5fG7hI9jK1lM3nO5pQ7rS9tU1vW3xY5"].join("") })}\n`;
++    const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-held-patch-"));
++    try {
++      const held = join(rootDir, "specs", "feat-x", "evidence", "held-patches");
++      mkdirSync(join(held, "chain"), { recursive: true });
++      mkdirSync(join(rootDir, "other"), { recursive: true });
++      writeFileSync(join(held, "chain", "01-abc.patch"), tokenLine);
++      writeFileSync(join(held, "notes.json"), tokenLine);
++      writeFileSync(join(rootDir, "other", "01-abc.patch"), tokenLine);
++
++      const result = await run({ rootDir, config: { binaryPath: gitleaksProbe.path }, timeoutMs: 20000 });
++      const seen = result.findings.map((f) => `${f.path} [${f.rule}]`).sort();
++      assert.deepEqual(seen, [
++        "other/01-abc.patch [github-pat]",
++        "specs/feat-x/evidence/held-patches/notes.json [github-pat]",
++      ], "only a .patch file inside a held-patches folder is exempt: the same line in another file there and in a patch elsewhere keeps its finding");
++    } finally {
++      rmSync(rootDir, { recursive: true, force: true });
++    }
++  },
++);
++
+ test(
+   "run() wires the repo's .gitleaks.toml: bare hex digests written by the close (audit bundle, State file) are exempt, a real key there and the same digest elsewhere keep their findings (candidate 16a, real gitleaks binary)",
+   { skip: gitleaksOnlySkip },
