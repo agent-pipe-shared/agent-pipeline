@@ -14825,6 +14825,10 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
   if (error?.reason === "companion-owning-lifecycle-context-required" && /^continuity-result-(bootstrap|close)-(plan|apply)$/u.test(String(sub))) {
     return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported, nothing was written. Cause: this project has a session-authority catalogue, so ${sub} runs only on the owner route, under a Close lifecycle at checkpointed. Repair: when closing a feature, run finish-feature.mjs: it opens that lifecycle and names each command. By hand: node ${fileURLToPath(new URL("./continuity-owner-route.mjs", import.meta.url))} run --root ${dir} --lifecycle <id> -- ${sub} <the same flags>.${elapsedText}`;
   }
+  // Live on native Windows, 2026-11-10: inspect reported a healthy registry for this cause and the agent read plugin code for about 25 tool calls looking for the route.
+  if (error?.reason === "companion-owning-lifecycle-context-required" && STATE_COMPANION_ENTRIES.has(String(sub))) {
+    return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported, nothing was written. Cause: this project has a session-authority catalogue, so ${sub} needs an owning lifecycle context, and a plain shell call has none. The registry is healthy: inspect names nothing here, and reading plugin sources will not find a route. Stop and report this code to the human.${elapsedText}`;
+  }
   // A short file-access conflict on Windows leaves nothing for inspect to name (claude greenfield 2026-11-08: inspect answered next: []).
   if (error?.reason === "WIN-AUTH-OPEN") {
     return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported. Repair: run ${repairInspect}. When its next list is empty this was a short file-access conflict: repeat the same command once. If it is refused again, the windowsAuthorityReadiness.causes field of the preflight names the folder.${elapsedText}`;

@@ -608,6 +608,10 @@ const cases = [
     const windows = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-UNAVAILABLE", reason: "WIN-AUTH-OPEN" }, { elapsedMs: 1 });
     assert.match(windows, /next list is empty this was a short file-access conflict: repeat the same command once/u, windows);
     assert.doesNotMatch(windows, /names the cause and the command that clears it/u, windows);
+    const noContext = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-UNAVAILABLE", reason: "companion-owning-lifecycle-context-required" }, { elapsedMs: 1, sub: "discard-feature" });
+    assert.match(noContext, /discard-feature needs an owning lifecycle context/u, noContext);
+    assert.match(noContext, /Stop and report this code to the human/u, noContext);
+    assert.doesNotMatch(noContext, /names the cause and the command that clears it/u, noContext);
   } },
   { id: "SAS02", name: "SAD diag (2) an error without code and reason keeps the default code alone in the parenthesis and names its class, message and at most two bare frames after it", run: () => {
     const untyped = describeStateAuthorityRefusal(new TypeError("boom"), { elapsedMs: 5 });
