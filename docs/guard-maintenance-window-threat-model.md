@@ -350,6 +350,9 @@ below assumes it holds and is written to catch a change that would break it.
   The pure validation half split out of `lib/critic-review-lineage.mjs`
   (`lib/critic-review-lineage-core.mjs`, imported by that kernel path and re-exported
   unchanged) is protected for the same reason.
+  The damaged-course locator `lib/course-evidence-gap.mjs` is imported by the State
+  writer and `lib/critic-course-admission.mjs`; a discard with a bound Result is admitted
+  only on its finding (PO decision 2026-11-10), so it is protected as well.
   The Critic preflight, the session finalizer and the diagnostic producer also import
   `lib/critic-correction-input-bindings.mjs`, `lib/critic-packet-release.mjs`, and
   `lib/critic-required-guardrails.mjs`, which are protected for the same reason.

@@ -100,6 +100,58 @@ test("AC-2: discard-feature refuses when continuity.authority.result already exi
   }
 });
 
+// PO tile 2026-11-10 (Codex greenfield, candidate 27): a bound Result plus a damaged Critic course history is a dead end
+// (close needs the course, submit-plan is busy, set-feature refuses). The discard is admitted for exactly that case.
+function damagedCourseFixture({ damaged }) {
+  const featureId = "abandoned-feature";
+  const state = stuckState({ continuity: { authority: { result: { path: "specs/abandoned-feature/result.md", sha256: "a".repeat(64) } } } });
+  const { root, statePath } = fixture(state);
+  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  git("config", "commit.gpgsign", "false");
+  const put = (rel, text) => { mkdirSync(join(root, rel, ".."), { recursive: true }); writeFileSync(join(root, rel), text); };
+  const evidencePath = `specs/${featureId}/evidence/final-candidate-verify.json`;
+  put(`specs/${featureId}/lifecycle.json`, `${JSON.stringify({ artifacts: [] })}\n`);
+  git("add", "--", `specs/${featureId}/lifecycle.json`);
+  git("commit", "-q", "-m", "base");
+  put(evidencePath, "{}\n");
+  put(`specs/${featureId}/lifecycle.json`, `${JSON.stringify({ artifacts: [{ class: "candidate-evidence", path: evidencePath, sha256: "b".repeat(64) }] })}\n`);
+  if (damaged) {
+    git("add", "--", `specs/${featureId}/lifecycle.json`);
+    git("commit", "-q", "-m", "manifest alone");
+  }
+  git("add", "--", `specs/${featureId}`);
+  git("commit", "-q", "-m", damaged ? "evidence later" : "manifest with its evidence");
+  return { root, statePath, gapCommit: damaged ? git("rev-parse", "HEAD~1").trim() : null, evidencePath };
+}
+
+test("PO tile 2026-11-10: with a bound Result, a damaged Critic course admits the discard, records the gap, and set-feature works again", () => {
+  const { root, statePath, gapCommit, evidencePath } = damagedCourseFixture({ damaged: true });
+  try {
+    assert.equal(run(["discard-feature", "--by", "PO", "--reason", "Critic course damaged; continue as a new feature"], { dir: root, now: () => "2026-11-10T21:30:00.000Z" }), 0);
+    const after = readState(statePath);
+    assert.equal(Object.hasOwn(after, "activeFeature"), false);
+    assert.equal(Object.hasOwn(after, "continuity"), false);
+    const entry = after.discardedFeatures.at(-1);
+    assert.deepEqual(entry.damagedCriticCourse, { commit: gapCommit, path: evidencePath, result: { path: "specs/abandoned-feature/result.md", sha256: "a".repeat(64) } });
+    assert.equal(entry.discardedBy, "PO");
+    assert.equal(run(["set-feature", "--id", "next-feature", "--plan-path", "specs/next/prd.md"], { dir: root, now: () => "2026-11-10T21:31:00.000Z" }), 0);
+    assert.equal(readState(statePath).activeFeature.id, "next-feature");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("PO tile 2026-11-10: with a bound Result and an intact course history the discard still refuses, zero write", () => {
+  const { root, statePath } = damagedCourseFixture({ damaged: false });
+  try {
+    const before = readFileSync(statePath, "utf8");
+    assert.equal(run(["discard-feature", "--by", "PO", "--reason", "changed mind"], { dir: root, now: () => "2026-11-10T21:30:00.000Z" }), 2);
+    assert.equal(readFileSync(statePath, "utf8"), before);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("AC-2: close-feature is structurally unsatisfiable in the stuck state (Result null, no request), proving the deadlock", () => {
   const { root, statePath } = fixture(stuckState());
   try {

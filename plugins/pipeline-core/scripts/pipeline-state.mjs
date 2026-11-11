@@ -472,6 +472,7 @@ import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib
 import {coverOnboardingOutput} from '../lib/onboarding-consent-scope.mjs';
 import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
 import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
+import { locateCourseEvidenceGap } from "../lib/course-evidence-gap.mjs";
 import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
 import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
 import { rebindApproval } from "../lib/rebind-approval.mjs";
@@ -14129,14 +14130,23 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       // unconditionally, so this refuses and names it; continuity present with a Result
       // already means the close ceremony is available, so this refuses for the same reason.
       // Never widen this to a heuristic ("was anything implemented").
+      // The one exception (PO tile 2026-11-10, Codex greenfield): with a bound Result, close-feature is
+      // unsatisfiable as well when the feature's Critic course history is damaged (a manifest revision lists
+      // evidence its own commit lacks), because every course read refuses for good. Only that located gap
+      // admits the discard, and the record names it.
+      const discardHead = gitHead(dir);
+      let courseGap = null;
       if (base.continuity === undefined) {
         // A legacy state with no continuity cannot satisfy the current coordinator-close
         // contract.  Record an honest discard instead of falsely advertising close-feature.
       } else if (base.continuity.authority.result !== null) {
-        console.error('Error: discard-feature refused -- continuity.authority.result already exists; close-feature is the route that is available.');
-        return 2;
+        courseGap = discardHead.ok ? (deps.locateCourseEvidenceGapFn ?? locateCourseEvidenceGap)({ repoRoot: dir, featureId: activeFeature.id, commit: discardHead.commit }) : null;
+        if (courseGap === null) {
+          console.error('Error: discard-feature refused -- continuity.authority.result already exists; close-feature is the route that is available. A discard with a bound Result is admitted only when the feature\'s Critic course history is damaged (a feature manifest revision lists evidence its own commit does not hold), and none was found.');
+          return 2;
+        }
+        console.error(`discard-feature: the Critic course of this feature is damaged (commit ${courseGap.commit} lists ${courseGap.path}, which that commit does not hold), so close-feature cannot run; the discard records it.`);
       }
-      const discardHead = gitHead(dir);
       let discardForCommit = null;
       if (discardHead.ok) {
         discardForCommit = discardHead.commit;
@@ -14155,6 +14165,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         reason,
         forCommit: discardForCommit,
       };
+      if (courseGap !== null) discardedEntry.damagedCriticCourse = { commit: courseGap.commit, path: courseGap.path, result: base.continuity.authority.result };
       if (base.planCancellation !== undefined) discardedEntry.planCancellation = base.planCancellation;
       if (base.planMixedStateRecovery !== undefined) discardedEntry.planMixedStateRecovery = base.planMixedStateRecovery;
       const discardNext = {

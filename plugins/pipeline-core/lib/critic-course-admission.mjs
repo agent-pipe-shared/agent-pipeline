@@ -16,6 +16,7 @@ import { validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
 import { validateCriticDispositionAddendum } from "./critic-disposition-addendum.mjs";
 import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
 import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
+import { locateCourseEvidenceGap } from "./course-evidence-gap.mjs";
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const MODES = new Set(["full", "delta"]);
@@ -44,28 +45,8 @@ const fail = (code, detail = null) => { throw new CriticCourseAdmissionError(cod
  * 2026-11-10), so the one way on is a new feature. This text says so, with the commit and the path.
  */
 export const COURSE_EVIDENCE_GAP_CODES = Object.freeze(["CCA-EVIDENCE-MODE", "CCA-EVIDENCE-READ"]);
-/**
- * Read-only: the first manifest revision (oldest first, up to `commit`) that lists a candidate-evidence path its own commit
- * does not hold as a regular file, as { commit, path }, or null. Used only to name the gap in a refusal text; it decides nothing.
- */
-export function locateCourseEvidenceGap({ repoRoot, featureId, commit }) {
-  try {
-    if (typeof repoRoot !== "string" || !FEATURE_ID.test(featureId ?? "") || !OID.test(commit ?? "")) return null;
-    const manifestPath = `specs/${featureId}/lifecycle.json`;
-    const run = (args) => execFileSync("git", ["-C", repoRoot, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 * 1024 * 1024 });
-    const revisions = run(["rev-list", "--reverse", commit, "--", manifestPath]).split("\n").filter(Boolean).slice(0, 512);
-    for (const revision of revisions) {
-      let manifest;
-      try { manifest = JSON.parse(run(["show", `${revision}:${manifestPath}`])); } catch { continue; }
-      for (const entry of Array.isArray(manifest?.artifacts) ? manifest.artifacts : []) {
-        if (entry?.class !== "candidate-evidence" || typeof entry.path !== "string") continue;
-        const row = run(["ls-tree", "-z", revision, "--", entry.path]);
-        if (!/^100644 blob [a-f0-9]{40,64}\t/u.test(row) || !row.endsWith(`\t${entry.path}\0`)) return { commit: revision, path: entry.path };
-      }
-    }
-    return null;
-  } catch { return null; }
-}
+// The locator (read only, names the gap in a refusal text, decides nothing here) lives in its own file so the State writer can use it too.
+export { locateCourseEvidenceGap };
 
 export function courseEvidenceGapText(code, detail) {
   if (!COURSE_EVIDENCE_GAP_CODES.includes(code)) return null;
@@ -74,7 +55,9 @@ export function courseEvidenceGapText(code, detail) {
     : "a revision of the feature manifest lists an evidence file that its own commit does not hold as a regular file";
   return `The Critic course of this feature cannot be read (${code}): ${where}. `
     + "Every course read checks each manifest revision, so this stays true for every later round and takeover of this feature, and history is not rewritten. "
-    + "Continue the remaining work as a new feature of rigor 1 (its own PRD and Spec) and run a full Critic over its commits.";
+    + "Continue the remaining work as a new feature of rigor 1 (its own PRD and Spec) and run a full Critic over its commits. "
+    + "Before that, the PO ends this feature in the PO's own terminal: node ${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-state.mjs discard-feature --by \"<the PO's name>\" --reason \"<why>\" "
+    + "(admitted with a bound Result only because of this damaged course; the agent never supplies the name).";
 }
 
 // PF-34: the one refusal whose repair is a sanctioned command. The decision object's keys stay

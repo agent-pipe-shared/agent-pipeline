@@ -594,6 +594,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/onboarding-initial-answers-transaction.mjs",
   "plugins/pipeline-core/lib/onboarding-later-language.mjs",
   "plugins/pipeline-core/lib/critic-course-admission.mjs",
+  // The damaged-course locator: the State writer admits a discard with a bound Result only on its finding.
+  "plugins/pipeline-core/lib/course-evidence-gap.mjs",
   // The selector/bootstrap and protected design gates are transitively closed
   // over these authorities, host observations, evidence readers, and their
   // sandbox contract. A maintenance window must not rewrite the route, its
