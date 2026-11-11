@@ -1428,6 +1428,14 @@ for (const rule of EXTRA_BLOCKERS) if (rule.re.test(normalizedStripped)) matched
 const recursiveDelete = recursiveDeleteFinding(cmd, { root: projectDir, cwd: toolCwd ?? process.cwd(), throwawayDirs: projectConfig?.throwawayDirs, guardConfigPath: guardConfigRelPath });
 if (recursiveDelete) matched.push(recursiveDelete);
 
+// PO decision 2026-11-10: the author answered in onboarding reaches the local Git config directly before the commit that needs it.
+if (matched.length === 0 && /\bgit\s+commit\b/.test(normalizedC)) {
+  try {
+    const { applyHeldGitAuthor } = await import("../lib/held-git-author.mjs");
+    applyHeldGitAuthor(projectDir);
+  } catch { /* fail-open like the rest of this guard: a commit is not stopped by the author step */ }
+}
+
 if (matched.length > 0) {
   // ADR-0079: hook-bypass rules protect the mechanism that evaluates every
   // other Git rule. Letting the same mechanism authorize its own removal is
