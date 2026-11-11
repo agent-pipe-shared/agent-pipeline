@@ -1,0 +1,82 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 1d467b129cca6c34e0c8b60d047094152264f262..d3bee27e008ab9d3635112239fbb25d56601a9e1 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -33,7 +33,7 @@
+         "hook:plugins/pipeline-core/hooks/hooks.json:PostToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/claude-task-output-scope-posttool.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PostToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|Agent|TodoWrite|WebFetch|WebSearch|Write|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
+-        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
++        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|SendMessage|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
+         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell|Read|Grep|Glob:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
+@@ -569,8 +569,8 @@
+         "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
+         "verify-phase:harness/scripts/verify.mjs:handover-rotation-tests",
+         "verify-phase:harness/scripts/verify.mjs:hardened-private-directory-tests",
+-        "verify-phase:harness/scripts/verify.mjs:held-git-author-tests",
+         "verify-phase:harness/scripts/verify.mjs:harness-lib-plan-spec-state-v2-tests",
++        "verify-phase:harness/scripts/verify.mjs:held-git-author-tests",
+         "verify-phase:harness/scripts/verify.mjs:hook-governance-scope-tests",
+         "verify-phase:harness/scripts/verify.mjs:hook-refresh-detection-tests",
+         "verify-phase:harness/scripts/verify.mjs:hooks-manifest-shape-tests",
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+index eac6653be23931613a2e7c448779d4d28bb96485..f96bc2674d969e82eaca2463ec1178ac7221ac00 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+@@ -216,7 +216,7 @@ function scratchScriptRelative(word, root) {
+   return /^scratch\/[A-Za-z0-9._-]+\.mjs$/u.test(rel) ? rel : null;
+ }
+ 
+-// C28-GUARD-LANES (AC-108, PO decision 2026-11-10): a test run of the project's REGISTERED suites (harness/verify-suites.json, the list Verify itself runs; read through
++// C28-GUARD-LANES (AC-108, PO decision 2026-11-10): a test run of the project's REGISTERED suites (the verify-suites list, the one Verify itself runs; read through
+ // the one shared loader) is not an opaque write in design draft -- the suites write only to scratch/ and the system temp directory. Exactly `node --test <file>...`
+ // with no other option, every operand a plain file inside the root that the list names; one unregistered operand makes the whole run what it was before.
+ function isRegisteredSuiteRun(operands, root) {
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs
+index f884cc5b0071f4fba06b4f7f95341e2dbe40c7cf..a386353427900b9c28fb11e3129914abb45ec8c0 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs
+@@ -258,7 +258,10 @@ const cases = [
+     assert.match(message, /scripts\/goldfish-host-commit-recover\.mjs plan --root <root> --dispatch-id gf-store-backup/u);
+     assert.match(message, /--expect-sha256/u);
+     const other = nativeGoldfishHookMessage(null, { stopFailure: { ...stopFailure, code: "NGHF-STOP-UNRESOLVED" } });
+-    assert.doesNotMatch(other, /goldfish-host-commit-recover/u, "the recovery line belongs to the pending-unavailable code only");
++    // C28 restatement: the unresolved-stop message now names the same recover helper (plan, then apply with the digest), because a stop
++    // that cannot resolve its child needs the identical explicit recovery; the line is still absent for a code that names no failed stop.
++    assert.match(other, /goldfish-host-commit-recover/u, "the unresolved-stop code names the recovery line too");
++    assert.match(other, /No commit or authorship record is claimed/u);
+   }},
+ 
+ ];
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
+index cd8a3b223b74ea61855242148221f853d922f4c7..2d6b3ab1b819a757406cd66de1af39e444b79f7b 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
+@@ -184,7 +184,8 @@ test("R6-2 case 7: State without continuity -> continuityAuthorityDrift is an ex
+   assert.equal(payload[KEY], null, "explicit null, not omitted");
+   // QG-04 restatement (C19): two additive read-only keys of the same payload are named here and nothing else is allowed to appear:
+   // `runbook` (G5, the typed link of the first call of a standard command) and `sealSituation` (late binding step 5, the seal readback).
+-  const ADDITIVE_KEYS = new Set(["runbook", "sealSituation"]);
++  // C28 restatement: a third additive read-only key, `featureStatus` (the close projection's four status facts, candidate 28b), is named here too.
++  const ADDITIVE_KEYS = new Set(["runbook", "sealSituation", "featureStatus"]);
+   assert.deepEqual(Object.keys(payload).filter((key) => key !== KEY && !ADDITIVE_KEYS.has(key)).sort(), [...ORIGINAL_KEYS].sort(), "no other key appears or disappears");
+   assert.equal(payload.schema, "pipeline.inspect.v1");
+   assert.equal(typeof payload.generatedAt, "string");
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+index 730e60f3a671710fe6270095d236d91db9510a34..21c9af11549233d3cdd3ab34a57f0a8027926fa7 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/push-approval.md
+@@ -276,8 +276,9 @@ with what the PO named.
+ Resolve this before the first push is prepared, not after it fails, and ask at
+ most once per repository. `push-init.mjs` asks it once at the first push setup
+ and remembers the answer (the credential's name or the remote, never its content)
+-in this machine's own Pipeline file (`push-init.mjs --transport-kind
+-ssh-key|credential-helper|configured-default [--transport-reference <name>]`),
++in this machine's own Pipeline file (the first setup call takes the flags `--transport-kind
++ssh-key|credential-helper|configured-default` and, when the kind needs one,
++`--transport-reference <name>`),
+ never in a tracked file or the calibrated handover; every later `push-init.mjs`
+ reads it back as `transport` instead of asking again.
+ 
