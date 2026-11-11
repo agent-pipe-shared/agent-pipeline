@@ -66,7 +66,7 @@ test('mirror without the option-file push loses the outside value (case can fail
   const start=source.indexOf('const QP4_RG_SHORT_VALUE');
   const end=source.indexOf('export function qp4OperandResolvesOutsideRoot');
   assert.ok(start>0&&end>start,'production anchors present');
-  const slice=source.slice(start,end);
+  const slice=source.slice(start,end).replace(/^export /gmu,''); // the slice is compiled as a function body, where `export` is a syntax error
   const push='if (optionFile && typeof value === "string" && value !== "") fileValues.push(value);';
   assert.ok(slice.includes(push),'option-file push present in production');
   const build=text=>new Function(text+'\nreturn qp4ReadTargetOperands;')();

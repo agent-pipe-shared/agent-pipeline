@@ -239,10 +239,10 @@ test('case B (structural): the OSV bridge bounds only osvWindowsPrivate with the
   assert.deepEqual(callsOf(source, 'osvWindowsAncestors').map(({caller, args}) => [caller, args.join('|')]), [['osvWindowsRead', 'path|boundaryRoot'], ['osvWindowsRead', 'path|boundaryRoot']]);
   const reads = callsOf(source, 'osvWindowsRead');
   const bounded = reads.filter(({args}) => args.length > 3);
-  assert.equal(bounded.length, 1, 'exactly one osvWindowsRead caller passes a boundary');
-  assert.equal(bounded[0].caller, 'osvWindowsPrivate');
-  assert.equal(bounded[0].args[3], 'osvWindowsBoundary(file,r.primaryRoot)');
-  assert.deepEqual(reads.filter((call) => call !== bounded[0]).map(({caller}) => caller).sort(), ['osvWindowsEvidence', 'osvWindowsPhysical', 'osvWindowsPhysicalRef']);
+  // QG-04 restated (candidate 23, owner route): the owner-route invocation reads a private file under the same repository bound, so there are exactly two bounded readers.
+  assert.equal(bounded.length, 2, 'exactly the two private-file readers pass a boundary');
+  assert.deepEqual(bounded.map(({caller, args}) => [caller, args[3]]), [['osvWindowsPrivate', 'osvWindowsBoundary(file,r.primaryRoot)'], ['inspectSourceOwnedContinuityOwnerRouteInvocation', 'osvWindowsBoundary(path,r.primaryRoot)']]);
+  assert.deepEqual(reads.filter((call) => !bounded.includes(call)).map(({caller}) => caller).sort(), ['osvWindowsEvidence', 'osvWindowsPhysical', 'osvWindowsPhysicalRef']);
 });
 
 test('case C (structural): the host-process journal bounds only the three repository-bearing verification readers', () => {

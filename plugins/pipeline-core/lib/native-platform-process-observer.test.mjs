@@ -41,8 +41,8 @@ test('actual Windows program branch keeps executable/module/argv/cwd custody and
   let fresh=structuredClone(actual),refs=0;
   const p={platform:'win32',pid:31,cwd:()=>'/repo',execPath:'/node',argv:['/node','/bridge']};
   const fail=code=>{throw Object.assign(Error(code),{code});};
-  const fn=compileFunction(body+'\nreturn osvProgram;',['process','osvObservedProcess','osvSameProcess','realpathSync','osvPhysicalRef','osvFail','sameNativeDarwinProcess','isAbsolute','readFileSync','processArgvDigest'])
-    (p,()=>fresh,(a,b)=>JSON.stringify(a)===JSON.stringify(b),x=>x,path=>{refs++;return {path};},fail,()=>false,x=>x.startsWith('/'),()=>{throw Error('unexpected POSIX read');},()=>{throw Error('unexpected POSIX hash');});
+  const fn=compileFunction(body+'\nreturn osvProgram;',['process','osvObservedProcess','osvSameProcess','realpathSync','osvPhysicalRef','osvFail','sameNativeDarwinProcess','isAbsolute','readFileSync','processArgvDigest','windowsSameArgvPath'])
+    (p,()=>fresh,(a,b)=>JSON.stringify(a)===JSON.stringify(b),x=>x,path=>{refs++;return {path};},fail,()=>false,x=>x.startsWith('/'),()=>{throw Error('unexpected POSIX read');},()=>{throw Error('unexpected POSIX hash');},(a,b)=>a===b);
   assert.deepEqual(fn(actual),{executable:{path:'/node'},module:{path:'/bridge'},argv:['/node','/bridge'],cwd:'/repo'});assert.equal(refs,2);
   fresh={...actual,cwd:'/changed'};assert.throws(()=>fn(actual),{code:'OSV-INPUT-DRIFT'});
   fresh={...actual,argv:['/node','/unbound']};assert.throws(()=>fn(actual),{code:'OSV-INPUT-DRIFT'});
