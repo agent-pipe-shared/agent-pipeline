@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28c: 6 held patches exported from the build clone chain 8438dac43..22bc6a5d4
+# PO apply script for candidate 28c: 7 held patches exported from the build clone chain 8438dac43..9b76a43a9
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -20,6 +20,7 @@ step 03-1414e512a 'feat(evidence): record the software bill of materials in ever
 step 04-3da45b49f 'docs(sbom): record the decision that the close writes the SBOM and describe it in the operating model and the close skill'
 step 05-cde1280bc 'docs(architecture): bring the concept map of the close and the Critic finalizer up to date'
 step 06-22bc6a5d4 'docs(backlog): record the follow-ups of the SBOM close (audit pack, override binding, more readers)'
+step 07-9b76a43a9 'docs(backlog): record that a follow-up epic cannot extend the closed architecture design'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
