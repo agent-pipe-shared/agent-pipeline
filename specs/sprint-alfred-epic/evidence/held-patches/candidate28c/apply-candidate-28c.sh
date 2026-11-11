@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28c: 14 held patches exported from the build clone chain 8438dac43..926726c50
+# PO apply script for candidate 28c: 25 held patches exported from the build clone chain 8438dac43..f6738d2f8
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -28,6 +28,17 @@ step 11-6d1aacfdb 'feat(architecture): let a predecessor module grow its depende
 step 12-93758c680 'feat(evidence): require the PO'"'"'s signature to accept a gap in the SBOM of a feature close'
 step 13-61cb7e2e2 'docs(architecture): bring the concept map up to date for the signed SBOM override'
 step 14-926726c50 'feat(evidence): carry the signed SBOM override in the audit bundle and check its signature offline'
+step 15-2f2be4cd4 'feat(scripts): measure the fixed context baseline of a session per window and the Pipeline'"'"'s share of it'
+step 16-90a343fb3 'feat(guard): print the full shell grammar once per context window, also for read-spelling refusals'
+step 17-115d08bfd 'feat(preflight): print a compact ready envelope and keep the full one in the session scratch directory'
+step 18-a325921ac 'fix(verify): place the context-baseline and grammar-once suites in the capability inventory'
+step 19-3e8187c91 'fix(guard): list the SBOM modules the audit bundle and the signing script import as kernel paths'
+step 20-3929ecf80 'fix(preflight): keep the repair of open readiness findings and the Antigravity hint for an unidentified runner'
+step 21-d269e29c1 'chore(derived): refresh the backlog ledger projections and the Reader inputs for candidate 28c'
+step 22-a0e225be7 'feat(pipeline-start): keep the start skill inside the re-attach window and move status-conditional blocks to their references'
+step 23-6c3f9c66b 'docs(guard): name candidate 28c as the origin of the SBOM kernel paths'
+step 24-eff94f0cd 'docs(claude-md): keep the hard rules in CLAUDE.md and move their incident history to a maintainer record'
+step 25-f6738d2f8 'fix(docs): classify the new maintainer record and ADR-0091, and vendor ADR-0091 with the refreshed operating model'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog

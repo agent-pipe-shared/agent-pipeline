@@ -1,0 +1,192 @@
+diff --git a/governance/observation-doc-governance.json b/governance/observation-doc-governance.json
+index e6456a13db78f980e9914d9af1e7660af796735d..3a1a25effd973a0b916fe8abe8586f3afd0c54c2 100644
+--- a/governance/observation-doc-governance.json
++++ b/governance/observation-doc-governance.json
+@@ -132,6 +132,7 @@
+           "docs/gitlab-ci-pilot-threat-model.md",
+           "docs/governance-events.md",
+           "docs/guard-maintenance-window-threat-model.md",
++          "docs/hard-rule-incidents.md",
+           "docs/human-guard-override-threat-model.md",
+           "docs/local-supervisor-state-threat-model.md",
+           "docs/marketplace-supply-chain-threat-model.md",
+@@ -289,6 +290,7 @@
+           "docs/adr/0088-test-economy.md",
+           "docs/adr/0089-project-routing-is-user-owned.md",
+           "docs/adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md",
++          "docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md",
+           "docs/adr/README.md"
+         ]
+       },
+diff --git a/harness/scripts/generate-vendored-canon.mjs b/harness/scripts/generate-vendored-canon.mjs
+index b22a90b2b2d8e2c392602cae0b9dae28812e1dfa..630745c52e570113fbba1062ca04999eb7bd405d 100644
+--- a/harness/scripts/generate-vendored-canon.mjs
++++ b/harness/scripts/generate-vendored-canon.mjs
+@@ -174,6 +174,7 @@ export const UNIVERSAL_ADRS = Object.freeze([
+   { path: "docs/adr/0074-port-authorize-critical-ceremony.md", reason: "Cited by docs/push-release-flow.md (the ported `authorize-critical` single-command ceremony)." },
+   { path: "docs/adr/0076-global-chat-attributed-unattested-approval-mode.md", reason: "Cited by the vendored docs/operating-model.md as the normative distinction between chat-attributed-unattested and signature approval." },
+   { path: "docs/adr/0081-boundary-aware-impacted-verify.md", reason: "Defines the universal work, Critic, push, candidate, and release verification boundaries used in consuming projects." },
++  { path: "docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md", reason: "Cited by the vendored docs/operating-model.md and docs/adr/0032-project-doc-structure.md: every consuming project's feature close records the SBOM." },
+   { path: "docs/adr/draft-item-owned-egm-retained-quality-gates.md", reason: "Draft ADR already shipped under the plugin subtree (d02409a8a); classified rather than removed per PO decision 2026-10-17. Vendored copy of its repo-root origin until the ADR is accepted and renumbered." },
+   { path: "docs/adr/draft-item-owned-egm-retained-quality-gates.json", reason: "Machine-readable sidecar of the draft ADR above; vendored together with it (PO decision 2026-10-17)." },
+ ]);
+diff --git a/plugins/pipeline-core/docs/adr/0032-project-doc-structure.md b/plugins/pipeline-core/docs/adr/0032-project-doc-structure.md
+index bc950b3fc4ae1bb74bf34f9bbbff5c5a20bf486c..0f0cd2c68c8f68b1d61722c96c98e24a0c10f09d 100644
+--- a/plugins/pipeline-core/docs/adr/0032-project-doc-structure.md
++++ b/plugins/pipeline-core/docs/adr/0032-project-doc-structure.md
+@@ -6,7 +6,7 @@
+ 
+ **Status:** accepted (2026-07-07, PO directive from the AP1-TUNING session + plan approval "retro-speed") · **Basis:** PO directive (verbatim), `.claude/plans/2026-07-07-retro-speed.md` package G-E
+ 
+-**Governs:** templates/release-manifest.md, templates/architecture-doc.md, templates/prompts/kickoff-new-project.md, third-party-licenses.json, plugins/pipeline-core/scripts/security-scan.mjs, plugins/pipeline-core/scripts/security-scan.test.mjs, plugins/pipeline-core/lib/sbom-manifest.mjs, plugins/pipeline-core/lib/sbom-manifest.test.mjs, plugins/pipeline-core/lib/sbom-lifecycle.test.mjs, plugins/pipeline-core/lib/sbom-release-binding.mjs, plugins/pipeline-core/lib/sbom-release-binding.test.mjs
++**Governs:** templates/release-manifest.md, templates/architecture-doc.md, templates/prompts/kickoff-new-project.md, third-party-licenses.json, plugins/pipeline-core/scripts/security-scan.mjs, plugins/pipeline-core/scripts/security-scan.test.mjs, plugins/pipeline-core/lib/sbom-manifest.mjs, plugins/pipeline-core/lib/sbom-manifest.test.mjs, plugins/pipeline-core/lib/sbom-lifecycle.test.mjs, plugins/pipeline-core/lib/sbom-release-binding.mjs, plugins/pipeline-core/lib/sbom-release-binding.test.mjs, plugins/pipeline-core/lib/sbom-close.mjs, plugins/pipeline-core/lib/sbom-close.test.mjs
+ 
+ ## Context
+ 
+@@ -47,6 +47,10 @@ This amendment retains the greenfield decision and the prohibition on automatic
+ 
+ An SBOM is inventory evidence only: findings, VEX disposition, risk acceptance and release approval remain separately typed. The lifecycle states are closed as `complete`, `stale`, `invalid`, `partial`, `unsupported`, `unavailable` and `not-applicable`; only a fresh, complete, validated record can later be bound to a release. CycloneDX remains a project-selected adapter, not a universal tooling mandate. Existing baseline artifacts remain byte-stable until an explicit, preview-first migration is separately approved.
+ 
++## Amendment 2026-11-11 — the close writes the SBOM
++
++[ADR-0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) (PO tiles, register D240) makes the SBOM part of every feature close and of its audit bundle. The rejected alternative "Full CycloneDX mandatory for all projects" and the sentence that the full SBOM is not mandatory are superseded for the lockfiles the close can read (npm, Python, Go, Rust): the close reads them without installing any tool and records both formats, or an explicit `not-applicable`, and a blocking state needs the PO's signed override. Everything else in this ADR stays.
++
+ <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+ 
+ # ADR-0032: Projekt-Doku-Struktur — Release-Traceability, SBOM-Konvention, lebendes Architektur-Dokument (GREENFIELD)
+@@ -93,3 +97,7 @@ Adoption durch ein Bestandsprojekt: auf the PO-Initiative, projekt-individuell (
+ Diese Ergänzung erhält die Greenfield-Entscheidung und das Verbot automatischer historischer Migration. Nach ausdrücklicher Projektadoption ist `pipeline.sbom-manifest.v1` der einzige kanonische, unveränderliche Inventarnachweis. Er bindet exakten Kandidaten, Source-Input-Digests, Adapteridentität/-konfiguration, festgelegte CycloneDX-1.6- und SPDX-2.3-Payloads, Komponentenherkunft/-beziehungen, Vollständigkeit, Frische, Export-Privacy und den kanonischen Digest.
+ 
+ Eine SBOM ist ausschließlich Inventar: Findings, VEX, Risikoakzeptanz und Release-Freigabe bleiben getrennte Records. Die Zustände sind geschlossen (`complete`, `stale`, `invalid`, `partial`, `unsupported`, `unavailable`, `not-applicable`); eine spätere Release-Bindung darf nur einen frischen, vollständigen und validierten Record verwenden. Bestehende Baseline-Artefakte bleiben bis zu einer ausdrücklich genehmigten, preview-basierten Migration byte-stabil.
++
++## Ergänzung 2026-11-11 — der Close schreibt die SBOM
++
++[ADR-0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) (PO-Kacheln, Register D240) macht die SBOM zum Teil jedes Feature-Close und seines Audit-Bundles. Die verworfene Alternative „Volles CycloneDX für alle Projekte verpflichtend“ und der Satz, die volle SBOM sei nicht verpflichtend, gelten für die Lockfiles, die der Close lesen kann (npm, Python, Go, Rust), nicht mehr: der Close liest sie ohne Werkzeuginstallation und hält beide Formate fest, oder ein ausdrückliches `not-applicable`; ein sperrender Zustand braucht die signierte Übersteuerung des PO. Alles Übrige dieses ADR bleibt.
+diff --git a/plugins/pipeline-core/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md b/plugins/pipeline-core/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..067edef2f91f637d45dfe4c37db356af880683d3
+--- /dev/null
++++ b/plugins/pipeline-core/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+@@ -0,0 +1,28 @@
++# ADR-0091: The software bill of materials is part of every feature close
++
++> Agent-Pipeline · Sprint Alfred · 2026-11-11
++
++**Status:** accepted (2026-11-11, PO tiles, register D240). Built in candidate 28c. Not yet run on a real repository.
++
++**Context source (PO direction, 2026-11-11, from the tile answers):** the SBOM is a standard part of the audit bundle and is written by the close; a stale or invalid one blocks the close; more languages than Node in the first version; no component means an explicit `not-applicable` with a reason; an existing SBOM is checked and otherwise generated; `partial` and `unsupported` block as well, with an override and a help text on how an adapter can be added.
++
++## Context
++
++ADR-0032 made the full CycloneDX SBOM an option and rejected it as a mandate, because it forced new stack tooling without a demonstrated need. Its amendment of 2026-08-01 then built the lifecycle: `pipeline.sbom-manifest.v1`, the CycloneDX 1.6 and SPDX 2.3 views, the Node adapter and the closed lifecycle states. None of it was wired into the close, so the audit bundle of a closed feature never carried a bill of materials, and a project that wanted one had to produce it by hand outside the close.
++
++## Decision
++
++1. **The close checks or writes the SBOM, always.** `finish-feature.mjs --one-shot` reads the lockfiles tracked in the repository and writes `specs/<feature>/evidence/sbom/` with `record.json` (`pipeline.sbom-close-record.v1`), `cyclonedx.json` and `spdx.json`. An existing record whose lockfile digests still match is reused; otherwise one is generated. Nothing runs a package manager and nothing uses the network: only pinned lockfiles are read.
++2. **First readers:** npm (`package-lock.json`, `npm-shrinkwrap.json`), Python (`poetry.lock`, `Pipfile.lock`, `requirements.txt` with `==` pins), Go (`go.mod`) and Rust (`Cargo.lock`). A reader is one row in `SBOM_READERS` and one test, so an adapter for another ecosystem is an addition, not a redesign. The inventory has no dependency edges (`edges: "not-recorded"`): a document never claims a graph it did not read.
++3. **No component is an explicit record, never an absent file.** A repository with no manifest, or lockfiles that list nothing, gets `status: not-applicable` with its reason.
++4. **Four states block the close,** before the acceptance question and before anything is written: `stale` (the lockfiles changed after the record), `invalid` (an unreadable or damaged file or record), `partial` (a manifest without a lockfile, an unpinned requirement) and `unsupported` (a manifest or lockfile with no reader yet). The stop names each finding and says how to repair it, including how a reader is added.
++5. **Only the PO's signature passes a block** (PO tile 2026-11-11: require a signature; the first draft took the human's literal words as an attribution record, which nothing proved). When a finding blocks, the stop writes a request (`pipeline.sbom-override-request.v1`, under `scratch/`) that names the feature, every blocked finding and HEAD (commit and tree), and prints the command the PO runs in their own terminal: `po-human-approval.mjs sign-intent --request <the request>`. The signing command shows the findings, signs the request's intent digest and writes the proof next to the request. The close then runs again with `--sbom-override-proof <that file>`, verifies the proof with `verifyPoApprovalProof` against the trust anchors of `project/critical-human-proof.json` and records the override (`status: overridden`: the findings, the actor, and the authority: key reference, intent digest, proof digest, candidate commit) together with the signed request and proof in `specs/<feature>/evidence/sbom/`. A proof for other findings, another commit, another feature or a key the project does not name is refused; a project without a trust anchor cannot pass a block at all, it can only repair it. The bundle carries the record under the code `SBOM-OVERRIDDEN` and its README states that the SBOM is then incomplete by that decision. A resumed close needs no second override for the findings the record names; a new finding blocks again. The old `--sbom-override "<words>"` flag no longer exists.
++6. **The audit bundle carries it.** The close names the record in its audit request; the bundle copies the record and the two documents as artifacts, prints a section for them, and the offline verifier re-checks the record's shape, that the carried documents are exactly the ones it names by digest, and that each document holds its profile. For a signed override it also copies the signed request and the proof (`sbom-override:request`, `sbom-override:proof`) and the verifier (`AB-SBOM-OVERRIDE`) re-derives the request from its own fields, checks that it names exactly the findings the record covered and that the proof is a valid Ed25519 signature over its intent whose key reference and digests are the record's.
++
++## Consequences
++
++Every closed feature has an inventory in its evidence, in two standard formats, without a tool the project must install. A project with a stack the readers do not know is stopped once, with the way forward named, and can pass only by the PO's signed decision. The override is visible to whoever reads the bundle. Known limits, by design: the trust anchors are the project's committed policy file (human-gated and audited, not unwritable), and a project without an anchor has no override route. The offline verifier holds no anchors: it checks the signature and its binding, and the record names the key so a reader can compare it with the project's policy. Paths under `node_modules`, `vendor`, fixture, example, `docs`, `specs` and similar directories are not observed.
++
++## Affected contracts
++
++ADR-0032 stays for everything else (release manifests, the living architecture document, the greenfield scope); its option "full CycloneDX per stack tooling" is now met inside the close for the supported lockfiles. The lifecycle states of its 2026-08-01 amendment are reused as typed finding states; `pipeline.sbom-manifest.v1` still binds a release candidate and is not replaced by the close record, which binds the feature's evidence.
+diff --git a/plugins/pipeline-core/docs/operating-model.md b/plugins/pipeline-core/docs/operating-model.md
+index 4dc4f0e18b7cac3e73e0523d758bb981ddc6c2e0..30498a33c38113836e0c305d09ef9f3ad189ae1c 100644
+--- a/plugins/pipeline-core/docs/operating-model.md
++++ b/plugins/pipeline-core/docs/operating-model.md
+@@ -582,9 +582,13 @@ your project's authority settings before using one.
+ <!-- capability:supply-chain-provenance -->
+ <a id="capability-supply-chain-provenance"></a>
+ 
+-- **SBOM and provenance contracts (optional, host-only):** inspect component
+-  inputs and validate local provenance structures; they do not install
+-  scanners or create an external attestation.
++- **SBOM and provenance contracts (provenance optional, host-only; the SBOM
++  is part of every feature close, [ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md)):**
++  the close reads the pinned lockfiles (npm, Python, Go, Rust) and records the
++  components in CycloneDX 1.6 and SPDX 2.3, or an explicit `not-applicable`;
++  `stale`, `invalid`, `partial` and `unsupported` stop the close unless the
++  PO's signed override for exactly those findings is recorded. Provenance structures are validated locally;
++  nothing here installs scanners or creates an external attestation.
+ 
+ <!-- capability:ai-assisted-hardening -->
+ <a id="capability-ai-assisted-hardening"></a>
+@@ -1194,9 +1198,15 @@ externe Freigabe oder die Aktivierung in einem Nutzer-Repository.
+ - **Security-Control-Katalog (optional, nur Host):** prüft Anwendbarkeit,
+   Receipts und Waiver-Ablauf; er ist weder ein automatisch laufender Scanner
+   noch Ersatz für das konfigurierte Security-Gate.
+-- **SBOM- und Provenienzverträge (optional, nur Host):** prüfen lokale
+-  Komponenten- und Provenienzangaben, installieren aber keine Scanner und
+-  erstellen keine externe Attestierung.
++- **SBOM- und Provenienzverträge (Provenienz optional, nur Host; die SBOM ist
++  Teil jedes Feature-Close, [ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md)):**
++  der Close liest die gepinnten Lockfiles (npm, Python, Go, Rust) und hält die
++  Komponenten in CycloneDX 1.6 und SPDX 2.3 fest, oder ein ausdrückliches
++  `not-applicable`; `stale`, `invalid`, `partial` und `unsupported` stoppen den
++  Close, solange keine signierte Übersteuerung des PO für genau diese Befunde
++  festgehalten ist.
++  Provenienzstrukturen werden lokal geprüft; nichts davon installiert Scanner
++  oder erstellt eine externe Attestierung.
+ - **KI-gestützte Härtung (optional, nur Host):** bewertet nicht vertrauenswürdige
+   Änderungseingaben explizit; ein vorhandener Test bedeutet keinen aktiven
+   Runner-Hook.
+diff --git a/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs b/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
+index 486e20d408a88528c51fea910dfb758f332d0dbe..993fa904a6aa4bc28bda10aa973fdc4ad5080003 100644
+--- a/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
++++ b/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
+@@ -27,8 +27,8 @@ export function blob(root,commit,path,limit=1048576){commitIdentity(root,commit)
+ export const sourcePaths=Object.freeze(['GEMINI.md','PIPELINE_FLOW.de.md','PIPELINE_FLOW.md','README.md','SETUP.md','docs/README.md','docs/audit-and-evidence.md','docs/audit-bundles.md','docs/cost-and-measurement.md','docs/enforcement.md','docs/overview.md','docs/parallel-work.md','docs/security-controls.md','docs/sprint-alfred-completion-report.md','docs/usage.md','docs/v3-consumer-onboarding.md']);
+ export const inputPaths=Object.freeze({capabilityInventorySha256:'docs/product-capability-inventory.json',governanceSha256:'governance/observation-doc-governance.json',readerProtocolSha256:'harness/reader-review-protocol.md'});
+ export const policySha256='e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337';
+-const inputHashes=Object.freeze({capabilityInventorySha256:'6ec6e77a4b4f88746c0ec0f7d3d5d7df560cfccd918416ce3d528bb56baa54f5',governanceSha256:'def300140d059c6c60a1f57be0f50c8774946a99e6625947b0c584382621caaa',readerProtocolSha256:'9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640'});
++const inputHashes=Object.freeze({capabilityInventorySha256:'ba310ce407c834d6be4c91ce75e94dd3d6bd19bd54f02fccb17613140e018f56',governanceSha256:'a5c5ed153850d29c460d52a7419abc3f08f1dd9347f50046ed054e73d07cf339',readerProtocolSha256:'9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640'});
+ const pluginRoot=fileURLToPath(new URL('..',import.meta.url));
+ export function sourceIdentity(root){try{const tracked=p=>gitText(root,['ls-files','--error-unmatch','--',p])===p;const a=jsonBytes(physicalBytes(root,'.claude/pipeline.json')),b=jsonBytes(physicalBytes(root,'.claude-plugin/marketplace.json'));return tracked('.claude/pipeline.json')&&tracked('.claude-plugin/marketplace.json')&&a.project==='agent-pipeline'&&b.name==='agent-pipeline'&&b.owner?.name==='agent-pipeline'&&Array.isArray(b.plugins)&&b.plugins.filter(x=>x.name==='pipeline-core').length===1&&b.plugins.find(x=>x.name==='pipeline-core').source==='./plugins/pipeline-core'&&tracked('harness/reader-review-protocol.md')&&tracked('harness/scripts/check-doc-reader-binding.mjs');}catch{return false;}}
+-export function installedInputs(){const root=realpathSync.native(pluginRoot),manifestBytes=physicalBytes(root,'reader-inputs/manifest.json',65536);requireFact(hash(manifestBytes)==='f7f89fbaa5dd605f3bfe43549bbae5602d11717eadbcf81bc7e0fcec04d55e5d');const manifest=jsonBytes(manifestBytes);exact(manifest,['schema','policySha256','inputs']);requireFact(manifest.schema==='pipeline.doc-reader-input-bundle.v1'&&manifest.policySha256===policySha256);exact(manifest.inputs,Object.keys(inputPaths));const inputs={};for(const [key,path] of Object.entries(inputPaths)){const entry=manifest.inputs[key];exact(entry,['canonicalSourcePath','pluginPath','sha256']);const relative=`reader-inputs/${path.split('/').at(-1)}`;requireFact(entry.canonicalSourcePath===path&&entry.pluginPath===`plugins/pipeline-core/${relative}`&&entry.sha256===inputHashes[key]);const bytes=physicalBytes(root,relative,1048576);requireFact(hash(bytes)===inputHashes[key]);inputs[key]=hash(bytes);requireFact(physicalBytes(root,relative,1048576).equals(bytes));}requireFact(hash(physicalBytes(root,'skills/reader-review/SKILL.md',1048576))===policySha256&&physicalBytes(root,'reader-inputs/manifest.json',65536).equals(manifestBytes));return inputs;}
++export function installedInputs(){const root=realpathSync.native(pluginRoot),manifestBytes=physicalBytes(root,'reader-inputs/manifest.json',65536);requireFact(hash(manifestBytes)==='6d09f098d59a6faf7ba43e7d4154050aea6aa0dbd7ae8c3e0b9e9f0ba1294d7f');const manifest=jsonBytes(manifestBytes);exact(manifest,['schema','policySha256','inputs']);requireFact(manifest.schema==='pipeline.doc-reader-input-bundle.v1'&&manifest.policySha256===policySha256);exact(manifest.inputs,Object.keys(inputPaths));const inputs={};for(const [key,path] of Object.entries(inputPaths)){const entry=manifest.inputs[key];exact(entry,['canonicalSourcePath','pluginPath','sha256']);const relative=`reader-inputs/${path.split('/').at(-1)}`;requireFact(entry.canonicalSourcePath===path&&entry.pluginPath===`plugins/pipeline-core/${relative}`&&entry.sha256===inputHashes[key]);const bytes=physicalBytes(root,relative,1048576);requireFact(hash(bytes)===inputHashes[key]);inputs[key]=hash(bytes);requireFact(physicalBytes(root,relative,1048576).equals(bytes));}requireFact(hash(physicalBytes(root,'skills/reader-review/SKILL.md',1048576))===policySha256&&physicalBytes(root,'reader-inputs/manifest.json',65536).equals(manifestBytes));return inputs;}
+ export function snapshotScopedReaderDocumentation({root,candidate,scope,inputBundle=null}){physicalRoot(root);const tree=commitIdentity(root,candidate);requireFact(Array.isArray(scope.documentPaths)&&scope.documentPaths.length>0&&scope.documentPaths.length<=128&&new Set(scope.documentPaths).size===scope.documentPaths.length);let total=0;const coverage=scope.documentPaths.map(path=>{const bytes=blob(root,candidate,path,524288);total+=bytes.length;requireFact(total<=4194304);return{path,sha256:hash(bytes)};});const source=sourceIdentity(root);if(source)requireFact(same(scope.documentPaths,sourcePaths));requireFact(inputBundle===null,'COURSE-REQUEST-INVALID');const inputs=source?Object.fromEntries(Object.entries(inputPaths).map(([k,p])=>[k,hash(blob(root,candidate,p))])):installedInputs();const docsetSha256=hash(`pipeline.doc-reader-docset.v1\0${canonical({coverage:[...coverage].sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0),...inputs})}`);requireFact(commitIdentity(root,candidate)===tree);return Object.freeze({commit:candidate,tree,coverage,inputs,docsetSha256});}
+diff --git a/plugins/pipeline-core/reader-inputs/manifest.json b/plugins/pipeline-core/reader-inputs/manifest.json
+index ca31203cb779ef7193bbdc41e7d3f1b0286447f3..8946c45b5ed3cb48163ce8ffa96e614031d216ca 100644
+--- a/plugins/pipeline-core/reader-inputs/manifest.json
++++ b/plugins/pipeline-core/reader-inputs/manifest.json
+@@ -1 +1 @@
+-{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"6ec6e77a4b4f88746c0ec0f7d3d5d7df560cfccd918416ce3d528bb56baa54f5"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"def300140d059c6c60a1f57be0f50c8774946a99e6625947b0c584382621caaa"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640"}},"policySha256":"e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337","schema":"pipeline.doc-reader-input-bundle.v1"}
++{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"ba310ce407c834d6be4c91ce75e94dd3d6bd19bd54f02fccb17613140e018f56"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"a5c5ed153850d29c460d52a7419abc3f08f1dd9347f50046ed054e73d07cf339"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640"}},"policySha256":"e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337","schema":"pipeline.doc-reader-input-bundle.v1"}
+diff --git a/plugins/pipeline-core/reader-inputs/observation-doc-governance.json b/plugins/pipeline-core/reader-inputs/observation-doc-governance.json
+index e6456a13db78f980e9914d9af1e7660af796735d..3a1a25effd973a0b916fe8abe8586f3afd0c54c2 100644
+--- a/plugins/pipeline-core/reader-inputs/observation-doc-governance.json
++++ b/plugins/pipeline-core/reader-inputs/observation-doc-governance.json
+@@ -132,6 +132,7 @@
+           "docs/gitlab-ci-pilot-threat-model.md",
+           "docs/governance-events.md",
+           "docs/guard-maintenance-window-threat-model.md",
++          "docs/hard-rule-incidents.md",
+           "docs/human-guard-override-threat-model.md",
+           "docs/local-supervisor-state-threat-model.md",
+           "docs/marketplace-supply-chain-threat-model.md",
+@@ -289,6 +290,7 @@
+           "docs/adr/0088-test-economy.md",
+           "docs/adr/0089-project-routing-is-user-owned.md",
+           "docs/adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md",
++          "docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md",
+           "docs/adr/README.md"
+         ]
+       },
+diff --git a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+index 4573d5d2329aee4727ef6a431b466f219ce6754b..fc544c46d6a43b8b510e8f1cfd3cfaedce044494 100644
+--- a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
++++ b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+@@ -1163,6 +1163,7 @@
+         "verify-phase:harness/scripts/verify.mjs:stack-fuzz-replay-tests",
+         "verify-phase:harness/scripts/verify.mjs:stack-run-outcome-tests",
+         "verify-phase:harness/scripts/verify.mjs:staleness-check-tests",
++        "verify-phase:harness/scripts/verify.mjs:start-skill-fits-the-reattach-window-tests",
+         "verify-phase:harness/scripts/verify.mjs:state-budget-check",
+         "verify-phase:harness/scripts/verify.mjs:state-budget-tests",
+         "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-check",

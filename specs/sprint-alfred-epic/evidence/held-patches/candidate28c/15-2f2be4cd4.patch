@@ -1,0 +1,261 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index ddb82ed81838325eb06a3fe58defc0ef971f0fea..9f291f70756d412b305afca29e81d62bf4aacae9 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -11,6 +11,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
+ | Run the Full Verify (candidate mode, no reuse) in a clone with a private HOME, a short TMPDIR and a red-step summary | `scripts/full-verify.mjs` | output file, verify's run record in the clone, temp dirs |
+ | Shrink recorded agent runs (Codex, Claude Code, Antigravity, logs) to digests of human messages, tool calls, refusals and errors, for a complete audit of a greenfield run; the operator runs it because the transcripts live outside the repository | `scripts/transcript-digest.mjs` | one private text file per source in the `--out` directory |
+ | Rough token split of session and subagent transcripts into impl / content / admin / dialogue (heuristic, +-10 points; target for admin: about 15 % in user repositories) | `scripts/transcript-token-buckets.mjs` | none (prints JSON) |
++| How many tokens every request of a Claude Code session carries before any work (the fixed baseline of each context window, re-read by every later request), how much of it the Pipeline puts there (invoked pipeline-core skills, listings, hook context, the project CLAUDE.md or AGENTS.md) and how much guard denials add per window | `scripts/context-baseline.mjs <transcript.jsonl> [--windows N]` (`node --test scripts/context-baseline.test.mjs`) | none (prints JSON with sizes and names, never content) |
+ | Check, summarise and apply Goldfish diffs or format-patch files through Node (the shell grammar refuses `git apply`) | `scripts/apply-diff.mjs` | the working tree (stages nothing) |
+ | Package a held-kernel-patch scratch work tree into one patch against the candidate commit, with preimage hashes and `git apply --check` | `scripts/pack-held-patch.mjs <candidate> <work-dir> <out-patch> <repo-path>...` | the patch file only |
+ | Fill the Goldfish briefing template verbatim from a JSON spec (fix-wave task without an Alfred acceptance row) | `scripts/fill-goldfish-briefing.mjs` | one briefing file under `scratch/` |
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index c959468e2428ffc570c64454b5d4f3acbee0162b..1f9ca319911398575d02a9ea44d89f2e26ad8452 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4849,6 +4849,12 @@
+       "file": "plugins/pipeline-core/lib/sbom-close.test.mjs",
+       "invariantPinned": "The close reads the lockfiles it knows (npm, Python, Go, Rust) into CycloneDX 1.6 and SPDX 2.3 documents and a closed record; no component is an explicit not-applicable record with its reason; a manifest without a lockfile, an unpinned requirement, a format without a reader, a changed lockfile or a damaged record is a typed finding that blocks, and only a human's literal override, named in the record with every finding it covers, passes it",
+       "nonOverlapNote": "Unique cases: the lockfile readers and the close record; sbom-manifest, sbom-node-adapter and sbom-release-binding tests pin the portable manifest, the Node graph adapter and the release links and do not read any lockfile"
++    },
++    {
++      "name": "context-baseline-tests",
++      "file": "scripts/context-baseline.test.mjs",
++      "invariantPinned": "The context baseline of a transcript window is the input of its first real reply, later requests count at most that much as re-read baseline, zero-usage replies are no requests, and the attachments before that reply are attributed to pipeline (pipeline-core skills, listings and hook context, the project CLAUDE.md or AGENTS.md), user (the memory index) and harness",
++      "nonOverlapNote": "Unique test suite for scripts/context-baseline.mjs; outside the harness and plugins roots the registration checker scans, so only this entry runs it"
+     }
+   ]
+ }
+diff --git a/scripts/context-baseline.mjs b/scripts/context-baseline.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a99ed6ad0f1df05bc01162f2ad416fa39fdd7288
+--- /dev/null
++++ b/scripts/context-baseline.mjs
+@@ -0,0 +1,149 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Fixed context baseline of a Claude Code session transcript (JSONL), per context window.
++ *
++ * PURPOSE. Answers "how many tokens does every request of a session carry before any work, and how much of
++ * that does the Pipeline put there". A context window starts at the session start and after every compaction.
++ * Its baseline is the input of the first model reply in that window (fresh input + cache write + cache read);
++ * every later request of the window re-reads it. The tool attributes the attachments that precede that first
++ * reply to their source (Pipeline, user, harness) and counts the guard denials a window accumulates.
++ *
++ * USAGE. node scripts/context-baseline.mjs <transcript.jsonl> [--windows N]
++ *   Prints one JSON object (schema pipeline.context-baseline.v1): session totals (requests, input tokens, the
++ *   share of all input that is the re-read window baseline), the last N windows (default 3) with their
++ *   baseline tokens and attributed sizes in KB, and the guard denials (count, KB, KB per window).
++ *   Reads only the file named; writes nothing; prints sizes and names, never content. Sizes are UTF-8 bytes,
++ *   not model tokens (roughly bytes / 4).
++ *
++ * ATTRIBUTION. pipeline: invoked skills, agent and skill descriptions and hook context of the pipeline-core
++ * plugin, the repository CLAUDE.md / AGENTS.md; user: the memory index; harness: everything else (tool
++ * schemas are not in the transcript; they are inside the cache read of the first reply).
++ */
++import { readFileSync } from "node:fs";
++import { isDirectInvocation } from "../plugins/pipeline-core/lib/entrypoint.mjs";
++
++export const SCHEMA = "pipeline.context-baseline.v1";
++const PIPELINE_PREFIX = "pipeline-core:";
++const DENIAL = /PreToolUse:\w+ hook error: \[[^\]]*\]: BLOCKED/;
++const kb = (bytes) => Math.round(bytes / 102.4) / 10;
++const size = (value) => Buffer.byteLength(typeof value === "string" ? value : JSON.stringify(value ?? ""));
++
++function listingBytes(text) {
++  const out = { pipeline: 0, other: 0 };
++  for (const line of String(text).split("\n")) {
++    out[line.replace(/^[-*\s]+/, "").startsWith(PIPELINE_PREFIX) ? "pipeline" : "other"] += size(line);
++  }
++  return out;
++}
++
++/** Attribute one attachment to { pipeline, user, harness } byte counts. */
++export function attributeAttachment(attachment) {
++  const a = attachment ?? {};
++  const total = size(a);
++  if (a.type === "invoked_skills") {
++    const skills = Array.isArray(a.skills) ? a.skills : [];
++    const pipeline = skills.filter((s) => String(s.name ?? "").startsWith(PIPELINE_PREFIX)).reduce((n, s) => n + size(s.content ?? s), 0);
++    return { pipeline, user: 0, harness: total - pipeline };
++  }
++  if (a.type === "skill_listing" || a.type === "agent_listing_delta") {
++    const text = a.type === "skill_listing" ? a.content ?? "" : (Array.isArray(a.addedLines) ? a.addedLines : []).join("\n");
++    const { pipeline } = listingBytes(text);
++    return { pipeline, user: 0, harness: Math.max(0, total - pipeline) };
++  }
++  if (a.type === "instructions" || a.type === "nested_memory") {
++    const items = Array.isArray(a.files) ? a.files : Array.isArray(a.content) ? a.content : [];
++    let pipeline = 0;
++    let user = 0;
++    for (const item of items) {
++      const path = String(item.path ?? "");
++      if (/\/memory\/MEMORY\.md$/.test(path)) user += size(item.content ?? item);
++      else if (/(^|\/)(CLAUDE|AGENTS)\.md$/.test(path)) pipeline += size(item.content ?? item);
++    }
++    return { pipeline, user, harness: Math.max(0, total - pipeline - user) };
++  }
++  if (a.type === "hook_additional_context") return { pipeline: total, user: 0, harness: 0 };
++  return { pipeline: 0, user: 0, harness: total };
++}
++
++/** Measure a parsed transcript (array of entries). */
++export function measureContextBaseline(entries, { windows: keep = 3 } = {}) {
++  const windows = [];
++  let current = null;
++  let denials = 0;
++  let denialBytes = 0;
++  for (const e of entries) {
++    if (!current || (e.type === "system" && /compact/i.test(e.subtype ?? ""))) {
++      current = { baselineTokens: null, requests: new Map(), parts: {}, bytes: { pipeline: 0, user: 0, harness: 0 } };
++      windows.push(current);
++      if (e.type === "system") continue;
++    }
++    if (e.type === "assistant" && e.message?.usage) {
++      const u = e.message.usage;
++      const input = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
++      if (input === 0) continue; // a synthetic reply (interrupt, error) carries no request
++      current.requests.set(e.message.id ?? `${current.requests.size}`, input);
++      if (current.baselineTokens === null) current.baselineTokens = input;
++      continue;
++    }
++    if (e.type === "user" && Array.isArray(e.message?.content)) {
++      for (const c of e.message.content) {
++        if (c.type !== "tool_result") continue;
++        const text = typeof c.content === "string" ? c.content : JSON.stringify(c.content ?? "");
++        if (DENIAL.test(text)) { denials += 1; denialBytes += size(text); }
++      }
++    }
++    if (e.type === "attachment" && current.baselineTokens === null) {
++      const a = e.attachment ?? {};
++      const key = a.type === "invoked_skills"
++        ? `invoked_skills(${(a.skills ?? []).map((s) => s.name).join(",")})`
++        : `${a.type ?? "?"}${a.hookName ? `:${a.hookName}` : ""}`;
++      const attributed = attributeAttachment(a);
++      for (const owner of Object.keys(attributed)) current.bytes[owner] += attributed[owner];
++      current.parts[key] = (current.parts[key] ?? 0) + size(a);
++    }
++  }
++  const measured = windows.filter((w) => w.baselineTokens !== null);
++  let requests = 0;
++  let inputTokens = 0;
++  let baselineTokens = 0;
++  for (const w of measured) {
++    requests += w.requests.size;
++    for (const t of w.requests.values()) { inputTokens += t; baselineTokens += Math.min(t, w.baselineTokens); }
++  }
++  return {
++    schema: SCHEMA,
++    windows: measured.length,
++    requests,
++    inputTokens,
++    baselineShareOfInput: inputTokens ? Math.round((baselineTokens / inputTokens) * 1000) / 1000 : 0,
++    baselineTokensPerWindow: measured.map((w) => w.baselineTokens),
++    guardDenials: { count: denials, kb: kb(denialBytes), kbPerWindow: measured.length ? kb(denialBytes / measured.length) : 0 },
++    lastWindows: measured.slice(-keep).map((w) => ({
++      baselineTokens: w.baselineTokens,
++      attributedKB: { pipeline: kb(w.bytes.pipeline), user: kb(w.bytes.user), harness: kb(w.bytes.harness) },
++      partsKB: Object.fromEntries(Object.entries(w.parts).sort((x, y) => y[1] - x[1]).map(([k, v]) => [k, kb(v)])),
++    })),
++  };
++}
++
++export function parseTranscript(text) {
++  const entries = [];
++  for (const line of text.split("\n")) {
++    if (!line) continue;
++    try { entries.push(JSON.parse(line)); } catch { /* a torn line is skipped */ }
++  }
++  return entries;
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  const args = process.argv.slice(2);
++  const file = args[0];
++  const at = args.indexOf("--windows");
++  if (!file || file.startsWith("--")) {
++    process.stderr.write("usage: node scripts/context-baseline.mjs <transcript.jsonl> [--windows N]\n");
++    process.exit(2);
++  }
++  const report = measureContextBaseline(parseTranscript(readFileSync(file, "utf8")), { windows: at >= 0 ? Number(args[at + 1]) : 3 });
++  process.stdout.write(`${JSON.stringify(report, null, 1)}\n`);
++}
+diff --git a/scripts/context-baseline.test.mjs b/scripts/context-baseline.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a37d142952520739b7f4dda3c522e749623740c8
+--- /dev/null
++++ b/scripts/context-baseline.test.mjs
+@@ -0,0 +1,71 @@
++// SPDX-License-Identifier: SUL-1.0
++import { test } from "node:test";
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { writeFileSync } from "node:fs";
++import { join } from "node:path";
++import { fileURLToPath } from "node:url";
++import { attributeAttachment, measureContextBaseline, parseTranscript, SCHEMA } from "./context-baseline.mjs";
++import { mkdtempTestScratch } from "../plugins/pipeline-core/lib/test-tmpdir.mjs";
++
++const usage = (id, fresh, write, read) => ({ type: "assistant", message: { id, usage: { input_tokens: fresh, cache_creation_input_tokens: write, cache_read_input_tokens: read } } });
++const attach = (attachment) => ({ type: "attachment", attachment });
++const denial = { type: "user", message: { content: [{ type: "tool_result", content: "PreToolUse:Bash hook error: [command hook 6]: BLOCKED (guard-lifecycle-ready): x" }] } };
++
++const fixture = [
++  attach({ type: "skill_listing", content: "- pipeline-core:pipeline-start: start\n- other:thing: elsewhere" }),
++  attach({ type: "instructions", files: [{ path: "/r/CLAUDE.md", content: "r".repeat(1024) }, { path: "/h/.claude/projects/p/memory/MEMORY.md", content: "m".repeat(512) }] }),
++  usage("m1", 2, 900, 100),
++  usage("m2", 2, 50, 1000),
++  denial,
++  { type: "system", subtype: "compact_boundary" },
++  attach({ type: "invoked_skills", skills: [{ name: "pipeline-core:pipeline-start", content: "x".repeat(2048) }, { name: "other:skill", content: "y".repeat(1024) }] }),
++  attach({ type: "hook_additional_context", content: ["continuity"] }),
++  usage("m3", 0, 0, 0),
++  usage("m4", 2, 500, 300),
++  usage("m5", 2, 10, 900),
++  denial,
++];
++
++test("each window's baseline is the first real reply's input; later requests re-read at most that much", () => {
++  const r = measureContextBaseline(fixture, { windows: 2 });
++  assert.equal(r.schema, SCHEMA);
++  assert.equal(r.windows, 2);
++  assert.deepEqual(r.baselineTokensPerWindow, [1002, 802]);
++  assert.equal(r.requests, 4, "the zero-usage reply is not a request");
++  assert.equal(r.inputTokens, 1002 + 1052 + 802 + 912);
++  assert.equal(r.baselineShareOfInput, Math.round(((1002 + 1002 + 802 + 802) / 3768) * 1000) / 1000);
++  assert.equal(r.guardDenials.count, 2);
++});
++
++test("attachments before the first reply are attributed to pipeline, user and harness", () => {
++  const r = measureContextBaseline(fixture, { windows: 2 });
++  const [first, second] = r.lastWindows;
++  assert.ok(first.attributedKB.pipeline > 0, "pipeline-core listing line and CLAUDE.md count as pipeline");
++  assert.ok(first.attributedKB.user > 0, "the memory index counts as user");
++  assert.equal(second.attributedKB.pipeline, Math.round((2048 + Buffer.byteLength(JSON.stringify({ type: "hook_additional_context", content: ["continuity"] }))) / 102.4) / 10);
++  assert.ok(Object.keys(second.partsKB).some((k) => k.startsWith("invoked_skills(pipeline-core:pipeline-start,other:skill)")));
++});
++
++test("only pipeline-core skills of an invoked-skills attachment are pipeline-owned", () => {
++  const a = { type: "invoked_skills", skills: [{ name: "pipeline-core:x", content: "abc" }, { name: "design:y", content: "defg" }] };
++  const out = attributeAttachment(a);
++  assert.equal(out.pipeline, 3);
++  assert.equal(out.pipeline + out.harness, Buffer.byteLength(JSON.stringify(a)));
++});
++
++test("the CLI prints the report for a file, skips torn lines and refuses a missing argument", () => {
++  const dir = mkdtempTestScratch("context-baseline-");
++  const file = join(dir, "t.jsonl");
++  writeFileSync(file, `${fixture.map((e) => JSON.stringify(e)).join("\n")}\n{torn\n`);
++  assert.equal(parseTranscript(`${JSON.stringify(fixture[0])}\n{torn`).length, 1);
++  const script = fileURLToPath(new URL("./context-baseline.mjs", import.meta.url));
++  const ok = spawnSync(process.execPath, [script, file, "--windows", "1"], { encoding: "utf8" });
++  assert.equal(ok.status, 0, ok.stderr);
++  const report = JSON.parse(ok.stdout);
++  assert.equal(report.lastWindows.length, 1);
++  assert.equal(report.windows, 2);
++  const bad = spawnSync(process.execPath, [script], { encoding: "utf8" });
++  assert.equal(bad.status, 2);
++  assert.match(bad.stderr, /usage: node scripts\/context-baseline\.mjs/);
++});

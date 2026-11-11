@@ -1,0 +1,234 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 1f9ca319911398575d02a9ea44d89f2e26ad8452..584ef96fc5bb7b195b9a6ce4dd7acb668f0ee6ed 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4855,6 +4855,12 @@
+       "file": "scripts/context-baseline.test.mjs",
+       "invariantPinned": "The context baseline of a transcript window is the input of its first real reply, later requests count at most that much as re-read baseline, zero-usage replies are no requests, and the attachments before that reply are attributed to pipeline (pipeline-core skills, listings and hook context, the project CLAUDE.md or AGENTS.md), user (the memory index) and harness",
+       "nonOverlapNote": "Unique test suite for scripts/context-baseline.mjs; outside the harness and plugins roots the registration checker scans, so only this entry runs it"
++    },
++    {
++      "name": "grammar-listing-once-per-context-window-tests",
++      "file": "plugins/pipeline-core/lib/pins/grammar-listing-once-per-context-window.test.mjs",
++      "invariantPinned": "A repeated GUARD-READ-COMMAND-UNSUPPORTED refusal in one context window prints the short grammar form and keeps the decision and the read-spelling note; the post-compact re-ground hook clears only the session-keyed trim state, so the first refusal of the next window prints the full grammar again, and never touches a subagent's own file or a climbing name",
++      "nonOverlapNote": "Unique cases: the read-spelling trim and the per-window reset; the NVA-B-DENIALTRIM cases in guard-lifecycle-ready.test.mjs pin the three grammar codes' per-session trim and scope keys"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/hooks/post-compact-reground.mjs b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+index f587a02bcb7e416fc258f665dbbebcce57655a3f..a812b1dcf567c345f97c4288a16660ac8cd5ce36 100644
+--- a/plugins/pipeline-core/hooks/post-compact-reground.mjs
++++ b/plugins/pipeline-core/hooks/post-compact-reground.mjs
+@@ -25,6 +25,7 @@ import {
+   resolveProjectAuthorityPaths,
+ } from "../lib/project-authority.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
++import { resetDenialClassesForSession } from "../lib/guard/denial-telemetry.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ // Repository admission precedes hook input hardening and all governed effects.
+ if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+@@ -379,7 +380,11 @@ export function decideOutput(input, state, { rootDir = null, env = process.env }
+   return { stdout: `${JSON.stringify(payload)}\n`, json: true, payload, projection, measurement };
+ }
+ 
+-/** Real hook boundary. It always exits zero and never writes repository state. */
++/**
++ * Real hook boundary. It always exits zero and never writes repository state. Its one write is private:
++ * it clears the session's guard denial-trim marker under `<git-common-dir>/agent-pipeline/` (candidate
++ * 28c), so the first grammar denial of the new context window prints the full grammar once again.
++ */
+ export function run() {
+   if (!observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return;
+   const rootDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+@@ -390,6 +395,7 @@ export function run() {
+     process.exit(0);
+   }
+   if (!shouldActivate(input)) process.exit(0);
++  resetDenialClassesForSession(input?.session_id, rootDir);
+ 
+   const authority = resolveProjectAuthorityPaths({ rootDir });
+   const statePath = authority.status === "ready"
+diff --git a/plugins/pipeline-core/lib/guard/denial-route.mjs b/plugins/pipeline-core/lib/guard/denial-route.mjs
+index 6879f70894dbb1bc09f58f9b1b55a3c7c671f5e1..f39a2b41648c28071b3c21728b69ca1cbbc98b60 100644
+--- a/plugins/pipeline-core/lib/guard/denial-route.mjs
++++ b/plugins/pipeline-core/lib/guard/denial-route.mjs
+@@ -48,7 +48,8 @@ export function blocked(
+       : readCredential
+         ? READ_CREDENTIAL_TARGET_REMEDY
+         : readUnsupported
+-        ? [READ_COMMAND_UNSUPPORTED_NOTE, ...GRAMMAR_DENIAL_REMEDY]
++        // Candidate 28c (context baseline): the read-spelling refusal trims its grammar listing on repeat like the three grammar codes.
++        ? [READ_COMMAND_UNSUPPORTED_NOTE, ...(firstOccurrenceThisSession ? GRAMMAR_DENIAL_REMEDY : GRAMMAR_DENIAL_REMEDY_SHORT)]
+         : (firstOccurrenceThisSession ? GRAMMAR_DENIAL_REMEDY : GRAMMAR_DENIAL_REMEDY_SHORT);
+     return verdict(
+       2,
+diff --git a/plugins/pipeline-core/lib/guard/denial-telemetry.mjs b/plugins/pipeline-core/lib/guard/denial-telemetry.mjs
+index cd587aa12ad4498ea903482bcfed4c92fd0cabcb..1a5142dcba3222358ea30d030dc3c76d982eb707 100644
+--- a/plugins/pipeline-core/lib/guard/denial-telemetry.mjs
++++ b/plugins/pipeline-core/lib/guard/denial-telemetry.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Guard module "denial-telemetry" (layer 5), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
+ 
+-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { renderProjectOnboardingAction } from "../project-onboarding-v3.mjs";
+ import { observeReturnedActionDenial, resetLifecycleDenial } from "../lifecycle-denial-loop.mjs";
+@@ -134,6 +134,28 @@ export function isFirstDenialThisScope(input, root, classKey, dependencies) {
+   }
+ }
+ 
++/**
++ * Candidate 28c (PO tile 2026-11-11, context baseline): the full grammar listing is printed once per
++ * CONTEXT WINDOW, not once per session. A compaction drops the earlier full listing from the model's
++ * context, so the post-compact re-ground hook calls this to forget which classes the orchestrating
++ * session has seen; the next grammar denial in the new window prints the full listing again. Only the
++ * session-keyed file of that session is removed (a dispatched subagent keeps its own agent-keyed file).
++ * Never throws: a missing file, an unusable session id or an unresolvable common dir is a no-op.
++ */
++export function resetDenialClassesForSession(sessionId, root, dependencies = {}) {
++  if (typeof sessionId !== "string" || !/^[A-Za-z0-9._-]{1,128}$/u.test(sessionId) || sessionId.startsWith("agent-")) return "skipped";
++  try {
++    const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
++    if (commonDir === null) return "skipped";
++    const statePath = guardDenialClassesPath(commonDir, sessionId);
++    if (!(dependencies.existsSyncFn ?? existsSync)(statePath)) return "absent";
++    (dependencies.rmSyncFn ?? rmSync)(statePath, { force: true });
++    return "reset";
++  } catch {
++    return "skipped";
++  }
++}
++
+ /**
+  * ADR-0059 Decision 5 / NOVA-LCR-HGO-2: everything below -- the LAUNCH_SCRIPT
+  * external-restart refusal and the onboarding-readiness gate (denial code
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 17d35a84cd2c93ed7a55aea267c39b146e68862d..b7b0616bc7de0f29bd2aad766cf7f64f77f19323 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -565,7 +565,10 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+         : externalFilter !== null ? `the filter "${externalFilter}" (${EXTERNAL_DIRECTORY_FILTER_HINT})`
+         : flag === null ? (recursiveSearch === null ? null : `the tree this recursive search reads (an admitted spelling of the same search: \`${recursiveSearch}\`)`)
+           : `the flag "${flag}"${spelling === null ? "" : ` (${spelling})`}`;
+-      return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejected));
++      const readCode = outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE;
++      // Candidate 28c (context baseline): only the read-spelling code trims; the read-scope code keeps its own full remedy.
++      const firstRead = readCode === READ_COMMAND_UNSUPPORTED_CODE ? isFirstDenialThisScope(input, root, readCode, dependencies) : true;
++      return withLifts(lifts, blocked(readCode, null, [], "", rejected, null, null, false, firstRead));
+     }
+   }
+   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
+@@ -645,7 +648,8 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+         || isOutsideRootSingleCommandRead(parsed, root);
+       // CGF-10 (PO tile 2026-11-09): a pipeline of readers that is not an admitted shape is a spelling question, so no signed override is offered.
+       if (!readScope && isReaderOnlyPipeline(parsed, root)) {
+-        return withLifts(lifts, blocked(READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejectedGrammarElement("GUARD-OPERATOR-UNAPPROVED", (input.tool_input.command ?? input.tool_input.CommandLine), parsed)));
++        const firstRead = isFirstDenialThisScope(input, root, READ_COMMAND_UNSUPPORTED_CODE, dependencies);
++        return withLifts(lifts, blocked(READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejectedGrammarElement("GUARD-OPERATOR-UNAPPROVED", (input.tool_input.command ?? input.tool_input.CommandLine), parsed), null, null, false, firstRead));
+       }
+       const code = readScope
+         ? READ_SCOPE_DENIAL_CODE
+diff --git a/plugins/pipeline-core/lib/pins/grammar-listing-once-per-context-window.test.mjs b/plugins/pipeline-core/lib/pins/grammar-listing-once-per-context-window.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a373667b88bee3ac89f244b4f5927e563941aa29
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/grammar-listing-once-per-context-window.test.mjs
+@@ -0,0 +1,96 @@
++// SPDX-License-Identifier: SUL-1.0
++// Candidate 28c (PO tile 2026-11-11, context baseline): the complete admitted shell grammar is printed once per
++// context window. GUARD-READ-COMMAND-UNSUPPORTED printed it in full on every refusal (about 3.5 KB each, four
++// times in one measured window); it now trims on repeat like the three grammar codes, and the post-compact
++// re-ground hook forgets the session's seen classes so the first refusal of a new window is full again.
++import test from "node:test";
++import assert from "node:assert/strict";
++import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { join } from "node:path";
++import { fileURLToPath } from "node:url";
++import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
++import { resetDenialClassesForSession } from "../guard/denial-telemetry.mjs";
++import { mkdtempTestScratch } from "../test-tmpdir.mjs";
++
++const FULL = /The complete admitted grammar, with bounds and exact spellings:/u;
++const SHORT = /already printed on the earlier denial of this kind this session/u;
++const READ_SPELLING = "head -c 700 probe.txt";
++
++function governedRoot() {
++  const path = mkdtempTestScratch("grammar-once-root-");
++  mkdirSync(join(path, ".claude"), { recursive: true });
++  mkdirSync(join(path, ".agent-pipeline"), { recursive: true });
++  writeFileSync(join(path, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
++    schema: "pipeline.onboarding-consent-marker.v1",
++    status: "consent-given-onboarding-incomplete",
++    consentGivenAt: "2026-09-29T00:00:00.000Z",
++  }));
++  writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
++  return path;
++}
++
++const bash = (command, session_id) => ({ tool_name: "Bash", tool_input: { command }, session_id });
++
++test("a repeated read-spelling refusal in one window drops the full grammar listing and stays actionable", () => {
++  const path = governedRoot();
++  const commonDir = mkdtempTestScratch("grammar-once-common-");
++  const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
++  try {
++    const first = evaluateLifecycleReadyGuard(bash(READ_SPELLING, "grammar-once-1"), deps);
++    assert.equal(first.exitCode, 2);
++    assert.match(first.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u);
++    assert.match(first.stderr, FULL);
++    const second = evaluateLifecycleReadyGuard(bash(READ_SPELLING, "grammar-once-1"), deps);
++    assert.equal(second.exitCode, 2, "the trim never weakens the decision");
++    assert.match(second.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u);
++    assert.doesNotMatch(second.stderr, FULL);
++    assert.match(second.stderr, SHORT);
++    assert.match(second.stderr, /Re-spell it with the admitted grammar/u, "the read-spelling note still says what to do");
++    assert.ok(second.stderr.length + 2000 < first.stderr.length, `${second.stderr.length} vs ${first.stderr.length}`);
++  } finally {
++    rmSync(path, { recursive: true, force: true });
++    rmSync(commonDir, { recursive: true, force: true });
++  }
++});
++
++test("after the window reset the next refusal prints the full grammar once again", () => {
++  const path = governedRoot();
++  const commonDir = mkdtempTestScratch("grammar-once-common-");
++  const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
++  try {
++    evaluateLifecycleReadyGuard(bash(READ_SPELLING, "grammar-once-2"), deps);
++    assert.doesNotMatch(evaluateLifecycleReadyGuard(bash(READ_SPELLING, "grammar-once-2"), deps).stderr, FULL);
++    assert.equal(resetDenialClassesForSession("grammar-once-2", path, deps), "reset");
++    assert.match(evaluateLifecycleReadyGuard(bash(READ_SPELLING, "grammar-once-2"), deps).stderr, FULL);
++    assert.equal(resetDenialClassesForSession("grammar-once-unknown", path, deps), "absent");
++  } finally {
++    rmSync(path, { recursive: true, force: true });
++    rmSync(commonDir, { recursive: true, force: true });
++  }
++});
++
++test("the reset touches only a plain session key and never a subagent's own file or a climbing name", () => {
++  const commonDir = mkdtempTestScratch("grammar-once-common-");
++  const dir = join(commonDir, "agent-pipeline", "guard-denial-classes");
++  mkdirSync(dir, { recursive: true });
++  const agentFile = join(dir, "agent-x.json");
++  writeFileSync(agentFile, "{}\n");
++  const deps = { resolveGitCommonDirFn: () => commonDir };
++  try {
++    assert.equal(resetDenialClassesForSession("agent-x", "/unused", deps), "skipped");
++    assert.equal(resetDenialClassesForSession("../agent-x", "/unused", deps), "skipped");
++    assert.equal(resetDenialClassesForSession(null, "/unused", deps), "skipped");
++    assert.equal(resetDenialClassesForSession("s1", "/unused", { resolveGitCommonDirFn: () => null }), "skipped");
++    assert.ok(existsSync(agentFile));
++  } finally {
++    rmSync(commonDir, { recursive: true, force: true });
++  }
++});
++
++test("the post-compact re-ground hook resets the session's trim state on every compaction it handles", () => {
++  const source = readFileSync(fileURLToPath(new URL("../../hooks/post-compact-reground.mjs", import.meta.url)), "utf8");
++  const run = source.slice(source.indexOf("export function run()"));
++  const gate = run.indexOf("if (!shouldActivate(input)) process.exit(0);");
++  const reset = run.indexOf("resetDenialClassesForSession(input?.session_id, rootDir);");
++  assert.ok(gate > 0 && reset > gate, "the reset runs right after the compact gate, inside run()");
++});

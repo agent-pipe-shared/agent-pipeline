@@ -1,0 +1,34 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index dc162a63ab5248e990093810c9888d752b007b23..ce26665d9c6259fad234a103822114f10e69185a 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -792,6 +792,15 @@ kernel authority: `plugins/pipeline-core/lib/observation-governance-bootstrap.mj
+ readback of the observation governance status) and `plugins/pipeline-core/lib/critic-round-pass.mjs`
+ (the one rule deciding whether a Critic round passed). Both are kernel paths now.
+ 
++Candidates 28b and 28c add the software bill of materials to the feature close and the audit
++bundle, and a PO-signed override for an accepted gap in it. `lib/audit-bundle.mjs` and
++`scripts/po-human-approval.mjs` (both kernel above) import four first-party modules that therefore
++execute with kernel authority: `plugins/pipeline-core/lib/sbom-close.mjs` (the close-time SBOM
++check), `plugins/pipeline-core/lib/sbom-manifest.mjs` (the manifest shape and its digest),
++`plugins/pipeline-core/lib/sbom-node-adapter.mjs` (the Node dependency reader) and
++`plugins/pipeline-core/lib/sbom-override-authority.mjs` (the signed override's verification). All
++four are kernel paths now.
++
+ ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
+ and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
+ (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 58266630a96fe0b759e877bcc72bc64a115e4977..df64601c794dbb311fef0fefc6af104d22b711a4 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -944,6 +944,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs", "plugins/pipeline-core/lib/project-onboarding-v3-author-identity.mjs", "plugins/pipeline-core/lib/plan-handoff-readiness.mjs", "plugins/pipeline-core/lib/authority-restore.mjs",
+   // Candidate 28 (GMWKC01): imports added by candidates 26 and 27.
+   "plugins/pipeline-core/lib/observation-governance-bootstrap.mjs", "plugins/pipeline-core/lib/critic-round-pass.mjs",
++  // Candidates 28b/28c (GMWKC01): the SBOM modules lib/audit-bundle.mjs and scripts/po-human-approval.mjs import.
++  "plugins/pipeline-core/lib/sbom-close.mjs", "plugins/pipeline-core/lib/sbom-manifest.mjs",
++  "plugins/pipeline-core/lib/sbom-node-adapter.mjs", "plugins/pipeline-core/lib/sbom-override-authority.mjs",
+ ]);
+ 
+ // The "plugins/pipeline-core/..." entries above are written against whatever

@@ -1,0 +1,28 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index ce26665d9c6259fad234a103822114f10e69185a..907d17b98b93bcfb099dfb69c6ba1c34ee647310 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -792,8 +792,8 @@ kernel authority: `plugins/pipeline-core/lib/observation-governance-bootstrap.mj
+ readback of the observation governance status) and `plugins/pipeline-core/lib/critic-round-pass.mjs`
+ (the one rule deciding whether a Critic round passed). Both are kernel paths now.
+ 
+-Candidates 28b and 28c add the software bill of materials to the feature close and the audit
+-bundle, and a PO-signed override for an accepted gap in it. `lib/audit-bundle.mjs` and
++Candidate 28c adds the software bill of materials to the feature close and the audit bundle, and
++a PO-signed override for an accepted gap in it. `lib/audit-bundle.mjs` and
+ `scripts/po-human-approval.mjs` (both kernel above) import four first-party modules that therefore
+ execute with kernel authority: `plugins/pipeline-core/lib/sbom-close.mjs` (the close-time SBOM
+ check), `plugins/pipeline-core/lib/sbom-manifest.mjs` (the manifest shape and its digest),
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index df64601c794dbb311fef0fefc6af104d22b711a4..ebbed37f34f3e26dc678227dfd5f010dfef4c5e4 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -944,7 +944,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs", "plugins/pipeline-core/lib/project-onboarding-v3-author-identity.mjs", "plugins/pipeline-core/lib/plan-handoff-readiness.mjs", "plugins/pipeline-core/lib/authority-restore.mjs",
+   // Candidate 28 (GMWKC01): imports added by candidates 26 and 27.
+   "plugins/pipeline-core/lib/observation-governance-bootstrap.mjs", "plugins/pipeline-core/lib/critic-round-pass.mjs",
+-  // Candidates 28b/28c (GMWKC01): the SBOM modules lib/audit-bundle.mjs and scripts/po-human-approval.mjs import.
++  // Candidate 28c (GMWKC01): the SBOM modules lib/audit-bundle.mjs and scripts/po-human-approval.mjs import.
+   "plugins/pipeline-core/lib/sbom-close.mjs", "plugins/pipeline-core/lib/sbom-manifest.mjs",
+   "plugins/pipeline-core/lib/sbom-node-adapter.mjs", "plugins/pipeline-core/lib/sbom-override-authority.mjs",
+ ]);

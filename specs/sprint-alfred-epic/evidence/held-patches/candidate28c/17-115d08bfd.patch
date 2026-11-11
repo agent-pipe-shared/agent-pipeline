@@ -1,0 +1,224 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 0c483934cfcd453441e44ffe14b787805cd74937..e5db183c75507a8ab3b117771fc9d2b289452688 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1039,6 +1039,7 @@
+         "verify-phase:harness/scripts/verify.mjs:r7-3-bound-paths-tests",
+         "verify-phase:harness/scripts/verify.mjs:read-command-diagnosis-tests",
+         "verify-phase:harness/scripts/verify.mjs:read-option-operands-tests",
++        "verify-phase:harness/scripts/verify.mjs:ready-preflight-prints-a-compact-envelope-tests",
+         "verify-phase:harness/scripts/verify.mjs:rebase-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:rebind-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:record-only-paths-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 584ef96fc5bb7b195b9a6ce4dd7acb668f0ee6ed..b92fd9a48a358730d448a0a5389ac5006a761626 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4861,6 +4861,12 @@
+       "file": "plugins/pipeline-core/lib/pins/grammar-listing-once-per-context-window.test.mjs",
+       "invariantPinned": "A repeated GUARD-READ-COMMAND-UNSUPPORTED refusal in one context window prints the short grammar form and keeps the decision and the read-spelling note; the post-compact re-ground hook clears only the session-keyed trim state, so the first refusal of the next window prints the full grammar again, and never touches a subagent's own file or a climbing name",
+       "nonOverlapNote": "Unique cases: the read-spelling trim and the per-window reset; the NVA-B-DENIALTRIM cases in guard-lifecycle-ready.test.mjs pin the three grammar codes' per-session trim and scope keys"
++    },
++    {
++      "name": "ready-preflight-prints-a-compact-envelope-tests",
++      "file": "plugins/pipeline-core/lib/pins/ready-preflight-prints-a-compact-envelope.test.mjs",
++      "invariantPinned": "A ready or plugin-refresh-required preflight prints a compact envelope (non-ok readiness findings, schema-and-status for ready provisioning and close capability, no Antigravity hint outside an Antigravity run) and writes the unchanged full envelope to the session's bound scratch directory; any other status, a missing or climbing binding, or a failed write prints the full envelope; printedPayload measures the printed line as an upper bound",
++      "nonOverlapNote": "Unique cases: the printed-line compaction and its fail-open paths; bootstrap-payload-measure.test.mjs pins the budget owner and the typed original/emitted measurement"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/pins/ready-preflight-prints-a-compact-envelope.test.mjs b/plugins/pipeline-core/lib/pins/ready-preflight-prints-a-compact-envelope.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..41d947cbbed3ed7c6d17fd7ae3e65709842e0697
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/ready-preflight-prints-a-compact-envelope.test.mjs
+@@ -0,0 +1,90 @@
++// SPDX-License-Identifier: SUL-1.0
++// Candidate 28c (PO tile 2026-11-11, context baseline): the ready preflight envelope stays in the model's
++// context until the next compaction. On ready it prints only what is not green-and-repeated and keeps the full
++// envelope in the session's bound scratch directory; the printed line is measured as printed.
++import test from "node:test";
++import assert from "node:assert/strict";
++import { existsSync, readFileSync, rmSync } from "node:fs";
++import { join } from "node:path";
++import { compactReadyEnvelope, withPrintedPayload } from "../../scripts/pipeline-start-preflight.mjs";
++import { mkdtempTestScratch } from "../test-tmpdir.mjs";
++
++const measurement = { schema: "pipeline.bootstrap-payload-measurement.v1", bytes: 3587, maxUpperBoundUnits: 45000, withinBudget: true };
++function envelope(status = "ready", runner = "claude") {
++  return {
++    schema: "pipeline.start-preflight.v1",
++    status,
++    rulesetSource: { runner },
++    nextAction: { kind: "command", argv: ["inspect"] },
++    mandatoryHookReadiness: { status: "ready", required: [{ id: "pre-commit-hook", status: "current" }] },
++    cloneProvisioning: { schema: "pipeline.clone-provisioning-report.v1", status: "ready", checks: [{ id: "pre-push-hook", status: "current", path: "/x/.git/hooks/pre-push" }] },
++    bootstrapPayload: { schema: "pipeline.bootstrap-payload-receipt.v1", originalMeasurement: measurement, emittedMeasurement: { ...measurement } },
++    bootstrapHousekeeping: {
++      scratchLifecycle: { schema: "pipeline.bootstrap-scratch-lifecycle.v1", sweep: { retiredCount: 0 }, binding: { status: "bound", scratchRelativePath: "scratch/s1-abc" }, faults: [] },
++      worktreeSweep: { schema: "pipeline.bootstrap-worktree-sweep.v1", sweep: { retainedCount: 5 }, faults: [] },
++    },
++    closeAndPushCapability: { schema: "pipeline.close-push-capability.v1", status: "ready", checks: [{ id: "node", status: "ready" }] },
++    environmentReadiness: { schema: "pipeline.environment-readiness.v1", mutation: false, nonGating: true, ok: false, findings: [
++      { findingId: "git-version", status: "ok", cause: "fine", repair: null },
++      { findingId: "orphan-descriptors", status: "unknown", cause: "no probe", repair: { kind: "attended-prerequisite", summary: "long text" } },
++    ] },
++    agyStartHint: { governed: true, loaded: { status: "refresh-required" } },
++    architectureOrientation: { status: "decision-recorded" },
++    modelRoleBootstrap: { status: "unavailable" },
++  };
++}
++
++test("a ready envelope prints a compact line and keeps the full envelope in the bound session scratch directory", () => {
++  const root = mkdtempTestScratch("preflight-compact-");
++  try {
++    const full = envelope();
++    const compact = compactReadyEnvelope(full, { rootDir: root });
++    assert.equal(compact.fullEnvelope, "scratch/s1-abc/preflight-full.json");
++    const stored = JSON.parse(readFileSync(join(root, compact.fullEnvelope), "utf8"));
++    assert.deepEqual(stored, full, "the file holds the unchanged full envelope");
++    assert.deepEqual(compact.environmentReadiness.findings, [{ findingId: "orphan-descriptors", status: "unknown", cause: "no probe" }]);
++    assert.equal(compact.environmentReadiness.okCount, 1);
++    assert.deepEqual(compact.cloneProvisioning, { schema: "pipeline.clone-provisioning-report.v1", status: "ready" });
++    assert.equal(compact.bootstrapPayload.emittedMeasurement, "same-as-original");
++    assert.equal(compact.bootstrapHousekeeping.scratchLifecycle.scratchRelativePath, "scratch/s1-abc");
++    assert.equal(compact.bootstrapHousekeeping.worktreeSweep.schema, "pipeline.bootstrap-worktree-sweep.v1");
++    assert.deepEqual(compact.closeAndPushCapability, { schema: "pipeline.close-push-capability.v1", status: "ready" });
++    assert.equal(compact.agyStartHint, undefined, "the Antigravity hint is not printed in a Claude run");
++    for (const kept of ["nextAction", "mandatoryHookReadiness", "architectureOrientation", "modelRoleBootstrap", "status", "rulesetSource"]) {
++      assert.deepEqual(compact[kept], full[kept], `${kept} is printed unchanged`);
++    }
++    assert.ok(JSON.stringify(compact).length < JSON.stringify(full).length);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("a non-ready status, an Antigravity run's hint, a missing binding and a failed write keep the full envelope", () => {
++  const root = mkdtempTestScratch("preflight-compact-");
++  try {
++    const refused = envelope("hook-refresh-required");
++    assert.equal(compactReadyEnvelope(refused, { rootDir: root }), refused);
++    assert.equal(existsSync(join(root, "scratch")), false, "nothing is written for a non-ready status");
++    assert.ok(compactReadyEnvelope(envelope("ready", "antigravity"), { rootDir: root }).agyStartHint, "an Antigravity run keeps its hint");
++    const unbound = envelope();
++    unbound.bootstrapHousekeeping.scratchLifecycle.binding = { status: "unbound" };
++    assert.equal(compactReadyEnvelope(unbound, { rootDir: root }), unbound);
++    const climbing = envelope();
++    climbing.bootstrapHousekeeping.scratchLifecycle.binding.scratchRelativePath = "scratch/../x";
++    assert.equal(compactReadyEnvelope(climbing, { rootDir: root }), climbing);
++    const failing = envelope();
++    assert.equal(compactReadyEnvelope(failing, { rootDir: root, writeFile: () => { throw new Error("disk"); } }), failing);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("the printed payload is measured on the printed line, not on the typed result", () => {
++  const line = withPrintedPayload({ status: "ready", padding: "x".repeat(5000) });
++  const printedBytes = Buffer.byteLength(JSON.stringify(line));
++  assert.equal(line.printedPayload.metric, "utf8-byte-upper-bound");
++  assert.ok(Math.abs(line.printedPayload.bytes - printedBytes) <= 16, `${line.printedPayload.bytes} vs ${printedBytes}`);
++  assert.ok(line.printedPayload.bytes >= printedBytes, "an upper bound never under-reports");
++  assert.equal(line.printedPayload.withinBudget, true);
++  assert.equal(withPrintedPayload({ padding: "x".repeat(46000) }).printedPayload.withinBudget, false);
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 49225e8c788ee13ca774a3ab797607426a226df1..059fb01e6336c563eedde051d66912bb66ca14df 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -4,7 +4,7 @@
+ /** Report loaded distribution identity and restart-handoff presence without secrets. */
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { existsSync, readFileSync, readdirSync, realpathSync, statSync, lstatSync, opendirSync } from "node:fs";
++import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, lstatSync, opendirSync, writeFileSync } from "node:fs";
+ import { homedir } from "node:os";
+ import { readMachineOperatorLabel } from "../lib/machine-plane.mjs";
+ import { inspectObservationGovernanceBootstrap, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCHEMA } from "../lib/observation-governance-bootstrap.mjs";
+@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
+ import { loadManifestSafe, resolveHumanFacingLanguage } from "../lib/manifest.mjs";
+ import { onboardingConsentQuestion } from "../lib/onboarding-consent-scope.mjs";
+ 
+-import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
++import { BOOTSTRAP_PAYLOAD_MAX_BYTES, measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
+ import { attachRunbookLink } from "../lib/runbook-link.mjs";
+ import { observeArchitectureAdoptionOrientation } from "../lib/architecture-adoption-orientation.mjs";
+ import { inspectArchitectureDecisionContinuity } from "../lib/architecture-decision-continuity.mjs";
+@@ -2453,6 +2453,66 @@ export function observeHostSkillCatalogReadback({
+   }
+ }
+ 
++/**
++ * Candidate 28c (PO tile 2026-11-11, context baseline): a `ready` (or soft `plugin-refresh-required`) envelope stays in the model's context
++ * until the next compaction, and most of its ~11 KB are all-green diagnostics. On `ready` the full
++ * envelope is written to the session's bound scratch directory (`fullEnvelope` names it) and the printed
++ * line drops only what is green and repeated: `ok` readiness findings (counted), the clone-provisioning
++ * hook list (mandatoryHookReadiness keeps the gating hooks), the second identical payload measurement,
++ * the housekeeping receipts beyond their schema and counts, an all-ready close/push capability list, and
++ * the Antigravity start hint outside an Antigravity run. Any other status, a missing scratch binding or a
++ * failed write prints the full envelope unchanged.
++ */
++export function compactReadyEnvelope(envelope, { rootDir = process.cwd(), writeFile = writeFileSync, makeDir = mkdirSync } = {}) {
++  try {
++    // `plugin-refresh-required` is the soft advisory a session proceeds on (pipeline-start SKILL.md), so it compacts like `ready`.
++    if (envelope?.status !== "ready" && envelope?.status !== "plugin-refresh-required") return envelope;
++    const scratchDir = envelope.bootstrapHousekeeping?.scratchLifecycle?.binding?.scratchRelativePath;
++    if (typeof scratchDir !== "string" || !/^scratch\/[A-Za-z0-9._-]+$/u.test(scratchDir)) return envelope;
++    const fullRelative = `${scratchDir}/preflight-full.json`;
++    makeDir(resolve(rootDir, scratchDir), { recursive: true });
++    writeFile(resolve(rootDir, fullRelative), `${JSON.stringify(envelope, null, 1)}\n`, "utf8");
++    const compact = { ...envelope, fullEnvelope: fullRelative };
++    const readiness = envelope.environmentReadiness;
++    if (readiness && Array.isArray(readiness.findings)) {
++      const open = readiness.findings.filter((finding) => finding?.status !== "ok");
++      compact.environmentReadiness = { schema: readiness.schema, mutation: readiness.mutation, nonGating: readiness.nonGating, ok: readiness.ok,
++        okCount: readiness.findings.length - open.length, findings: open.map(({ findingId, status, cause }) => ({ findingId, status, cause })) };
++    }
++    if (envelope.cloneProvisioning?.status === "ready") compact.cloneProvisioning = { schema: envelope.cloneProvisioning.schema, status: "ready" };
++    const payload = envelope.bootstrapPayload;
++    if (payload?.emittedMeasurement && JSON.stringify(payload.emittedMeasurement) === JSON.stringify(payload.originalMeasurement)) {
++      const { emittedMeasurement, ...rest } = payload;
++      compact.bootstrapPayload = { ...rest, emittedMeasurement: "same-as-original" };
++    }
++    const housekeeping = envelope.bootstrapHousekeeping;
++    if (housekeeping) {
++      compact.bootstrapHousekeeping = Object.fromEntries(Object.entries(housekeeping).map(([key, receipt]) => [key, {
++        schema: receipt?.schema, faults: Array.isArray(receipt?.faults) ? receipt.faults : [],
++        ...(receipt?.binding?.scratchRelativePath ? { scratchRelativePath: receipt.binding.scratchRelativePath } : {}),
++      }]));
++    }
++    const capability = envelope.closeAndPushCapability;
++    if (capability?.status === "ready") compact.closeAndPushCapability = { schema: capability.schema, status: "ready" };
++    if (envelope.agyStartHint && envelope.rulesetSource?.runner !== "antigravity") delete compact.agyStartHint;
++    return compact;
++  } catch {
++    return envelope;
++  }
++}
++
++/**
++ * Candidate 28c: the bootstrap payload receipt measures the typed preflight result, not the line the runner
++ * reads (measured live: receipt 3,587 bytes, printed line 10,822). `printedPayload` measures the printed
++ * line itself, with the same UTF-8 byte metric and the same 45,000-unit limit.
++ */
++export function withPrintedPayload(envelope) {
++  const limit = envelope?.bootstrapPayload?.originalMeasurement?.maxUpperBoundUnits ?? BOOTSTRAP_PAYLOAD_MAX_BYTES;
++  const probe = { ...envelope, printedPayload: { metric: "utf8-byte-upper-bound", bytes: 0, maxUpperBoundUnits: limit, withinBudget: true } };
++  const bytes = Buffer.byteLength(JSON.stringify(probe)) + 8;
++  return { ...envelope, printedPayload: { metric: "utf8-byte-upper-bound", bytes, maxUpperBoundUnits: limit, withinBudget: bytes <= limit } };
++}
++
+ /**
+  * Synchronous, exactly as before the readiness report existed: it returns the exit code and,
+  * called with no options, writes the same one compact line. `environmentReadiness` is an
+@@ -2502,7 +2562,8 @@ export function main(options = {}) {
+     ...(options?.observationGovernance === undefined ? {} : { observationGovernance: options.observationGovernance }),
+   };
+   // C19-G5: the typed runbook link (start path, preflight step) is the last key, once per session, and always when the preflight is not ready.
+-  process.stdout.write(`${JSON.stringify(attachRunbookLink(envelope, { pathId: "start", step: "preflight", refused: pipelineStartPreflightExitCode(result) !== 0, rootDir: process.cwd() }))}\n`);
++  const linked = attachRunbookLink(envelope, { pathId: "start", step: "preflight", refused: pipelineStartPreflightExitCode(result) !== 0, rootDir: process.cwd() });
++  process.stdout.write(`${JSON.stringify(withPrintedPayload(compactReadyEnvelope(linked, { rootDir: process.cwd() })))}\n`);
+   if (result.statusScope === "pipeline-governance-activation") return pipelineStartPreflightExitCode(result);
+   // Antigravity-only: the structured field above already carries this, but a
+   // human watching the terminal reads stderr, not a JSON blob -- so the same

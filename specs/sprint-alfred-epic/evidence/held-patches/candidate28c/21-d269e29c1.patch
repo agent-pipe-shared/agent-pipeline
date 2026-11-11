@@ -1,0 +1,182 @@
+diff --git a/backlog/STATUS.md b/backlog/STATUS.md
+index d199a46b34b54361c7449bc7c40ced8dc7d0fd20..9a17f3ea5f351a656f9becbb91b23c10817eafe1 100644
+--- a/backlog/STATUS.md
++++ b/backlog/STATUS.md
+@@ -24,6 +24,7 @@
+ | pipeline.a-divergent-adr-body-is-invisible-to-the-parity-comparison-while-unadopted | open | defect | pipeline | none | 2026-10-21 | — | — |
+ | pipeline.a-doc-edit-silently-obligates-its-vendored-copy | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
+ | pipeline.a-feature-closes-over-a-slice-with-no-delivery-evidence | open | defect | pipeline | none | 2026-10-20 | — | — |
++| pipeline.a-follow-up-epic-cannot-extend-the-closed-architecture-design | open | workflow-improvement | pipeline | alfred | 2026-11-11 | — | — |
+ | pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
+ | pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path | closed | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — the second of the two directions named by the RED-capture item. The first direction shipped as a capture tool; this one is what that tool structurally cannot cover, and it is the half that catches a human or an agent writing an artifact by hand. |
+ | pipeline.a-large-tracked-inventory-reads-as-git-identity-unavailable-in-the-security-scan | open | defect | pipeline | alfred | 2026-10-29 | — | — |
+@@ -129,6 +130,7 @@
+ | pipeline.atomic-prd-approval-without-mutation | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
+ | pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner | closed | defect | pipeline | alfred | 2026-08-28 | — | — |
+ | pipeline.attestation-git-presence-gate-not-gs8-protected | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
++| pipeline.audit-pack-does-not-carry-the-sbom | open | workflow-improvement | pipeline | alfred | 2026-11-11 | — | — |
+ | pipeline.author-repair-route-has-no-signed-event-chain | open | requirement | pipeline | nightwing | 2026-09-12 | 2026-09-30 | — |
+ | pipeline.authority-decision-apply-defaults-to-codex | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
+ | pipeline.authority-decision-candidate-is-a-literal | open | defect | pipeline | nightwing | 2026-08-08 | 2026-08-22 | — |
+@@ -887,6 +889,7 @@
+ | pipeline.runtime-projection-v2-eager-manifest-load | closed | defect | pipeline | — | 2026-07-27 | — | — |
+ | pipeline.runtime-projections-drift-after-v3-refresh | closed | defect | pipeline | nova-b | 2026-08-28 | — | Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report |
+ | pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop | closed | defect | pipeline | nova | 2026-09-13 | — | NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies. |
++| pipeline.sbom-readers-for-more-lockfile-formats-and-dependency-edges | open | workflow-improvement | pipeline | alfred | 2026-11-11 | — | — |
+ | pipeline.scan-exception-commits-spend-the-critic-correction-budget | open | workflow-improvement | pipeline | alfred | 2026-10-29 | — | — |
+ | pipeline.scanner-bootstrap-is-not-self-sufficient | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks. |
+ | pipeline.scanner-diagnostics-keep-no-finding-provenance-before-suppression | open | defect | pipeline | none | 2026-10-21 | — | — |
+@@ -1092,7 +1095,7 @@
+ 
+ ## Counts
+ 
+-- open: 395
++- open: 398
+ - in_progress: 0
+ - closed: 674
+ - rejected: 3
+diff --git a/backlog/index.json b/backlog/index.json
+index 0685de71eb7ca6b17702c6b84cd7bc401b80916f..94b5b10d3b40fa42de57cfb2c7727bcd8f4f0cb6 100644
+--- a/backlog/index.json
++++ b/backlog/index.json
+@@ -3,10 +3,10 @@
+   "generatedFrom": {
+     "items": "backlog/items/*.md",
+     "ledger": "backlog/transitions.ndjson",
+-    "transitionHead": "8953e4a67fe2b87a072347cdbde022531220170513c405912fb64cfad65547b5"
++    "transitionHead": "14fc40ecffb5bc7f23dc8fcef65ff0fe1398d777cc388c9c4a9dd3d1c972675e"
+   },
+   "counts": {
+-    "open": 395,
++    "open": 398,
+     "in_progress": 0,
+     "closed": 674,
+     "rejected": 3,
+@@ -253,6 +253,16 @@
+       "deferred": false,
+       "sprint": "none"
+     },
++    {
++      "id": "pipeline.a-follow-up-epic-cannot-extend-the-closed-architecture-design",
++      "status": "open",
++      "type": "workflow-improvement",
++      "owner": "pipeline",
++      "created": "2026-11-11",
++      "source": "Consumer session finding K-13 for a second epic; confirmed against the source and not executed",
++      "deferred": false,
++      "sprint": "alfred"
++    },
+     {
+       "id": "pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback",
+       "status": "closed",
+@@ -1533,6 +1543,16 @@
+       "closureCommit": "025f9e1a2a547b7abc438d998801acddcabdf166",
+       "closureEvidence": "plugins/pipeline-core/hooks/guard-gate-strength.mjs"
+     },
++    {
++      "id": "pipeline.audit-pack-does-not-carry-the-sbom",
++      "status": "open",
++      "type": "workflow-improvement",
++      "owner": "pipeline",
++      "created": "2026-11-11",
++      "source": "Candidate 28c design; ADR-0091 wires the SBOM into the feature close and its audit bundle only",
++      "deferred": false,
++      "sprint": "alfred"
++    },
+     {
+       "id": "pipeline.author-repair-route-has-no-signed-event-chain",
+       "status": "open",
+@@ -10988,6 +11008,16 @@
+       "closureCommit": "6970805a573550ddf7835f28f80dae83e66b4851",
+       "closureEvidence": "backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md"
+     },
++    {
++      "id": "pipeline.sbom-readers-for-more-lockfile-formats-and-dependency-edges",
++      "status": "open",
++      "type": "workflow-improvement",
++      "owner": "pipeline",
++      "created": "2026-11-11",
++      "source": "Candidate 28c design; ADR-0091 decisions 2 and 4",
++      "deferred": false,
++      "sprint": "alfred"
++    },
+     {
+       "id": "pipeline.scan-exception-commits-spend-the-critic-correction-budget",
+       "status": "open",
+diff --git a/backlog/transitions.ndjson b/backlog/transitions.ndjson
+index 50aeb5edfd2e124911c263a7954db4050abfe889..d3fc59813587e3992b5db1435d6cb3333eef41bc 100644
+--- a/backlog/transitions.ndjson
++++ b/backlog/transitions.ndjson
+@@ -2483,3 +2483,6 @@
+ {"actor":"backlog-reconciliation","at":"2026-11-11","entryHash":"bb45a9ca544f4a9c88f54aa1afffc2d07b1ae643793821cb78974fcdfc7efb30","evidence":{"commit":"c457d0b214dbf45989285ad5088fdee935c0d0ff","kind":"item-file-reconciliation","reference":"backlog/items/2026-11-10-design-addendum-for-a-single-value-after-0-7-0.md"},"from":null,"id":"pipeline.design-addendum-for-a-single-value","previousHash":"91416d76848899752905f74e4899786fd60f0f2a33a734762ac8bd48e8ca6158","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":2483,"to":"open"}
+ {"actor":"backlog-reconciliation","at":"2026-11-11","entryHash":"93a605d5a1d32680a0f8b424c378493a380335e93fcf8493eac67688d8c31401","evidence":{"commit":"c457d0b214dbf45989285ad5088fdee935c0d0ff","kind":"item-file-reconciliation","reference":"backlog/items/2026-11-10-queue-parallel-dispatch-starts-after-0-7-0.md"},"from":null,"id":"pipeline.queue-parallel-dispatch-starts","previousHash":"bb45a9ca544f4a9c88f54aa1afffc2d07b1ae643793821cb78974fcdfc7efb30","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":2484,"to":"open"}
+ {"actor":"backlog-reconciliation","at":"2026-11-11","entryHash":"8953e4a67fe2b87a072347cdbde022531220170513c405912fb64cfad65547b5","evidence":{"commit":"4f252d175eaf15184f2f445c051356d88dd0e793","kind":"item-file-reconciliation","reference":"backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md"},"from":null,"id":"pipeline.no-read-only-preview-of-the-architecture-check-before-the-design-signature","previousHash":"93a605d5a1d32680a0f8b424c378493a380335e93fcf8493eac67688d8c31401","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":2485,"to":"open"}
++{"actor":"backlog-reconciliation","at":"2026-11-11","entryHash":"e5b2502239c478f80b7f4c88f836a56254c9d5db83ca9209930c92b2e210fa53","evidence":{"commit":"3929ecf80718e128874221f6df2a07ae1ce15550","kind":"item-file-reconciliation","reference":"backlog/items/2026-11-11-a-follow-up-epic-cannot-extend-the-closed-architecture-design.md"},"from":null,"id":"pipeline.a-follow-up-epic-cannot-extend-the-closed-architecture-design","previousHash":"8953e4a67fe2b87a072347cdbde022531220170513c405912fb64cfad65547b5","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":2486,"to":"open"}
++{"actor":"backlog-reconciliation","at":"2026-11-11","entryHash":"3b5143b936657936680aee373a3397764c4f21a449428798a794849e6410084e","evidence":{"commit":"3929ecf80718e128874221f6df2a07ae1ce15550","kind":"item-file-reconciliation","reference":"backlog/items/2026-11-11-audit-pack-does-not-carry-the-sbom.md"},"from":null,"id":"pipeline.audit-pack-does-not-carry-the-sbom","previousHash":"e5b2502239c478f80b7f4c88f836a56254c9d5db83ca9209930c92b2e210fa53","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":2487,"to":"open"}
++{"actor":"backlog-reconciliation","at":"2026-11-11","entryHash":"14fc40ecffb5bc7f23dc8fcef65ff0fe1398d777cc388c9c4a9dd3d1c972675e","evidence":{"commit":"3929ecf80718e128874221f6df2a07ae1ce15550","kind":"item-file-reconciliation","reference":"backlog/items/2026-11-11-sbom-readers-for-more-lockfile-formats-and-dependency-edges.md"},"from":null,"id":"pipeline.sbom-readers-for-more-lockfile-formats-and-dependency-edges","previousHash":"3b5143b936657936680aee373a3397764c4f21a449428798a794849e6410084e","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":2488,"to":"open"}
+diff --git a/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs b/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
+index cb76fffb984d504dcb84de031b4ec9fcbd458e1d..486e20d408a88528c51fea910dfb758f332d0dbe 100644
+--- a/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
++++ b/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs
+@@ -27,8 +27,8 @@ export function blob(root,commit,path,limit=1048576){commitIdentity(root,commit)
+ export const sourcePaths=Object.freeze(['GEMINI.md','PIPELINE_FLOW.de.md','PIPELINE_FLOW.md','README.md','SETUP.md','docs/README.md','docs/audit-and-evidence.md','docs/audit-bundles.md','docs/cost-and-measurement.md','docs/enforcement.md','docs/overview.md','docs/parallel-work.md','docs/security-controls.md','docs/sprint-alfred-completion-report.md','docs/usage.md','docs/v3-consumer-onboarding.md']);
+ export const inputPaths=Object.freeze({capabilityInventorySha256:'docs/product-capability-inventory.json',governanceSha256:'governance/observation-doc-governance.json',readerProtocolSha256:'harness/reader-review-protocol.md'});
+ export const policySha256='e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337';
+-const inputHashes=Object.freeze({capabilityInventorySha256:'aba22283af3d0dc8dd03839968d038429b58ab4102367bc9dddadbb3dc8a3543',governanceSha256:'def300140d059c6c60a1f57be0f50c8774946a99e6625947b0c584382621caaa',readerProtocolSha256:'9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640'});
++const inputHashes=Object.freeze({capabilityInventorySha256:'6ec6e77a4b4f88746c0ec0f7d3d5d7df560cfccd918416ce3d528bb56baa54f5',governanceSha256:'def300140d059c6c60a1f57be0f50c8774946a99e6625947b0c584382621caaa',readerProtocolSha256:'9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640'});
+ const pluginRoot=fileURLToPath(new URL('..',import.meta.url));
+ export function sourceIdentity(root){try{const tracked=p=>gitText(root,['ls-files','--error-unmatch','--',p])===p;const a=jsonBytes(physicalBytes(root,'.claude/pipeline.json')),b=jsonBytes(physicalBytes(root,'.claude-plugin/marketplace.json'));return tracked('.claude/pipeline.json')&&tracked('.claude-plugin/marketplace.json')&&a.project==='agent-pipeline'&&b.name==='agent-pipeline'&&b.owner?.name==='agent-pipeline'&&Array.isArray(b.plugins)&&b.plugins.filter(x=>x.name==='pipeline-core').length===1&&b.plugins.find(x=>x.name==='pipeline-core').source==='./plugins/pipeline-core'&&tracked('harness/reader-review-protocol.md')&&tracked('harness/scripts/check-doc-reader-binding.mjs');}catch{return false;}}
+-export function installedInputs(){const root=realpathSync.native(pluginRoot),manifestBytes=physicalBytes(root,'reader-inputs/manifest.json',65536);requireFact(hash(manifestBytes)==='03f04fc279ecdf446bbd00087bd13e83bcbac7f79592992f7caafc8726280d80');const manifest=jsonBytes(manifestBytes);exact(manifest,['schema','policySha256','inputs']);requireFact(manifest.schema==='pipeline.doc-reader-input-bundle.v1'&&manifest.policySha256===policySha256);exact(manifest.inputs,Object.keys(inputPaths));const inputs={};for(const [key,path] of Object.entries(inputPaths)){const entry=manifest.inputs[key];exact(entry,['canonicalSourcePath','pluginPath','sha256']);const relative=`reader-inputs/${path.split('/').at(-1)}`;requireFact(entry.canonicalSourcePath===path&&entry.pluginPath===`plugins/pipeline-core/${relative}`&&entry.sha256===inputHashes[key]);const bytes=physicalBytes(root,relative,1048576);requireFact(hash(bytes)===inputHashes[key]);inputs[key]=hash(bytes);requireFact(physicalBytes(root,relative,1048576).equals(bytes));}requireFact(hash(physicalBytes(root,'skills/reader-review/SKILL.md',1048576))===policySha256&&physicalBytes(root,'reader-inputs/manifest.json',65536).equals(manifestBytes));return inputs;}
++export function installedInputs(){const root=realpathSync.native(pluginRoot),manifestBytes=physicalBytes(root,'reader-inputs/manifest.json',65536);requireFact(hash(manifestBytes)==='f7f89fbaa5dd605f3bfe43549bbae5602d11717eadbcf81bc7e0fcec04d55e5d');const manifest=jsonBytes(manifestBytes);exact(manifest,['schema','policySha256','inputs']);requireFact(manifest.schema==='pipeline.doc-reader-input-bundle.v1'&&manifest.policySha256===policySha256);exact(manifest.inputs,Object.keys(inputPaths));const inputs={};for(const [key,path] of Object.entries(inputPaths)){const entry=manifest.inputs[key];exact(entry,['canonicalSourcePath','pluginPath','sha256']);const relative=`reader-inputs/${path.split('/').at(-1)}`;requireFact(entry.canonicalSourcePath===path&&entry.pluginPath===`plugins/pipeline-core/${relative}`&&entry.sha256===inputHashes[key]);const bytes=physicalBytes(root,relative,1048576);requireFact(hash(bytes)===inputHashes[key]);inputs[key]=hash(bytes);requireFact(physicalBytes(root,relative,1048576).equals(bytes));}requireFact(hash(physicalBytes(root,'skills/reader-review/SKILL.md',1048576))===policySha256&&physicalBytes(root,'reader-inputs/manifest.json',65536).equals(manifestBytes));return inputs;}
+ export function snapshotScopedReaderDocumentation({root,candidate,scope,inputBundle=null}){physicalRoot(root);const tree=commitIdentity(root,candidate);requireFact(Array.isArray(scope.documentPaths)&&scope.documentPaths.length>0&&scope.documentPaths.length<=128&&new Set(scope.documentPaths).size===scope.documentPaths.length);let total=0;const coverage=scope.documentPaths.map(path=>{const bytes=blob(root,candidate,path,524288);total+=bytes.length;requireFact(total<=4194304);return{path,sha256:hash(bytes)};});const source=sourceIdentity(root);if(source)requireFact(same(scope.documentPaths,sourcePaths));requireFact(inputBundle===null,'COURSE-REQUEST-INVALID');const inputs=source?Object.fromEntries(Object.entries(inputPaths).map(([k,p])=>[k,hash(blob(root,candidate,p))])):installedInputs();const docsetSha256=hash(`pipeline.doc-reader-docset.v1\0${canonical({coverage:[...coverage].sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0),...inputs})}`);requireFact(commitIdentity(root,candidate)===tree);return Object.freeze({commit:candidate,tree,coverage,inputs,docsetSha256});}
+diff --git a/plugins/pipeline-core/reader-inputs/manifest.json b/plugins/pipeline-core/reader-inputs/manifest.json
+index 3275a6558e0ed5a989730caa0d1508546aed465a..ca31203cb779ef7193bbdc41e7d3f1b0286447f3 100644
+--- a/plugins/pipeline-core/reader-inputs/manifest.json
++++ b/plugins/pipeline-core/reader-inputs/manifest.json
+@@ -1 +1 @@
+-{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"aba22283af3d0dc8dd03839968d038429b58ab4102367bc9dddadbb3dc8a3543"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"def300140d059c6c60a1f57be0f50c8774946a99e6625947b0c584382621caaa"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640"}},"policySha256":"e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337","schema":"pipeline.doc-reader-input-bundle.v1"}
++{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"6ec6e77a4b4f88746c0ec0f7d3d5d7df560cfccd918416ce3d528bb56baa54f5"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"def300140d059c6c60a1f57be0f50c8774946a99e6625947b0c584382621caaa"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640"}},"policySha256":"e93bf44d63ace80621a2ca820c2325fdd87741bffcc5b27cbb89f58eb30c3337","schema":"pipeline.doc-reader-input-bundle.v1"}
+diff --git a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+index 1205726b81b4672f396c885227975019feaab9fe..4573d5d2329aee4727ef6a431b466f219ce6754b 100644
+--- a/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
++++ b/plugins/pipeline-core/reader-inputs/product-capability-inventory.json
+@@ -369,6 +369,7 @@
+         "verify-phase:harness/scripts/verify.mjs:commit-pipeline-owned-tests",
+         "verify-phase:harness/scripts/verify.mjs:consumer-baseline-verify-tests",
+         "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
++        "verify-phase:harness/scripts/verify.mjs:context-baseline-tests",
+         "verify-phase:harness/scripts/verify.mjs:continuity-authority-drift-tests",
+         "verify-phase:harness/scripts/verify.mjs:continuity-capacity-shared-tests",
+         "verify-phase:harness/scripts/verify.mjs:continuity-drift-exits-tests",
+@@ -517,6 +518,7 @@
+         "verify-phase:harness/scripts/verify.mjs:governance-scope-retirement-retry-tests",
+         "verify-phase:harness/scripts/verify.mjs:governance-scope-tests",
+         "verify-phase:harness/scripts/verify.mjs:governance-scope-win32-acl-tests",
++        "verify-phase:harness/scripts/verify.mjs:grammar-listing-once-per-context-window-tests",
+         "verify-phase:harness/scripts/verify.mjs:greenfield-comparison-citation-check-tests",
+         "verify-phase:harness/scripts/verify.mjs:greenfield-public-comparison-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
+@@ -796,6 +798,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-escaped-and-powershell-redirects-to-a-protected-path-are-writes-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-every-dispatch-pays-a-bootstrap-receipt-detour-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-evidence-artifacts-carry-no-commit-identity-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-evidence-commands-stage-their-own-paths-and-never-commit-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-existing-signing-key-reuse-deadlocks-onboarding-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-feature-branch-push-admitted-without-signature-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-first-enrollment-enters-retirement-before-consent-tests",
+@@ -1038,6 +1041,7 @@
+         "verify-phase:harness/scripts/verify.mjs:r7-3-bound-paths-tests",
+         "verify-phase:harness/scripts/verify.mjs:read-command-diagnosis-tests",
+         "verify-phase:harness/scripts/verify.mjs:read-option-operands-tests",
++        "verify-phase:harness/scripts/verify.mjs:ready-preflight-prints-a-compact-envelope-tests",
+         "verify-phase:harness/scripts/verify.mjs:rebase-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:rebind-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:record-only-paths-tests",
+@@ -2610,6 +2614,7 @@
+         "verify-phase:harness/scripts/verify.mjs:provenance-fixture-matrix-tests",
+         "verify-phase:harness/scripts/verify.mjs:provenance-local-builder-tests",
+         "verify-phase:harness/scripts/verify.mjs:provenance-release-binding-tests",
++        "verify-phase:harness/scripts/verify.mjs:sbom-close-tests",
+         "verify-phase:harness/scripts/verify.mjs:sbom-discovery-cli-tests",
+         "verify-phase:harness/scripts/verify.mjs:sbom-discovery-tests",
+         "verify-phase:harness/scripts/verify.mjs:sbom-fixture-matrix-tests",

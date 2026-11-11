@@ -1,0 +1,46 @@
+diff --git a/plugins/pipeline-core/lib/pins/ready-preflight-prints-a-compact-envelope.test.mjs b/plugins/pipeline-core/lib/pins/ready-preflight-prints-a-compact-envelope.test.mjs
+index 41d947cbbed3ed7c6d17fd7ae3e65709842e0697..81a8f33b3a90c70919e9c2674453f725cfb764aa 100644
+--- a/plugins/pipeline-core/lib/pins/ready-preflight-prints-a-compact-envelope.test.mjs
++++ b/plugins/pipeline-core/lib/pins/ready-preflight-prints-a-compact-envelope.test.mjs
+@@ -42,7 +42,7 @@ test("a ready envelope prints a compact line and keeps the full envelope in the
+     assert.equal(compact.fullEnvelope, "scratch/s1-abc/preflight-full.json");
+     const stored = JSON.parse(readFileSync(join(root, compact.fullEnvelope), "utf8"));
+     assert.deepEqual(stored, full, "the file holds the unchanged full envelope");
+-    assert.deepEqual(compact.environmentReadiness.findings, [{ findingId: "orphan-descriptors", status: "unknown", cause: "no probe" }]);
++    assert.deepEqual(compact.environmentReadiness.findings, [full.environmentReadiness.findings[1]], "an open finding keeps its repair");
+     assert.equal(compact.environmentReadiness.okCount, 1);
+     assert.deepEqual(compact.cloneProvisioning, { schema: "pipeline.clone-provisioning-report.v1", status: "ready" });
+     assert.equal(compact.bootstrapPayload.emittedMeasurement, "same-as-original");
+@@ -66,6 +66,9 @@ test("a non-ready status, an Antigravity run's hint, a missing binding and a fai
+     assert.equal(compactReadyEnvelope(refused, { rootDir: root }), refused);
+     assert.equal(existsSync(join(root, "scratch")), false, "nothing is written for a non-ready status");
+     assert.ok(compactReadyEnvelope(envelope("ready", "antigravity"), { rootDir: root }).agyStartHint, "an Antigravity run keeps its hint");
++    const sourceless = envelope();
++    delete sourceless.rulesetSource;
++    assert.ok(compactReadyEnvelope(sourceless, { rootDir: root }).agyStartHint, "an unidentified runner keeps the hint");
+     const unbound = envelope();
+     unbound.bootstrapHousekeeping.scratchLifecycle.binding = { status: "unbound" };
+     assert.equal(compactReadyEnvelope(unbound, { rootDir: root }), unbound);
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 059fb01e6336c563eedde051d66912bb66ca14df..79d57b4d6533a5f14b5776d60eff49fb57275f26 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -2477,7 +2477,7 @@ export function compactReadyEnvelope(envelope, { rootDir = process.cwd(), writeF
+     if (readiness && Array.isArray(readiness.findings)) {
+       const open = readiness.findings.filter((finding) => finding?.status !== "ok");
+       compact.environmentReadiness = { schema: readiness.schema, mutation: readiness.mutation, nonGating: readiness.nonGating, ok: readiness.ok,
+-        okCount: readiness.findings.length - open.length, findings: open.map(({ findingId, status, cause }) => ({ findingId, status, cause })) };
++        okCount: readiness.findings.length - open.length, findings: open };
+     }
+     if (envelope.cloneProvisioning?.status === "ready") compact.cloneProvisioning = { schema: envelope.cloneProvisioning.schema, status: "ready" };
+     const payload = envelope.bootstrapPayload;
+@@ -2494,7 +2494,8 @@ export function compactReadyEnvelope(envelope, { rootDir = process.cwd(), writeF
+     }
+     const capability = envelope.closeAndPushCapability;
+     if (capability?.status === "ready") compact.closeAndPushCapability = { schema: capability.schema, status: "ready" };
+-    if (envelope.agyStartHint && envelope.rulesetSource?.runner !== "antigravity") delete compact.agyStartHint;
++    // Dropped only for a positively identified Claude or Codex run; a missing ruleset source keeps the hint.
++    if (envelope.agyStartHint && ["claude", "codex"].includes(envelope.rulesetSource?.runner)) delete compact.agyStartHint;
+     return compact;
+   } catch {
+     return envelope;
