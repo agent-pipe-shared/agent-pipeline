@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "91416d76848899752905f74e4899786fd60f0f2a33a734762ac8bd48e8ca6158"
+    "transitionHead": "93a605d5a1d32680a0f8b424c378493a380335e93fcf8493eac67688d8c31401"
   },
   "counts": {
-    "open": 392,
+    "open": 394,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -1644,6 +1644,7 @@
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-11-10",
+      "source": "Codex greenfield report, point R5 (P1); PO tile 2026-11-10 places it after 0.7.0",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -3820,6 +3821,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.design-addendum-for-a-single-value",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-11-10",
+      "source": "PO tile of 2026-11-10 on a one-value design change during implementation, placing an addendum after 0.7.0",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.design-approval-validator-rejects-json-key-reordering",
       "status": "open",
       "type": "defect",
@@ -4014,6 +4025,7 @@
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-11-10",
+      "source": "Claude greenfield report, section 6.2; PO tile 2026-11-10 places it after 0.7.0",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -7666,6 +7678,7 @@
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-11-10",
+      "source": "Claude greenfield report (592 Elephant messages, 69 percent cache reads); PO tile 2026-11-10",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -8719,6 +8732,7 @@
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-11-10",
+      "source": "PO tile of 2026-11-10 on project-owned routing (ADR-0089), placing it after 0.7.0",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -10034,6 +10048,16 @@
       "owner": "pipeline",
       "created": "2026-10-31",
       "source": "D214 slice of candidate 14 (2026-10-31): the build stopped at its own stop condition; evidence survey in specs/sprint-alfred-epic/evidence/held-patches/w8-d214-committed-rigor-source-for-the-push-review-waiver.notes.md.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.queue-parallel-dispatch-starts",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-11-10",
+      "source": "PO tile of 2026-11-10 on parallel Agent starts on native Windows, placing a queue after 0.7.0",
       "deferred": false,
       "sprint": "alfred"
     },

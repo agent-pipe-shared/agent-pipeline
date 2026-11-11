@@ -313,6 +313,7 @@
 | pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | batman | 2026-08-28 | — | Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate |
 | pipeline.delta-candidate-choice-and-transport-test-disagree-on-reconcile-commits | open | defect | pipeline | alfred | 2026-10-31 | — | — |
 | pipeline.denial-names-a-diagnosis-it-refuses | open | defect | pipeline | alfred | 2026-10-08 | — | — |
+| pipeline.design-addendum-for-a-single-value | open | workflow-improvement | pipeline | alfred | 2026-11-10 | — | — |
 | pipeline.design-approval-validator-rejects-json-key-reordering | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.design-bootstrap-verify-state-contradicts-deferred-contract | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.design-course-and-registrar-disagree-on-the-feature-directory | open | defect | pipeline | alfred | 2026-10-26 | — | — |
@@ -812,6 +813,7 @@
 | pipeline.push-release-flow-unusable-for-third-party-adopters | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.push-review-of-a-feature-with-course-history-ends-in-cca-parent | open | defect | pipeline | alfred | 2026-10-30 | — | — |
 | pipeline.push-review-waiver-has-no-committed-approval-evidence | open | defect | pipeline | alfred | 2026-10-31 | — | — |
+| pipeline.queue-parallel-dispatch-starts | open | workflow-improvement | pipeline | alfred | 2026-11-10 | — | — |
 | pipeline.quote-style-fragility-in-shell-command-admission | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate | closed | defect | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.read-allowlist-for-neighbour-folders | open | workflow-improvement | pipeline | alfred | 2026-11-10 | — | — |
@@ -1089,7 +1091,7 @@
 
 ## Counts
 
-- open: 392
+- open: 394
 - in_progress: 0
 - closed: 674
 - rejected: 3
