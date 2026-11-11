@@ -20,6 +20,11 @@ human-guard override are not covered. An action the consent covers prints `requi
 `escalationJustification`: when a runner's escalation review asks for a reason to run it (Codex mounts `.git` read-only, so every lifecycle write is
 escalated), give that line verbatim. Without a record nothing is marked covered.
 
+Before you put anything in front of the PO for acceptance or to try out, make sure you have seen it work yourself (PO decision 2026-11-10):
+start or open it the way the PO will and look at what it really shows. Then tell the PO in one line what you saw, or plainly that you could not
+see it and why. This holds for every kind of result (an app, a page, a command-line tool, a library, a document) and for every hand-over, not
+only the acceptance question at the close. It is not a gate: the Pipeline cannot check what you saw, only you can.
+
 ## 1. Design
 
 1. `pipeline-state.mjs set-feature --id <id> --plan-path <path>` (agent). Both flags are required.

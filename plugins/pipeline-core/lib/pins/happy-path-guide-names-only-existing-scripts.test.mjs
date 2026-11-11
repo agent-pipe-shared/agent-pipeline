@@ -36,6 +36,17 @@ test("G20-61: the guide makes the wait command at the hand-back the cue to conti
   assert.match(guide, /never end a turn with a status report/u);
 });
 
+// PO decision 2026-11-10: a greenfield run handed the PO a first result for acceptance that showed nothing but a black page. The rule is
+// product-neutral and holds for every hand-over, not only the close's acceptance question (finish-feature.mjs carries that one).
+test("the guide asks for a self-run line before every hand-over to the PO, for any kind of result, without a gate", () => {
+  const guide = readFileSync(GUIDE, "utf8");
+  assert.match(guide, /Before you put anything in front of the PO for acceptance or to try out, make sure you have seen it work yourself/u);
+  assert.match(guide, /start or open it the way the PO will and look at what it really shows/u);
+  assert.match(guide, /or plainly that you could not\s+see it and why/u);
+  assert.match(guide, /every kind of result \(an app, a page, a command-line tool, a library, a document\)/u);
+  assert.match(guide, /It is not a gate/u);
+});
+
 test("the guide keeps its honesty markers and holds no host path", () => {
   const guide = readFileSync(GUIDE, "utf8");
   assert.match(guide, /## Gaps this guide does not close/u);
