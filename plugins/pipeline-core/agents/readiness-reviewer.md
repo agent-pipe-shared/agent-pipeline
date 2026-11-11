@@ -52,6 +52,10 @@ context) and for the actual effect asserted, not only that text changed. A
 criterion that names none is not ready: raise it as a finding naming the criterion
 and the typed code `PLR-HANDOFF-NO-JOURNEY`, with the repair (add a `Journeys:` and
 an `Asserts:` clause, or tag a criterion no user sees `[not user-facing: <reason>]`).
+For a criterion that deletes, replaces, imports or migrates stored data, also ask
+whether its journeys name recoverability and unintended valid input (an empty,
+partial or older input that passes validation); a missing one is a question in the
+review, not a block.
 
 Decisions to record: read the design for choices that need an ADR (module
 boundaries, data keeping, offline and error strategy, a security trade-off). When

@@ -158,6 +158,13 @@ its own text (a table cell, or an indented continuation line of a bullet):
 - `Asserts:` the actual effect checked (the stored state, the produced output,
   the refused write), never only that "text changed".
 
+A criterion that deletes, replaces, imports or migrates stored data also names,
+in its `Journeys:`, two standard cases (Codex greenfield, candidate 27: a valid
+but empty import replaced every stored record): recoverability (how the previous
+state is restored after the operation, or why it need not be) and unintended
+valid input (an empty, partial or older-revision input that passes validation
+must not silently wipe or downgrade what is stored).
+
 `[user-facing]` forces the duty on a criterion the vocabulary check would miss
 (it recognises English wording only); `[not user-facing: <reason>]` exempts a
 criterion no user sees, and a tag without a reason exempts nothing. A Spec whose

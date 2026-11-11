@@ -142,6 +142,18 @@ test("J4 the generated Goldfish briefing and the readiness reviewer carry the du
   has(reviewer, /journey/iu, "the readiness reviewer asks about journeys");
 });
 
+// Codex greenfield report (candidate 27): a valid but empty import replaced every stored record. A data operation's journeys
+// name recoverability and unintended valid input, in the Spec template and in the readiness review (a question, not a block).
+test("J6 a data operation's journeys name recoverability and unintended valid input in the Spec template and the readiness review", () => {
+  const spec = flat(read("templates/spec.md"));
+  has(spec, /deletes, replaces, imports or migrates stored data/u, "templates/spec.md names data operations");
+  has(spec, /recoverability/u, "templates/spec.md asks for recoverability");
+  has(spec, /unintended valid input/u, "templates/spec.md asks for unintended valid input");
+  const reviewer = flat(read("plugins/pipeline-core/agents/readiness-reviewer.md"));
+  has(reviewer, /recoverability and unintended valid input/u, "the readiness reviewer asks both questions");
+  has(reviewer, /not a block/u, "the question never blocks");
+});
+
 test("J5 the close readback reports journey coverage per criterion as covered / not covered, never a bare count", async () => {
   const { closeQualityReadback, QUALITY_ROW_IDS } = await load("lib/close-quality-readback.mjs");
   assert.ok(QUALITY_ROW_IDS.includes("journey-coverage"));
