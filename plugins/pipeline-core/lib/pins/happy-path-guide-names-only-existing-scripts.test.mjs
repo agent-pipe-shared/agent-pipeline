@@ -47,6 +47,13 @@ test("the guide asks for a self-run line before every hand-over to the PO, for a
   assert.match(guide, /It is not a gate/u);
 });
 
+// Live 2026-11-10, Claude on native Windows: the run said it waited for the design signature, started its wait, and gave no command until the PO asked.
+test("the guide puts the signing command into the same message that waits for a PO signature", () => {
+  const guide = readFileSync(GUIDE, "utf8");
+  assert.match(guide, /Whenever you wait for a PO signature \(this one, a push, a residual acceptance\), the\s+same message gives the PO the exact signing command/u);
+  assert.match(guide, /never announce that you\s+wait for a signature without it/u);
+});
+
 test("the guide keeps its honesty markers and holds no host path", () => {
   const guide = readFileSync(GUIDE, "utf8");
   assert.match(guide, /## Gaps this guide does not close/u);

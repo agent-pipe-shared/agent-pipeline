@@ -45,7 +45,9 @@ only the acceptance question at the close. It is not a gate: the Pipeline cannot
    present the plan to the PO; its digest is part of what the one signature covers. This step and `set-phase implementation` also check the scanners the close will need: in a critical calibration a missing one is refused here with its install guidance or the named exception route, otherwise it prints a notice. Ask the PO to install it now, while nothing waits on it. The first `pipeline-start-preflight` output carries the same facts in `environmentReadiness` once the project's manifest enables scanners.
 5. `pipeline-state.mjs approve-plan` (PO ceremony): in `signature` mode the flag `--by` is forbidden; in `chat` mode the PO's explicit actor name is
    required. A bootstrap acknowledgement receipt and a prior `present-plan` for this exact submission are required. **No further syntax documented**: follow
-   the action `pipeline-state.mjs inspect` returns. **For a draft package this one signature is the seal:** the approval writes the PRD and Spec digests into the State in the
+   the action `pipeline-state.mjs inspect` returns. Whenever you wait for a PO signature (this one, a push, a residual acceptance), the
+   same message gives the PO the exact signing command, relayed verbatim from the tool output that printed it; never announce that you
+   wait for a signature without it (live 2026-11-10: the PO had to ask where the command was). **For a draft package this one signature is the seal:** the approval writes the PRD and Spec digests into the State in the
    same transaction. A project bound before this change (`bound-unapproved`) stays locked until its approval; `pipeline-state.mjs reopen-design --by <name>` is executable in
    every state (it voids a prepared seal plan, unlocks a bound package, releases a sealed one); the refusals about a draft or a bound package name it as an exit.
 6. `register-feature-package.mjs --root <root>` (agent). It prints `commitPaths`: commit them BEFORE the binding is generated. After registration do not edit
