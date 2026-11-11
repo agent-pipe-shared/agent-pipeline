@@ -653,7 +653,10 @@ function featureRigor(root, candidateCommit, specPath) {
 
 /** MP-07 prompt lines for a Critic route that resolves to an Opus model; null for any other route. T1 and T2 select the high-risk Critic duty (as admit does). */
 function opusCriticPromptLines({ root, result, env, registry, trigger }) {
-  const runner = env.CODEX_SESSION_ID !== undefined || env.CODEX_THREAD_ID !== undefined ? "codex" : "claude";
+  // Antigravity greenfield 2026-11-10: an Antigravity session got the Claude Opus lines (its own Critic route is a Gemini one), pasted them and
+  // was refused twice. The cell is read for the runner the session really is; an unknown session keeps the Claude cell as before.
+  const detected = criticRunnerFromEnv(env);
+  const runner = detected === "codex" || detected === "antigravity" ? detected : "claude";
   const duty = trigger === "T1" || trigger === "T2" ? "critic_high_risk" : "critic_normal";
   let cell;
   // C23: the Critic route of the PROJECT (its pipeline.user.yaml), not the shipped registry. This CLI's stderr protocol is closed

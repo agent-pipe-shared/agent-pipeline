@@ -2153,16 +2153,25 @@ test("AGY report: an Antigravity Critic gets one generated line naming the repos
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
-// Antigravity greenfield 2026-11-10: the run pasted the generated lines as nextStep says and the Antigravity guard refused the Critic
-// dispatch under its Contamination Rule, because the Opus rationale line said "security review". Every generated prompt line must pass
-// that same rule (imported from the guard, not copied).
-test("AGY report: every generated Critic prompt line passes the Antigravity Contamination Rule", () => {
+// Antigravity greenfield 2026-11-10 (transcript steps 502/503 and 892/893): an Antigravity session got the Claude Opus MP-07 lines although
+// its own Critic route is not Opus, pasted them as nextStep says, and the Antigravity guard refused the dispatch under its Contamination
+// Rule, because the rationale line said "security review". Every generated prompt line must pass that same rule (imported from the guard,
+// not copied), and an Antigravity session gets the Opus lines only when its own route cell is Opus.
+test("AGY report: an Antigravity session gets no Claude Opus lines, and every generated Critic prompt line passes the Contamination Rule", () => {
   const fx = fixture();
   try {
-    const printed = g2069Printed(fx, {}, { env: { ANTIGRAVITY_AGENT: "antigravity" } });
-    const lines = [...printed.criticRunnerPromptLines, ...(printed.criticDispatchPromptLines ?? [])];
-    assert.ok(printed.criticDispatchPromptLines?.length === 2, "control: the registered Critic route is Opus, so the MP-07 lines are printed too");
-    for (const line of lines) assert.doesNotMatch(line, CRITIC_DISPATCH_PROSE, line);
+    const agy = { env: { ANTIGRAVITY_AGENT: "antigravity" } };
+    const printed = g2069Printed(fx, {}, agy);
+    assert.equal(Object.hasOwn(printed, "criticDispatchPromptLines"), false, "the registered Antigravity Critic route is not Opus");
+    for (const line of printed.criticRunnerPromptLines) assert.doesNotMatch(line, CRITIC_DISPATCH_PROSE, line);
+    // An Antigravity route configured to Opus does get the lines, and they pass the rule too.
+    const registry = structuredClone(loadRunnerProfilesV3Registry());
+    registry.duties.critic_high_risk.antigravity = { ...registry.duties.critic_high_risk.claude };
+    const opus = g2069Printed(fx, {}, { ...agy, registry });
+    assert.equal(opus.criticDispatchPromptLines.length, 2, "control: an Opus Antigravity route prints the MP-07 lines");
+    for (const line of opus.criticDispatchPromptLines) assert.doesNotMatch(line, CRITIC_DISPATCH_PROSE, line);
+    const claudeLines = g2069Printed(fx, {}, { env: { CLAUDE_CODE_SESSION_ID: "s" } }).criticDispatchPromptLines;
+    for (const line of claudeLines) assert.doesNotMatch(line, CRITIC_DISPATCH_PROSE, line);
     assert.match(CRITIC_DISPATCH_PROSE.source, /review/u, "control: the rule still names the trigger word");
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
