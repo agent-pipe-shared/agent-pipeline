@@ -1,0 +1,23 @@
+diff --git a/backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md b/backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md
+index 03d0b0275bf3c453cf5c8248e878d92609e2c419..8a90cdba977c7070e6e7b492fc0e7ac2714bfd8f 100644
+--- a/backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md
++++ b/backlog/items/2026-11-11-no-read-only-preview-of-the-architecture-check-before-the-design-signature.md
+@@ -30,8 +30,14 @@ rules).
+   the module and the rule. It writes nothing and needs no signature.
+ - The design-approval stop and the preflight of `present-plan` name that command.
+ 
+-## To verify when the run report arrives
++## Checked against the code (2026-11-11)
+ 
+-The architecture check at the phase change is reported to take every path that appears
+-anywhere in the PRD text, and its reason does not name the violated rule. Confirm against the
+-code and the report before building; if true, the refusal must name the rule and the path.
++The same run reported that the planning-time architecture check takes every path that appears
++anywhere in the PRD text and that its refusal does not name the violated rule. Read in
++`lib/architecture-entry-readiness.mjs`: the first half is true by design
++(`deriveArchitecturePlanningSurface` takes every path-like token of the plan, and the repair
++guidance of `ARCHITECTURE-FITNESS-REPAIR` says so). The second half is already covered: the
++refusal text names the fitness class, its outcome and the first violation as JSON with
++`ruleId`, `module` and `target`. What remains is the preview above; a path that only appears
++in prose (for example in a sentence about what is NOT done) still counts as planned surface,
++which the preview would make visible before a signature is spent.
