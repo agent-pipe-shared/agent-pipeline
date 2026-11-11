@@ -47,6 +47,16 @@ function assertRecognised(spelling, expected, label) {
   }
 }
 
+// Live on native Windows, 2026-11-10: `--root D:/x` was refused while the root reads `D:\x`, and the repair stayed out of reach. Comparison-only, so the injected platform is enough.
+test("FSLASH: a root argument in another spelling of the same folder is admitted on Windows and stays refused on Linux", () => {
+  const repair = fileURLToPath(new URL("./routine-repair.mjs", import.meta.url));
+  const command = (root) => `node '${repair}' run heal --root '${root}' --reason 'routine' --no-goldfish-running`;
+  assert.equal(isSanctionedLifecycleCommand(command(ROOT), ROOT), true, "the root's own spelling");
+  assert.equal(isSanctionedLifecycleCommand(command(swapCase(ROOT)), ROOT, { platform: "win32" }), true, "same folder, other spelling");
+  assert.equal(isSanctionedLifecycleCommand(command(`${ROOT}-other`), ROOT, { platform: "win32" }), false, "another folder");
+  assert.equal(isSanctionedLifecycleCommand(command(swapCase(ROOT)), ROOT, { platform: "linux" }), false, "Linux has one spelling");
+});
+
 test("FSLASH: the canonical backslash spelling is recognised by the receipt trigger and the lifecycle admission", { skip: NOT_WIN32 }, () => {
   assertRecognised(SCRIPT, true, "backslash, as cased");
 });
