@@ -341,7 +341,8 @@ const failedCourseWithResidual = ({ residual = "valid", severity = "minor" } = {
       evidencePaths: ["evidence/critic-diagnostic.json"], priorCriticEvidencePath: null },
     taskId: "TASK-ONE", projectId: "fixture", sessionId: "close-review-3", packetId,
     route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" },
-    verdict: { findings, deliberately_not_flagged: ["fixture"], trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence", briefing_violations: [], pass: false } };
+    // "partial review" keeps this round failed: a round holding only minors passes since the 2026-11-10 PO decision.
+    verdict: { findings, deliberately_not_flagged: ["fixture"], trajectory_verdict: "consistent", trajectory_evidence: "partial review: pass/fail withheld", briefing_violations: [], pass: false } };
   const batch = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: { taskId: "TASK-ONE", baseCommit: c2, candidateCommit: c3,
     logicalWorkIds: ["AC-1", "AC-2"], specPath: "specs/critic/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
   review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
@@ -593,9 +594,10 @@ const W9_FAIL_MAJOR = { findings: [
   { gap: "major gap one", risk: "consumer breaks", severity: "major", evidence: `${COURSE_SPEC}:1`, spec_ref: "AC-1" },
   { gap: "minor gap one", risk: "small drift", severity: "minor", evidence: `${COURSE_SPEC}:2`, spec_ref: "AC-1" },
   { gap: "minor gap two", risk: "small drift", severity: "minor", evidence: `${COURSE_SPEC}:2`, spec_ref: "AC-1" }], pass: false };
+// A round holding only minors passes since the 2026-11-10 PO decision, unless its review was partial; these rounds must stay failed.
 const w9Minors = (tag) => ({ findings: [
   { gap: `minor ${tag} one`, risk: "cosmetic drift", severity: "minor", evidence: `${COURSE_SPEC}:1`, spec_ref: "AC-1" },
-  { gap: `minor ${tag} two`, risk: "cosmetic drift", severity: "minor", evidence: `${COURSE_SPEC}:2`, spec_ref: "AC-1" }], pass: false });
+  { gap: `minor ${tag} two`, risk: "cosmetic drift", severity: "minor", evidence: `${COURSE_SPEC}:2`, spec_ref: "AC-1" }], pass: false, trajectory_evidence: "partial review: pass/fail withheld" });
 const W9_PASS = { findings: [], pass: true };
 const w9VerdictOf = (value) => ({ deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "candidate evidence inspected", briefing_violations: [], ...value });
 const w9Origin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });

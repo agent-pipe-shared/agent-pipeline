@@ -81,9 +81,11 @@ const FAIL_MAJOR = { findings: [
   { gap: "minor gap one", risk: "small drift", severity: "minor", evidence: `${SPEC_PATH}:2`, spec_ref: "AC-1" },
   { gap: "minor gap two", risk: "small drift", severity: "minor", evidence: `${SPEC_PATH}:2`, spec_ref: "AC-1" }],
   pass: false };
+// A round holding only minors passes since the 2026-11-10 PO decision, unless its review was partial. These rounds must stay failed so the
+// residual acceptance route under test has a failed receipt to accept.
 const minors = (tag) => ({ findings: [
   { gap: `minor ${tag} one`, risk: "cosmetic drift", severity: "minor", evidence: `${SPEC_PATH}:1`, spec_ref: "AC-1" },
-  { gap: `minor ${tag} two`, risk: "cosmetic drift", severity: "minor", evidence: `${SPEC_PATH}:2`, spec_ref: "AC-1" }], pass: false });
+  { gap: `minor ${tag} two`, risk: "cosmetic drift", severity: "minor", evidence: `${SPEC_PATH}:2`, spec_ref: "AC-1" }], pass: false, trajectory_evidence: "partial review: pass/fail withheld" });
 const PASS = { findings: [], pass: true };
 const verdictOf = (value) => ({ deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "candidate evidence inspected", briefing_violations: [], ...value });
 const origin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });
