@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28b: 7 held patches exported from the build clone chain 946dd2ea2..f714838f3
+# PO apply script for candidate 28b: 9 held patches exported from the build clone chain 946dd2ea2..dbf5c42b3
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -21,6 +21,8 @@ step 04-7be285d15 'fix(guard): refuse credential reads through find, sed and the
 step 05-00ec74e0b 'feat(onboarding): ask the Advisor consent inside the first question, probe the host route before the mutating init, ask all missing fields at once and remember the push transport'
 step 06-8424ec797 'fix(guard): admit the push transport answer of push-init and the ADR draft discard of create-adr in their closed shapes'
 step 07-f714838f3 'fix(state): count the PRD in HEAD from the direct entries of the feature directory and read the audit index with a large buffer'
+step 08-6e2227eb8 'fix(host-commit): admit a history that mixes proven sibling commits and ordinary commits, and extend the stop-pair case policy to its declared cases'
+step 09-dbf5c42b3 'test(verify): extend case-completion policies and restate observed counts for the candidate 28 cases'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
