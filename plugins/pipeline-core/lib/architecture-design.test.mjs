@@ -531,6 +531,36 @@ test("C19-F1: an accepted predecessor receipt does not relax the target drift ch
   assert.equal(Object.hasOwn(exact, "inheritedFrom"), false);
 });
 
+// Live on native Windows, 2026-11-10: after a reopened design got its new signature, the first materialization's receipt could only be answered with another reopen.
+test("a reopened and newly approved design refreshes its own receipt over the recorded bytes, and nothing else does", async () => {
+  const { stage, mod } = await hf9Load();
+  const own = (r, f) => ({ ...r, featureId: HF9_FEATURE, planPath: HF9_PLAN, planSha256: "a".repeat(64), specSha256: hf9Sha(HF9_SPEC_TEXT) });
+  const fixture = f1Fixture(stage, { edit: own });
+  const result = mod.inspectArchitectureDesign(fixture.root, null, {});
+  assert.equal(result.status, "materialization-required", result.code);
+  assert.ok(result.targets.every(target => /^[0-9a-f]{64}$/u.test(target.preimageSha256)), "every existing target is bound to its recorded bytes");
+  assert.equal(result.receiptPreimageSha256, hf9Sha(readFileSync(join(fixture.root, "architecture/design-materialization.json"), "utf8")));
+  const lockPath = join(fixture.root, "project", "pipeline-state.json.lock");
+  writeFileSync(lockPath, JSON.stringify({ schema: "pipeline.continuity-lock.v0", token: "token-1", ownerNonce: "nonce-1" }));
+  const published = mod.materializeArchitectureDesign(fixture.root, { lock: { ok: true, path: lockPath, token: "token-1", ownerNonce: "nonce-1" } });
+  assert.equal(published.status, "materialized", published.code);
+  assert.equal(JSON.parse(readFileSync(join(fixture.root, "architecture/design-materialization.json"), "utf8")).planSha256, fixture.prdSha, "the receipt now names the newly approved plan");
+  assert.equal(mod.inspectArchitectureDesign(fixture.root, null, {}).status, "materialized", "the refresh is settled, not repeated");
+
+  assert.equal(mod.inspectArchitectureDesign(f1Fixture(stage, { edit: own, driftTarget: true }).root, null, {}).code, "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT", "a hand-edited target is not silently replaced");
+  const unchangedSources = (r, f) => ({ ...own(r, f), planSha256: f.prdSha, designSha256: "d".repeat(64) });
+  assert.equal(mod.inspectArchitectureDesign(f1Fixture(stage, { edit: unchangedSources }).root, null, {}).code, "ARCHITECTURE-DESIGN-RECEIPT-STALE", "with unchanged plan and Spec a differing receipt was edited");
+
+  const orphan = "architecture/map/removed-module.md";
+  const withOrphan = f1Fixture(stage, { edit: (r, f) => ({ ...own(r, f), targets: [...r.targets, { path: orphan, sha256: "e".repeat(64) }] }) });
+  hf9Put(withOrphan.root, orphan, "old module\n");
+  const refused = mod.inspectArchitectureDesign(withOrphan.root, null, {});
+  assert.equal(refused.code, "ARCHITECTURE-DESIGN-TARGET-REMOVED");
+  assert.deepEqual(refused.rejectedValue, [orphan], "the refusal names the file the new design dropped");
+  unlinkSync(join(withOrphan.root, orphan));
+  assert.equal(mod.inspectArchitectureDesign(withOrphan.root, null, {}).status, "materialization-required", "once the file is gone the refresh proceeds");
+});
+
 // --- G20-65 (AC-108): a module that owns no admissible check is reported at design time, before the PO signs, with the move that repairs it ---
 // Measured in the Claude greenfield on candidate 20c: the module user-guide owned two documents and its test belonged to module shell; the dispatch
 // route refused every check only after the design was signed.

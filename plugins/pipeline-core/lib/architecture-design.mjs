@@ -342,6 +342,30 @@ function committedOrWorkingTree(root, path) {
   return String(status.stdout).trim() === "" ? "committed" : "working-tree-only";
 }
 
+/**
+ * A reopened design gets a new signature under the same feature and plan path, so the receipt of the first materialization names old digests.
+ * The caller has already proven the current approval. Null when the receipt is not that case; each recorded target must still hold the bytes the receipt recorded.
+ * Returns the current targets, each replaceable only over its recorded preimage.
+ */
+function refreshReceiptAfterReapproval(root, stored, receipt, targets) {
+  let previous = null;
+  try { previous = JSON.parse(stored); } catch { return null; }
+  if (previous === null || typeof previous !== "object" || previous.schema !== receipt.schema || previous.featureId !== receipt.featureId
+    || previous.planPath !== receipt.planPath || !Array.isArray(previous.targets)
+    || (previous.planSha256 === receipt.planSha256 && previous.specSha256 === receipt.specSha256)) return null;
+  const recorded = new Map(previous.targets.map(row => [row?.path, row?.sha256]));
+  const current = new Set(targets.map(target => target.path));
+  const orphaned = [...recorded.keys()].filter(path => !current.has(path) && existsSync(physical(root, path)));
+  if (orphaned.length > 0) {
+    throw Object.assign(new Error("ARCHITECTURE-DESIGN-TARGET-REMOVED"), { field: "architecture/map",
+      expected: "the new design no longer names these files: delete them, commit, and run materialize-architecture again", rejectedValue: orphaned });
+  }
+  for (const target of targets) {
+    if (recorded.has(target.path)) requireValue(existsSync(physical(root, target.path)) && hash(bytes(root, target.path)) === recorded.get(target.path), "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
+  }
+  return targets.map(target => recorded.has(target.path) ? { ...target, preimageSha256: recorded.get(target.path) } : target);
+}
+
 /** Read-only authority projection: no adoption record or second PO decision is fabricated. */
 export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) {
   const root = resolve(rootDir);
@@ -418,6 +442,8 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
       const stored = bytes(root, receiptPath);
       let inheritedFrom = null;
       if (stored !== json(receipt)) {
+        const refreshed = refreshReceiptAfterReapproval(root, stored, receipt, targets);
+        if (refreshed) return { ok: true, status: "materialization-required", input, targets: refreshed, receipt, receiptPreimageSha256: hash(stored), scope: input.disposition.scope };
         // C19-F1: the receipt of a CLOSED predecessor feature is accepted when the design and every target digest are equal.
         // Only a parseable receipt of the same schema qualifies; the receipt on disk is never rewritten.
         let predecessor = null;
@@ -640,14 +666,15 @@ export function inspectArchitectureMaterializationTargets(rootDir, deps = {}) {
   const prospective = subset.required ? prepareApprovedArchitectureMaterialization(subset.handle)
     : { ok: true, required: false, targets: [] };
   if (!prospective.ok) return { ok: false, status: "blocked", code: prospective.code };
+  const receiptTarget = inspected.receipt ? { path: "architecture/design-materialization.json", bytes: json(inspected.receipt),
+    ...(inspected.receiptPreimageSha256 ? { preimageSha256: inspected.receiptPreimageSha256 } : {}) } : null;
   const mapTargets = inspected.receipt && inspected.status === "materialization-required"
-    ? [...inspected.targets, { path: "architecture/design-materialization.json", bytes: json(inspected.receipt) }] : [];
+    ? [...inspected.targets, receiptTarget] : [];
   // The retained authority is the final publication of the single transaction.
   const targets = [...prospective.targets.filter(target => target.path !== prospective.referencePath),
     ...mapTargets, ...prospective.targets.filter(target => target.path === prospective.referencePath)];
   requireValue(new Set(targets.map(target => target.path)).size === targets.length, "ARCHITECTURE-DESIGN-DUPLICATE-TARGET");
-  const mapInventory = inspected.receipt
-    ? [...inspected.targets, { path: "architecture/design-materialization.json", bytes: json(inspected.receipt) }] : [];
+  const mapInventory = inspected.receipt ? [...inspected.targets, receiptTarget] : [];
   const prospectiveInventory = prospective.inventoryTargets ?? [];
   const sealedTargets = [...prospectiveInventory.filter(target => target.path !== prospective.referencePath),
     ...mapInventory, ...prospectiveInventory.filter(target => target.path === prospective.referencePath)];
