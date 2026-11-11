@@ -508,8 +508,9 @@ test("N22 candidate Verify admits a failed all-minor Critic receipt through the 
     commit("chat approval mode");
     const featureId = "carry-feature";
     const minor = { gap: "wording of the refusal", risk: "r", severity: "minor", evidence: "e", spec_ref: "s" };
+    // "partial review" keeps this round failed: a round holding only minors passes since the 2026-11-10 PO decision.
     const reviewed = await completedCriticPacket(root, { featureId, verdict: { findings: [minor], deliberately_not_flagged: ["fixture"],
-      trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence", briefing_violations: [], pass: false } });
+      trajectory_verdict: "consistent", trajectory_evidence: "partial review: pass/fail withheld", briefing_violations: [], pass: false } });
     const evidencePath = `specs/${featureId}/evidence/review.json`;
     const evidenceBytes = `${JSON.stringify({ schema: "fixture.review.v1", verdict: "pass" })}\n`;
     writeFileSync(join(root, evidencePath), evidenceBytes);
