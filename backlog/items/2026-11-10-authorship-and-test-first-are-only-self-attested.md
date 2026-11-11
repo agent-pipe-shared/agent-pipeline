@@ -5,7 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-11-10
-source: Codex greenfield report, point R5 (P1); PO tile 2026-11-10 places it after 0.7.0
+source: "Codex greenfield report, point R5 (P1); PO tile 2026-11-10 places it after 0.7.0"
 sprint: alfred
 done_when: manual
 ---

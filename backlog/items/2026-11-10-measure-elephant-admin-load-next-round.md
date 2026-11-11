@@ -5,7 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-11-10
-source: Claude greenfield report (592 Elephant messages, 69 percent cache reads); PO tile 2026-11-10
+source: "Claude greenfield report (592 Elephant messages, 69 percent cache reads); PO tile 2026-11-10"
 sprint: alfred
 done_when: manual
 ---
