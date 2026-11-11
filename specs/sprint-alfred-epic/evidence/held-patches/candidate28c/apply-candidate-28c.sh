@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PO apply script for candidate 28c: 25 held patches exported from the build clone chain 8438dac43..f6738d2f8
+# PO apply script for candidate 28c: 24 held patches exported from the build clone chain 8438dac43..74c36e33f
 # by scripts/export-held-chain.mjs, each applied as one commit with its original subject, then the derived files in ONE follow-up commit.
 # Run from the repository root with a clean tree: bash <this script>
 # Idempotent: a patch whose exact subject is already in the history of HEAD is skipped. `git apply --index` stages exactly the
@@ -34,11 +34,10 @@ step 17-115d08bfd 'feat(preflight): print a compact ready envelope and keep the 
 step 18-a325921ac 'fix(verify): place the context-baseline and grammar-once suites in the capability inventory'
 step 19-3e8187c91 'fix(guard): list the SBOM modules the audit bundle and the signing script import as kernel paths'
 step 20-3929ecf80 'fix(preflight): keep the repair of open readiness findings and the Antigravity hint for an unidentified runner'
-step 21-d269e29c1 'chore(derived): refresh the backlog ledger projections and the Reader inputs for candidate 28c'
-step 22-a0e225be7 'feat(pipeline-start): keep the start skill inside the re-attach window and move status-conditional blocks to their references'
-step 23-6c3f9c66b 'docs(guard): name candidate 28c as the origin of the SBOM kernel paths'
-step 24-eff94f0cd 'docs(claude-md): keep the hard rules in CLAUDE.md and move their incident history to a maintainer record'
-step 25-f6738d2f8 'fix(docs): classify the new maintainer record and ADR-0091, and vendor ADR-0091 with the refreshed operating model'
+step 21-9e714cf0b 'feat(pipeline-start): keep the start skill inside the re-attach window and move status-conditional blocks to their references'
+step 22-22e723fd1 'docs(guard): name candidate 28c as the origin of the SBOM kernel paths'
+step 23-d972a041e 'docs(claude-md): keep the hard rules in CLAUDE.md and move their incident history to a maintainer record'
+step 24-74c36e33f 'fix(docs): classify the new maintainer record and ADR-0091, and vendor ADR-0091 with the refreshed operating model'
 
 node scripts/refresh-derived-files.mjs
 git add -A -- docs plugins/pipeline-core backlog
