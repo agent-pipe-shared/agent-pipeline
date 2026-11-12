@@ -25,6 +25,7 @@ import { declaredRepositoryMode } from "./repository-freshness.mjs";
 import { exportCriticRoundFromJournal } from "./session-critic-finalizer.mjs";
 import { FOLLOWUP_EVIDENCE } from "../lib/critical-action-authorization.mjs";
 import { closeDispatchProjectionBytes, projectCloseDispatches, readCloseDispatchInputs } from "../lib/durable-evidence.mjs";
+import { closeSbom, sbomFindingHelp } from "../lib/sbom-close.mjs";
 
 const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
@@ -36,6 +37,7 @@ const REGISTER_PACKAGE = fileURLToPath(new URL("./register-feature-package.mjs",
 const SECURITY_SCAN = fileURLToPath(new URL("./security-scan.mjs", HERE));
 const PLUGIN_MANIFEST = fileURLToPath(new URL("../.claude-plugin/plugin.json", HERE));
 const FEATURE = /^[a-z][a-z0-9-]{2,63}$/u;
+const SBOM_OUTPUTS = Object.freeze(["record.json", "cyclonedx.json", "spdx.json"]);
 // P3: the same five dispositions the coordinator accepts (the driver used to know only three and refused the rest before the coordinator spoke).
 const IMPACT = new Set(["architecture-conforms", "architecture-changed", "architecture-decision-added", "architecture-decision-superseded", "architecture-summary-updated", "no-architecture-impact"]);
 
@@ -228,7 +230,7 @@ const HEX32 = /^[a-f0-9]{32}$/u;
 function stopResult(stage, code, reason, repair, extra = {}) { return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "stopped", stage, stop: Object.freeze({ code, reason: String(reason).slice(0, 1200), repair }), ...extra }); }
 function writeRepoJson(root, path, value) { const target = resolve(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`); return path; }
 
-export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, humanDecline = null, openChecks = null } = {}, deps = {}) {
+export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, humanDecline = null, openChecks = null, sbomOverride = null } = {}, deps = {}) {
   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
   if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", `Feature close requires a known architecture impact; allowed --architecture-impact values: ${[...IMPACT].join(", ")}.`);
@@ -238,6 +240,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   if (humanAcceptance !== null && (typeof humanAcceptance !== "string" || humanAcceptance.trim() === "" || humanAcceptance.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(humanAcceptance))) fail("FINISH-ACCEPTANCE", "The human acceptance must be the human's literal answer: non-empty, at most 500 characters, no control characters.");
   // C28: the human's literal words of a decline, held to the same bounds; the two answers exclude each other.
   if (humanDecline !== null && (typeof humanDecline !== "string" || humanDecline.trim() === "" || humanDecline.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(humanDecline))) fail("FINISH-ACCEPTANCE", "The human decline must be the human's literal answer: non-empty, at most 500 characters, no control characters.");
+  // C28c: the human's literal words accepting a gap in the SBOM, held to the same bounds; it is recorded as given, never composed by the agent.
+  if (sbomOverride !== null && (typeof sbomOverride !== "string" || sbomOverride.trim() === "" || sbomOverride.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(sbomOverride))) fail("FINISH-SBOM-OVERRIDE", "The SBOM override must be the human's literal words: non-empty, at most 500 characters, no control characters.");
   if (humanAcceptance !== null && humanDecline !== null) fail("FINISH-ACCEPTANCE", "--human-acceptance and --human-decline are exclusive: the human either accepted (exactly the fixed yes form) or did not.");
   if (openChecks !== null && (!Array.isArray(openChecks) || openChecks.some((value) => typeof value !== "string"))) fail("FINISH-ACCEPTANCE", "The open checks must be a list of texts.");
   const runner = deps.runCommand ?? ((executable, argv) => spawnSync(executable, argv, { cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root } }));
@@ -341,6 +345,18 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
           `finish the Critic review (it records the packet), then run: ${rerunBase}${again === null ? "" : ` --resume-lifecycle-id ${again}`} --critic-packet-id <packet-id>`);
       }
       packetForRerun = packet;
+      // C28c (PO decision 2026-11-11): the SBOM is a standard part of the close. An existing record is checked, otherwise one is generated from the tracked lockfiles. A finding of any blocking state
+      // (stale, invalid, partial, unsupported) stops the close HERE, before the acceptance question or any write, so nothing half-closed is left; only a human's literal override, recorded in the record, lets it pass.
+      // Nothing is written yet: the files are written after the candidate Verify, with the other close evidence, from this same result.
+      const tracked = runner("git", ["ls-files", "-z"]);
+      if (tracked?.status !== 0) return stopResult("sbom", "ONESHOT-SBOM-TRACKED-FILES", failedText(tracked), `rerun the identical command: ${rerun(again)}`);
+      const readText = (path) => { try { return readFileSync(resolve(root, path), "utf8"); } catch { return null; } };
+      const sbom = closeSbom({ featureId, evidenceDir, tracked: String(tracked.stdout ?? "").split("\0").filter((path) => path !== ""), read: readText, existing: readText(`${evidenceDir}/sbom/record.json`), override: sbomOverride, actor });
+      if (sbom.status === "blocked") {
+        const helps = [...new Set(sbom.blocks.map((block) => sbomFindingHelp(block)))];
+        return stopResult("sbom", sbom.blocks[0].code, sbom.blocks.map((block) => `${block.state} ${block.path}: ${block.reason}`).join("; "),
+          `${helps.join(" ")} A human can instead accept the gap: ask them, then rerun with --sbom-override "<the human's literal words>" (the record names every finding it covers and travels in the audit bundle): ${rerun(again)}`);
+      }
       // C24 (Claude greenfield): a round that did not pass used to surface only inside Verify, after the Result bootstrap, with no way out named, and a run took a PO's word in chat for an acceptance.
       let standing = null;
       try { standing = command(runner, process.execPath, [COORDINATOR, "critic-standing", "--root", root, "--packet", packet], "ONESHOT-CRITIC-STANDING"); } catch { standing = null; /* the close keeps its own check */ }
@@ -478,7 +494,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward
       // (VEP-CVL-CARRY-RANGE; a human had to reset). Only a tree whose every dirty path is such an output, with an evidence file proving an earlier attempt, is rolled back; the stages write the same again.
       // C22: the acceptance record is such an output too (the answer is already held in `accepted`, and written again after the package moves below).
-      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath, acceptanceTarget(root, featureId).path, `specs/${featureId}/acceptance.md`, `${evidenceDir}/human-acceptance.md`, `${evidenceDir}/dispatch-projection.json`]);
+      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath, acceptanceTarget(root, featureId).path, `specs/${featureId}/acceptance.md`, `${evidenceDir}/human-acceptance.md`, `${evidenceDir}/dispatch-projection.json`, ...SBOM_OUTPUTS.map((name) => `${evidenceDir}/sbom/${name}`)]);
       const leftovers = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
       const dirtyOutputs = leftovers?.status === 0 ? String(leftovers.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => ({ tracked: !line.startsWith("??"), path: line.slice(3) })) : [];
       if (dirtyOutputs.some(({ tracked, path }) => !tracked && (path === auditRequestPath || path === verifyPath)) && dirtyOutputs.every(({ path }) => ownOutputs.has(path))) {
@@ -548,8 +564,11 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
           dispatchProjectionPath = target; stages.push("dispatch-projection");
         }
       } catch { dispatchProjectionPath = null; }
+      stages.push("sbom");
+      for (const file of sbom.files) { mkdirSync(dirname(resolve(root, file.path)), { recursive: true }); writeFileSync(resolve(root, file.path), file.text); }
+      const sbomRecordPath = sbom.recordPath;
       stages.push("audit-request");
-      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports, ...(dispatchProjectionPath === null ? {} : { dispatchProjectionPath }) } });
+      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports, ...(dispatchProjectionPath === null ? {} : { dispatchProjectionPath }), sbomRecordPath } });
       if (state.continuity !== null && typeof state.continuity === "object") {
         let current = state;
         if (state.continuity.queueHead?.nextAction !== "close") {
@@ -730,13 +749,13 @@ export function stageOneShotCommit(root, result) {
 function parseOneShot(argvWithStage) {
   const stage = argvWithStage.length > 0 && argvWithStage.at(-1) === "--stage";
   const argv = stage ? argvWithStage.slice(0, -1) : argvWithStage;
-  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--human-decline", "--open-checks"]; const value = {};
+  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--human-decline", "--open-checks", "--sbom-override"]; const value = {};
   for (let i = 0; i < argv.length; i += 2) {
     const flag = argv[i]; const next = argv[i + 1];
-    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] [--stage] (the first call stops once with the acceptance question for the human; --stage, last, stages exactly the paths of the commit the result asks for and never commits)");
+    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] [--sbom-override \"<the human's literal words accepting a blocked SBOM>\"] [--stage] (the first call stops once with the acceptance question for the human; a SBOM finding that blocks the close is named with its repair, and only the human's override passes it; --stage, last, stages exactly the paths of the commit the result asks for and never commits)");
     value[flag] = next;
   }
-  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, humanDecline: value["--human-decline"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";"), stage };
+  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, humanDecline: value["--human-decline"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";"), sbomOverride: value["--sbom-override"] ?? null, stage };
 }
 
 function parse(argv) {

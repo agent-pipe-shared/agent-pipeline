@@ -11,6 +11,7 @@ import { canonicalSha256 } from "./governance-event.mjs";
 import { closeDispatchProjectionBytes, projectCloseDispatches } from "./durable-evidence.mjs";
 import { denyPrivateAbsolutePaths } from "./dispatch-record.mjs";
 import { planVerifySelection } from "./verify-selection.mjs";
+import { closeSbom } from "./sbom-close.mjs";
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 // E-AC-20 fixtures: a governance export adapter profile and a delivery receipt, matching the
@@ -283,6 +284,48 @@ test("C28 the bundle carries the dispatch projection as one evidence item, verif
   assert.deepEqual((await verifyAuditBundle({ bundleRoot: join(third.root, "bundle") })).findings, ["AB-DISPATCH-PROJECTION"]);
   const unreadable = planWith(fixture(), { candidate: CANDIDATE, evidence: { dispatchProjectionPath: "evidence/absent.json" } });
   assert.deepEqual(unreadable.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["dispatch-projection:gap:UNREADABLE"]);
+});
+// C28c (PO decision 2026-11-11): the SBOM the close records is its own bundle section: the record, then the two documents it names, bound by digest and re-checked offline.
+const LOCK = JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/left-pad": { version: "1.3.0" } } });
+function sbomBundle(input, files, mutate = (value) => value) {
+  const closed = closeSbom({ featureId: FEATURE_ID, evidenceDir: "evidence", tracked: Object.keys(files), read: (path) => files[path] ?? null, ...mutate({}) });
+  for (const file of closed.files) { mkdirSync(join(input.root, "evidence/sbom"), { recursive: true }); writeFileSync(join(input.root, file.path), file.text); }
+  return { closed, plan: planWith(input, { candidate: CANDIDATE, evidence: { sbomRecordPath: "evidence/sbom/record.json" } }) };
+}
+test("C28c the bundle carries the SBOM record and its documents, names the section, and verifies offline", async () => {
+  const input = fixture(); const { closed, plan } = sbomBundle(input, { "package-lock.json": LOCK });
+  assert.equal(closed.record.status, "complete");
+  assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["sbom:carried:null", "sbom-document:cyclonedx-json:carried:null", "sbom-document:spdx-json:carried:null"], "only the SBOM items: no approval item is invented");
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  assert.match(readFileSync(join(input.root, "bundle", "README.md"), "utf8"), /## Software bill of materials/u);
+  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
+});
+test("C28c a not-applicable and an overridden record are carried with their code named", async () => {
+  const none = fixture(); const empty = sbomBundle(none, { "src/a.js": "x" });
+  assert.deepEqual(empty.plan.evidence.items.map((entry) => `${entry.item}:${entry.code}`), ["sbom:SBOM-NOT-APPLICABLE"]);
+  await buildAuditBundle({ repositoryRoot: none.root, outputPath: "bundle", plan: empty.plan });
+  assert.equal((await verifyAuditBundle({ bundleRoot: join(none.root, "bundle") })).status, "verified");
+  const over = fixture(); const gap = sbomBundle(over, { "package-lock.json": LOCK, "yarn.lock": "x" }, () => ({ override: "weiter", actor: "po" }));
+  assert.equal(gap.plan.evidence.items[0].code, "SBOM-OVERRIDDEN");
+  await buildAuditBundle({ repositoryRoot: over.root, outputPath: "bundle", plan: gap.plan });
+  assert.equal((await verifyAuditBundle({ bundleRoot: join(over.root, "bundle") })).status, "verified");
+  assert.match(readFileSync(join(over.root, "bundle", "README.md"), "utf8"), /SBOM-OVERRIDDEN/u);
+});
+test("C28c an unreadable record or a document that does not match its recorded digest is a typed gap; a damaged carried document is found offline", async () => {
+  const absent = planWith(fixture(), { candidate: CANDIDATE, evidence: { sbomRecordPath: "evidence/sbom/absent.json" } });
+  assert.deepEqual(absent.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["sbom:gap:UNREADABLE"]);
+  const input = fixture(); const { plan } = sbomBundle(input, { "package-lock.json": LOCK });
+  writeFileSync(join(input.root, "evidence/sbom/spdx.json"), "{}\n");
+  const changed = planWith(input, { candidate: CANDIDATE, evidence: { sbomRecordPath: "evidence/sbom/record.json" } });
+  assert.deepEqual(changed.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["sbom:carried:null", "sbom-document:cyclonedx-json:carried:null", "sbom-document:spdx-json:gap:UNREADABLE"]);
+  const second = fixture(); const built = sbomBundle(second, { "package-lock.json": LOCK });
+  await buildAuditBundle({ repositoryRoot: second.root, outputPath: "bundle", plan: built.plan });
+  const bundle = join(second.root, "bundle"); const manifest = JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8")); const target = manifest.artifacts.find((entry) => entry.path.endsWith("sbom-document")).path;
+  const forged = Buffer.from("{\"bomFormat\":\"x\"}\n"); writeFileSync(join(bundle, target), forged);
+  manifest.artifacts = manifest.artifacts.map((entry) => entry.path === target ? { ...entry, sha256: hash(forged) } : entry); writeFileSync(join(bundle, "manifest.json"), `${JSON.stringify(manifest)}\n`);
+  const findings = (await verifyAuditBundle({ bundleRoot: bundle })).findings;
+  assert.ok(findings.some((finding) => finding.startsWith("AB-SBOM-DOCUMENT")), findings.join(","));
+  assert.ok(plan.evidence.items.length === 3);
 });
 test("Q3 evidence bound to another candidate or not passing is a typed gap and is not carried", () => {
   const other = { commit: "e".repeat(40), tree: "f".repeat(40) }; const input = fixture();

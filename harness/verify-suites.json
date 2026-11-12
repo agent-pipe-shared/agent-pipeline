@@ -4843,6 +4843,12 @@
       "file": "plugins/pipeline-core/lib/pins/evidence-commands-stage-their-own-paths-and-never-commit.test.mjs",
       "invariantPinned": "With the last argument --stage the registration command, the Critic finalizer and the one-shot close stage exactly the paths they print and make no commit; a refused result, an unstageable path or a climbing path stages nothing further, and the guard admits the flag only in that position",
       "nonOverlapNote": "Unique test suite for the staging option of register-feature-package.mjs, session-critic-finalizer.mjs and finish-feature.mjs"
+    },
+    {
+      "name": "sbom-close-tests",
+      "file": "plugins/pipeline-core/lib/sbom-close.test.mjs",
+      "invariantPinned": "The close reads the lockfiles it knows (npm, Python, Go, Rust) into CycloneDX 1.6 and SPDX 2.3 documents and a closed record; no component is an explicit not-applicable record with its reason; a manifest without a lockfile, an unpinned requirement, a format without a reader, a changed lockfile or a damaged record is a typed finding that blocks, and only a human's literal override, named in the record with every finding it covers, passes it",
+      "nonOverlapNote": "Unique cases: the lockfile readers and the close record; sbom-manifest, sbom-node-adapter and sbom-release-binding tests pin the portable manifest, the Node graph adapter and the release links and do not read any lockfile"
     }
   ]
 }

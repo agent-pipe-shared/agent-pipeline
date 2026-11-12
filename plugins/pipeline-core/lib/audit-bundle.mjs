@@ -9,6 +9,8 @@ import { canonicalSha256, canonicalizeJson, parseStrictJson } from "./governance
 import { validateFeaturePackage } from "./feature-package-topology.mjs";
 import { resolveEffectiveOrganizationPolicy } from "./organization-policy.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "./verify-selection.mjs";
+import { SBOM_CLOSE_CODES, SBOM_DOCUMENT_FORMATS, sbomCloseRecordShape } from "./sbom-close.mjs";
+import { validateSbomPayload } from "./sbom-manifest.mjs";
 
 const SHA = /^[a-f0-9]{64}$/u; const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u; const BUNDLE_ID = /^[a-z][a-z0-9-]{2,63}$/u;
 const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u; const SIGNATURE = /^[A-Za-z0-9_-]{16,16384}$/u;
@@ -19,13 +21,16 @@ function evidenceSection(manifest) {
   if (!Object.hasOwn(manifest, "evidence")) return "";
   const line = (entry) => `- ${entry.item}: ${entry.status}${entry.code ? ` (${entry.code})` : ""}${entry.bundlePath ? ` at \`${entry.bundlePath}\`` : ""}`;
   // C22 (CGR-12): the Critic round reports are their own section; a round without a report names what is missing instead of being left out.
-  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:") && entry.item !== "dispatch-projection"); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
+  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:") && entry.item !== "dispatch-projection" && !entry.item.startsWith("sbom")); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
   // C28: the dispatch projection is its own section, printed after the reports.
   const projections = manifest.evidence.items.filter((entry) => entry.item === "dispatch-projection");
   const projectionText = projections.length === 0 ? "" : `\n## Dispatch projection\n\nThe tracked, redacted projection of the feature's dispatches: each briefing's text with its digest and each completed dispatch record. \`redacted\` means an absolute host path was masked (the digest of the original bytes is kept next to the digest of the text carried); a \`gap\` names why a text is not carried (a typed gap with the original digest, never an omission). A private key or secret-shaped value is never copied.\n\n${projections.map(line).join("\n")}\n`;
+  // C28c: the software bill of materials is its own section: the close's record, then the two documents it names.
+  const sboms = manifest.evidence.items.filter((entry) => entry.item.startsWith("sbom"));
+  const sbomText = sboms.length === 0 ? "" : `\n## Software bill of materials\n\nThe close reads the lockfiles pinned in the repository (npm, Python, Go, Rust) and records the components in CycloneDX 1.6 and SPDX 2.3; the component list carries no dependency edges. \`SBOM-NOT-APPLICABLE\` means no component was found, with the reason in the record. \`SBOM-OVERRIDDEN\` means a human's literal override of a blocked state is recorded in the record, which names every finding it covered: the SBOM is then incomplete by that decision, not by accident.\n\n${sboms.map(line).join("\n")}\n`;
   const approvalText = approval.length === 0 ? "" : `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${approval.map(line).join("\n")}\n`;
   const reportText = reports.length === 0 ? "" : `\n## Critic round reports\n\nOne entry per Critic round of the feature. \`REPORT-NOT-EXPORTED\` means the round's report was never exported into the repository's tracked evidence (it lived outside the tracked tree), and \`UNREADABLE\` that the named file was missing or empty at the close: the report is NOT part of this bundle.\n\n${reports.map(line).join("\n")}\n`;
-  return `${approvalText}${reportText}${projectionText}`;
+  return `${approvalText}${reportText}${projectionText}${sbomText}`;
 }
 // C22B (CGR-13): printed prose only, from a build input that is NOT a manifest field (the manifest and its keys are hashed by the verifier and the bindings).
 // The README digest is recorded in the manifest at build time, so the extra text is bound like the rest of the README.
@@ -194,8 +199,8 @@ function followUpFindings(root, manifest) {
   return findings;
 }
 function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
-const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection"]);
-const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection" });
+const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection", "sbom", "sbom-document"]);
+const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection", sbom: "sbom-record", sbomDocument: "sbom-document" });
 // C28: the projection the close writes (lib/durable-evidence.mjs `projectCloseDispatches`). The verifier re-checks it offline: every carried text hashes to the digest it names, nothing is a gap with a text,
 // and no absolute host path or private key is anywhere in the file, so a producer that skipped the redaction is found even when the artifact digest is consistent with the manifest.
 const DISPATCH_PROJECTION_SCHEMA = "pipeline.close-dispatch-projection.v1"; const BRIEFING_STATUSES = new Set(["carried", "redacted", "gap"]);
@@ -233,7 +238,7 @@ const sameCandidate = (value, candidate) => value !== null && typeof value === "
  */
 function collectEvidence(root, candidate, evidence, firstIndex) {
   if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) fail("AB-EVIDENCE-INPUT");
-  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath"]);
+  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath", "sbomRecordPath"]);
   if (Object.keys(evidence).some((key) => !known.has(key)) || (evidence.proofPaths !== undefined && (!Array.isArray(evidence.proofPaths) || evidence.proofPaths.length > 16))) fail("AB-EVIDENCE-INPUT");
   // C22 (CGR-12): one entry per Critic round of the feature; a null path is a round whose report was never exported.
   const reports = evidence.criticReports;
@@ -246,7 +251,9 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
   // Only reports named (the close's own request): no approval item is invented, so a gap there is not a claim this request made.
   // C28: a request that names only the dispatch projection (the close's own) invents no approval item either.
   if (evidence.dispatchProjectionPath !== undefined && typeof evidence.dispatchProjectionPath !== "string") fail("AB-EVIDENCE-INPUT");
-  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined)) {
+  // C28c: the same for the SBOM record the close names.
+  if (evidence.sbomRecordPath !== undefined && typeof evidence.sbomRecordPath !== "string") fail("AB-EVIDENCE-INPUT");
+  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined && evidence.sbomRecordPath === undefined)) {
   if (evidence.traceReportPath === undefined) gap("approval-trace", "NOT-REFERENCED");
   else {
     const file = readEvidenceFile(root, evidence.traceReportPath); const report = file && jsonOrNull(file.bytes);
@@ -294,6 +301,20 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
     const file = readEvidenceFile(root, evidence.dispatchProjectionPath);
     if (file === null || file.bytes.length === 0) gap("dispatch-projection", "UNREADABLE");
     else items.push({ item: "dispatch-projection", status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.dispatch, evidence.dispatchProjectionPath, file.sha256) });
+  }
+  if (evidence.sbomRecordPath !== undefined) {
+    const file = readEvidenceFile(root, evidence.sbomRecordPath); const record = file && jsonOrNull(file.bytes);
+    if (file === null || !sbomCloseRecordShape(record)) gap("sbom", "UNREADABLE");
+    else {
+      items.push({ item: "sbom", status: "carried", code: record.status === "complete" ? null : record.code, bundlePath: carry(EVIDENCE_CLASSES.sbom, evidence.sbomRecordPath, file.sha256) });
+      const directory = evidence.sbomRecordPath.slice(0, evidence.sbomRecordPath.lastIndexOf("/") + 1);
+      for (const document of record.documents) {
+        const item = `sbom-document:${document.format}`;
+        const documentFile = document.path.startsWith(directory) && !document.path.slice(directory.length).includes("/") ? readEvidenceFile(root, document.path) : null;
+        if (documentFile === null || documentFile.sha256 !== document.sha256) gap(item, "UNREADABLE");
+        else items.push({ item, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.sbomDocument, document.path, documentFile.sha256) });
+      }
+    }
   }
   return { artifacts, evidence: Object.freeze({ schema: "pipeline.audit-bundle-evidence.v1", candidateBound: true, traceStatus, items: Object.freeze(items.map((entry) => Object.freeze(entry))) }) };
 }
@@ -355,6 +376,20 @@ function evidenceFindings(root, manifest) {
     if (item.item === "dispatch-projection" && item.bundlePath !== null) {
       let bytes = null; try { bytes = readFileSync(join(root, item.bundlePath)); } catch { bytes = null; }
       if (bytes === null || !dispatchProjectionHolds(bytes)) findings.push("AB-DISPATCH-PROJECTION");
+    }
+    // C28c: the SBOM record must be a valid close record whose carried documents are exactly those it names, by digest; each document must hold its profile.
+    if (item.item === "sbom" && item.bundlePath !== null) {
+      let record = null; try { record = parseStrictJson(readFileSync(join(root, item.bundlePath))); } catch { record = null; }
+      const artifactDigest = (path) => (Array.isArray(manifest.artifacts) ? manifest.artifacts.find((entry) => entry?.path === path)?.sha256 : undefined);
+      if (!sbomCloseRecordShape(record) || item.code !== (record.status === "complete" ? null : record.code) || !Object.values(SBOM_CLOSE_CODES).includes(record.code)) findings.push("AB-SBOM");
+      else for (const document of record.documents) {
+        const named = manifest.evidence.items.find((entry) => entry.item === `sbom-document:${document.format}`);
+        if (named === undefined || named.bundlePath === null || artifactDigest(named.bundlePath) !== document.sha256) findings.push(`AB-SBOM-DOCUMENT ${document.format}`);
+      }
+    }
+    if (item.item.startsWith("sbom-document:") && item.bundlePath !== null) {
+      const format = item.item.slice("sbom-document:".length); let payload = null; try { payload = parseStrictJson(readFileSync(join(root, item.bundlePath))); } catch { payload = null; }
+      if (!SBOM_DOCUMENT_FORMATS.includes(format) || payload === null || validateSbomPayload(format, payload).valid !== true) findings.push(`AB-SBOM-DOCUMENT ${format}`);
     }
     if (item.item === "approval-trace" && item.bundlePath !== null) {
       let report = null; try { report = parseStrictJson(readFileSync(join(root, item.bundlePath))); } catch { report = null; }

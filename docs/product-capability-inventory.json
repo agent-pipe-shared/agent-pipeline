@@ -2611,6 +2611,7 @@
         "verify-phase:harness/scripts/verify.mjs:provenance-fixture-matrix-tests",
         "verify-phase:harness/scripts/verify.mjs:provenance-local-builder-tests",
         "verify-phase:harness/scripts/verify.mjs:provenance-release-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-close-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-discovery-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-discovery-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-fixture-matrix-tests",
