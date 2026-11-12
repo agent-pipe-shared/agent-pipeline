@@ -4837,6 +4837,12 @@
       "file": "plugins/pipeline-core/scripts/wait-host-commit.test.mjs",
       "invariantPinned": "The wait for a background Goldfish's stop answers from the stop's own last record: committed, checkpoint, stop-failed with the stop's recovery, or still-waiting; another dispatch or an earlier attempt under the same id never answers for this one, and it changes nothing",
       "nonOverlapNote": "Unique cases: the waiter and the launch notice command; claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs pins it once against the real stop hook"
+    },
+    {
+      "name": "pin-evidence-commands-stage-their-own-paths-and-never-commit-tests",
+      "file": "plugins/pipeline-core/lib/pins/evidence-commands-stage-their-own-paths-and-never-commit.test.mjs",
+      "invariantPinned": "With the last argument --stage the registration command, the Critic finalizer and the one-shot close stage exactly the paths they print and make no commit; a refused result, an unstageable path or a climbing path stages nothing further, and the guard admits the flag only in that position",
+      "nonOverlapNote": "Unique test suite for the staging option of register-feature-package.mjs, session-critic-finalizer.mjs and finish-feature.mjs"
     }
   ]
 }

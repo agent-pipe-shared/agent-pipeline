@@ -796,6 +796,7 @@
         "verify-phase:harness/scripts/verify.mjs:pin-escaped-and-powershell-redirects-to-a-protected-path-are-writes-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-every-dispatch-pays-a-bootstrap-receipt-detour-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-evidence-artifacts-carry-no-commit-identity-tests",
+        "verify-phase:harness/scripts/verify.mjs:pin-evidence-commands-stage-their-own-paths-and-never-commit-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-existing-signing-key-reuse-deadlocks-onboarding-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-feature-branch-push-admitted-without-signature-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-first-enrollment-enters-retirement-before-consent-tests",

@@ -973,8 +973,36 @@ function runSessionCriticExportCli(argv, deps) {
     root, packetId: raw.packetId, reportPath: raw.reportPath, outDir: raw.outDir }, deps) });
 }
 
+/**
+ * `--stage` (C28c, PO decision 2026-11-11), the last argument of `export` and `finalize`: stage exactly the paths the verb prints (the exported
+ * evidence and the lineage commitPaths), nothing else. The verb still never commits: the commit stays the caller's one `git commit -F`. A path that
+ * cannot be staged stops the staging and is named in `stageRefused`, with the paths staged so far in `staged`.
+ */
+export function stageExactPaths(root, paths) {
+  const run = (args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 10_000 });
+  const staged = [];
+  for (const path of [...new Set(paths)]) {
+    if (typeof path !== "string" || path === "" || isAbsolute(path) || path.split("/").includes("..")) return { staged, stageRefused: String(path) };
+    const ignored = run(["check-ignore", "-q", "--", path]).status === 0;
+    if (run(["add", ...(ignored ? ["-f"] : []), "--", path]).status !== 0) return { staged, stageRefused: path };
+    staged.push(path);
+  }
+  return { staged };
+}
+
+function runStagedFinalizerCli(argv, deps) {
+  const result = runSessionCriticFinalizerCli(argv, deps);
+  if (result.exitCode !== 0 || result.output === null || typeof result.output !== "object") return result;
+  const root = realpathSync(resolve(argv[2]));
+  const paths = [...(Array.isArray(result.output.paths) ? result.output.paths : []), ...(Array.isArray(result.output.lineage?.commitPaths) ? result.output.lineage.commitPaths : [])];
+  return Object.freeze({ ...result, output: Object.freeze({ ...result.output, ...stageExactPaths(root, paths) }) });
+}
+
 /** Closed CLI adapter. The request and verdict stay as bounded local files. */
 export function runSessionCriticFinalizerCli(argv, deps = {}) {
+  if (Array.isArray(argv) && argv.length > 1 && argv.at(-1) === "--stage" && (argv[0] === "export" || argv[0] === "finalize")) {
+    return runStagedFinalizerCli(argv.slice(0, -1), deps);
+  }
   try {
     // The opt-in is a sixth argv token on `finalize` only; it is never read from the request file.
     const optIn = Array.isArray(argv) && argv.length === 6 && argv[0] === "finalize" && argv[5] === "--allow-caller-authored-fallback";

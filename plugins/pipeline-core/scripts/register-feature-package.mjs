@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 //
-// register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]
+// register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>] [--stage]
+//
+// `--stage` (last argument) stages exactly the `commitPaths` of the result; it never commits.
 //
 // `--add-diagnostic-evidence <path>` (D165-CDR) registers a Critic diagnostic (a file under
 // `specs/<feature>/evidence/`, produced by critic-diagnostic-evidence.mjs) and the log it names as
@@ -70,7 +72,10 @@ export function pushThreatModelReadback(root) {
 }
 
 export const REGISTER_FEATURE_PACKAGE_HELP = [
-  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>]",
+  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>] [--stage]",
+  "",
+  "Add --stage as the LAST argument to stage exactly the paths the result names in commitPaths (the result then carries staged: [...]). It never commits and stages nothing else:",
+  "  your commit stays one `git commit -F <message file>` of what is staged.",
   "",
   "Feature-close audit route, package side (run in this order, nothing committed in between: the package candidate must equal HEAD):",
   "  1. Produce passing Verify evidence for HEAD: verify-evidence-producer.mjs --root <root> --mode candidate --critic-packet-id <id> --out specs/<feature>/evidence/<name>.json",
@@ -113,8 +118,29 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
   "",
 ].join("\n");
 
+/**
+ * `--stage` (C28c, PO decision 2026-11-11): stage exactly the paths this run names in `commitPaths`, nothing else. The tool still never commits:
+ * the commit stays the caller's one `git commit -F <message file>`. An ignored envelope is staged with `-f`, as the plan above says; a path that
+ * cannot be staged stops the staging and is named, with the paths staged so far.
+ */
+export function stageCommitPaths(root, result) {
+  if (result === null || typeof result !== "object" || result.status === "refused" || !Array.isArray(result.commitPaths)) return result;
+  const staged = [];
+  for (const path of result.commitPaths) {
+    const ignored = path === result.envelopePath && git(root, ["check-ignore", "-q", "--", path]).status === 0;
+    const added = git(root, ["add", ...(ignored ? ["-f"] : []), "--", path]);
+    if (added.status !== 0) return { ...result, staged, stageRefused: path };
+    staged.push(path);
+  }
+  return { ...result, staged };
+}
+
 export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.write(text)) {
   if (argv.length === 1 && argv[0] === "--help") { out(REGISTER_FEATURE_PACKAGE_HELP); return 0; }
+  const stage = argv.length > 2 && argv.at(-1) === "--stage";
+  if (stage) argv = argv.slice(0, -1);
+  let stagingRoot = null;
+  const emit = (value) => `${JSON.stringify(stage && stagingRoot !== null ? stageCommitPaths(stagingRoot, value) : value)}\n`;
   const rootIndex = argv.indexOf("--root");
   const rootValue = rootIndex >= 0 ? argv[rootIndex + 1] : undefined;
   // PF-34: `--add-review-unit` adds the Critic review unit to a feature registered before it existed.
@@ -137,6 +163,7 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
     out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "--root does not resolve to a directory" })}\n`);
     return 2;
   }
+  stagingRoot = root;
   const read = readState(root);
   if (read?.status !== "ok") {
     out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-NO-APPROVED-PLAN", reason: "the project authority State is unavailable; run set-feature, submit-plan, present-plan and approve-plan first", stateStatus: read?.status ?? null })}\n`);
@@ -144,32 +171,32 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   }
   if (addDelta) {
     const added = addCriticDeltaRequest({ root, inputPath: argv[3], readAcceptedDeliveryContract });
-    out(`${JSON.stringify(added)}\n`);
+    out(emit(added));
     return added.status === "refused" ? 2 : 0;
   }
   if (addLineage) {
     const added = addCriticReviewLineage({ root, packetId: argv[4], readAcceptedDeliveryContract });
-    out(`${JSON.stringify(added)}\n`);
+    out(emit(added));
     return added.status === "refused" ? 2 : 0;
   }
   if (addDiagnostic) {
     const added = addCriticDiagnosticEvidence({ root, state: read.state, path: argv[3], readAcceptedDeliveryContract });
-    out(`${JSON.stringify(added)}\n`);
+    out(emit(added));
     return added.status === "refused" ? 2 : 0;
   }
   if (addVerify) {
     const added = addVerifyEvidence({ root, state: read.state, path: argv[3], readAcceptedDeliveryContract });
-    out(`${JSON.stringify(added)}\n`);
+    out(emit(added));
     return added.status === "refused" ? 2 : 0;
   }
   if (addReviewUnit) {
     const added = addCriticReviewUnit({ root, state: read.state, readAcceptedDeliveryContract });
-    out(`${JSON.stringify(added)}\n`);
+    out(emit(added));
     return added.status === "refused" ? 2 : 0;
   }
   const result = registerFeaturePackage({ root, state: read.state, readAcceptedDeliveryContract });
   const printed = result.status === "registered" || result.status === "already-registered" ? { ...result, ...commitPlan(root, result) } : result;
-  out(`${JSON.stringify(printed)}\n`);
+  out(emit(printed));
   return result.status === "refused" ? 2 : 0;
 }
 

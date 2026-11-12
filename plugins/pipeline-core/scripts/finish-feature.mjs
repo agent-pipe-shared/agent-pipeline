@@ -708,14 +708,35 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
 }
 
-function parseOneShot(argv) {
+/**
+ * `--stage` (C28c, PO decision 2026-11-11), the last argument of `--one-shot`: when the result names the commit the close needs (status commit-required, or the commit-pending stop),
+ * stage exactly `commit.paths` with the add form its own first step prescribes (`git add -f --` when it says so), and report them in `staged`. It never commits: the commit
+ * stays the caller's one step (the pre-commit hook admits exactly these bytes), and nothing else in the tree is staged. A path that cannot be staged stops the staging and is named.
+ */
+export function stageOneShotCommit(root, result) {
+  const paths = result?.commit?.paths;
+  if (!Array.isArray(paths) || paths.length === 0 || (result.status !== "commit-required" && result.stop?.code !== "ONESHOT-COMMIT-PENDING")) return result;
+  const force = typeof result.commit.steps?.[0] === "string" && result.commit.steps[0].startsWith("git add -f --");
+  const staged = [];
+  for (const path of paths) {
+    if (typeof path !== "string" || path === "" || isAbsolute(path) || path.split("/").includes("..")) return { ...result, staged, stageRefused: String(path) };
+    const added = spawnSync("git", ["-C", root, "add", ...(force ? ["-f"] : []), "--", path], { encoding: "utf8", shell: false, timeout: 10000 });
+    if (added.status !== 0) return { ...result, staged, stageRefused: path };
+    staged.push(path);
+  }
+  return { ...result, staged };
+}
+
+function parseOneShot(argvWithStage) {
+  const stage = argvWithStage.length > 0 && argvWithStage.at(-1) === "--stage";
+  const argv = stage ? argvWithStage.slice(0, -1) : argvWithStage;
   const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--human-decline", "--open-checks"]; const value = {};
   for (let i = 0; i < argv.length; i += 2) {
     const flag = argv[i]; const next = argv[i + 1];
-    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] (the first call stops once with the acceptance question for the human)");
+    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] [--stage] (the first call stops once with the acceptance question for the human; --stage, last, stages exactly the paths of the commit the result asks for and never commits)");
     value[flag] = next;
   }
-  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, humanDecline: value["--human-decline"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";") };
+  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, humanDecline: value["--human-decline"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";"), stage };
 }
 
 function parse(argv) {
@@ -731,7 +752,9 @@ function parse(argv) {
 if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === "--one-shot") {
   // P3: the one agent command. JSON on stdout; the commit steps or the stop with its repair on stderr; exit 2 when stopped.
   try {
-    const result = oneShotClose(parseOneShot(process.argv.slice(3)));
+    const parsed = parseOneShot(process.argv.slice(3));
+    const closed = oneShotClose(parsed);
+    const result = parsed.stage ? stageOneShotCommit(realpathSync(resolve(parsed.rootDir)), closed) : closed;
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     if (result.status === "stopped") { process.stderr.write(`finish-feature --one-shot: stopped at ${result.stage}: ${result.stop.code}: ${result.stop.reason}\nrepair: ${result.stop.repair}\n`); process.exitCode = 2; }
     else if (result.status === "commit-required") process.stderr.write(`finish-feature --one-shot: run the commit, then the next command.\n${(result.commit.steps ?? []).join("\n")}\nnext: ${result.next}\n`);

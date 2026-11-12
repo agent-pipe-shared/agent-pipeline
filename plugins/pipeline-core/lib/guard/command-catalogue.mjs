@@ -234,9 +234,11 @@ function sanctionedModelRoleDispatchSelectArgs(args, root) {
     && (!antigravity || (args[6] === "--host-session-id" && NATIVE_SESSION_ID.test(args[7])));
 }
 
-function sanctionedRegisterFeaturePackageArgs(args, root) {
+function sanctionedRegisterFeaturePackageArgs(allArgs, root) {
   // D41: a sole `--help` prints the evidence route; it takes no root and combines with nothing.
-  if (args.length === 1 && args[0] === "--help") return true;
+  if (allArgs.length === 1 && allArgs[0] === "--help") return true;
+  // C28c: a trailing `--stage` (stage exactly the printed commitPaths, never commit) combines with every root form; the form before it is judged as before.
+  const args = allArgs.length > 2 && allArgs.at(-1) === "--stage" ? allArgs.slice(0, -1) : allArgs;
   if (!exactRoot(args, root, 0)) return false;
   if (args.length === 2) return true;
   if (args.length === 3) return args[2] === "--add-review-unit";

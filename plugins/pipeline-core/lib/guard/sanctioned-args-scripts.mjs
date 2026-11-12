@@ -14,7 +14,9 @@ import * as SANCTIONED_CONSTANTS from "./constants.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
 import { isNodeInterpreterWord, relativeUnderRoot, sameNativePath } from "../path-spelling.mjs";
 
-export function sanctionedSessionCriticFinalizerArgs(args, root) {
+export function sanctionedSessionCriticFinalizerArgs(allArgs, root) {
+  // C28c: a trailing `--stage` on `finalize` (stage exactly the printed lineage commitPaths, never commit) is judged on the form before it.
+  const args = allArgs[0] === "finalize" && allArgs.length === 6 && allArgs.at(-1) === "--stage" ? allArgs.slice(0, -1) : allArgs;
   const exactProjectRoot = exactRoot(args, root, 1)
     || (args[1] === "--root" && args[2] === "."
       && resolve(root, args[2]) === resolve(root)
