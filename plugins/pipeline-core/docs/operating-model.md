@@ -582,9 +582,13 @@ your project's authority settings before using one.
 <!-- capability:supply-chain-provenance -->
 <a id="capability-supply-chain-provenance"></a>
 
-- **SBOM and provenance contracts (optional, host-only):** inspect component
-  inputs and validate local provenance structures; they do not install
-  scanners or create an external attestation.
+- **SBOM and provenance contracts (provenance optional, host-only; the SBOM
+  is part of every feature close, [ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md)):**
+  the close reads the pinned lockfiles (npm, Python, Go, Rust) and records the
+  components in CycloneDX 1.6 and SPDX 2.3, or an explicit `not-applicable`;
+  `stale`, `invalid`, `partial` and `unsupported` stop the close unless the
+  PO's signed override for exactly those findings is recorded. Provenance structures are validated locally;
+  nothing here installs scanners or creates an external attestation.
 
 <!-- capability:ai-assisted-hardening -->
 <a id="capability-ai-assisted-hardening"></a>
@@ -1194,9 +1198,15 @@ externe Freigabe oder die Aktivierung in einem Nutzer-Repository.
 - **Security-Control-Katalog (optional, nur Host):** prüft Anwendbarkeit,
   Receipts und Waiver-Ablauf; er ist weder ein automatisch laufender Scanner
   noch Ersatz für das konfigurierte Security-Gate.
-- **SBOM- und Provenienzverträge (optional, nur Host):** prüfen lokale
-  Komponenten- und Provenienzangaben, installieren aber keine Scanner und
-  erstellen keine externe Attestierung.
+- **SBOM- und Provenienzverträge (Provenienz optional, nur Host; die SBOM ist
+  Teil jedes Feature-Close, [ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md)):**
+  der Close liest die gepinnten Lockfiles (npm, Python, Go, Rust) und hält die
+  Komponenten in CycloneDX 1.6 und SPDX 2.3 fest, oder ein ausdrückliches
+  `not-applicable`; `stale`, `invalid`, `partial` und `unsupported` stoppen den
+  Close, solange keine signierte Übersteuerung des PO für genau diese Befunde
+  festgehalten ist.
+  Provenienzstrukturen werden lokal geprüft; nichts davon installiert Scanner
+  oder erstellt eine externe Attestierung.
 - **KI-gestützte Härtung (optional, nur Host):** bewertet nicht vertrauenswürdige
   Änderungseingaben explizit; ein vorhandener Test bedeutet keinen aktiven
   Runner-Hook.

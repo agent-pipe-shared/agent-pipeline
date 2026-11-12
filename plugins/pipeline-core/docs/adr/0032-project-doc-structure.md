@@ -6,7 +6,7 @@
 
 **Status:** accepted (2026-07-07, PO directive from the AP1-TUNING session + plan approval "retro-speed") · **Basis:** PO directive (verbatim), `.claude/plans/2026-07-07-retro-speed.md` package G-E
 
-**Governs:** templates/release-manifest.md, templates/architecture-doc.md, templates/prompts/kickoff-new-project.md, third-party-licenses.json, plugins/pipeline-core/scripts/security-scan.mjs, plugins/pipeline-core/scripts/security-scan.test.mjs, plugins/pipeline-core/lib/sbom-manifest.mjs, plugins/pipeline-core/lib/sbom-manifest.test.mjs, plugins/pipeline-core/lib/sbom-lifecycle.test.mjs, plugins/pipeline-core/lib/sbom-release-binding.mjs, plugins/pipeline-core/lib/sbom-release-binding.test.mjs
+**Governs:** templates/release-manifest.md, templates/architecture-doc.md, templates/prompts/kickoff-new-project.md, third-party-licenses.json, plugins/pipeline-core/scripts/security-scan.mjs, plugins/pipeline-core/scripts/security-scan.test.mjs, plugins/pipeline-core/lib/sbom-manifest.mjs, plugins/pipeline-core/lib/sbom-manifest.test.mjs, plugins/pipeline-core/lib/sbom-lifecycle.test.mjs, plugins/pipeline-core/lib/sbom-release-binding.mjs, plugins/pipeline-core/lib/sbom-release-binding.test.mjs, plugins/pipeline-core/lib/sbom-close.mjs, plugins/pipeline-core/lib/sbom-close.test.mjs
 
 ## Context
 
@@ -46,6 +46,10 @@ Adoption by an existing project: on the PO's initiative, per project (no fixed d
 This amendment retains the greenfield decision and the prohibition on automatic historical migration. For an explicitly adopted lifecycle, `pipeline.sbom-manifest.v1` is the one canonical, immutable inventory record. It binds the exact candidate, governed source-input digests, adapter identity/configuration, pinned CycloneDX 1.6 and SPDX 2.3 payloads, component provenance/relationships, declared completeness, freshness, export privacy classification and canonical digest.
 
 An SBOM is inventory evidence only: findings, VEX disposition, risk acceptance and release approval remain separately typed. The lifecycle states are closed as `complete`, `stale`, `invalid`, `partial`, `unsupported`, `unavailable` and `not-applicable`; only a fresh, complete, validated record can later be bound to a release. CycloneDX remains a project-selected adapter, not a universal tooling mandate. Existing baseline artifacts remain byte-stable until an explicit, preview-first migration is separately approved.
+
+## Amendment 2026-11-11 — the close writes the SBOM
+
+[ADR-0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) (PO tiles, register D240) makes the SBOM part of every feature close and of its audit bundle. The rejected alternative "Full CycloneDX mandatory for all projects" and the sentence that the full SBOM is not mandatory are superseded for the lockfiles the close can read (npm, Python, Go, Rust): the close reads them without installing any tool and records both formats, or an explicit `not-applicable`, and a blocking state needs the PO's signed override. Everything else in this ADR stays.
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
@@ -93,3 +97,7 @@ Adoption durch ein Bestandsprojekt: auf the PO-Initiative, projekt-individuell (
 Diese Ergänzung erhält die Greenfield-Entscheidung und das Verbot automatischer historischer Migration. Nach ausdrücklicher Projektadoption ist `pipeline.sbom-manifest.v1` der einzige kanonische, unveränderliche Inventarnachweis. Er bindet exakten Kandidaten, Source-Input-Digests, Adapteridentität/-konfiguration, festgelegte CycloneDX-1.6- und SPDX-2.3-Payloads, Komponentenherkunft/-beziehungen, Vollständigkeit, Frische, Export-Privacy und den kanonischen Digest.
 
 Eine SBOM ist ausschließlich Inventar: Findings, VEX, Risikoakzeptanz und Release-Freigabe bleiben getrennte Records. Die Zustände sind geschlossen (`complete`, `stale`, `invalid`, `partial`, `unsupported`, `unavailable`, `not-applicable`); eine spätere Release-Bindung darf nur einen frischen, vollständigen und validierten Record verwenden. Bestehende Baseline-Artefakte bleiben bis zu einer ausdrücklich genehmigten, preview-basierten Migration byte-stabil.
+
+## Ergänzung 2026-11-11 — der Close schreibt die SBOM
+
+[ADR-0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) (PO-Kacheln, Register D240) macht die SBOM zum Teil jedes Feature-Close und seines Audit-Bundles. Die verworfene Alternative „Volles CycloneDX für alle Projekte verpflichtend“ und der Satz, die volle SBOM sei nicht verpflichtend, gelten für die Lockfiles, die der Close lesen kann (npm, Python, Go, Rust), nicht mehr: der Close liest sie ohne Werkzeuginstallation und hält beide Formate fest, oder ein ausdrückliches `not-applicable`; ein sperrender Zustand braucht die signierte Übersteuerung des PO. Alles Übrige dieses ADR bleibt.
