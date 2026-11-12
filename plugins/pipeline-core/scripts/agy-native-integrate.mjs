@@ -9,6 +9,9 @@
  *
  *   plan  --root <root> --branch <subagent-...> --allowed-path <p>...                              read-only
  *   apply --root <root> --branch <subagent-...> --allowed-path <p>... --expect-sha256 <digest>     writes the working tree only
+ *   apply ... --commit-dispatch-id <id>   (C28C) the same, then the recovery route's own plan and apply commit exactly those paths with the dispatch trailer
+ *
+ * A refusal of the commit step never undoes the applied change: the result carries `commit: {status: "refused", ...}` and `next` names the manual route.
  *
  * --allowed-path (at least one, repeated) is the briefed write scope; a branch that changed any other path is refused. The digest binds HEAD,
  * the branch tip, the merge base, the paths and the patch bytes, so a moved HEAD or branch makes `apply` refuse before writing. `git apply`
@@ -27,7 +30,8 @@ const integratedDirectory = (commonDir) => join(commonDir, "agent-pipeline", "ru
 const SELF = fileURLToPath(import.meta.url);
 const RECOVER = fileURLToPath(new URL("./goldfish-host-commit-recover.mjs", import.meta.url));
 const BRANCH = /^subagent-[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u;
-const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>]";
+const SYNTAX = "plan|apply --root <root> --branch <subagent-...> --allowed-path <p>... [--expect-sha256 <digest>] [--commit-dispatch-id <briefed dispatch id>, apply only]";
+const DISPATCH_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/u; // the same token the recovery route accepts
 const MAX_COMMITS = 200;
 
 const git = (cwd, args, input) => {
@@ -41,7 +45,7 @@ const shellWord = (value) => (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(value) ? value : 
 export function parseArgs(argv) {
   const [verb, ...rest] = argv;
   if (verb !== "plan" && verb !== "apply") return { error: `unknown verb; usage: ${SYNTAX}` };
-  const out = { verb, root: null, branch: null, allowed: [], expect: null };
+  const out = { verb, root: null, branch: null, allowed: [], expect: null, commitDispatchId: null };
   for (let i = 0; i < rest.length; i += 2) {
     const flag = rest[i], value = rest[i + 1];
     if (typeof value !== "string" || value === "" || /[\u0000-\u001f\u007f]/u.test(value)) return { error: `flag ${flag} needs one value; usage: ${SYNTAX}` };
@@ -49,8 +53,11 @@ export function parseArgs(argv) {
     else if (flag === "--branch" && out.branch === null) out.branch = value;
     else if (flag === "--allowed-path") out.allowed.push(value);
     else if (flag === "--expect-sha256" && out.expect === null) out.expect = value;
+    // C28C: apply may also land the ordinary dispatch-trailer commit through the recovery route in the same call (one path, no extra decision).
+    else if (flag === "--commit-dispatch-id" && out.commitDispatchId === null && DISPATCH_ID.test(value)) out.commitDispatchId = value;
     else return { error: `unexpected or repeated flag ${flag}; usage: ${SYNTAX}` };
   }
+  if (out.commitDispatchId !== null && verb !== "apply") return { error: `--commit-dispatch-id belongs to apply; usage: ${SYNTAX}` };
   return out;
 }
 
@@ -182,8 +189,33 @@ export function apply(options) {
     return { ...planned, status: "refused", code: "AGYI-APPLY-FAILED", paths: [],
       refusals: [refuse("AGYI-APPLY-FAILED", String(applied.err).trim().split("\n").slice(-2).join(" | "), "nothing was written (git apply is all-or-nothing); plan again")] };
   }
-  return { ...planned, status: "applied", code: "AGYI-APPLIED",
-    next: `the child's change is now in the working tree, uncommitted: commit it with the existing recovery route: node ${shellWord(RECOVER)} plan --root ${shellWord(planned.root)} --dispatch-id <the briefed dispatch id> ${planned.paths.map((p) => `--allowed-path ${shellWord(p)}`).join(" ")}, then the same command as apply with the --expect-sha256 digest it printed` };
+  const next = `the child's change is now in the working tree, uncommitted: commit it with the existing recovery route: node ${shellWord(RECOVER)} plan --root ${shellWord(planned.root)} --dispatch-id <the briefed dispatch id> ${planned.paths.map((p) => `--allowed-path ${shellWord(p)}`).join(" ")}, then the same command as apply with the --expect-sha256 digest it printed`;
+  if (options.commitDispatchId == null) return { ...planned, status: "applied", code: "AGYI-APPLIED", next };
+  const commit = commitThroughRecovery(planned, options.commitDispatchId);
+  return { ...planned, status: "applied", code: "AGYI-APPLIED", commit,
+    next: commit.status === "committed" ? "nothing left to do for this child: its change is committed with the dispatch trailer" : next };
+}
+
+/**
+ * C28C: the recovery route's own plan, then its apply with the digest that plan printed, run back to back for exactly the paths this take-over wrote. The
+ * paths are the integrate plan's own, so there is nothing new to review between the two pairs; every refusal of the recovery route is returned as it is and the
+ * working tree keeps the applied change (the manual route in `next` still works).
+ */
+function commitThroughRecovery(planned, dispatchId) {
+  const run = (args) => {
+    const res = spawnSync(process.execPath, [RECOVER, ...args], { encoding: "utf8", shell: false, timeout: 120_000, maxBuffer: 1 << 26 });
+    let json = null;
+    try { json = JSON.parse(String(res.stdout ?? "")); } catch { /* typed below */ }
+    return { json };
+  };
+  const planArgs = ["plan", "--root", planned.root, "--dispatch-id", dispatchId, ...planned.paths.flatMap((p) => ["--allowed-path", p])];
+  const recoveryPlan = run(planArgs).json;
+  if (recoveryPlan?.status !== "ready" || !Array.isArray(recoveryPlan.next) || recoveryPlan.next[2] !== "apply" || !recoveryPlan.next.every((word) => typeof word === "string")) {
+    return { status: "refused", code: recoveryPlan?.code ?? "AGYI-COMMIT-PLAN-UNREADABLE", refusals: recoveryPlan?.refusals ?? [] };
+  }
+  const committed = run(recoveryPlan.next.slice(2)).json;
+  if (committed?.status !== "committed") return { status: "refused", code: committed?.code ?? "AGYI-COMMIT-APPLY-UNREADABLE", refusals: committed?.refusals ?? [] };
+  return { status: "committed", commit: committed.commit, dispatchId };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === SELF) {

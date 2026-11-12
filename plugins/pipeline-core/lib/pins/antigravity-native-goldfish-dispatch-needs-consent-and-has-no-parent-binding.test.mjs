@@ -538,6 +538,56 @@ test("M4b: the take-over refuses with a typed repair and leaves no state: unknow
   } finally { rmSync(fx.base, { recursive: true, force: true }); }
 });
 
+// C28C: five of six Antigravity take-overs were followed by the recovery route's plan and apply for exactly the paths the take-over wrote. `apply` can now do
+// both in one call when it is given the briefed dispatch id; the recovery route's own checks run unchanged and its refusal never undoes the applied change.
+test("C28C: apply with a dispatch id lands the dispatch-trailer commit of exactly the applied paths in the same call", async () => {
+  const fx = brainFixture();
+  try {
+    const integrate = await import("../../scripts/agy-native-integrate.mjs");
+    const wt = worktreeFixture(fx);
+    childWork(fx, wt, { "src/a.mjs": "export const a = 1;\n" });
+    const options = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs"], expect: null };
+    const planned = integrate.plan(options);
+    const head = git(fx.workspace, "rev-parse", "HEAD");
+    // The fixture repository has no identity of its own and the test HOME has none either.
+    git(fx.workspace, "config", "user.name", "Fixture");
+    git(fx.workspace, "config", "user.email", "fixture@example.invalid");
+    const applied = integrate.apply({ ...options, expect: planned.planSha256, commitDispatchId: "C28C-AGY-COMMIT" });
+    assert.equal(applied.status, "applied", JSON.stringify(applied));
+    assert.equal(applied.commit.status, "committed", JSON.stringify(applied.commit));
+    assert.notEqual(git(fx.workspace, "rev-parse", "HEAD"), head, "HEAD moved by exactly one commit");
+    assert.equal(git(fx.workspace, "rev-list", "--count", `${head}..HEAD`), "1");
+    assert.match(git(fx.workspace, "log", "-1", "--format=%B"), /Dispatch: C28C-AGY-COMMIT \(goldfish\)/u);
+    assert.equal(git(fx.workspace, "show", "--name-only", "--format=", "HEAD"), "src/a.mjs", "only the applied path is committed");
+    assert.match(applied.next, /nothing left to do/u);
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
+test("C28C: a refused commit step keeps the applied change and names the manual route; parse rules for the new flag", async () => {
+  const fx = brainFixture();
+  try {
+    const integrate = await import("../../scripts/agy-native-integrate.mjs");
+    const wt = worktreeFixture(fx);
+    childWork(fx, wt, { "src/a.mjs": "export const a = 1;\n" });
+    const options = { root: fx.workspace, branch: wt.branch, allowed: ["src/a.mjs"], expect: null };
+    const planned = integrate.plan(options);
+    const head = git(fx.workspace, "rev-parse", "HEAD");
+    // An id the recovery route does not accept (the command line refuses it earlier, a direct call does not): the commit step refuses, the take-over itself stays applied.
+    const applied = integrate.apply({ ...options, expect: planned.planSha256, commitDispatchId: "x".repeat(100) });
+    assert.equal(applied.status, "applied", JSON.stringify(applied));
+    assert.equal(applied.commit.status, "refused", JSON.stringify(applied.commit));
+    assert.equal(git(fx.workspace, "rev-parse", "HEAD"), head, "nothing committed");
+    assert.equal(readFileSync(join(fx.workspace, "src", "a.mjs"), "utf8"), "export const a = 1;\n", "the applied change stays");
+    assert.match(applied.next, /goldfish-host-commit-recover\.mjs plan/u);
+    const parsed = (...args) => integrate.parseArgs(args);
+    const common = ["--root", "/r", "--branch", "subagent-x", "--allowed-path", "a"];
+    assert.equal(parsed("apply", ...common, "--expect-sha256", "a".repeat(64), "--commit-dispatch-id", "C28C-X").commitDispatchId, "C28C-X");
+    assert.match(parsed("plan", ...common, "--commit-dispatch-id", "C28C-X").error, /belongs to apply/u);
+    assert.match(parsed("apply", ...common, "--commit-dispatch-id", "C28C-X", "--commit-dispatch-id", "C28C-Y").error, /repeated/u);
+    assert.match(parsed("apply", ...common, "--commit-dispatch-id", "bad id").error, /unexpected/u);
+  } finally { rmSync(fx.base, { recursive: true, force: true }); }
+});
+
 test("M4b: the guard admits the take-over command as an exact argv shape, nothing looser", async () => {
   const { isSanctionedLifecycleCommand } = await import("../guard/command-catalogue.mjs");
   const root = realpathSync(resolve(libDir, "..", "..", ".."));
@@ -547,7 +597,13 @@ test("M4b: the guard admits the take-over command as an exact argv shape, nothin
   assert.equal(admitted(`plan --root '${root}' --branch ${branch} --allowed-path a/b.txt`), true);
   assert.equal(admitted(`plan --root '${root}' --branch ${branch} --allowed-path a/b.txt --allowed-path c.md`), true);
   assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)}`), true);
+  // C28C: apply (never plan) may carry one dispatch id for the commit step.
+  assert.equal(admitted(`apply --root '${root}' --branch ${branch} --allowed-path a/b.txt --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C28C-AGY-COMMIT`), true);
   for (const args of [
+    `plan --root '${root}' --branch ${branch} --allowed-path a --commit-dispatch-id C28C-X`,
+    `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id C28C-X --commit-dispatch-id C28C-Y`,
+    `apply --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)} --commit-dispatch-id 'bad id'`,
+    `apply --root '${root}' --branch ${branch} --allowed-path a --commit-dispatch-id C28C-X`,
     "", "plan", `plan --root '${root}'`, `plan --root '${root}/x' --branch ${branch} --allowed-path a`, `plan --root '${root}' --branch main --allowed-path a`,
     `plan --root '${root}' --branch ${branch}`, `plan --root '${root}' --branch ${branch} --allowed-path ../x`,
     `apply --root '${root}' --branch ${branch} --allowed-path a`, `plan --root '${root}' --branch ${branch} --allowed-path a --expect-sha256 ${"a".repeat(64)}`,
