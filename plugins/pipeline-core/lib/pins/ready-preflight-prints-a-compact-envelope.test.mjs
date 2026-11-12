@@ -42,7 +42,7 @@ test("a ready envelope prints a compact line and keeps the full envelope in the 
     assert.equal(compact.fullEnvelope, "scratch/s1-abc/preflight-full.json");
     const stored = JSON.parse(readFileSync(join(root, compact.fullEnvelope), "utf8"));
     assert.deepEqual(stored, full, "the file holds the unchanged full envelope");
-    assert.deepEqual(compact.environmentReadiness.findings, [{ findingId: "orphan-descriptors", status: "unknown", cause: "no probe" }]);
+    assert.deepEqual(compact.environmentReadiness.findings, [full.environmentReadiness.findings[1]], "an open finding keeps its repair");
     assert.equal(compact.environmentReadiness.okCount, 1);
     assert.deepEqual(compact.cloneProvisioning, { schema: "pipeline.clone-provisioning-report.v1", status: "ready" });
     assert.equal(compact.bootstrapPayload.emittedMeasurement, "same-as-original");
@@ -66,6 +66,9 @@ test("a non-ready status, an Antigravity run's hint, a missing binding and a fai
     assert.equal(compactReadyEnvelope(refused, { rootDir: root }), refused);
     assert.equal(existsSync(join(root, "scratch")), false, "nothing is written for a non-ready status");
     assert.ok(compactReadyEnvelope(envelope("ready", "antigravity"), { rootDir: root }).agyStartHint, "an Antigravity run keeps its hint");
+    const sourceless = envelope();
+    delete sourceless.rulesetSource;
+    assert.ok(compactReadyEnvelope(sourceless, { rootDir: root }).agyStartHint, "an unidentified runner keeps the hint");
     const unbound = envelope();
     unbound.bootstrapHousekeeping.scratchLifecycle.binding = { status: "unbound" };
     assert.equal(compactReadyEnvelope(unbound, { rootDir: root }), unbound);

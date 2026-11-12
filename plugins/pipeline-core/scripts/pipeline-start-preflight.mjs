@@ -2477,7 +2477,7 @@ export function compactReadyEnvelope(envelope, { rootDir = process.cwd(), writeF
     if (readiness && Array.isArray(readiness.findings)) {
       const open = readiness.findings.filter((finding) => finding?.status !== "ok");
       compact.environmentReadiness = { schema: readiness.schema, mutation: readiness.mutation, nonGating: readiness.nonGating, ok: readiness.ok,
-        okCount: readiness.findings.length - open.length, findings: open.map(({ findingId, status, cause }) => ({ findingId, status, cause })) };
+        okCount: readiness.findings.length - open.length, findings: open };
     }
     if (envelope.cloneProvisioning?.status === "ready") compact.cloneProvisioning = { schema: envelope.cloneProvisioning.schema, status: "ready" };
     const payload = envelope.bootstrapPayload;
@@ -2494,7 +2494,8 @@ export function compactReadyEnvelope(envelope, { rootDir = process.cwd(), writeF
     }
     const capability = envelope.closeAndPushCapability;
     if (capability?.status === "ready") compact.closeAndPushCapability = { schema: capability.schema, status: "ready" };
-    if (envelope.agyStartHint && envelope.rulesetSource?.runner !== "antigravity") delete compact.agyStartHint;
+    // Dropped only for a positively identified Claude or Codex run; a missing ruleset source keeps the hint.
+    if (envelope.agyStartHint && ["claude", "codex"].includes(envelope.rulesetSource?.runner)) delete compact.agyStartHint;
     return compact;
   } catch {
     return envelope;
