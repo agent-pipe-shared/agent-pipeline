@@ -3261,6 +3261,24 @@
         ],
         "maxBytes": 65536
       }
+    },
+    {
+      "name": "g23-quoted-pipeline-reads-tests",
+      "file": "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs",
+      "previousPolicySha256": "ff37fbe85b8829922f05c0a5bbe058a978e453ec32fd6eba70aa1ad0c94018cb",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "G23Q001",
+          "G23Q002",
+          "G23Q003",
+          "G23Q004",
+          "G23Q005",
+          "G23Q006",
+          "G23Q007"
+        ],
+        "maxBytes": 65536
+      }
     }
   ]
 }
