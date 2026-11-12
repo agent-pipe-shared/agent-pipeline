@@ -41,11 +41,11 @@ adrReferences:
 Verification runner, test orchestration, suite registration validation, and CI checks.
 
 ## Public Contracts
-- `harness/scripts/verify.mjs`: Main test suite verification runner. It includes the staged private-identifier scanner's focused regression suite in the required local candidate checks.
+- `harness/scripts/verify.mjs`: Main test suite verification runner. It includes the staged private-identifier scanner's focused regression suite in the required local candidate checks. Registers the newer suites (recursive delete, Git author, dispatch-record liveness, design-package false-drift pin, the 24 declared onboarding case ids) and diagnoses the address root around the Verify run.
 - `harness/scripts/check-verify-suite-registration.mjs`: Static and declarative suite registration completeness checker.
-- `harness/scripts/check-verify-suite-append.mjs`: TP-13-era Git history and pending-postimage append-only check for the declarative registry.
+- `harness/scripts/check-verify-suite-append.mjs`: TP-13-era Git history and pending-postimage append-only check for the declarative registry. Admits several recorded case-list extensions and a first case-completion policy, evaluates the registry history against the relaxed D103 contract and needs no machine-local receipt; an in-place edit of a registered entry, even one a later commit undoes, stays refused, and the supplementary case list goes through the augmentation table instead.
 - `harness/verify-suites.json`: Declarative suite registry.
-- `harness/scripts/verify-case-completion-augmentation.mjs`: Canonical physical and Git-candidate loader for closed supplementary completion policies. It fills only absent policy on an exact existing suite name and file, preserving prior registration rows and rejecting conflicts or unknown targets.
+- `harness/scripts/verify-case-completion-augmentation.mjs`: Canonical physical and Git-candidate loader for closed supplementary completion policies. It fills only absent policy on an exact existing suite name and file, preserving prior registration rows and rejecting conflicts or unknown targets. Reaches hard-coded suites as well, so an augmentation can extend the case list of a suite registered in the runner source.
 - `harness/config/verify-case-completion-augmentations.v1.json`: Closed named-policy table consumed by the canonical loader. Declaration and disposition coverage remains checked by the real FD completion protocol.
 
 ## Verification
