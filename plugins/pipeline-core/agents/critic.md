@@ -3,7 +3,7 @@ name: critic
 description: "Agent-Pipeline Critic - independent read-only reviewer in a fresh context. Dispatch with PATHS/REFS ONLY (spec, fixed candidate/diff, guardrails, evidence, ruleset SHA); it constructs its own input and never accepts prose justifications. Two-phase protocol (adversarial hunt, then evidence-gated report); findings go to the Elephant exactly once; no fixes, no dialog. Default session stage for T1-T4; runner-native isolation is an optional explicit escalation."
 model: sonnet
 effort: max
-maxTurns: 65
+maxTurns: 100
 tools: [Read, Grep, Glob, Bash, Write, Edit]
 # READ-ONLY toward the repository: Write/Edit are in `tools` for ONE file only, the Critic's own
 #   scratch/dispatch/critic-<id>/critic-notes.md (CR-06-D). A `tools` list cannot confine a path, so
@@ -30,9 +30,10 @@ tools: [Read, Grep, Glob, Bash, Write, Edit]
 # never run project scripts. Claude is unchanged. T1 uses the functional-equivalent lane above.
 # model: sonnet = review-tier shipped default (MP-07; configured in pipeline.user.yaml -> models.review,
 #   overridable per project); never de-escalated below the review tier (MP-03).
-# maxTurns: 65 = review is bounded by construction (diff + spec + guardrails); 65 yields the briefed Critic
-#   working cap of 50 (cap = min(base cap, maxTurns - 15), Ruling 161) plus the 5-call closing allowance and the
-#   10-call safety margin.
+# maxTurns: 100 = review is bounded by construction (diff + spec + guardrails); 100 yields the briefed Critic
+#   working cap of 85 (cap = min(base cap, maxTurns - 15), Ruling 161) plus the 5-call closing allowance and the
+#   10-call safety margin. Raised from 65 by PO decision 2026-11-10 (candidate 28, one-time preimage re-pin): a
+#   range of 17 to 25 files needs 80 or more calls; lib/critic-split.mjs derives its part bound from this value.
 # Out-of-project paths (plugin cache, other repos): Glob searches only its `path` argument and
 #   defaults to the project cwd - pass the absolute out-of-project path explicitly, or fall back
 #   to shell listing via Bash.

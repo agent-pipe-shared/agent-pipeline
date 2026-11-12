@@ -24,6 +24,7 @@ import { fileURLToPath } from "node:url";
 import { briefingRoutePath, evaluateBriefingRoute } from "../hooks/guard-dispatch.mjs";
 import { readAgentMaxTurns } from "./dispatch-budget-binding.mjs";
 import { CLOSING_ALLOWANCE } from "./dispatch-budget-core.mjs";
+import { CRITIC_MAX_TURNS } from "./critic-split.mjs";
 import { dispatchBudgetBinding, dispatchBudgetLineForRole, dispatchFindings } from "./dispatch-policy.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import {
@@ -727,12 +728,18 @@ check("DP25 the default Critic budget line states 30 tool uses (Ruling 98c, was 
     `Ruling 98(c): the Critic default base cap is 30, got ${JSON.stringify(line)}`);
 });
 
-check("DP26 the shipped Critic definition carries maxTurns 65 (Ruling 161, was 50)", () => {
-  assert.equal(readAgentMaxTurns("critic", CRITIC_BUDGET_PLUGIN_ROOT), 65,
-    "Ruling 161: plugins/pipeline-core/agents/critic.md raises maxTurns to 65");
+// QG-04 restated in place (candidate 28, PO decision 2026-11-10, one-time preimage re-pin): maxTurns 65 -> 100, so
+// a range of 17 to 25 files fits one Critic. The working cap follows (100 - 15 = 85); the default base cap 30 and the
+// closing allowance are unchanged. DP26 also pins lib/critic-split.mjs CRITIC_MAX_TURNS to the shipped value, since
+// the split's part bound is derived from it.
+check("DP26 the shipped Critic definition carries maxTurns 100 and critic-split mirrors it (C28, was 65, before that 50)", () => {
+  assert.equal(readAgentMaxTurns("critic", CRITIC_BUDGET_PLUGIN_ROOT), 100,
+    "C28: plugins/pipeline-core/agents/critic.md raises maxTurns to 100");
+  assert.equal(CRITIC_MAX_TURNS, readAgentMaxTurns("critic", CRITIC_BUDGET_PLUGIN_ROOT),
+    "lib/critic-split.mjs CRITIC_MAX_TURNS must equal the shipped Critic maxTurns");
 });
 
-check("DP27 the default Critic budget binds base 30 under working cap 50 with 30 turns in reserve (Ruling 161, was 30/50/35/15)", () => {
+check("DP27 the default Critic budget binds base 30 under working cap 85 with 65 turns in reserve (C28, was 30/50/35/30)", () => {
   const binding = dispatchBudgetBinding({
     subagentType: "pipeline-core:critic",
     prompt: dispatchBudgetLineForRole("critic"),
@@ -740,13 +747,13 @@ check("DP27 the default Critic budget binds base 30 under working cap 50 with 30
   });
   assert.equal(binding.code, "DBB-PREPARED", JSON.stringify(binding));
   assert.equal(binding.baseCalls, 30, "default base cap");
-  assert.equal(binding.maxTurns, 65, "maxTurns read from the shipped definition");
-  assert.equal(binding.workingCap, 50, "maxTurns - 15");
+  assert.equal(binding.maxTurns, 100, "maxTurns read from the shipped definition");
+  assert.equal(binding.workingCap, 85, "maxTurns - 15");
   assert.equal(binding.effectiveCap, 30, "the tier no longer limits the default base cap");
   assert.equal(binding.tierLimited, false);
   const closingEnd = binding.baseCalls + CLOSING_ALLOWANCE;
   assert.equal(closingEnd, 35, "base cap + closing allowance (was 24 + 5 = 29)");
-  assert.equal(binding.maxTurns - closingEnd, 30, "turns left in reserve below maxTurns (65 - 35; was 50 - 35 = 15)");
+  assert.equal(binding.maxTurns - closingEnd, 65, "turns left in reserve below maxTurns (100 - 35; was 65 - 35 = 30)");
 });
 
 check("DP28 an Opus model-selection line without a Batch-scope rationale yields DISPATCH-OPUS-NO-BATCH-RATIONALE; examples never select (AC-222)", () => {

@@ -87,10 +87,19 @@ function checkOneNumber(core, maxTurns, template) {
   assert.doesNotMatch(template, /working cap of 12|cap of 12 tool uses/u, "the stale 12 is gone");
 }
 
+// C28 (PO tile 2026-11-11, one re-pin of agents/critic.md): the agent definition now ships maxTurns 100. The Critic briefing template is itself
+// preimage-pinned and still states the earlier 65; it carries its own clause "If an actual selected definition differs, derive its working cap
+// from that definition". The pin is restated in place (QG-04): the agent definition, the guard core and the template's OWN stated figure stay
+// internally consistent, and a template figure that differs from the shipped definition is admitted only together with that derive clause.
+const TEMPLATE_TURNS = Number(/ships `maxTurns: (\d+)`/u.exec(TEMPLATE)?.[1]);
+
 test("A1 template, agent definition and guard state one working-cap number", () => {
-  assert.equal(MAX_TURNS, 65);
+  assert.ok(Number.isInteger(MAX_TURNS) && MAX_TURNS >= 65, "the shipped Critic definition carries a maxTurns of at least the earlier 65");
   assert.match(AGENT, new RegExp(`^maxTurns: ${MAX_TURNS}$`, "mu"));
-  checkOneNumber(realCore, MAX_TURNS, TEMPLATE);
+  assert.equal(realCore.dispatchWorkingCap(MAX_TURNS), MAX_TURNS - 15, "the guard derives the working cap of the shipped definition");
+  assert.ok(Number.isInteger(TEMPLATE_TURNS), "the template states a shipped maxTurns");
+  if (TEMPLATE_TURNS !== MAX_TURNS) assert.ok(TEMPLATE.includes("If an actual selected definition differs, derive its working cap from that definition"), "a template figure that differs from the shipped definition keeps the derive clause");
+  checkOneNumber(realCore, TEMPLATE_TURNS, TEMPLATE);
 });
 
 test("A2 RED: the number checker fails against a mutated core mirror and a mutated template", async () => {
@@ -99,8 +108,8 @@ test("A2 RED: the number checker fails against a mutated core mirror and a mutat
   assert.ok(source.includes("export const SAFETY_MARGIN = 10;"));
   writeFileSync(mirrorPath, source.replace("export const SAFETY_MARGIN = 10;", "export const SAFETY_MARGIN = 53;"));
   const mirror = await import(pathToFileURL(mirrorPath).href);
-  assert.throws(() => checkOneNumber(mirror, MAX_TURNS, TEMPLATE), "a guard working cap below the template's number must be caught");
-  assert.throws(() => checkOneNumber(realCore, MAX_TURNS, TEMPLATE.replace(`at most ${MAX_TURNS - 15}`, "at most 12")), "a template stating a different number must be caught");
+  assert.throws(() => checkOneNumber(mirror, TEMPLATE_TURNS, TEMPLATE), "a guard working cap below the template's number must be caught");
+  assert.throws(() => checkOneNumber(realCore, TEMPLATE_TURNS, TEMPLATE.replace(`at most ${TEMPLATE_TURNS - 15}`, "at most 12")), "a template stating a different number must be caught");
 });
 
 // ------------------------------------------------------------------ case B: Bash notes route decision

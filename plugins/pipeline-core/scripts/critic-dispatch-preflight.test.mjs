@@ -701,7 +701,7 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
   // C22 (CGF-03, QG-04 restated in place): the printed-only `routeAssurance` is one more additive field next to the admit fields; every other key still equals the library result.
   // C28-CRITIC-TOIL (QG-04 restated in place): the printed-only `criticSizing` and `criticReviewPaths` are two more additive fields; every other key still equals the library result.
   const { admitRequest: printedAdmitRequest, admitCommand: printedAdmitCommand, nextStep: printedNextStep, criticDispatchPromptLines: _printedLines, taskIdResolution: _printedResolution, split: _printedSplit, routeAssurance: _printedAssurance, criticSizing: _printedSizing, criticReviewPaths: _printedPaths, ...printedRest } = JSON.parse(printedRun.stdout);
-  assert.deepEqual(_printedSizing.parts, [{ id: null, files: 1, toolBudget: 17, workingCap: 50, aboveBound: false }], "the one-file range prints the sizing of its one part");
+  assert.deepEqual(_printedSizing.parts, [{ id: null, files: 1, toolBudget: 17, workingCap: 85, aboveBound: false }], "the one-file range prints the sizing of its one part");
   assert.deepEqual(_printedPaths, ["specs/spec.md"]);
   assert.equal(_printedSplit, undefined, "a one-file range carries no split");
   assert.equal(JSON.stringify(printedRest) + "\n", JSON.stringify(expected) + "\n");
@@ -2514,10 +2514,10 @@ test("C28 the split bound is derived from the Critic working cap and a stated re
   const definition = readFileSync(new URL("../agents/critic.md", import.meta.url), "utf8");
   assert.equal(split.CRITIC_MAX_TURNS, Number(/^maxTurns:\s*(\d+)\s*$/mu.exec(definition)?.[1]), "the one turn figure is the pinned agent definition's own");
   const workingCap = dispatchWorkingCap(split.CRITIC_MAX_TURNS);
-  assert.equal(workingCap, 50);
+  assert.equal(workingCap, 85, "maxTurns 100 (PO tile 2026-11-11, one re-pin of agents/critic.md) gives the Critic a working cap of 85; restated in place from 50 (QG-04)");
   assert.ok(Number.isInteger(split.CRITIC_READS_PER_FILE) && split.CRITIC_READS_PER_FILE >= 2, "the stated figure is measured: 17 files used 40 calls with about 8 fixed ones");
   const need = (files) => split.CRITIC_FIXED_CALLS + split.CRITIC_READS_PER_FILE * files + split.CRITIC_VERDICT_RESERVE;
-  assert.ok(split.SPLIT_MAX_CHANGED_FILES < 17, "a part of 17 files reached the checkpoint while still reading");
+  assert.ok(split.SPLIT_MAX_CHANGED_FILES >= 17, "a part of 17 files reached the checkpoint at the old cap of 50; at the lifted cap it fits (restated in place from < 17, QG-04)");
   assert.ok(need(split.SPLIT_MAX_CHANGED_FILES) <= dispatchCheckpointThreshold(workingCap), "a part at the bound is read and its verdict composed before the checkpoint");
   assert.ok(need(split.SPLIT_MAX_CHANGED_FILES + 1) > dispatchCheckpointThreshold(workingCap), "the bound is the largest part that fits");
   const budgets = [1, 3, 6, split.SPLIT_MAX_CHANGED_FILES].map((files) => split.criticToolBudget(files));
@@ -2530,7 +2530,7 @@ test("C28 the split bound is derived from the Critic working cap and a stated re
   assert.equal(above.aboveBound, true);
   assert.match(above.notice, new RegExp(`${split.SPLIT_MAX_CHANGED_FILES + 1} files`, "u"));
   assert.match(above.notice, /budget checkpoint/u);
-  assert.match(above.notice, /80 or more/u, "the notes' sentence: a budget of 80 or more per Critic needs the pinned agent file (PO decision)");
+  assert.match(above.notice, /fixed by the pinned agent file \(agents\/critic\.md, maxTurns 100\)/u, "the notice names the pinned agent file and its turn limit, so a larger part needs that file to move (PO decision; restated in place from the old '80 or more' sentence, QG-04)");
 });
 
 test("C28 the printed split result carries the sizing of every part, and the library result stays byte-identical", async () => {

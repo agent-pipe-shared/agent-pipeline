@@ -22,21 +22,22 @@ import { validateAgainstSchema } from "./schema-lite.mjs";
 
 export const CRITIC_SPLIT_SCHEMA = "pipeline.critic-review-split.v1";
 /**
- * C28-CRITIC-TOIL (PO decision 2026-11-10): the part size follows the Critic budget. The agent definition (`agents/critic.md`, maxTurns 65) is preimage-pinned, so one Critic's budget
- * cannot grow; a budget of 80 or more per Critic needs that pinned file and is a PO decision. A Critic has `dispatchWorkingCap(65) = 50` working calls (lib/dispatch-budget-core.mjs)
- * and is told to hand back at the checkpoint, call 40. The review must be read AND its verdict composed before that call, so the figures below fix the one bound.
+ * C28-CRITIC-TOIL (PO decision 2026-11-10): the part size follows the Critic budget. The agent definition (`agents/critic.md`) is preimage-pinned; by a second PO decision
+ * the same day its maxTurns was raised once from 65 to 100 (one re-pin), so that a range of 17 to 25 files fits one Critic. CRITIC_MAX_TURNS mirrors that file (a test compares
+ * them). A Critic has `dispatchWorkingCap(100) = 85` working calls (lib/dispatch-budget-core.mjs) and is told to hand back at the checkpoint, call 68. The review must be read AND
+ * its verdict composed before that call, so the figures below fix the one bound (28 files).
  *
  * MEASURED: the greenfield Critic parts of 17 to 25 changed files reached the checkpoint at call 40 of 50 while still reading. With about 8 fixed calls (spec criterion,
  * guardrails, evidence, bindings, notes) that is (40 - 8) / 17 = 1.9 reads per file, so 2 (the file's diff and the source or test beside it). The verdict needs about 4 more.
  * Still a small sample, not a distribution of reviews: change the figures here and nowhere else.
  */
-export const CRITIC_MAX_TURNS = 65;
+export const CRITIC_MAX_TURNS = 100;
 export const CRITIC_FIXED_CALLS = 8;
 export const CRITIC_READS_PER_FILE = 2;
 export const CRITIC_VERDICT_RESERVE = 4;
 const CRITIC_WORKING_CAP = dispatchWorkingCap(CRITIC_MAX_TURNS);
 const criticReviewNeed = (files) => CRITIC_FIXED_CALLS + CRITIC_READS_PER_FILE * files + CRITIC_VERDICT_RESERVE;
-/** The ONE size bound: the largest part whose estimated calls end before the checkpoint of the full working cap (14 for the figures above). */
+/** The ONE size bound: the largest part whose estimated calls end before the checkpoint of the full working cap (28 for the figures above). */
 export const SPLIT_MAX_CHANGED_FILES = Math.floor((dispatchCheckpointThreshold(CRITIC_WORKING_CAP) - CRITIC_FIXED_CALLS - CRITIC_VERDICT_RESERVE) / CRITIC_READS_PER_FILE);
 
 /** The base tool budget a Critic part of `files` paths is briefed with: the smallest base cap whose checkpoint comes after the estimated review, never above the working cap. */
@@ -53,7 +54,7 @@ export function criticToolBudget(files) {
 export function criticSizing(files) {
   const sizing = { files, toolBudget: criticToolBudget(files), workingCap: CRITIC_WORKING_CAP, aboveBound: files > SPLIT_MAX_CHANGED_FILES };
   if (!sizing.aboveBound) return sizing;
-  return { ...sizing, notice: `${files} files are above the ${SPLIT_MAX_CHANGED_FILES} one Critic reads within its budget (estimated ${criticReviewNeed(files)} calls against the budget checkpoint at call ${dispatchCheckpointThreshold(CRITIC_WORKING_CAP)} of ${CRITIC_WORKING_CAP}): expect a budget checkpoint and a grant, or review a smaller range. A budget of 80 or more per Critic needs the pinned agent file (agents/critic.md, maxTurns ${CRITIC_MAX_TURNS}; a PO decision), so the part size is the lever.` };
+  return { ...sizing, notice: `${files} files are above the ${SPLIT_MAX_CHANGED_FILES} one Critic reads within its budget (estimated ${criticReviewNeed(files)} calls against the budget checkpoint at call ${dispatchCheckpointThreshold(CRITIC_WORKING_CAP)} of ${CRITIC_WORKING_CAP}): expect a budget checkpoint and a grant, or review a smaller range. The Critic's turn limit is fixed by the pinned agent file (agents/critic.md, maxTurns ${CRITIC_MAX_TURNS}), so the part size is the lever.` };
 }
 export const SPLIT_SHARED_ENTRY_ID = "shared";
 export const SPLIT_SCOPE_PREFIX = "scope:";
