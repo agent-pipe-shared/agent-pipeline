@@ -8,6 +8,8 @@
  *                  [--supersedes <adr-id>] [--date YYYY-MM-DD]
  *   create-adr.mjs --root <root> --slug <slug> --refresh
  *   create-adr.mjs --root <root> --refresh    (every docs/adr/draft-*.md at once)
+ *   create-adr.mjs --root <root> --slug <slug> --discard --reason "<why the draft is not wanted>"
+ *                                              (records the discard in docs/adr/discarded/draft-<slug>.json; the draft stays as history)
  *
  * Writes docs/adr/draft-<slug>.md and docs/adr/draft-<slug>.json: a PROPOSAL (status `proposed`, schema
  * pipeline.architecture-decision.v1, or .v2 when module ids are named) whose `digest` is already the SHA-256 of the Markdown bytes.
@@ -21,14 +23,14 @@
  */
 import { createHash } from "node:crypto";
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadPhysicalArchitectureMap, validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
+import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, loadPhysicalArchitectureMap, validateArchitectureDecisionSidecar } from "../lib/architecture-effective-decisions.mjs";
 
 const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 const MODULE_ID = /^[a-z][a-z0-9-]{0,79}$/u;
 const ADR_ID = /^[A-Za-z0-9._-]+$/u;
-const FLAGS = new Set(["--root", "--slug", "--title", "--scope", "--modules", "--supersedes", "--date", "--refresh"]);
+const FLAGS = new Set(["--root", "--slug", "--title", "--scope", "--modules", "--supersedes", "--date", "--refresh", "--discard", "--reason"]);
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 class Refusal extends Error {}
@@ -40,7 +42,7 @@ function parseArgs(argv) {
     const flag = argv[index];
     if (!FLAGS.has(flag)) refuse(`unknown argument ${JSON.stringify(flag)}; allowed: ${[...FLAGS].join(" ")}`);
     if (values.has(flag)) refuse(`${flag} may be given only once`);
-    if (flag === "--refresh") { values.set(flag, true); continue; }
+    if (flag === "--refresh" || flag === "--discard") { values.set(flag, true); continue; }
     const value = argv[index + 1];
     if (typeof value !== "string" || (value.startsWith("--") && FLAGS.has(value))) refuse(`${flag} needs a value`);
     values.set(flag, value);
@@ -102,6 +104,36 @@ function refreshAllDigests(root) {
   if (slugs.length === 0) refuse("docs/adr holds no draft-<slug>.md to refresh");
   const refreshed = slugs.map((slug) => refreshDigest(root, slug));
   return { ok: true, refreshed, changed: refreshed.filter((entry) => entry.changed).map((entry) => entry.id) };
+}
+
+/**
+ * C28-PLAN-GATES: a draft that is deliberately not wanted is discarded with a reason, so that submit-plan stops asking for its binding.
+ * It writes ONE record (docs/adr/discarded/draft-<slug>.json: who/what/why, bound to the exact draft bytes) and leaves the draft on disk,
+ * because ADRs are history. No signature: the record is an audit trail, not an approval, and it never makes anything accepted.
+ */
+function discardDraft(root, values) {
+  const slug = values.get("--slug");
+  const reason = values.get("--reason");
+  if (typeof reason !== "string" || reason.trim() === "" || reason.length > 300 || /[\u0000-\u001f\u007f]/u.test(reason)) {
+    refuse("--discard needs --reason \"<why the draft is not wanted>\": 1 to 300 characters on one line");
+  }
+  const dir = adrDirectory(root, false);
+  const id = `draft-${slug}`;
+  const markdownPath = join(dir, `${id}.md`), sidecarPath = join(dir, `${id}.json`);
+  if (!existsSync(markdownPath) || !existsSync(sidecarPath)) refuse(`docs/adr/${id}.md and docs/adr/${id}.json must both exist (nothing to discard for --slug ${slug})`);
+  const accepted = readdirSync(dir).find((name) => new RegExp(`^\\d{4}-${slug}\\.json$`, "u").test(name));
+  if (accepted !== undefined) refuse(`docs/adr/${accepted} already exists: this proposal was materialized, ADRs are immutable history and a discard record would mean nothing`);
+  if (existsSync(join(root, ...adrDraftDiscardPath(slug).split("/")))) refuse(`docs/adr/discarded/${id}.json: this draft is already discarded (the first record is never rewritten)`);
+  const body = {
+    schema: ADR_DRAFT_DISCARD_SCHEMA, id, markdownSha256: sha256(readFileSync(markdownPath)), sidecarSha256: sha256(readFileSync(sidecarPath)),
+    reason, discardedAt: new Date().toISOString(),
+  };
+  const target = join(root, ...adrDraftDiscardPath(slug).split("/"));
+  mkdirSync(dirname(target), { recursive: true });
+  const fd = openSync(target, "wx", 0o644);
+  try { writeSync(fd, `${JSON.stringify(body, null, 2)}\n`); } finally { closeSync(fd); }
+  return { ok: true, discarded: `docs/adr/${id}.md`, record: adrDraftDiscardPath(slug), reason,
+    next: "Commit the discard record. The draft files stay as history; submit-plan no longer asks for this proposal's binding. If the draft changes later it counts as a new proposal and must be bound or discarded again." };
 }
 
 function pendingDraftSlugs(dir) {
@@ -182,6 +214,11 @@ export function main(argv = process.argv.slice(2)) {
       return 0;
     }
     if (typeof slug !== "string" || !SLUG.test(slug)) refuse("--slug must be 1 to 64 characters of a-z, 0-9 and '-', starting with a letter or digit");
+    if (values.has("--discard") || values.has("--reason")) {
+      if (!values.has("--discard") || refresh || values.size !== 4) refuse("--discard takes exactly --root, --slug and --reason \"<why the draft is not wanted>\"");
+      console.log(JSON.stringify(discardDraft(root, values), null, 2));
+      return 0;
+    }
     if (refresh && values.size !== 3) refuse("--refresh takes only --root and, for one draft, --slug");
     const result = refresh ? refreshDigest(root, slug) : createProposal(root, values);
     console.log(JSON.stringify(result, null, 2));

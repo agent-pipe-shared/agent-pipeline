@@ -21,7 +21,7 @@ import {
   SCHEMA_DECISION
 } from "./architecture-baseline.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
-import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
+import { inspectAdrDraftBindings, inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
 import { inspectProspectiveArchitectureManifest } from "../lib/architecture-prospective-materialization.mjs";
 
 // C20 G20-23 (c): fileURLToPath, not a string replace of "file://" (wrong on Windows); the path it names is unchanged.
@@ -492,6 +492,62 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       assert.equal(record.digest, sha(fs.readFileSync(path.join(root, "docs", "adr", "draft-two.md"))));
     });
 
+    // C28-PLAN-GATES (AC-108): a draft that is deliberately not wanted is discarded with a reason, as an auditable record and no signature.
+    it("7.6b create-adr --discard --reason records the discard for the exact draft bytes, leaves the draft in place and resolves it for submit-plan", () => {
+      const root = makeRoot();
+      assert.equal(create(root, "--slug", "unwanted", "--title", "Unwanted", "--date", "2026-11-07").status, 0);
+      const before = { md: fs.readFileSync(path.join(root, "docs", "adr", "draft-unwanted.md")), json: fs.readFileSync(path.join(root, "docs", "adr", "draft-unwanted.json")) };
+      const out = create(root, "--slug", "unwanted", "--discard", "--reason", "the storage decision replaced it");
+      assert.equal(out.status, 0, out.stderr);
+      const result = JSON.parse(out.stdout);
+      assert.equal(result.ok, true);
+      assert.equal(result.discarded, "docs/adr/draft-unwanted.md");
+      assert.equal(result.record, "docs/adr/discarded/draft-unwanted.json");
+      const record = JSON.parse(fs.readFileSync(path.join(root, result.record), "utf8"));
+      assert.deepEqual(Object.keys(record).sort(), ["discardedAt", "id", "markdownSha256", "reason", "schema", "sidecarSha256"]);
+      assert.equal(record.schema, "pipeline.adr-draft-discard.v1");
+      assert.equal(record.id, "draft-unwanted");
+      assert.equal(record.markdownSha256, sha(before.md));
+      assert.equal(record.sidecarSha256, sha(before.json));
+      assert.equal(record.reason, "the storage decision replaced it");
+      assert.equal(new Date(record.discardedAt).toISOString(), record.discardedAt);
+      assert.ok(fs.readFileSync(path.join(root, "docs", "adr", "draft-unwanted.md")).equals(before.md), "ADRs are history: the draft stays");
+      assert.ok(fs.readFileSync(path.join(root, "docs", "adr", "draft-unwanted.json")).equals(before.json));
+      assert.deepEqual(inspectAdrDraftBindings({ rootDir: root, featureDirs: ["specs/f"] }).map((entry) => entry.state), ["discarded"]);
+      assert.deepEqual(inspectArchitectureDecisionAuthoringSources({ rootDir: root, area: "project" }).findings, [], "the record raises no decision finding");
+      assert.equal(create(root, "--refresh").status, 0, "a draft-wide refresh still works with a discard record present");
+    });
+
+    it("7.6c create-adr --discard refuses without a one-line reason, for an unknown, already discarded or materialized draft, and mixed with create flags; nothing is written", () => {
+      const root = makeRoot();
+      assert.equal(create(root, "--slug", "unwanted", "--title", "Unwanted", "--date", "2026-11-07").status, 0);
+      const noRecord = () => assert.equal(fs.existsSync(path.join(root, "docs", "adr", "discarded")), false, "no record directory was created");
+      for (const args of [["--discard"], ["--discard", "--reason"], ["--discard", "--reason", ""], ["--discard", "--reason", "two\nlines"], ["--discard", "--reason", "x".repeat(301)],
+        ["--discard", "--reason", "ok", "--title", "Mixed"], ["--reason", "alone"]]) {
+        const refused = create(root, "--slug", "unwanted", ...args);
+        assert.notEqual(refused.status, 0, args.join(" "));
+        assert.match(refused.stderr, /create-adr refused|create-adr:/u);
+      }
+      noRecord();
+      const unknown = create(root, "--slug", "nothing-here", "--discard", "--reason", "x");
+      assert.notEqual(unknown.status, 0);
+      assert.match(unknown.stderr, /docs\/adr\/draft-nothing-here\.md/u);
+      noRecord();
+      fs.writeFileSync(path.join(root, "docs", "adr", "0001-unwanted.md"), "# accepted\n");
+      fs.writeFileSync(path.join(root, "docs", "adr", "0001-unwanted.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "0001-unwanted", title: "Unwanted", status: "accepted", digest: sha("# accepted\n"), scope: "project", date: "2026-11-07" })}\n`);
+      const materialized = create(root, "--slug", "unwanted", "--discard", "--reason", "x");
+      assert.notEqual(materialized.status, 0);
+      assert.match(materialized.stderr, /0001-unwanted/u, "names the accepted record that makes a discard meaningless");
+      noRecord();
+      fs.rmSync(path.join(root, "docs", "adr", "0001-unwanted.md"));
+      fs.rmSync(path.join(root, "docs", "adr", "0001-unwanted.json"));
+      assert.equal(create(root, "--slug", "unwanted", "--discard", "--reason", "first").status, 0);
+      const twice = create(root, "--slug", "unwanted", "--discard", "--reason", "second");
+      assert.notEqual(twice.status, 0);
+      assert.match(twice.stderr, /already discarded/u);
+      assert.equal(JSON.parse(fs.readFileSync(path.join(root, "docs", "adr", "discarded", "draft-unwanted.json"), "utf8")).reason, "first", "the first record is never rewritten");
+    });
+
     it("7.7 create-adr writes a v2 record for named modules, sorted and unique, only when the physical map has them", () => {
       const root = makeRoot();
       makeMap(root, ["alpha", "beta"]);
@@ -649,6 +705,12 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
         drafts = ["docs/adr/draft-method-egm.md", "docs/adr/draft-method-egm.json"].map((name) => [name, fs.readFileSync(path.join(fixture.dir, name))]);
       } });
       assert.equal(bound.bound[0].id, "9998-method-egm");
+      // C28-PLAN-GATES (AC-108): the binding names the accepted path the modules cite in adrReferences, never the draft (Codex greenfield 2026-11).
+      assert.deepEqual(bound.adrReferences, ["docs/adr/9998-method-egm.md"]);
+      assert.match(bound.next, /adrReferences/u);
+      assert.match(bound.next, /never a docs\/adr\/draft-/u);
+      assert.deepEqual(inspectAdrDraftBindings({ rootDir: f.dir, featureDirs: ["specs/e2e"] }).map((entry) => `${entry.slug}:${entry.state}:${entry.acceptedId}`), ["method-egm:bound:9998-method-egm"],
+        "the real binding output is what submit-plan recognizes as bound");
       for (const name of ["docs/adr/9998-method-egm.md", "docs/adr/9998-method-egm.json", "project/architecture-chat-selections/9998-method-egm.json"]) {
         assert.equal(fs.existsSync(path.join(f.dir, name)), false, `${name} must not exist before the PO's approval is consumed`);
       }

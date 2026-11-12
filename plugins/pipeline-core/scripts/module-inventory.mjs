@@ -177,6 +177,31 @@ export function loadMapBundle(rootDir = process.cwd(), schema = getModuleInvento
   };
 }
 
+const ADR_DRAFT_REFERENCE = /^(?:\.\/)?docs\/adr\/draft-([a-z0-9][a-z0-9-]{0,63})\.(?:md|json)$/u;
+
+/** C28-PLAN-GATES: the slug when `ref` names an ADR proposal (docs/adr/draft-<slug>.md|json), else null. A draft is never an accepted decision. */
+export function adrDraftReferenceSlug(ref) {
+  return typeof ref === "string" ? ADR_DRAFT_REFERENCE.exec(ref)?.[1] ?? null : null;
+}
+
+/** The adrReferences of `modules` that cite a draft: `{ moduleId, reference, slug }`. Read-only; the map bytes are signed design targets and are never rewritten. */
+export function adrDraftReferenceFindings(modules) {
+  const found = [];
+  for (const module of Array.isArray(modules) ? modules : []) {
+    for (const reference of Array.isArray(module?.adrReferences) ? module.adrReferences : []) {
+      const slug = adrDraftReferenceSlug(reference);
+      if (slug !== null) found.push({ moduleId: module.id, reference, slug });
+    }
+  }
+  return found;
+}
+
+/** One line per finding for a reader that must not fail on it (the map stays valid; the citation is what is wrong). */
+export function adrDraftReferenceWarnings(modules) {
+  return adrDraftReferenceFindings(modules).map(({ moduleId, reference, slug }) => `Warning: module ${moduleId} lists the ADR draft ${reference} in adrReferences; a draft is a proposal, not an accepted decision. `
+    + `Cite the accepted record docs/adr/NNNN-${slug}.md once the proposal is bound (bind-adr-proposals.mjs prints the exact path as adrReferences), or remove the reference if the draft was discarded.`);
+}
+
 /**
  * Matches a relative file path against a pattern like 'plugins/pipeline-core/**'
  */
@@ -352,6 +377,7 @@ function runCli() {
   }
 
   const result = loadMapBundle(rootDir);
+  for (const line of adrDraftReferenceWarnings(result.modules)) console.error(line);
 
   if (json) {
     const output = {

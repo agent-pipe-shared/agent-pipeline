@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 import { architectureOverview, checkArchitectureOverview, renderArchitectureOverview } from "./generate-architecture-overview.mjs";
 
 import {
+  adrDraftReferenceFindings,
+  adrDraftReferenceSlug,
   extractFrontmatter,
   loadConceptFile,
   loadMapBundle,
@@ -411,6 +413,45 @@ describe("generated architecture overview", () => {
     assert.throws(() => renderArchitectureOverview(modules, new Map(), SHA), /unsafe path/u);
     modules[0].publicContracts = ["https://example.com/x.mjs"];
     assert.throws(() => renderArchitectureOverview(modules, new Map(), SHA), /unsafe path/u);
+  });
+
+  // C28-PLAN-GATES (AC-108; Codex greenfield 2026-11): the map listed docs/adr/draft-*.md in adrReferences instead of the accepted ADR.
+  // The overview and the concept files are byte-pinned design targets, so nothing is rewritten here: the readers name the problem instead.
+  it("classifies an ADR draft reference and finds it among the modules of a map", () => {
+    assert.equal(adrDraftReferenceSlug("docs/adr/draft-storage-adapter.md"), "storage-adapter");
+    assert.equal(adrDraftReferenceSlug("./docs/adr/draft-storage-adapter.json"), "storage-adapter");
+    for (const accepted of ["docs/adr/0003-storage-adapter.md", "docs/adr/draft-.md", "docs/adr/discarded/draft-x.json", "docs/other/draft-x.md", 7, null]) {
+      assert.equal(adrDraftReferenceSlug(accepted), null, String(accepted));
+    }
+    assert.deepEqual(adrDraftReferenceFindings([
+      { id: "alpha", adrReferences: ["docs/adr/0001-first.md", "docs/adr/draft-storage-adapter.md"] },
+      { id: "beta", adrReferences: [] },
+    ]), [{ moduleId: "alpha", reference: "docs/adr/draft-storage-adapter.md", slug: "storage-adapter" }]);
+    assert.deepEqual(adrDraftReferenceFindings(loadMapBundle(REPO_ROOT).modules), [], "the live map cites accepted records only");
+  });
+
+  it("the overview generator and the inventory check warn about a draft reference on stderr without failing or changing the bytes", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "architecture-overview-draft-"));
+    try {
+      const mapDir = path.join(root, "architecture/map");
+      fs.mkdirSync(mapDir, { recursive: true });
+      fs.writeFileSync(path.join(mapDir, "index.md"), "# Map\n\nOKF v0.1 concept bundle.\n\n- [alpha](alpha.md)\n");
+      const concept = (ref) => `---\ntype: Governed Module\nid: alpha\nresponsibility: First\nnonResponsibilities: []\nownedPaths:\n  - src/**\npublicContracts:\n  - src/main.mjs\nallowedDependencies: []\nauthorityEffects: []\nverificationEntryPoints:\n  - tests/main.test.mjs\nadrReferences:\n  - ${ref}\n---\n# Alpha\n`;
+      fs.writeFileSync(path.join(mapDir, "alpha.md"), concept("docs/adr/draft-storage-adapter.md"));
+      const overview = spawnSync(process.execPath, [fileURLToPath(new URL("./generate-architecture-overview.mjs", import.meta.url)), "--write"], { cwd: root, encoding: "utf8" });
+      assert.equal(overview.status, 0, overview.stderr);
+      assert.match(overview.stderr, /module alpha lists the ADR draft docs\/adr\/draft-storage-adapter\.md/u);
+      assert.match(overview.stderr, /accepted record docs\/adr\/NNNN-storage-adapter\.md/u, "names what to cite instead");
+      const generated = architectureOverview(root);
+      assert.match(generated.html, /docs\/adr\/draft-storage-adapter\.md/u, "the signed bytes keep what the design said");
+      const inventory = spawnSync(process.execPath, [fileURLToPath(new URL("./module-inventory.mjs", import.meta.url)), "--check", "--root", root], { encoding: "utf8" });
+      assert.equal(inventory.status, 0, inventory.stderr);
+      assert.match(inventory.stderr, /module alpha lists the ADR draft docs\/adr\/draft-storage-adapter\.md/u);
+      fs.writeFileSync(path.join(mapDir, "alpha.md"), concept("docs/adr/0001-storage-adapter.md"));
+      const clean = spawnSync(process.execPath, [fileURLToPath(new URL("./module-inventory.mjs", import.meta.url)), "--check", "--root", root], { encoding: "utf8" });
+      assert.equal(clean.status, 0, clean.stderr);
+      assert.equal(clean.stderr, "");
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 
   it("detects a source mutation until the generated view is refreshed", () => {

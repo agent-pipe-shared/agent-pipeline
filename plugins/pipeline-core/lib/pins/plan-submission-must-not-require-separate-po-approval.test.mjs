@@ -325,6 +325,93 @@ test("G20-15 control: a feature submission with no ADR sidecar problem is not re
   assert.doesNotMatch(result.err, /ARCH-DECISION-EFFECTIVE-UNRESOLVED/u);
 });
 
+// --- C28-PLAN-GATES (AC-108; WSL Claude greenfield 2026-11): ADR drafts that were never bound into the design package ---
+// create-adr wrote docs/adr/draft-*, bind-adr-proposals never ran, the PRD carried no binding block, and the design approval and the
+// architecture check passed all the same, because only an accepted record is ever read. submit-plan is the last point before the PO signs.
+function adrDraftFixture(featureId, slug = "storage-adapter") {
+  const f = fixture(featureId);
+  mkdirSync(join(f.root, "docs", "adr"), { recursive: true });
+  const body = `# Use a storage adapter\n\n## Decision\n\nThe adapter owns persistence.\n`;
+  writeFileSync(join(f.root, "docs", "adr", `draft-${slug}.md`), body);
+  writeFileSync(join(f.root, "docs", "adr", `draft-${slug}.json`), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: `draft-${slug}`,
+    title: "Use a storage adapter", status: "proposed", digest: sha256Hex(body), scope: "project", date: "2026-11-10" })}\n`);
+  const designDeps = { ...f.deps, architectureDesignDraft: () => ({ ok: true, required: true, status: "draft" }) };
+  return { ...f, slug, body, designDeps, digest: sha256Hex(body) };
+}
+const writeManifest = (f, rows) => {
+  mkdirSync(join(f.root, "specs", f.featureId), { recursive: true });
+  writeFileSync(join(f.root, "specs", f.featureId, "prospective-architecture.json"), `${JSON.stringify({ schema: "pipeline.architecture-prospective-materialization.v1",
+    decisions: rows.map(({ id, slug, digest }) => ({ id, proposedMarkdown: { path: `docs/adr/draft-${slug}.md`, sha256: digest } })) })}\n`);
+};
+
+test("C28 ADR gate: an unbound draft refuses submit-plan before the PO signs, names the exact bind command and the discard command, and records nothing", () => {
+  const f = adrDraftFixture("pin-adr-unbound");
+  const before = readFileSync(statePath(f.root), "utf8");
+  const refused = capture(submitArgs("feature"), f.designDeps);
+  assert.equal(refused.status, 2, refused.err);
+  assert.match(refused.err, /submit-plan blocked by ADR-DRAFT-UNBOUND \(docs\/adr\/draft-storage-adapter\.md\)/u);
+  assert.ok(refused.err.includes(`bind-adr-proposals.mjs --root ${f.root} --feature pin-adr-unbound --carrier specs/pin-adr-unbound/design.md --selection specs/pin-adr-unbound/po-selection.json --draft storage-adapter`), refused.err);
+  assert.ok(refused.err.includes(`create-adr.mjs --root ${f.root} --slug storage-adapter --discard --reason "<why it is not wanted>"`), refused.err);
+  assert.match(refused.err, /No submission or signature request was recorded\./u);
+  assert.equal(readFileSync(statePath(f.root), "utf8"), before, "nothing is recorded");
+});
+
+test("C28 ADR gate: every unbound draft is listed once, in one refusal, with one --draft each", () => {
+  const f = adrDraftFixture("pin-adr-two");
+  const body = "# Second\n";
+  writeFileSync(join(f.root, "docs/adr/draft-second-choice.md"), body);
+  writeFileSync(join(f.root, "docs/adr/draft-second-choice.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "draft-second-choice", title: "Second", status: "proposed", digest: sha256Hex(body), scope: "project", date: "2026-11-10" })}\n`);
+  const refused = capture(submitArgs("feature"), f.designDeps);
+  assert.equal(refused.status, 2, refused.err);
+  assert.match(refused.err, /ADR-DRAFT-UNBOUND \(docs\/adr\/draft-second-choice\.md, docs\/adr\/draft-storage-adapter\.md\)/u);
+  assert.match(refused.err, /--draft second-choice --draft storage-adapter/u);
+});
+
+test("C28 ADR gate: a bound draft, a discarded draft and an earlier-materialized draft do not refuse; a draft edited after binding does", () => {
+  const bound = adrDraftFixture("pin-adr-bound");
+  writeManifest({ ...bound, featureId: "pin-adr-bound" }, [{ id: "0001-storage-adapter", slug: "storage-adapter", digest: bound.digest }]);
+  assert.doesNotMatch(capture(submitArgs("feature"), bound.designDeps).err, /ADR-DRAFT/u, "bound through the manifest of the feature folder");
+  // The edit plus `create-adr.mjs --refresh` (the sidecar digest follows the Markdown): the sidecar check passes, the binding is what is stale.
+  writeFileSync(join(bound.root, "docs/adr/draft-storage-adapter.md"), "# edited after binding\n");
+  writeFileSync(join(bound.root, "docs/adr/draft-storage-adapter.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "draft-storage-adapter",
+    title: "Use a storage adapter", status: "proposed", digest: sha256Hex("# edited after binding\n"), scope: "project", date: "2026-11-10" })}\n`);
+  assert.match(capture(submitArgs("feature"), bound.designDeps).err, /ADR-DRAFT-UNBOUND/u, "a bound draft that changed must be bound again");
+
+  const discarded = adrDraftFixture("pin-adr-discarded");
+  mkdirSync(join(discarded.root, "docs/adr/discarded"), { recursive: true });
+  writeFileSync(join(discarded.root, "docs/adr/discarded/draft-storage-adapter.json"), `${JSON.stringify({ schema: "pipeline.adr-draft-discard.v1", id: "draft-storage-adapter",
+    markdownSha256: discarded.digest, sidecarSha256: "0".repeat(64), reason: "not wanted", discardedAt: NOW })}\n`);
+  assert.doesNotMatch(capture(submitArgs("feature"), discarded.designDeps).err, /ADR-DRAFT/u);
+
+  const earlier = adrDraftFixture("pin-adr-earlier");
+  const accepted = "# Accepted\n";
+  writeFileSync(join(earlier.root, "docs/adr/0004-storage-adapter.md"), accepted);
+  writeFileSync(join(earlier.root, "docs/adr/0004-storage-adapter.json"), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: "0004-storage-adapter", title: "Storage", status: "accepted", digest: sha256Hex(accepted), scope: "project", date: "2026-11-10" })}\n`);
+  assert.doesNotMatch(capture(submitArgs("feature"), earlier.designDeps).err, /ADR-DRAFT/u, "a consumer project's earlier, materialized proposal is never refused again");
+});
+
+test("C28 ADR gate: it applies where a design package applies; the mini profile and a repository without one are not refused", () => {
+  const mini = adrDraftFixture("pin-adr-mini");
+  assert.doesNotMatch(capture(submitArgs("mini"), mini.designDeps).err, /ADR-DRAFT/u);
+  const none = adrDraftFixture("pin-adr-none");
+  const noDesign = { ...none.deps, architectureDesignDraft: () => ({ ok: true, required: false }) };
+  assert.doesNotMatch(capture(submitArgs("feature"), noDesign).err, /ADR-DRAFT/u);
+});
+
+test("C28 ADR gate: a module that cites the draft path instead of the accepted record is refused with the accepted path to cite", () => {
+  const f = adrDraftFixture("pin-adr-cites-draft");
+  writeManifest({ ...f, featureId: "pin-adr-cites-draft" }, [{ id: "0001-storage-adapter", slug: "storage-adapter", digest: f.digest }]);
+  const design = { modules: [{ id: "persistence", adrReferences: ["docs/adr/draft-storage-adapter.md"] }, { id: "ui", adrReferences: [] }] };
+  const citing = { ...f.deps, architectureDesignDraft: () => ({ ok: true, required: true, status: "draft", design }) };
+  const refused = capture(submitArgs("feature"), citing);
+  assert.equal(refused.status, 2, refused.err);
+  assert.match(refused.err, /submit-plan blocked by ADR-DRAFT-CITED-AS-ACCEPTED \(module persistence: docs\/adr\/draft-storage-adapter\.md -> docs\/adr\/0001-storage-adapter\.md\)/u);
+  assert.match(refused.err, /No submission or signature request was recorded\./u);
+  const fixed = { ...f.deps, architectureDesignDraft: () => ({ ok: true, required: true, status: "draft",
+    design: { modules: [{ id: "persistence", adrReferences: ["docs/adr/0001-storage-adapter.md"] }] } }) };
+  assert.doesNotMatch(capture(submitArgs("feature"), fixed).err, /ADR-DRAFT/u);
+});
+
 test("AC2: a plan still carrying framing placeholder text cannot be submitted", () => {
   const f = fixture("pin-framing");
   writeFileSync(join(f.root, f.planPath), "# PRD\n\n## Why\n<Problem/benefit/trigger; how success is measured.>\n");

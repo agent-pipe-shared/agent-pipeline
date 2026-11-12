@@ -265,3 +265,81 @@ export function compareEffectiveArchitectureDecisions(left, right) {
 
 /** Reuse the closed physical sidecar syntax; this grants no adoption authority. */
 export const validateArchitectureDecisionSidecar = validDecision;
+
+// --- C28-PLAN-GATES (AC-108): which ADR proposals of a feature were never bound into its design package ---
+// `create-adr.mjs` writes docs/adr/draft-<slug>.{md,json}; only `bind-adr-proposals.mjs` turns them into something the PO's design approval
+// signs. A proposal nobody binds is invisible to every later check (only an accepted record is read as a decision), so submit-plan asks this
+// reader before the PO is asked to sign. Read-only; it grants nothing.
+export const ADR_DRAFT_DISCARD_SCHEMA = "pipeline.adr-draft-discard.v1";
+const PROSPECTIVE_MANIFEST_SCHEMA = "pipeline.architecture-prospective-materialization.v1";
+const PROSPECTIVE_MANIFEST_FILE = "prospective-architecture.json";
+/** The discard record lives in a SUBFOLDER on purpose: a `.json` or `.md` directly in docs/adr would be read as an orphan decision sidecar. */
+export const adrDraftDiscardPath = (slug) => `docs/adr/discarded/draft-${slug}.json`;
+const DRAFT_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
+const MAX_MANIFEST_WALK = 2000;
+
+function readJsonFile(path) {
+  try { return JSON.parse(physicalFile(path).toString("utf8")); } catch { return null; }
+}
+
+/** The binding manifests (the file bind-adr-proposals writes next to its carrier) below the given repository-relative folders. */
+function boundManifestRows(root, featureDirs) {
+  const rows = [];
+  let seen = 0;
+  const walk = (relative, depth) => {
+    let entries;
+    try { entries = readdirSync(join(root, ...relative.split("/").filter(Boolean)), { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (++seen > MAX_MANIFEST_WALK || entry.name.startsWith(".") || entry.name === "node_modules" || entry.isSymbolicLink()) continue;
+      const child = relative === "" ? entry.name : `${relative}/${entry.name}`;
+      if (entry.isDirectory()) { if (depth < 4) walk(child, depth + 1); continue; }
+      if (entry.name !== PROSPECTIVE_MANIFEST_FILE) continue;
+      const value = readJsonFile(join(root, ...child.split("/")));
+      if (value?.schema !== PROSPECTIVE_MANIFEST_SCHEMA || !Array.isArray(value.decisions)) continue;
+      for (const row of value.decisions) {
+        if (typeof row?.id === "string" && typeof row.proposedMarkdown?.path === "string" && typeof row.proposedMarkdown.sha256 === "string") {
+          rows.push({ id: row.id, path: row.proposedMarkdown.path, sha256: row.proposedMarkdown.sha256 });
+        }
+      }
+    }
+  };
+  for (const folder of featureDirs) if (typeof folder === "string") walk(folder.replace(/\\/gu, "/").replace(/^\.\//u, "").replace(/\/+$/u, ""), 0);
+  return rows;
+}
+
+/**
+ * The ADR proposals under docs/adr and what became of each: `{ slug, path, state, acceptedId }`. A proposal is a draft-<slug>.md whose sidecar is a valid
+ * `proposed` record of the same id (hand-written notes and accepted drafts are not proposals). State:
+ *   materialized  an accepted or superseded docs/adr/NNNN-<slug> record exists (the draft stays on disk as history; never unbound again)
+ *   bound         a binding manifest below `featureDirs` lists the draft with its CURRENT digest (an edit after binding means unbound)
+ *   discarded     docs/adr/discarded/draft-<slug>.json records a discard of the CURRENT draft bytes (an edited or recreated draft is not exempt)
+ *   unbound       none of the above
+ */
+export function inspectAdrDraftBindings({ rootDir, featureDirs = [] } = {}) {
+  if (typeof rootDir !== "string" || !isAbsolute(rootDir)) return [];
+  const root = resolve(rootDir);
+  const dir = join(root, "docs", "adr");
+  let names;
+  try { names = readdirSync(dir); } catch { return []; }
+  const manifest = boundManifestRows(root, Array.isArray(featureDirs) ? featureDirs : []);
+  const result = [];
+  for (const name of names.sort()) {
+    const slug = /^draft-(.+)\.md$/u.exec(name)?.[1];
+    if (slug === undefined || !DRAFT_SLUG.test(slug)) continue;
+    let markdown;
+    try { markdown = physicalFile(join(dir, name)); } catch { continue; }
+    const sidecar = readJsonFile(join(dir, `draft-${slug}.json`));
+    if (!validDecision(sidecar) || sidecar.id !== `draft-${slug}` || sidecar.status !== "proposed") continue;
+    const path = `docs/adr/${name}`;
+    const current = digest(markdown);
+    const accepted = names.filter((entry) => new RegExp(`^\\d{4}-${slug}\\.json$`, "u").test(entry))
+      .find((entry) => ["accepted", "superseded"].includes(readJsonFile(join(dir, entry))?.status));
+    const row = manifest.find((entry) => entry.path === path && entry.sha256 === current);
+    const discard = readJsonFile(join(root, ...adrDraftDiscardPath(slug).split("/")));
+    if (accepted !== undefined) result.push({ slug, path, state: "materialized", acceptedId: accepted.slice(0, -5) });
+    else if (row !== undefined) result.push({ slug, path, state: "bound", acceptedId: row.id });
+    else if (discard?.schema === ADR_DRAFT_DISCARD_SCHEMA && discard.id === `draft-${slug}` && discard.markdownSha256 === current) result.push({ slug, path, state: "discarded", acceptedId: null });
+    else result.push({ slug, path, state: "unbound", acceptedId: null });
+  }
+  return result;
+}

@@ -5,7 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { closeSync, fsyncSync, lstatSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadMapBundle } from "./module-inventory.mjs";
+import { adrDraftReferenceWarnings, loadMapBundle } from "./module-inventory.mjs";
 
 // The tool ships in an installed plugin; its default target is the consuming
 // repository, never the plugin or marketplace installation directory.
@@ -149,7 +149,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     else { process.stderr.write("Usage: generate-architecture-overview.mjs [--root <repo>] [--check|--write]\n"); process.exit(2); }
   }
   try {
-    const rendered = architectureOverview(root);
+    architectureOverview(root);
+    // C28-PLAN-GATES: the view prints what the design said, so a cited draft is named here instead of rewritten (the bytes are a signed target).
+    for (const line of adrDraftReferenceWarnings(loadMapBundle(root).modules)) process.stderr.write(`${line}\n`);
     if (mode === "--write") {
       writeArchitectureOverview(root);
       process.stdout.write(`Generated ${OUTPUT}\n`);

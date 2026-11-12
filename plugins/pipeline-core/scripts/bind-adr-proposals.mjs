@@ -256,7 +256,10 @@ function bind(root, values, slugs) {
   const written = writes.map(({ rel }) => rel).sort();
   return { ok: true, bound, manifest: { path: manifestPath, sha256: manifest.sha256 }, carrier: carrierPath, written,
     companions: [...companions].sort(),
-    next: "Stage and commit the written files together with the drafts; then create the design review receipt with design-review-receipt.mjs create and one --companion <path> for EVERY path in `companions` "
+    // C28-PLAN-GATES (Codex greenfield 2026-11): the map listed docs/adr/draft-*.md instead of the accepted ADR. The accepted path is known here.
+    adrReferences: bound.map(({ id }) => `docs/adr/${id}.md`),
+    next: "In the design's modules, cite the accepted record in adrReferences (the paths in `adrReferences`), never a docs/adr/draft-* path: submit-plan refuses a draft citation. "
+      + "Stage and commit the written files together with the drafts; then create the design review receipt with design-review-receipt.mjs create and one --companion <path> for EVERY path in `companions` "
       + "(plus the other companions of the package), and continue with submit-plan, present-plan and approve-plan. "
       + "If a draft changes later, run create-adr.mjs --refresh and then this command again with the same arguments; it replaces its own files in place." };
 }

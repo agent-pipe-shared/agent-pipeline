@@ -149,6 +149,7 @@ const sessionAuthorityRegistry = cliHelp ? {} : await import("../lib/session-aut
 const { inspectSignedDescriptorCustodyRepository } = cliHelp ? {} : await import("../lib/worktree-lifecycle.mjs");
 const { deliversModuleSlice, moduleDispatchScope, readPrdModules } = cliHelp ? {} : await import("../lib/module-dispatch-scope.mjs");
 const { loadMapBundle } = cliHelp ? {} : await import("./module-inventory.mjs");
+const { inspectSpecJourneys } = cliHelp ? {} : await import("../lib/spec-journey-coverage.mjs");
 const { owningModules } = cliHelp ? {} : await import("./architecture-boundary-check.mjs");
 
 export const DISPATCH_BINDING_SCHEMA = "pipeline.dispatch-briefing.binding.v1";
@@ -1265,7 +1266,11 @@ function resolveModulePackage(root, pkg, deps) {
   }
   // G20-65: the binding learns from the cut that the module is documentation-only (the generator itself cannot see the module).
   const withDocumentation = (value) => (checked.documentationOnly === true ? { ...value, documentationModule: pkg.module } : value);
-  if (pkg.paths !== undefined) return { pkg: withDocumentation(pkg), warnings: [] };
+  const specBytes = (() => { try { return readRepoFile(root, pkg.spec); } catch { return null; } })();
+  const vertical = verticalSliceFirstWarning({ moduleId: pkg.module, moduleCount: read.modules.length, planSliceIds: checked.planSliceIds, integrated,
+    specText: specBytes === null ? null : specBytes.toString("utf8") });
+  const verticalWarnings = vertical === null ? [] : [vertical];
+  if (pkg.paths !== undefined) return { pkg: withDocumentation(pkg), warnings: verticalWarnings };
   const derived = declared.length === 0 ? checked : moduleDispatchScope(input);
   const files = expandModuleScope(root, derived.writeScope);
   if (files.length === 0 && (pkg.newFiles ?? []).length === 0) {
@@ -1273,8 +1278,30 @@ function resolveModulePackage(root, pkg, deps) {
   }
   return {
     pkg: withDocumentation({ ...pkg, paths: files }),
-    warnings: [{ code: "DBG-MODULE-SCOPE-DERIVED", moduleId: pkg.module, ownedPaths: derived.writeScope, files, message: `the write scope of module ${pkg.module} (${derived.writeScope.join(", ")}) is listed as the ${files.length} regular file(s) it holds now. A file created there later is outside the scope; add it under "newFiles" in a new briefing, never by widening the match` }],
+    warnings: [{ code: "DBG-MODULE-SCOPE-DERIVED", moduleId: pkg.module, ownedPaths: derived.writeScope, files, message: `the write scope of module ${pkg.module} (${derived.writeScope.join(", ")}) is listed as the ${files.length} regular file(s) it holds now. A file created there later is outside the scope; add it under "newFiles" in a new briefing, never by widening the match` }, ...verticalWarnings],
   };
+}
+
+/**
+ * C28-PLAN-GATES (AC-108; Codex and WSL greenfield 2026-11): the Spec's plan is sliced vertical first (kickoff-design.md), yet the dispatches went
+ * module by module and nothing noticed. PO decision 2026-11-10: a WARNING only, never a refusal. The measurable signal the Pipeline already holds,
+ * and nothing more: this is a module dispatch, the design has two or more modules, the Spec names at least one user journey (a criterion with
+ * `Journeys:` and `Asserts:`), and no integrated dispatch outside the module cut exists yet. It is a proxy: the Spec has no field that names the
+ * planned thin path, so a design that deliberately builds a foundation module first is told it may ignore the warning. Pure; null when it does not apply.
+ */
+export function verticalSliceFirstWarning({ moduleId, moduleCount, planSliceIds, integrated, specText } = {}) {
+  if (!(moduleCount >= 2) || typeof specText !== "string") return null;
+  const slices = Array.isArray(planSliceIds) ? planSliceIds : [];
+  const done = Array.isArray(integrated) ? integrated : [];
+  if (done.some((id) => !slices.some((slice) => deliversModuleSlice(id, slice, slices)))) return null;
+  const journeys = inspectSpecJourneys(specText).covered;
+  if (journeys.length === 0) return null;
+  const named = journeys.slice(0, 5);
+  return { code: "DBG-VERTICAL-SLICE-FIRST", moduleId, journeyCriteria: named,
+    message: `module ${moduleId} is a module dispatch, the design has ${moduleCount} modules, and no integrated dispatch outside the module cut exists yet (${done.length} module slice(s) integrated so far), although the Spec names a user journey (${named.join(", ")}${journeys.length > named.length ? ", ..." : ""}). `
+      + `The plan is sliced vertical first: one thin end-to-end path for the most important journey, then widened, never all of one layer before the next. This is a warning, nothing is refused. `
+      + `Next step: if the plan's first slice is that thin path, brief it first as its own package without "module" (paths that run through the modules it needs, the criterion of that journey) and integrate it before the next module; `
+      + `if the design deliberately builds this module first (a foundation the path cannot run without), ignore this warning.` };
 }
 
 /** The binding options one closed package yields for an agent type (shared by build and probe). */

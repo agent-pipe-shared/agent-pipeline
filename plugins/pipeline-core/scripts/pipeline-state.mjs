@@ -473,7 +473,8 @@ import {coverOnboardingOutput} from '../lib/onboarding-consent-scope.mjs';
 import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
 import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
 import { locateCourseEvidenceGap } from "../lib/course-evidence-gap.mjs";
-import { inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
+import { inspectAdrDraftBindings, inspectArchitectureDecisionAuthoringSources } from "../lib/architecture-effective-decisions.mjs";
+import { adrDraftReferenceSlug } from "./module-inventory.mjs";
 import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
 import { rebindApproval } from "../lib/rebind-approval.mjs";
 import { profileSourceChangedKeys } from "../lib/plan-approval-device-rebind.mjs";
@@ -12460,6 +12461,40 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           const listed = (submitDecisions.findings ?? []).map((item) => `${item.code}${item.path ? ` ${item.path}` : ""}`).join("; ");
           console.error(`Error: submit-plan blocked by ${submitDecisions.code} (${listed || "no detail"}); fix each named ADR sidecar now (node <plugin-root>/scripts/architecture-baseline.mjs --validate docs/adr/<name>.json validates one), so the signed approval never has to be reopened for it. No submission or signature request was recorded.`);
           return 2;
+        }
+        // C28-PLAN-GATES (AC-108; WSL Claude greenfield 2026-11): the ADR proposals were written, never bound, and the design approval still passed
+        // because only an accepted record is read as a decision. Where a design package applies, an unbound proposal is refused here, before the PO
+        // signs. A proposal already materialized (accepted record exists), bound in this feature's folder or discarded with a reason does not count,
+        // so a consumer project's earlier approvals and bound ADRs stay valid. Codex greenfield: a module cited the draft path as an accepted ADR.
+        if (submitDesignDraft.required === true) {
+          const featureDirs = [...new Set([authority.value.planPath, authority.value.specPath].filter((value) => typeof value === "string")
+            .map((value) => posixPath.dirname(value.replace(/\\/gu, "/"))))];
+          const adrDrafts = (deps.adrDraftBindings ?? inspectAdrDraftBindings)({ rootDir: dir, featureDirs });
+          const unbound = adrDrafts.filter((entry) => entry.state === "unbound");
+          const scripts = (name) => fileURLToPath(new URL(`./${name}`, import.meta.url));
+          if (unbound.length > 0) {
+            const featureFolder = featureDirs[0] ?? "specs";
+            console.error(`Error: submit-plan blocked by ADR-DRAFT-UNBOUND (${unbound.map((entry) => entry.path).join(", ")}); ${unbound.length === 1 ? "this ADR proposal was" : "these ADR proposals were"} written but never bound into the design package, `
+              + `so the design approval would pass and no decision would ever become an accepted ADR. Bind ${unbound.length === 1 ? "it" : "them"}: node ${scripts("bind-adr-proposals.mjs")} --root ${dir} --feature ${base.activeFeature.id} `
+              + `--carrier ${featureFolder}/design.md --selection ${featureFolder}/po-selection.json ${unbound.map((entry) => `--draft ${entry.slug}`).join(" ")} (the selection file holds the PO's own words as JSON; skills/architecture-decision/SKILL.md shows its shape), `
+              + `commit the written files, then run submit-plan again. A proposal that is deliberately not wanted is discarded with a reason instead, one command per draft (an audit record, no signature): `
+              + `${unbound.map((entry) => `node ${scripts("create-adr.mjs")} --root ${dir} --slug ${entry.slug} --discard --reason "<why it is not wanted>"`).join(" ; ")}. No submission or signature request was recorded.`);
+            return 2;
+          }
+          const cited = [];
+          for (const module of Array.isArray(submitDesignDraft.design?.modules) ? submitDesignDraft.design.modules : []) {
+            for (const reference of Array.isArray(module?.adrReferences) ? module.adrReferences : []) {
+              const slug = adrDraftReferenceSlug(reference);
+              if (slug === null) continue;
+              const accepted = adrDrafts.find((entry) => entry.slug === slug)?.acceptedId ?? null;
+              cited.push(`module ${module.id}: ${reference} -> ${accepted === null ? "remove it, no accepted record exists for this proposal" : `docs/adr/${accepted}.md`}`);
+            }
+          }
+          if (cited.length > 0) {
+            console.error(`Error: submit-plan blocked by ADR-DRAFT-CITED-AS-ACCEPTED (${cited.join("; ")}); a draft is a proposal, not an accepted decision, so the module's adrReferences must cite the accepted record that binding publishes. `
+              + `Correct the architecture design block in the PRD, commit it, and run submit-plan again. No submission or signature request was recorded.`);
+            return 2;
+          }
         }
       }
       // D165 D4: when no design package applies, a brownfield architecture hurdle

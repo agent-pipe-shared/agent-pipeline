@@ -2545,6 +2545,58 @@ test("G20-59: a further attempt on a dependency releases the waiting module like
     "an unrelated id never stands in for the module's slice");
 });
 
+// --- C28-PLAN-GATES (AC-108; Codex and WSL greenfield 2026-11): the Spec planned one thin end-to-end path first, the dispatches went module by module ---
+// PO decision 2026-11-10: a WARNING only (no refusal, no PO look). The measurable signal the Pipeline already holds: a module dispatch of a design
+// with two or more modules, a Spec that names a user journey, and no integrated dispatch outside the module cut yet.
+const JOURNEY_ROW = "| AC-4 | The user reloads the page and sees the saved game. Journeys: entry from the menu; reload in the middle of a save; a second save after an error. Asserts: the stored save slot holds the game state. | backlog/items/2026-01-02-sample-slug.md |\n";
+function withJourneySpec(made) {
+  const file = join(made.fx.root, made.fx.specRel);
+  writeFileSync(file, `${readFileSync(file, "utf8")}${JOURNEY_ROW}`);
+  return made;
+}
+const verticalWarning = (result) => (result.warnings ?? []).find((warning) => warning.code === "DBG-VERTICAL-SLICE-FIRST");
+
+test("C28 vertical slice: a module dispatch with no end-to-end dispatch integrated yet warns, names the figures and a next step, and never refuses", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = withJourneySpec(modulePackage());
+  const built = runDispatchBriefing(argv, depsOf(fx, { integratedSliceIds: () => [] }));
+  assert.equal(built.ok, true, JSON.stringify(built));
+  const warning = verticalWarning(built);
+  assert.ok(warning, JSON.stringify(built.warnings.map((entry) => entry.code)));
+  assert.match(warning.message, /module core/u);
+  assert.match(warning.message, /2 modules/u);
+  assert.match(warning.message, /AC-4/u, "names the criterion whose journey a thin path would prove");
+  assert.match(warning.message, /no integrated dispatch outside the module cut/u, "states the measured fact, not a verdict");
+  assert.match(warning.message, /Next step: /u);
+  assert.match(warning.message, /without "module"/u, "the next step names how the thin path is briefed");
+  const probed = runDispatchBriefing(probeArgvOf(fx), probeDepsOf(fx));
+  assert.ok(verticalWarning(probed), "the readiness probe carries the same warning");
+});
+
+test("C28 vertical slice: the second module of a component-by-component run warns as well; a further attempt on a module slice counts as the module cut", async () => {
+  const { runDispatchBriefing } = await lib();
+  const second = withJourneySpec(modulePackage({ module: "api" }));
+  assert.ok(verticalWarning(runDispatchBriefing(second.argv, depsOf(second.fx, { integratedSliceIds: () => ["slice-core"] }))));
+  const retry = withJourneySpec(modulePackage({ id: "slice-core-r2" }));
+  assert.ok(verticalWarning(runDispatchBriefing(retry.argv, depsOf(retry.fx, { integratedSliceIds: () => ["slice-core"] }))));
+});
+
+test("C28 vertical slice: silent once a dispatch outside the module cut is integrated, without a Spec journey, for one module, and for a package without a module", async () => {
+  const { runDispatchBriefing, verticalSliceFirstWarning } = await lib();
+  const thin = withJourneySpec(modulePackage({ module: "api" }));
+  assert.equal(verticalWarning(runDispatchBriefing(thin.argv, depsOf(thin.fx, { integratedSliceIds: () => ["slice-core", "thin-end-to-end"] }))), undefined);
+  const noJourney = modulePackage();
+  assert.equal(verticalWarning(runDispatchBriefing(noJourney.argv, depsOf(noJourney.fx, { integratedSliceIds: () => [] }))), undefined, "the default Spec names no journey to cut a path through");
+  const plain = packageFixture();
+  withJourneySpec(plain);
+  assert.equal(verticalWarning(runDispatchBriefing(plain.argv, depsOf(plain.fx))), undefined, "a package without a module is no module dispatch");
+  const specText = `## Acceptance criteria\n\n| # | Criterion | Evidence |\n| --- | --- | --- |\n| AC-4 | The user reloads the page and sees the saved game. Journeys: entry from the menu; reload in the middle of a save. Asserts: the stored save slot holds the game state. | x |\n`;
+  const input = { moduleId: "core", moduleCount: 1, planSliceIds: ["slice-core"], integrated: [], specText };
+  assert.equal(verticalSliceFirstWarning(input), null, "one module has no layers to cut across");
+  assert.equal(verticalSliceFirstWarning({ ...input, moduleCount: 2 })?.code, "DBG-VERTICAL-SLICE-FIRST");
+  assert.equal(verticalSliceFirstWarning({ ...input, moduleCount: 2, specText: null }), null, "an unreadable Spec yields no warning");
+});
+
 test("module package: the two reference keys come together, and a package without them keeps the old shape and the old paths rule", async () => {
   const { runDispatchBriefing } = await lib();
   const half = packageFixture({ module: "core" });

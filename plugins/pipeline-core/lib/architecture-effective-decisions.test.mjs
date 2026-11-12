@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { compareEffectiveArchitectureDecisions, inspectEffectiveArchitectureDecisions, inspectArchitectureDecisionAuthoringSources } from "./architecture-effective-decisions.mjs";
+import { ADR_DRAFT_DISCARD_SCHEMA, adrDraftDiscardPath, compareEffectiveArchitectureDecisions, inspectAdrDraftBindings, inspectEffectiveArchitectureDecisions, inspectArchitectureDecisionAuthoringSources } from "./architecture-effective-decisions.mjs";
 import { runArchitectureEffectiveCli } from "../scripts/architecture-effective-decisions.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -291,4 +291,84 @@ test("D179 docs/adr as a symlink to a directory still blocks and names docs/adr"
   assert.equal(result.status, "blocked");
   assert.equal(result.code, "ARCH-DECISION-SOURCE-UNAVAILABLE");
   assert.ok(result.findings.some(({ path }) => path === "docs/adr"));
+});
+
+// --- C28-PLAN-GATES (AC-108): which ADR drafts of a feature were never bound into the design package ---
+// WSL Claude greenfield 2026-11: the drafts were written, bind-adr-proposals never ran, and the design approval still passed because only an
+// `accepted` record is ever read as a decision. The reader below is what submit-plan asks before the PO is asked to sign.
+function draftPair(root, slug, { status = "proposed", body = `# ${slug}\n\nThe real decision text.\n` } = {}) {
+  const dir = join(root, "docs", "adr");
+  writeFileSync(join(dir, `draft-${slug}.md`), body);
+  writeFileSync(join(dir, `draft-${slug}.json`), `${JSON.stringify({ schema: "pipeline.architecture-decision.v1", id: `draft-${slug}`, title: slug, status, digest: sha(body), scope: "project", date: "2026-11-10" })}\n`);
+  return sha(body);
+}
+function boundManifest(root, dir, rows) {
+  mkdirSync(join(root, dir), { recursive: true });
+  writeFileSync(join(root, dir, "prospective-architecture.json"), `${JSON.stringify({ schema: "pipeline.architecture-prospective-materialization.v1",
+    decisions: rows.map(({ id, slug, digest }) => ({ id, proposedMarkdown: { path: `docs/adr/draft-${slug}.md`, sha256: digest } })) })}\n`);
+}
+const bindingStates = (root, featureDirs = ["specs/f"]) => Object.fromEntries(inspectAdrDraftBindings({ rootDir: root, featureDirs }).map((entry) => [entry.slug, entry.state]));
+
+test("C28 ADR drafts: a proposal that no manifest, accepted record or discard names is unbound; no drafts means nothing to bind", (t) => {
+  const root = fixture(t);
+  assert.deepEqual(inspectAdrDraftBindings({ rootDir: root, featureDirs: ["specs/f"] }), []);
+  draftPair(root, "storage-adapter");
+  const [only] = inspectAdrDraftBindings({ rootDir: root, featureDirs: ["specs/f"] });
+  assert.deepEqual({ slug: only.slug, path: only.path, state: only.state }, { slug: "storage-adapter", path: "docs/adr/draft-storage-adapter.md", state: "unbound" });
+});
+
+test("C28 ADR drafts: only a real proposal counts (Markdown plus a proposed sidecar), never an accepted draft or a bare Markdown", (t) => {
+  const root = fixture(t);
+  draftPair(root, "wanted");
+  draftPair(root, "already-accepted", { status: "accepted" });
+  writeFileSync(join(root, "docs", "adr", "draft-notes-only.md"), "# notes\n");
+  assert.deepEqual(bindingStates(root), { wanted: "unbound" });
+});
+
+test("C28 ADR drafts: a draft listed in a manifest of the feature folder with its current digest is bound and names its accepted id", (t) => {
+  const root = fixture(t);
+  const digest = draftPair(root, "storage-adapter");
+  boundManifest(root, "specs/f", [{ id: "0001-storage-adapter", slug: "storage-adapter", digest }]);
+  assert.deepEqual(bindingStates(root), { "storage-adapter": "bound" });
+  assert.equal(inspectAdrDraftBindings({ rootDir: root, featureDirs: ["specs/f"] })[0].acceptedId, "0001-storage-adapter");
+  assert.deepEqual(bindingStates(root, ["specs/other"]), { "storage-adapter": "unbound" }, "a manifest outside the feature folders is not this feature's binding");
+  writeFileSync(join(root, "docs", "adr", "draft-storage-adapter.md"), "# changed after binding\n");
+  assert.deepEqual(bindingStates(root), { "storage-adapter": "unbound" }, "a draft edited after it was bound must be bound again");
+});
+
+test("C28 ADR drafts: a manifest in a nested folder of the feature is found; one that is not a binding manifest is ignored", (t) => {
+  const root = fixture(t);
+  const digest = draftPair(root, "nested");
+  boundManifest(root, "specs/f/design", [{ id: "0002-nested", slug: "nested", digest }]);
+  assert.deepEqual(bindingStates(root), { nested: "bound" });
+  writeFileSync(join(root, "specs", "f", "design", "prospective-architecture.json"), `${JSON.stringify({ schema: "something-else", decisions: [] })}\n`);
+  assert.deepEqual(bindingStates(root), { nested: "unbound" });
+});
+
+test("C28 ADR drafts: a draft that was materialized earlier (accepted NNNN record exists) is never unbound again, so later features are not refused", (t) => {
+  const root = fixture(t);
+  draftPair(root, "storage-adapter");
+  decision(root, "0004-storage-adapter", { status: "accepted" });
+  assert.deepEqual(bindingStates(root, ["specs/another-feature"]), { "storage-adapter": "materialized" });
+  assert.equal(inspectAdrDraftBindings({ rootDir: root, featureDirs: [] })[0].acceptedId, "0004-storage-adapter");
+});
+
+test("C28 ADR drafts: a discard record for the exact draft bytes resolves it; an edited draft is not silently exempt", (t) => {
+  const root = fixture(t);
+  const digest = draftPair(root, "unwanted");
+  mkdirSync(join(root, "docs", "adr", "discarded"), { recursive: true });
+  const record = { schema: ADR_DRAFT_DISCARD_SCHEMA, id: "draft-unwanted", markdownSha256: digest, reason: "superseded by the storage decision", discardedAt: NOW };
+  writeFileSync(join(root, adrDraftDiscardPath("unwanted")), `${JSON.stringify(record)}\n`);
+  assert.deepEqual(bindingStates(root), { unwanted: "discarded" });
+  writeFileSync(join(root, "docs", "adr", "draft-unwanted.md"), "# the slug was reused for a new proposal\n");
+  assert.deepEqual(bindingStates(root), { unwanted: "unbound" });
+  assert.equal(adrDraftDiscardPath("unwanted"), "docs/adr/discarded/draft-unwanted.json");
+});
+
+test("C28 ADR drafts: the discard record directory raises no decision finding (an orphan sidecar would block submit-plan)", (t) => {
+  const root = fixture(t);
+  const digest = draftPair(root, "unwanted");
+  mkdirSync(join(root, "docs", "adr", "discarded"), { recursive: true });
+  writeFileSync(join(root, adrDraftDiscardPath("unwanted")), `${JSON.stringify({ schema: ADR_DRAFT_DISCARD_SCHEMA, id: "draft-unwanted", markdownSha256: digest, reason: "no longer needed", discardedAt: NOW })}\n`);
+  assert.deepEqual(inspect(root).findings, []);
 });
