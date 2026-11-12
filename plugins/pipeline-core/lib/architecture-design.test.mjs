@@ -561,6 +561,60 @@ test("a reopened and newly approved design refreshes its own receipt over the re
   assert.equal(mod.inspectArchitectureDesign(withOrphan.root, null, {}).status, "materialization-required", "once the file is gone the refresh proceeds");
 });
 
+// K-13 (PO tile 2026-11-11): a follow-up epic adds modules to the design a closed epic materialized. Only an addition is accepted; the closed predecessor's plan must still be the one
+// its receipt names, every predecessor module must be in the new design unchanged, and each recorded target must still hold its recorded bytes.
+const k13Module = (id, over = {}) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: ["Network"], ownedPaths: [`src/${id}.mjs`], publicContracts: [`src/${id}.mjs`],
+  allowedDependencies: [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [], ...over });
+function k13Design(modules) {
+  const base = hf9Design(); const { modules: _omitted, ...fitnessModel } = base.fitnessModel;
+  return { ...base, modules, implementationSurface: modules.map((module) => module.ownedPaths[0]), fitnessModel };
+}
+function k13Fixture(stage, { closed = true, current = [k13Module("engine"), k13Module("shell")], earlier = [k13Module("engine")], editPlan = false, driftTarget = false } = {}) {
+  const fixture = hf9Fixture(stage, { block: true, scaffold: "none", receipt: true, designInput: k13Design(current) });
+  const oldPrd = `# Design\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(k13Design(earlier))}\n\`\`\`\n`;
+  hf9Put(fixture.root, "specs/old/prd.md", editPlan ? `${oldPrd}\nedited after the close\n` : oldPrd);
+  const oldInput = parseArchitectureDesign(oldPrd); const oldTargets = architectureDesignTargets(oldInput);
+  for (const target of oldTargets) hf9Put(fixture.root, target.path, driftTarget ? `${target.bytes}\ndrift\n` : target.bytes);
+  const receipt = { schema: "pipeline.architecture-design-materialization.v1", featureId: "feat-0", planPath: "specs/old/prd.md", planSha256: hf9Sha(oldPrd), specSha256: "b".repeat(64),
+    designSha256: hf9Sha(`${JSON.stringify(oldInput, null, 2)}\n`), targets: oldTargets.map((target) => ({ path: target.path, sha256: hf9Sha(target.bytes) })) };
+  hf9Put(fixture.root, "architecture/design-materialization.json", `${JSON.stringify(receipt, null, 2)}\n`);
+  const statePath = join(fixture.root, "project/pipeline-state.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.closedFeatures = closed ? [{ id: "feat-0", planPath: "specs/old/prd.md", closedAt: "2026-01-01T00:00:00.000Z", forCommit: null }] : [];
+  writeFileSync(statePath, JSON.stringify(state, null, 2));
+  return { ...fixture, receipt };
+}
+
+test("K-13: a follow-up design that only adds a module extends the closed predecessor's materialization over the recorded bytes and publishes", async () => {
+  const { stage, mod } = await hf9Load();
+  const fixture = k13Fixture(stage);
+  const result = mod.inspectArchitectureDesign(fixture.root, null, {});
+  assert.equal(result.status, "materialization-required", result.code);
+  assert.deepEqual(result.extendsClosedFeature, { featureId: "feat-0", planPath: "specs/old/prd.md", designSha256: fixture.receipt.designSha256 });
+  const recorded = new Set(fixture.receipt.targets.map((target) => target.path));
+  assert.ok(result.targets.filter((target) => recorded.has(target.path)).every((target) => /^[0-9a-f]{64}$/u.test(target.preimageSha256)), "every recorded target is bound to its recorded bytes");
+  const added = result.targets.filter((target) => !recorded.has(target.path));
+  assert.ok(added.some((target) => target.path === "architecture/map/shell.md") && added.every((target) => target.preimageSha256 === undefined), "the new module's file is a creation, not a replacement");
+  assert.equal(result.receiptPreimageSha256, hf9Sha(readFileSync(join(fixture.root, "architecture/design-materialization.json"), "utf8")));
+  const lockPath = join(fixture.root, "project", "pipeline-state.json.lock");
+  writeFileSync(lockPath, JSON.stringify({ schema: "pipeline.continuity-lock.v0", token: "token-1", ownerNonce: "nonce-1" }));
+  const published = mod.materializeArchitectureDesign(fixture.root, { lock: { ok: true, path: lockPath, token: "token-1", ownerNonce: "nonce-1" } });
+  assert.equal(published.status, "materialized", published.code);
+  const stored = JSON.parse(readFileSync(join(fixture.root, "architecture/design-materialization.json"), "utf8"));
+  assert.equal(stored.featureId, HF9_FEATURE, "the receipt now names the follow-up feature");
+  assert.equal(mod.inspectArchitectureDesign(fixture.root, null, {}).status, "materialized", "the extension is settled, not repeated");
+});
+
+test("K-13: removing or changing a predecessor module, an open predecessor, an edited predecessor plan or a drifted target keeps the refusal", async () => {
+  const { stage, mod } = await hf9Load();
+  const refused = (options, label, code = "ARCHITECTURE-DESIGN-RECEIPT-STALE") => assert.equal(mod.inspectArchitectureDesign(k13Fixture(stage, options).root, null, {}).code, code, label);
+  refused({ current: [k13Module("shell")] }, "the predecessor module is gone");
+  refused({ current: [k13Module("engine", { responsibility: "another job" }), k13Module("shell")] }, "the predecessor module changed");
+  refused({ closed: false }, "the predecessor is not closed");
+  refused({ editPlan: true }, "the predecessor's plan is not the one its receipt names");
+  refused({ driftTarget: true }, "a recorded target no longer holds its recorded bytes", "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
+});
+
 // --- G20-65 (AC-108): a module that owns no admissible check is reported at design time, before the PO signs, with the move that repairs it ---
 // Measured in the Claude greenfield on candidate 20c: the module user-guide owned two documents and its test belonged to module shell; the dispatch
 // route refused every check only after the design was signed.

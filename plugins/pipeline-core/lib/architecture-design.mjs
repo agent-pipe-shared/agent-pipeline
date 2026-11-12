@@ -353,6 +353,32 @@ function refreshReceiptAfterReapproval(root, stored, receipt, targets) {
   if (previous === null || typeof previous !== "object" || previous.schema !== receipt.schema || previous.featureId !== receipt.featureId
     || previous.planPath !== receipt.planPath || !Array.isArray(previous.targets)
     || (previous.planSha256 === receipt.planSha256 && previous.specSha256 === receipt.specSha256)) return null;
+  return replaceOverRecorded(root, previous, targets);
+}
+
+/**
+ * K-13 (PO tile 2026-11-11): a follow-up epic may ADD modules to the design a CLOSED epic materialized. Only an addition qualifies: the closed predecessor's own plan must still be the
+ * one its receipt names, and every module it declared must be in the new design with an identical definition. Removing or changing a predecessor module, or a missing or edited
+ * predecessor plan, is not an extension. The new plan signature stays the authority; the receipt only records what is materialized.
+ */
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value !== null && typeof value === "object") return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+function additiveExtensionOf(root, predecessor, input) {
+  let earlier;
+  try {
+    const prd = bytes(root, predecessor.planPath);
+    if (hash(prd) !== predecessor.planSha256) return false;
+    earlier = parseArchitectureDesign(prd);
+  } catch { return false; }
+  const current = new Map(input.modules.map(module => [module.id, stableJson(module)]));
+  return earlier.modules.length > 0 && earlier.modules.every(module => current.get(module.id) === stableJson(module));
+}
+
+/** Shared by a reopened design and a follow-up extension: each recorded target must still hold the recorded bytes and is replaceable only over them; a recorded file the new design drops is refused. */
+function replaceOverRecorded(root, previous, targets) {
   const recorded = new Map(previous.targets.map(row => [row?.path, row?.sha256]));
   const current = new Set(targets.map(target => target.path));
   const orphaned = [...recorded.keys()].filter(path => !current.has(path) && existsSync(physical(root, path)));
@@ -448,12 +474,18 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
         // Only a parseable receipt of the same schema qualifies; the receipt on disk is never rewritten.
         let predecessor = null;
         try { predecessor = JSON.parse(stored); } catch { /* unparseable: stale below */ }
-        requireValue(predecessor !== null && typeof predecessor === "object"
-          && predecessor.schema === receipt.schema && predecessor.designSha256 === receipt.designSha256
-          && JSON.stringify(predecessor.targets) === JSON.stringify(receipt.targets)
+        const closedPredecessor = predecessor !== null && typeof predecessor === "object" && predecessor.schema === receipt.schema
           && typeof predecessor.featureId === "string" && predecessor.featureId !== state.activeFeature.id
-          && Array.isArray(state.closedFeatures) && state.closedFeatures.some(entry => entry?.id === predecessor.featureId),
-        "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+          && Array.isArray(state.closedFeatures) && state.closedFeatures.some(entry => entry?.id === predecessor.featureId);
+        const equalDesign = closedPredecessor && predecessor.designSha256 === receipt.designSha256 && JSON.stringify(predecessor.targets) === JSON.stringify(receipt.targets);
+        if (!equalDesign) {
+          // K-13: a different design is accepted only as an addition to the closed predecessor's; everything else stays stale.
+          const extended = closedPredecessor && Array.isArray(predecessor.targets) && typeof predecessor.planPath === "string" && additiveExtensionOf(root, predecessor, input)
+            ? replaceOverRecorded(root, predecessor, targets) : null;
+          requireValue(extended !== null, "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+          return { ok: true, status: "materialization-required", input, targets: extended, receipt, receiptPreimageSha256: hash(stored), scope: input.disposition.scope,
+            extendsClosedFeature: { featureId: predecessor.featureId, planPath: predecessor.planPath, designSha256: predecessor.designSha256 } };
+        }
         inheritedFrom = { featureId: predecessor.featureId, planPath: predecessor.planPath, designSha256: predecessor.designSha256 };
       }
       requireValue(targets.every(target => bytes(root, target.path) === target.bytes), "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
