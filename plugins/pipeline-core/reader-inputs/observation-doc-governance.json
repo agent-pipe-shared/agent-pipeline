@@ -132,6 +132,7 @@
           "docs/gitlab-ci-pilot-threat-model.md",
           "docs/governance-events.md",
           "docs/guard-maintenance-window-threat-model.md",
+          "docs/hard-rule-incidents.md",
           "docs/human-guard-override-threat-model.md",
           "docs/local-supervisor-state-threat-model.md",
           "docs/marketplace-supply-chain-threat-model.md",
@@ -289,6 +290,7 @@
           "docs/adr/0088-test-economy.md",
           "docs/adr/0089-project-routing-is-user-owned.md",
           "docs/adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md",
+          "docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md",
           "docs/adr/README.md"
         ]
       },

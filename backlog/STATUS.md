@@ -24,6 +24,7 @@
 | pipeline.a-divergent-adr-body-is-invisible-to-the-parity-comparison-while-unadopted | open | defect | pipeline | none | 2026-10-21 | — | — |
 | pipeline.a-doc-edit-silently-obligates-its-vendored-copy | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-feature-closes-over-a-slice-with-no-delivery-evidence | open | defect | pipeline | none | 2026-10-20 | — | — |
+| pipeline.a-follow-up-epic-cannot-extend-the-closed-architecture-design | open | workflow-improvement | pipeline | alfred | 2026-11-11 | — | — |
 | pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path | closed | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — the second of the two directions named by the RED-capture item. The first direction shipped as a capture tool; this one is what that tool structurally cannot cover, and it is the half that catches a human or an agent writing an artifact by hand. |
 | pipeline.a-large-tracked-inventory-reads-as-git-identity-unavailable-in-the-security-scan | open | defect | pipeline | alfred | 2026-10-29 | — | — |
@@ -129,6 +130,7 @@
 | pipeline.atomic-prd-approval-without-mutation | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner | closed | defect | pipeline | alfred | 2026-08-28 | — | — |
 | pipeline.attestation-git-presence-gate-not-gs8-protected | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
+| pipeline.audit-pack-does-not-carry-the-sbom | open | workflow-improvement | pipeline | alfred | 2026-11-11 | — | — |
 | pipeline.author-repair-route-has-no-signed-event-chain | open | requirement | pipeline | nightwing | 2026-09-12 | 2026-09-30 | — |
 | pipeline.authority-decision-apply-defaults-to-codex | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.authority-decision-candidate-is-a-literal | open | defect | pipeline | nightwing | 2026-08-08 | 2026-08-22 | — |
@@ -887,6 +889,7 @@
 | pipeline.runtime-projection-v2-eager-manifest-load | closed | defect | pipeline | — | 2026-07-27 | — | — |
 | pipeline.runtime-projections-drift-after-v3-refresh | closed | defect | pipeline | nova-b | 2026-08-28 | — | Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report |
 | pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop | closed | defect | pipeline | nova | 2026-09-13 | — | NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies. |
+| pipeline.sbom-readers-for-more-lockfile-formats-and-dependency-edges | open | workflow-improvement | pipeline | alfred | 2026-11-11 | — | — |
 | pipeline.scan-exception-commits-spend-the-critic-correction-budget | open | workflow-improvement | pipeline | alfred | 2026-10-29 | — | — |
 | pipeline.scanner-bootstrap-is-not-self-sufficient | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks. |
 | pipeline.scanner-diagnostics-keep-no-finding-provenance-before-suppression | open | defect | pipeline | none | 2026-10-21 | — | — |
@@ -1092,7 +1095,7 @@
 
 ## Counts
 
-- open: 395
+- open: 398
 - in_progress: 0
 - closed: 674
 - rejected: 3

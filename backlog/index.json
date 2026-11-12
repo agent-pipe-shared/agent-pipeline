@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c2b9060ef24606cd8647479aa52c09f6962b938a59315a21aba515bfcbf12117"
+    "transitionHead": "750d741ba8502d470a3b86c23ea7e5571ebee32168623f23e988becc7fef413b"
   },
   "counts": {
-    "open": 395,
+    "open": 398,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -252,6 +252,16 @@
       "source": "Elephant observation while building D27/D55 (Q1), 2026-10-20: the close route's authorship classification names slices with neither a dispatch record nor commit evidence, and does not gate them",
       "deferred": false,
       "sprint": "none"
+    },
+    {
+      "id": "pipeline.a-follow-up-epic-cannot-extend-the-closed-architecture-design",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-11-11",
+      "source": "Consumer session finding K-13 for a second epic; confirmed against the source and not executed",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback",
@@ -1532,6 +1542,16 @@
       "closureRepository": "self",
       "closureCommit": "025f9e1a2a547b7abc438d998801acddcabdf166",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-gate-strength.mjs"
+    },
+    {
+      "id": "pipeline.audit-pack-does-not-carry-the-sbom",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-11-11",
+      "source": "Candidate 28c design; ADR-0091 wires the SBOM into the feature close and its audit bundle only",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.author-repair-route-has-no-signed-event-chain",
@@ -10987,6 +11007,16 @@
       "closureRepository": "self",
       "closureCommit": "6970805a573550ddf7835f28f80dae83e66b4851",
       "closureEvidence": "backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md"
+    },
+    {
+      "id": "pipeline.sbom-readers-for-more-lockfile-formats-and-dependency-edges",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-11-11",
+      "source": "Candidate 28c design; ADR-0091 decisions 2 and 4",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.scan-exception-commits-spend-the-critic-correction-budget",

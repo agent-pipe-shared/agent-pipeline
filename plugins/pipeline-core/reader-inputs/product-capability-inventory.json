@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "1085a32bf273643e9e939ef813ff74ebc6f6b657",
-    "tree": "97e6fec1e61c9e07624c3b526244a26357a25261"
+    "commit": "a4934b6fccee6af83ea9e235c41576ee28a21300",
+    "tree": "1f6abb4bf381f79b37be2c3a80982e9b997bb563"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -369,6 +369,7 @@
         "verify-phase:harness/scripts/verify.mjs:commit-pipeline-owned-tests",
         "verify-phase:harness/scripts/verify.mjs:consumer-baseline-verify-tests",
         "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
+        "verify-phase:harness/scripts/verify.mjs:context-baseline-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-authority-drift-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-capacity-shared-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-drift-exits-tests",
@@ -517,6 +518,7 @@
         "verify-phase:harness/scripts/verify.mjs:governance-scope-retirement-retry-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-scope-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-scope-win32-acl-tests",
+        "verify-phase:harness/scripts/verify.mjs:grammar-listing-once-per-context-window-tests",
         "verify-phase:harness/scripts/verify.mjs:greenfield-comparison-citation-check-tests",
         "verify-phase:harness/scripts/verify.mjs:greenfield-public-comparison-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
@@ -796,6 +798,7 @@
         "verify-phase:harness/scripts/verify.mjs:pin-escaped-and-powershell-redirects-to-a-protected-path-are-writes-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-every-dispatch-pays-a-bootstrap-receipt-detour-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-evidence-artifacts-carry-no-commit-identity-tests",
+        "verify-phase:harness/scripts/verify.mjs:pin-evidence-commands-stage-their-own-paths-and-never-commit-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-existing-signing-key-reuse-deadlocks-onboarding-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-feature-branch-push-admitted-without-signature-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:pin-first-enrollment-enters-retirement-before-consent-tests",
@@ -1038,6 +1041,7 @@
         "verify-phase:harness/scripts/verify.mjs:r7-3-bound-paths-tests",
         "verify-phase:harness/scripts/verify.mjs:read-command-diagnosis-tests",
         "verify-phase:harness/scripts/verify.mjs:read-option-operands-tests",
+        "verify-phase:harness/scripts/verify.mjs:ready-preflight-prints-a-compact-envelope-tests",
         "verify-phase:harness/scripts/verify.mjs:rebase-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:rebind-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:record-only-paths-tests",
@@ -1159,6 +1163,7 @@
         "verify-phase:harness/scripts/verify.mjs:stack-fuzz-replay-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-run-outcome-tests",
         "verify-phase:harness/scripts/verify.mjs:staleness-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:start-skill-fits-the-reattach-window-tests",
         "verify-phase:harness/scripts/verify.mjs:state-budget-check",
         "verify-phase:harness/scripts/verify.mjs:state-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-check",
@@ -2610,6 +2615,7 @@
         "verify-phase:harness/scripts/verify.mjs:provenance-fixture-matrix-tests",
         "verify-phase:harness/scripts/verify.mjs:provenance-local-builder-tests",
         "verify-phase:harness/scripts/verify.mjs:provenance-release-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-close-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-discovery-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-discovery-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-fixture-matrix-tests",
