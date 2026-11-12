@@ -17,6 +17,7 @@ import {
   exitCodeForBoundaryCheck,
   measureArchitecture,
   owningModules,
+  previewArchitectureBoundaries,
 } from "./architecture-boundary-check.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./architecture-boundary-check.mjs", import.meta.url));
@@ -236,4 +237,69 @@ test("ABC11 budgets carried by the fitness model are reported per module and sta
   assert.deepEqual(lib.budget, { maxFileLines: 3, maxModuleLines: 4 });
   assert.deepEqual(lib.overBudget, [{ scope: "file", path: "src/lib/x.mjs", lines: 5, budget: 3 }, { scope: "module", path: null, lines: 5, budget: 4 }]);
   assert.deepEqual(result.measurement.modules.find((entry) => entry.id === "app").overBudget, []);
+});
+
+test("ABC14 the preview checks the tracked tree against the PROPOSED design, names file, module and rule, and writes nothing", () => {
+  // No architecture/map exists yet (it appears only after the PO signs the design): that is exactly the state the preview is for.
+  const root = fixture({ map: false, files: {
+    "src/app/main.mjs": 'import { x } from "../lib/x.mjs";\n',
+    "src/lib/x.mjs": "export const x = 1;\n",
+    "tools/loose.mjs": "export {};\n",
+  } });
+  const proposal = (allowed) => ({ ok: true, modules: [{ id: "app", ownedPaths: ["src/app/**"], allowedDependencies: allowed }, { id: "lib", ownedPaths: ["src/lib/**"], allowedDependencies: [] }] });
+  const before = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).stdout;
+  const closed = previewArchitectureBoundaries({ rootDir: root, prd: "specs/f/prd.md" }, { readPrdModules: () => proposal([]) });
+  assert.equal(closed.schema, "pipeline.architecture-boundary-preview.v1");
+  assert.equal(closed.status, "findings");
+  assert.deepEqual(rules(closed), [["forbidden-dependency", "src/app/main.mjs", "src/lib/x.mjs"], ["unowned-path", "tools/loose.mjs", null]]);
+  assert.match(closed.violations[0].detail, /module app imports src\/lib\/x\.mjs of module lib, which is not in its allowedDependencies \[\]/u);
+  assert.match(closed.scope, /not an approval, nothing is written, no signature is needed/u);
+  assert.equal(exitCodeForBoundaryCheck(closed), 1);
+  // The same tree passes once the proposed design lets app depend on lib and owns the loose file; the permission is read from the proposal, never from a map.
+  const open = previewArchitectureBoundaries({ rootDir: root, prd: "specs/f/prd.md" }, { readPrdModules: () => ({ ok: true, modules: [{ id: "app", ownedPaths: ["src/app/**", "tools/**"], allowedDependencies: ["lib"] }, { id: "lib", ownedPaths: ["src/lib/**"], allowedDependencies: [] }] }) });
+  assert.equal(open.status, "pass", JSON.stringify(open.violations));
+  assert.equal(exitCodeForBoundaryCheck(open), 0);
+  assert.equal(existsSync(path.join(root, "architecture")), false, "the preview creates no map");
+  assert.equal(spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).stdout, before, "the preview changes nothing in the tree");
+});
+
+test("ABC16 the preview reads the proposed modules from a real PRD design block and finds an import its allowedDependencies do not permit", () => {
+  const module = (id, allowedDependencies) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: [], ownedPaths: [`src/${id}/**`], publicContracts: [`src/${id}/index.mjs`], allowedDependencies, authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [] });
+  const prd = (allowedForApi) => `# PRD\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify({
+    schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
+    disposition: { decision: "approved-scoped", scope: ["specs/", "src/", "tests/", "architecture/"], rationale: "fixture" },
+    modules: [module("core", []), module("api", allowedForApi)],
+    implementationSurface: ["src/core/index.mjs", "src/api/index.mjs"],
+    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "fixture", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { minimumModuleFiles: 1 } },
+  }, null, 2)}\n\`\`\`\n`;
+  const root = fixture({ map: false, files: {
+    "src/core/index.mjs": "export const core = 1;\n",
+    "src/api/index.mjs": 'import { core } from "../core/index.mjs";\nexport const api = core;\n',
+    "specs/prd.md": prd([]),
+    "specs/prd-open.md": prd(["core"]),
+  } });
+  const closed = previewArchitectureBoundaries({ rootDir: root, prd: "specs/prd.md" });
+  assert.equal(closed.status, "findings", JSON.stringify(closed));
+  assert.deepEqual(rules(closed), [["forbidden-dependency", "src/api/index.mjs", "src/core/index.mjs"]]);
+  assert.equal(closed.counts.modules, 2);
+  const open = previewArchitectureBoundaries({ rootDir: root, prd: "specs/prd-open.md" });
+  assert.equal(open.status, "pass", JSON.stringify(open));
+  const cli = spawnSync(process.execPath, [SCRIPT, "--root", root, "--preview-prd", "specs/prd.md"], { encoding: "utf8" });
+  assert.equal(cli.status, 1, cli.stdout + cli.stderr);
+  assert.match(cli.stdout, /\[forbidden-dependency\] module api imports src\/core\/index\.mjs of module core/u);
+});
+
+test("ABC15 the preview names a PRD it cannot read as a typed refusal, never a pass, and --preview-prd excludes --write-policy", () => {
+  const root = fixture({ map: false, files: { "src/app/main.mjs": "export {};\n" } });
+  const missing = previewArchitectureBoundaries({ rootDir: root, prd: "specs/none/prd.md" });
+  assert.equal(missing.status, "design-unavailable");
+  assert.equal(missing.code, "DBG-MODULE-PLAN-UNREADABLE");
+  assert.equal(exitCodeForBoundaryCheck(missing), 2);
+  const cli = spawnSync(process.execPath, [SCRIPT, "--root", root, "--preview-prd", "specs/none/prd.md"], { encoding: "utf8" });
+  assert.equal(cli.status, 2, cli.stdout + cli.stderr);
+  assert.match(cli.stdout, /Architecture boundary PREVIEW against the proposed design of specs\/none\/prd\.md: design-unavailable/u);
+  assert.match(cli.stdout, /DBG-MODULE-PLAN-UNREADABLE/u);
+  const both = spawnSync(process.execPath, [SCRIPT, "--root", root, "--preview-prd", "specs/none/prd.md", "--write-policy"], { encoding: "utf8" });
+  assert.equal(both.status, 2);
+  assert.equal(existsSync(path.join(root, BOUNDARY_POLICY_PATH)), false, "nothing is written");
 });
