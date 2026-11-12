@@ -485,6 +485,27 @@ test("AUTHORITY-WORKTREE-HEAD-DIVERGENCE emitted when worktree and HEAD diverge"
   assert.ok(missingInWorktree, "old PRD must be reported as missing in worktree");
 });
 
+// C28: a feature directory that holds its evidence outgrew the 1 MiB default buffer of the recursive HEAD listing (9308 files, 1.06 MB in this repository):
+// the call failed, HEAD counted no PRD and the check answered "PRD cardinality in HEAD is 0", which stopped every dispatch with CVCT-AUTHORITY-STALE.
+test("the PRD cardinality in HEAD does not depend on how much evidence the feature directory holds", () => {
+  const root = setupGitRepo("cardinality-large-feature");
+  const featureDir = "specs/feat-big";
+  const planPath = `${featureDir}/prd_feat-big.md`;
+  mkdirSync(join(root, featureDir, "evidence"), { recursive: true });
+  writeFileSync(join(root, planPath), "# PRD\n");
+  writeFileSync(join(root, `${featureDir}/spec.md`), "# Spec\n");
+  const longName = "e".repeat(200);
+  for (let index = 0; index < 4800; index += 1) writeFileSync(join(root, featureDir, "evidence", `${longName}-${String(index).padStart(5, "0")}.json`), "{}\n");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "feat-big", planPath, phase: "design" }, planApproved: false, updatedAt: "2026-11-11T06:00:00.000Z" }, null, 2) + "\n");
+  commitAll(root, "Commit a feature with a large evidence tree");
+  const listing = spawnSync("git", ["ls-tree", "-r", "--name-only", "HEAD", featureDir], { cwd: root, encoding: "utf8" });
+  assert.equal(listing.error?.code, "ENOBUFS", "the fixture must be large enough to have broken the recursive listing with the default buffer");
+  const check = checkPoGateAuthority({ repoRoot: root });
+  assert.equal(check.prdCardinality.head.count, 1);
+  assert.equal(check.prdCardinality.head.ok, true);
+  assert.deepEqual(check.divergences.filter((d) => d.divergence === "prd-cardinality-divergence"), []);
+});
+
 test("check-evidence-drift CLI inspects and reports drift across closedFeatures", () => {
   const root = setupGitRepo("cli-test");
 

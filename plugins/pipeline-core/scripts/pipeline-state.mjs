@@ -11615,9 +11615,13 @@ export function checkPoGateAuthority(request = {}, deps = {}) {
       };
 
       let headPrds = [];
-      const gitLs = spawn("git", ["ls-tree", "-r", "--name-only", "HEAD", featureDir], {
+      // C28: the PRD sits directly in the feature directory, exactly as the worktree read above takes it, so only the direct entries are listed.
+      // A recursive list of a feature directory that holds its evidence (thousands of files after a few candidates) outgrew the 1 MiB default
+      // buffer of spawnSync: the call failed with ENOBUFS, HEAD counted no PRD and every dispatch and close stopped with CVCT-AUTHORITY-STALE.
+      const gitLs = spawn("git", ["ls-tree", "--name-only", "HEAD", `${featureDir}/`], {
         cwd: dir,
         encoding: "utf8",
+        maxBuffer: 16 * 1024 * 1024,
       });
       if (gitLs.status === 0 && typeof gitLs.stdout === "string") {
         const lines = gitLs.stdout.split("\n").map((l) => l.trim()).filter(Boolean);

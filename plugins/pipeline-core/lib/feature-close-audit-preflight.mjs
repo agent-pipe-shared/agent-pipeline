@@ -44,7 +44,8 @@ export async function planFeatureCloseAudit({ repositoryRoot, featureId, candida
       return blocked("FCA-PACKAGE", `Complete and reconcile the exact feature package, Result and candidate evidence before snapshot planning. Observed: ${why}.`);
     }
     const git = args => {
-      const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10000 });
+      // C28: `ls-tree -r` of a feature directory is far above the 1 MiB default buffer once the evidence has grown; a failed call returned null and the audit index was silently left out.
+      const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 10000, maxBuffer: 64 * 1024 * 1024 });
       return result.status === 0 ? result.stdout.trim() : null;
     };
     if (git(["rev-parse", "HEAD"]) !== candidate.commit || git(["rev-parse", "HEAD^{tree}"]) !== candidate.tree) return blocked("FCA-CANDIDATE-CHANGED", "Requalify the actual current candidate and re-plan; never relabel historical evidence.");
