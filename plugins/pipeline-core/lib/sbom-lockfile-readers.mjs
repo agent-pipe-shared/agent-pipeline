@@ -80,7 +80,9 @@ export function parseYarnLock(text, path) {
     if (resolution === null) throw new Error(`${name}: entry without a resolution`);
     const { name: realName, range: locator } = descriptorName(resolution);
     if (/^(?:workspace|link|portal|patch):/u.test(locator) || entry.header.includes("@patch:")) continue; // the project itself, or a patch listed again under the locator it patches
-    if (/^npm:/u.test(locator)) { const pinned = locator.slice(4); if (!SEMVER.test(pinned)) throw new Error(`${realName}: npm resolution without a version`); out.push(npm(realName, pinned)); continue; }
+    // A private registry whose tarball path differs from the default adds `::__archiveUrl=<encoded URL>` after the version: still a registry
+    // package; the URL is dropped like every other one.
+    if (/^npm:/u.test(locator)) { const pinned = locator.slice(4).replace(/::.*$/u, ""); if (!SEMVER.test(pinned)) throw new Error(`${realName}: npm resolution without a version`); out.push(npm(realName, pinned)); continue; }
     issues.push(finding("partial", path, `${realName} is resolved from ${/^file:/u.test(locator) ? "a local file" : "a git commit or URL"}, not a registry version`));
   }
   return { components: dedupe(out), issues };
@@ -121,7 +123,10 @@ export function parsePnpmLock(text, path) {
       const resolution = entry.fields.resolution ?? "";
       const parsed = pnpmKey(entry.key, major);
       const name = entry.fields.name ?? parsed?.name ?? entry.key;
-      if (/tarball:|commit:|type:\s*git|directory:/u.test(resolution) || parsed === null || !SEMVER.test(parsed.version)) { issues.push(finding("partial", path, `${short(name)} is resolved from a git commit, a tarball URL or a local path, not a registry version`)); continue; }
+      // A registry package whose tarball URL pnpm cannot derive (a private registry) keeps `tarball:` next to its `integrity:`; it is still a
+      // registry package. A tarball without an integrity hash, a git commit or a local directory is not.
+      const tarballOnly = /tarball:/u.test(resolution) && !/integrity:/u.test(resolution);
+      if (tarballOnly || /commit:|type:\s*git|directory:/u.test(resolution) || parsed === null || !SEMVER.test(parsed.version)) { issues.push(finding("partial", path, `${short(name)} is resolved from a git commit, a tarball URL or a local path, not a registry version`)); continue; }
       const scope = entry.fields.dev === "true" ? "dev" : entry.fields.optional === "true" || optional.has(`${parsed.name}@${parsed.version}`) ? "optional" : "required";
       out.push(npm(parsed.name, parsed.version, scope));
     }

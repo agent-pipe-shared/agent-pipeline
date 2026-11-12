@@ -33,6 +33,10 @@ left-pad@^1.3.0:
   version "4.2.3"
   resolved "https://registry.yarnpkg.com/string-width/-/string-width-4.2.3.tgz#269c7117d27b05ad2e536830a8ec895ef9c6d010"
 
+"@corp/ui@^2.0.0":
+  version "2.1.0"
+  resolved "https://secret@artifactory.example.invalid/artifactory/api/npm/npm-virtual/@corp%2fui/-/ui-2.1.0.tgz#0123456789abcdef"
+
 mine@git+https://secret@example.invalid/mine.git:
   version "0.0.1"
   resolved "git+https://secret@example.invalid/mine.git#abc"
@@ -69,6 +73,12 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@corp/ui@npm:^2.0.0":
+  version: 2.1.0
+  resolution: "@corp/ui@npm:2.1.0::__archiveUrl=https%3A%2F%2Fsecret%40nexus.example.invalid%2Frepository%2Fnpm%2F%40corp%2Fui%2F-%2Fui-2.1.0.tgz"
+  languageName: node
+  linkType: hard
+
 "mine@https://secret@example.invalid/mine.git#commit=abc":
   version: 0.0.1
   resolution: "mine@https://secret@example.invalid/mine.git#commit=abc"
@@ -77,12 +87,13 @@ __metadata:
 `;
 
 test("yarn.lock: v1 and Berry registry packages are components, aliases resolve to the real package, workspaces and links are left out", () => {
+  // A private registry (Artifactory, Nexus) is a registry: its packages are components and its URL is never carried.
   const v1 = parseYarnLock(YARN_V1, "yarn.lock");
-  assert.deepEqual(purls(v1), ["pkg:npm/%40babel/code-frame@7.22.13", "pkg:npm/left-pad@1.3.0", "pkg:npm/string-width@4.2.3"]);
-  assert.deepEqual(states(v1), ["partial", "partial"]); noUrl(v1.issues, "yarn v1");
+  assert.deepEqual(purls(v1), ["pkg:npm/%40babel/code-frame@7.22.13", "pkg:npm/left-pad@1.3.0", "pkg:npm/string-width@4.2.3", "pkg:npm/%40corp/ui@2.1.0"]);
+  assert.deepEqual(states(v1), ["partial", "partial"]); noUrl(v1, "yarn v1");
   const berry = parseYarnLock(YARN_BERRY, "yarn.lock");
-  assert.deepEqual(purls(berry), ["pkg:npm/left-pad@1.3.0", "pkg:npm/%40types/node@20.10.0"]);
-  assert.deepEqual(states(berry), ["partial"]); noUrl(berry.issues, "yarn berry");
+  assert.deepEqual(purls(berry), ["pkg:npm/left-pad@1.3.0", "pkg:npm/%40types/node@20.10.0", "pkg:npm/%40corp/ui@2.1.0"], "a ::__archiveUrl suffix is a private registry, not a damaged entry");
+  assert.deepEqual(states(berry), ["partial"]); noUrl(berry, "yarn berry");
   assert.deepEqual(parseYarnLock("# yarn lockfile v1\n\n\n", "yarn.lock"), { components: [], issues: [] }, "an empty v1 lockfile locks nothing");
   assert.deepEqual(states(parseYarnLock(YARN_BERRY.replace("version: 8", "version: 3"), "yarn.lock")), ["unsupported"]);
   assert.throws(() => parseYarnLock("left-pad@^1:\n  version \"1.3.0\"\n", "yarn.lock"), /neither a yarn v1 lockfile nor a Berry lockfile/u);
@@ -113,6 +124,9 @@ packages:
     resolution: {integrity: sha512-z}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  '@corp/ui@2.1.0':
+    resolution: {integrity: sha512-w, tarball: https://gitlab.example.invalid/api/v4/projects/7/packages/npm/@corp/ui/-/@corp/ui-2.1.0.tgz}
 
   mine@https://codeload.example.invalid/mine/tar.gz/abc:
     resolution: {tarball: https://codeload.example.invalid/mine/tar.gz/abc}
@@ -157,8 +171,8 @@ packages:
 
 test("pnpm-lock.yaml: the 9.x, 6.x and 5.x key forms, dev and optional scopes, and a tarball pin as partial", () => {
   const v9 = parsePnpmLock(PNPM_9, "pnpm-lock.yaml");
-  assert.deepEqual(scoped(v9), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/%40types/node@20.10.0", "required"], ["pkg:npm/fsevents@2.3.3", "optional"]]);
-  assert.deepEqual(states(v9), ["partial"]); noUrl(v9.issues, "pnpm 9");
+  assert.deepEqual(scoped(v9), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/%40types/node@20.10.0", "required"], ["pkg:npm/fsevents@2.3.3", "optional"], ["pkg:npm/%40corp/ui@2.1.0", "required"]], "a private-registry tarball with an integrity hash is a registry package");
+  assert.deepEqual(states(v9), ["partial"]); noUrl(v9, "pnpm 9");
   assert.deepEqual(scoped(parsePnpmLock(PNPM_6, "pnpm-lock.yaml")), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/jest@29.7.0", "dev"]]);
   assert.deepEqual(scoped(parsePnpmLock(PNPM_5, "pnpm-lock.yaml")), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/%40babel/core@7.23.0", "dev"]]);
   assert.deepEqual(states(parsePnpmLock("lockfileVersion: '7.0'\n", "pnpm-lock.yaml")), ["unsupported"]);

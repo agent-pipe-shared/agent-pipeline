@@ -956,10 +956,11 @@ test("C28c: a lockfile format without a reader stops the close with the repair a
     const anchor = { keyReference: "po-key", publicKeySha256: createHash("sha256").update(pem).digest("hex") };
     mkdirSync(join(f.root, "project"), { recursive: true });
     writeFileSync(join(f.root, "project/critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [anchor] }));
-    writeFileSync(join(f.root, "yarn.lock"), "# yarn\n"); f.git("add", "yarn.lock", "project/critical-human-proof.json"); f.git("commit", "-q", "-m", "yarn");
+    // C28d: yarn.lock has a reader now; Podfile.lock (CocoaPods) still has none.
+    writeFileSync(join(f.root, "Podfile.lock"), "PODS:\n"); f.git("add", "Podfile.lock", "project/critical-human-proof.json"); f.git("commit", "-q", "-m", "pods");
     const stopped = oneShotClose({ ...f.input, humanAcceptance: null }, { runCommand: f.runner });
     assert.equal(stopped.status, "stopped"); assert.equal(stopped.stage, "sbom"); assert.equal(stopped.stop.code, "SBOM-ADAPTER-UNSUPPORTED");
-    assert.match(stopped.stop.reason, /yarn\.lock/u); assert.match(stopped.stop.repair, /SBOM_READERS/u);
+    assert.match(stopped.stop.reason, /Podfile\.lock/u); assert.match(stopped.stop.repair, /SBOM_READERS/u);
     const requestPath = /--request (scratch\/sbom-override-request-[a-f0-9]{16}\.json)/u.exec(stopped.stop.repair)?.[1];
     assert.ok(requestPath !== undefined, `the stop names the request to sign: ${stopped.stop.repair}`);
     const proofPath = requestPath.replace("request", "proof");
@@ -980,7 +981,7 @@ test("C28c: a lockfile format without a reader stops the close with the repair a
     const passed = oneShotClose({ ...f.input, sbomOverrideProof: proofPath }, { runCommand: f.runner });
     assert.equal(passed.status, "commit-required", JSON.stringify(passed).slice(0, 300));
     const record = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/sbom/record.json"), "utf8"));
-    assert.equal(record.status, "overridden"); assert.equal(record.override.actor, "PO"); assert.equal(record.override.blocked[0].path, "yarn.lock");
+    assert.equal(record.status, "overridden"); assert.equal(record.override.actor, "PO"); assert.equal(record.override.blocked[0].path, "Podfile.lock");
     assert.equal(record.override.authority.kind, "po-signature"); assert.equal(record.override.authority.keyReference, "po-key"); assert.equal(record.override.authority.intentSha256, request.intentSha256);
     for (const name of ["override-request.json", "override-proof.json"]) assert.ok(passed.commit.paths.includes(`specs/feature-abc/evidence/sbom/${name}`), `the signed override travels in the close commit: ${name}`);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
@@ -989,7 +990,7 @@ test("C28c: a lockfile format without a reader stops the close with the repair a
 test("C28c: without a trust anchor in the project a signed override cannot pass, and a words-only flag is no longer a flag", () => {
   const f = oneShotFixture();
   try {
-    writeFileSync(join(f.root, "yarn.lock"), "# yarn\n"); f.git("add", "yarn.lock"); f.git("commit", "-q", "-m", "yarn");
+    writeFileSync(join(f.root, "Podfile.lock"), "PODS:\n"); f.git("add", "Podfile.lock"); f.git("commit", "-q", "-m", "pods");
     const stopped = oneShotClose({ ...f.input, humanAcceptance: null }, { runCommand: f.runner });
     const requestPath = /--request (scratch\/sbom-override-request-[a-f0-9]{16}\.json)/u.exec(stopped.stop.repair)[1];
     const request = JSON.parse(readFileSync(join(f.root, requestPath), "utf8"));

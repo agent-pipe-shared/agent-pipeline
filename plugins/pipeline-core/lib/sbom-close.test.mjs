@@ -124,12 +124,12 @@ test("an existing matching record is reused; a changed lockfile makes it stale; 
 });
 
 test("a recorded override keeps covering the same findings on a resumed close, and no others", () => {
-  const files = { "package-lock.json": NPM_LOCK, "yarn.lock": "x" };
+  const files = { "package-lock.json": NPM_LOCK, "Podfile.lock": "x" };
   const first = close(files, { override: "weiter", authority: AUTHORITY, actor: "po" });
   const stored = Object.fromEntries(first.files.map((f) => [f.path, f.text]));
   const resumed = close({ ...files, ...stored }, { existing: stored[first.recordPath] });
   assert.equal(resumed.status, "ready"); assert.equal(resumed.reused, true);
-  const extra = close({ ...files, ...stored, "pom.xml": "<p/>" }, { existing: stored[first.recordPath] });
+  const extra = close({ ...files, ...stored, "build.sbt": "libraryDependencies += x" }, { existing: stored[first.recordPath] });
   assert.equal(extra.status, "blocked");
 });
 
