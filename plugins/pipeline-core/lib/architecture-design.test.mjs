@@ -562,7 +562,7 @@ test("a reopened and newly approved design refreshes its own receipt over the re
 });
 
 // K-13 (PO tile 2026-11-11): a follow-up epic adds modules to the design a closed epic materialized. Only an addition is accepted; the closed predecessor's plan must still be the one
-// its receipt names, every predecessor module must be in the new design unchanged, and each recorded target must still hold its recorded bytes.
+// its receipt names, every predecessor module must be in the new design (unchanged but for growth, see the test below), and each recorded target must still hold its recorded bytes.
 const k13Module = (id, over = {}) => ({ id, responsibility: `the ${id} module`, nonResponsibilities: ["Network"], ownedPaths: [`src/${id}.mjs`], publicContracts: [`src/${id}.mjs`],
   allowedDependencies: [], authorityEffects: [], verificationEntryPoints: [`tests/${id}.test.mjs`], adrReferences: [], ...over });
 function k13Design(modules) {
@@ -613,6 +613,22 @@ test("K-13: removing or changing a predecessor module, an open predecessor, an e
   refused({ closed: false }, "the predecessor is not closed");
   refused({ editPlan: true }, "the predecessor's plan is not the one its receipt names");
   refused({ driftTarget: true }, "a recorded target no longer holds its recorded bytes", "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT");
+});
+
+// Consumer finding on the first build (2026-11-11): a module that owns the pages must gain a dependency on every new module, so a predecessor module may GROW in exactly three lists.
+test("K-13: a predecessor module may grow its dependencies, contracts and test entry points, nothing else, and growth never closes a loop", async () => {
+  const { stage, mod } = await hf9Load();
+  const status = (options) => mod.inspectArchitectureDesign(k13Fixture(stage, options).root, null, {});
+  const grown = status({ current: [k13Module("engine", { allowedDependencies: ["shell"], publicContracts: ["src/engine.mjs", "src/engine-api.mjs"], verificationEntryPoints: ["tests/engine.test.mjs", "tests/engine-more.test.mjs"] }), k13Module("shell")] });
+  assert.equal(grown.status, "materialization-required", grown.code);
+  assert.equal(grown.extendsClosedFeature.featureId, "feat-0");
+  const refused = (current, label) => assert.equal(status({ current }).code, "ARCHITECTURE-DESIGN-RECEIPT-STALE", label);
+  refused([k13Module("engine", { ownedPaths: ["src/engine.mjs", "src/more.mjs"] }), k13Module("shell")], "a predecessor module may not take over more paths");
+  refused([k13Module("engine", { authorityEffects: ["writes-files"] }), k13Module("shell")], "a predecessor module may not gain an authority effect");
+  refused([k13Module("engine", { publicContracts: ["src/engine-api.mjs"] }), k13Module("shell")], "an earlier contract may not be dropped");
+  refused([k13Module("engine", { verificationEntryPoints: ["tests/other.test.mjs"] }), k13Module("shell")], "an earlier test entry point may not be dropped");
+  refused([k13Module("engine", { allowedDependencies: ["shell"] }), k13Module("shell", { allowedDependencies: ["engine"] })], "growth that closes a loop is refused");
+  refused([k13Module("engine", { allowedDependencies: ["engine"] }), k13Module("shell")], "a module may not depend on itself");
 });
 
 // --- G20-65 (AC-108): a module that owns no admissible check is reported at design time, before the PO signs, with the move that repairs it ---

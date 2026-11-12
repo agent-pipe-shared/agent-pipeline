@@ -358,8 +358,8 @@ function refreshReceiptAfterReapproval(root, stored, receipt, targets) {
 
 /**
  * K-13 (PO tile 2026-11-11): a follow-up epic may ADD modules to the design a CLOSED epic materialized. Only an addition qualifies: the closed predecessor's own plan must still be the
- * one its receipt names, and every module it declared must be in the new design with an identical definition. Removing or changing a predecessor module, or a missing or edited
- * predecessor plan, is not an extension. The new plan signature stays the authority; the receipt only records what is materialized.
+ * one its receipt names, and every module it declared must be in the new design, unchanged except for growth in its dependency, contract and test-entry-point lists
+ * (see predecessorModuleKept). Removing or otherwise changing a predecessor module, or a missing or edited predecessor plan, is not an extension. The new plan signature stays the authority; the receipt only records what is materialized.
  */
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -373,8 +373,36 @@ function additiveExtensionOf(root, predecessor, input) {
     if (hash(prd) !== predecessor.planSha256) return false;
     earlier = parseArchitectureDesign(prd);
   } catch { return false; }
-  const current = new Map(input.modules.map(module => [module.id, stableJson(module)]));
-  return earlier.modules.length > 0 && earlier.modules.every(module => current.get(module.id) === stableJson(module));
+  const current = new Map(input.modules.map(module => [module.id, module]));
+  return earlier.modules.length > 0 && earlier.modules.every(module => predecessorModuleKept(module, current.get(module.id))) && !hasDependencyCycle(input.modules);
+}
+
+/**
+ * A predecessor module may only GROW in the three lists a new module forces onto it: the modules it may depend on (a page-owning module must reach each new module), the contracts it
+ * publishes and its test entry points. Every other field (id, kind, ownedPaths, responsibility, authorityEffects, ...) and every earlier list entry stays exactly as it was (PO tile 2026-11-11).
+ */
+const GROWING_MODULE_LISTS = Object.freeze(["allowedDependencies", "publicContracts", "verificationEntryPoints"]);
+function predecessorModuleKept(earlier, now) {
+  if (now === undefined || now === null || typeof now !== "object") return false;
+  const keys = new Set([...Object.keys(earlier), ...Object.keys(now)]);
+  return [...keys].every(key => GROWING_MODULE_LISTS.includes(key)
+    ? Array.isArray(earlier[key]) && Array.isArray(now[key]) && earlier[key].every(entry => now[key].includes(entry))
+    : stableJson(earlier[key]) === stableJson(now[key]));
+}
+
+/** Growth must not create a loop: a module reaching itself through its allowedDependencies, directly or over other modules. */
+function hasDependencyCycle(modules) {
+  const edges = new Map(modules.map(module => [module.id, module.allowedDependencies]));
+  const state = new Map();
+  const visit = id => {
+    if (state.get(id) === "done") return false;
+    if (state.get(id) === "open") return true;
+    state.set(id, "open");
+    const loops = (edges.get(id) ?? []).some(visit);
+    state.set(id, "done");
+    return loops;
+  };
+  return [...edges.keys()].some(visit);
 }
 
 /** Shared by a reopened design and a follow-up extension: each recorded target must still hold the recorded bytes and is replaceable only over them; a recorded file the new design drops is refused. */
