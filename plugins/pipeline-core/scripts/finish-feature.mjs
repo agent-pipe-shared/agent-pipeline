@@ -426,6 +426,26 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
             retired = { path: bound.path, sha256: bound.sha256, apply: applyAction };
           } catch (error) { return stopResult("retire-result", error.refusalCode ?? error.code, error.message, declineRepair(error), { decline: { path: decline.path, sha256: decline.sha256, candidate: candidateHead } }); }
         }
+        // C28 (PO decision 2026-11-11, replaces the label-only handling of the record lag): the package record must not keep saying `verifying` or `completed` while the feature is back in a
+        // correction round. State now proves the round (a retirement of the reason declined-acceptance, no Result bound), so the planner admits the move to `implementing`; the second
+        // move to `verifying` rebinds the candidate as always. Idempotent: a package that is already past this step (implementing, draft, ...) is left alone.
+        let packageBack = null;
+        try {
+          const packageManifest = `specs/${featureId}/lifecycle.json`;
+          let packageState = null;
+          try { const value = JSON.parse(readFileSync(resolve(root, packageManifest), "utf8")).state; packageState = typeof value === "string" ? value : null; } catch { packageState = null; }
+          if (packageState === "verifying" || packageState === "completed") {
+            stages.push("package-correction-round");
+            const plan = command(runner, process.execPath, [STATE_WRITER, "feature-package-plan", "--root", root, "--manifest", packageManifest, "--next-state", "implementing"], "ONESHOT-PACKAGE-PLAN");
+            if (typeof plan.planSha256 !== "string") fail("ONESHOT-PACKAGE-PLAN", "The package plan for the correction round returned no plan digest.");
+            command(runner, process.execPath, [STATE_WRITER, "feature-package-apply", "--root", root, "--manifest", packageManifest, "--next-state", "implementing", "--plan-sha256", plan.planSha256], "ONESHOT-PACKAGE-APPLY");
+            packageBack = { manifest: packageManifest, from: packageState, to: "implementing" };
+          }
+        } catch (error) {
+          // Never a stop: the decline itself (the record and the retired Result) is done and must not be blocked by this side step. The failure is reported in the result, and the four-status
+          // projection (`featureStatus.recordLag`) keeps the lagging record visible until the move to `implementing` is made by hand (feature-package-plan / feature-package-apply).
+          packageBack = { manifest: `specs/${featureId}/lifecycle.json`, to: "implementing", error: String(error.refusalCode ?? error.code ?? "ONESHOT-PACKAGE"), detail: String(error.message ?? "").slice(0, 300) };
+        }
         // The decline's own outputs travel in one commit through the writer-commit capability the close uses; none of them is an output the leftover rollback below names.
         const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${featureId}`]);
         const tokens = (status?.status === 0 ? String(status.stdout ?? "") : "").split("\0").filter((token) => token !== "");
@@ -441,7 +461,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
           `Critic delta round on the new candidate: node ${PREPARE_DISPATCH} critic --delta-request <the delta request path> --root ${root} (see the critic-review skill); the packet it consumes is the new packet`,
           `then run the identical close command with the new packet: ${rerunBase} --critic-packet-id <new-packet-id>; it runs the Result bootstrap again and asks the acceptance question again for the new candidate`,
         ];
-        return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "declined", featureId, lifecycleId: lifecycle ?? null, resumeLifecycleId: lifecycle ?? null, stages: [...stages], decline: { path: decline.path, sha256: decline.sha256, candidate: candidateHead }, retired, commit, next,
+        return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "declined", featureId, lifecycleId: lifecycle ?? null, resumeLifecycleId: lifecycle ?? null, stages: [...stages], decline: { path: decline.path, sha256: decline.sha256, candidate: candidateHead }, retired, packageBack, commit, next,
           message: "The acceptance was declined: the human's words are recorded (not as an acceptance), the bound Result is retired and the feature returns to a correction round without reopening the design. Nothing was verified, closed, signed or pushed. Follow `next` in order." });
       }
       if (humanAcceptance !== null && !isAcceptanceYes(humanAcceptance, yesForm)) {

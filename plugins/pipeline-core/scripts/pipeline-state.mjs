@@ -9114,7 +9114,7 @@ function runFeaturePackageReadCommand(sub, argv) {
     if (flags.proposal !== undefined) {
       return refuseFeaturePackageRead(sub, `argument "--proposal" applies only to an absent manifest, and ${manifest} exists`);
     }
-    const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root), activeFeatureId: featurePackageActiveFeatureId(root) });
+    const plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root), activeFeatureId: featurePackageActiveFeatureId(root), correctionRoundFeatureId: featurePackageCorrectionFeatureId(root) });
     // A previewed transition prints the digest `feature-package-apply --plan-sha256` expects (the digest of the plan object itself,
     // computed before this field is added), so a consumer does not have to re-derive it.
     console.log(JSON.stringify(plan.status === "preview" ? { ...plan, planSha256: sha256CanonicalJson(plan) } : plan, null, 2));
@@ -9347,6 +9347,21 @@ function featurePackageActiveFeatureId(root) {
   return current.status === "ok" ? current.state.activeFeature?.id ?? null : null;
 }
 
+/**
+ * C28 (PO decision 2026-11-11): the active feature id when State proves a CORRECTION ROUND, null otherwise. A correction round is: an active feature, no Result bound in Continuity
+ * now, and at least one retirement of the reason `declined-acceptance` in `continuity.resultRetirements`. The planner admits `completed` back to `implementing` for exactly that feature.
+ */
+function featurePackageCorrectionFeatureId(root) {
+  const current = readStateRaw(root);
+  if (current.status !== "ok") return null;
+  const id = current.state.activeFeature?.id ?? null;
+  const continuity = current.state.continuity;
+  if (typeof id !== "string" || continuity === null || typeof continuity !== "object") return null;
+  const retirements = Array.isArray(continuity.resultRetirements) ? continuity.resultRetirements : [];
+  const unbound = continuity.authority?.result === null;
+  return unbound && retirements.some((entry) => entry?.reason === "declined-acceptance") ? id : null;
+}
+
 function buildFeaturePackageApplyPreview(flags, deps = {}) {
   if (flags.root === undefined) return { ok: false, error: 'argument "--root <dir>" is required' };
   const root = resolve(flags.root);
@@ -9368,7 +9383,7 @@ function buildFeaturePackageApplyPreview(flags, deps = {}) {
   if (manifestExists) {
     if (nextState === undefined) return { ok: false, error: 'argument "--next-state <state>" is required for an existing manifest' };
     if (flags.proposal !== undefined) return { ok: false, error: `argument "--proposal" applies only to an absent manifest, and ${manifest} exists` };
-    plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root, deps), activeFeatureId: featurePackageActiveFeatureId(root) });
+    plan = planFeaturePackageTransition(root, manifest, nextState, { head: featurePackageHead(root, deps), activeFeatureId: featurePackageActiveFeatureId(root), correctionRoundFeatureId: featurePackageCorrectionFeatureId(root) });
     kind = "transition";
   } else {
     if (flags.proposal === undefined) return { ok: false, error: `argument "--proposal <repo-relative-path>" is required because ${manifest} is absent; the bootstrap preview validates the proposed manifest bytes in memory and creates nothing` };

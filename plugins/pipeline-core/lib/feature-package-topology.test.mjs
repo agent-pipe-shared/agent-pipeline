@@ -46,6 +46,15 @@ try {
     assert.match(plan({ head: newHead }).repair, /returns to verifying only when HEAD has moved/u);
     write(oldCandidate);
     assert.equal(plan({ head: newHead, activeFeatureId: c21 }).reason, "verify-evidence-required", "no Verify for the new HEAD, no rebinding");
+    // C28 (PO decision 2026-11-11): the second exit of `completed`, to `implementing`, only for a feature State proves to be in a correction round (a declined acceptance retired its Result).
+    const correction = (options) => planFeaturePackageTransition(root, `${c21Base}/lifecycle.json`, "implementing", options);
+    const returned = correction({ correctionRoundFeatureId: c21 });
+    assert.equal(returned.status, "preview", JSON.stringify(returned)); assert.equal(returned.from, "completed"); assert.equal(returned.to, "implementing");
+    assert.equal(returned.candidate, undefined, "no candidate is bound on the way back; the move to verifying rebinds it");
+    assert.equal(correction({}).reason, "invalid-transition", "without the proof of a correction round a completed package stays completed");
+    assert.equal(correction({ correctionRoundFeatureId: "another-feature" }).reason, "invalid-transition", "a foreign feature is not in a correction round");
+    assert.equal(correction({ activeFeatureId: c21 }).reason, "invalid-transition", "an active feature alone is not a correction round");
+    assert.match(correction({}).repair, /to implementing only after a declined acceptance/u);
   }
   const bootstrapId = "bootstrap-feature";
   const bootstrapBase = `specs/${bootstrapId}`;

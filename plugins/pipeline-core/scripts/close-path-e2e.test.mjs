@@ -508,6 +508,10 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
           assert.equal(declined.status, 0, JSON.stringify(declined.result).slice(0, 1200)); assert.equal(declined.code, "declined", JSON.stringify(declined.result).slice(0, 1200));
           const after = stateJson();
           assert.equal(after.continuity.authority.result, null, "the bound Result is retired");
+          // C28 (PO decision 2026-11-11, measured here): on the real chain the acceptance question comes BEFORE the package moves to verifying/completed, so the record already says
+          // implementing at the decline and nothing is written (packageBack null). The exit completed -> implementing is the safety net for a package that is further along (see feature-package-topology.test.mjs).
+          assert.equal(JSON.parse(readFileSync(join(fx.root, MANIFEST), "utf8")).state, "implementing", "the package record says implementing during the correction round");
+          assert.equal(declined.result.packageBack, null, JSON.stringify(declined.result.packageBack));
           assert.equal(after.continuity.revision, JSON.parse(stateBeforeAnswer).continuity.revision + 1, "one revision step");
           const retirement = after.continuity.resultRetirements.at(-1);
           assert.deepEqual({ path: retirement.path, sha256: retirement.sha256 }, boundResult, "the retired binding stays in history");

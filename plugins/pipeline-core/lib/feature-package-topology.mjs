@@ -236,6 +236,11 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
     && (checked.receipt.candidate.commit !== head.commit || checked.receipt.candidate.tree !== head.tree);
   const requalifies = from === "completed" && nextState === "verifying" && candidateMoved
     && typeof options?.activeFeatureId === "string" && options.activeFeatureId === checked.receipt.featureId;
+  // C28 (PO decision 2026-11-11): a declined acceptance retires the bound Result and returns the feature to a correction round; the package record must not keep saying
+  // `completed`. The one new exit of `completed`: the active feature, whose Continuity binding says a declined acceptance retired its Result and binds none now
+  // (the caller proves that from State, `options.correctionRoundFeatureId`). It goes to `implementing`; the second move to `verifying` rebinds the candidate as always.
+  const returnsToCorrection = from === "completed" && nextState === "implementing"
+    && typeof options?.correctionRoundFeatureId === "string" && options.correctionRoundFeatureId === checked.receipt.featureId;
   const admitted = new Set([
     "draft:awaiting-approval",
     "awaiting-approval:draft",
@@ -247,11 +252,11 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
     "verifying:completed",
     "verifying:implementing",
   ]);
-  if (!admitted.has(`${from}:${nextState}`) && !requalifies) {
+  if (!admitted.has(`${from}:${nextState}`) && !requalifies && !returnsToCorrection) {
     // 17 (AGY greenfield): the agent asked for implementing -> completed in one step and had to read this file to learn the chain.
     const next = [...admitted].filter((key) => key.startsWith(`${from}:`)).map((key) => key.slice(from.length + 1));
     return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", from, to: nextState,
-      repair: `a package moves one admitted step at a time (draft > awaiting-approval > approved > implementing > verifying > completed); from ${from} the admitted next states are ${next.length === 0 ? "none" : next.join(", ")}; plan and apply each step in turn${from === "completed" ? "; a completed package of the active feature returns to verifying only when HEAD has moved past its candidate" : ""}`, findings: [] };
+      repair: `a package moves one admitted step at a time (draft > awaiting-approval > approved > implementing > verifying > completed); from ${from} the admitted next states are ${next.length === 0 ? "none" : next.join(", ")}; plan and apply each step in turn${from === "completed" ? "; a completed package of the active feature returns to verifying only when HEAD has moved past its candidate, and to implementing only after a declined acceptance retired its Result (the close's decline route writes that step itself)" : ""}`, findings: [] };
   }
   // The first move into `verifying` binds the package candidate: no other verb writes it, and `verifying`/`completed`
   // require one (FTP-CANDIDATE). It is the current HEAD, and only when a registered, passing Verify evidence for exactly
