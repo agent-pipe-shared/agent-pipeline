@@ -792,8 +792,8 @@ kernel authority: `plugins/pipeline-core/lib/observation-governance-bootstrap.mj
 readback of the observation governance status) and `plugins/pipeline-core/lib/critic-round-pass.mjs`
 (the one rule deciding whether a Critic round passed). Both are kernel paths now.
 
-Candidates 28b and 28c add the software bill of materials to the feature close and the audit
-bundle, and a PO-signed override for an accepted gap in it. `lib/audit-bundle.mjs` and
+Candidate 28c adds the software bill of materials to the feature close and the audit bundle, and
+a PO-signed override for an accepted gap in it. `lib/audit-bundle.mjs` and
 `scripts/po-human-approval.mjs` (both kernel above) import four first-party modules that therefore
 execute with kernel authority: `plugins/pipeline-core/lib/sbom-close.mjs` (the close-time SBOM
 check), `plugins/pipeline-core/lib/sbom-manifest.mjs` (the manifest shape and its digest),
