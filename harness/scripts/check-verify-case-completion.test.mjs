@@ -183,7 +183,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["architecture-close-disposition-tests","plugins/pipeline-core/lib/architecture-close-disposition.test.mjs","top-level-assertions",16],
     ["architecture-entry-required-source-tests","harness/scripts/architecture-entry-required-source.test.mjs","top-level-assertions",13],
     ["architecture-prospective-companion-tests","plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs","top-level-assertions",21],
-    ["architecture-prospective-materialization-tests","plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs","top-level-assertions",60],
+    ["architecture-prospective-materialization-tests","plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs","top-level-assertions",62], // cand. 28 (QG-04: extension only, measured): 60->62, the cases the plan gates and the reopen route added
     ["audit-pack-command-admission-tests","plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs","top-level-assertions",30],
     ["audit-pack-tests","plugins/pipeline-core/scripts/audit-pack.test.mjs","top-level-assertions",51],
     ["bootstrap-acknowledgement-mode-tests","plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs","top-level-assertions",15],
@@ -200,7 +200,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",353],
-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",563], // cand. 21 (QG-04: extension only): the move into the state archive and the printed refusal reason; before that cand. 20 w252: G20-11 retained prior result cases, measured
+    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",587], // cand. 28 (QG-04: extension only, measured): 563->587, the Critic part sizing and briefing cases; before: cand. 21 (QG-04: extension only): the move into the state archive and the printed refusal reason; before that cand. 20 w252: G20-11 retained prior result cases, measured
     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",157], // cand. 20 w252 (QG-04: extension only), measured
     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
@@ -222,7 +222,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["fanout-governor-tests","plugins/pipeline-core/lib/fanout-governor.test.mjs","top-level-assertions",273],
     ["fanout-ledger-tests","plugins/pipeline-core/lib/fanout-ledger.test.mjs","top-level-assertions",62],
     ["g17-publication-observation-tests","plugins/pipeline-core/lib/g17-publication-observation.test.mjs","top-level-assertions",31],
-    ["g23-quoted-pipeline-reads-tests","plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs","top-level-assertions",19],
+    ["g23-quoted-pipeline-reads-tests","plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs","top-level-assertions",30], // cand. 28 (QG-04: extension only, measured): 19->30
     ["g23-read-help-tests","plugins/pipeline-core/lib/guard/g23-read-help.test.mjs","top-level-assertions",51],
     ["g29-public-handover-admission-tests","plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs","top-level-assertions",3],
     ["g6-aggregate-native-boundaries-tests","plugins/pipeline-core/hooks/g6-aggregate-native-boundaries.test.mjs","top-level-assertions",6],
@@ -233,7 +233,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["gitleaks-scratch-clones-exclusion-tests","plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs","node-test-single",5],
     ["governance-scope-win32-acl-tests","plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs","top-level-assertions",7],
     ["guard-devplan-design-approval-v7-tests","plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","top-level-assertions",18],
-    ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",178],
+    ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",199], // cand. 28 (QG-04: extension only, measured): 178->199, GDBC18 and GDBC19 and the grant text cases
     ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",25], // W7-R7 (QG-04): 19->25, the restated GDM04/GDM05 (dc8204a28) carry more assertion sites; classifier unchanged
     // cand. 21 (QG-04, restated): guard-grep-max-count-read-tests gained the C21 context-flag case (two node:test cases), so the classifier no longer reports it `node-test-single`.
     ["hardened-private-directory-install-tests","plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs","top-level-assertions",6],
@@ -246,7 +246,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["model-family-approval-request-tests","plugins/pipeline-core/scripts/model-family-approval-request.test.mjs","top-level-assertions",49],
     ["native-goldfish-host-parallel-admission-tests","plugins/pipeline-core/lib/native-goldfish-host-parallel-admission.test.mjs","top-level-assertions",29], // cand. 19i w236/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
     ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",82], // cand. 21 (QG-04: extension only): NGFO01 gained the bounded Windows race retry; cand. 20 w252 G20-4 release retry cases (QG-04: extension only), measured; cand. 19l w250 (QG-04: extension only): NGFO01 gained the binding-change retry and terminal-round cases, measured with the unchanged classifier
-    ["native-goldfish-host-stop-pair-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs","top-level-assertions",71], // cand. 19j w242/w244, 19k w245/w246 (QG-04: extension only): new suite, measured with the unchanged classifier; 19k added NGSP6-NGSP9D
+    ["native-goldfish-host-stop-pair-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-pair.test.mjs","top-level-assertions",99], // cand. 28 (QG-04: extension only, measured): 71->99, NGSP2R and NGSP9C2-NGSP9C4 (the recovery route and the mixed history); before: cand. 19j w242/w244, 19k w245/w246 (QG-04: extension only): new suite, measured with the unchanged classifier; 19k added NGSP6-NGSP9D
     ["native-goldfish-host-stop-read-scope-tests","plugins/pipeline-core/lib/native-goldfish-host-stop-read-scope.test.mjs","top-level-assertions",46], // cand. 19i w237/w240 (QG-04: extension only): new suite, measured with the unchanged classifier
     ["native-platform-process-observer-tests","plugins/pipeline-core/lib/native-platform-process-observer.test.mjs","top-level-assertions",20],
     ["onboarding-greenfield-walk-tests","plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs","top-level-assertions",16],
@@ -272,7 +272,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["schema-lite-alternatives-tests","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs","top-level-assertions",49],
     ["scratch-package-staging-tests","plugins/pipeline-core/lib/scratch-package-staging.test.mjs","top-level-assertions",42],
     ["security-scan-large-inventory-tests","plugins/pipeline-core/scripts/security-scan-large-inventory.test.mjs","node-test-single",4],
-    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",326], // cand. 21 (QG-04: restated, measured): 324->326, two cases added in 20j; cand. 19g (QG-04: extension only): 295->319, the four cross-process memo cases SAS21-SAS24; cand. 19h w235: 319->324, SAS25 (byte-less observations persisted)
+    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",329], // cand. 28 (QG-04: extension only, measured): 326->329; before: cand. 21 (QG-04: restated, measured): 324->326, two cases added in 20j; cand. 19g (QG-04: extension only): 295->319, the four cross-process memo cases SAS21-SAS24; cand. 19h w235: 319->324, SAS25 (byte-less observations persisted)
     ["shared-pool-bounds-tests","plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","top-level-assertions",4],
     ["shared-pool-occupancy-tests","plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","top-level-assertions",19],
     ["shell-grammar-capability-placement-tests","harness/scripts/shell-grammar-capability-placement.test.mjs","top-level-assertions",21],
