@@ -944,6 +944,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs", "plugins/pipeline-core/lib/project-onboarding-v3-author-identity.mjs", "plugins/pipeline-core/lib/plan-handoff-readiness.mjs", "plugins/pipeline-core/lib/authority-restore.mjs",
   // Candidate 28 (GMWKC01): imports added by candidates 26 and 27.
   "plugins/pipeline-core/lib/observation-governance-bootstrap.mjs", "plugins/pipeline-core/lib/critic-round-pass.mjs",
+  // Candidates 28b/28c (GMWKC01): the SBOM modules lib/audit-bundle.mjs and scripts/po-human-approval.mjs import.
+  "plugins/pipeline-core/lib/sbom-close.mjs", "plugins/pipeline-core/lib/sbom-manifest.mjs",
+  "plugins/pipeline-core/lib/sbom-node-adapter.mjs", "plugins/pipeline-core/lib/sbom-override-authority.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

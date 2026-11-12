@@ -792,6 +792,15 @@ kernel authority: `plugins/pipeline-core/lib/observation-governance-bootstrap.mj
 readback of the observation governance status) and `plugins/pipeline-core/lib/critic-round-pass.mjs`
 (the one rule deciding whether a Critic round passed). Both are kernel paths now.
 
+Candidates 28b and 28c add the software bill of materials to the feature close and the audit
+bundle, and a PO-signed override for an accepted gap in it. `lib/audit-bundle.mjs` and
+`scripts/po-human-approval.mjs` (both kernel above) import four first-party modules that therefore
+execute with kernel authority: `plugins/pipeline-core/lib/sbom-close.mjs` (the close-time SBOM
+check), `plugins/pipeline-core/lib/sbom-manifest.mjs` (the manifest shape and its digest),
+`plugins/pipeline-core/lib/sbom-node-adapter.mjs` (the Node dependency reader) and
+`plugins/pipeline-core/lib/sbom-override-authority.mjs` (the signed override's verification). All
+four are kernel paths now.
+
 ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
 and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
 (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
