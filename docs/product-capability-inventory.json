@@ -1039,6 +1039,7 @@
         "verify-phase:harness/scripts/verify.mjs:r7-3-bound-paths-tests",
         "verify-phase:harness/scripts/verify.mjs:read-command-diagnosis-tests",
         "verify-phase:harness/scripts/verify.mjs:read-option-operands-tests",
+        "verify-phase:harness/scripts/verify.mjs:ready-preflight-prints-a-compact-envelope-tests",
         "verify-phase:harness/scripts/verify.mjs:rebase-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:rebind-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:record-only-paths-tests",

@@ -4,7 +4,7 @@
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync, lstatSync, opendirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, lstatSync, opendirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { readMachineOperatorLabel } from "../lib/machine-plane.mjs";
 import { inspectObservationGovernanceBootstrap, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCHEMA } from "../lib/observation-governance-bootstrap.mjs";
@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { loadManifestSafe, resolveHumanFacingLanguage } from "../lib/manifest.mjs";
 import { onboardingConsentQuestion } from "../lib/onboarding-consent-scope.mjs";
 
-import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
+import { BOOTSTRAP_PAYLOAD_MAX_BYTES, measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { attachRunbookLink } from "../lib/runbook-link.mjs";
 import { observeArchitectureAdoptionOrientation } from "../lib/architecture-adoption-orientation.mjs";
 import { inspectArchitectureDecisionContinuity } from "../lib/architecture-decision-continuity.mjs";
@@ -2454,6 +2454,66 @@ export function observeHostSkillCatalogReadback({
 }
 
 /**
+ * Candidate 28c (PO tile 2026-11-11, context baseline): a `ready` (or soft `plugin-refresh-required`) envelope stays in the model's context
+ * until the next compaction, and most of its ~11 KB are all-green diagnostics. On `ready` the full
+ * envelope is written to the session's bound scratch directory (`fullEnvelope` names it) and the printed
+ * line drops only what is green and repeated: `ok` readiness findings (counted), the clone-provisioning
+ * hook list (mandatoryHookReadiness keeps the gating hooks), the second identical payload measurement,
+ * the housekeeping receipts beyond their schema and counts, an all-ready close/push capability list, and
+ * the Antigravity start hint outside an Antigravity run. Any other status, a missing scratch binding or a
+ * failed write prints the full envelope unchanged.
+ */
+export function compactReadyEnvelope(envelope, { rootDir = process.cwd(), writeFile = writeFileSync, makeDir = mkdirSync } = {}) {
+  try {
+    // `plugin-refresh-required` is the soft advisory a session proceeds on (pipeline-start SKILL.md), so it compacts like `ready`.
+    if (envelope?.status !== "ready" && envelope?.status !== "plugin-refresh-required") return envelope;
+    const scratchDir = envelope.bootstrapHousekeeping?.scratchLifecycle?.binding?.scratchRelativePath;
+    if (typeof scratchDir !== "string" || !/^scratch\/[A-Za-z0-9._-]+$/u.test(scratchDir)) return envelope;
+    const fullRelative = `${scratchDir}/preflight-full.json`;
+    makeDir(resolve(rootDir, scratchDir), { recursive: true });
+    writeFile(resolve(rootDir, fullRelative), `${JSON.stringify(envelope, null, 1)}\n`, "utf8");
+    const compact = { ...envelope, fullEnvelope: fullRelative };
+    const readiness = envelope.environmentReadiness;
+    if (readiness && Array.isArray(readiness.findings)) {
+      const open = readiness.findings.filter((finding) => finding?.status !== "ok");
+      compact.environmentReadiness = { schema: readiness.schema, mutation: readiness.mutation, nonGating: readiness.nonGating, ok: readiness.ok,
+        okCount: readiness.findings.length - open.length, findings: open.map(({ findingId, status, cause }) => ({ findingId, status, cause })) };
+    }
+    if (envelope.cloneProvisioning?.status === "ready") compact.cloneProvisioning = { schema: envelope.cloneProvisioning.schema, status: "ready" };
+    const payload = envelope.bootstrapPayload;
+    if (payload?.emittedMeasurement && JSON.stringify(payload.emittedMeasurement) === JSON.stringify(payload.originalMeasurement)) {
+      const { emittedMeasurement, ...rest } = payload;
+      compact.bootstrapPayload = { ...rest, emittedMeasurement: "same-as-original" };
+    }
+    const housekeeping = envelope.bootstrapHousekeeping;
+    if (housekeeping) {
+      compact.bootstrapHousekeeping = Object.fromEntries(Object.entries(housekeeping).map(([key, receipt]) => [key, {
+        schema: receipt?.schema, faults: Array.isArray(receipt?.faults) ? receipt.faults : [],
+        ...(receipt?.binding?.scratchRelativePath ? { scratchRelativePath: receipt.binding.scratchRelativePath } : {}),
+      }]));
+    }
+    const capability = envelope.closeAndPushCapability;
+    if (capability?.status === "ready") compact.closeAndPushCapability = { schema: capability.schema, status: "ready" };
+    if (envelope.agyStartHint && envelope.rulesetSource?.runner !== "antigravity") delete compact.agyStartHint;
+    return compact;
+  } catch {
+    return envelope;
+  }
+}
+
+/**
+ * Candidate 28c: the bootstrap payload receipt measures the typed preflight result, not the line the runner
+ * reads (measured live: receipt 3,587 bytes, printed line 10,822). `printedPayload` measures the printed
+ * line itself, with the same UTF-8 byte metric and the same 45,000-unit limit.
+ */
+export function withPrintedPayload(envelope) {
+  const limit = envelope?.bootstrapPayload?.originalMeasurement?.maxUpperBoundUnits ?? BOOTSTRAP_PAYLOAD_MAX_BYTES;
+  const probe = { ...envelope, printedPayload: { metric: "utf8-byte-upper-bound", bytes: 0, maxUpperBoundUnits: limit, withinBudget: true } };
+  const bytes = Buffer.byteLength(JSON.stringify(probe)) + 8;
+  return { ...envelope, printedPayload: { metric: "utf8-byte-upper-bound", bytes, maxUpperBoundUnits: limit, withinBudget: bytes <= limit } };
+}
+
+/**
  * Synchronous, exactly as before the readiness report existed: it returns the exit code and,
  * called with no options, writes the same one compact line. `environmentReadiness` is an
  * optional seam the async process entry (`runEntry`, below) fills; an exported function must
@@ -2502,7 +2562,8 @@ export function main(options = {}) {
     ...(options?.observationGovernance === undefined ? {} : { observationGovernance: options.observationGovernance }),
   };
   // C19-G5: the typed runbook link (start path, preflight step) is the last key, once per session, and always when the preflight is not ready.
-  process.stdout.write(`${JSON.stringify(attachRunbookLink(envelope, { pathId: "start", step: "preflight", refused: pipelineStartPreflightExitCode(result) !== 0, rootDir: process.cwd() }))}\n`);
+  const linked = attachRunbookLink(envelope, { pathId: "start", step: "preflight", refused: pipelineStartPreflightExitCode(result) !== 0, rootDir: process.cwd() });
+  process.stdout.write(`${JSON.stringify(withPrintedPayload(compactReadyEnvelope(linked, { rootDir: process.cwd() })))}\n`);
   if (result.statusScope === "pipeline-governance-activation") return pipelineStartPreflightExitCode(result);
   // Antigravity-only: the structured field above already carries this, but a
   // human watching the terminal reads stderr, not a JSON blob -- so the same
