@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "c457d0b214dbf45989285ad5088fdee935c0d0ff",
-    "tree": "cafdda2b015185cf8b5af14c8da28a7fd703edfc"
+    "commit": "1085a32bf273643e9e939ef813ff74ebc6f6b657",
+    "tree": "97e6fec1e61c9e07624c3b526244a26357a25261"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -32,8 +32,8 @@
         "guard:plugins/pipeline-core/hooks/guard-worktree-isolation.mjs:guard-worktree-isolation",
         "hook:plugins/pipeline-core/hooks/hooks.json:PostToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/claude-task-output-scope-posttool.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PostToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|SendMessage|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|Agent|TodoWrite|WebFetch|WebSearch|Write|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
-        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell|Read|Grep|Glob:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
@@ -569,8 +569,8 @@
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
         "verify-phase:harness/scripts/verify.mjs:handover-rotation-tests",
         "verify-phase:harness/scripts/verify.mjs:hardened-private-directory-tests",
-        "verify-phase:harness/scripts/verify.mjs:held-git-author-tests",
         "verify-phase:harness/scripts/verify.mjs:harness-lib-plan-spec-state-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:held-git-author-tests",
         "verify-phase:harness/scripts/verify.mjs:hook-governance-scope-tests",
         "verify-phase:harness/scripts/verify.mjs:hook-refresh-detection-tests",
         "verify-phase:harness/scripts/verify.mjs:hooks-manifest-shape-tests",

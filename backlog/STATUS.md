@@ -655,6 +655,7 @@
 | pipeline.no-governed-directory-contract | closed | workflow-improvement | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing | closed | workflow-improvement | pipeline | — | 2026-08-17 | — | — |
 | pipeline.no-push-preflight-before-requesting-a-signature | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking: a burned or expired signature stops the path at its last step and costs a live PO interaction to retry |
+| pipeline.no-read-only-preview-of-the-architecture-check-before-the-design-signature | open | workflow-improvement | pipeline | none | 2026-11-11 | — | — |
 | pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed | closed | defect | pipeline | — | 2026-08-10 | — | — |
 | pipeline.no-route-back-to-install-after-project-uninstall | open | defect | pipeline | alfred | 2026-10-30 | — | — |
 | pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
@@ -1091,7 +1092,7 @@
 
 ## Counts
 
-- open: 394
+- open: 395
 - in_progress: 0
 - closed: 674
 - rejected: 3

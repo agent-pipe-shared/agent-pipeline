@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "93a605d5a1d32680a0f8b424c378493a380335e93fcf8493eac67688d8c31401"
+    "transitionHead": "c2b9060ef24606cd8647479aa52c09f6962b938a59315a21aba515bfcbf12117"
   },
   "counts": {
-    "open": 394,
+    "open": 395,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -8033,6 +8033,16 @@
       "closureRepository": "self",
       "closureCommit": "c5c143541b155ac749b2db9323fa58c588d39fcd",
       "closureEvidence": "backlog/items/2026-08-28-no-preflight-checks-whether-the-push-gate-is-satisfiable-before-a-signature-is-requested.md"
+    },
+    {
+      "id": "pipeline.no-read-only-preview-of-the-architecture-check-before-the-design-signature",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-11-11",
+      "source": "Windows greenfield run on candidate 27, monitoring note 2026-11-11 (transcript read only, no run report yet)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed",
