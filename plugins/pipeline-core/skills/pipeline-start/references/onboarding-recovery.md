@@ -1,5 +1,78 @@
 # Onboarding and recovery (lazy)
 
+## Pre-ready preflight statuses
+
+Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
+carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`
+or `refresh-mandatory-hooks.mjs --root <root>`. Elephant executes that exact
+action once, then reruns the identical preflight and continues only on `ready`;
+a missing or failed action stops bootstrap. Goldfish and Critic never execute it.
+
+Status `plugin-attestation-required` is a closed hard recovery, never the
+soft `plugin-refresh-required` advisory. For Codex, accept it only with
+`nextAction.schema: pipeline.installed-plugin-attestation-setup-action.v1`,
+`kind: host-postinstall`, `executionBoundary: host`, `mutation: true`,
+`requiresPoApproval: false`, executable `node`, and expected result schema
+`pipeline.installed-plugin-attestation-host-result.v1` with status `written`.
+Elephant executes that exact action once at the declared host boundary without
+asking the PO, accepts only its exact expected result, then reruns the identical
+`pipeline-start-preflight.mjs` command. Continue only when that fresh readback is
+`ready`; a missing, malformed or failed action, another
+`plugin-attestation-required`, or any other non-ready status stops bootstrap.
+Goldfish and Critic never perform this mutation and remain blocked for Elephant
+recovery. Never reconstruct the argv or add a source path from conversation.
+
+## One onboarding consent, not a chain of prompts
+
+Private Critic export requires a separate, project-bound consent decision before
+candidate-bearing child creation. Load `references/critic-export.md` when
+preparing it; never infer host approval from a saved consent or model label.
+
+When the user has directly agreed to use Agent Pipeline for this repository,
+consent authorizes the bounded local onboarding happy path: read-only plans
+and readbacks, portable authority seed, any plan-disclosed local Git init,
+runtime init, restart-barrier prep, the first kickoff artifacts, and after the
+promotion mandatory-hook activation (plus the runner's own refresh step). State
+the bounded effects once, then execute each returned digest-bound action and
+readback without re-asking per digest. `requiresConfirmation` describes the
+action's safety shape, not a second PO chat gate.
+
+A local Git init result carrying a `collect-input` action for the repository's
+commit author (`project-onboarding-v3.mjs`'s `applyProjectOnboardingV3`,
+neither `user.name` nor `user.email` resolves locally or globally) is a
+blocking question, same tier as the kickoff goal/profile/language questions —
+never a diagnostic to notice and act on later, never a default or invented
+value. Ask the PO once now for both, hold the answered values, and apply them
+via `git config user.name "<name>"` / `git config user.email "<email>"` in
+THIS repository's local config only, immediately before the first commit,
+never sooner — never `--global`, never an untyped value.
+
+**Before this consent exists:** never create a deliverable file — reading,
+explaining, answering are fine, artifacts are not, even in the turn you say
+you will wait for a yes. Never volunteer whether the Pipeline fits the task;
+that call is the human's — if asked, state cost/benefit neutrally, not a
+recommendation.
+
+## Host boundary and copy commands for a human
+
+Treat
+`executionBoundary: "host-authorized-wsl"` as mandatory: submit the exact
+returned action directly at that boundary, including every Git
+observation, keeping that routing authoritative. For Codex, never retry
+in the Codex workspace sandbox first, and never probe both sandbox and
+host views. Runner-owned structured `executable`/`argv` actions are
+primary; a human copy-only rendering must use a tested native Bash/zsh,
+PowerShell or cmd.exe renderer with explicit safe continuation, never a
+visually wrapped long command. When a tool result already carries such a
+pre-rendered field — for example `launch.copyCommand` in
+`project-onboarding-v3.mjs`'s `restartCopyCommands`, whose `posix`/
+`powershell`/`cmd` arrays are each a line already bounded under
+`COPY_COMMAND_MAX_COLUMNS` — relay it VERBATIM, line for line, from that
+same tool result. Never hand-reconstruct the command from memory of a
+prior turn, even for an identical earlier restart action: re-read it.
+
+## Advisory and restart
+
 Preflight status `plugin-refresh-required` is advisory-only: no recovery
 action is required. `nextAction` is `{kind: "advisory", ...}` (nothing to
 execute); bootstrap continues normally through Step 0-4, and the advisory
@@ -43,7 +116,7 @@ own typed authority status. Never substitute a remote URL/ref from conversation
 text or use a generic checkout command.
 
 Resume-Hint card shape, capture-trigger interpretation, bootstrap passivity
-and the sanitisation prohibitions are documented inline in `SKILL.md` §6
+and the sanitisation prohibitions are documented in `references/resume-hint.md`
 (the exact keys, their shapes, and the validator's rejection rules) — not
 duplicated here to avoid the two descriptions drifting apart.
 

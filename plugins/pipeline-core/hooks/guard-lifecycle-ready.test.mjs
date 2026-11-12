@@ -13436,7 +13436,11 @@ test("C23 bootstrap-binding-required admits exactly the two local author-identit
 });
 
 test("C23 the author commands the start skill spells out are the ones bootstrap-binding-required admits (every entry path)", () => {
-  const skill = readFileSync(new URL("../skills/pipeline-start/SKILL.md", import.meta.url), "utf8");
+  // Candidate 28c (context baseline): the commit-author paragraph moved verbatim from SKILL.md into the reference the
+  // skill names for the commit author question; the same pattern is read there, and the skill keeps that pointer.
+  assert.match(readFileSync(new URL("../skills/pipeline-start/SKILL.md", import.meta.url), "utf8"),
+    /the commit\nauthor question .* are in\n`references\/onboarding-recovery\.md`/su);
+  const skill = readFileSync(new URL("../skills/pipeline-start/references/onboarding-recovery.md", import.meta.url), "utf8");
   const spelled = [...skill.matchAll(/git config (user\.(?:name|email)) "<(name|email)>"/gu)];
   assert.deepEqual(spelled.map((match) => match[1]), ["user.name", "user.email"], "the skill names both forms");
   const path = root();

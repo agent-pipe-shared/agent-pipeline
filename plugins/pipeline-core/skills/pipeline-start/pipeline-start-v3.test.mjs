@@ -106,10 +106,15 @@ assert.match(all, /pipeline\.session-cleanup-privatization-plan\.v1/u);
 assert.match(all, /Agent Pipeline source: local-development/u);
 assert.match(all, /pipeline\.start-preflight\.v1/u);
 assert.match(core, /Status `plugin-attestation-required` is a closed hard recovery/u);
-assert.match(core, /executes that exact action once at the declared host boundary without\nasking the PO/u);
-assert.match(core, /then reruns the identical\n`pipeline-start-preflight\.mjs` command/u);
-assert.match(core, /Continue only when that fresh readback is\n`ready`/u);
-assert.match(core, /Never reconstruct the argv or add a source path from conversation/u);
+// Candidate 28c (PO tile 2026-11-11, context baseline): the Codex host-postinstall steps are status-conditional, so
+// they moved verbatim from the core into the reference the core names at that status. Same patterns, retargeted
+// at that one file, never dropped; the core keeps the trigger (asserted just above and in the next line).
+assert.match(core, /For Codex, execute only the exact typed\nhost-postinstall action, as `references\/onboarding-recovery\.md` states/u);
+const recoveryReference = readFileSync(join(here, "references", "onboarding-recovery.md"), "utf8");
+assert.match(recoveryReference, /executes that exact action once at the declared host boundary without\nasking the PO/u);
+assert.match(recoveryReference, /then reruns the identical\n`pipeline-start-preflight\.mjs` command/u);
+assert.match(recoveryReference, /Continue only when that fresh readback is\n`ready`/u);
+assert.match(recoveryReference, /Never reconstruct the argv or add a source path from conversation/u);
 assert.match(all, /CR?PCR?-BLOCKED|PCR-DECISION-PENDING/u);
 assert.match(all, /four|three|Verify|handover/u);
 assert.match(core, /Operating Model, compiled runtime manifest and recorded active\nplan are the only gate authority/u);

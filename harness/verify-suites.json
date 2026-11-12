@@ -4867,6 +4867,12 @@
       "file": "plugins/pipeline-core/lib/pins/ready-preflight-prints-a-compact-envelope.test.mjs",
       "invariantPinned": "A ready or plugin-refresh-required preflight prints a compact envelope (non-ok readiness findings, schema-and-status for ready provisioning and close capability, no Antigravity hint outside an Antigravity run) and writes the unchanged full envelope to the session's bound scratch directory; any other status, a missing or climbing binding, or a failed write prints the full envelope; printedPayload measures the printed line as an upper bound",
       "nonOverlapNote": "Unique cases: the printed-line compaction and its fail-open paths; bootstrap-payload-measure.test.mjs pins the budget owner and the typed original/emitted measurement"
+    },
+    {
+      "name": "start-skill-fits-the-reattach-window-tests",
+      "file": "plugins/pipeline-core/lib/pins/start-skill-fits-the-reattach-window.test.mjs",
+      "invariantPinned": "The pipeline-start skill body stays at least 1,500 characters below the about 20,000-character window the runner re-attaches after a compaction, with Compact as its last section; each status- or step-conditional block moved out of it lives once in the reference its trigger line names, and the skill names fullEnvelope for the compact ready line",
+      "nonOverlapNote": "Unique cases: the re-attach window and the one-home rule for the moved blocks; pipeline-start-v3.test.mjs and greenfield-machine-output-and-skill-budget.test.mjs keep the 24 KiB ceiling and the pinned phrases"
     }
   ]
 }

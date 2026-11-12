@@ -945,6 +945,11 @@ test("C18-20 the initial question and both consent paragraphs disclose hook prov
   const question = skill.slice(skill.indexOf("ask the human once whether this project should use the Pipeline"));
   assert.match(question.slice(0, 900), /lists in short what agreeing installs and activates/iu);
   assert.match(question.slice(0, 900), /git hooks/iu);
-  assert.match(skill.slice(skill.indexOf("One onboarding consent")).slice(0, 2500), /hook/iu);
+  // Candidate 28c (context baseline): the consent-scope section moved verbatim from the always-loaded skill into the
+  // reference the skill names for the consent; the same pattern is retargeted there, and the skill keeps the pointer.
+  const recovery = read("plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md");
+  assert.match(recovery.slice(recovery.indexOf("One onboarding consent")).slice(0, 2500), /hook/iu);
+  assert.ok(recovery.includes("One onboarding consent"), "the consent-scope section exists in the reference");
+  assert.match(skill, /What the consent covers, the commit author question and the rule before consent exists \(no deliverable file\) are in `references\/onboarding-recovery\.md`/u);
   assert.match(model.slice(model.indexOf("Pipeline-use consent is likewise one bounded bootstrap consent")).slice(0, 2500), /hook/iu);
 });

@@ -13,6 +13,7 @@ token count). A full Elephant bootstrap is session-bound: run it at
 never for an ordinary task, message, tool result, commit, test, PO response,
 or active-goal continuation in the same ready session. Normal bootstrap
 targets 10–15k units; an original payload over 45,000 is rejected.
+
 ## Role and runtime identity
 
 Resolve the plugin root, then run exactly:
@@ -25,6 +26,9 @@ version/source/boundary/handoff, and a read-only `nextAction` when ready.
 Goldfish/Critic validate but never execute onboarding; Elephant executes the
 returned action at its declared boundary. Resolve role before preflight:
 conflicting or unknown carriers stop — Critic is closed, never Elephant.
+A ready line is compact: green, repeated detail is left out and the unchanged
+full envelope is written to the repo-relative path in `fullEnvelope`; read that
+file only when a field you need is not on the line.
 
 For `pipeline-governance-inactive`, ask the human once whether this project
 should use the Pipeline. That question lists in short what agreeing
@@ -35,30 +39,20 @@ covered action runs, give its `escalationJustification` line verbatim; the
 design approval, push, release and any human-guard override are never covered.
 A decline leaves the project inactive. That question also carries the Advisor
 consent (no separate Advisor question); after `consentRecordAction`, rerun the
-same `onboarding-init.mjs` command once.
+same `onboarding-init.mjs` command once. What the consent covers, the commit
+author question and the rule before consent exists (no deliverable file) are in
+`references/onboarding-recovery.md`.
 
 Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
-carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`
-or `refresh-mandatory-hooks.mjs --root <root>`. Elephant executes that exact
-action once, then reruns the identical preflight and continues only on `ready`;
-a missing or failed action stops bootstrap. Goldfish and Critic never execute it.
+carries a mutating `nextAction`: execute it once as
+`references/onboarding-recovery.md` states; Goldfish and Critic never execute it.
 
 Status `windows-authority-unavailable` stops bootstrap. Present its closed
 causes using `references/onboarding-recovery.md`; never execute an ACL repair.
 
 Status `plugin-attestation-required` is a closed hard recovery, never the
-soft `plugin-refresh-required` advisory. For Codex, accept it only with
-`nextAction.schema: pipeline.installed-plugin-attestation-setup-action.v1`,
-`kind: host-postinstall`, `executionBoundary: host`, `mutation: true`,
-`requiresPoApproval: false`, executable `node`, and expected result schema
-`pipeline.installed-plugin-attestation-host-result.v1` with status `written`.
-Elephant executes that exact action once at the declared host boundary without
-asking the PO, accepts only its exact expected result, then reruns the identical
-`pipeline-start-preflight.mjs` command. Continue only when that fresh readback is
-`ready`; a missing, malformed or failed action, another
-`plugin-attestation-required`, or any other non-ready status stops bootstrap.
-Goldfish and Critic never perform this mutation and remain blocked for Elephant
-recovery. Never reconstruct the argv or add a source path from conversation.
+soft `plugin-refresh-required` advisory. For Codex, execute only the exact typed
+host-postinstall action, as `references/onboarding-recovery.md` states.
 For a Claude or Antigravity `plugin-attestation-required` result with no
 `nextAction`, stop and load `references/local-plugin-attestation.md`; recover
 from a verified source checkout, never a guessed source path or gitless copy.
@@ -74,46 +68,11 @@ A canon pointer here (`roles/`, `guardrails/`, `templates/prompts/`,
 
 ## Scratch space
 
-Use only the repository's `scratch/` for temporary files in every lifecycle
-phase. Do not use host temp or `.git/` as agent scratch; a scratch refusal
-needs typed recovery. For cleanup-bound files, ignored evidence, or any new
-durable directory, load `references/scratch-and-directory.md`.
+Temporary files go only in the repository's `scratch/`, never host temp or
+`.git/`. Cleanup-bound files, ignored evidence or a new durable directory:
+`references/scratch-and-directory.md`.
 
 ## Normal bootstrap command sequence
-
-### One onboarding consent, not a chain of prompts
-
-Private Critic export requires a separate, project-bound consent decision before
-candidate-bearing child creation. Load `references/critic-export.md` when
-preparing it; never infer host approval from a saved consent or model label.
-
-When the user has directly agreed to use Agent Pipeline for this repository,
-consent authorizes the bounded local onboarding happy path: read-only plans
-and readbacks, portable authority seed, any plan-disclosed local Git init,
-runtime init, restart-barrier prep, the first kickoff artifacts, and after the
-promotion mandatory-hook activation (plus the runner's own refresh step). State
-the bounded effects once, then execute each returned digest-bound action and
-readback without re-asking per digest. `requiresConfirmation` describes the
-action's safety shape, not a second PO chat gate.
-
-A local Git init result carrying a `collect-input` action for the repository's
-commit author (`project-onboarding-v3.mjs`'s `applyProjectOnboardingV3`,
-neither `user.name` nor `user.email` resolves locally or globally) is a
-blocking question, same tier as the kickoff goal/profile/language questions —
-never a diagnostic to notice and act on later, never a default or invented
-value. Ask the PO once now for both, hold the answered values, and apply them
-via `git config user.name "<name>"` / `git config user.email "<email>"` in
-THIS repository's local config only, immediately before the first commit,
-never sooner — never `--global`, never an untyped value.
-
-Restart bounds and what this consent does NOT grant →
-`references/onboarding-recovery.md`.
-
-**Before this consent exists:** never create a deliverable file — reading,
-explaining, answering are fine, artifacts are not, even in the turn you say
-you will wait for a yes. Never volunteer whether the Pipeline fits the task;
-that call is the human's — if asked, state cost/benefit neutrally, not a
-recommendation.
 
 1. **Step 0 / V4 onboarding:** First complete the
    `plugin-attestation-required` recovery above. `nextAction.kind: "advisory"` runs nothing --
@@ -138,32 +97,16 @@ recommendation.
    `references/model-role-antigravity.md` for Antigravity. A changed
    mapping needs an attended digest confirmation; absent optional evidence
    keeps the existing governed V3 route and does not degrade lifecycle.
-3. **Boundary:** one simple shell command per tool call; never compose
-   `&&`, `;`, redirects or pipelines except bounded, expansions-free
-   `rg … | rg …`, `rg … | head -n 1..500`, or `rg … | tail -n 1..500`
-   diagnostics, and never a heredoc
-   or a multi-line command. The full closed grammar, its costliest
-   workarounds, and the commit-trailer rule (`AI-Assisted: true`, plus
-   `Dispatch: <TASK_ID> (goldfish)` for a dispatched Goldfish, nothing else
-   identifying provider/model/session/run/trace/account — GIT-03,
-   `guardrails/git.md`, no override) are in
-   `templates/prompts/agent-obligations.md` §1/§6 — read it before hitting
-   the same refusal live. This binds a Goldfish/Critic dispatch and an
-   undispatched Elephant session alike. Treat
-   `executionBoundary: "host-authorized-wsl"` as mandatory: submit the exact
-   returned action directly at that boundary, including every Git
-   observation, keeping that routing authoritative. For Codex, never retry
-   in the Codex workspace sandbox first, and never probe both sandbox and
-   host views. Runner-owned structured `executable`/`argv` actions are
-   primary; a human copy-only rendering must use a tested native Bash/zsh,
-   PowerShell or cmd.exe renderer with explicit safe continuation, never a
-   visually wrapped long command. When a tool result already carries such a
-   pre-rendered field — for example `launch.copyCommand` in
-   `project-onboarding-v3.mjs`'s `restartCopyCommands`, whose `posix`/
-   `powershell`/`cmd` arrays are each a line already bounded under
-   `COPY_COMMAND_MAX_COLUMNS` — relay it VERBATIM, line for line, from that
-   same tool result. Never hand-reconstruct the command from memory of a
-   prior turn, even for an identical earlier restart action: re-read it.
+3. **Boundary:** one simple shell command per tool call; no `&&`, `;`,
+   redirects, heredocs or multi-line commands; pipelines only as bounded
+   `rg … | rg …`, `rg … | head -n 1..500` or `rg … | tail -n 1..500`. The full
+   grammar and the commit-trailer rule (`AI-Assisted: true`, plus
+   `Dispatch: <TASK_ID> (goldfish)` for a dispatched Goldfish, nothing else —
+   GIT-03) are in `templates/prompts/agent-obligations.md` §1/§6; this binds
+   every role alike. An action with
+   `executionBoundary: "host-authorized-wsl"`, and a command for the human
+   to copy (relayed VERBATIM from the tool result that rendered it, never
+   from memory): `references/onboarding-recovery.md`.
 4. **Confirmation:** after all checks print exactly this line, five concrete
    fields, no placeholder:
 
@@ -178,11 +121,9 @@ recommendation.
    preflight line's `subagentModelEnv.status` (`unset` or `set`, never the value); `set` blocks the confirmation.
    The four required confirmation facts are: `runtime.status`, `profile/model`
    and `role`, `calibration/handover`, and `Verify availability`; each is
-   digest-bound to the machine readback and printed before continuation. If
-   this project has `gates.push_approval` configured, note here that any push
-   will need a signed or chat-cleared approval before it can land —
-   `references/push-approval.md` explains the full ceremony when a push is
-   actually being constructed or discussed.
+   digest-bound to the machine readback and printed before continuation. With
+   `gates.push_approval` configured, note that any push needs a signed or
+   chat-cleared approval (`references/push-approval.md`).
 5. **Observation governance:** read `observationGovernance.status` on the
    preflight line before confirmation. `not-applicable` is the successful
    Consumer result; `required` means a source checkout, which runs
@@ -190,9 +131,8 @@ recommendation.
    is case **F6** → `references/failure-cases.md`.
 
 6. **Architecture orientation, never a bootstrap prerequisite:** consume the
-   mandatory `architectureOrientation` readback in the ready preflight
-   envelope. Follow `references/architecture-orientation.md` for its typed
-   status. The proposal is not authority to write a map or make a PO decision.
+   `architectureOrientation` readback per `references/architecture-orientation.md`;
+   it is no authority to write a map or make a PO decision.
 
 7. **Restart hint for material session input:** before a first kickoff **and
    before proposing, displaying, or performing any restart, session cut or
@@ -212,27 +152,13 @@ recommendation.
    next session.
    At the start of the NEXT session, when `resume-hint.mjs inspect` reports
    status `available`, the agent MUST read `project/resume-hint.json`'s
-   content in that same turn and incorporate its `intent`, `constraints`,
-   `scope`, and `questions` into its understanding of the session's goal
-   before presenting the bootstrap confirmation line — noting the card's
-   availability without reading its content does not satisfy this step. A
-   failed or skipped read must be surfaced honestly, never silently skipped
-   or claimed as done when it was not; this is a MUST-DO consumption step, not
-   a new readiness precondition, so it never blocks or gates the session.
+   content in that same turn, before the bootstrap confirmation line; a
+   failed read is surfaced honestly. It is never a readiness gate.
    Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
    their shapes differ: `intent` is one string; the other three are **arrays** of
-   short strings, at most 4, 4 and 3 entries. Every entry is a distilled
-   statement, never a transcript. At bootstrap, `resume-hint.mjs inspect` is passive context only:
-   `absent`, `challenged-stale`, or `ignored-invalid` never changes readiness,
-   actions, authority, approval, close state, or exit status. Do not capture
-   raw transcripts, commands, approvals, lifecycle instructions, host paths,
-   URLs, credentials, secrets, or private identifiers. The validator rejects
-   those forms rather than persisting them.
-
-   If the card contains verbatim `materialInput` or already-answered onboarding
-   `values`, read and use both at the next session start; never re-ask an
-   answered value. For their exact shapes, screens, and resumed-intake source
-   rules, load `references/resume-hint.md` before capture or consumption.
+   short strings, at most 4, 4 and 3 entries. For `materialInput`, answered
+   `values`, bootstrap passivity and the sanitisation rules,
+   load `references/resume-hint.md` before capture or consumption.
 
 8. **Normal restart is handover-only:** a same-topic restart, context cut, or
    request to save progress is not a block close. Update only the calibrated
@@ -277,19 +203,9 @@ line:
 ### Kickoff intake, durable design package, and document quality
 
 A pristine project, a first `kickoff plan`, material design input, or a design
-package about to be created or promoted — in any of those states load
-`references/kickoff-design.md` before writing or promoting anything, and follow
-it. It carries the two PO questions in full, the package directory and file
-names, the promotion transaction, the source-evidence rules, and the PRD/Spec
-quality bar.
-
-A pristine project's `v4Inspection` status is not always `kickoff-required`:
-a genuinely fresh repository (no prior kickoff
-transaction) is routed instead to `intake-required`,
-`intake-design-questions-required`, or `bootstrap-binding-required` — load
-`references/intake-generate-design.md` for that path instead of
-`kickoff-design.md`. A repository already mid-kickoff under the old model
-keeps following `kickoff-design.md` untouched.
+package about to be created or promoted: load `references/kickoff-design.md`
+first (a fresh repository on an `intake-*`/`bootstrap-binding-required` status:
+`references/intake-generate-design.md`).
 
 Three of its rules are stated here as well, because a session that never loads
 it is still bound by them. No artifact of a pristine project is written before
@@ -307,49 +223,28 @@ Load each reference only at its stated condition. A new-session model readback
 and a ready architecture readback each load their matching reference at that
 step; later implementation or Critic work loads its reference when reached:
 
-- `references/onboarding-recovery.md` for non-ready V4, restart, kickoff,
-  private handoff or host-bound recovery;
-- `references/local-plugin-attestation.md` for Claude/Antigravity
-  `plugin-attestation-required` with no executable action;
-- `references/model-role-codex-claude.md` for Codex/Claude model readback,
-  or `references/model-role-antigravity.md` for Antigravity's own hook-bound
-  model readback;
-- `references/scratch-and-directory.md` for temporary-file cleanup, ignored
-  evidence or any new durable directory;
+- `references/onboarding-recovery.md` for a non-ready status, the consent scope, restart, kickoff, handoff, host boundary, copy commands;
+- `references/local-plugin-attestation.md` for Claude/Antigravity `plugin-attestation-required` with no action;
+- `references/model-role-codex-claude.md` / `references/model-role-antigravity.md` for that runner's model readback;
+- `references/scratch-and-directory.md` for temporary-file cleanup, ignored evidence, a new durable directory;
 - `references/critic-export.md` before private Critic export;
 - `references/resume-hint.md` before material-input capture or consumption;
-- `references/architecture-orientation.md` for the ready preflight's typed
-  architecture readback;
+- `references/architecture-orientation.md` for the typed architecture readback;
 - `references/happy-path.md` for the ordered command chain, design to push;
-- `references/implementation-continuation.md` before implementation dispatch
-  or Critic preparation;
-- `references/design-course.md` before first `submit-plan` for an `epic` or
-  `feature`, and again when `inspect` requests a design-workflow package;
-- `references/private-overlay.md` for private overlay, cleanup or
-  project-authority privatization;
+- `references/implementation-continuation.md` before implementation dispatch or Critic preparation;
+- `references/design-course.md` before the first `submit-plan` of an `epic`/`feature`, or when `inspect` asks for a design-workflow package;
+- `references/private-overlay.md` for private overlay, cleanup, project-authority privatization;
 - `references/roles.md` for Goldfish/Critic role-specific prohibitions;
 - `references/freshness.md` for freshness/update/calibration/handover detail;
 - `references/failure-cases.md` for typed failure and recovery cases;
 - `references/continuation.md` for `PCR-BLOCKED` or `PCR-DECISION-PENDING`;
-- `references/kickoff-design.md` for kickoff intake questions, the durable
-  design package, promotion, and the PRD/Spec quality bar;
-- `references/intake-generate-design.md` for the `intake-*`/
-  `bootstrap-binding-required` coordinator path of a fresh repository and its
-  handoff into the promotion transaction `kickoff-design.md` documents;
-- `references/push-approval.md` for the point a session constructs,
-  explains, or discusses the push-approval gate (`gates.push_approval`),
-  before a human clears it;
-- `references/transcript-forensics.md` for a forensic-analysis dispatch of a
-  session transcript after a live test run.
-- `references/workflow-dispatch.md` for using the Workflow tool or
-  `isolation: "worktree"` to fan out Goldfish/Critic work: the
-  Elephant-only rule, the worktree self-heal briefing, the ~50-tool-call
-  cliff with its budget language, and recovery of a truncated dispatch's work.
-- `references/antigravity-native-dispatch.md` before an Elephant or other
-  authorized dispatcher constructs an Antigravity `invoke_subagent` call that
-  includes a Pipeline role.
-- `references/antigravity-feature-close.md` when an Antigravity session closes
-  an approved feature, not for a normal restart.
+- `references/kickoff-design.md` for kickoff intake, the design package, promotion and the PRD/Spec bar;
+- `references/intake-generate-design.md` for the `intake-*`/`bootstrap-binding-required` path;
+- `references/push-approval.md` when a push-approval gate is constructed, explained or discussed;
+- `references/transcript-forensics.md` for a forensic analysis of a session transcript;
+- `references/workflow-dispatch.md` for Workflow or `isolation: "worktree"` fan-out;
+- `references/antigravity-native-dispatch.md` before an Antigravity `invoke_subagent` with a Pipeline role;
+- `references/antigravity-feature-close.md` when an Antigravity session closes an approved feature.
 
 Lazy loading never widens authority and must preserve lifecycle, V3 authority,
 calibration, handover, Verify and continuation checks.
@@ -367,9 +262,7 @@ continuation are agent work. A standing approval is not a fresh human touch.
 **Agent work under `epic` or `feature` starts with Goldfish dispatch from the
 first implementation edit; the Elephant does not write that diff.** `mini` is
 the sole direct-implementation exception. A completed feature requires a
-returned `critic-review` result. Load `references/implementation-continuation.md`
-before dispatch or Critic preparation for the model route, sealed packet,
-review and autonomous-continuation contracts. A recorded PRD/Spec approval
+returned `critic-review` result. A recorded PRD/Spec approval
 mandates its accepted scope; routine work needs no fresh PO approval.
 
 Ask the human only for a configured decision gate, required final acceptance,
@@ -379,9 +272,8 @@ denial alone is not a human gate: first run its exact typed read-only or
 lifecycle recovery action. Never bypass a real gate or turn an automated
 evidence failure into an invented PO approval.
 
-When one of those does require asking, a confirmation with only one real
-option (proceed or don't) is plain text plus waiting for the reply — never
-`AskUserQuestion`, whose validator rejects a single-option call.
+A confirmation with only one real option is plain text plus waiting for the
+reply, never `AskUserQuestion` (it rejects a single-option call).
 
 ## Compact
 

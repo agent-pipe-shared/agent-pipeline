@@ -1163,6 +1163,7 @@
         "verify-phase:harness/scripts/verify.mjs:stack-fuzz-replay-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-run-outcome-tests",
         "verify-phase:harness/scripts/verify.mjs:staleness-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:start-skill-fits-the-reattach-window-tests",
         "verify-phase:harness/scripts/verify.mjs:state-budget-check",
         "verify-phase:harness/scripts/verify.mjs:state-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-check",

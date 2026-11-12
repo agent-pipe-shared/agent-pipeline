@@ -5,6 +5,10 @@ session cut or Compact after kickoff, or when `resume-hint.mjs inspect` reports
 an available card. This is a capture and consumption duty, never a new
 readiness gate.
 
+The capture duty, the one admitted pre-restart command and the next-session
+read duty are stated in `SKILL.md` step 7 (always loaded); this file holds the
+rest.
+
 A short goal with no further material input needs no card. Interpret user intent
 rather than keywords: an intended restart or session cut captures the card;
 changed scope or constraints refresh it; canonised or revoked information is
