@@ -49,6 +49,22 @@ parts of it that contradicted this decision.
 The historical sections below retain the prior decision and its evidence so
 the reversal remains auditable.
 
+## PO decision 2026-11-10 (candidate 28): one shell boundary, and what it does not cover
+
+One boundary, not two. Claude, Codex and Antigravity hand every Bash call to the same `guard-lifecycle-ready.mjs`, and a dispatched subagent's call
+arrives there like the main session's: the read scope and the closed grammar are the same for both (pinned by C28-GL-1 in
+`plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`). The one verdict difference the greenfield run saw was shape-dependent:
+`find`, `sed` and the checksum readers on a credential or system-root target were admitted while `ls`, `cat`, `rg` and `grep` on the same target were
+refused; they are now refused alike (C28-GL-2).
+
+What the guard does NOT cover, stated so nobody reads it as a containment:
+
+- native read tools (Read, Grep, Glob and their runner equivalents) where the runner does not route them through the hook, and the exact scope those
+  tools apply where it does;
+- plugin scripts and any admitted `node` script reading their own inputs: the guard judges the runner's tool call, not what an admitted program then opens;
+- an operating-system boundary: the guard is tool-level only. Teams that need one should use OS encapsulation (a container, a separate user,
+  read-only mounts). That is the recommendation; this repository does not build it.
+
 ## Context
 
 `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` governs which Bash

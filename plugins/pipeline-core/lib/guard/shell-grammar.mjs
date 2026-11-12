@@ -1131,7 +1131,23 @@ const QP4_RG_LONG_VALUE = new Set(["regexp", "file", "glob", "iglob", "max-count
 const QP4_GREP_LONG_VALUE = new Set(["regexp", "file", "max-count", "after-context", "before-context", "context", "directories", "devices", "include",
   "exclude", "exclude-from", "exclude-dir", "label", "binary-files", "group-separator"]);
 
+// C28-GUARD-LANES (AC-108): the readers whose targets are their path operands, not a pattern. `find` takes the leading non-option words, `sed` the files after
+// its script, the checksum readers every non-option word (`shasum -a <alg>` skips its algorithm). Label selection and the scope screen below only.
+const SCOPE_SCREENED_READERS = new Set(["find", "sed", "sha256sum", "shasum"]);
+
+function pathOperandsOfScreenedReader(name, argv) {
+  const words = argv.filter((token) => typeof token === "string");
+  if (name === "find") {
+    const index = words.findIndex((token) => token.startsWith("-"));
+    return index === -1 ? words : words.slice(0, index);
+  }
+  if (name === "shasum") return words.filter((token, index) => !token.startsWith("-") && !(index > 0 && ["-a", "--algorithm"].includes(words[index - 1])));
+  const plain = words.filter((token) => !token.startsWith("-"));
+  return name === "sed" && !words.some((token) => ["-e", "-f", "--expression", "--file"].includes(token)) ? plain.slice(1) : plain;
+}
+
 export function qp4ReadTargetOperands(name, argv) {
+  if (SCOPE_SCREENED_READERS.has(name)) return pathOperandsOfScreenedReader(name, argv);
   const rg = name === "rg";
   const shortValue = rg ? QP4_RG_SHORT_VALUE : QP4_GREP_SHORT_VALUE;
   const longValue = rg ? QP4_RG_LONG_VALUE : QP4_GREP_LONG_VALUE;
@@ -1178,7 +1194,7 @@ export function qp4OperandResolvesOutsideRoot(parsed, root) {
   if (!parsed || parsed.parseStatus !== "accepted" || parsed.segments.length !== 1) return false;
   const rootResolved = resolve(root);
   const executable = basename(String(parsed.segments[0].executable ?? "")).toLowerCase();
-  const operands = executable === "rg" || executable === "grep" ? qp4ReadTargetOperands(executable, parsed.segments[0].argv) : parsed.segments[0].argv;
+  const operands = executable === "rg" || executable === "grep" || SCOPE_SCREENED_READERS.has(executable) ? qp4ReadTargetOperands(executable, parsed.segments[0].argv) : parsed.segments[0].argv;
   return operands.some((token) => {
     if (typeof token !== "string" || token.includes("\0")) return false;
     const candidate = rawReadCandidatePath(token, root);
@@ -1201,7 +1217,7 @@ export function qp4OperandResolvesOutsideRoot(parsed, root) {
 export function qp4OperandIsCredentialTarget(parsed, root) {
   if (!parsed || parsed.parseStatus !== "accepted" || parsed.segments.length !== 1) return false;
   const executable = basename(String(parsed.segments[0].executable ?? "")).toLowerCase();
-  const operands = executable === "rg" || executable === "grep" ? qp4ReadTargetOperands(executable, parsed.segments[0].argv) : parsed.segments[0].argv;
+  const operands = executable === "rg" || executable === "grep" || SCOPE_SCREENED_READERS.has(executable) ? qp4ReadTargetOperands(executable, parsed.segments[0].argv) : parsed.segments[0].argv;
   return operands.some((token) => {
     if (typeof token !== "string" || token.includes("\0") || token.startsWith("-")) return false;
     try { return isCredentialReadTarget(token, { rootDir: root }); } catch { return false; }
@@ -1605,6 +1621,16 @@ export function isRejectedReadFamilyCommand(command, root) {
   const name = basename(executable).toLowerCase();
   if (["cat", "rg", "grep", "head", "tail", "wc", "stat", "file", "ls", "nl"].includes(name)
     || isSystemDiagnosticName(name)) return true;
+  // C28-GUARD-LANES (AC-108): find, sed and the checksum readers were in no list here, so a call the read grammar did not admit (a target the passive-read policy
+  // refuses: a credential root, a system root, a directory holding a secret) fell through to the lifecycle tail and was ADMITTED while `ls`, `cat`, `rg`, `grep`,
+  // `stat` and `head` on the same target were refused -- for the main session and a subagent alike (one hook path serves both). They count as read-family only
+  // for that cause, never for their write or exec forms (`sed -i`, `find -delete` on an ordinary target keep the lanes that decide them today).
+  if (SCOPE_SCREENED_READERS.has(name)) {
+    return qp4ReadTargetOperands(name, argv).some((token) => {
+      if (typeof token !== "string" || token === "" || token.includes("\0") || /[$`*?\[\]{}]/u.test(token)) return false;
+      try { return !isAllowedPassiveReadTarget(token, { rootDir: root, recursive: true }); } catch { return false; }
+    });
+  }
   if (name === "git" && argv[0] === "diff"
     && argv.some((arg) => arg === "--output" || arg.startsWith("--output=")
       || arg === "--ext-diff" || arg === "--textconv")) return true;

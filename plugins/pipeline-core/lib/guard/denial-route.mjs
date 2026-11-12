@@ -158,7 +158,7 @@ export function blocked(
  * @param {string} reason the exact denial reason text the refusal prints, bound into the capability.
  * @param {string} subject short noun for humanGuardRouteUnavailableReason ("command", "write").
  */
-export function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, dependencies = {}) {
+export function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, dependencies = {}, options = {}) {
   const denials = [{ guard: "guard-lifecycle-ready.mjs", reason }];
   const consumeFn = dependencies.consumeHumanGuardOverrideFn ?? consumeHumanGuardOverride;
   let consumed = { status: "absent" };
@@ -175,6 +175,9 @@ export function humanOverrideRoute(code, reason, subject, root, toolName, toolIn
       ),
     };
   }
+  // C28-GUARD-LANES (AC-108): `offer: false` is a refusal that is about a READ (a flag, a spelling, a composition of admitted readers). An already armed capability
+  // above still lifts it, but no plan request is recorded and no signature is offered: the caller names the admitted read form instead.
+  if (options.offer === false) return { admitted: null, overrideGuidance: "", repeatOverrideGuidance: "" };
   let overrideGuidance = "";
   let repeatOverrideGuidance = "";
   if (consumed.status === "absent" || consumed.status === "replan") {

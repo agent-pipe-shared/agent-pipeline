@@ -13596,3 +13596,163 @@ test("C23 AC-108: cat and rg on files under a Codex-shaped <home>/.codex/plugins
     rmSync(home, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------
+// C28-GUARD-LANES (AC-108, PO decisions 2026-11-10 on the greenfield run reports).
+// Part 1: ONE shell boundary for the main session and a dispatched subagent. Part 2: an admitted test and audit lane in design draft that never offers a signature
+// for a read. Fake credentials only; the fixtures mirror the real input (absolute host paths, a subagent transcript under `subagents/`).
+// ---------------------------------------------------------------------------------
+function c28Home() {
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "guard-lifecycle-c28-home-")));
+  for (const [rel, body] of [[".ssh/id_rsa", "fake-fixture-not-a-key\n"], [".aws/credentials", "fake-fixture\n"], ["notes/plain.txt", "needle\n"]]) {
+    mkdirSync(dirname(join(home, rel)), { recursive: true });
+    writeFileSync(join(home, rel), body);
+  }
+  return home;
+}
+
+function c28WithHome(home, fn) {
+  const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
+  process.env.HOME = home;
+  process.env.USERPROFILE = home;
+  try { return qp4WithoutAppDataRoots(fn); } finally {
+    for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  }
+}
+
+/** The two input shapes one Bash call can arrive in: the orchestrating session, and a dispatched subagent whose transcript sits under `subagents/` next to its meta file. */
+function c28Shapes(command) {
+  return { main: bash(command), subagent: subagentInput("Bash", subagentTranscript(), { command }) };
+}
+
+const c28Code = (text) => /(GUARD-[A-Z0-9-]+)/u.exec(text)?.[1] ?? "";
+
+/** A READY lifecycle, as the real hook sees a governed project: only then is a command the read grammar leaves unclassified decided by the tail, not by readiness. */
+function c28Verdict(input, path) {
+  const r = evaluateLifecycleReadyGuard(input, { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } });
+  return { exitCode: r.exitCode, text: String(r.stderr ?? "") };
+}
+
+test("C28-GL-1: a subagent's shell read takes the same hook path as the main session's -- no role, carrier or grammar difference decides a read verdict", () => {
+  const path = qp4Fixture();
+  const home = c28Home();
+  try {
+    c28WithHome(home, () => {
+      const targets = [".ssh", ".ssh/id_rsa", "notes", "notes/plain.txt"].map((rel) => `${home.replaceAll("\\", "/")}/${rel}`);
+      const commands = [
+        "ls scratch", "cat scratch/notes.md", "rg -n authorize scratch", "grep -rn authorize scratch", "find scratch -name notes.md", "sed -n 1,2p scratch/notes.md",
+        ...targets.flatMap((target) => [`ls ${target}`, `cat ${target}`, `rg -n needle ${target}`, `grep -n needle ${target}`, `stat ${target}`, `find ${target} -type f`, `sed -n 1,2p ${target}`, `sha256sum ${target}`]),
+      ];
+      for (const command of commands) {
+        const shapes = c28Shapes(command);
+        const main = c28Verdict(shapes.main, path);
+        const subagent = c28Verdict(shapes.subagent, path);
+        assert.deepEqual({ exitCode: subagent.exitCode, code: c28Code(subagent.text) }, { exitCode: main.exitCode, code: c28Code(main.text) }, `main vs subagent verdict differ for: ${command}`);
+      }
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("C28-GL-2: find, sed and the checksum readers are refused on a credential or system-root target exactly like ls, cat, rg and grep -- for the main session and a subagent alike", () => {
+  const path = qp4Fixture();
+  const home = c28Home();
+  try {
+    c28WithHome(home, () => {
+      const h = home.replaceAll("\\", "/");
+      const refused = [
+        `find ${h}/.ssh -type f`, `find ${h}/.aws -type f`, `find ${h} -maxdepth 1 -type d`, `find ${h}/.ssh -maxdepth 1 -name id_rsa`,
+        `sed -n 1,5p ${h}/.ssh/id_rsa`, `sed -n 1,5p ${h}/.aws/credentials`, `sha256sum ${h}/.ssh/id_rsa`, `shasum -a 256 ${h}/.ssh/id_rsa`,
+      ];
+      for (const command of refused) {
+        for (const [shape, input] of Object.entries(c28Shapes(command))) {
+          const verdict = c28Verdict(input, path);
+          assert.equal(verdict.exitCode, 2, `${shape} admitted a read the sibling readers refuse: ${command}`);
+          assert.match(verdict.text, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, `${shape}: ${command}\n${verdict.text}`);
+          assert.doesNotMatch(verdict.text, /guard-human-override/u, `a read refusal offers no override: ${command}`);
+        }
+      }
+      // The same readers stay admitted on an ordinary, non-credential target (D96), and the write forms of the same commands keep their own lanes.
+      for (const command of [`find ${h}/notes -type f`, `sed -n 1,5p ${h}/notes/plain.txt`, `sha256sum ${h}/notes/plain.txt`, "find scratch -name notes.md", "sed -n 1,2p scratch/notes.md"]) {
+        for (const [shape, input] of Object.entries(c28Shapes(command))) {
+          assert.equal(c28Verdict(input, path).exitCode, 0, `${shape} refused an ordinary read: ${command}`);
+        }
+      }
+      for (const command of ["sed -i s/a/b/ scratch/log.txt", `find scratch -name log.txt -delete`]) {
+        const verdict = c28Verdict(bash(command), path);
+        assert.doesNotMatch(verdict.text, /GUARD-READ-/u, `a write form was relabelled as a read refusal: ${command}\n${verdict.text}`);
+      }
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+const C28_SUITES_REGISTRY = { schema: "pipeline.verify-suites.v1", suites: [
+  { name: "content", file: "tests/content.test.mjs" }, { name: "engine", file: "tests/engine.test.mjs" },
+] };
+
+function c28DraftFixture() {
+  const path = devPlanShellFixture();
+  mkdirSync(join(path, "harness"), { recursive: true });
+  mkdirSync(join(path, "tests"), { recursive: true });
+  writeFileSync(join(path, "harness", "verify-suites.json"), JSON.stringify(C28_SUITES_REGISTRY));
+  for (const name of ["content", "engine", "unregistered"]) writeFileSync(join(path, "tests", `${name}.test.mjs`), "// fixture\n");
+  return path;
+}
+
+function c28DraftRun(path, command, spy = []) {
+  return evaluateLifecycleReadyGuard(
+    { tool_name: "Bash", tool_input: { command } },
+    { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; },
+      recordHumanGuardDenialFn(request) { spy.push(request); return { status: "planned", requestSha256: "0".repeat(64) }; } },
+  );
+}
+
+test("C28-GL-3: in design draft a test run of REGISTERED suites is admitted (writes only to scratch/ and the system temp directory count as no write); anything unregistered stays a refused write", () => {
+  const path = c28DraftFixture();
+  try {
+    for (const command of [
+      "node --test tests/content.test.mjs tests/engine.test.mjs", "node --test tests/content.test.mjs", "node tests/content.test.mjs",
+    ]) {
+      const result = c28DraftRun(path, command);
+      assert.equal(result.exitCode, 0, `refused a registered suite run: ${command}\n${result.stderr}`);
+    }
+    for (const command of [
+      "node --test tests/unregistered.test.mjs", "node --test tests/content.test.mjs tests/unregistered.test.mjs", "node --test", "node --test tests",
+      "node --test --test-concurrency=1 tests/content.test.mjs", "node --test ../tests/content.test.mjs", "node --test scratch/probe.test.mjs", "node --test src/app.js",
+    ]) {
+      const result = c28DraftRun(path, command);
+      assert.equal(result.exitCode, 2, `admitted a run that is not exactly registered suites: ${command}`);
+      assert.match(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("C28-GL-4: a refusal that is about a read names the admitted read form and never offers a signature or override", () => {
+  const path = c28DraftFixture();
+  try {
+    const scriptsDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", "scripts").replaceAll("\\", "/");
+    const spy = [];
+    // `--help` on a plugin script that has no help branch would START the script: refused as a command, but the refusal is about the flag, so it points at the read.
+    const help = c28DraftRun(path, `node ${scriptsDir}/usage-ledger.mjs --help`, spy);
+    assert.equal(help.exitCode, 2, help.stderr);
+    assert.match(help.stderr, /no usable help/u);
+    assert.match(help.stderr, /head -n \d+ \S*usage-ledger\.mjs/u, "the admitted read form of the script's header is named");
+    assert.doesNotMatch(help.stderr, /guard-human-override/u);
+    assert.equal(spy.length, 0, "a signature plan was requested for a flag refusal");
+    // Independent read-only diagnostics joined with `;` are refused as a composition, with the separate admitted calls typed as retry actions, and no signature.
+    const composed = c28DraftRun(path, "git status ; git log", spy);
+    assert.equal(composed.exitCode, 2);
+    assert.match(composed.stderr, /"retryActions":\[\{/u);
+    assert.doesNotMatch(composed.stderr, /guard-human-override/u);
+    assert.equal(spy.length, 0, "a signature plan was requested for a read-only composition");
+    // A composition that carries a real mutation keeps its route.
+    const mixed = c28DraftRun(path, "git status ; rm src/app.js", spy);
+    assert.equal(mixed.exitCode, 2);
+    assert.ok(spy.length >= 1, "a mutation lost its override route");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});

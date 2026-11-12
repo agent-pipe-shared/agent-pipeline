@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
 // Guard module "devplan-shell-lane" (layer 5), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
-import { basename, isAbsolute, relative, resolve, sep } from "node:path";
+import { lstatSync } from "node:fs";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { loadDeclarativeVerifySuites } from "../verify-suite-registration.mjs";
 import { observeReaderPlanScope } from '../doc-reader-plan-scope.mjs';
 import { physicalBytes, jsonBytes, hash, requireFact } from '../doc-reader-documentation-snapshot.mjs';
 import { DOC_READER_COURSE_SCRIPT } from './constants.mjs';
@@ -214,6 +216,23 @@ function scratchScriptRelative(word, root) {
   return /^scratch\/[A-Za-z0-9._-]+\.mjs$/u.test(rel) ? rel : null;
 }
 
+// C28-GUARD-LANES (AC-108, PO decision 2026-11-10): a test run of the project's REGISTERED suites (harness/verify-suites.json, the list Verify itself runs; read through
+// the one shared loader) is not an opaque write in design draft -- the suites write only to scratch/ and the system temp directory. Exactly `node --test <file>...`
+// with no other option, every operand a plain file inside the root that the list names; one unregistered operand makes the whole run what it was before.
+function isRegisteredSuiteRun(operands, root) {
+  if (operands.length === 0) return false;
+  const loaded = loadDeclarativeVerifySuites(join(root, "harness", "verify-suites.json"));
+  if (!loaded.ok || !loaded.exists) return false;
+  const registered = new Set(loaded.suites.map((suite) => suite.file));
+  return operands.every((operand) => {
+    if (typeof operand !== "string" || operand === "" || operand.startsWith("-")) return false;
+    const absolute = resolve(root, operand);
+    const rel = relative(resolve(root), absolute);
+    if (rel === "" || rel.startsWith("..") || isAbsolute(rel) || !registered.has(rel.split(sep).join("/"))) return false;
+    try { const entry = lstatSync(absolute); return entry.isFile() && !entry.isSymbolicLink(); } catch { return false; }
+  });
+}
+
 function opaqueScriptExecutionCandidate(words, root) {
   if (!Array.isArray(words) || words.length < 2) return null;
   const executable = basename(words[0]).toLowerCase();
@@ -223,7 +242,10 @@ function opaqueScriptExecutionCandidate(words, root) {
     const first = args[0] ?? "";
     if (["--version", "-v", "--help", "-h"].includes(first)) return null;
     if (first === "--check") return null;
-    if (first === "--test") return args[1] && !args[1].startsWith("-") ? args[1] : ".pipeline-opaque-execution";
+    if (first === "--test") {
+      if (isRegisteredSuiteRun(args.slice(1), root)) return null;
+      return args[1] && !args[1].startsWith("-") ? args[1] : ".pipeline-opaque-execution";
+    }
     if (["-e", "--eval", "-p", "--print"].includes(first)) return ".pipeline-opaque-execution";
     if (!first.startsWith("-")) script = first;
     else return ".pipeline-opaque-execution";

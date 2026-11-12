@@ -68,9 +68,9 @@
     },
     {
       "topic": "Observation boundary",
-      "claude": "tool-level only: the guard judges the runner's own tool calls, and an admitted `node` script can still read outside the repository; not an operating-system boundary",
-      "codex": "tool-level only where the same guard runs; what a spawned worker's own scripts read outside the repository is not measured",
-      "antigravity": "tool-level only on the calls the prepare step admits; what a `node` script reads outside the repository is not measured",
+      "claude": "tool-level only: the guard judges the runner's own tool calls, one hook serves the main session and a dispatched subagent alike, and an admitted `node` script can still read outside the repository; not covered: native read tools a runner does not route through the hook, plugin scripts reading their own inputs, and any operating-system boundary (a container, an own user or read-only mounts is the recommendation for teams that need one, not built)",
+      "codex": "tool-level only where the same guard runs; what a spawned worker's own scripts read outside the repository is not measured; not covered: native read tools the runner does not route through the hook, plugin scripts reading their own inputs, any operating-system boundary (OS encapsulation is the recommendation, not built)",
+      "antigravity": "tool-level only on the calls the prepare step admits; what a `node` script reads outside the repository is not measured; not covered: native read tools the runner does not route through the hook, plugin scripts reading their own inputs, any operating-system boundary (OS encapsulation is the recommendation, not built)",
       "owner": "hooks/guard-dispatch.mjs"
     }
   ]

@@ -702,7 +702,7 @@ export function scriptHelpRefusalHint(command, root, options = {}) {
   try { if (!lstatSync(join(PLUGIN_SCRIPTS_DIR, name)).isFile()) return null; } catch { return null; }
   const flags = flagsAnsweredBy(name);
   if (flags !== undefined) return `${name} answers ${flags.join(" and ")}, not ${resolved.args[0]}: ask with that flag. This refusal is about the flag, not about the feature's lifecycle.`;
-  return `${name} has no usable help: ${resolved.args[0]} would start the script or be refused by it without a usage text, so it is refused here. This refusal is about that, not about the feature's lifecycle. Read the comment at the top of ${resolved.script} for its usage.`;
+  return `${name} has no usable help: ${resolved.args[0]} would start the script or be refused by it without a usage text, so it is refused here. This refusal is about that, not about the feature's lifecycle, and it offers no signature: it is not a write. Read the comment at the top of ${resolved.script} for its usage; the admitted read is \`head -n 40 ${resolved.script}\`.`;
 }
 
 function sanctionedLifecycleScriptArgs(script, typedArgs, root, options = {}) {

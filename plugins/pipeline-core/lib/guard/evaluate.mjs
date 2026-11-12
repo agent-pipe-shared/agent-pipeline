@@ -340,8 +340,10 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
         shellLifts.push(verdict(0, `${rebaseAuthorityAdmissionNotice(rebase, "command")}\n`));
       } else {
         const reason = `${DEVPLAN_SHELL_DENIAL_CODE}: ${devPlanHit.reason}`;
+        // C28-GUARD-LANES (AC-108): a help-flag refusal (helpHint) is about a flag on a read, not about a write: it names the admitted spelling, never a signature.
         const route = humanOverrideRoute(
           DEVPLAN_SHELL_DENIAL_CODE, reason, "command", root, toolName, input.tool_input, dependencies,
+          { offer: typeof devPlanHit.helpHint !== "string" },
         );
         if (!route.admitted) return devPlanShellBlocked(devPlanHit, route.overrideGuidance);
         shellLifts.push(route.admitted);
@@ -605,9 +607,14 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       const reason = andChainReadScope
         ? `${code}: ${READ_SCOPE_DENIAL_GUIDANCE}`
         : `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`;
-      const route = overrideRouteUnlessRead(
-        code, reason, root, toolName, input.tool_input, dependencies,
-      );
+      // C28-GUARD-LANES (AC-108): retryActions are non-empty only when EVERY `;`/newline-separated part is itself an admitted read-only command (all or nothing,
+      // retryActionsForDeniedCommand), so the refusal is about composing reads: the typed actions are the admitted form and no signature is offered for it.
+      const retryActions = retryActionsForDeniedCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots);
+      const route = retryActions.length > 0 && !andChainReadScope
+        ? humanOverrideRoute(code, reason, "command", root, toolName, input.tool_input, dependencies, { offer: false })
+        : overrideRouteUnlessRead(
+          code, reason, root, toolName, input.tool_input, dependencies,
+        );
       if (!route.admitted) {
         // NVA-B-DENIALTRIM: consulted (and marked seen) ONLY on an actual denial, never on
         // an admitted/lifted command -- computed here, inside this branch, not earlier.
@@ -615,7 +622,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
         return withLifts(lifts, blocked(
           code,
           null,
-          retryActionsForDeniedCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots),
+          retryActions,
           firstOccurrence ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance),
           rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed, root),
           grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine)),
