@@ -33,10 +33,9 @@ read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
 mutations; then run `consentRecordAction`. When an escalation review asks why a
 covered action runs, give its `escalationJustification` line verbatim; the
 design approval, push, release and any human-guard override are never covered.
-A decline leaves the project inactive. That one question also carries the Advisor
-export consent (agreeing is part of using the Pipeline), so no separate Advisor
-question follows: after `consentRecordAction`, run the same `onboarding-init.mjs`
-command once more so the first round is read after the record.
+A decline leaves the project inactive. That question also carries the Advisor
+consent (no separate Advisor question); after `consentRecordAction`, rerun the
+same `onboarding-init.mjs` command once.
 
 Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
 carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`
@@ -285,7 +284,7 @@ names, the promotion transaction, the source-evidence rules, and the PRD/Spec
 quality bar.
 
 A pristine project's `v4Inspection` status is not always `kickoff-required`:
-since commit `10e1b6a0`, a genuinely fresh repository (no prior kickoff
+a genuinely fresh repository (no prior kickoff
 transaction) is routed instead to `intake-required`,
 `intake-design-questions-required`, or `bootstrap-binding-required` — load
 `references/intake-generate-design.md` for that path instead of
@@ -335,9 +334,8 @@ step; later implementation or Critic work loads its reference when reached:
 - `references/kickoff-design.md` for kickoff intake questions, the durable
   design package, promotion, and the PRD/Spec quality bar;
 - `references/intake-generate-design.md` for the `intake-*`/
-  `bootstrap-binding-required` coordinator path a genuinely fresh repository
-  now actually routes toward, its staging output, and its handoff into the
-  same promotion transaction `kickoff-design.md` documents;
+  `bootstrap-binding-required` coordinator path of a fresh repository and its
+  handoff into the promotion transaction `kickoff-design.md` documents;
 - `references/push-approval.md` for the point a session constructs,
   explains, or discusses the push-approval gate (`gates.push_approval`),
   before a human clears it;
@@ -345,14 +343,13 @@ step; later implementation or Critic work loads its reference when reached:
   session transcript after a live test run.
 - `references/workflow-dispatch.md` for using the Workflow tool or
   `isolation: "worktree"` to fan out Goldfish/Critic work: the
-  Elephant-only orchestration rule, the worktree self-heal briefing, the
-  ~50-tool-call termination cliff with its budget language, and recovery of
-  a truncated dispatch's real work.
+  Elephant-only rule, the worktree self-heal briefing, the ~50-tool-call
+  cliff with its budget language, and recovery of a truncated dispatch's work.
 - `references/antigravity-native-dispatch.md` before an Elephant or other
   authorized dispatcher constructs an Antigravity `invoke_subagent` call that
-  includes a Pipeline role, with or without Workflow or worktrees.
-- `references/antigravity-feature-close.md` when an Antigravity session is
-  actually closing an approved feature, not for a normal restart.
+  includes a Pipeline role.
+- `references/antigravity-feature-close.md` when an Antigravity session closes
+  an approved feature, not for a normal restart.
 
 Lazy loading never widens authority and must preserve lifecycle, V3 authority,
 calibration, handover, Verify and continuation checks.
