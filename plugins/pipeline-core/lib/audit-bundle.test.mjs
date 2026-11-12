@@ -8,6 +8,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { buildAuditBundle, evidenceIndexFromLsTree, planAuditBundle,planAuditBundleSignature, signAuditBundle, verifyAuditBundle, verifyAuditBundleSignature } from "./audit-bundle.mjs";
 import { canonicalSha256 } from "./governance-event.mjs";
+import { closeDispatchProjectionBytes, projectCloseDispatches } from "./durable-evidence.mjs";
+import { denyPrivateAbsolutePaths } from "./dispatch-record.mjs";
 import { planVerifySelection } from "./verify-selection.mjs";
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -223,6 +225,64 @@ test("C22 CGR-12 the bundle carries every Critic round report, names a round wit
   writeFileSync(join(input.root, "bundle", manifest.artifacts.at(-1).path), "tampered");
   assert.ok((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).findings.some((finding) => finding.startsWith("AB-DIGEST")));
   assert.throws(() => planWith(fixture(), { evidence: { criticReports: [{ packetId: "../x", path: null }] } }), (error) => error.code === "AB-EVIDENCE-INPUT");
+});
+// C28 (AC-108, WSL run): briefings, dispatch records and the security result stayed untracked, so the tracked bundle could not show them. What already existed: the signed proofs, the
+// final Verify and Security records (follow-up lists under proofs/) and the Critic reports. The gap built here: each dispatch briefing's text with its digest and the dispatch records,
+// redacted, as ONE bundle artifact (one evidence item, so no item limit is reachable), written by the close before the audit request.
+const sha = (value) => createHash("sha256").update(value).digest("hex");
+function dispatchRecord(taskId, extra = {}) {
+  return { record: { taskId, schema: "pipeline.dispatch-record.v4", runner: "claude", agentType: "goldfish-deep", model: "claude-sonnet-5-5", effort: "high", rulesetSha: "r".repeat(64), dispatcher: "elephant", candidateCommit: "a".repeat(40), commits: [], outcome: "succeeded", outcomeClassification: { kind: "authored-commit" }, resultSha256: null, report: { changedFiles: ["plugins/pipeline-core/lib/x.mjs"] }, ...extra } };
+}
+const FEATURE_ID = "release-evidence";
+test("C28 the projection carries each briefing text with its digest, redacts what must not travel, and names every gap per dispatch", () => {
+  const plain = "## Briefing\nTouch only plugins/pipeline-core/lib/x.mjs.\n"; const pathy = "Read /home/someone/src/repo/file.md and C:\\Users\\someone\\x.txt first.\n"; const secret = `token ghp_${"A".repeat(30)} here\n`;
+  const briefings = new Map([
+    ["D-PLAIN", [{ sha256: sha(plain), path: "scratch/a.md", text: plain, itemId: `${FEATURE_ID}.one` }]],
+    ["D-PATH", [{ sha256: sha(pathy), path: "scratch/b.md", text: pathy, itemId: null }]],
+    ["D-SECRET", [{ sha256: sha(secret), path: "scratch/c.md", text: secret, itemId: null }]],
+    ["D-OTHER", [{ sha256: sha("o"), path: "scratch/d.md", text: "o", itemId: "another-feature.item" }]],
+  ]);
+  const records = [dispatchRecord("D-PLAIN"), dispatchRecord("D-PATH"), dispatchRecord("D-SECRET"), dispatchRecord("D-OTHER"), dispatchRecord("D-ATTESTED", { attestation: { briefingSha256: "9".repeat(64) } }), dispatchRecord("D-NONE")];
+  const projection = projectCloseDispatches({ featureId: FEATURE_ID, records, briefings });
+  const by = Object.fromEntries(projection.dispatches.map((entry) => [entry.taskId, entry]));
+  assert.deepEqual(Object.keys(by).sort(), ["D-ATTESTED", "D-NONE", "D-PATH", "D-PLAIN", "D-SECRET"], "a dispatch whose briefing names another feature's item is not this feature's");
+  assert.deepEqual({ status: by["D-PLAIN"].briefing.status, text: by["D-PLAIN"].briefing.text, sourceSha256: by["D-PLAIN"].briefing.sourceSha256, textSha256: by["D-PLAIN"].briefing.textSha256 }, { status: "carried", text: plain, sourceSha256: sha(plain), textSha256: sha(plain) });
+  const masked = by["D-PATH"].briefing;
+  assert.equal(masked.status, "redacted"); assert.equal(masked.sourceSha256, sha(pathy), "the digest of the original bytes is kept"); assert.equal(masked.textSha256, sha(masked.text), "the digest of what is carried is its own");
+  assert.notEqual(masked.sourceSha256, masked.textSha256); assert.doesNotMatch(masked.text, /home\/someone|Users/u); assert.match(masked.text, /<host-path>/u);
+  assert.deepEqual({ status: by["D-SECRET"].briefing.status, code: by["D-SECRET"].briefing.code, text: by["D-SECRET"].briefing.text, sourceSha256: by["D-SECRET"].briefing.sourceSha256 }, { status: "gap", code: "BRIEFING-CREDENTIAL-SHAPE", text: null, sourceSha256: sha(secret) });
+  assert.deepEqual({ status: by["D-ATTESTED"].briefing.status, code: by["D-ATTESTED"].briefing.code, sourceSha256: by["D-ATTESTED"].briefing.sourceSha256 }, { status: "gap", code: "BRIEFING-TEXT-UNAVAILABLE", sourceSha256: "9".repeat(64) });
+  assert.deepEqual({ status: by["D-NONE"].briefing.status, code: by["D-NONE"].briefing.code }, { status: "gap", code: "BRIEFING-NOT-FOUND" });
+  assert.doesNotThrow(() => denyPrivateAbsolutePaths(projection, "projection"), "no absolute host path is anywhere in the projection");
+  assert.ok(!JSON.stringify(projection).includes("ghp_"), "no secret-shaped value is anywhere in the projection");
+  assert.equal(by["D-PLAIN"].record.taskId, "D-PLAIN"); assert.equal(by["D-PLAIN"].record.outcome, "succeeded");
+  const many = projectCloseDispatches({ featureId: FEATURE_ID, records: Array.from({ length: 250 }, (_, index) => dispatchRecord(`D-${String(index).padStart(3, "0")}`)), briefings: new Map() });
+  assert.equal(many.dispatches.length, 200); assert.ok(many.gaps.some((gap) => gap.code === "DISPATCH-LIST-TRUNCATED" && gap.count === 50), "the cut is a typed gap, not silence");
+  assert.ok(closeDispatchProjectionBytes(projection).toString("utf8").endsWith("\n"));
+});
+function projectionBundle(input, projection) {
+  mkdirSync(join(input.root, "evidence"), { recursive: true }); writeFileSync(join(input.root, "evidence/dispatch-projection.json"), closeDispatchProjectionBytes(projection));
+  return planWith(input, { candidate: CANDIDATE, evidence: { dispatchProjectionPath: "evidence/dispatch-projection.json" } });
+}
+test("C28 the bundle carries the dispatch projection as one evidence item, verifies offline, and refuses an inconsistent or unredacted projection", async () => {
+  const input = fixture(); const text = "Briefing text.\n";
+  const projection = projectCloseDispatches({ featureId: FEATURE_ID, records: [dispatchRecord("D-ONE")], briefings: new Map([["D-ONE", [{ sha256: sha(text), path: "scratch/a.md", text, itemId: null }]]]) });
+  const plan = projectionBundle(input, projection);
+  assert.deepEqual(plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["dispatch-projection:carried:null"], "only the named item: no approval item is invented");
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  assert.match(readFileSync(join(input.root, "bundle", "README.md"), "utf8"), /Dispatch projection/u);
+  assert.equal((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).status, "verified");
+  // A producer that bound a text to a digest it does not hash to, or carried an absolute path, is caught offline even though the artifact digest is consistent with the manifest.
+  const broken = structuredClone(projection); broken.dispatches[0].briefing.text = "Another text.\n";
+  const inconsistent = projectionBundle(fixture(), broken); const second = fixture(); const badPlan = projectionBundle(second, broken);
+  assert.ok(inconsistent.evidence.items.length === 1 && badPlan.evidence.items.length === 1);
+  await buildAuditBundle({ repositoryRoot: second.root, outputPath: "bundle", plan: badPlan });
+  assert.deepEqual((await verifyAuditBundle({ bundleRoot: join(second.root, "bundle") })).findings, ["AB-DISPATCH-PROJECTION"]);
+  const leaky = structuredClone(projection); leaky.dispatches[0].record.changedFiles = ["/home/someone/x.mjs"];
+  const third = fixture(); await buildAuditBundle({ repositoryRoot: third.root, outputPath: "bundle", plan: projectionBundle(third, leaky) });
+  assert.deepEqual((await verifyAuditBundle({ bundleRoot: join(third.root, "bundle") })).findings, ["AB-DISPATCH-PROJECTION"]);
+  const unreadable = planWith(fixture(), { candidate: CANDIDATE, evidence: { dispatchProjectionPath: "evidence/absent.json" } });
+  assert.deepEqual(unreadable.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["dispatch-projection:gap:UNREADABLE"]);
 });
 test("Q3 evidence bound to another candidate or not passing is a typed gap and is not carried", () => {
   const other = { commit: "e".repeat(40), tree: "f".repeat(40) }; const input = fixture();

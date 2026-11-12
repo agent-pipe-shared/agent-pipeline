@@ -172,6 +172,32 @@ check("German runtime renders German without an inferred language", () => {
   assert.doesNotMatch(message, /Active duty|Validated continuity/);
 });
 
+// C28 (AC-108, WSL run): the compact projection printed the planning entry initial-planning/review-goal as the next action while the feature was in implementation.
+check("a queue head that still names a planning entry is labelled as lagging, never presented as the next action", () => {
+  const stale = { packageId: "initial-planning", actionId: "review-goal", nextAction: "review" };
+  const projection = resolveRegroundProjection(outer({ queueHead: queueHead(stale) }));
+  assert.equal(projection.code, "PCR-READY");
+  assert.deepEqual(projection.queueHeadStatus, { status: "lagging", packageId: "initial-planning", actionId: "review-goal", phase: "implementation" });
+  assert.equal(projection.nextAction, null, "a lagging head is not the next action");
+  const message = buildRegroundMessage(projection);
+  assert.doesNotMatch(message, /CONTINUATION feature=.*nextAction="review"/);
+  assert.match(message, /QUEUE-HEAD-LAGGING feature="phase26-test" phase="implementation" head="initial-planning\/review-goal"/);
+  assert.match(message, /not the next action/);
+  const german = buildRegroundMessage(resolveRegroundProjection(outer({ runtime: { humanFacingLanguage: "de", activeDuty: "Koordinator", sessionCleanup: null }, queueHead: queueHead(stale) })));
+  assert.match(german, /QUEUE-HEAD-LAGGING/);
+  assert.match(german, /nicht die nächste Aktion/);
+});
+
+check("a current queue head, and a planning head while the feature is still in design, keep the continuation line", () => {
+  const current = resolveRegroundProjection(outer());
+  assert.deepEqual(current.queueHeadStatus, { status: "current" });
+  assert.match(buildRegroundMessage(current), /CONTINUATION feature="phase26-test" phase="implementation" queueRevision=4 nextAction="dispatch"/);
+  const design = resolveRegroundProjection(outer({ queueHead: queueHead({ packageId: "initial-planning", actionId: "review-goal", nextAction: "review" }) }, { activeFeature: { id: FEATURE, planPath: "specs/prd.md", phase: "design" } }));
+  assert.deepEqual(design.queueHeadStatus, { status: "current" });
+  assert.equal(design.nextAction, "review");
+  assert.match(buildRegroundMessage(design), /nextAction="review"/);
+});
+
 check("extractLiveStateNarrative finds the top-of-file-to-heading boundary", () => {
   const withHeading = "# Title\n\nLive paragraph one.\n\nLive paragraph two.\n\n## Archived history\n\n| Date | Summary |\n|---|---|\n";
   const extracted = extractLiveStateNarrative(withHeading);

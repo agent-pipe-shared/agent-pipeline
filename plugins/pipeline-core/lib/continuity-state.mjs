@@ -1551,3 +1551,12 @@ export const CONTINUITY_STATE_CODES = Object.freeze([
   "CS-CLOSE-DELIVERY-RECORDED", "CS-CLOSE-READBACK-BLOCKED",
   "CS-CLOSE-READBACK-RECORDED", "CS-CLOSE-COMPLETE-BLOCKED", "CS-CLOSE-CLOSED",
 ]);
+
+// C28 (AC-108, WSL run): the three heads the Pipeline itself creates when it opens a feature (onboarding, kickoff promotion, adoption) are planning entries. No transition advances them on plan
+// approval, so one can legitimately lag once the feature has left design. A reader labels such a head instead of presenting it as the next action; a head with a live dispatch never lags.
+export const PLANNING_ENTRY_PACKAGES = Object.freeze(["initial-planning", "kickoff-promotion", "continuity-adoption"]);
+export function queueHeadLag(continuity, phase) {
+  const head = continuity?.queueHead;
+  if (head === null || typeof head !== "object" || typeof phase !== "string" || phase === "design" || head.dispatch !== null) return null;
+  return PLANNING_ENTRY_PACKAGES.includes(head.packageId) ? { status: "lagging", packageId: head.packageId, actionId: head.actionId, phase } : null;
+}

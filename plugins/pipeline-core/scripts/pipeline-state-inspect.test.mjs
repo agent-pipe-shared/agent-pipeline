@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 
 import { run, SCHEMA_ID, statePath as resolveStatePath } from "./pipeline-state.mjs";
 import { applyOnboardingIntakeConsent, nextActionSection } from "../lib/onboarding-continuity.mjs";
+import { renderAcceptanceSection } from "../lib/close-acceptance-record.mjs";
 import { isolateFromStoredOperatorLabel, mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
 isolateFromStoredOperatorLabel();
 import { MACHINE_PLANE_SCHEMA, writeMachinePlane } from "../lib/machine-plane.mjs";
@@ -437,6 +438,47 @@ test("inspect classifies prior push approval without disclosing proof or destina
   writeFileSync(stateFile, JSON.stringify(state, null, 2) + "\n");
   const malformed = invoke(root, ["inspect"], { gitHead: () => ({ ok: true, commit: "a".repeat(40) }) });
   assert.deepEqual(JSON.parse(malformed.out).pushApproval, { present: true, relevance: "malformed" });
+});
+
+// C28 (AC-108, Codex run): after a design reopen the lifecycle record still said `completed` next to State design/draft, and the reports mixed 'package registered',
+// 'implementation delivered', 'technically qualified' and 'human-accepted'. The inspector states the four apart, from one function, and a reopen or a decline moves all of them.
+function statusFixture(name, { packageState = "completed", accepted = "a".repeat(40), mutate = () => {} } = {}) {
+  const root = implementingFixture(name);
+  mkdirSync(join(root, "specs", "widget"), { recursive: true });
+  if (packageState !== null) writeFileSync(join(root, "specs", "widget", "lifecycle.json"), `${JSON.stringify({ state: packageState })}\n`);
+  if (accepted !== null) writeFileSync(join(root, "specs", "widget", "acceptance.md"), `# Human acceptance\n\n${renderAcceptanceSection({ candidate: accepted, answer: "yes, I accept", openChecks: [] })}\n`);
+  const file = resolveStatePath(root); const state = JSON.parse(readFileSync(file, "utf8")); mutate(state);
+  writeFileSync(file, `${JSON.stringify(state, null, 2)}\n`);
+  return root;
+}
+const statusOf = (root, head = "a".repeat(40)) => { const result = invoke(root, ["inspect"], { gitHead: () => ({ ok: true, commit: head }) }); assert.equal(result.status, 0, result.err); return JSON.parse(result.out).featureStatus; };
+const reached = (status) => [status.packageRegistered, status.implementationDelivered, status.technicallyQualified, status.humanAccepted].map((entry) => entry.reached);
+
+test("C28 inspect states package registered, implementation delivered, technically qualified and human-accepted as four separate facts", () => {
+  const root = statusFixture("status-four");
+  assert.deepEqual(reached(statusOf(root)), [true, true, true, true]);
+  assert.equal(statusOf(root).packageRegistered.state, "completed");
+  assert.equal(statusOf(root).recordLag, null);
+  // The acceptance is bound to the candidate it was given for: a later HEAD is not accepted by an older answer.
+  assert.deepEqual(reached(statusOf(root, "b".repeat(40))), [true, true, true, false]);
+  assert.deepEqual(reached(statusOf(statusFixture("status-no-accept", { accepted: null }))), [true, true, true, false]);
+  assert.deepEqual(reached(statusOf(statusFixture("status-verifying", { packageState: "verifying" }))), [true, true, false, false]);
+  assert.deepEqual(reached(statusOf(statusFixture("status-unregistered", { packageState: null, accepted: null }))), [false, false, false, false]);
+});
+
+test("C28 a reopened design is never delivered, qualified or human-accepted, and the stale `completed` record is named as lagging", () => {
+  const root = statusFixture("status-reopened", { mutate: (state) => { state.activeFeature.phase = "design"; state.planApproved = false; } });
+  const status = statusOf(root);
+  assert.deepEqual(reached(status), [true, false, false, false]);
+  assert.equal(status.recordLag.packageState, "completed");
+  assert.match(status.recordLag.reason, /lifecycle record still says completed/u);
+});
+
+test("C28 a declined acceptance (the Result retired) is never delivered, qualified or human-accepted either", () => {
+  const root = statusFixture("status-declined", { mutate: (state) => { state.continuity = { authority: { prd: { path: "specs/widget/prd.md", sha256: "b".repeat(64) }, spec: { path: "specs/widget/spec.md", sha256: "c".repeat(64) }, result: null } }; } });
+  const status = statusOf(root);
+  assert.deepEqual(reached(status), [true, false, false, false]);
+  assert.equal(status.recordLag.packageState, "completed");
 });
 
 test("inspect without push history does not probe Git for approval freshness", () => {

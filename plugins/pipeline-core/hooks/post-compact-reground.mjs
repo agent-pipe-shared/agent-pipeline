@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
   continuityDispatchAllowed,
+  queueHeadLag,
   validateContinuityState,
 } from "../lib/continuity-state.mjs";
 import { buildContinuationLine } from "../lib/interaction-continuity.mjs";
@@ -249,6 +250,8 @@ export function resolveRegroundProjection(state, input = null, { rootDir = null 
   const code = continuity.decisionTxn !== null
     ? "PCR-DECISION-PENDING"
     : continuity.blocker !== null ? "PCR-BLOCKED" : "PCR-READY";
+  // C28: a head that names a planning entry after the feature left design is printed as lagging, and is not offered as the next action.
+  const lag = queueHeadLag(continuity, phase);
   return {
     code,
     workResumptionAllowed: code === "PCR-READY",
@@ -258,8 +261,9 @@ export function resolveRegroundProjection(state, input = null, { rootDir = null 
     runtime: structuredClone(continuity.runtime),
     authority: structuredClone(continuity.authority),
     queueHead: structuredClone(continuity.queueHead),
+    queueHeadStatus: lag ?? { status: "current" },
     blocker: structuredClone(continuity.blocker),
-    nextAction: continuity.queueHead?.nextAction ?? null,
+    nextAction: lag === null ? continuity.queueHead?.nextAction ?? null : null,
     resume: structuredClone(continuity.resume),
     dispatchEligibility: { allowed: dispatch.allowed, code: dispatch.code, scope: "continuity-only" },
     decisionTxn: structuredClone(continuity.decisionTxn),
@@ -296,14 +300,20 @@ export function buildRegroundMessage(stateOrProjection, { stateNarrative = null 
     ? stateOrProjection
     : resolveRegroundProjection(stateOrProjection);
   const canonical = JSON.stringify(projection);
-  const continuation = projection.workResumptionAllowed
-    ? buildContinuationLine({
-      featureId: projection.featureId,
-      phase: projection.phase,
-      queueRevision: projection.revision,
-      nextAction: projection.nextAction,
-    })
-    : null;
+  const lagging = projection.queueHeadStatus?.status === "lagging" ? projection.queueHeadStatus : null;
+  const language0 = projection.runtime?.humanFacingLanguage ?? "en";
+  const continuation = lagging !== null
+    ? `QUEUE-HEAD-LAGGING feature=${JSON.stringify(projection.featureId)} phase=${JSON.stringify(projection.phase)} head=${JSON.stringify(`${lagging.packageId}/${lagging.actionId}`)} · ${language0 === "de"
+      ? "Dieser Queue-Kopf ist ein Planungseintrag, der nach dem Design nie weitergesetzt wurde: er ist nicht die nächste Aktion. Nimm die nächste Aktion aus docs/state.md und aus pipeline-state.mjs inspect."
+      : "This queue head is a planning entry that was never advanced after design: it is not the next action. Take the next action from docs/state.md and from pipeline-state.mjs inspect."}`
+    : projection.workResumptionAllowed
+      ? buildContinuationLine({
+        featureId: projection.featureId,
+        phase: projection.phase,
+        queueRevision: projection.revision,
+        nextAction: projection.nextAction,
+      })
+      : null;
   if (!projection.workResumptionAllowed && projection.runtime === null) {
     return `POST_COMPACT_REGROUND ${canonical}`;
   }

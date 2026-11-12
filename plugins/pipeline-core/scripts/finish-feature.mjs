@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { armWriterCommitCapability, armWrittenSince, captureWorktree, formatWriterCommitNextStep, writerCommitSteps } from "../lib/writer-commit-capability.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { ensurePrivateDirectory, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
-import { acceptanceQuestion, acceptanceTarget, acceptanceYesForm, isAcceptanceYes, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord, writeDeclineRecord } from "../lib/close-acceptance-record.mjs";
+import { acceptanceQuestion, acceptanceTarget, acceptanceYesForm, featureStatusVocabulary, isAcceptanceYes, openChecksOf, readAcceptanceRecord, writeAcceptanceRecord, writeDeclineRecord } from "../lib/close-acceptance-record.mjs";
 import { readConsumedCandidateResult } from "../lib/critic-packet-preflight-read.mjs";
 import { CLOSE_COMMIT_SPLIT_SCHEMA, describeCommitSplit, featureRangeCommitSplit } from "../lib/close-commit-split.mjs";
 import { minorsFromVerdictFindings, openMinorsCloseLine, recordOpenMinors, summarizeOpenMinors } from "../lib/open-minors.mjs";
@@ -24,6 +24,7 @@ import { closeSecurityScope, describeCloseSecurityScope } from "../lib/security-
 import { declaredRepositoryMode } from "./repository-freshness.mjs";
 import { exportCriticRoundFromJournal } from "./session-critic-finalizer.mjs";
 import { FOLLOWUP_EVIDENCE } from "../lib/critical-action-authorization.mjs";
+import { closeDispatchProjectionBytes, projectCloseDispatches, readCloseDispatchInputs } from "../lib/durable-evidence.mjs";
 
 const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
@@ -457,7 +458,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       // CFC-2: a run that stopped after these stages leaves its own uncommitted outputs, the Verify below then reads "dirty", and a Claude run committed them in two commits, which ended the Critic carry-forward
       // (VEP-CVL-CARRY-RANGE; a human had to reset). Only a tree whose every dirty path is such an output, with an evidence file proving an earlier attempt, is rolled back; the stages write the same again.
       // C22: the acceptance record is such an output too (the answer is already held in `accepted`, and written again after the package moves below).
-      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath, acceptanceTarget(root, featureId).path, `specs/${featureId}/acceptance.md`, `${evidenceDir}/human-acceptance.md`]);
+      const ownOutputs = new Set([packageManifest, auditRequestPath, closeRequestPath, verifyPath, acceptanceTarget(root, featureId).path, `specs/${featureId}/acceptance.md`, `${evidenceDir}/human-acceptance.md`, `${evidenceDir}/dispatch-projection.json`]);
       const leftovers = runner("git", ["status", "--porcelain=v1", "--untracked-files=all"]);
       const dirtyOutputs = leftovers?.status === 0 ? String(leftovers.stdout ?? "").split("\n").filter((line) => line !== "").map((line) => ({ tracked: !line.startsWith("??"), path: line.slice(3) })) : [];
       if (dirtyOutputs.some(({ tracked, path }) => !tracked && (path === auditRequestPath || path === verifyPath)) && dirtyOutputs.every(({ path }) => ownOutputs.has(path))) {
@@ -516,8 +517,19 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
         try { (deps.exportCriticRoundFn ?? exportCriticRoundFromJournal)({ root, packetId, outDir }); rounds.set(packetId, `${outDir}/report.md`); } catch { /* named in the bundle README as not exported */ }
       }
       const criticReports = [...rounds].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([packetId, path]) => ({ packetId, path }));
+      // C28 (AC-108, WSL run): the tracked, redacted projection of the feature's dispatches (briefing texts with digests, dispatch records) goes into the feature's evidence directory, so it travels in the
+      // one close commit and the bundle carries it. Nothing to project, or a source that cannot be read, writes nothing and never stops the close.
+      let dispatchProjectionPath = null;
+      try {
+        const projection = projectCloseDispatches({ featureId, ...(deps.closeDispatchInputsFn ?? readCloseDispatchInputs)(root) });
+        if (projection.dispatches.length > 0 || projection.gaps.length > 0) {
+          const target = `${evidenceDir}/dispatch-projection.json`;
+          mkdirSync(dirname(resolve(root, target)), { recursive: true }); writeFileSync(resolve(root, target), closeDispatchProjectionBytes(projection));
+          dispatchProjectionPath = target; stages.push("dispatch-projection");
+        }
+      } catch { dispatchProjectionPath = null; }
       stages.push("audit-request");
-      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports } });
+      writeRepoJson(root, auditRequestPath, { schema: "pipeline.feature-close-audit-request.v1", manifestPath: manifest, coreVersion, packs: ["pipeline-core-baseline"], criticVerifyLifecycleId: criticVerifyLifecycle, evidence: { criticReports, ...(dispatchProjectionPath === null ? {} : { dispatchProjectionPath }) } });
       if (state.continuity !== null && typeof state.continuity === "object") {
         let current = state;
         if (state.continuity.queueHead?.nextAction !== "close") {
@@ -660,6 +672,9 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     const closeStatus = { technicalClose: { status: phase, source: "close coordinator phase" },
       productAcceptance: acceptance === null ? { status: "not-recorded", source: "the feature's acceptance record" } : { status: "recorded", candidate: acceptance.candidate, openChecks: acceptance.openChecks, source: acceptance.path },
       push: { status: "not-done-by-the-close", source: "the close never pushes; publication and push are separate human-gated steps" } };
+    // C28: the same four-fact vocabulary the State inspector prints (a closed feature: the acceptance names the candidate it was given for, so no HEAD comparison).
+    let closedPackageState = null; try { const value = JSON.parse(readFileSync(resolve(root, `specs/${closedFeatureId}/lifecycle.json`), "utf8")).state; closedPackageState = typeof value === "string" ? value : null; } catch { closedPackageState = null; }
+    closeStatus.statuses = featureStatusVocabulary({ packageState: closedPackageState, closed: true, acceptedCandidate: acceptance?.candidate ?? null });
     let securityDocument = null; try { securityDocument = JSON.parse(readFileSync(resolve(root, "evidence/security-latest.v2.verdict.json"), "utf8")); } catch { securityDocument = null; }
     const securityScope = closeSecurityScope(securityDocument);
     const securitySentence = describeCloseSecurityScope(securityScope);
@@ -668,7 +683,7 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
     const remotes = declaredMode === "local-only" ? String(rawGit(["remote"]) ?? "").split(/\r?\n/u).map((line) => line.trim()).filter(Boolean) : [];
     const repositoryMode = remotes.length === 0 ? null : { declared: "local-only", remotes, status: "calibration-behind-the-remote", next: "Leave it for this close: a calibration commit now ends the Critic carry of the push. Correct it as the first commit of the next feature with repository-mode-promote.mjs." };
     return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "closed-local", featureId: closedFeatureId, lifecycleId: id, stages, closeStatus, securityScope, commits, ...(repositoryMode === null ? {} : { repositoryMode }), ...pushEvidenceStep(closedFeatureId),
-      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. ${describeCommitSplit(commits)}${securitySentence === "" ? "" : ` ${securitySentence}`}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
+      message: `The feature is closed locally. Technical close: ${phase}. Product acceptance: ${acceptance === null ? "not recorded" : "recorded"}. Push: not done by the close. Status: ${closeStatus.statuses.summary}. ${describeCommitSplit(commits)}${securitySentence === "" ? "" : ` ${securitySentence}`}${repositoryMode === null ? "" : ` The calibration still says local-only although a remote exists (${remotes.join(", ")}): ${repositoryMode.next}`} Publication, push and release are separate human-gated steps and were not touched. To prepare the push, run pushEvidence.command when it is present, then push-init.` });
   }
   return stopResult("inspect", "ONESHOT-PHASE-UNEXPECTED", `The close coordinator is in phase ${phase}, which this command does not continue from.`, `inspect it: node ${COORDINATOR} drive --root ${root} --lifecycle ${id} --actor ${JSON.stringify(actor)}`, { resumeLifecycleId: id });
 }

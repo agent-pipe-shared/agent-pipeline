@@ -22,7 +22,8 @@ import { lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, wr
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { denyPrivateAbsolutePaths, isTerminalOutcome, validateDispatchRecord } from "./dispatch-record.mjs";
+import { denyPrivateAbsolutePaths, isTerminalOutcome, maskPrivateAbsolutePaths, validateDispatchRecord } from "./dispatch-record.mjs";
+import { evaluateCredentialHygiene } from "./provenance-attestation.mjs";
 import { traceHumanApprovals } from "./human-approval-trace.mjs";
 import { canonical } from "./po-approval-proof.mjs";
 
@@ -141,11 +142,51 @@ function scanBriefings(root) {
     try {
       const bytes = readBounded(join(root, "scratch", name));
       const block = BRIEFING_BLOCK.exec(bytes.toString("utf8"));
-      const id = block ? JSON.parse(block[1])?.dispatchId : null;
-      if (typeof id === "string") found.set(id, [...(found.get(id) ?? []), { sha256: sha(bytes), path: `scratch/${name}` }]);
+      const marker = block ? JSON.parse(block[1]) : null; const id = marker?.dispatchId;
+      // C28: the text and the item the marker binds travel with the digest, for the close's own projection (the mirror above uses digest and path only).
+      if (typeof id === "string") found.set(id, [...(found.get(id) ?? []), { sha256: sha(bytes), path: `scratch/${name}`, text: bytes.toString("utf8"), itemId: typeof marker?.itemDelivery?.itemId === "string" ? marker.itemDelivery.itemId : null }]);
     } catch { /* an unreadable or foreign scratch file is simply not a briefing */ }
   }
   return found;
+}
+
+// ---- C28 (AC-108, WSL run): the close's tracked, redacted projection of the dispatches ---------------------------------------------------
+// Briefings and dispatch records stay untracked (scratch/ and evidence/ are ignored), so the tracked audit bundle could not show them. The close writes this ONE file into the
+// feature's evidence directory; the audit bundle carries it as one artifact (one evidence item, so no item limit is reachable however many dispatches ran).
+// Redaction reuses the existing rules and invents none: an absolute host path is masked by the dispatch-record rule, a credential-shaped text is left out by the provenance credential check.
+// A text that cannot be carried is a typed gap per dispatch with the digest of the original bytes, never an omission. The private-identifier deny set of the neutral-leakage policy is built
+// from the local machine by a script of its own and is not reachable here: the notes name that as not covered.
+export const CLOSE_DISPATCH_PROJECTION_SCHEMA = "pipeline.close-dispatch-projection.v1";
+const PROJECTION_MAX_DISPATCHES = 200; const BRIEFING_TEXT_MAX_BYTES = 200_000;
+const maskDeep = (value) => (typeof value === "string" ? maskPrivateAbsolutePaths(value) : Array.isArray(value) ? value.map(maskDeep) : value !== null && typeof value === "object" ? Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, maskDeep(entry)])) : value);
+function projectedBriefing(record, hits) {
+  if (hits.length > 1) return { status: "gap", code: "BRIEFING-AMBIGUOUS", sourceSha256: null, textSha256: null, text: null };
+  const hit = hits[0];
+  if (hit === undefined) { const attested = digest(record.attestation?.briefingSha256); return { status: "gap", code: attested === null ? "BRIEFING-NOT-FOUND" : "BRIEFING-TEXT-UNAVAILABLE", sourceSha256: attested, textSha256: null, text: null }; }
+  const gap = (code) => ({ status: "gap", code, sourceSha256: hit.sha256, textSha256: null, text: null });
+  if (Buffer.byteLength(hit.text, "utf8") > BRIEFING_TEXT_MAX_BYTES) return gap("BRIEFING-TOO-LARGE");
+  if (!evaluateCredentialHygiene(hit.text).ok) return gap("BRIEFING-CREDENTIAL-SHAPE");
+  const text = maskPrivateAbsolutePaths(hit.text);
+  try { denyPrivateAbsolutePaths(text, "briefing"); } catch { return gap("BRIEFING-PRIVATE-PATH-REMAINS"); }
+  return { status: text === hit.text ? "carried" : "redacted", code: null, sourceSha256: hit.sha256, textSha256: sha(text), text };
+}
+/** `records` are validated terminal dispatch records (`{ record }`), `briefings` the map `scanBriefings` returns. A dispatch whose briefing names another feature's item is not this feature's. */
+export function projectCloseDispatches({ featureId, records = [], briefings = new Map() } = {}) {
+  const dispatches = []; const gaps = []; let omitted = 0;
+  for (const { record } of [...records].sort((left, right) => (left.record.taskId < right.record.taskId ? -1 : left.record.taskId > right.record.taskId ? 1 : 0))) {
+    const hits = briefings.get(record.taskId) ?? [];
+    if (hits.some((hit) => typeof hit.itemId === "string" && !hit.itemId.startsWith(`${featureId}.`))) continue;
+    if (dispatches.length >= PROJECTION_MAX_DISPATCHES) { omitted += 1; continue; }
+    const { briefing: unusedBriefing, source: unusedSource, ...fields } = dispatchEntry(record, null, null);
+    dispatches.push({ taskId: record.taskId, record: maskDeep(fields), briefing: projectedBriefing(record, hits) });
+  }
+  if (omitted > 0) gaps.push({ code: "DISPATCH-LIST-TRUNCATED", count: omitted });
+  return { schema: CLOSE_DISPATCH_PROJECTION_SCHEMA, featureId, dispatches, gaps };
+}
+export function closeDispatchProjectionBytes(projection) { return jsonBytes(projection); }
+/** The completed dispatch records and the briefings found in scratch/, for `projectCloseDispatches` (read-only). */
+export function readCloseDispatchInputs(root) {
+  return { records: readDispatchSources(resolve(root)).completed.map(({ record }) => ({ record })), briefings: scanBriefings(resolve(root)) };
 }
 function briefingFor(record, scanned) {
   if (digest(record.attestation?.briefingSha256) !== null) return { sha256: record.attestation.briefingSha256, path: null, source: "attestation" };

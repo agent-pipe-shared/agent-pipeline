@@ -65,6 +65,9 @@ export function denyPrivateAbsolutePaths(value, label, seen = new WeakSet()) {
   else Object.entries(value).forEach(([key, entry]) => denyPrivateAbsolutePaths(entry, `${label}.${key}`, seen));
   seen.delete(value);
 }
+// C28 (AC-108): the SAME rule as the denial above, applied as a mask: a projection that must keep the text around a host path replaces exactly what the denial would refuse.
+const PRIVATE_ABSOLUTE_PATH_EVERYWHERE = new RegExp(PRIVATE_ABSOLUTE_PATH.source, "giu");
+export function maskPrivateAbsolutePaths(text) { return String(text).replace(PRIVATE_ABSOLUTE_PATH_EVERYWHERE, "<host-path>"); }
 export function isSafeTaskId(value) { return typeof value === "string" && SAFE_TASK_ID.test(value); }
 export function isTerminalOutcome(outcome) {
   if (typeof outcome !== "string") return false;

@@ -900,6 +900,35 @@ test("C22 CGR-12: the audit request carries every Critic round report of the fea
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+// C28 (AC-108, WSL run): briefings and dispatch records stayed untracked. The close writes their redacted projection into the feature's evidence directory (so it travels in the
+// one close commit) and names it in the audit request; with nothing to project, or an unreadable source, nothing is written and the close is not blocked.
+test("C28: the close writes the redacted dispatch projection into the feature's evidence, names it in the audit request and commits it with the close", () => {
+  const f = oneShotFixture();
+  try {
+    const text = "Briefing for /home/someone/src/repo and the plain parts.\n";
+    const closeDispatchInputsFn = () => ({ records: [{ record: { taskId: "D-ONE", schema: "pipeline.dispatch-record.v4", runner: "claude", agentType: "goldfish-deep", model: "m", effort: "high", rulesetSha: "r".repeat(64), dispatcher: "elephant", candidateCommit: "a".repeat(40), commits: [], outcome: "succeeded", outcomeClassification: { kind: "authored-commit" }, resultSha256: null, report: { changedFiles: [] } } }],
+      briefings: new Map([["D-ONE", [{ sha256: "e".repeat(64), path: "scratch/x.md", text, itemId: null }]]]) });
+    const closed = oneShotClose(f.input, { runCommand: f.runner, closeDispatchInputsFn });
+    assert.equal(closed.status, "commit-required");
+    const path = "specs/feature-abc/evidence/dispatch-projection.json";
+    const projection = JSON.parse(readFileSync(join(f.root, path), "utf8"));
+    assert.equal(projection.schema, "pipeline.close-dispatch-projection.v1"); assert.equal(projection.dispatches[0].briefing.status, "redacted"); assert.ok(!JSON.stringify(projection).includes("/home/someone"));
+    assert.equal(JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), "utf8")).evidence.dispatchProjectionPath, path);
+    assert.ok(closed.commit.paths.includes(path), `the projection travels in the one close commit: ${closed.commit.paths}`);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C28: nothing to project, or a source that cannot be read, writes no projection and never stops the close", () => {
+  for (const closeDispatchInputsFn of [() => ({ records: [], briefings: new Map() }), () => { throw new Error("unreadable evidence directory"); }]) {
+    const f = oneShotFixture();
+    try {
+      assert.equal(oneShotClose(f.input, { runCommand: f.runner, closeDispatchInputsFn }).status, "commit-required");
+      assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/dispatch-projection.json")), false);
+      assert.equal(Object.hasOwn(JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/audit-request.json"), "utf8")).evidence, "dispatchProjectionPath"), false);
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
+});
+
 test("the close fetches a missing Critic report itself, inside its own evidence directory, and a failing export only leaves the round named", () => {
   const f = oneShotFixture();
   try {
@@ -1079,7 +1108,11 @@ test("C22B CGF-12: the closed-local status separates product acceptance, technic
   try {
     const none = oneShotClose(f.resumed, { runCommand: f.runner });
     assert.equal(none.status, "closed-local", JSON.stringify(none).slice(0, 400));
-    assert.deepEqual(Object.keys(none.closeStatus).sort(), ["productAcceptance", "push", "technicalClose"]);
+    // C28 (QG-04, restated in place): the three statuses stay as they were; `statuses` is the new fourth key, the one four-fact vocabulary the State inspector prints too.
+    assert.deepEqual(Object.keys(none.closeStatus).sort(), ["productAcceptance", "push", "statuses", "technicalClose"]);
+    assert.equal(none.closeStatus.statuses.schema, "pipeline.feature-status.v1");
+    assert.equal(none.closeStatus.statuses.humanAccepted.reached, false, "no acceptance record, no human-accepted");
+    assert.match(none.message, /Status: package registered: [^;]+; implementation delivered: (?:yes|no); technically qualified: (?:yes|no); human-accepted: no\./u);
     assert.equal(none.closeStatus.technicalClose.status, "closed-local");
     assert.equal(none.closeStatus.productAcceptance.status, "not-recorded");
     assert.equal(none.closeStatus.push.status, "not-done-by-the-close");

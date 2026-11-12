@@ -127,6 +127,32 @@ export function readAcceptanceRecord(root, featureId) {
   return null;
 }
 
+/**
+ * C28 (AC-108, Codex run): ONE status vocabulary, four facts shown apart where the State inspector and the close print status. After a design reopen the package's lifecycle record
+ * still said `completed` next to State design/draft, and reports mixed 'package registered', 'implementation delivered', 'technically qualified' and 'human-accepted'.
+ * Every projection derives from this one function, so a reopen (phase design) or a declined acceptance (the bound Result retired: `resultBound` false) moves all of them together:
+ * a reopened or declined feature is never delivered, qualified or human-accepted. `packageState` is what the package's lifecycle record says (null: none).
+ * `headCandidate` is the commit an acceptance must name: null skips the comparison (a closed feature: the acceptance names the candidate it was given for); the empty string
+ * (HEAD unreadable) can never match, so an acceptance that cannot be shown to name this candidate is not reported as one. `resultBound` null: no Continuity binding to read.
+ */
+export function featureStatusVocabulary({ packageState = null, phase = null, resultBound = null, closed = false, acceptedCandidate = null, headCandidate = null } = {}) {
+  const registered = typeof packageState === "string" && packageState !== "";
+  const delivered = registered && (closed === true || phase !== "design") && ["verifying", "completed"].includes(packageState) && resultBound !== false;
+  const qualified = delivered && packageState === "completed";
+  const accepted = qualified && typeof acceptedCandidate === "string" && (headCandidate === null || acceptedCandidate === headCandidate);
+  const recordLag = packageState === "completed" && !delivered
+    ? { packageState, reason: `the package's lifecycle record still says completed, but the feature is ${phase === "design" ? "back in design (reopened)" : resultBound === false ? "back in a correction round (the acceptance was declined and the Result retired)" : "not delivered"}; read the four statuses, not the record` }
+    : null;
+  const yn = (value) => (value ? "yes" : "no");
+  return { schema: "pipeline.feature-status.v1",
+    packageRegistered: { reached: registered, state: registered ? packageState : null },
+    implementationDelivered: { reached: delivered },
+    technicallyQualified: { reached: qualified },
+    humanAccepted: { reached: accepted, candidate: accepted ? acceptedCandidate : null },
+    recordLag,
+    summary: `package registered: ${registered ? packageState : "no"}; implementation delivered: ${yn(delivered)}; technically qualified: ${yn(qualified)}; human-accepted: ${yn(accepted)}` };
+}
+
 /** Writes (idempotently) the record and, for a registered non-authority entry, rebinds its digest with the package's amendment record. Returns the paths written. */
 export function writeAcceptanceRecord({ root, featureId, record, now = () => new Date().toISOString() }) {
   const target = acceptanceTarget(root, featureId); const file = resolve(root, target.path); const written = [];

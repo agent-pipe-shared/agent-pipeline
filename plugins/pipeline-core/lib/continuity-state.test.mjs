@@ -33,6 +33,7 @@ import { computeContinuityFinalDigest } from "./continuity-host-adapter.mjs";
 import { computePoGoalDecisionReceiptDigest, computeRunnerNativeContinuationDigest } from "./runner-native-continuation.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 
+import * as CS from "./continuity-state.mjs";
 let passed = 0;
 function check(name, fn) {
   fn();
@@ -1636,6 +1637,20 @@ check("a retired Result stays in the history: resultRetirements validates agains
     const broken = structuredClone(withHistory); mutate(broken);
     assert.equal(validateContinuityState(broken).ok, false, label);
   }
+});
+
+// C28 (AC-108, WSL run): the SessionStart projection printed the planning entry `initial-planning`/`review-goal` as the queue head while the feature was in
+// implementation. No transition advances that head on plan approval, so a head may legitimately lag; the reader labels it instead of presenting it as the next action.
+check("C28 a queue head that still names a planning entry lags once the feature has left design, and only then", () => {
+  const head = (packageId, extra = {}) => ({ packageId, actionId: "review-goal", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null, ...extra });
+  for (const packageId of ["initial-planning", "kickoff-promotion", "continuity-adoption"]) {
+    const lag = CS.queueHeadLag({ queueHead: head(packageId) }, "implementation");
+    assert.deepEqual(lag, { status: "lagging", packageId, actionId: "review-goal", phase: "implementation" }, packageId);
+    assert.equal(CS.queueHeadLag({ queueHead: head(packageId) }, "design"), null, `${packageId} is current while the feature is in design`);
+    assert.equal(CS.queueHeadLag({ queueHead: head(packageId, { dispatch: { dispatchId: "d" } }) }, "implementation"), null, `${packageId} with a live dispatch is not lagging`);
+  }
+  assert.equal(CS.queueHeadLag({ queueHead: head("P1") }, "implementation"), null, "a working package head is current");
+  assert.equal(CS.queueHeadLag({ queueHead: null }, "implementation"), null, "no head, nothing to label");
 });
 
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

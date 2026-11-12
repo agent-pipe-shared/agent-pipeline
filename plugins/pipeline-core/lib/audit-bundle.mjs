@@ -4,6 +4,7 @@ import { createHash, verify as cryptoVerify } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { copyFile, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { denyPrivateAbsolutePaths } from "./dispatch-record.mjs";
 import { canonicalSha256, canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
 import { validateFeaturePackage } from "./feature-package-topology.mjs";
 import { resolveEffectiveOrganizationPolicy } from "./organization-policy.mjs";
@@ -18,10 +19,13 @@ function evidenceSection(manifest) {
   if (!Object.hasOwn(manifest, "evidence")) return "";
   const line = (entry) => `- ${entry.item}: ${entry.status}${entry.code ? ` (${entry.code})` : ""}${entry.bundlePath ? ` at \`${entry.bundlePath}\`` : ""}`;
   // C22 (CGR-12): the Critic round reports are their own section; a round without a report names what is missing instead of being left out.
-  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:")); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
+  const approval = manifest.evidence.items.filter((entry) => !entry.item.startsWith("critic-report:") && entry.item !== "dispatch-projection"); const reports = manifest.evidence.items.filter((entry) => entry.item.startsWith("critic-report:"));
+  // C28: the dispatch projection is its own section, printed after the reports.
+  const projections = manifest.evidence.items.filter((entry) => entry.item === "dispatch-projection");
+  const projectionText = projections.length === 0 ? "" : `\n## Dispatch projection\n\nThe tracked, redacted projection of the feature's dispatches: each briefing's text with its digest and each completed dispatch record. \`redacted\` means an absolute host path was masked (the digest of the original bytes is kept next to the digest of the text carried); a \`gap\` names why a text is not carried (a typed gap with the original digest, never an omission). A private key or secret-shaped value is never copied.\n\n${projections.map(line).join("\n")}\n`;
   const approvalText = approval.length === 0 ? "" : `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${approval.map(line).join("\n")}\n`;
   const reportText = reports.length === 0 ? "" : `\n## Critic round reports\n\nOne entry per Critic round of the feature. \`REPORT-NOT-EXPORTED\` means the round's report was never exported into the repository's tracked evidence (it lived outside the tracked tree), and \`UNREADABLE\` that the named file was missing or empty at the close: the report is NOT part of this bundle.\n\n${reports.map(line).join("\n")}\n`;
-  return `${approvalText}${reportText}`;
+  return `${approvalText}${reportText}${projectionText}`;
 }
 // C22B (CGR-13): printed prose only, from a build input that is NOT a manifest field (the manifest and its keys are hashed by the verifier and the bindings).
 // The README digest is recorded in the manifest at build time, so the extra text is bound like the rest of the README.
@@ -190,8 +194,19 @@ function followUpFindings(root, manifest) {
   return findings;
 }
 function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
-const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report"]);
-const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report" });
+const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection"]);
+const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection" });
+// C28: the projection the close writes (lib/durable-evidence.mjs `projectCloseDispatches`). The verifier re-checks it offline: every carried text hashes to the digest it names, nothing is a gap with a text,
+// and no absolute host path or private key is anywhere in the file, so a producer that skipped the redaction is found even when the artifact digest is consistent with the manifest.
+const DISPATCH_PROJECTION_SCHEMA = "pipeline.close-dispatch-projection.v1"; const BRIEFING_STATUSES = new Set(["carried", "redacted", "gap"]);
+function dispatchProjectionHolds(bytes) {
+  const value = jsonOrNull(bytes);
+  if (value === null || typeof value !== "object" || value.schema !== DISPATCH_PROJECTION_SCHEMA || !Array.isArray(value.dispatches) || !Array.isArray(value.gaps)) return false;
+  try { denyPrivateAbsolutePaths(value, "projection"); } catch { return false; }
+  if (/PRIVATE KEY/u.test(bytes.toString("utf8"))) return false;
+  return value.dispatches.every((entry) => entry !== null && typeof entry === "object" && typeof entry.taskId === "string" && entry.record !== null && typeof entry.record === "object" && entry.briefing !== null && typeof entry.briefing === "object"
+    && BRIEFING_STATUSES.has(entry.briefing.status) && (entry.briefing.status === "gap" ? entry.briefing.text === null && entry.briefing.textSha256 === null : typeof entry.briefing.text === "string" && entry.briefing.textSha256 === digest(Buffer.from(entry.briefing.text, "utf8"))));
+}
 const TRACE_SCHEMA = "pipeline.human-approval-trace.v1"; const TRACE_STATUSES = new Set(["traced", "attribution-only", "untraceable"]);
 const PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
 function evidenceShape(value) {
@@ -218,7 +233,7 @@ const sameCandidate = (value, candidate) => value !== null && typeof value === "
  */
 function collectEvidence(root, candidate, evidence, firstIndex) {
   if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) fail("AB-EVIDENCE-INPUT");
-  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports"]);
+  const known = new Set(["traceReportPath", "proofPaths", "verifyRecordPath", "securityScanPath", "criticReports", "dispatchProjectionPath"]);
   if (Object.keys(evidence).some((key) => !known.has(key)) || (evidence.proofPaths !== undefined && (!Array.isArray(evidence.proofPaths) || evidence.proofPaths.length > 16))) fail("AB-EVIDENCE-INPUT");
   // C22 (CGR-12): one entry per Critic round of the feature; a null path is a round whose report was never exported.
   const reports = evidence.criticReports;
@@ -229,7 +244,9 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
   const gap = (item, code) => items.push({ item, status: "gap", code, bundlePath: null });
   let traceBundlePath = null;
   // Only reports named (the close's own request): no approval item is invented, so a gap there is not a claim this request made.
-  if (approvalNamed || reports === undefined) {
+  // C28: a request that names only the dispatch projection (the close's own) invents no approval item either.
+  if (evidence.dispatchProjectionPath !== undefined && typeof evidence.dispatchProjectionPath !== "string") fail("AB-EVIDENCE-INPUT");
+  if (approvalNamed || (reports === undefined && evidence.dispatchProjectionPath === undefined)) {
   if (evidence.traceReportPath === undefined) gap("approval-trace", "NOT-REFERENCED");
   else {
     const file = readEvidenceFile(root, evidence.traceReportPath); const report = file && jsonOrNull(file.bytes);
@@ -272,6 +289,11 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
     const file = readEvidenceFile(root, entry.path);
     if (file === null || file.bytes.length === 0) gap(item, "UNREADABLE");
     else items.push({ item, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.critic, entry.path, file.sha256) });
+  }
+  if (evidence.dispatchProjectionPath !== undefined) {
+    const file = readEvidenceFile(root, evidence.dispatchProjectionPath);
+    if (file === null || file.bytes.length === 0) gap("dispatch-projection", "UNREADABLE");
+    else items.push({ item: "dispatch-projection", status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.dispatch, evidence.dispatchProjectionPath, file.sha256) });
   }
   return { artifacts, evidence: Object.freeze({ schema: "pipeline.audit-bundle-evidence.v1", candidateBound: true, traceStatus, items: Object.freeze(items.map((entry) => Object.freeze(entry))) }) };
 }
@@ -330,6 +352,10 @@ function evidenceFindings(root, manifest) {
   const findings = []; const listed = new Set(Array.isArray(manifest.artifacts) ? manifest.artifacts.filter((entry) => entry !== null && typeof entry === "object").map((entry) => entry.path) : []);
   for (const item of manifest.evidence.items) {
     if (item.bundlePath !== null && !listed.has(item.bundlePath)) { findings.push(`AB-EVIDENCE-ITEM ${item.item}`); continue; }
+    if (item.item === "dispatch-projection" && item.bundlePath !== null) {
+      let bytes = null; try { bytes = readFileSync(join(root, item.bundlePath)); } catch { bytes = null; }
+      if (bytes === null || !dispatchProjectionHolds(bytes)) findings.push("AB-DISPATCH-PROJECTION");
+    }
     if (item.item === "approval-trace" && item.bundlePath !== null) {
       let report = null; try { report = parseStrictJson(readFileSync(join(root, item.bundlePath))); } catch { report = null; }
       if (report?.schema !== TRACE_SCHEMA || !sameCandidate(report.candidate, manifest.candidate ?? {}) || report.status !== manifest.evidence.traceStatus) findings.push("AB-EVIDENCE-TRACE-CANDIDATE");

@@ -389,6 +389,7 @@ import { attachRunbookLink, runbookLine } from "../lib/runbook-link.mjs";
 import { resolveCanonicalArtifactIdentity as acceptedContractArtifactIdentity } from "../lib/feature-package-topology.mjs";
 import { verifyAgainstTrustAnchors as verifyAcceptedTrustAnchors } from "../lib/critical-human-proof-policy.mjs";
 import { basename, dirname, isAbsolute, join, posix as posixPath, relative, resolve, sep, win32 as win32Path } from "node:path";
+import { featureStatusVocabulary, readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
 import { spawnSync } from "node:child_process";
 import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
 import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
@@ -4334,6 +4335,19 @@ function inspectPlanLifecycle(dir, state) {
     ...(typeof planPath === 'string' ? { planSha256: physicalRebindFile(dir, planPath)?.sha256 ?? null } : {}),
     ...(typeof specPath === 'string' ? { specSha256: physicalRebindFile(dir, specPath)?.sha256 ?? null } : {}),
   });
+}
+
+// C28 (AC-108): the four statuses of the active feature, read from the package's lifecycle record, the State and the acceptance record through the one vocabulary function.
+function inspectFeatureStatus(dir, state, headOf) {
+  const feature = state.activeFeature;
+  if (feature === null || typeof feature !== "object" || typeof feature.id !== "string" || typeof feature.planPath !== "string" || isAbsolute(feature.planPath) || feature.planPath.split(/[\\/]/u).includes("..")) return null;
+  let packageState = null;
+  try { const value = JSON.parse(readFileSync(join(dir, dirname(feature.planPath), "lifecycle.json"), "utf8")).state; packageState = typeof value === "string" ? value : null; } catch { packageState = null; }
+  let acceptedCandidate = null;
+  try { acceptedCandidate = readAcceptanceRecord(dir, feature.id)?.candidate ?? null; } catch { acceptedCandidate = null; }
+  // HEAD is read only when an acceptance exists to compare it with (a project without one is never probed).
+  const head = acceptedCandidate === null ? null : headOf(dir);
+  return featureStatusVocabulary({ packageState, phase: feature.phase ?? null, resultBound: state.continuity?.authority ? state.continuity.authority.result != null : null, acceptedCandidate, headCandidate: head === null ? null : head?.ok === true ? head.commit : "" });
 }
 
 function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
@@ -14756,6 +14770,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         activeFeature: base.activeFeature ?? null,
         phase: base.activeFeature?.phase ?? null,
         planApproved: base.planApproved === true,
+        featureStatus: inspectFeatureStatus(dir, base, gitHead),
         lifecycle: { ok: lifecycle.ok, code: lifecycle.code, status: lifecycle.status },
         mixedPlanRecovery: mixedPlanRecoveryObservation(base),
         // D206: the approval is read through the private store (legacy tracked record as the fallback).
