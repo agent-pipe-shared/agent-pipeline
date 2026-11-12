@@ -69,7 +69,7 @@ const READ_CREDENTIAL_TARGET_COPY_REPAIR = "Repair: ask the human to put the con
 export const READ_CREDENTIAL_TARGET_REMEDY = [
   READ_CREDENTIAL_TARGET_CAUSE,
   READ_CREDENTIAL_TARGET_COPY_REPAIR,
-  "Alternatively the human can release this one exact read with a signed one-time override; the route is printed below when the override planner offers one for this path, and when it reports that none is offered, the copy above is the repair.",
+  "A read needs no human override and none is offered: there is never a signature for a read, so the copy above is the only repair.",
 ];
 
 /** Native read tools (no shell command, no override route for a native tool call): the same cause and the same runnable repair. */

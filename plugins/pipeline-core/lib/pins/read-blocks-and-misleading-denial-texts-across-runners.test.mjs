@@ -420,9 +420,13 @@ test("M7b an in-root credential read on every shell runner carries GUARD-READ-CR
   }
 }));
 
-test("M7c the claude lane's credential refusal also offers the override route text of the other human-liftable refusals, and says plainly when none is offered", { timeout: 300000 }, () => withRunnerFixture((path) => {
-  const decision = runnerDecision("claude", shellCall("cat vault/id_rsa", path), path);
-  assert.match(decision.text, /Human override available for this exact command|No human override route is offered for this exact command/u, decision.text);
+// C28 (PO decision 2026-11-11, replaces the K96 override route): a credential read never gets a signature, on any lane.
+test("M7c a credential read offers no human override on any shell runner: the refusal says none is offered and plans none", { timeout: 300000 }, () => withRunnerFixture((path) => {
+  for (const runner of RUNNERS) {
+    const decision = runnerDecision(runner, shellCall("cat vault/id_rsa", path), path);
+    assert.match(decision.text, /A read needs no human override and none is offered/u, `${runner}\n${decision.text}`);
+    assert.doesNotMatch(decision.text, /Human override available|signed one-time override|prepare-authorization|plan --request/u, `${runner}: no override route is printed\n${decision.text}`);
+  }
 }));
 
 test("M7d negative control: refusals that are not about a credential keep their codes (a flag the grammar does not know, an unsupported recursive grep, a missing file)", { timeout: 300000 }, () => withRunnerFixture((path) => {

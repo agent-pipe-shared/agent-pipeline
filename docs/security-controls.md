@@ -18,7 +18,7 @@ configuration. Identify the runtime before treating a guard as live. The
 portable methodology and host-specific hooks; [runner support](runner-support.md)
 states the separate runner and platform limits.
 
-A read of a protected credential location is refused with the typed code `GUARD-READ-CREDENTIAL-TARGET`, which names the path itself as the cause: no change to the command, its options or its wording lifts it. The shell route, the Claude native read tools and the Antigravity native read tools print this code. The repair is for a human to put the content you need into a non-credential file inside the project (for example under `docs/` or `scratch/`) and for you to read that copy. Where the human override planner offers a route for the exact path, a signed one-time override can release that one read in a shell command; native read tools have no override route, and for secret-named files the refusal says that no override route is offered.
+A read of a protected credential location is refused with the typed code `GUARD-READ-CREDENTIAL-TARGET`, which names the path itself as the cause: no change to the command, its options or its wording lifts it. The shell route, the Claude native read tools and the Antigravity native read tools print this code. The repair is for a human to put the content you need into a non-credential file inside the project (for example under `docs/` or `scratch/`) and for you to read that copy. No human override is offered on any lane (PO decision 2026-11-11): a read never gets a signature, so the shell route states that none is offered and plans none, and the native read tools have no override route either.
 
 ## Authority is separate from consent
 

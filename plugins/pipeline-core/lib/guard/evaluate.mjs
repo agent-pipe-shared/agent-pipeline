@@ -14,7 +14,7 @@ import { writeTargetPath } from "../tool-write-target.mjs";
 import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { observeGovernanceScope } from "../governance-scope.mjs";
 import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
-import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
 import { EXTERNAL_DIRECTORY_FILTER_HINT, filterRefusedOnExternalDirectory, firstUnadmittedFlag, firstUnadmittedGlobValue, flagSpellingHint, GLOB_FORM_HINT, clusterSpellingHint, lsListingHint, recursiveGrepHint, repeatedFlagHint } from "../read-command-diagnosis.mjs";
 import { isProjectWritePath } from "./path-containment.mjs";
 import { grammarRemediation, isReaderOnlyPipeline, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandIsCredentialTarget, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
@@ -535,12 +535,9 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       }
     } catch { outsideRoot = false; credentialTarget = false; }
     if (credentialTarget) {
-      // Same override route as the other human-liftable read refusals: a consumed one-time capability lifts exactly this command; otherwise
-      // the guidance is the plan command, or the planner's own statement that no route is offered for this path.
-      const reason = `${READ_CREDENTIAL_TARGET_CODE}: ${READ_CREDENTIAL_TARGET_GUIDANCE}`;
-      const route = humanOverrideRoute(READ_CREDENTIAL_TARGET_CODE, reason, "command", root, toolName, input.tool_input, dependencies);
-      if (!route.admitted) return withLifts(lifts, blocked(READ_CREDENTIAL_TARGET_CODE, null, [], route.overrideGuidance));
-      lifts.push(route.admitted);
+      // C28 (PO decision 2026-11-11, replaces the K96 override route): a read never gets a signature, so a credential target offers NO human
+      // override at all, not even a planned one; the typed refusal states the copy repair and that none is offered. No override request is seeded.
+      return withLifts(lifts, blocked(READ_CREDENTIAL_TARGET_CODE, null, [], ""));
     } else {
       // Name the one flag the grammar objects to when a single flag is the whole reason (null otherwise; nothing is granted).
       let flag = null;
