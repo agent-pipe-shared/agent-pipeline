@@ -1,0 +1,28 @@
+# ADR-0091: The software bill of materials is part of every feature close
+
+> Agent-Pipeline · Sprint Alfred · 2026-11-11
+
+**Status:** accepted (2026-11-11, PO tiles, register D240). Built in candidate 28c. Not yet run on a real repository.
+
+**Context source (PO direction, 2026-11-11, from the tile answers):** the SBOM is a standard part of the audit bundle and is written by the close; a stale or invalid one blocks the close; more languages than Node in the first version; no component means an explicit `not-applicable` with a reason; an existing SBOM is checked and otherwise generated; `partial` and `unsupported` block as well, with an override and a help text on how an adapter can be added.
+
+## Context
+
+ADR-0032 made the full CycloneDX SBOM an option and rejected it as a mandate, because it forced new stack tooling without a demonstrated need. Its amendment of 2026-08-01 then built the lifecycle: `pipeline.sbom-manifest.v1`, the CycloneDX 1.6 and SPDX 2.3 views, the Node adapter and the closed lifecycle states. None of it was wired into the close, so the audit bundle of a closed feature never carried a bill of materials, and a project that wanted one had to produce it by hand outside the close.
+
+## Decision
+
+1. **The close checks or writes the SBOM, always.** `finish-feature.mjs --one-shot` reads the lockfiles tracked in the repository and writes `specs/<feature>/evidence/sbom/` with `record.json` (`pipeline.sbom-close-record.v1`), `cyclonedx.json` and `spdx.json`. An existing record whose lockfile digests still match is reused; otherwise one is generated. Nothing runs a package manager and nothing uses the network: only pinned lockfiles are read.
+2. **First readers:** npm (`package-lock.json`, `npm-shrinkwrap.json`), Python (`poetry.lock`, `Pipfile.lock`, `requirements.txt` with `==` pins), Go (`go.mod`) and Rust (`Cargo.lock`). A reader is one row in `SBOM_READERS` and one test, so an adapter for another ecosystem is an addition, not a redesign. The inventory has no dependency edges (`edges: "not-recorded"`): a document never claims a graph it did not read.
+3. **No component is an explicit record, never an absent file.** A repository with no manifest, or lockfiles that list nothing, gets `status: not-applicable` with its reason.
+4. **Four states block the close,** before the acceptance question and before anything is written: `stale` (the lockfiles changed after the record), `invalid` (an unreadable or damaged file or record), `partial` (a manifest without a lockfile, an unpinned requirement) and `unsupported` (a manifest or lockfile with no reader yet). The stop names each finding and says how to repair it, including how a reader is added.
+5. **Only a human's literal override passes a block.** `--sbom-override "<the human's literal words>"` records those words, the actor and every finding it covers in the record (`status: overridden`). The bundle carries it under the code `SBOM-OVERRIDDEN` and its README states that the SBOM is then incomplete by that decision. A resumed close needs no second override for the findings the record names; a new finding blocks again. The flag is recorded as given, like the acceptance answer: an attribution record, not a signature.
+6. **The audit bundle carries it.** The close names the record in its audit request; the bundle copies the record and the two documents as artifacts, prints a section for them, and the offline verifier re-checks the record's shape, that the carried documents are exactly the ones it names by digest, and that each document holds its profile.
+
+## Consequences
+
+Every closed feature has an inventory in its evidence, in two standard formats, without a tool the project must install. A project with a stack the readers do not know is stopped once, with the way forward named, and can pass by a recorded human decision. The override is visible to whoever reads the bundle. Paths under `node_modules`, `vendor`, fixture, example, `docs`, `specs` and similar directories are not observed.
+
+## Affected contracts
+
+ADR-0032 stays for everything else (release manifests, the living architecture document, the greenfield scope); its option "full CycloneDX per stack tooling" is now met inside the close for the supported lockfiles. The lifecycle states of its 2026-08-01 amendment are reused as typed finding states; `pipeline.sbom-manifest.v1` still binds a release candidate and is not replaced by the close record, which binds the feature's evidence.
