@@ -26,6 +26,8 @@ import { exportCriticRoundFromJournal } from "./session-critic-finalizer.mjs";
 import { FOLLOWUP_EVIDENCE } from "../lib/critical-action-authorization.mjs";
 import { closeDispatchProjectionBytes, projectCloseDispatches, readCloseDispatchInputs } from "../lib/durable-evidence.mjs";
 import { closeSbom, sbomFindingHelp } from "../lib/sbom-close.mjs";
+import { SBOM_OVERRIDE_CODES, createSbomOverrideRequest, verifySbomOverrideProof } from "../lib/sbom-override-authority.mjs";
+import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 
 const HERE = new URL(".", import.meta.url);
 const COORDINATOR = fileURLToPath(new URL("./close-coordinator.mjs", HERE));
@@ -37,7 +39,8 @@ const REGISTER_PACKAGE = fileURLToPath(new URL("./register-feature-package.mjs",
 const SECURITY_SCAN = fileURLToPath(new URL("./security-scan.mjs", HERE));
 const PLUGIN_MANIFEST = fileURLToPath(new URL("../.claude-plugin/plugin.json", HERE));
 const FEATURE = /^[a-z][a-z0-9-]{2,63}$/u;
-const SBOM_OUTPUTS = Object.freeze(["record.json", "cyclonedx.json", "spdx.json"]);
+const SBOM_OUTPUTS = Object.freeze(["record.json", "cyclonedx.json", "spdx.json", "override-request.json", "override-proof.json"]);
+const PO_HUMAN_APPROVAL = fileURLToPath(new URL("./po-human-approval.mjs", HERE));
 // P3: the same five dispositions the coordinator accepts (the driver used to know only three and refused the rest before the coordinator spoke).
 const IMPACT = new Set(["architecture-conforms", "architecture-changed", "architecture-decision-added", "architecture-decision-superseded", "architecture-summary-updated", "no-architecture-impact"]);
 
@@ -230,7 +233,7 @@ const HEX32 = /^[a-f0-9]{32}$/u;
 function stopResult(stage, code, reason, repair, extra = {}) { return Object.freeze({ schema: "pipeline.one-shot-close.v1", status: "stopped", stage, stop: Object.freeze({ code, reason: String(reason).slice(0, 1200), repair }), ...extra }); }
 function writeRepoJson(root, path, value) { const target = resolve(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`); return path; }
 
-export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, humanDecline = null, openChecks = null, sbomOverride = null } = {}, deps = {}) {
+export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, criticPacketId = null, resumeLifecycleId = null, humanAcceptance = null, humanDecline = null, openChecks = null, sbomOverrideProof = null } = {}, deps = {}) {
   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
   if (!IMPACT.has(architectureImpact)) fail("FINISH-IMPACT", `Feature close requires a known architecture impact; allowed --architecture-impact values: ${[...IMPACT].join(", ")}.`);
@@ -240,8 +243,8 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   if (humanAcceptance !== null && (typeof humanAcceptance !== "string" || humanAcceptance.trim() === "" || humanAcceptance.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(humanAcceptance))) fail("FINISH-ACCEPTANCE", "The human acceptance must be the human's literal answer: non-empty, at most 500 characters, no control characters.");
   // C28: the human's literal words of a decline, held to the same bounds; the two answers exclude each other.
   if (humanDecline !== null && (typeof humanDecline !== "string" || humanDecline.trim() === "" || humanDecline.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(humanDecline))) fail("FINISH-ACCEPTANCE", "The human decline must be the human's literal answer: non-empty, at most 500 characters, no control characters.");
-  // C28c: the human's literal words accepting a gap in the SBOM, held to the same bounds; it is recorded as given, never composed by the agent.
-  if (sbomOverride !== null && (typeof sbomOverride !== "string" || sbomOverride.trim() === "" || sbomOverride.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u.test(sbomOverride))) fail("FINISH-SBOM-OVERRIDE", "The SBOM override must be the human's literal words: non-empty, at most 500 characters, no control characters.");
+  // C28c (PO decision 2026-11-11): accepting a gap in the SBOM needs the PO's signature. The flag names the proof file the signing command mirrored next to the request this close printed; its path is held to that scratch shape.
+  if (sbomOverrideProof !== null && (typeof sbomOverrideProof !== "string" || !/^scratch\/sbom-override-proof-[a-f0-9]{16}\.json$/u.test(sbomOverrideProof))) fail("FINISH-SBOM-OVERRIDE", "The SBOM override proof must be the file the signing command wrote next to the printed request: scratch/sbom-override-proof-<16 hex>.json.");
   if (humanAcceptance !== null && humanDecline !== null) fail("FINISH-ACCEPTANCE", "--human-acceptance and --human-decline are exclusive: the human either accepted (exactly the fixed yes form) or did not.");
   if (openChecks !== null && (!Array.isArray(openChecks) || openChecks.some((value) => typeof value !== "string"))) fail("FINISH-ACCEPTANCE", "The open checks must be a list of texts.");
   const runner = deps.runCommand ?? ((executable, argv) => spawnSync(executable, argv, { cwd: root, encoding: "utf8", shell: false, env: { ...process.env, CLAUDE_PROJECT_DIR: root } }));
@@ -351,11 +354,31 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       const tracked = runner("git", ["ls-files", "-z"]);
       if (tracked?.status !== 0) return stopResult("sbom", "ONESHOT-SBOM-TRACKED-FILES", failedText(tracked), `rerun the identical command: ${rerun(again)}`);
       const readText = (path) => { try { return readFileSync(resolve(root, path), "utf8"); } catch { return null; } };
-      const sbom = closeSbom({ featureId, evidenceDir, tracked: String(tracked.stdout ?? "").split("\0").filter((path) => path !== ""), read: readText, existing: readText(`${evidenceDir}/sbom/record.json`), override: sbomOverride, actor });
+      const sbomInput = { featureId, evidenceDir, tracked: String(tracked.stdout ?? "").split("\0").filter((path) => path !== ""), read: readText, existing: readText(`${evidenceDir}/sbom/record.json`), actor };
+      let sbom = closeSbom(sbomInput);
       if (sbom.status === "blocked") {
         const helps = [...new Set(sbom.blocks.map((block) => sbomFindingHelp(block)))];
-        return stopResult("sbom", sbom.blocks[0].code, sbom.blocks.map((block) => `${block.state} ${block.path}: ${block.reason}`).join("; "),
-          `${helps.join(" ")} A human can instead accept the gap: ask them, then rerun with --sbom-override "<the human's literal words>" (the record names every finding it covers and travels in the audit bundle): ${rerun(again)}`);
+        const blockedText = sbom.blocks.map((block) => `${block.state} ${block.path}: ${block.reason}`).join("; ");
+        // The PO's signature, never a sentence, accepts the gap. The request names the feature, every finding and HEAD, so a changed finding or a moved HEAD needs a new request and a new signature.
+        const head = rawGit(["rev-parse", "HEAD"]); const headTree = rawGit(["rev-parse", "HEAD^{tree}"]);
+        const request = head === null || headTree === null ? null : createSbomOverrideRequest({ featureId, blocked: sbom.blocks, candidate: { commit: head, tree: headTree } });
+        if (request === null) return stopResult("sbom", sbom.blocks[0].code, blockedText, `${helps.join(" ")} The commit (HEAD) could not be read, so a signed override cannot be prepared: repair the repository, then rerun the identical command: ${rerun(again)}`);
+        const requestPath = `scratch/sbom-override-request-${request.intentSha256.slice(0, 16)}.json`; const proofPath = requestPath.replace("request", "proof");
+        const signText = `The PO can accept the gap by signature, in their own terminal (never the agent): node ${PO_HUMAN_APPROVAL} sign-intent --repo-root ${root} --request ${requestPath} -- it shows the findings and writes the proof to ${proofPath}. Then rerun the identical command with the proof added: ${rerun(again)} --sbom-override-proof ${proofPath}. Do not commit or change the tree in between: the signature names the current commit.`;
+        if (sbomOverrideProof === null) {
+          mkdirSync(resolve(root, "scratch"), { recursive: true }); writeFileSync(resolve(root, requestPath), `${JSON.stringify(request, null, 2)}\n`);
+          return stopResult("sbom", sbom.blocks[0].code, blockedText, `${helps.join(" ")} ${signText}`);
+        }
+        if (sbomOverrideProof !== proofPath) return stopResult("sbom", "SBOM-OVERRIDE-PROOF-STALE", `the proof ${sbomOverrideProof} does not belong to the current findings and commit (${blockedText})`, `${signText}`, { sbomOverrideRequest: requestPath });
+        let proof = null;
+        try { proof = JSON.parse(readFileSync(resolve(root, proofPath), "utf8")); } catch { return stopResult("sbom", SBOM_OVERRIDE_CODES.unreadable, `the proof file ${proofPath} could not be read as JSON`, `${signText}`, { sbomOverrideRequest: requestPath }); }
+        const policy = readCriticalHumanProofPolicy(root);
+        const trustAnchors = policy?.ok === true ? (policy.trustAnchors ?? (policy.trustAnchor ? [policy.trustAnchor] : [])) : [];
+        const verified = verifySbomOverrideProof({ featureId, blocked: sbom.blocks, candidate: { commit: head, tree: headTree }, proof, trustAnchors });
+        if (verified.verified !== true) return stopResult("sbom", verified.code, `the signed override was refused (${verified.code}): ${blockedText}`, `${verified.code === SBOM_OVERRIDE_CODES.noAnchor || verified.code === SBOM_OVERRIDE_CODES.untrusted ? "the project's trust anchors (project/critical-human-proof.json) do not name the signing key; " : ""}${signText}`, { sbomOverrideRequest: requestPath });
+        sbom = closeSbom({ ...sbomInput, override: `The PO accepted the findings listed here by signature (key ${verified.authority.keyReference}).`, authority: verified.authority });
+        if (sbom.status === "ready") sbom.files.push({ path: `${evidenceDir}/sbom/override-request.json`, text: `${JSON.stringify(verified.request, null, 2)}\n` }, { path: `${evidenceDir}/sbom/override-proof.json`, text: `${JSON.stringify(proof, null, 2)}\n` });
+        else return stopResult("sbom", sbom.blocks[0].code, sbom.blocks.map((block) => `${block.state} ${block.path}: ${block.reason}`).join("; "), `${helps.join(" ")}`);
       }
       // C24 (Claude greenfield): a round that did not pass used to surface only inside Verify, after the Result bootstrap, with no way out named, and a run took a PO's word in chat for an acceptance.
       let standing = null;
@@ -749,13 +772,13 @@ export function stageOneShotCommit(root, result) {
 function parseOneShot(argvWithStage) {
   const stage = argvWithStage.length > 0 && argvWithStage.at(-1) === "--stage";
   const argv = stage ? argvWithStage.slice(0, -1) : argvWithStage;
-  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--human-decline", "--open-checks", "--sbom-override"]; const value = {};
+  const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--human-decline", "--open-checks", "--sbom-override-proof"]; const value = {};
   for (let i = 0; i < argv.length; i += 2) {
     const flag = argv[i]; const next = argv[i + 1];
-    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] [--sbom-override \"<the human's literal words accepting a blocked SBOM>\"] [--stage] (the first call stops once with the acceptance question for the human; a SBOM finding that blocks the close is named with its repair, and only the human's override passes it; --stage, last, stages exactly the paths of the commit the result asks for and never commits)");
+    if (!allowed.includes(flag) || next === undefined || next.startsWith("--") || Object.hasOwn(value, flag)) fail("FINISH-USAGE", "Usage: finish-feature.mjs --one-shot --by <name> --architecture-impact <value> [--root <repo>] [--critic-packet-id <32-hex>] [--resume-lifecycle-id <id>] [--open-checks \"<check; check>\"] [--human-acceptance \"<exactly the fixed yes form>\" | --human-decline \"<the human's literal answer>\"] [--sbom-override-proof scratch/sbom-override-proof-<16 hex>.json] [--stage] (the first call stops once with the acceptance question for the human; a SBOM finding that blocks the close is named with its repair, and only the PO's signed override, written by the signing command next to the request the stop prints, passes it; --stage, last, stages exactly the paths of the commit the result asks for and never commits)");
     value[flag] = next;
   }
-  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, humanDecline: value["--human-decline"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";"), sbomOverride: value["--sbom-override"] ?? null, stage };
+  return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], criticPacketId: value["--critic-packet-id"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null, humanAcceptance: value["--human-acceptance"] ?? null, humanDecline: value["--human-decline"] ?? null, openChecks: value["--open-checks"] === undefined ? null : value["--open-checks"].split(";"), sbomOverrideProof: value["--sbom-override-proof"] ?? null, stage };
 }
 
 function parse(argv) {

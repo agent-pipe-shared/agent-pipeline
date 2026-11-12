@@ -586,8 +586,8 @@ your project's authority settings before using one.
   is part of every feature close, [ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md)):**
   the close reads the pinned lockfiles (npm, Python, Go, Rust) and records the
   components in CycloneDX 1.6 and SPDX 2.3, or an explicit `not-applicable`;
-  `stale`, `invalid`, `partial` and `unsupported` stop the close unless a
-  human's override is recorded. Provenance structures are validated locally;
+  `stale`, `invalid`, `partial` and `unsupported` stop the close unless the
+  PO's signed override for exactly those findings is recorded. Provenance structures are validated locally;
   nothing here installs scanners or creates an external attestation.
 
 <!-- capability:ai-assisted-hardening -->
@@ -1203,7 +1203,8 @@ externe Freigabe oder die Aktivierung in einem Nutzer-Repository.
   der Close liest die gepinnten Lockfiles (npm, Python, Go, Rust) und hält die
   Komponenten in CycloneDX 1.6 und SPDX 2.3 fest, oder ein ausdrückliches
   `not-applicable`; `stale`, `invalid`, `partial` und `unsupported` stoppen den
-  Close, solange keine Übersteuerung eines Menschen festgehalten ist.
+  Close, solange keine signierte Übersteuerung des PO für genau diese Befunde
+  festgehalten ist.
   Provenienzstrukturen werden lokal geprüft; nichts davon installiert Scanner
   oder erstellt eine externe Attestierung.
 - **KI-gestützte Härtung (optional, nur Host):** bewertet nicht vertrauenswürdige

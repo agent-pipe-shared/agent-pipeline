@@ -60,6 +60,7 @@ import { organizationArchitectureConfigIntentSha256 } from "../lib/organization-
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
+import { createSbomOverrideRequest } from "../lib/sbom-override-authority.mjs";
 
 /**
  * ALF-C-W2-03D: where the fixtures of this suite live.
@@ -1401,6 +1402,45 @@ test("sign-intent discloses the exact reviewed PRD, specification, and checkpoin
     assert.ok(prompt.includes("revision 7") && prompt.includes(action.checkpoint.sha256));
     assert.ok(prompt.includes("content-sound and consistent"));
     assert.equal(intentSha256.length, 64, "sanity check: unrelated JSON ordering digest is not authority");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+// C28c (PO decision 2026-11-11): the SBOM override is signed. The signer sees the feature, the commit and every finding the request names, and the proof lands next to the request for the close to read.
+const SBOM_FINDINGS = [{ state: "unsupported", code: "SBOM-ADAPTER-UNSUPPORTED", path: "yarn.lock", reason: "no reader for yarn.lock" }];
+test("sign-intent discloses the feature, the commit and every finding of an SBOM override request and mirrors the proof next to it", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
+    const request = createSbomOverrideRequest({ featureId: "greenfield-42", blocked: SBOM_FINDINGS, candidate: { commit: "1".repeat(40), tree: "2".repeat(40) } });
+    const name = `sbom-override-request-${request.intentSha256.slice(0, 16)}.json`;
+    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+    writeFileSync(join(dirs.repoRoot, "scratch", name), `${JSON.stringify(request, null, 2)}\n`);
+    const prompts = [];
+    const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", `scratch/${name}`],
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }));
+    assert.equal(result.ok, true);
+    assert.equal(prompts.length, 1);
+    for (const shown of ["greenfield-42", "1".repeat(40), "yarn.lock", "SBOM-ADAPTER-UNSUPPORTED", "software bill of materials"]) assert.ok(prompts[0].includes(shown), `the signer is shown: ${shown}`);
+    assert.equal(existsSync(join(dirs.repoRoot, "scratch", name.replace("request", "proof"))), true, "the proof is mirrored next to the request");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("sign-intent rejects an SBOM override request whose findings no longer bind its intent digest", () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const request = createSbomOverrideRequest({ featureId: "greenfield-42", blocked: SBOM_FINDINGS, candidate: { commit: "1".repeat(40), tree: "2".repeat(40) } });
+    const name = `sbom-override-request-${request.intentSha256.slice(0, 16)}.json`;
+    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+    writeFileSync(join(dirs.repoRoot, "scratch", name), `${JSON.stringify({ ...request, blocked: [{ ...SBOM_FINDINGS[0], path: "other.lock" }] }, null, 2)}\n`);
+    assert.throws(() => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", `scratch/${name}`], { readConfirmation: () => "approve" }),
+      /SBOM override request does not bind its exact feature, findings, candidate and intent digest/);
+    assert.equal(existsSync(join(dirs.repoRoot, "scratch", name.replace("request", "proof"))), false);
   } finally {
     cleanup(dirs);
   }

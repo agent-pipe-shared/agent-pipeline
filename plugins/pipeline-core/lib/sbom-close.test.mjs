@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { SBOM_READERS, closeSbom, observeSbomInputs, sbomCloseRecordShape, sbomFindingHelp } from "./sbom-close.mjs";
 import { validateSbomPayload } from "./sbom-manifest.mjs";
+import { createHash, generateKeyPairSync, sign as nodeSign } from "node:crypto";
+import { PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
+import { SBOM_OVERRIDE_CODES, SBOM_OVERRIDE_REQUEST_SCHEMA, createSbomOverrideRequest, describeSbomOverrideRequest, verifySbomOverrideProof } from "./sbom-override-authority.mjs";
 
 const NPM_LOCK = JSON.stringify({ name: "app", lockfileVersion: 3, packages: { "": { name: "app" }, "node_modules/left-pad": { version: "1.3.0" }, "node_modules/@scope/pkg": { version: "2.0.0", dev: true }, "node_modules/a/node_modules/b": { version: "0.1.0", optional: true }, "packages/inner": { version: "1.0.0" }, "node_modules/inner": { resolved: "packages/inner", link: true } } });
 const CARGO_LOCK = '[[package]]\nname = "app"\nversion = "0.1.0"\n\n[[package]]\nname = "serde"\nversion = "1.0.200"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\ndependencies = [\n "x",\n]\n';
@@ -84,16 +87,23 @@ test("a complete close writes both documents, valid in their profiles and bound 
   assert.equal(close({ "package-lock.json": NPM_LOCK, "go.mod": GO_MOD }).files[0].text, out.files[0].text, "deterministic bytes");
 });
 
-test("every blocking state stops the close unless a human's override is given; the override names what it covers", () => {
+// The verified signature the close records; the caller (the one-shot close) proves it before this function is given it.
+const AUTHORITY = Object.freeze({ kind: "po-signature", keyReference: "po-key", intentSha256: "a".repeat(64), proofSha256: "b".repeat(64), candidateCommit: "c".repeat(40) });
+
+test("every blocking state stops the close unless a verified PO signature comes with the override; the override names what it covers", () => {
   const files = { "package-lock.json": NPM_LOCK, "yarn.lock": "x" };
   const blocked = close(files);
   assert.equal(blocked.status, "blocked"); assert.equal(blocked.blocks[0].state, "unsupported");
-  const overridden = close(files, { override: "ja, ohne SBOM fuer yarn", actor: "po" });
+  assert.equal(close(files, { override: "ja, ohne SBOM fuer yarn", actor: "po" }).status, "blocked", "words alone never pass");
+  const overridden = close(files, { override: "accepted by signature", authority: AUTHORITY, actor: "po" });
   assert.equal(overridden.status, "ready"); assert.equal(overridden.record.status, "overridden"); assert.equal(overridden.record.code, "SBOM-OVERRIDDEN");
-  assert.equal(overridden.record.override.statement, "ja, ohne SBOM fuer yarn"); assert.equal(overridden.record.override.blocked[0].path, "yarn.lock");
+  assert.equal(overridden.record.override.statement, "accepted by signature"); assert.equal(overridden.record.override.blocked[0].path, "yarn.lock");
+  assert.deepEqual(overridden.record.override.authority, AUTHORITY);
   assert.equal(overridden.record.componentCount, 3, "what could be read is still carried");
   assert.equal(sbomCloseRecordShape(overridden.record), true);
-  const onlyOverride = close({ "yarn.lock": "x" }, { override: "weiter", actor: "po" });
+  assert.equal(sbomCloseRecordShape({ ...overridden.record, override: { ...overridden.record.override, authority: { ...AUTHORITY, kind: "words" } } }), false, "the authority is a PO signature");
+  assert.equal(sbomCloseRecordShape({ ...overridden.record, override: { statement: "x", actor: "po", blocked: overridden.record.override.blocked } }), false, "an override without its authority is not a record");
+  const onlyOverride = close({ "yarn.lock": "x" }, { override: "weiter", authority: AUTHORITY, actor: "po" });
   assert.equal(onlyOverride.record.componentCount, 0); assert.equal(onlyOverride.record.documents.length, 0);
 });
 
@@ -113,7 +123,7 @@ test("an existing matching record is reused; a changed lockfile makes it stale; 
 
 test("a recorded override keeps covering the same findings on a resumed close, and no others", () => {
   const files = { "package-lock.json": NPM_LOCK, "yarn.lock": "x" };
-  const first = close(files, { override: "weiter", actor: "po" });
+  const first = close(files, { override: "weiter", authority: AUTHORITY, actor: "po" });
   const stored = Object.fromEntries(first.files.map((f) => [f.path, f.text]));
   const resumed = close({ ...files, ...stored }, { existing: stored[first.recordPath] });
   assert.equal(resumed.status, "ready"); assert.equal(resumed.reused, true);
@@ -128,4 +138,48 @@ test("the record shape is closed", () => {
   assert.equal(sbomCloseRecordShape({ ...out.record, componentCount: 0 }), false);
   assert.equal(sbomCloseRecordShape({ ...out.record, edges: "full" }), false);
   assert.equal(sbomCloseRecordShape(null), false);
+});
+
+// The signed override (PO decision 2026-11-11): a request names the feature, every finding and the candidate; only a proof from a trusted key over exactly that request verifies.
+function signer(keyReference = "po-key") {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const pem = publicKey.export({ type: "spki", format: "pem" });
+  const anchor = { keyReference, publicKeySha256: createHash("sha256").update(pem).digest("hex") };
+  const sign = (request) => ({ schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: request.approvalIntent.sha256, keyReference, publicKey: pem, signatureBase64: nodeSign(null, Buffer.from(request.approvalIntent.sha256, "utf8"), privateKey).toString("base64") });
+  return { anchor, sign };
+}
+const BLOCKED = [{ state: "unsupported", code: "SBOM-ADAPTER-UNSUPPORTED", path: "yarn.lock", reason: "no reader for yarn.lock" }, { state: "partial", code: "SBOM-PARTIAL", path: "requirements.txt", reason: "an unpinned line" }];
+const CANDIDATE = { commit: "1".repeat(40), tree: "2".repeat(40) };
+
+test("an override request is deterministic, bound to feature, findings and candidate, and shown to the signer from the request alone", () => {
+  const request = createSbomOverrideRequest({ featureId: "demo-feature", blocked: BLOCKED, candidate: CANDIDATE });
+  assert.equal(request.schema, SBOM_OVERRIDE_REQUEST_SCHEMA); assert.equal(request.intentSha256, request.approvalIntent.sha256);
+  assert.equal(createSbomOverrideRequest({ featureId: "demo-feature", blocked: [...BLOCKED].reverse(), candidate: CANDIDATE }).intentSha256, request.intentSha256, "the order of the findings does not matter");
+  for (const other of [{ featureId: "other-feature" }, { blocked: [BLOCKED[0]] }, { candidate: { commit: "3".repeat(40), tree: "2".repeat(40) } }]) {
+    assert.notEqual(createSbomOverrideRequest({ featureId: "demo-feature", blocked: BLOCKED, candidate: CANDIDATE, ...other }).intentSha256, request.intentSha256, JSON.stringify(other));
+  }
+  assert.equal(createSbomOverrideRequest({ featureId: "demo-feature", blocked: [], candidate: CANDIDATE }), null);
+  assert.equal(createSbomOverrideRequest({ featureId: "demo-feature", blocked: BLOCKED, candidate: { commit: "1".repeat(40), tree: "1".repeat(40) } }), null);
+  const shown = describeSbomOverrideRequest(request, request.intentSha256);
+  assert.equal(shown.resolved, true); assert.ok(shown.lines.some((line) => line.includes("yarn.lock")) && shown.lines.some((line) => line.includes("requirements.txt")) && shown.lines.some((line) => line.includes(CANDIDATE.commit)));
+  assert.equal(describeSbomOverrideRequest({ ...request, blocked: [BLOCKED[0]] }, request.intentSha256), null, "a request that no longer re-derives shows nothing and is not signed");
+  assert.equal(describeSbomOverrideRequest(request, "f".repeat(64)), null);
+});
+
+test("only a proof of a trusted key over exactly this feature, these findings and this candidate verifies", () => {
+  const { anchor, sign } = signer();
+  const request = createSbomOverrideRequest({ featureId: "demo-feature", blocked: BLOCKED, candidate: CANDIDATE });
+  const proof = sign(request);
+  const ask = (over = {}) => verifySbomOverrideProof({ featureId: "demo-feature", blocked: BLOCKED, candidate: CANDIDATE, proof, trustAnchors: [anchor], ...over });
+  const ok = ask();
+  assert.equal(ok.verified, true); assert.equal(ok.authority.kind, "po-signature"); assert.equal(ok.authority.keyReference, "po-key"); assert.equal(ok.authority.intentSha256, request.intentSha256); assert.equal(ok.authority.candidateCommit, CANDIDATE.commit);
+  assert.equal(ask({ featureId: "other-feature" }).verified, false, "another feature");
+  assert.equal(ask({ blocked: [BLOCKED[0]] }).verified, false, "another set of findings");
+  assert.equal(ask({ candidate: { commit: "3".repeat(40), tree: "2".repeat(40) } }).verified, false, "another candidate");
+  assert.equal(ask({ trustAnchors: [] }).code, SBOM_OVERRIDE_CODES.noAnchor, "no trust anchor is not an open door");
+  assert.equal(ask({ trustAnchors: [signer("other-key").anchor] }).code, SBOM_OVERRIDE_CODES.untrusted, "a key the project does not name");
+  assert.equal(ask({ trustAnchors: [{ ...anchor, publicKeySha256: "0".repeat(64) }] }).verified, false, "a key that does not match its anchor");
+  assert.equal(ask({ proof: { ...proof, signatureBase64: Buffer.from("not a signature").toString("base64") } }).verified, false, "an edited signature");
+  assert.equal(ask({ proof: { ...proof, extra: 1 } }).code, SBOM_OVERRIDE_CODES.invalid, "a proof of another shape");
+  assert.equal(ask({ proof: null }).code, SBOM_OVERRIDE_CODES.invalid);
 });

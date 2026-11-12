@@ -305,7 +305,7 @@ test("C28c a not-applicable and an overridden record are carried with their code
   assert.deepEqual(empty.plan.evidence.items.map((entry) => `${entry.item}:${entry.code}`), ["sbom:SBOM-NOT-APPLICABLE"]);
   await buildAuditBundle({ repositoryRoot: none.root, outputPath: "bundle", plan: empty.plan });
   assert.equal((await verifyAuditBundle({ bundleRoot: join(none.root, "bundle") })).status, "verified");
-  const over = fixture(); const gap = sbomBundle(over, { "package-lock.json": LOCK, "yarn.lock": "x" }, () => ({ override: "weiter", actor: "po" }));
+  const over = fixture(); const gap = sbomBundle(over, { "package-lock.json": LOCK, "yarn.lock": "x" }, () => ({ override: "weiter", authority: { kind: "po-signature", keyReference: "po-key", intentSha256: "a".repeat(64), proofSha256: "b".repeat(64), candidateCommit: "c".repeat(40) }, actor: "po" }));
   assert.equal(gap.plan.evidence.items[0].code, "SBOM-OVERRIDDEN");
   await buildAuditBundle({ repositoryRoot: over.root, outputPath: "bundle", plan: gap.plan });
   assert.equal((await verifyAuditBundle({ bundleRoot: join(over.root, "bundle") })).status, "verified");

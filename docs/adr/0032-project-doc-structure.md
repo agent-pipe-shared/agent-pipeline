@@ -49,7 +49,7 @@ An SBOM is inventory evidence only: findings, VEX disposition, risk acceptance a
 
 ## Amendment 2026-11-11 — the close writes the SBOM
 
-[ADR-0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) (PO tiles, register D240) makes the SBOM part of every feature close and of its audit bundle. The rejected alternative "Full CycloneDX mandatory for all projects" and the sentence that the full SBOM is not mandatory are superseded for the lockfiles the close can read (npm, Python, Go, Rust): the close reads them without installing any tool and records both formats, or an explicit `not-applicable`, and a blocking state needs a human's recorded override. Everything else in this ADR stays.
+[ADR-0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) (PO tiles, register D240) makes the SBOM part of every feature close and of its audit bundle. The rejected alternative "Full CycloneDX mandatory for all projects" and the sentence that the full SBOM is not mandatory are superseded for the lockfiles the close can read (npm, Python, Go, Rust): the close reads them without installing any tool and records both formats, or an explicit `not-applicable`, and a blocking state needs the PO's signed override. Everything else in this ADR stays.
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
@@ -100,4 +100,4 @@ Eine SBOM ist ausschließlich Inventar: Findings, VEX, Risikoakzeptanz und Relea
 
 ## Ergänzung 2026-11-11 — der Close schreibt die SBOM
 
-[ADR-0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) (PO-Kacheln, Register D240) macht die SBOM zum Teil jedes Feature-Close und seines Audit-Bundles. Die verworfene Alternative „Volles CycloneDX für alle Projekte verpflichtend“ und der Satz, die volle SBOM sei nicht verpflichtend, gelten für die Lockfiles, die der Close lesen kann (npm, Python, Go, Rust), nicht mehr: der Close liest sie ohne Werkzeuginstallation und hält beide Formate fest, oder ein ausdrückliches `not-applicable`; ein sperrender Zustand braucht die festgehaltene Übersteuerung eines Menschen. Alles Übrige dieses ADR bleibt.
+[ADR-0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) (PO-Kacheln, Register D240) macht die SBOM zum Teil jedes Feature-Close und seines Audit-Bundles. Die verworfene Alternative „Volles CycloneDX für alle Projekte verpflichtend“ und der Satz, die volle SBOM sei nicht verpflichtend, gelten für die Lockfiles, die der Close lesen kann (npm, Python, Go, Rust), nicht mehr: der Close liest sie ohne Werkzeuginstallation und hält beide Formate fest, oder ein ausdrückliches `not-applicable`; ein sperrender Zustand braucht die signierte Übersteuerung des PO. Alles Übrige dieses ADR bleibt.

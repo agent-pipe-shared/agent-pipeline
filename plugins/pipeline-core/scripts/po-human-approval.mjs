@@ -54,6 +54,7 @@ import { readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-
 import { ORGANIZATION_ARCHITECTURE_CONFIG_PATH, organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
 import { MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA, describeModelFamilyApprovalRequest } from "./model-family-approval-request.mjs";
 import { canonical as canonicalProofJson } from "../lib/po-approval-proof.mjs";
+import { SBOM_OVERRIDE_REQUEST_SCHEMA, describeSbomOverrideRequest } from "../lib/sbom-override-authority.mjs";
 import { resolveTrustedSystemExecutable, trustedToolRepairHint } from "../lib/trusted-tool-resolution.mjs";
 import { PO_APPROVAL_DIRECTORY_ENV, own, text, resolvePoKeyDirectory } from "../lib/po-human-approval-read.mjs";
 export { resolvePoKeyDirectory } from "../lib/po-human-approval-read.mjs";
@@ -2857,6 +2858,9 @@ function executeHumanApprovalCore(args, dependencies = {}) {
       case "pipeline.historical-fresh-review-request.v1":
         record = historicalFreshReviewProvider?.describeHistoricalFreshReviewApprovalRequest(scratchRequestRecord, intentSha256, repository) ?? null;
         invalidRequest = "historical fresh-review request does not bind the actual immutable inventory, exact current target and preparation-only purpose"; break;
+      case SBOM_OVERRIDE_REQUEST_SCHEMA:
+        record = describeSbomOverrideRequest(scratchRequestRecord, intentSha256);
+        invalidRequest = "the SBOM override request does not bind its exact feature, findings, candidate and intent digest"; break;
       case DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA:
         fail("PO-HUMAN-REQUEST-RETIRED: use the current source-owned design approval request"); break;
       default:

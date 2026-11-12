@@ -6,7 +6,7 @@
  * and uses no network or package manager. It reads LOCKFILES (what is pinned), never resolves anything itself:
  *   npm (package-lock.json, npm-shrinkwrap.json), Python (poetry.lock, Pipfile.lock, pinned requirements.txt), Go (go.mod), Rust (Cargo.lock).
  * A manifest without a lockfile, an unpinned requirement or a lockfile format this module has no reader for is NAMED as a finding of a typed
- * state (`partial`, `unsupported`, `invalid`, `stale`); every such finding BLOCKS the close, unless a human's literal override is recorded.
+ * state (`partial`, `unsupported`, `invalid`, `stale`); every such finding BLOCKS the close, unless the PO's signed override for exactly those findings is recorded.
  * No component at all is an explicit `not-applicable` record with its reason, never an absent file.
  * The component inventory is flat: dependency edges are not recorded (`edges: "not-recorded"`), so a document never claims a graph it did not read.
  */
@@ -178,7 +178,7 @@ export function observeSbomInputs({ tracked, read }) {
 
 /** What the person at the close is told for one finding: how to remove the cause, and how an adapter can be added. */
 export function sbomFindingHelp(item) {
-  if (item.state === "unsupported") return `Add a reader: one function from the file's text to { ecosystem, name, version, purl, scope } components, registered by file name in SBOM_READERS (plugins/pipeline-core/lib/sbom-close.mjs), with a test in sbom-close.test.mjs. Until it exists, generate the SBOM with your own tool and have a human record the override.`;
+  if (item.state === "unsupported") return `Add a reader: one function from the file's text to { ecosystem, name, version, purl, scope } components, registered by file name in SBOM_READERS (plugins/pipeline-core/lib/sbom-close.mjs), with a test in sbom-close.test.mjs. Until it exists, generate the SBOM with your own tool and have the PO sign the override.`;
   if (item.state === "partial") return "Pin the dependencies in a lockfile this reader knows (package-lock.json, Cargo.lock, poetry.lock, Pipfile.lock, requirements.txt with ==, go.mod), commit it, and run the close again.";
   if (item.state === "stale") return "The recorded SBOM no longer matches the lockfiles. Remove the sbom directory named in the finding (the close writes a fresh one from the current lockfiles) and run the close again.";
   return "Repair or remove the named file, then run the close again.";
@@ -199,8 +199,10 @@ export function sbomCloseRecordShape(value) {
   if ((value.componentCount === 0) !== (value.documents.length === 0)) return false;
   if (value.status === "not-applicable" && (value.componentCount !== 0 || value.override !== null)) return false;
   if (value.status === "complete" && (value.componentCount === 0 || value.override !== null)) return false;
-  if (value.status === "overridden") return exact(value.override, ["statement", "actor", "blocked"]) && typeof value.override.statement === "string" && value.override.statement !== "" && typeof value.override.actor === "string" && value.override.actor !== ""
-    && Array.isArray(value.override.blocked) && value.override.blocked.length > 0 && value.override.blocked.every((entry) => exact(entry, ["state", "code", "path", "reason"]) && Object.values(entry).every((part) => typeof part === "string"));
+  if (value.status === "overridden") return exact(value.override, ["statement", "actor", "blocked", "authority"]) && typeof value.override.statement === "string" && value.override.statement !== "" && typeof value.override.actor === "string" && value.override.actor !== ""
+    && Array.isArray(value.override.blocked) && value.override.blocked.length > 0 && value.override.blocked.every((entry) => exact(entry, ["state", "code", "path", "reason"]) && Object.values(entry).every((part) => typeof part === "string"))
+    && exact(value.override.authority, ["kind", "keyReference", "intentSha256", "proofSha256", "candidateCommit"]) && value.override.authority.kind === "po-signature" && typeof value.override.authority.keyReference === "string" && value.override.authority.keyReference !== ""
+    && SHA.test(value.override.authority.intentSha256) && SHA.test(value.override.authority.proofSha256) && /^[a-f0-9]{40,64}$/u.test(value.override.authority.candidateCommit);
   return true;
 }
 
@@ -216,10 +218,11 @@ function documentsFor(observed, featureId, evidenceDir) {
 
 /**
  * The close's SBOM step. Returns { status: "ready", record, files, reused } or { status: "blocked", blocks }.
- * `existing` is the text of a record already on disk (or null), `override` the human's literal words (or null) with `actor`.
+ * `existing` is the text of a record already on disk (or null). `override` (a statement) and `authority` (the verified PO signature, see sbom-override-authority.mjs) come together or not at all: the
+ * caller verifies the signature against the blocked findings first, so this function never decides authority; it only records it, with the `actor` who ran the close.
  * An existing record whose inputs, shape or documents no longer match is `stale` or `invalid` and blocks like any other finding.
  */
-export function closeSbom({ featureId, evidenceDir, tracked, read, existing = null, override = null, actor = null }) {
+export function closeSbom({ featureId, evidenceDir, tracked, read, existing = null, override = null, authority = null, actor = null }) {
   const observed = observeSbomInputs({ tracked, read });
   const blocks = [...observed.findings];
   const recordPath = `${evidenceDir}/sbom/record.json`;
@@ -234,7 +237,7 @@ export function closeSbom({ featureId, evidenceDir, tracked, read, existing = nu
   // A record that already carries a human's override keeps covering exactly the findings it names, so a resumed close needs no second override.
   const coveredByRecord = reusable?.status === "overridden" && blocks.every((block) => reusable.override.blocked.some((named) => named.state === block.state && named.code === block.code && named.path === block.path));
   if (reusable !== null && (blocks.length === 0 || coveredByRecord)) return { status: "ready", record: reusable, recordPath, files: [], reused: true, blocks: [] };
-  if (blocks.length > 0 && override === null) return { status: "blocked", blocks, recordPath };
+  if (blocks.length > 0 && (override === null || authority === null)) return { status: "blocked", blocks, recordPath };
   const documents = observed.components.length === 0 ? { files: [] } : documentsFor(observed, featureId, evidenceDir);
   if (documents.error !== undefined) return { status: "blocked", blocks: [...blocks, finding("invalid", SBOM_LIFECYCLE_CODES.invalidFacts, recordPath, `the SBOM documents could not be generated (${documents.error})`)], recordPath };
   const overridden = blocks.length > 0;
@@ -242,10 +245,10 @@ export function closeSbom({ featureId, evidenceDir, tracked, read, existing = nu
     schema: SBOM_CLOSE_RECORD_SCHEMA,
     status: overridden ? "overridden" : observed.components.length === 0 ? "not-applicable" : "complete",
     code: overridden ? SBOM_CLOSE_CODES.overridden : observed.components.length === 0 ? SBOM_CLOSE_CODES.notApplicable : SBOM_CLOSE_CODES.complete,
-    reason: overridden ? `${blocks.length} finding(s) blocked the SBOM; a human's override is recorded` : observed.components.length === 0 ? (observed.inputs.length === 0 ? "no dependency manifest or lockfile is tracked in this repository" : "the tracked lockfiles list no component") : `${observed.components.length} component(s) read from ${observed.ecosystems.length} lockfile(s)`,
+    reason: overridden ? `${blocks.length} finding(s) blocked the SBOM; the PO's signed override is recorded` : observed.components.length === 0 ? (observed.inputs.length === 0 ? "no dependency manifest or lockfile is tracked in this repository" : "the tracked lockfiles list no component") : `${observed.components.length} component(s) read from ${observed.ecosystems.length} lockfile(s)`,
     sourceInputs: observed.inputs, ecosystems: observed.ecosystems, componentCount: observed.components.length, edges: "not-recorded",
     documents: documents.files.map(({ format, path, sha256: digest }) => ({ format, path, sha256: digest })),
-    override: overridden ? { statement: override, actor, blocked: blocks.map(({ state, code, path, reason }) => ({ state, code, path, reason })) } : null,
+    override: overridden ? { statement: override, actor, blocked: blocks.map(({ state, code, path, reason }) => ({ state, code, path, reason })), authority } : null,
   };
   if (!sbomCloseRecordShape(record)) return { status: "blocked", blocks: [...blocks, finding("invalid", SBOM_LIFECYCLE_CODES.invalidFacts, recordPath, "the SBOM close record could not be formed")], recordPath };
   return { status: "ready", record, recordPath, files: [...documents.files.map(({ path, text }) => ({ path, text })), { path: recordPath, text: `${JSON.stringify(record, null, 2)}\n` }], reused: false, blocks };

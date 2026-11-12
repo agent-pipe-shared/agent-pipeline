@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign as nodeSign } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -946,20 +947,59 @@ test("C28c: a lockfile the close can read gives a complete record with both docu
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-test("C28c: a lockfile format without a reader stops the close with the repair and writes nothing; the human's override passes it and is recorded", () => {
+test("C28c: a lockfile format without a reader stops the close with the repair and writes nothing; only the PO's signed override passes it and is recorded", () => {
+  const f = oneShotFixture();
+  try {
+    // The project's trust anchor names the PO's key (the policy file is committed, so HEAD is final before the request is made).
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const pem = publicKey.export({ type: "spki", format: "pem" });
+    const anchor = { keyReference: "po-key", publicKeySha256: createHash("sha256").update(pem).digest("hex") };
+    mkdirSync(join(f.root, "project"), { recursive: true });
+    writeFileSync(join(f.root, "project/critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [anchor] }));
+    writeFileSync(join(f.root, "yarn.lock"), "# yarn\n"); f.git("add", "yarn.lock", "project/critical-human-proof.json"); f.git("commit", "-q", "-m", "yarn");
+    const stopped = oneShotClose({ ...f.input, humanAcceptance: null }, { runCommand: f.runner });
+    assert.equal(stopped.status, "stopped"); assert.equal(stopped.stage, "sbom"); assert.equal(stopped.stop.code, "SBOM-ADAPTER-UNSUPPORTED");
+    assert.match(stopped.stop.reason, /yarn\.lock/u); assert.match(stopped.stop.repair, /SBOM_READERS/u);
+    const requestPath = /--request (scratch\/sbom-override-request-[a-f0-9]{16}\.json)/u.exec(stopped.stop.repair)?.[1];
+    assert.ok(requestPath !== undefined, `the stop names the request to sign: ${stopped.stop.repair}`);
+    const proofPath = requestPath.replace("request", "proof");
+    assert.match(stopped.stop.repair, /sign-intent/u); assert.ok(stopped.stop.repair.includes(`--sbom-override-proof ${proofPath}`)); assert.doesNotMatch(stopped.stop.repair, /literal words/u);
+    assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/audit-request.json")), false); assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/sbom")), false);
+    assert.deepEqual(f.calls, [], "no Verify ran and nothing was asked of the human");
+    const request = JSON.parse(readFileSync(join(f.root, requestPath), "utf8"));
+    const sign = (key, reference) => ({ schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: reference, publicKey: pem, signatureBase64: nodeSign(null, Buffer.from(request.approvalIntent.sha256, "utf8"), key).toString("base64") });
+    // The signing command mirrors the proof next to the request; a proof of a key the project does not name, or of another shape of path, is refused and nothing is recorded.
+    const stranger = generateKeyPairSync("ed25519");
+    writeFileSync(join(f.root, proofPath), JSON.stringify({ ...sign(stranger.privateKey, "other-key"), publicKey: stranger.publicKey.export({ type: "spki", format: "pem" }) }));
+    const untrusted = oneShotClose({ ...f.input, sbomOverrideProof: proofPath }, { runCommand: f.runner });
+    assert.equal(untrusted.status, "stopped"); assert.equal(untrusted.stop.code, "SBOM-OVERRIDE-KEY-UNTRUSTED"); assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/sbom")), false);
+    const stale = oneShotClose({ ...f.input, sbomOverrideProof: "scratch/sbom-override-proof-0000000000000000.json" }, { runCommand: f.runner });
+    assert.equal(stale.stop.code, "SBOM-OVERRIDE-PROOF-STALE");
+    assert.throws(() => oneShotClose({ ...f.input, sbomOverrideProof: "../outside.json" }, { runCommand: f.runner }), (error) => error.code === "FINISH-SBOM-OVERRIDE");
+    writeFileSync(join(f.root, proofPath), JSON.stringify(sign(privateKey, "po-key")));
+    const passed = oneShotClose({ ...f.input, sbomOverrideProof: proofPath }, { runCommand: f.runner });
+    assert.equal(passed.status, "commit-required", JSON.stringify(passed).slice(0, 300));
+    const record = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/sbom/record.json"), "utf8"));
+    assert.equal(record.status, "overridden"); assert.equal(record.override.actor, "PO"); assert.equal(record.override.blocked[0].path, "yarn.lock");
+    assert.equal(record.override.authority.kind, "po-signature"); assert.equal(record.override.authority.keyReference, "po-key"); assert.equal(record.override.authority.intentSha256, request.intentSha256);
+    for (const name of ["override-request.json", "override-proof.json"]) assert.ok(passed.commit.paths.includes(`specs/feature-abc/evidence/sbom/${name}`), `the signed override travels in the close commit: ${name}`);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("C28c: without a trust anchor in the project a signed override cannot pass, and a words-only flag is no longer a flag", () => {
   const f = oneShotFixture();
   try {
     writeFileSync(join(f.root, "yarn.lock"), "# yarn\n"); f.git("add", "yarn.lock"); f.git("commit", "-q", "-m", "yarn");
     const stopped = oneShotClose({ ...f.input, humanAcceptance: null }, { runCommand: f.runner });
-    assert.equal(stopped.status, "stopped"); assert.equal(stopped.stage, "sbom"); assert.equal(stopped.stop.code, "SBOM-ADAPTER-UNSUPPORTED");
-    assert.match(stopped.stop.reason, /yarn\.lock/u); assert.match(stopped.stop.repair, /SBOM_READERS/u); assert.match(stopped.stop.repair, /--sbom-override/u);
-    assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/audit-request.json")), false); assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/sbom")), false);
-    assert.deepEqual(f.calls, [], "no Verify ran and nothing was asked of the human");
-    const passed = oneShotClose({ ...f.input, sbomOverride: "Ja, das SBOM fuer yarn lassen wir weg." }, { runCommand: f.runner });
-    assert.equal(passed.status, "commit-required", JSON.stringify(passed).slice(0, 300));
-    const record = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/sbom/record.json"), "utf8"));
-    assert.equal(record.status, "overridden"); assert.equal(record.override.statement, "Ja, das SBOM fuer yarn lassen wir weg."); assert.equal(record.override.actor, "PO"); assert.equal(record.override.blocked[0].path, "yarn.lock");
-    assert.throws(() => oneShotClose({ ...f.input, sbomOverride: "x".repeat(501) }, { runCommand: f.runner }), (error) => error.code === "FINISH-SBOM-OVERRIDE");
+    const requestPath = /--request (scratch\/sbom-override-request-[a-f0-9]{16}\.json)/u.exec(stopped.stop.repair)[1];
+    const request = JSON.parse(readFileSync(join(f.root, requestPath), "utf8"));
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "po-key", publicKey: publicKey.export({ type: "spki", format: "pem" }), signatureBase64: nodeSign(null, Buffer.from(request.approvalIntent.sha256, "utf8"), privateKey).toString("base64") };
+    writeFileSync(join(f.root, requestPath.replace("request", "proof")), JSON.stringify(proof));
+    const refused = oneShotClose({ ...f.input, sbomOverrideProof: requestPath.replace("request", "proof") }, { runCommand: f.runner });
+    assert.equal(refused.stop.code, "SBOM-OVERRIDE-NO-TRUST-ANCHOR"); assert.equal(existsSync(join(f.root, "specs/feature-abc/evidence/sbom")), false);
+    const parsed = spawnSync(process.execPath, [fileURLToPath(new URL("./finish-feature.mjs", import.meta.url)), "--one-shot", "--by", "PO", "--architecture-impact", "no-architecture-impact", "--sbom-override", "words"], { encoding: "utf8" });
+    assert.notEqual(parsed.status, 0); assert.match(`${parsed.stdout}${parsed.stderr}`, /FINISH-USAGE/u);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
