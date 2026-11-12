@@ -1,0 +1,175 @@
+diff --git a/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md b/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+index 45a991af2a91248bd3c9906da748147aced079bf..f3469d9f87507f19e8fd646a92940f07c4cb9f36 100644
+--- a/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
++++ b/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+@@ -24,7 +24,7 @@ ADR-0032 made the full CycloneDX SBOM an option and rejected it as a mandate, be
+ **Context source (PO tiles, 2026-11-12):** readers for all common lockfiles, so that the most important languages are covered; Maven by its pom plus an imported CycloneDX file.
+ 
+ 1. **Readers added** (`plugins/pipeline-core/lib/sbom-lockfile-readers.mjs`, each a row in `SBOM_READERS` or, where the name is a pattern, in `SBOM_READER_PATTERNS`): JavaScript `yarn.lock` (v1 and the Berry formats 4 to 8), `pnpm-lock.yaml` (5.x, 6.x, 9.x) and `bun.lock` (0 to 2); Python `uv.lock` (format 1); JVM `gradle.lockfile`, `buildscript-gradle.lockfile` and the older `gradle/dependency-locks/*.lockfile`; .NET `packages.lock.json` (1 and 2, the lockfile of a `.csproj`, `.fsproj` or `.vbproj`); Ruby `Gemfile.lock` and `gems.locked`; PHP `composer.lock`; Dart `pubspec.lock`; Swift `Package.resolved` (1 to 3); Elixir `mix.lock`; C/C++ `conan.lock` (0.4 and 0.5); and a committed CycloneDX JSON file (`*.cdx.json`, or `bom.json` when it is one), spec 1.2 to 1.6, every component with a package URL.
+-2. **The same rules for every reader.** A package resolved from a registry is a component; a member of the project itself (a workspace, link, virtual or editable root, a project reference, an SDK package) is left out; a package pinned to a git commit, a local path, a tarball URL or a branch is `partial`; a format version the reader does not know is `unsupported`; an entry it cannot read makes the file `invalid`. No reader ever writes a URL from a lockfile into the SBOM or a finding: such URLs carry access tokens in real repositories. A Swift package is named by its host and path (the package-URL convention), without scheme, credentials or port; a CycloneDX component keeps its package URL without qualifiers.
++2. **The same rules for every reader.** A package resolved from a registry is a component, a private one included (an Artifactory or Nexus tarball path in `yarn.lock`, a Berry `::__archiveUrl` suffix, a pnpm `tarball` next to its `integrity`); a member of the project itself (a workspace, link, virtual or editable root, a project reference, an SDK package) is left out; a package pinned to a git commit, a local path, a tarball URL or a branch is `partial`; a format version the reader does not know is `unsupported`; an entry it cannot read makes the file `invalid`. No reader ever writes a URL from a lockfile into the SBOM or a finding: such URLs carry access tokens in real repositories. A Swift package is named by its host and path (the package-URL convention), without scheme, credentials or port; a CycloneDX component keeps its package URL without qualifiers.
+ 3. **Maven.** Maven pins no transitive dependency, so `pom.xml` is read for its direct dependencies (outside `dependencyManagement`, `build`, `parent` and comments; a version from a literal or this pom's own properties). A pom is `partial` unless a CycloneDX file in its directory or a parent directory lists every one of them, by version where the pom fixes one; the finding names what is missing, so a stale CycloneDX file does not pass. The help names the cyclonedx-maven-plugin. `target/` and `build/` stay unobserved, so the file has to be committed where the close reads it.
+ 4. **A manifest needs its lockfile.** `Gemfile`, `gems.rb`, `composer.json`, `pubspec.yaml`, `mix.exs`, `Package.swift`, `build.gradle(.kts)`, `conanfile.txt`/`.py` and a .NET project file that declare dependencies without the lockfile next to them (or in a parent directory) are `partial`, with help that names the switch to turn on (Gradle `dependencyLocking`, NuGet `RestorePackagesWithLockFile`). Files with no reader yet are named `unsupported`: `bun.lockb`, `Podfile`/`Podfile.lock`, `build.sbt`, `packages.config`, `paket.lock`, `pdm.lock`, `pylock.toml` and `vcpkg.json`.
+ 5. **The module is a kernel path** (`docs/guard-maintenance-window-threat-model.md`): a loosened reader would let a close pass with an incomplete SBOM.
+diff --git a/plugins/pipeline-core/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md b/plugins/pipeline-core/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+index 45a991af2a91248bd3c9906da748147aced079bf..f3469d9f87507f19e8fd646a92940f07c4cb9f36 100644
+--- a/plugins/pipeline-core/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
++++ b/plugins/pipeline-core/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+@@ -24,7 +24,7 @@ ADR-0032 made the full CycloneDX SBOM an option and rejected it as a mandate, be
+ **Context source (PO tiles, 2026-11-12):** readers for all common lockfiles, so that the most important languages are covered; Maven by its pom plus an imported CycloneDX file.
+ 
+ 1. **Readers added** (`plugins/pipeline-core/lib/sbom-lockfile-readers.mjs`, each a row in `SBOM_READERS` or, where the name is a pattern, in `SBOM_READER_PATTERNS`): JavaScript `yarn.lock` (v1 and the Berry formats 4 to 8), `pnpm-lock.yaml` (5.x, 6.x, 9.x) and `bun.lock` (0 to 2); Python `uv.lock` (format 1); JVM `gradle.lockfile`, `buildscript-gradle.lockfile` and the older `gradle/dependency-locks/*.lockfile`; .NET `packages.lock.json` (1 and 2, the lockfile of a `.csproj`, `.fsproj` or `.vbproj`); Ruby `Gemfile.lock` and `gems.locked`; PHP `composer.lock`; Dart `pubspec.lock`; Swift `Package.resolved` (1 to 3); Elixir `mix.lock`; C/C++ `conan.lock` (0.4 and 0.5); and a committed CycloneDX JSON file (`*.cdx.json`, or `bom.json` when it is one), spec 1.2 to 1.6, every component with a package URL.
+-2. **The same rules for every reader.** A package resolved from a registry is a component; a member of the project itself (a workspace, link, virtual or editable root, a project reference, an SDK package) is left out; a package pinned to a git commit, a local path, a tarball URL or a branch is `partial`; a format version the reader does not know is `unsupported`; an entry it cannot read makes the file `invalid`. No reader ever writes a URL from a lockfile into the SBOM or a finding: such URLs carry access tokens in real repositories. A Swift package is named by its host and path (the package-URL convention), without scheme, credentials or port; a CycloneDX component keeps its package URL without qualifiers.
++2. **The same rules for every reader.** A package resolved from a registry is a component, a private one included (an Artifactory or Nexus tarball path in `yarn.lock`, a Berry `::__archiveUrl` suffix, a pnpm `tarball` next to its `integrity`); a member of the project itself (a workspace, link, virtual or editable root, a project reference, an SDK package) is left out; a package pinned to a git commit, a local path, a tarball URL or a branch is `partial`; a format version the reader does not know is `unsupported`; an entry it cannot read makes the file `invalid`. No reader ever writes a URL from a lockfile into the SBOM or a finding: such URLs carry access tokens in real repositories. A Swift package is named by its host and path (the package-URL convention), without scheme, credentials or port; a CycloneDX component keeps its package URL without qualifiers.
+ 3. **Maven.** Maven pins no transitive dependency, so `pom.xml` is read for its direct dependencies (outside `dependencyManagement`, `build`, `parent` and comments; a version from a literal or this pom's own properties). A pom is `partial` unless a CycloneDX file in its directory or a parent directory lists every one of them, by version where the pom fixes one; the finding names what is missing, so a stale CycloneDX file does not pass. The help names the cyclonedx-maven-plugin. `target/` and `build/` stay unobserved, so the file has to be committed where the close reads it.
+ 4. **A manifest needs its lockfile.** `Gemfile`, `gems.rb`, `composer.json`, `pubspec.yaml`, `mix.exs`, `Package.swift`, `build.gradle(.kts)`, `conanfile.txt`/`.py` and a .NET project file that declare dependencies without the lockfile next to them (or in a parent directory) are `partial`, with help that names the switch to turn on (Gradle `dependencyLocking`, NuGet `RestorePackagesWithLockFile`). Files with no reader yet are named `unsupported`: `bun.lockb`, `Podfile`/`Podfile.lock`, `build.sbt`, `packages.config`, `paket.lock`, `pdm.lock`, `pylock.toml` and `vcpkg.json`.
+ 5. **The module is a kernel path** (`docs/guard-maintenance-window-threat-model.md`): a loosened reader would let a close pass with an incomplete SBOM.
+diff --git a/plugins/pipeline-core/lib/sbom-close.test.mjs b/plugins/pipeline-core/lib/sbom-close.test.mjs
+index 03cc56df0c9328d0d957a4fee253fd122dff8fe6..4da0857a5cdf0900dc2698aa3f58a2b54f6dde6d 100644
+--- a/plugins/pipeline-core/lib/sbom-close.test.mjs
++++ b/plugins/pipeline-core/lib/sbom-close.test.mjs
+@@ -124,12 +124,12 @@ test("an existing matching record is reused; a changed lockfile makes it stale;
+ });
+ 
+ test("a recorded override keeps covering the same findings on a resumed close, and no others", () => {
+-  const files = { "package-lock.json": NPM_LOCK, "yarn.lock": "x" };
++  const files = { "package-lock.json": NPM_LOCK, "Podfile.lock": "x" };
+   const first = close(files, { override: "weiter", authority: AUTHORITY, actor: "po" });
+   const stored = Object.fromEntries(first.files.map((f) => [f.path, f.text]));
+   const resumed = close({ ...files, ...stored }, { existing: stored[first.recordPath] });
+   assert.equal(resumed.status, "ready"); assert.equal(resumed.reused, true);
+-  const extra = close({ ...files, ...stored, "pom.xml": "<p/>" }, { existing: stored[first.recordPath] });
++  const extra = close({ ...files, ...stored, "build.sbt": "libraryDependencies += x" }, { existing: stored[first.recordPath] });
+   assert.equal(extra.status, "blocked");
+ });
+ 
+diff --git a/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs b/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
+index 1fa35f5cd9d3047c64c123585de758c5d499239b..595aa56b18aeda38d2dc9c8ec6dba1cecb81d147 100644
+--- a/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
++++ b/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
+@@ -80,7 +80,9 @@ export function parseYarnLock(text, path) {
+     if (resolution === null) throw new Error(`${name}: entry without a resolution`);
+     const { name: realName, range: locator } = descriptorName(resolution);
+     if (/^(?:workspace|link|portal|patch):/u.test(locator) || entry.header.includes("@patch:")) continue; // the project itself, or a patch listed again under the locator it patches
+-    if (/^npm:/u.test(locator)) { const pinned = locator.slice(4); if (!SEMVER.test(pinned)) throw new Error(`${realName}: npm resolution without a version`); out.push(npm(realName, pinned)); continue; }
++    // A private registry whose tarball path differs from the default adds `::__archiveUrl=<encoded URL>` after the version: still a registry
++    // package; the URL is dropped like every other one.
++    if (/^npm:/u.test(locator)) { const pinned = locator.slice(4).replace(/::.*$/u, ""); if (!SEMVER.test(pinned)) throw new Error(`${realName}: npm resolution without a version`); out.push(npm(realName, pinned)); continue; }
+     issues.push(finding("partial", path, `${realName} is resolved from ${/^file:/u.test(locator) ? "a local file" : "a git commit or URL"}, not a registry version`));
+   }
+   return { components: dedupe(out), issues };
+@@ -121,7 +123,10 @@ export function parsePnpmLock(text, path) {
+       const resolution = entry.fields.resolution ?? "";
+       const parsed = pnpmKey(entry.key, major);
+       const name = entry.fields.name ?? parsed?.name ?? entry.key;
+-      if (/tarball:|commit:|type:\s*git|directory:/u.test(resolution) || parsed === null || !SEMVER.test(parsed.version)) { issues.push(finding("partial", path, `${short(name)} is resolved from a git commit, a tarball URL or a local path, not a registry version`)); continue; }
++      // A registry package whose tarball URL pnpm cannot derive (a private registry) keeps `tarball:` next to its `integrity:`; it is still a
++      // registry package. A tarball without an integrity hash, a git commit or a local directory is not.
++      const tarballOnly = /tarball:/u.test(resolution) && !/integrity:/u.test(resolution);
++      if (tarballOnly || /commit:|type:\s*git|directory:/u.test(resolution) || parsed === null || !SEMVER.test(parsed.version)) { issues.push(finding("partial", path, `${short(name)} is resolved from a git commit, a tarball URL or a local path, not a registry version`)); continue; }
+       const scope = entry.fields.dev === "true" ? "dev" : entry.fields.optional === "true" || optional.has(`${parsed.name}@${parsed.version}`) ? "optional" : "required";
+       out.push(npm(parsed.name, parsed.version, scope));
+     }
+diff --git a/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs b/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
+index 15925a9dace6247c96e6349c6b96139d2fc01659..5af062c59824961f842d1ed40c372704fa52124e 100644
+--- a/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
++++ b/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
+@@ -33,6 +33,10 @@ left-pad@^1.3.0:
+   version "4.2.3"
+   resolved "https://registry.yarnpkg.com/string-width/-/string-width-4.2.3.tgz#269c7117d27b05ad2e536830a8ec895ef9c6d010"
+ 
++"@corp/ui@^2.0.0":
++  version "2.1.0"
++  resolved "https://secret@artifactory.example.invalid/artifactory/api/npm/npm-virtual/@corp%2fui/-/ui-2.1.0.tgz#0123456789abcdef"
++
+ mine@git+https://secret@example.invalid/mine.git:
+   version "0.0.1"
+   resolved "git+https://secret@example.invalid/mine.git#abc"
+@@ -69,6 +73,12 @@ __metadata:
+   languageName: node
+   linkType: hard
+ 
++"@corp/ui@npm:^2.0.0":
++  version: 2.1.0
++  resolution: "@corp/ui@npm:2.1.0::__archiveUrl=https%3A%2F%2Fsecret%40nexus.example.invalid%2Frepository%2Fnpm%2F%40corp%2Fui%2F-%2Fui-2.1.0.tgz"
++  languageName: node
++  linkType: hard
++
+ "mine@https://secret@example.invalid/mine.git#commit=abc":
+   version: 0.0.1
+   resolution: "mine@https://secret@example.invalid/mine.git#commit=abc"
+@@ -77,12 +87,13 @@ __metadata:
+ `;
+ 
+ test("yarn.lock: v1 and Berry registry packages are components, aliases resolve to the real package, workspaces and links are left out", () => {
++  // A private registry (Artifactory, Nexus) is a registry: its packages are components and its URL is never carried.
+   const v1 = parseYarnLock(YARN_V1, "yarn.lock");
+-  assert.deepEqual(purls(v1), ["pkg:npm/%40babel/code-frame@7.22.13", "pkg:npm/left-pad@1.3.0", "pkg:npm/string-width@4.2.3"]);
+-  assert.deepEqual(states(v1), ["partial", "partial"]); noUrl(v1.issues, "yarn v1");
++  assert.deepEqual(purls(v1), ["pkg:npm/%40babel/code-frame@7.22.13", "pkg:npm/left-pad@1.3.0", "pkg:npm/string-width@4.2.3", "pkg:npm/%40corp/ui@2.1.0"]);
++  assert.deepEqual(states(v1), ["partial", "partial"]); noUrl(v1, "yarn v1");
+   const berry = parseYarnLock(YARN_BERRY, "yarn.lock");
+-  assert.deepEqual(purls(berry), ["pkg:npm/left-pad@1.3.0", "pkg:npm/%40types/node@20.10.0"]);
+-  assert.deepEqual(states(berry), ["partial"]); noUrl(berry.issues, "yarn berry");
++  assert.deepEqual(purls(berry), ["pkg:npm/left-pad@1.3.0", "pkg:npm/%40types/node@20.10.0", "pkg:npm/%40corp/ui@2.1.0"], "a ::__archiveUrl suffix is a private registry, not a damaged entry");
++  assert.deepEqual(states(berry), ["partial"]); noUrl(berry, "yarn berry");
+   assert.deepEqual(parseYarnLock("# yarn lockfile v1\n\n\n", "yarn.lock"), { components: [], issues: [] }, "an empty v1 lockfile locks nothing");
+   assert.deepEqual(states(parseYarnLock(YARN_BERRY.replace("version: 8", "version: 3"), "yarn.lock")), ["unsupported"]);
+   assert.throws(() => parseYarnLock("left-pad@^1:\n  version \"1.3.0\"\n", "yarn.lock"), /neither a yarn v1 lockfile nor a Berry lockfile/u);
+@@ -114,6 +125,9 @@ packages:
+     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+     os: [darwin]
+ 
++  '@corp/ui@2.1.0':
++    resolution: {integrity: sha512-w, tarball: https://gitlab.example.invalid/api/v4/projects/7/packages/npm/@corp/ui/-/@corp/ui-2.1.0.tgz}
++
+   mine@https://codeload.example.invalid/mine/tar.gz/abc:
+     resolution: {tarball: https://codeload.example.invalid/mine/tar.gz/abc}
+     version: 0.0.1
+@@ -157,8 +171,8 @@ packages:
+ 
+ test("pnpm-lock.yaml: the 9.x, 6.x and 5.x key forms, dev and optional scopes, and a tarball pin as partial", () => {
+   const v9 = parsePnpmLock(PNPM_9, "pnpm-lock.yaml");
+-  assert.deepEqual(scoped(v9), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/%40types/node@20.10.0", "required"], ["pkg:npm/fsevents@2.3.3", "optional"]]);
+-  assert.deepEqual(states(v9), ["partial"]); noUrl(v9.issues, "pnpm 9");
++  assert.deepEqual(scoped(v9), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/%40types/node@20.10.0", "required"], ["pkg:npm/fsevents@2.3.3", "optional"], ["pkg:npm/%40corp/ui@2.1.0", "required"]], "a private-registry tarball with an integrity hash is a registry package");
++  assert.deepEqual(states(v9), ["partial"]); noUrl(v9, "pnpm 9");
+   assert.deepEqual(scoped(parsePnpmLock(PNPM_6, "pnpm-lock.yaml")), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/jest@29.7.0", "dev"]]);
+   assert.deepEqual(scoped(parsePnpmLock(PNPM_5, "pnpm-lock.yaml")), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/%40babel/core@7.23.0", "dev"]]);
+   assert.deepEqual(states(parsePnpmLock("lockfileVersion: '7.0'\n", "pnpm-lock.yaml")), ["unsupported"]);
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index 7c41c1636b0394d17c2163465eeaaf19e9a1b169..19cd27b6204253d2566b3783219544cace6bf61c 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -956,10 +956,11 @@ test("C28c: a lockfile format without a reader stops the close with the repair a
+     const anchor = { keyReference: "po-key", publicKeySha256: createHash("sha256").update(pem).digest("hex") };
+     mkdirSync(join(f.root, "project"), { recursive: true });
+     writeFileSync(join(f.root, "project/critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [anchor] }));
+-    writeFileSync(join(f.root, "yarn.lock"), "# yarn\n"); f.git("add", "yarn.lock", "project/critical-human-proof.json"); f.git("commit", "-q", "-m", "yarn");
++    // C28d: yarn.lock has a reader now; Podfile.lock (CocoaPods) still has none.
++    writeFileSync(join(f.root, "Podfile.lock"), "PODS:\n"); f.git("add", "Podfile.lock", "project/critical-human-proof.json"); f.git("commit", "-q", "-m", "pods");
+     const stopped = oneShotClose({ ...f.input, humanAcceptance: null }, { runCommand: f.runner });
+     assert.equal(stopped.status, "stopped"); assert.equal(stopped.stage, "sbom"); assert.equal(stopped.stop.code, "SBOM-ADAPTER-UNSUPPORTED");
+-    assert.match(stopped.stop.reason, /yarn\.lock/u); assert.match(stopped.stop.repair, /SBOM_READERS/u);
++    assert.match(stopped.stop.reason, /Podfile\.lock/u); assert.match(stopped.stop.repair, /SBOM_READERS/u);
+     const requestPath = /--request (scratch\/sbom-override-request-[a-f0-9]{16}\.json)/u.exec(stopped.stop.repair)?.[1];
+     assert.ok(requestPath !== undefined, `the stop names the request to sign: ${stopped.stop.repair}`);
+     const proofPath = requestPath.replace("request", "proof");
+@@ -980,7 +981,7 @@ test("C28c: a lockfile format without a reader stops the close with the repair a
+     const passed = oneShotClose({ ...f.input, sbomOverrideProof: proofPath }, { runCommand: f.runner });
+     assert.equal(passed.status, "commit-required", JSON.stringify(passed).slice(0, 300));
+     const record = JSON.parse(readFileSync(join(f.root, "specs/feature-abc/evidence/sbom/record.json"), "utf8"));
+-    assert.equal(record.status, "overridden"); assert.equal(record.override.actor, "PO"); assert.equal(record.override.blocked[0].path, "yarn.lock");
++    assert.equal(record.status, "overridden"); assert.equal(record.override.actor, "PO"); assert.equal(record.override.blocked[0].path, "Podfile.lock");
+     assert.equal(record.override.authority.kind, "po-signature"); assert.equal(record.override.authority.keyReference, "po-key"); assert.equal(record.override.authority.intentSha256, request.intentSha256);
+     for (const name of ["override-request.json", "override-proof.json"]) assert.ok(passed.commit.paths.includes(`specs/feature-abc/evidence/sbom/${name}`), `the signed override travels in the close commit: ${name}`);
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+@@ -989,7 +990,7 @@ test("C28c: a lockfile format without a reader stops the close with the repair a
+ test("C28c: without a trust anchor in the project a signed override cannot pass, and a words-only flag is no longer a flag", () => {
+   const f = oneShotFixture();
+   try {
+-    writeFileSync(join(f.root, "yarn.lock"), "# yarn\n"); f.git("add", "yarn.lock"); f.git("commit", "-q", "-m", "yarn");
++    writeFileSync(join(f.root, "Podfile.lock"), "PODS:\n"); f.git("add", "Podfile.lock"); f.git("commit", "-q", "-m", "pods");
+     const stopped = oneShotClose({ ...f.input, humanAcceptance: null }, { runCommand: f.runner });
+     const requestPath = /--request (scratch\/sbom-override-request-[a-f0-9]{16}\.json)/u.exec(stopped.stop.repair)[1];
+     const request = JSON.parse(readFileSync(join(f.root, requestPath), "utf8"));

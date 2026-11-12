@@ -1,0 +1,1283 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 907d17b98b93bcfb099dfb69c6ba1c34ee647310..228862376121c7322449e9a6563e8ff55933073b 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -801,6 +801,14 @@ check), `plugins/pipeline-core/lib/sbom-manifest.mjs` (the manifest shape and it
+ `plugins/pipeline-core/lib/sbom-override-authority.mjs` (the signed override's verification). All
+ four are kernel paths now.
+ 
++Candidate 28d adds the lockfile readers for the remaining common ecosystems (JavaScript, Python,
++JVM, .NET, Ruby, PHP, Dart, Swift, Elixir, C/C++ and committed CycloneDX files). `lib/sbom-close.mjs`
++imports them from `plugins/pipeline-core/lib/sbom-lockfile-readers.mjs`, which therefore executes
++with kernel authority and is a kernel path now. It is pure: it opens no file, runs no process and
++uses no network, and it imports only `lib/sbom-manifest.mjs`, itself a kernel path. A reader that
++loosened its rules (a git pin read as a registry package, an unknown format read as empty) would
++let a close pass with an incomplete SBOM, which is why it cannot be lifted by a window.
++
+ ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
+ and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
+ (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 01e2956f6cfd175af7e8084ffe30122a80e57a7e..4c78eb6642f07ee420be29d911c8b471385025cb 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -2620,6 +2620,7 @@
+         "verify-phase:harness/scripts/verify.mjs:sbom-discovery-tests",
+         "verify-phase:harness/scripts/verify.mjs:sbom-fixture-matrix-tests",
+         "verify-phase:harness/scripts/verify.mjs:sbom-lifecycle-tests",
++        "verify-phase:harness/scripts/verify.mjs:sbom-lockfile-readers-tests",
+         "verify-phase:harness/scripts/verify.mjs:sbom-manifest-tests",
+         "verify-phase:harness/scripts/verify.mjs:sbom-node-adapter-tests",
+         "verify-phase:harness/scripts/verify.mjs:sbom-release-binding-tests"
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 6b7b4df61586a85b7345de22cd373acb45d22776..8ea6c77207eb12999d49c6a07a4b17b2bc2ffeab 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4873,6 +4873,12 @@
+       "file": "plugins/pipeline-core/lib/pins/start-skill-fits-the-reattach-window.test.mjs",
+       "invariantPinned": "The pipeline-start skill body stays at least 1,500 characters below the about 20,000-character window the runner re-attaches after a compaction, with Compact as its last section; each status- or step-conditional block moved out of it lives once in the reference its trigger line names, and the skill names fullEnvelope for the compact ready line",
+       "nonOverlapNote": "Unique cases: the re-attach window and the one-home rule for the moved blocks; pipeline-start-v3.test.mjs and greenfield-machine-output-and-skill-budget.test.mjs keep the 24 KiB ceiling and the pinned phrases"
++    },
++    {
++      "name": "sbom-lockfile-readers-tests",
++      "file": "plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs",
++      "invariantPinned": "The close SBOM reads yarn.lock (v1, Berry), pnpm-lock.yaml (5, 6, 9), bun.lock, uv.lock, Gradle lockfiles, NuGet packages.lock.json, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock and committed CycloneDX files: a registry package is a component, a workspace or link member is left out, a git, path or URL pin is partial and its URL is never written, an unknown format version is unsupported and an unreadable entry invalid; a Maven pom is partial unless a CycloneDX file in its directory or above lists every direct dependency, and a .NET project or Gradle build without its lockfile is partial with help naming the switch",
++      "nonOverlapNote": "Unique cases: the readers added in candidate 28d and the Maven coverage rule; sbom-close.test.mjs keeps the npm, Python, Go and Rust readers and the close record"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index ebbed37f34f3e26dc678227dfd5f010dfef4c5e4..4d67d29bf2b591cc4f262c3f36c6a3725d9a42a6 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -947,6 +947,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // Candidate 28c (GMWKC01): the SBOM modules lib/audit-bundle.mjs and scripts/po-human-approval.mjs import.
+   "plugins/pipeline-core/lib/sbom-close.mjs", "plugins/pipeline-core/lib/sbom-manifest.mjs",
+   "plugins/pipeline-core/lib/sbom-node-adapter.mjs", "plugins/pipeline-core/lib/sbom-override-authority.mjs",
++  // Candidate 28d (GMWKC01): the lockfile readers lib/sbom-close.mjs imports.
++  "plugins/pipeline-core/lib/sbom-lockfile-readers.mjs",
+ ]);
+ 
+ // The "plugins/pipeline-core/..." entries above are written against whatever
+diff --git a/plugins/pipeline-core/lib/sbom-close.mjs b/plugins/pipeline-core/lib/sbom-close.mjs
+index a83f8fbcebebfd600e854a14f210e48e5f3d0e0d..9fb60edee7e15e1e2abab8138f47f76d92b700d2 100644
+--- a/plugins/pipeline-core/lib/sbom-close.mjs
++++ b/plugins/pipeline-core/lib/sbom-close.mjs
+@@ -4,7 +4,9 @@
+  *
+  * Pure and offline: the caller hands in the list of tracked paths and a reader for their text, so this module opens no file, runs no process
+  * and uses no network or package manager. It reads LOCKFILES (what is pinned), never resolves anything itself:
+- *   npm (package-lock.json, npm-shrinkwrap.json), Python (poetry.lock, Pipfile.lock, pinned requirements.txt), Go (go.mod), Rust (Cargo.lock).
++ *   npm (package-lock.json, npm-shrinkwrap.json), Python (poetry.lock, Pipfile.lock, pinned requirements.txt), Go (go.mod), Rust (Cargo.lock),
++ *   and since candidate 28d (sbom-lockfile-readers.mjs) yarn, pnpm, bun, uv, Gradle, NuGet, Bundler, Composer, pub, SwiftPM, Mix, Conan,
++ *   a committed CycloneDX file, and Maven pom.xml for its direct dependencies (partial unless a CycloneDX file of the build covers it).
+  * A manifest without a lockfile, an unpinned requirement or a lockfile format this module has no reader for is NAMED as a finding of a typed
+  * state (`partial`, `unsupported`, `invalid`, `stale`); every such finding BLOCKS the close, unless the PO's signed override for exactly those findings is recorded.
+  * No component at all is an explicit `not-applicable` record with its reason, never an absent file.
+@@ -13,6 +15,10 @@
+ import { createHash } from "node:crypto";
+ import { generateNodeSbom, NODE_GRAPH_SCHEMA } from "./sbom-node-adapter.mjs";
+ import { SBOM_LIFECYCLE_CODES } from "./sbom-manifest.mjs";
++import {
++  mavenCoverage, parseBunLock, parseCargoLock, parseComposerLock, parseConanLock, parseCycloneDx, parseGemfileLock, parseGradleLockfile, parseMixLock,
++  parseNugetLock, parsePackageResolved, parsePnpmLock, parsePoetryLock, parsePomXml, parsePubspecLock, parseUvLock, parseYarnLock,
++} from "./sbom-lockfile-readers.mjs";
+ 
+ export const SBOM_CLOSE_RECORD_SCHEMA = "pipeline.sbom-close-record.v1";
+ export const SBOM_CLOSE_STATUSES = Object.freeze(["complete", "not-applicable", "overridden"]);
+@@ -24,8 +30,8 @@ const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex")
+ 
+ // Paths holding fixtures, vendored code, generated output or the pipeline's own working files are not the project's dependencies.
+ const IGNORED_SEGMENTS = new Set(["node_modules", "vendor", "third_party", "fixtures", "fixture", "__fixtures__", "testdata", "scratch", "specs", "docs", "examples", ".claude", ".git", "dist", "build", "target", ".venv", "venv"]);
+-const UNSUPPORTED_NAMES = new Set(["yarn.lock", "pnpm-lock.yaml", "pom.xml", "build.gradle", "build.gradle.kts", "Gemfile", "Gemfile.lock", "composer.json", "composer.lock", "pubspec.yaml", "mix.exs", "Package.swift", "uv.lock", "bun.lock", "bun.lockb", "packages.lock.json"]);
+-const UNSUPPORTED_EXTENSIONS = /\.(?:csproj|fsproj|vbproj)$/u;
++// Dependency inputs no reader exists for yet (candidate 28d moved every other name of the first list to a reader).
++const UNSUPPORTED_NAMES = new Set(["bun.lockb", "Podfile", "Podfile.lock", "build.sbt", "packages.config", "paket.lock", "pdm.lock", "pylock.toml", "vcpkg.json"]);
+ 
+ const baseName = (path) => path.slice(path.lastIndexOf("/") + 1);
+ const dirOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
+@@ -63,21 +69,7 @@ function parseNpmLock(text, path) {
+   throw new Error(`${path}: not an npm lockfile`);
+ }
+ 
+-// Cargo.lock and poetry.lock share the `[[package]]` block form; only the lines before the block's first sub-table are read.
+-function tomlPackages(text, { skipWithoutSource }) {
+-  const out = [];
+-  for (const block of text.split(/^\[\[package\]\]\s*$/mu).slice(1)) {
+-    const head = block.split(/^\[/mu)[0];
+-    const name = /^name\s*=\s*"([^"\n]+)"\s*$/mu.exec(head)?.[1];
+-    const version = /^version\s*=\s*"([^"\n]+)"\s*$/mu.exec(head)?.[1];
+-    if (name === undefined || version === undefined) throw new Error("package block without a name and a version");
+-    if (skipWithoutSource && !/^source\s*=/mu.test(head)) continue; // a path or workspace crate: the project itself
+-    out.push({ name, version, category: /^category\s*=\s*"([^"\n]+)"/mu.exec(head)?.[1] ?? null });
+-  }
+-  return out;
+-}
+-function parseCargoLock(text) { return { components: tomlPackages(text, { skipWithoutSource: true }).map(({ name, version }) => ({ ecosystem: "cargo", name, version, purl: `pkg:cargo/${encodePart(name)}@${encodeURIComponent(version)}`, scope: "required" })), issues: [] }; }
+-function parsePoetryLock(text) { return { components: tomlPackages(text, { skipWithoutSource: false }).map(({ name, version, category }) => ({ ecosystem: "pypi", name: name.toLowerCase().replace(/_/gu, "-"), version, purl: `pkg:pypi/${encodePart(name.toLowerCase().replace(/_/gu, "-"))}@${encodeURIComponent(version)}`, scope: category === "dev" ? "dev" : "required" })), issues: [] }; }
++// Cargo.lock and poetry.lock (and uv.lock) are read by sbom-lockfile-readers.mjs: one TOML block reader that skips multi-line strings.
+ 
+ function parsePipfileLock(text, path) {
+   const lock = JSON.parse(text);
+@@ -129,14 +121,46 @@ function parseGoMod(text, path) {
+ export const SBOM_READERS = Object.freeze({
+   "package-lock.json": parseNpmLock, "npm-shrinkwrap.json": parseNpmLock, "Cargo.lock": parseCargoLock, "poetry.lock": parsePoetryLock,
+   "Pipfile.lock": parsePipfileLock, "requirements.txt": parseRequirements, "go.mod": parseGoMod,
++  // Candidate 28d.
++  "yarn.lock": parseYarnLock, "pnpm-lock.yaml": parsePnpmLock, "bun.lock": parseBunLock, "uv.lock": parseUvLock,
++  "gradle.lockfile": parseGradleLockfile, "buildscript-gradle.lockfile": parseGradleLockfile, "packages.lock.json": parseNugetLock,
++  "Gemfile.lock": parseGemfileLock, "gems.locked": parseGemfileLock, "composer.lock": parseComposerLock, "pubspec.lock": parsePubspecLock,
++  "Package.resolved": parsePackageResolved, "mix.lock": parseMixLock, "conan.lock": parseConanLock, "pom.xml": parsePomXml, "bom.json": parseCycloneDx,
+ });
++// Readers chosen by a path pattern instead of an exact file name (a pattern row, still not a branch elsewhere).
++const SBOM_READER_PATTERNS = Object.freeze([[/\.cdx\.json$/u, parseCycloneDx, "CycloneDX"], [/(?:^|\/)gradle\/dependency-locks\/[^/]+\.lockfile$/u, parseGradleLockfile, "Gradle dependency-locks"]]);
++function readerFor(path) {
++  const name = baseName(path);
++  if (SBOM_READERS[name] !== undefined) return { reader: SBOM_READERS[name], label: name };
++  const pattern = SBOM_READER_PATTERNS.find(([test]) => test.test(path));
++  return pattern === undefined ? null : { reader: pattern[1], label: pattern[2] };
++}
++const isCycloneDx = (reader) => reader === parseCycloneDx;
+ 
+ const hasKeys = (value) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length > 0;
+-const MANIFEST_NEEDS = Object.freeze({ "package.json": ["package-lock.json", "npm-shrinkwrap.json"], "Cargo.toml": ["Cargo.lock"], "pyproject.toml": ["poetry.lock", "Pipfile.lock", "requirements.txt"], Pipfile: ["Pipfile.lock"] });
++const MANIFEST_NEEDS = Object.freeze({
++  "package.json": ["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock"], "Cargo.toml": ["Cargo.lock"],
++  "pyproject.toml": ["poetry.lock", "Pipfile.lock", "requirements.txt", "uv.lock"], Pipfile: ["Pipfile.lock"],
++  Gemfile: ["Gemfile.lock"], "gems.rb": ["gems.locked"], "composer.json": ["composer.lock"], "pubspec.yaml": ["pubspec.lock"], "mix.exs": ["mix.lock"],
++  "Package.swift": ["Package.resolved"], "build.gradle": ["gradle.lockfile"], "build.gradle.kts": ["gradle.lockfile"],
++  "conanfile.txt": ["conan.lock"], "conanfile.py": ["conan.lock"],
++});
++const PROJECT_FILE = /\.(?:csproj|fsproj|vbproj)$/u; // a .NET project: its lockfile is packages.lock.json next to it
++const manifestNeeds = (name) => MANIFEST_NEEDS[name] ?? (PROJECT_FILE.test(name) ? ["packages.lock.json"] : undefined);
++const LOCKFILE_NAMES = new Set([...Object.values(MANIFEST_NEEDS).flat(), "packages.lock.json"].filter((name) => name !== "requirements.txt"));
+ function manifestDeclaresDependencies(name, text) {
+   if (name === "package.json") { try { const value = JSON.parse(text); return ["dependencies", "devDependencies", "optionalDependencies"].some((key) => hasKeys(value?.[key])); } catch { return false; } }
+   if (name === "Cargo.toml") return /^\[(?:[A-Za-z0-9_.-]*\.)?(?:dependencies|dev-dependencies|build-dependencies)\]/mu.test(text);
+   if (name === "pyproject.toml") return /^dependencies\s*=\s*\[\s*"/mu.test(text) || /^\[tool\.poetry\.dependencies\]/mu.test(text);
++  if (name === "Gemfile" || name === "gems.rb") return /^\s*gem\s+["']/mu.test(text);
++  if (name === "composer.json") { try { const value = JSON.parse(text); return ["require", "require-dev"].some((key) => Object.keys(value?.[key] ?? {}).some((dep) => dep.includes("/"))); } catch { return false; } }
++  if (name === "pubspec.yaml") return /^(?:dev_)?dependencies:\s*\n(?:\s*#.*\n)*\s+[A-Za-z_]/mu.test(text);
++  if (name === "mix.exs") return /\{:[a-z_]+,\s*(?:"|github:|git:|path:)/u.test(text);
++  if (name === "Package.swift") return /\.package\s*\(/u.test(text);
++  if (name === "build.gradle" || name === "build.gradle.kts") return /^\s*dependencies\s*\{[^}]*\b(?:implementation|api|compile|runtimeOnly|compileOnly|testImplementation|annotationProcessor|kapt)\b/mu.test(text);
++  if (name === "conanfile.txt") return /^\[(?:requires|tool_requires|build_requires)\]\s*\n\s*[A-Za-z0-9_]/mu.test(text);
++  if (name === "conanfile.py") return /\b(?:requires|tool_requires|build_requires)\s*=|self\.(?:requires|tool_requires)\s*\(/u.test(text);
++  if (PROJECT_FILE.test(name)) return /<PackageReference\b/u.test(text);
+   return /^\[(?:packages|dev-packages)\]\s*\n\s*[A-Za-z0-9"']/mu.test(text);
+ }
+ 
+@@ -144,26 +168,36 @@ function manifestDeclaresDependencies(name, text) {
+ export function observeSbomInputs({ tracked, read }) {
+   const paths = [...new Set(tracked)].filter((path) => typeof path === "string" && path !== "" && !path.split("/").some((part) => IGNORED_SEGMENTS.has(part))).sort();
+   const inputs = []; const ecosystems = []; const findings = []; const components = []; const seen = new Set();
++  const poms = []; const cyclone = []; // Maven poms wait until every CycloneDX file is read (mavenCoverage below)
+   const lockDirs = new Map(); // lockfile name -> directories holding it
+-  for (const path of paths) { const name = baseName(path); if (SBOM_READERS[name] !== undefined && name !== "requirements.txt" && name !== "go.mod") { if (!lockDirs.has(name)) lockDirs.set(name, new Set()); lockDirs.get(name).add(dirOf(path)); } }
+-  const lockCovers = (needs, dir) => needs.some((name) => ancestors(dir).some((candidate) => lockDirs.get(name)?.has(candidate)));
+-  const unsupportedDirs = new Set(paths.filter((path) => UNSUPPORTED_NAMES.has(baseName(path)) || UNSUPPORTED_EXTENSIONS.test(path)).map(dirOf));
++  for (const path of paths) { const name = baseName(path); if (LOCKFILE_NAMES.has(name)) { if (!lockDirs.has(name)) lockDirs.set(name, new Set()); lockDirs.get(name).add(dirOf(path)); } }
++  const legacyGradleLocks = new Set(paths.filter((path) => /(?:^|\/)gradle\/dependency-locks\/[^/]+\.lockfile$/u.test(path)).map((path) => dirOf(dirOf(dirOf(path)))));
++  const lockCovers = (needs, dir) => needs.some((name) => ancestors(dir).some((candidate) => lockDirs.get(name)?.has(candidate)))
++    || (needs.includes("gradle.lockfile") && ancestors(dir).some((candidate) => legacyGradleLocks.has(candidate)));
++  const unsupportedDirs = new Set(paths.filter((path) => UNSUPPORTED_NAMES.has(baseName(path))).map(dirOf));
++  const record = (path, label, parsed) => {
++    findings.push(...parsed.issues);
++    ecosystems.push({ path, reader: label, components: parsed.components.length });
++    for (const component of parsed.components) { if (!seen.has(component.purl)) { seen.add(component.purl); components.push({ ...component, provenance: path }); } }
++  };
+   for (const path of paths) {
+     const name = baseName(path);
+-    if (UNSUPPORTED_NAMES.has(name) || UNSUPPORTED_EXTENSIONS.test(name)) { findings.push(finding("unsupported", SBOM_LIFECYCLE_CODES.unsupported, path, `no reader exists yet for ${name}`)); continue; }
+-    const reader = SBOM_READERS[name];
+-    if (reader !== undefined) {
++    if (UNSUPPORTED_NAMES.has(name)) { findings.push(finding("unsupported", SBOM_LIFECYCLE_CODES.unsupported, path, `no reader exists yet for ${name}`)); continue; }
++    const chosen = readerFor(path);
++    if (chosen !== null) {
+       const text = read(path);
+       if (typeof text !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
++      // A file merely NAMED bom.json is an input only when it is a CycloneDX document; a *.cdx.json file must be one.
++      if (name === "bom.json") { let probe = null; try { probe = JSON.parse(text); } catch { probe = null; } if (probe?.bomFormat !== "CycloneDX") continue; }
+       inputs.push({ path, sha256: sha256(text) });
+       let parsed;
+-      try { parsed = reader(text, path); } catch (error) { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, `the file is not readable as ${name}: ${String(error.message).slice(0, 160)}`)); continue; }
+-      findings.push(...parsed.issues);
+-      ecosystems.push({ path, reader: name, components: parsed.components.length });
+-      for (const component of parsed.components) { if (!seen.has(component.purl)) { seen.add(component.purl); components.push({ ...component, provenance: path }); } }
++      try { parsed = chosen.reader(text, path); } catch (error) { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, `the file is not readable as ${chosen.label}: ${String(error.message).slice(0, 160)}`)); continue; }
++      if (parsed.maven !== undefined) { poms.push({ path, parsed }); continue; }
++      if (isCycloneDx(chosen.reader)) cyclone.push({ dir: dirOf(path), components: parsed.components });
++      record(path, chosen.label, parsed);
+       continue;
+     }
+-    const needs = MANIFEST_NEEDS[name];
++    const needs = manifestNeeds(name);
+     if (needs === undefined) continue;
+     const dir = dirOf(path);
+     if (lockCovers(needs, dir) || ancestors(dir).some((candidate) => unsupportedDirs.has(candidate)) || (name === "pyproject.toml" && paths.some((other) => baseName(other) === "requirements.txt" && dirOf(other) === dir))) continue;
+@@ -171,6 +205,19 @@ export function observeSbomInputs({ tracked, read }) {
+     if (typeof text !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
+     if (manifestDeclaresDependencies(name, text)) findings.push(finding("partial", SBOM_LIFECYCLE_CODES.partial, path, `${name} declares dependencies but no lockfile pins them (${needs.join(" or ")})`));
+   }
++  // Maven: a pom lists its direct dependencies only. It is complete when a CycloneDX file in its directory or an ancestor lists every one of
++  // them (by version where the pom fixes one); otherwise it is partial and names what is missing, so a stale CycloneDX file does not pass.
++  for (const { path, parsed } of poms) {
++    record(path, "pom.xml", parsed);
++    const direct = parsed.maven.direct;
++    if (direct.length === 0) continue;
++    const covering = cyclone.filter((entry) => ancestors(dirOf(path)).includes(entry.dir));
++    const missing = covering.length === 0 ? null : mavenCoverage(direct, covering.flatMap((entry) => entry.components));
++    if (missing !== null && missing.length === 0) continue;
++    findings.push(finding("partial", SBOM_LIFECYCLE_CODES.partial, path, missing === null
++      ? "Maven pins no transitive dependency and no CycloneDX file of the build covers this pom"
++      : `the CycloneDX file of the build does not list ${missing.length} direct dependenc${missing.length === 1 ? "y" : "ies"} of this pom (${missing.slice(0, 5).join(", ")}${missing.length > 5 ? ", ..." : ""})`));
++  }
+   const byScope = (left, right) => (left.scope === right.scope ? 0 : left.scope === "required" ? -1 : right.scope === "required" ? 1 : 0);
+   components.sort((left, right) => byScope(left, right) || (left.purl < right.purl ? -1 : left.purl > right.purl ? 1 : 0));
+   return { inputs, ecosystems, components, findings };
+@@ -179,7 +226,13 @@ export function observeSbomInputs({ tracked, read }) {
+ /** What the person at the close is told for one finding: how to remove the cause, and how an adapter can be added. */
+ export function sbomFindingHelp(item) {
+   if (item.state === "unsupported") return `Add a reader: one function from the file's text to { ecosystem, name, version, purl, scope } components, registered by file name in SBOM_READERS (plugins/pipeline-core/lib/sbom-close.mjs), with a test in sbom-close.test.mjs. Until it exists, generate the SBOM with your own tool and have the PO sign the override.`;
+-  if (item.state === "partial") return "Pin the dependencies in a lockfile this reader knows (package-lock.json, Cargo.lock, poetry.lock, Pipfile.lock, requirements.txt with ==, go.mod), commit it, and run the close again.";
++  if (item.state === "partial") {
++    const name = baseName(String(item.path ?? ""));
++    if (name === "pom.xml") return "Maven pins no transitive dependency. Generate a CycloneDX file with your build (for example the cyclonedx-maven-plugin with outputName bom, so the file is bom.json), commit it next to pom.xml or in a parent directory (target/ and build/ are not read), make sure it lists every direct dependency of this pom, and run the close again. Otherwise the PO signs the override.";
++    if (name === "build.gradle" || name === "build.gradle.kts") return "Enable Gradle dependency locking (dependencyLocking { lockAllConfigurations() }), write the locks (gradle dependencies --write-locks), commit gradle.lockfile, and run the close again.";
++    if (PROJECT_FILE.test(name)) return "Enable the NuGet lockfile (<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>), restore once, commit packages.lock.json next to the project file, and run the close again.";
++    return "Pin the dependencies in a lockfile a reader knows (package-lock.json, npm-shrinkwrap.json, yarn.lock, pnpm-lock.yaml, bun.lock, Cargo.lock, poetry.lock, Pipfile.lock, uv.lock, requirements.txt with ==, go.mod, gradle.lockfile, packages.lock.json, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock), commit it, and run the close again. A dependency pinned to a git commit, a local path or a URL stays partial until it comes from a registry; otherwise the PO signs the override.";
++  }
+   if (item.state === "stale") return "The recorded SBOM no longer matches the lockfiles. Remove the sbom directory named in the finding (the close writes a fresh one from the current lockfiles) and run the close again.";
+   return "Repair or remove the named file, then run the close again.";
+ }
+diff --git a/plugins/pipeline-core/lib/sbom-close.test.mjs b/plugins/pipeline-core/lib/sbom-close.test.mjs
+index 2cb649d2ad77b06467a9bf4a172f180431400c27..03cc56df0c9328d0d957a4fee253fd122dff8fe6 100644
+--- a/plugins/pipeline-core/lib/sbom-close.test.mjs
++++ b/plugins/pipeline-core/lib/sbom-close.test.mjs
+@@ -46,9 +46,11 @@ test("a manifest without a lockfile is partial; a lockfile in an ancestor direct
+ });
+ 
+ test("a lockfile format without a reader is unsupported and not also reported as partial", () => {
+-  const seen = observe({ "yarn.lock": "# yarn", "package.json": JSON.stringify({ dependencies: { a: "1" } }), "svc/Service.csproj": "<Project/>", "pom.xml": "<project/>" });
+-  assert.deepEqual(seen.findings.map((f) => [f.state, f.path]).sort(), [["unsupported", "pom.xml"], ["unsupported", "svc/Service.csproj"], ["unsupported", "yarn.lock"]]);
++  const seen = observe({ "bun.lockb": "\u0000binary", "package.json": JSON.stringify({ dependencies: { a: "1" } }), "ios/Podfile.lock": "PODS:\n", "build.sbt": "libraryDependencies += x" });
++  assert.deepEqual(seen.findings.map((f) => [f.state, f.path]).sort(), [["unsupported", "build.sbt"], ["unsupported", "bun.lockb"], ["unsupported", "ios/Podfile.lock"]]);
+   assert.match(sbomFindingHelp(seen.findings[0]), /SBOM_READERS/u);
++  // C28d: the names this test used to list (yarn.lock, a .csproj, pom.xml) have readers now; empty forms of them are no finding.
++  assert.deepEqual(observe({ "yarn.lock": "# yarn lockfile v1\n", "svc/Service.csproj": "<Project/>", "pom.xml": "<project/>" }).findings, []);
+ });
+ 
+ test("fixture, vendored and working paths are not the project's dependencies", () => {
+@@ -91,19 +93,19 @@ test("a complete close writes both documents, valid in their profiles and bound
+ const AUTHORITY = Object.freeze({ kind: "po-signature", keyReference: "po-key", intentSha256: "a".repeat(64), proofSha256: "b".repeat(64), candidateCommit: "c".repeat(40) });
+ 
+ test("every blocking state stops the close unless a verified PO signature comes with the override; the override names what it covers", () => {
+-  const files = { "package-lock.json": NPM_LOCK, "yarn.lock": "x" };
++  const files = { "package-lock.json": NPM_LOCK, "Podfile.lock": "x" };
+   const blocked = close(files);
+   assert.equal(blocked.status, "blocked"); assert.equal(blocked.blocks[0].state, "unsupported");
+-  assert.equal(close(files, { override: "ja, ohne SBOM fuer yarn", actor: "po" }).status, "blocked", "words alone never pass");
++  assert.equal(close(files, { override: "ja, ohne SBOM fuer CocoaPods", actor: "po" }).status, "blocked", "words alone never pass");
+   const overridden = close(files, { override: "accepted by signature", authority: AUTHORITY, actor: "po" });
+   assert.equal(overridden.status, "ready"); assert.equal(overridden.record.status, "overridden"); assert.equal(overridden.record.code, "SBOM-OVERRIDDEN");
+-  assert.equal(overridden.record.override.statement, "accepted by signature"); assert.equal(overridden.record.override.blocked[0].path, "yarn.lock");
++  assert.equal(overridden.record.override.statement, "accepted by signature"); assert.equal(overridden.record.override.blocked[0].path, "Podfile.lock");
+   assert.deepEqual(overridden.record.override.authority, AUTHORITY);
+   assert.equal(overridden.record.componentCount, 3, "what could be read is still carried");
+   assert.equal(sbomCloseRecordShape(overridden.record), true);
+   assert.equal(sbomCloseRecordShape({ ...overridden.record, override: { ...overridden.record.override, authority: { ...AUTHORITY, kind: "words" } } }), false, "the authority is a PO signature");
+   assert.equal(sbomCloseRecordShape({ ...overridden.record, override: { statement: "x", actor: "po", blocked: overridden.record.override.blocked } }), false, "an override without its authority is not a record");
+-  const onlyOverride = close({ "yarn.lock": "x" }, { override: "weiter", authority: AUTHORITY, actor: "po" });
++  const onlyOverride = close({ "Podfile.lock": "x" }, { override: "weiter", authority: AUTHORITY, actor: "po" });
+   assert.equal(onlyOverride.record.componentCount, 0); assert.equal(onlyOverride.record.documents.length, 0);
+ });
+ 
+diff --git a/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs b/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..1fa35f5cd9d3047c64c123585de758c5d499239b
+--- /dev/null
++++ b/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
+@@ -0,0 +1,433 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C28d (PO tiles 2026-11-12): the lockfile readers of the close SBOM beyond npm, Python, Go and Rust.
++ *
++ * Pure and offline, like sbom-close.mjs that registers them: each reader turns a file's text into `{ components, issues }` and opens no
++ * file, runs no process and uses no network. The rules every reader follows (fail closed, never a silent skip):
++ *   - a package resolved from a registry is a component `{ ecosystem, name, version, purl, scope }`;
++ *   - a member of the project itself (a workspace, link or virtual root) is not a dependency and is left out;
++ *   - a package pinned to a git commit, a local path or a URL is a `partial` finding: it has no registry version a reader of the SBOM can
++ *     look up, and its URL is never written into the SBOM (real lockfiles carry access tokens in such URLs);
++ *   - a lockfile format version this module does not know is an `unsupported` finding, and an entry it cannot classify is `invalid`
++ *     (thrown, so the caller names the file).
++ * Readers: yarn.lock (v1 and the Berry format), pnpm-lock.yaml (5.x, 6.x, 9.x), bun.lock, uv.lock, Gradle lockfiles, NuGet
++ * packages.lock.json, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock (0.4, 0.5), a committed
++ * CycloneDX file, and Maven pom.xml (direct dependencies only; see mavenCoverage).
++ */
++import { SBOM_LIFECYCLE_CODES } from "./sbom-manifest.mjs";
++
++const finding = (state, path, reason) => ({ state, code: state === "unsupported" ? SBOM_LIFECYCLE_CODES.unsupported : state === "partial" ? SBOM_LIFECYCLE_CODES.partial : SBOM_LIFECYCLE_CODES.invalidRecord, path, reason });
++const encodePart = (value) => encodeURIComponent(value).replace(/%2F/gu, "/");
++const component = (ecosystem, purlType, name, version, scope) => ({ ecosystem, name, version, purl: `pkg:${purlType}/${purlType === "npm" && name.startsWith("@") ? `%40${encodePart(name.slice(1))}` : encodePart(name)}@${encodeURIComponent(version)}`, scope });
++const npm = (name, version, scope = "required") => component("npm", "npm", name, version, scope);
++const SEMVER = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.+-]+)?$/u;
++const short = (value) => String(value).slice(0, 80);
++function dedupe(list) { const seen = new Set(); return list.filter((entry) => (seen.has(entry.purl) ? false : (seen.add(entry.purl), true))); }
++
++// ---------------------------------------------------------------------------------------------------------------- JavaScript
++
++/** The package name of a descriptor such as `@scope/name@^1`, `alias@npm:real@^1` or `"name@file:x"` (quotes and trailing colon removed). */
++function descriptorName(descriptor) {
++  const scoped = descriptor.startsWith("@");
++  const at = descriptor.indexOf("@", scoped ? 1 : 0);
++  const name = at === -1 ? descriptor : descriptor.slice(0, at);
++  const range = at === -1 ? "" : descriptor.slice(at + 1);
++  if (range.startsWith("npm:") && range.slice(4).includes("@", range.slice(4).startsWith("@") ? 1 : 0)) return descriptorName(range.slice(4));
++  return { name, range };
++}
++
++function yarnEntries(text) {
++  const entries = []; let current = null;
++  for (const line of text.split(/\r?\n/u)) {
++    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
++    if (!line.startsWith(" ")) { current = { header: line, props: [] }; entries.push(current); continue; }
++    if (current === null) throw new Error("a property line before the first entry");
++    current.props.push(line);
++  }
++  return entries;
++}
++const unquote = (value) => value.replace(/^"(.*)"$/u, "$1");
++const yarnProp = (props, key) => { for (const line of props) { const match = new RegExp(`^ {2}"?${key}"?:? (.+)$`, "u").exec(line); if (match) return unquote(match[1].trim()); } return null; };
++
++export function parseYarnLock(text, path) {
++  const v1 = /^# yarn lockfile v1\s*$/mu.test(text);
++  const entries = yarnEntries(text);
++  if (entries.length === 0) return { components: [], issues: [] }; // only the generated header: nothing is locked
++  const meta = entries.find((entry) => entry.header === "__metadata:");
++  if (!v1 && meta === undefined) throw new Error("neither a yarn v1 lockfile nor a Berry lockfile with __metadata");
++  const issues = []; const out = [];
++  if (!v1) {
++    const version = Number(yarnProp(meta.props, "version"));
++    if (!Number.isInteger(version) || version < 4 || version > 8) return { components: [], issues: [finding("unsupported", path, `yarn lockfile format ${short(yarnProp(meta.props, "version"))} has no reader yet (known: v1 and Berry formats 4 to 8)`)] };
++  }
++  for (const entry of entries) {
++    if (entry === meta) continue;
++    const first = unquote(entry.header.replace(/:$/u, "").split(/,\s*/u)[0].trim());
++    const { name } = descriptorName(first);
++    const version = yarnProp(entry.props, "version");
++    if (v1) {
++      const range = descriptorName(first).range;
++      const resolved = yarnProp(entry.props, "resolved");
++      if (/^link:/u.test(range)) continue;
++      if (resolved === null && /^file:/u.test(range)) { issues.push(finding("partial", path, `${name} is a local file dependency, not a registry version`)); continue; }
++      if (typeof version !== "string" || version === "") throw new Error(`${name}: entry without a version`);
++      if (resolved === null || !/\/-\/[^/]+\.tgz(?:#.*)?$/u.test(resolved)) { issues.push(finding("partial", path, `${name} is pinned to a git commit or URL, not a registry version`)); continue; }
++      const real = /\/((?:@[^/]+\/)?[^/]+)\/-\//u.exec(new URL(resolved).pathname)?.[1];
++      out.push(npm(real === undefined ? name : decodeURIComponent(real), version));
++      continue;
++    }
++    const resolution = yarnProp(entry.props, "resolution");
++    if (resolution === null) throw new Error(`${name}: entry without a resolution`);
++    const { name: realName, range: locator } = descriptorName(resolution);
++    if (/^(?:workspace|link|portal|patch):/u.test(locator) || entry.header.includes("@patch:")) continue; // the project itself, or a patch listed again under the locator it patches
++    if (/^npm:/u.test(locator)) { const pinned = locator.slice(4); if (!SEMVER.test(pinned)) throw new Error(`${realName}: npm resolution without a version`); out.push(npm(realName, pinned)); continue; }
++    issues.push(finding("partial", path, `${realName} is resolved from ${/^file:/u.test(locator) ? "a local file" : "a git commit or URL"}, not a registry version`));
++  }
++  return { components: dedupe(out), issues };
++}
++
++/** The top-level `packages:` (and v9 `snapshots:`) entries of one pnpm document: key and its 4-space fields. */
++function pnpmSections(doc) {
++  const sections = { packages: [], snapshots: [] }; let section = null; let current = null;
++  for (const line of doc.split(/\r?\n/u)) {
++    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
++    if (!line.startsWith(" ")) { section = /^(packages|snapshots):\s*$/u.exec(line)?.[1] ?? null; current = null; continue; }
++    if (section === null) continue;
++    const key = /^ {2}(?! )(.+?):\s*(\{\})?\s*$/u.exec(line);
++    if (key) { current = { key: key[1].replace(/^'(.*)'$/u, "$1").replace(/^"(.*)"$/u, "$1"), fields: {} }; sections[section].push(current); continue; }
++    const field = /^ {4}(?! )([A-Za-z]+):\s*(.*)$/u.exec(line);
++    if (field && current) current.fields[field[1]] = field[2].trim().replace(/^'(.*)'$/u, "$1");
++  }
++  return sections;
++}
++function pnpmKey(key, major) {
++  // 9.x: name@version ; 6.x: /name@version(peers) ; 5.x: /name/version_peers. A key outside these forms names no registry package.
++  if (major === 9) { const at = key.indexOf("@", key.startsWith("@") ? 1 : 0); return at === -1 ? null : { name: key.slice(0, at), version: key.slice(at + 1).replace(/\(.*$/u, "") }; }
++  if (!key.startsWith("/")) return null;
++  if (major === 6) { const body = key.slice(1); const at = body.indexOf("@", body.startsWith("@") ? 1 : 0); return at === -1 ? null : { name: body.slice(0, at), version: body.slice(at + 1).replace(/\(.*$/u, "") }; }
++  const parts = key.slice(1).split("/"); const version = parts.pop()?.replace(/_.*$/u, ""); return parts.length === 0 ? null : { name: parts.join("/"), version };
++}
++export function parsePnpmLock(text, path) {
++  const out = []; const issues = []; const optional = new Set();
++  for (const doc of text.split(/^---\s*$/mu)) {
++    if (doc.trim() === "") continue;
++    const raw = /^lockfileVersion:\s*['"]?([0-9.]+)['"]?\s*$/mu.exec(doc)?.[1];
++    if (raw === undefined) throw new Error("no lockfileVersion");
++    const major = Number(raw.split(".")[0]);
++    if (![5, 6, 9].includes(major)) { issues.push(finding("unsupported", path, `pnpm lockfile version ${short(raw)} has no reader yet (known: 5.x, 6.x, 9.x)`)); continue; }
++    const { packages, snapshots } = pnpmSections(doc);
++    for (const snapshot of snapshots) if (snapshot.fields.optional === "true") { const parsed = pnpmKey(snapshot.key, 9); if (parsed) optional.add(`${parsed.name}@${parsed.version}`); }
++    for (const entry of packages) {
++      const resolution = entry.fields.resolution ?? "";
++      const parsed = pnpmKey(entry.key, major);
++      const name = entry.fields.name ?? parsed?.name ?? entry.key;
++      if (/tarball:|commit:|type:\s*git|directory:/u.test(resolution) || parsed === null || !SEMVER.test(parsed.version)) { issues.push(finding("partial", path, `${short(name)} is resolved from a git commit, a tarball URL or a local path, not a registry version`)); continue; }
++      const scope = entry.fields.dev === "true" ? "dev" : entry.fields.optional === "true" || optional.has(`${parsed.name}@${parsed.version}`) ? "optional" : "required";
++      out.push(npm(parsed.name, parsed.version, scope));
++    }
++  }
++  return { components: dedupe(out), issues };
++}
++
++/** bun.lock is JSON with trailing commas; strip them outside strings, nothing else. */
++function parseJsonWithTrailingCommas(text) {
++  let out = ""; let inString = false;
++  for (let index = 0; index < text.length; index += 1) {
++    const char = text[index];
++    if (inString) { out += char; if (char === "\\") { out += text[index + 1] ?? ""; index += 1; } else if (char === "\"") inString = false; continue; }
++    if (char === "\"") { inString = true; out += char; continue; }
++    if (char === ",") { const rest = text.slice(index + 1).trimStart(); if (rest.startsWith("}") || rest.startsWith("]")) continue; }
++    out += char;
++  }
++  return JSON.parse(out);
++}
++export function parseBunLock(text, path) {
++  const lock = parseJsonWithTrailingCommas(text);
++  if (lock === null || typeof lock !== "object" || !Number.isInteger(lock.lockfileVersion)) throw new Error("not a bun.lock");
++  if (![0, 1, 2].includes(lock.lockfileVersion)) return { components: [], issues: [finding("unsupported", path, `bun.lock version ${lock.lockfileVersion} has no reader yet (known: 0 to 2)`)] };
++  const out = []; const issues = [];
++  const dev = new Set(Object.values(lock.workspaces ?? {}).flatMap((workspace) => Object.keys(workspace?.devDependencies ?? {})));
++  for (const [key, entry] of Object.entries(lock.packages ?? {})) {
++    if (!Array.isArray(entry) || typeof entry[0] !== "string") throw new Error(`${key}: package entry is not a tuple`);
++    const { name, range } = descriptorName(entry[0]);
++    if (/^(?:workspace|link):/u.test(range)) continue;
++    if (SEMVER.test(range) && typeof entry[1] === "string") { out.push(npm(name, range, dev.has(key) ? "dev" : "required")); continue; }
++    issues.push(finding("partial", path, `${name} is resolved from a git commit, a local path or a URL, not a registry version`));
++  }
++  return { components: dedupe(out), issues };
++}
++
++// ---------------------------------------------------------------------------------------------------------------- TOML (Cargo, Poetry, uv)
++
++/**
++ * The `[[package]]` blocks of a lockfile: for each, its top-level `key = value` lines and its `[package.<sub>]` tables, read line by
++ * line. Multi-line strings are skipped as a whole, so a `name = ...` line inside a description is never read as the package name.
++ */
++export function tomlPackageBlocks(text) {
++  const blocks = []; let current = null; let table = null; let multiline = null;
++  for (const raw of text.split(/\r?\n/u)) {
++    if (multiline !== null) { if (raw.split(multiline).length % 2 === 0) multiline = null; continue; }
++    const line = raw.trimEnd();
++    for (const quote of ['"""', "'''"]) if (line.split(quote).length % 2 === 0) { multiline = quote; break; }
++    if (/^\s*#/u.test(line) || line.trim() === "") continue;
++    if (/^\[\[package\]\]\s*$/u.test(line)) { current = { fields: {}, tables: {} }; table = current.fields; blocks.push(current); continue; }
++    if (/^\[\[/u.test(line)) { table = null; continue; } // another array of tables (e.g. [[patch.unused]]) ends the package block
++    const header = /^\[([^\]]+)\]\s*$/u.exec(line);
++    if (header) { const sub = /^package\.(.+)$/u.exec(header[1]); table = current !== null && sub ? (current.tables[sub[1]] = {}) : null; continue; }
++    const pair = /^([A-Za-z0-9_-]+)\s*=\s*(.*)$/u.exec(line);
++    if (pair && table !== null && multiline === null) table[pair[1]] = pair[2];
++  }
++  return blocks;
++}
++const tomlString = (value) => (typeof value === "string" ? /^"((?:[^"\\]|\\.)*)"$/u.exec(value.trim())?.[1] ?? /^'([^']*)'$/u.exec(value.trim())?.[1] : undefined);
++const inlineKeys = (value) => (typeof value === "string" && value.trim().startsWith("{") ? [...value.matchAll(/([A-Za-z0-9_-]+)\s*=/gu)].map((match) => match[1]) : []);
++function namedVersion(block) {
++  const name = tomlString(block.fields.name); const version = tomlString(block.fields.version);
++  if (name === undefined || version === undefined) throw new Error("package block without a name and a version");
++  return { name, version };
++}
++const pypiName = (name) => name.toLowerCase().replace(/[_.]+/gu, "-");
++
++export function parseCargoLock(text, path) {
++  const out = []; const issues = [];
++  for (const block of tomlPackageBlocks(text)) {
++    const { name, version } = namedVersion(block);
++    const source = tomlString(block.fields.source);
++    if (source === undefined) continue; // a path or workspace crate: the project itself
++    if (!/^(?:registry|sparse)\+/u.test(source)) { issues.push(finding("partial", path, `${name} is pinned to a git commit, not a registry version`)); continue; }
++    out.push(component("cargo", "cargo", name, version, "required"));
++  }
++  return { components: dedupe(out), issues };
++}
++export function parsePoetryLock(text, path) {
++  const out = []; const issues = [];
++  for (const block of tomlPackageBlocks(text)) {
++    const { name, version } = namedVersion(block);
++    const sourceType = tomlString(block.tables.source?.type);
++    if (sourceType !== undefined && sourceType !== "legacy") { issues.push(finding("partial", path, `${name} comes from a ${sourceType} source, not a registry version`)); continue; }
++    out.push(component("pypi", "pypi", pypiName(name), version, tomlString(block.fields.category) === "dev" ? "dev" : "required"));
++  }
++  return { components: dedupe(out), issues };
++}
++export function parseUvLock(text, path) {
++  const format = /^version\s*=\s*(\d+)\s*$/mu.exec(text)?.[1];
++  if (format === undefined) throw new Error("no lock format version");
++  if (format !== "1") return { components: [], issues: [finding("unsupported", path, `uv.lock format ${format} has no reader yet (known: 1)`)] };
++  const out = []; const issues = [];
++  for (const block of tomlPackageBlocks(text)) {
++    const kind = inlineKeys(block.fields.source)[0]; // only the first key names the source kind; later ones are its options
++    if (kind === "virtual" || kind === "editable") continue; // the project or a workspace member
++    const { name, version } = namedVersion(block);
++    if (kind !== "registry") { issues.push(finding("partial", path, `${name} comes from ${kind === undefined ? "no recorded source" : `a ${kind} source`}, not a registry version`)); continue; }
++    out.push(component("pypi", "pypi", pypiName(name), version, "required"));
++  }
++  return { components: dedupe(out), issues };
++}
++
++// ---------------------------------------------------------------------------------------------------------------- JVM
++
++export function parseGradleLockfile(text, path) {
++  const out = []; const testOnlyFile = /(?:^|\/)test[^/]*\.lockfile$/iu.test(path) && !path.endsWith("gradle.lockfile");
++  for (const raw of text.split(/\r?\n/u)) {
++    const line = raw.trim();
++    if (line === "" || line.startsWith("#") || line.startsWith("empty=")) continue;
++    const match = /^([^:\s=]+):([^:\s=]+):([^:\s=]+)(?:=(.*))?$/u.exec(line);
++    if (match === null) throw new Error(`a line that is no group:artifact:version entry: "${short(line)}"`);
++    const configurations = (match[4] ?? "").split(",").filter(Boolean);
++    const testOnly = configurations.length > 0 ? configurations.every((name) => /^test/iu.test(name)) : testOnlyFile;
++    out.push(component("maven", "maven", `${match[1]}/${match[2]}`, match[3], testOnly ? "dev" : "required"));
++  }
++  return { components: dedupe(out), issues: [] };
++}
++
++const xmlText = (block, tag) => new RegExp(`<${tag}>\\s*([^<]*?)\\s*</${tag}>`, "u").exec(block)?.[1];
++/**
++ * Maven pins no transitive dependency, so pom.xml is read only for its DIRECT dependencies: the `<dependency>` blocks outside
++ * `<dependencyManagement>` and `<build>`, a version resolved from a literal or from this pom's own `<properties>` (anything else, a parent
++ * or BOM managed version or a range, stays unresolved). The pom is always a `partial` finding unless a committed CycloneDX file covers
++ * it (sbom-close.mjs applies mavenCoverage).
++ */
++export function readPomDependencies(text) {
++  if (!/<project[\s/>]/u.test(text)) throw new Error("not a Maven pom");
++  const body = text.replace(/<!--[\s\S]*?-->/gu, "").replace(/<dependencyManagement>[\s\S]*?<\/dependencyManagement>/gu, "").replace(/<build>[\s\S]*?<\/build>/gu, "").replace(/<parent>[\s\S]*?<\/parent>/gu, "");
++  const properties = new Map();
++  for (const block of text.replace(/<!--[\s\S]*?-->/gu, "").match(/<properties>[\s\S]*?<\/properties>/gu) ?? []) for (const match of block.matchAll(/<([A-Za-z0-9_.-]+)>\s*([^<]*?)\s*<\/\1>/gu)) properties.set(match[1], match[2]);
++  const own = body.replace(/<dependencies>[\s\S]*?<\/dependencies>/gu, "").replace(/<profiles>[\s\S]*?<\/profiles>/gu, "");
++  const parent = /<parent>([\s\S]*?)<\/parent>/u.exec(text.replace(/<!--[\s\S]*?-->/gu, ""))?.[1] ?? "";
++  for (const [key, value] of [["project.groupId", xmlText(own, "groupId") ?? xmlText(parent, "groupId")], ["project.artifactId", xmlText(own, "artifactId")], ["project.version", xmlText(own, "version") ?? xmlText(parent, "version")]]) if (value !== undefined) properties.set(key, value);
++  const resolve = (value) => { if (value === undefined) return null; const resolved = value.replace(/\$\{([^}]+)\}/gu, (whole, key) => properties.get(key) ?? whole); return /\$\{|[[\]()]|,/u.test(resolved) || resolved === "" ? null : resolved; };
++  return (body.match(/<dependency>[\s\S]*?<\/dependency>/gu) ?? []).map((block) => {
++    const rawGroup = xmlText(block, "groupId"); const rawArtifact = xmlText(block, "artifactId");
++    if (rawGroup === undefined || rawArtifact === undefined) throw new Error("a dependency without a groupId and an artifactId");
++    const groupId = resolve(rawGroup); const artifactId = resolve(rawArtifact);
++    const scope = xmlText(block, "scope"); const optional = xmlText(block, "optional") === "true";
++    // A name this pom cannot resolve keeps its raw text: it is never a component, and no CycloneDX file can be shown to cover it.
++    return { name: `${groupId ?? rawGroup}/${artifactId ?? rawArtifact}`, version: groupId === null || artifactId === null ? null : resolve(xmlText(block, "version")), resolvedName: groupId !== null && artifactId !== null, scope: scope === "test" ? "dev" : optional || scope === "provided" ? "optional" : "required" };
++  });
++}
++export function parsePomXml(text, path) {
++  const direct = readPomDependencies(text);
++  return { components: dedupe(direct.filter((entry) => entry.version !== null).map((entry) => component("maven", "maven", entry.name, entry.version, entry.scope))), issues: [], maven: { path, direct } };
++}
++/** Which direct dependencies of a pom a CycloneDX file does not list: by name and version, or by name alone when the pom names no version. */
++export function mavenCoverage(direct, cycloneComponents) {
++  const listed = new Set(); const names = new Set();
++  for (const entry of cycloneComponents) if (entry.ecosystem === "maven") { listed.add(`${entry.name}@${entry.version}`); names.add(entry.name); }
++  return direct.filter((entry) => (entry.version === null ? !names.has(entry.name) : !listed.has(`${entry.name}@${entry.version}`))).map((entry) => `${entry.name}${entry.version === null ? "" : `@${entry.version}`}`);
++}
++
++// ---------------------------------------------------------------------------------------------------------------- .NET, Ruby, PHP, Dart, Swift, Elixir, C/C++
++
++export function parseNugetLock(text, path) {
++  const lock = JSON.parse(text);
++  if (lock === null || typeof lock !== "object" || typeof lock.dependencies !== "object" || lock.dependencies === null) throw new Error("not a NuGet packages.lock.json");
++  if (![1, 2].includes(lock.version)) return { components: [], issues: [finding("unsupported", path, `packages.lock.json version ${short(lock.version)} has no reader yet (known: 1 and 2)`)] };
++  const out = [];
++  for (const packages of Object.values(lock.dependencies)) for (const [name, entry] of Object.entries(packages ?? {})) {
++    if (entry?.type === "Project") continue; // a project reference: the solution itself
++    if (typeof entry?.resolved !== "string" || entry.resolved === "") throw new Error(`${name}: package without a resolved version`);
++    out.push(component("nuget", "nuget", name, entry.resolved, "required"));
++  }
++  return { components: dedupe(out), issues: [] };
++}
++
++export function parseGemfileLock(text, path) {
++  const out = []; const issues = []; let section = null; let inSpecs = false; let sawSection = false;
++  for (const line of text.split(/\r?\n/u)) {
++    if (/^[A-Z][A-Z ]*$/u.test(line)) { section = line.trim(); inSpecs = false; sawSection = true; continue; }
++    if (line === "  specs:") { inSpecs = ["GEM", "GIT", "PATH", "PLUGIN SOURCE"].includes(section); continue; }
++    if (!inSpecs) continue;
++    const spec = /^ {4}([^\s(]+) \(([^)]+)\)$/u.exec(line);
++    if (spec === null) { if (/^ {6}/u.test(line) || line.trim() === "") continue; throw new Error(`a specs line this reader cannot read: "${short(line)}"`); }
++    if (section === "GEM") out.push(component("gem", "gem", spec[1], spec[2], "required"));
++    else issues.push(finding("partial", path, `${spec[1]} comes from a ${section === "GIT" ? "git" : section === "PATH" ? "local path" : "plugin"} source, not a registry version`));
++  }
++  if (!sawSection) throw new Error("no Gemfile.lock section");
++  return { components: dedupe(out), issues };
++}
++
++export function parseComposerLock(text, path) {
++  const lock = JSON.parse(text);
++  if (lock === null || typeof lock !== "object" || (!Array.isArray(lock.packages) && !Array.isArray(lock["packages-dev"]))) throw new Error("not a composer.lock");
++  const out = []; const issues = [];
++  for (const [list, scope] of [[lock.packages ?? [], "required"], [lock["packages-dev"] ?? [], "dev"]]) for (const entry of list) {
++    if (typeof entry?.name !== "string" || typeof entry.version !== "string") throw new Error("package without a name and a version");
++    if (entry.dist?.type === "path" || entry.source?.type === "path") { issues.push(finding("partial", path, `${entry.name} is a local path package, not a registry version`)); continue; }
++    if (/^dev-|-dev$/u.test(entry.version)) { issues.push(finding("partial", path, `${entry.name} is pinned to a branch (${short(entry.version)}), not a released version`)); continue; }
++    out.push(component("composer", "composer", entry.name, entry.version, scope));
++  }
++  return { components: dedupe(out), issues };
++}
++
++export function parsePubspecLock(text, path) {
++  if (!/^packages:\s*(?:\{\})?\s*$/mu.test(text)) throw new Error("not a pubspec.lock");
++  const out = []; const issues = []; let inPackages = false; let current = null;
++  const flush = () => {
++    if (current === null) return;
++    const { name, fields } = current; current = null;
++    if (fields.source === "sdk") return; // part of the Dart or Flutter SDK
++    if (fields.source !== "hosted") { issues.push(finding("partial", path, `${name} comes from a ${fields.source ?? "unrecorded"} source, not a registry version`)); return; }
++    if (typeof fields.version !== "string" || fields.version === "") throw new Error(`${name}: hosted package without a version`);
++    out.push(component("pub", "pub", name, fields.version, fields.dependency === "direct dev" ? "dev" : "required"));
++  };
++  for (const line of text.split(/\r?\n/u)) {
++    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
++    if (!line.startsWith(" ")) { flush(); inPackages = /^packages:/u.test(line); continue; }
++    if (!inPackages) continue;
++    const key = /^ {2}(?! )([^:\s]+):\s*$/u.exec(line);
++    if (key) { flush(); current = { name: key[1], fields: {} }; continue; }
++    const field = /^ {4}(?! )([a-z_]+):\s*(.*)$/u.exec(line);
++    if (field && current) current.fields[field[1]] = field[2].trim().replace(/^"(.*)"$/u, "$1");
++  }
++  flush();
++  return { components: dedupe(out), issues };
++}
++
++/** host/path of a source-control location, without scheme, credentials, port or `.git`; null when it is not one. */
++function sourceLocation(location) {
++  const scp = /^[^@/\s]+@([^:/\s]+):(.+)$/u.exec(location);
++  try {
++    const { host, pathname } = scp ? { host: scp[1], pathname: `/${scp[2]}` } : new URL(location);
++    const path = pathname.replace(/\.git$/u, "").replace(/\/+$/u, "");
++    return host !== "" && path.length > 1 ? `${host.replace(/:\d+$/u, "")}${path}` : null;
++  } catch { return null; }
++}
++export function parsePackageResolved(text, path) {
++  const lock = JSON.parse(text);
++  if (lock === null || typeof lock !== "object" || !Number.isInteger(lock.version)) throw new Error("not a Package.resolved");
++  if (![1, 2, 3].includes(lock.version)) return { components: [], issues: [finding("unsupported", path, `Package.resolved version ${lock.version} has no reader yet (known: 1 to 3)`)] };
++  const pins = lock.version === 1 ? lock.object?.pins : lock.pins;
++  if (!Array.isArray(pins)) throw new Error("no pins");
++  const out = []; const issues = [];
++  for (const pin of pins) {
++    const kind = lock.version === 1 ? "remoteSourceControl" : pin?.kind;
++    const label = pin?.identity ?? pin?.package ?? "a package";
++    const version = pin?.state?.version;
++    if (kind === "registry" && typeof version === "string") { out.push(component("swift", "swift", String(pin.identity).replace(".", "/"), version, "required")); continue; }
++    if (kind !== "remoteSourceControl") { issues.push(finding("partial", path, `${short(label)} is a local package, not a released version`)); continue; }
++    if (typeof version !== "string" || version === "") { issues.push(finding("partial", path, `${short(label)} is pinned to a branch or a revision, not a released version`)); continue; }
++    const location = sourceLocation(lock.version === 1 ? pin.repositoryURL : pin.location);
++    out.push(component("swift", "swift", location ?? String(label), version, "required"));
++  }
++  return { components: dedupe(out), issues };
++}
++
++export function parseMixLock(text, path) {
++  if (!text.trimStart().startsWith("%{")) throw new Error("not a mix.lock");
++  const out = []; const issues = [];
++  for (const line of text.split(/\r?\n/u)) {
++    const entry = /^\s*"([^"]+)":\s*\{:(\w+),\s*(.*)$/u.exec(line);
++    if (entry === null) { if (/^\s*(?:%\{|\}|)\s*$/u.test(line)) continue; throw new Error(`a line this reader cannot read: "${short(line)}"`); }
++    if (entry[2] !== "hex") { issues.push(finding("partial", path, `${entry[1]} comes from a ${entry[2]} source, not a registry version`)); continue; }
++    const hex = /^:([A-Za-z0-9_]+),\s*"([^"]+)"/u.exec(entry[3]);
++    if (hex === null) throw new Error(`${entry[1]}: hex entry without a package and a version`);
++    out.push(component("hex", "hex", hex[1], hex[2], "required"));
++  }
++  return { components: dedupe(out), issues };
++}
++
++const conanRef = (reference) => { const match = /^([^/@#%:\s]+)\/([^@#%:\s]+)/u.exec(String(reference)); if (match === null) throw new Error(`a reference this reader cannot read: "${short(reference)}"`); return match; };
++export function parseConanLock(text, path) {
++  const lock = JSON.parse(text);
++  if (lock === null || typeof lock !== "object") throw new Error("not a conan.lock");
++  const version = lock.version ?? lock.graph_lock?.version;
++  const out = [];
++  if (version === "0.5") {
++    for (const [list, scope] of [[lock.requires, "required"], [lock.build_requires, "dev"], [lock.python_requires, "dev"]]) for (const reference of list ?? []) { const [, name, ref] = conanRef(reference); out.push(component("conan", "conan", name, ref, scope)); }
++    return { components: dedupe(out), issues: [] };
++  }
++  if (version === "0.4") {
++    const nodes = lock.graph_lock?.nodes;
++    if (nodes === null || typeof nodes !== "object") throw new Error("no graph_lock nodes");
++    const build = new Set(Object.values(nodes).flatMap((node) => node?.build_requires ?? []));
++    for (const [id, node] of Object.entries(nodes)) {
++      if (typeof node?.path === "string" || node?.ref === undefined) continue; // the consumer conanfile itself
++      const [, name, ref] = conanRef(node.ref); out.push(component("conan", "conan", name, ref, build.has(id) ? "dev" : "required"));
++    }
++    return { components: dedupe(out), issues: [] };
++  }
++  return { components: [], issues: [finding("unsupported", path, `conan.lock version ${short(version)} has no reader yet (known: 0.4 and 0.5)`)] };
++}
++
++// ---------------------------------------------------------------------------------------------------------------- CycloneDX
++
++/** A committed CycloneDX JSON file produced by the project's own build: every component needs a package URL. */
++export function parseCycloneDx(text, path) {
++  const bom = JSON.parse(text);
++  if (bom === null || typeof bom !== "object" || bom.bomFormat !== "CycloneDX") throw new Error("not a CycloneDX JSON document");
++  if (!/^1\.[2-6]$/u.test(String(bom.specVersion))) return { components: [], issues: [finding("unsupported", path, `CycloneDX ${short(bom.specVersion)} has no reader yet (known: 1.2 to 1.6)`)] };
++  const out = []; const issues = [];
++  const walk = (list) => {
++    for (const entry of list ?? []) {
++      if (entry?.scope === "excluded") continue;
++      const purl = typeof entry?.purl === "string" ? entry.purl : null;
++      const match = purl === null ? null : /^pkg:([a-z][a-z0-9.+-]*)\/(.+)@([^?#]+)/u.exec(purl);
++      if (match === null) { issues.push(finding("partial", path, `component ${short(entry?.name ?? "without a name")} has no package URL with a version`)); walk(entry?.components); continue; }
++      const name = decodeURIComponent(match[2]);
++      out.push({ ecosystem: match[1] === "golang" ? "golang" : match[1], name, version: decodeURIComponent(match[3]), purl: purl.replace(/[?#].*$/u, ""), scope: entry.scope === "optional" ? "optional" : "required" });
++      walk(entry.components);
++    }
++  };
++  walk(bom.components);
++  return { components: dedupe(out), issues };
++}
+diff --git a/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs b/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..15925a9dace6247c96e6349c6b96139d2fc01659
+--- /dev/null
++++ b/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
+@@ -0,0 +1,544 @@
++// SPDX-License-Identifier: SUL-1.0
++// C28d: the lockfile readers of the close SBOM beyond npm, Python, Go and Rust. Every fixture is a small file in the real format of its
++// tool (shape checked against the upstream formats); every reader is pinned for a registry package, a project member it leaves out, a
++// git/path/URL pin it reports as partial without writing the URL, an unknown format version and an entry it cannot read.
++import assert from "node:assert/strict";
++import test from "node:test";
++import {
++  mavenCoverage, parseBunLock, parseCargoLock, parseComposerLock, parseConanLock, parseCycloneDx, parseGemfileLock, parseGradleLockfile, parseMixLock,
++  parseNugetLock, parsePackageResolved, parsePnpmLock, parsePoetryLock, parsePomXml, parsePubspecLock, parseUvLock, parseYarnLock, readPomDependencies,
++} from "./sbom-lockfile-readers.mjs";
++import { SBOM_READERS, closeSbom, observeSbomInputs, sbomFindingHelp } from "./sbom-close.mjs";
++
++const purls = (result) => result.components.map((c) => c.purl);
++const scoped = (result) => result.components.map((c) => [c.purl, c.scope]);
++const states = (result) => result.issues.map((i) => i.state);
++const noUrl = (value, label) => assert.doesNotMatch(JSON.stringify(value), /:\/\/|example\.invalid|secret/u, `${label}: no URL, host or credential is carried`);
++function observe(files) { return observeSbomInputs({ tracked: Object.keys(files), read: (path) => (Object.hasOwn(files, path) ? files[path] : null) }); }
++
++const YARN_V1 = `# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.
++# yarn lockfile v1
++
++
++"@babel/code-frame@^7.0.0", "@babel/code-frame@^7.22.13":
++  version "7.22.13"
++  resolved "https://registry.yarnpkg.com/@babel/code-frame/-/code-frame-7.22.13.tgz#e3c1c099402598483b7a8c46a721d1038803755e"
++  integrity sha512-x
++
++left-pad@^1.3.0:
++  version "1.3.0"
++  resolved "https://registry.yarnpkg.com/left-pad/-/left-pad-1.3.0.tgz#5b8a3a7765dfe001261dde915589e782f8c94d1e"
++
++"string-width-cjs@npm:string-width@^4.2.0":
++  version "4.2.3"
++  resolved "https://registry.yarnpkg.com/string-width/-/string-width-4.2.3.tgz#269c7117d27b05ad2e536830a8ec895ef9c6d010"
++
++mine@git+https://secret@example.invalid/mine.git:
++  version "0.0.1"
++  resolved "git+https://secret@example.invalid/mine.git#abc"
++
++local@file:./local:
++  version "1.0.0"
++
++linked@link:./linked:
++  version "0.0.0"
++`;
++const YARN_BERRY = `# This file is generated by running "yarn install" inside your project.
++# Manual changes might be lost - proceed with caution!
++
++__metadata:
++  version: 8
++  cacheKey: 10c0
++
++"app@workspace:.":
++  version: 0.0.0-use.local
++  resolution: "app@workspace:."
++  languageName: unknown
++  linkType: soft
++
++"left-pad@npm:^1.3.0":
++  version: 1.3.0
++  resolution: "left-pad@npm:1.3.0"
++  checksum: 10c0/x
++  languageName: node
++  linkType: hard
++
++"@types/node@npm:*, @types/node@npm:^20.0.0":
++  version: 20.10.0
++  resolution: "@types/node@npm:20.10.0"
++  languageName: node
++  linkType: hard
++
++"mine@https://secret@example.invalid/mine.git#commit=abc":
++  version: 0.0.1
++  resolution: "mine@https://secret@example.invalid/mine.git#commit=abc"
++  languageName: node
++  linkType: hard
++`;
++
++test("yarn.lock: v1 and Berry registry packages are components, aliases resolve to the real package, workspaces and links are left out", () => {
++  const v1 = parseYarnLock(YARN_V1, "yarn.lock");
++  assert.deepEqual(purls(v1), ["pkg:npm/%40babel/code-frame@7.22.13", "pkg:npm/left-pad@1.3.0", "pkg:npm/string-width@4.2.3"]);
++  assert.deepEqual(states(v1), ["partial", "partial"]); noUrl(v1.issues, "yarn v1");
++  const berry = parseYarnLock(YARN_BERRY, "yarn.lock");
++  assert.deepEqual(purls(berry), ["pkg:npm/left-pad@1.3.0", "pkg:npm/%40types/node@20.10.0"]);
++  assert.deepEqual(states(berry), ["partial"]); noUrl(berry.issues, "yarn berry");
++  assert.deepEqual(parseYarnLock("# yarn lockfile v1\n\n\n", "yarn.lock"), { components: [], issues: [] }, "an empty v1 lockfile locks nothing");
++  assert.deepEqual(states(parseYarnLock(YARN_BERRY.replace("version: 8", "version: 3"), "yarn.lock")), ["unsupported"]);
++  assert.throws(() => parseYarnLock("left-pad@^1:\n  version \"1.3.0\"\n", "yarn.lock"), /neither a yarn v1 lockfile nor a Berry lockfile/u);
++});
++
++const PNPM_9 = `lockfileVersion: '9.0'
++
++settings:
++  autoInstallPeers: true
++
++importers:
++
++  .:
++    dependencies:
++      left-pad:
++        specifier: ^1.3.0
++        version: 1.3.0
++
++packages:
++
++  left-pad@1.3.0:
++    resolution: {integrity: sha512-x}
++
++  '@types/node@20.10.0':
++    resolution: {integrity: sha512-y}
++
++  fsevents@2.3.3:
++    resolution: {integrity: sha512-z}
++    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
++    os: [darwin]
++
++  mine@https://codeload.example.invalid/mine/tar.gz/abc:
++    resolution: {tarball: https://codeload.example.invalid/mine/tar.gz/abc}
++    version: 0.0.1
++
++snapshots:
++
++  left-pad@1.3.0: {}
++
++  fsevents@2.3.3:
++    optional: true
++`;
++const PNPM_6 = `lockfileVersion: '6.0'
++
++dependencies:
++  left-pad:
++    specifier: ^1.3.0
++    version: 1.3.0
++
++packages:
++
++  /left-pad@1.3.0:
++    resolution: {integrity: sha512-x}
++    dev: false
++
++  /jest@29.7.0(@types/node@20.10.0):
++    resolution: {integrity: sha512-y}
++    dev: true
++`;
++const PNPM_5 = `lockfileVersion: 5.4
++
++packages:
++
++  /left-pad/1.3.0:
++    resolution: {integrity: sha512-x}
++    dev: false
++
++  /@babel/core/7.23.0_supports-color@5.5.0:
++    resolution: {integrity: sha512-y}
++    dev: true
++`;
++
++test("pnpm-lock.yaml: the 9.x, 6.x and 5.x key forms, dev and optional scopes, and a tarball pin as partial", () => {
++  const v9 = parsePnpmLock(PNPM_9, "pnpm-lock.yaml");
++  assert.deepEqual(scoped(v9), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/%40types/node@20.10.0", "required"], ["pkg:npm/fsevents@2.3.3", "optional"]]);
++  assert.deepEqual(states(v9), ["partial"]); noUrl(v9.issues, "pnpm 9");
++  assert.deepEqual(scoped(parsePnpmLock(PNPM_6, "pnpm-lock.yaml")), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/jest@29.7.0", "dev"]]);
++  assert.deepEqual(scoped(parsePnpmLock(PNPM_5, "pnpm-lock.yaml")), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/%40babel/core@7.23.0", "dev"]]);
++  assert.deepEqual(states(parsePnpmLock("lockfileVersion: '7.0'\n", "pnpm-lock.yaml")), ["unsupported"]);
++  assert.throws(() => parsePnpmLock("packages:\n  left-pad@1.3.0: {}\n", "pnpm-lock.yaml"), /no lockfileVersion/u);
++});
++
++const BUN_LOCK = `{
++  "lockfileVersion": 1,
++  "workspaces": {
++    "": {
++      "name": "app",
++      "dependencies": { "left-pad": "^1.3.0", },
++      "devDependencies": { "typescript": "^5.3.0", },
++    },
++  },
++  "packages": {
++    "left-pad": ["left-pad@1.3.0", "", {}, "sha512-x"],
++    "typescript": ["typescript@5.3.3", "", { "bin": { "tsc": "bin/tsc" } }, "sha512-y"],
++    "mine": ["mine@github:example/mine#abc", {}, "example-mine-abc"],
++    "inner": ["inner@workspace:packages/inner"],
++  }
++}
++`;
++
++test("bun.lock: JSON with trailing commas, dev from the workspace, workspace members left out, a git pin partial", () => {
++  const bun = parseBunLock(BUN_LOCK, "bun.lock");
++  assert.deepEqual(scoped(bun), [["pkg:npm/left-pad@1.3.0", "required"], ["pkg:npm/typescript@5.3.3", "dev"]]);
++  assert.deepEqual(states(bun), ["partial"]);
++  assert.deepEqual(states(parseBunLock('{ "lockfileVersion": 9, "packages": {} }', "bun.lock")), ["unsupported"]);
++  assert.throws(() => parseBunLock('{ "lockfileVersion": 1, "packages": { "x": "x@1.0.0" } }', "bun.lock"), /not a tuple/u);
++});
++
++const CARGO_LOCK = `# This file is automatically @generated by Cargo.
++version = 3
++
++[[package]]
++name = "app"
++version = "0.1.0"
++dependencies = [
++ "serde",
++]
++
++[[package]]
++name = "serde"
++version = "1.0.200"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "abc"
++
++[[package]]
++name = "mine"
++version = "0.1.0"
++source = "git+https://secret@example.invalid/mine.git?rev=abc#abc"
++
++[[patch.unused]]
++name = "unused"
++version = "9.9.9"
++`;
++const POETRY_LOCK = `[[package]]
++name = "Requests"
++version = "2.31.0"
++description = """
++name = "not-a-package"
++"""
++optional = false
++
++[package.source]
++type = "legacy"
++url = "https://mirror.example.invalid/simple"
++reference = "mirror"
++
++[[package]]
++name = "mine"
++version = "0.1.0"
++description = "a package from git"
++
++[package.source]
++type = "git"
++url = "https://secret@example.invalid/mine.git"
++`;
++const UV_LOCK = `version = 1
++requires-python = ">=3.12"
++
++[[package]]
++name = "app"
++version = "0.1.0"
++source = { virtual = "." }
++dependencies = [
++    { name = "requests" },
++]
++
++[[package]]
++name = "Requests"
++version = "2.32.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/x.tar.gz", hash = "sha256:x", size = 1 }
++
++[[package]]
++name = "mine"
++version = "0.1.0"
++source = { git = "https://secret@example.invalid/mine.git?rev=abc#abc" }
++
++[[package]]
++name = "Sub_Pkg"
++version = "0.2.0"
++source = { editable = "packages/sub" }
++`;
++
++test("Cargo.lock, poetry.lock and uv.lock: registry packages only, a multi-line string never names a package, git sources partial", () => {
++  const cargo = parseCargoLock(CARGO_LOCK, "Cargo.lock");
++  assert.deepEqual(purls(cargo), ["pkg:cargo/serde@1.0.200"], "the path crate and an unused patch table are not components");
++  assert.deepEqual(states(cargo), ["partial"]); noUrl(cargo.issues, "cargo");
++  const poetry = parsePoetryLock(POETRY_LOCK, "poetry.lock");
++  assert.deepEqual(purls(poetry), ["pkg:pypi/requests@2.31.0"], "a legacy mirror is a registry; the description's name line is no package");
++  assert.deepEqual(states(poetry), ["partial"]); noUrl(poetry.issues, "poetry");
++  const uv = parseUvLock(UV_LOCK, "uv.lock");
++  assert.deepEqual(purls(uv), ["pkg:pypi/requests@2.32.3"], "the virtual root and the editable member are the project itself");
++  assert.deepEqual(states(uv), ["partial"]); noUrl(uv.issues, "uv");
++  assert.deepEqual(states(parseUvLock(UV_LOCK.replace("version = 1\n", "version = 2\n"), "uv.lock")), ["unsupported"]);
++  assert.throws(() => parseUvLock('[[package]]\nname = "x"\n', "uv.lock"), /no lock format version/u);
++  assert.throws(() => parseCargoLock('[[package]]\nname = "x"\n', "Cargo.lock"), /without a name and a version/u);
++});
++
++const GRADLE_LOCK = `# This is a Gradle generated file for dependency locking.
++# Manual edits can break the build and are not advised.
++# This file is expected to be part of source control.
++com.google.guava:guava:32.1.3-jre=compileClasspath,runtimeClasspath
++junit:junit:4.13.2=testCompileClasspath,testRuntimeClasspath
++empty=annotationProcessor
++`;
++const POM = `<?xml version="1.0" encoding="UTF-8"?>
++<project xmlns="http://maven.apache.org/POM/4.0.0">
++  <modelVersion>4.0.0</modelVersion>
++  <parent>
++    <groupId>org.springframework.boot</groupId>
++    <artifactId>spring-boot-starter-parent</artifactId>
++    <version>3.2.0</version>
++  </parent>
++  <groupId>com.example</groupId>
++  <artifactId>svc</artifactId>
++  <version>1.0.0</version>
++  <properties>
++    <jackson.version>2.16.0</jackson.version>
++  </properties>
++  <dependencyManagement>
++    <dependencies>
++      <dependency><groupId>managed</groupId><artifactId>bom</artifactId><version>9</version></dependency>
++    </dependencies>
++  </dependencyManagement>
++  <dependencies>
++    <!-- <dependency><groupId>commented</groupId><artifactId>out</artifactId><version>1</version></dependency> -->
++    <dependency>
++      <groupId>com.fasterxml.jackson.core</groupId>
++      <artifactId>jackson-databind</artifactId>
++      <version>\${jackson.version}</version>
++    </dependency>
++    <dependency>
++      <groupId>org.springframework.boot</groupId>
++      <artifactId>spring-boot-starter-web</artifactId>
++    </dependency>
++    <dependency>
++      <groupId>\${project.groupId}</groupId>
++      <artifactId>svc-api</artifactId>
++      <version>\${project.version}</version>
++    </dependency>
++    <dependency>
++      <groupId>junit</groupId>
++      <artifactId>junit</artifactId>
++      <version>[4.13,5)</version>
++      <scope>test</scope>
++    </dependency>
++  </dependencies>
++  <build><plugins><plugin><groupId>x</groupId><artifactId>y</artifactId><dependencies><dependency><groupId>p</groupId><artifactId>q</artifactId><version>1</version></dependency></dependencies></plugin></plugins></build>
++</project>
++`;
++const cdx = (components, specVersion = "1.5") => JSON.stringify({ bomFormat: "CycloneDX", specVersion, version: 1, components });
++const mavenComponent = (group, artifact, version) => ({ type: "library", name: artifact, group, version, purl: `pkg:maven/${group}/${artifact}@${version}?type=jar&repository_url=https%3A%2F%2Fsecret%40repo.example.invalid` });
++const FULL_CDX = cdx([mavenComponent("com.fasterxml.jackson.core", "jackson-databind", "2.16.0"), mavenComponent("org.springframework.boot", "spring-boot-starter-web", "3.2.0"), mavenComponent("com.example", "svc-api", "1.0.0"), mavenComponent("junit", "junit", "4.13.2")]);
++
++test("Gradle lockfiles: configurations decide the scope, a legacy per-configuration file is test-only by name, a damaged line throws", () => {
++  assert.deepEqual(scoped(parseGradleLockfile(GRADLE_LOCK, "gradle.lockfile")), [["pkg:maven/com.google.guava/guava@32.1.3-jre", "required"], ["pkg:maven/junit/junit@4.13.2", "dev"]]);
++  assert.deepEqual(scoped(parseGradleLockfile("junit:junit:4.13.2\n", "gradle/dependency-locks/testCompileClasspath.lockfile")), [["pkg:maven/junit/junit@4.13.2", "dev"]]);
++  assert.throws(() => parseGradleLockfile("com.google.guava:guava\n", "gradle.lockfile"), /no group:artifact:version entry/u);
++});
++
++test("pom.xml: direct dependencies outside management, build and comments; versions from literals and this pom's properties only", () => {
++  const direct = readPomDependencies(POM);
++  assert.deepEqual(direct.map((d) => [d.name, d.version, d.scope]), [
++    ["com.fasterxml.jackson.core/jackson-databind", "2.16.0", "required"], ["org.springframework.boot/spring-boot-starter-web", null, "required"],
++    ["com.example/svc-api", "1.0.0", "required"], ["junit/junit", null, "dev"],
++  ], "a parent-managed version and a range stay unresolved");
++  assert.deepEqual(purls(parsePomXml(POM, "pom.xml")), ["pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0", "pkg:maven/com.example/svc-api@1.0.0"]);
++  const listed = parseCycloneDx(FULL_CDX, "bom.json").components;
++  assert.deepEqual(mavenCoverage(direct, listed), []);
++  assert.deepEqual(mavenCoverage(direct, listed.filter((c) => c.name !== "junit/junit")), ["junit/junit"]);
++  assert.deepEqual(mavenCoverage(direct, listed.map((c) => (c.name === "com.fasterxml.jackson.core/jackson-databind" ? { ...c, version: "2.15.0" } : c))), ["com.fasterxml.jackson.core/jackson-databind@2.16.0"], "a stale CycloneDX file does not cover a pinned version");
++  assert.throws(() => readPomDependencies("<projects/>"), /not a Maven pom/u);
++});
++
++test("CycloneDX: every component needs a package URL with a version; qualifiers (repository URLs) are dropped; unknown spec versions are unsupported", () => {
++  const nested = cdx([{ ...mavenComponent("a", "b", "1.0"), components: [mavenComponent("c", "d", "2.0")] }, { type: "library", name: "no-purl" }, { ...mavenComponent("e", "f", "3.0"), scope: "excluded" }]);
++  const result = parseCycloneDx(nested, "app.cdx.json");
++  assert.deepEqual(purls(result), ["pkg:maven/a/b@1.0", "pkg:maven/c/d@2.0"]);
++  assert.deepEqual(states(result), ["partial"]); noUrl(result, "cyclonedx");
++  assert.deepEqual(states(parseCycloneDx(cdx([], "1.1"), "bom.json")), ["unsupported"]);
++  assert.throws(() => parseCycloneDx("{}", "x.cdx.json"), /not a CycloneDX JSON document/u);
++});
++
++const NUGET_LOCK = JSON.stringify({ version: 1, dependencies: {
++  "net8.0": { "Newtonsoft.Json": { type: "Direct", requested: "[13.0.3, )", resolved: "13.0.3", contentHash: "x" }, "System.Memory": { type: "Transitive", resolved: "4.5.5", contentHash: "y" }, "Svc.Core": { type: "Project" } },
++  "net8.0/win-x64": { "System.Memory": { type: "Transitive", resolved: "4.5.5", contentHash: "y" } },
++} });
++
++test("packages.lock.json (NuGet): every target framework is read once, project references are left out", () => {
++  assert.deepEqual(purls(parseNugetLock(NUGET_LOCK, "svc/packages.lock.json")), ["pkg:nuget/Newtonsoft.Json@13.0.3", "pkg:nuget/System.Memory@4.5.5"]);
++  assert.deepEqual(states(parseNugetLock(JSON.stringify({ version: 3, dependencies: {} }), "packages.lock.json")), ["unsupported"]);
++  assert.throws(() => parseNugetLock(JSON.stringify({ version: 1, dependencies: { "net8.0": { X: { type: "Direct" } } } }), "packages.lock.json"), /without a resolved version/u);
++});
++
++const GEMFILE_LOCK = `GIT
++  remote: https://secret@example.invalid/mine.git
++  revision: abc
++  specs:
++    mine (0.1.0)
++
++PATH
++  remote: engines/local
++  specs:
++    local (0.0.1)
++
++GEM
++  remote: https://rubygems.org/
++  specs:
++    rack (3.0.8)
++    rails (7.1.2)
++      actionpack (= 7.1.2)
++
++PLATFORMS
++  x86_64-linux
++
++DEPENDENCIES
++  rails (~> 7.1)
++
++BUNDLED WITH
++   2.5.3
++`;
++const COMPOSER_LOCK = JSON.stringify({ packages: [
++  { name: "monolog/monolog", version: "3.5.0", dist: { type: "zip", url: "https://api.example.invalid/x" } },
++  { name: "acme/local", version: "dev-main", dist: { type: "path", url: "../local" } },
++  { name: "acme/branch", version: "dev-main", source: { type: "git", url: "https://secret@example.invalid/branch.git" } },
++], "packages-dev": [{ name: "phpunit/phpunit", version: "10.5.0" }] });
++
++test("Gemfile.lock and composer.lock: registry gems and packages are components, git, path and branch pins are partial", () => {
++  const gems = parseGemfileLock(GEMFILE_LOCK, "Gemfile.lock");
++  assert.deepEqual(purls(gems), ["pkg:gem/rack@3.0.8", "pkg:gem/rails@7.1.2"]);
++  assert.deepEqual(states(gems), ["partial", "partial"]); noUrl(gems.issues, "gemfile");
++  assert.throws(() => parseGemfileLock("GEM\n  specs:\n    rack 3.0.8\n", "Gemfile.lock"), /cannot read/u);
++  const composer = parseComposerLock(COMPOSER_LOCK, "composer.lock");
++  assert.deepEqual(scoped(composer), [["pkg:composer/monolog/monolog@3.5.0", "required"], ["pkg:composer/phpunit/phpunit@10.5.0", "dev"]]);
++  assert.deepEqual(states(composer), ["partial", "partial"]); noUrl(composer.issues, "composer");
++});
++
++const PUBSPEC_LOCK = `# Generated by pub
++# See https://dart.dev/tools/pub/glossary#lockfile
++packages:
++  http:
++    dependency: "direct main"
++    description:
++      name: http
++      sha256: "abc"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.1.0"
++  flutter:
++    dependency: "direct main"
++    description: flutter
++    source: sdk
++    version: "0.0.0"
++  test:
++    dependency: "direct dev"
++    description:
++      name: test
++      sha256: "def"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.24.9"
++  mine:
++    dependency: "direct main"
++    description:
++      path: "../mine"
++      relative: true
++    source: path
++    version: "0.1.0"
++sdks:
++  dart: ">=3.2.0 <4.0.0"
++`;
++const MIX_LOCK = `%{
++  "jason": {:hex, :jason, "1.4.1", "af1504e35f629ddcdd6addb3513c3853991f694921b1b9368b0bd32beb9f1b63", [:mix], [{:decimal, "~> 1.0 or ~> 2.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm", "fbb01ecdfd565b56261302f7e1fcc27c4fb8f32d56eab74db621fc154604a7a1"},
++  "my_alias": {:hex, :real_pkg, "1.0.0", "abc", [:mix], [], "hexpm", "def"},
++  "mine": {:git, "https://secret@example.invalid/mine.git", "abc", []},
++}
++`;
++
++test("pubspec.lock and mix.lock: hosted and hex packages are components, SDK packages are left out, path and git pins partial", () => {
++  const pub = parsePubspecLock(PUBSPEC_LOCK, "pubspec.lock");
++  assert.deepEqual(scoped(pub), [["pkg:pub/http@1.1.0", "required"], ["pkg:pub/test@1.24.9", "dev"]]);
++  assert.deepEqual(states(pub), ["partial"]);
++  assert.throws(() => parsePubspecLock("sdks:\n  dart: x\n", "pubspec.lock"), /not a pubspec.lock/u);
++  const mix = parseMixLock(MIX_LOCK, "mix.lock");
++  assert.deepEqual(purls(mix), ["pkg:hex/jason@1.4.1", "pkg:hex/real_pkg@1.0.0"], "a hex alias names the real package");
++  assert.deepEqual(states(mix), ["partial"]); noUrl(mix.issues, "mix");
++  assert.throws(() => parseMixLock('%{\n  jason: "x"\n}\n', "mix.lock"), /cannot read/u);
++});
++
++const PACKAGE_RESOLVED_2 = JSON.stringify({ pins: [
++  { identity: "swift-algorithms", kind: "remoteSourceControl", location: "https://github.com/apple/swift-algorithms.git", state: { revision: "b14b7f4c528c942f121c8b860b9410b2bf57825e", version: "1.0.0" } },
++  { identity: "lib", kind: "remoteSourceControl", location: "https://user:secret@git.example.invalid:8443/team/lib.git", state: { revision: "abc", version: "2.1.0" } },
++  { identity: "mine", kind: "remoteSourceControl", location: "git@github.com:owner/mine.git", state: { branch: "main", revision: "abc" } },
++  { identity: "local", kind: "localSourceControl", location: "/x/local", state: { revision: "abc" } },
++], version: 2 });
++
++test("Package.resolved: a released pin is named by host and path with scheme, credentials and port removed; branch and local pins are partial", () => {
++  const v2 = parsePackageResolved(PACKAGE_RESOLVED_2, "Package.resolved");
++  assert.deepEqual(purls(v2), ["pkg:swift/github.com/apple/swift-algorithms@1.0.0", "pkg:swift/git.example.invalid/team/lib@2.1.0"]);
++  assert.doesNotMatch(JSON.stringify(v2), /secret|user:|:8443|https:/u);
++  assert.deepEqual(states(v2), ["partial", "partial"]);
++  const v1 = parsePackageResolved(JSON.stringify({ object: { pins: [{ package: "Alamofire", repositoryURL: "git@github.com:Alamofire/Alamofire.git", state: { branch: null, revision: "x", version: "5.8.1" } }] }, version: 1 }), "Package.resolved");
++  assert.deepEqual(purls(v1), ["pkg:swift/github.com/Alamofire/Alamofire@5.8.1"]);
++  assert.deepEqual(states(parsePackageResolved('{ "pins": [], "version": 4 }', "Package.resolved")), ["unsupported"]);
++});
++
++test("conan.lock: the 0.5 reference lists and the 0.4 graph, build requirements as dev, older formats unsupported", () => {
++  const v5 = parseConanLock(JSON.stringify({ version: "0.5", requires: ["zlib/1.3#b3b71bfe8dd07abc7b82ff2bd0eac021%1702683583.3411012", "fmt/10.1.1@team/stable#abc"], build_requires: ["cmake/3.28.1#x"], python_requires: [] }), "conan.lock");
++  assert.deepEqual(scoped(v5), [["pkg:conan/zlib@1.3", "required"], ["pkg:conan/fmt@10.1.1", "required"], ["pkg:conan/cmake@3.28.1", "dev"]]);
++  const v4 = parseConanLock(JSON.stringify({ graph_lock: { nodes: { 0: { path: "conanfile.txt", requires: ["1"], build_requires: ["2"] }, 1: { ref: "zlib/1.2.13", options: "" }, 2: { ref: "cmake/3.27.0" } }, revisions_enabled: false }, version: "0.4" }), "conan.lock");
++  assert.deepEqual(scoped(v4), [["pkg:conan/zlib@1.2.13", "required"], ["pkg:conan/cmake@3.27.0", "dev"]]);
++  assert.deepEqual(states(parseConanLock(JSON.stringify({ graph_lock: { nodes: {} }, version: "0.3" }), "conan.lock")), ["unsupported"]);
++});
++
++test("the close finds each reader by file name or path pattern, and a manifest with its lockfile is no finding", () => {
++  for (const name of ["yarn.lock", "pnpm-lock.yaml", "bun.lock", "uv.lock", "gradle.lockfile", "packages.lock.json", "Gemfile.lock", "gems.locked", "composer.lock", "pubspec.lock", "Package.resolved", "mix.lock", "conan.lock", "pom.xml", "bom.json"]) assert.equal(typeof SBOM_READERS[name], "function", name);
++  const seen = observe({
++    "package.json": JSON.stringify({ dependencies: { "left-pad": "^1.3.0" } }), "pnpm-lock.yaml": PNPM_9.replace(/\n {2}mine@[\s\S]*?version: 0\.0\.1\n/u, "\n"),
++    "svc/Service.csproj": '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Newtonsoft.Json" Version="13.0.3" /></ItemGroup></Project>', "svc/packages.lock.json": NUGET_LOCK,
++    "lib/build.gradle": "dependencies {\n  implementation 'com.google.guava:guava:32.1.3-jre'\n}\n", "lib/gradle/dependency-locks/compileClasspath.lockfile": "com.google.guava:guava:32.1.3-jre\n",
++    "deps/app.cdx.json": cdx([mavenComponent("org.slf4j", "slf4j-api", "2.0.9")]),
++  });
++  assert.deepEqual(seen.findings, []);
++  assert.ok(seen.components.some((c) => c.purl === "pkg:maven/org.slf4j/slf4j-api@2.0.9"), "a *.cdx.json file is read");
++  assert.ok(seen.components.some((c) => c.purl === "pkg:nuget/System.Memory@4.5.5"));
++  assert.ok(seen.components.some((c) => c.purl === "pkg:maven/com.google.guava/guava@32.1.3-jre"), "a legacy Gradle lock file is read and covers its build file");
++});
++
++test("a .NET project or a Gradle build without its lockfile is partial with help that names the switch to turn on", () => {
++  const seen = observe({ "svc/Service.csproj": '<Project><ItemGroup><PackageReference Include="X" Version="1.0.0" /></ItemGroup></Project>', "lib/build.gradle.kts": "dependencies {\n  implementation(\"a:b:1\")\n}\n", "empty/Empty.csproj": "<Project/>" });
++  assert.deepEqual(seen.findings.map((f) => [f.state, f.path]), [["partial", "lib/build.gradle.kts"], ["partial", "svc/Service.csproj"]]);
++  assert.match(sbomFindingHelp(seen.findings[0]), /dependencyLocking/u);
++  assert.match(sbomFindingHelp(seen.findings[1]), /RestorePackagesWithLockFile/u);
++});
++
++test("a Maven pom is partial unless a CycloneDX file in its directory or above lists every direct dependency", () => {
++  const alone = observe({ "pom.xml": POM });
++  assert.deepEqual(alone.findings.map((f) => [f.state, f.path]), [["partial", "pom.xml"]]);
++  assert.match(alone.findings[0].reason, /no CycloneDX file of the build covers/u); assert.match(sbomFindingHelp(alone.findings[0]), /cyclonedx-maven-plugin/u);
++  assert.deepEqual(observe({ "svc/pom.xml": POM, "bom.json": FULL_CDX }).findings, [], "a CycloneDX file above the pom covers it");
++  const stale = observe({ "pom.xml": POM, "bom.json": cdx(JSON.parse(FULL_CDX).components.filter((c) => c.name !== "junit")) });
++  assert.match(stale.findings[0].reason, /does not list 1 direct dependency of this pom \(junit\/junit\)/u);
++  assert.deepEqual(observe({ "pom.xml": POM, "svc/bom.json": FULL_CDX }).findings.map((f) => f.path), ["pom.xml"], "a CycloneDX file below the pom does not cover it");
++  const notCdx = observe({ "pom.xml": POM, "bom.json": JSON.stringify({ name: "a bill of materials of another kind" }) });
++  assert.deepEqual(notCdx.inputs.map((i) => i.path), ["pom.xml"], "a bom.json that is no CycloneDX document is no input");
++});
++
++test("a lockfile a reader cannot read is invalid, never skipped; a whole close of every format writes no URL into the SBOM", () => {
++  assert.deepEqual(observe({ "yarn.lock": "left-pad@^1:\n  version \"1\"\n" }).findings.map((f) => f.state), ["invalid"]);
++  const files = { "yarn.lock": YARN_V1, "a/pnpm-lock.yaml": PNPM_9, "b/bun.lock": BUN_LOCK, "Cargo.lock": CARGO_LOCK, "poetry.lock": POETRY_LOCK, "c/uv.lock": UV_LOCK,
++    "gradle.lockfile": GRADLE_LOCK, "packages.lock.json": NUGET_LOCK, "Gemfile.lock": GEMFILE_LOCK, "composer.lock": COMPOSER_LOCK, "pubspec.lock": PUBSPEC_LOCK,
++    "Package.resolved": PACKAGE_RESOLVED_2, "mix.lock": MIX_LOCK, "pom.xml": POM, "bom.json": FULL_CDX };
++  const authority = { kind: "po-signature", keyReference: "po-key", intentSha256: "a".repeat(64), proofSha256: "b".repeat(64), candidateCommit: "c".repeat(40) };
++  const out = closeSbom({ featureId: "demo-feature", evidenceDir: "specs/demo-feature/evidence", tracked: Object.keys(files), read: (path) => files[path] ?? null, override: "pins outside a registry accepted", authority, actor: "po" });
++  assert.equal(out.status, "ready"); assert.ok(out.record.componentCount >= 25);
++  // A Swift package is named by its host and path (the purl spec), and SPDX carries its fixed document namespace; scheme, credentials,
++  // port and every URL read from a lockfile stay out.
++  for (const file of out.files) assert.doesNotMatch(file.text.replaceAll("git.example.invalid/team/lib", "swift-name").replaceAll('"https://pipeline.invalid/sbom/node"', '"namespace"'), /:\/\/|example\.invalid|secret|user:|:8443/u, file.path);
++});
