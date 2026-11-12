@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "a4934b6fccee6af83ea9e235c41576ee28a21300",
-    "tree": "1f6abb4bf381f79b37be2c3a80982e9b997bb563"
+    "commit": "94c1fbf8b4a0f7226c7d221925c364888f6ee0dd",
+    "tree": "768d19253879312d1f9768af58cede3532e88f92"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -2620,6 +2620,7 @@
         "verify-phase:harness/scripts/verify.mjs:sbom-discovery-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-fixture-matrix-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-lockfile-readers-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-manifest-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-node-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-release-binding-tests"
