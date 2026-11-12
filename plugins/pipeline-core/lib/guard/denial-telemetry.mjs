@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Guard module "denial-telemetry" (layer 5), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderProjectOnboardingAction } from "../project-onboarding-v3.mjs";
 import { observeReturnedActionDenial, resetLifecycleDenial } from "../lifecycle-denial-loop.mjs";
@@ -131,6 +131,28 @@ export function isFirstDenialThisScope(input, root, classKey, dependencies) {
     return true;
   } catch {
     return true; // never let a state-store failure trim an actionable denial -- fail open
+  }
+}
+
+/**
+ * Candidate 28c (PO tile 2026-11-11, context baseline): the full grammar listing is printed once per
+ * CONTEXT WINDOW, not once per session. A compaction drops the earlier full listing from the model's
+ * context, so the post-compact re-ground hook calls this to forget which classes the orchestrating
+ * session has seen; the next grammar denial in the new window prints the full listing again. Only the
+ * session-keyed file of that session is removed (a dispatched subagent keeps its own agent-keyed file).
+ * Never throws: a missing file, an unusable session id or an unresolvable common dir is a no-op.
+ */
+export function resetDenialClassesForSession(sessionId, root, dependencies = {}) {
+  if (typeof sessionId !== "string" || !/^[A-Za-z0-9._-]{1,128}$/u.test(sessionId) || sessionId.startsWith("agent-")) return "skipped";
+  try {
+    const commonDir = (dependencies.resolveGitCommonDirFn ?? resolveGitCommonDir)(root, dependencies);
+    if (commonDir === null) return "skipped";
+    const statePath = guardDenialClassesPath(commonDir, sessionId);
+    if (!(dependencies.existsSyncFn ?? existsSync)(statePath)) return "absent";
+    (dependencies.rmSyncFn ?? rmSync)(statePath, { force: true });
+    return "reset";
+  } catch {
+    return "skipped";
   }
 }
 

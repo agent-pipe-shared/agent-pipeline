@@ -25,6 +25,7 @@ import {
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { resetDenialClassesForSession } from "../lib/guard/denial-telemetry.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 // Repository admission precedes hook input hardening and all governed effects.
 if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
@@ -379,7 +380,11 @@ export function decideOutput(input, state, { rootDir = null, env = process.env }
   return { stdout: `${JSON.stringify(payload)}\n`, json: true, payload, projection, measurement };
 }
 
-/** Real hook boundary. It always exits zero and never writes repository state. */
+/**
+ * Real hook boundary. It always exits zero and never writes repository state. Its one write is private:
+ * it clears the session's guard denial-trim marker under `<git-common-dir>/agent-pipeline/` (candidate
+ * 28c), so the first grammar denial of the new context window prints the full grammar once again.
+ */
 export function run() {
   if (!observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return;
   const rootDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
@@ -390,6 +395,7 @@ export function run() {
     process.exit(0);
   }
   if (!shouldActivate(input)) process.exit(0);
+  resetDenialClassesForSession(input?.session_id, rootDir);
 
   const authority = resolveProjectAuthorityPaths({ rootDir });
   const statePath = authority.status === "ready"

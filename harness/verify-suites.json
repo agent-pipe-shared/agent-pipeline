@@ -4855,6 +4855,12 @@
       "file": "scripts/context-baseline.test.mjs",
       "invariantPinned": "The context baseline of a transcript window is the input of its first real reply, later requests count at most that much as re-read baseline, zero-usage replies are no requests, and the attachments before that reply are attributed to pipeline (pipeline-core skills, listings and hook context, the project CLAUDE.md or AGENTS.md), user (the memory index) and harness",
       "nonOverlapNote": "Unique test suite for scripts/context-baseline.mjs; outside the harness and plugins roots the registration checker scans, so only this entry runs it"
+    },
+    {
+      "name": "grammar-listing-once-per-context-window-tests",
+      "file": "plugins/pipeline-core/lib/pins/grammar-listing-once-per-context-window.test.mjs",
+      "invariantPinned": "A repeated GUARD-READ-COMMAND-UNSUPPORTED refusal in one context window prints the short grammar form and keeps the decision and the read-spelling note; the post-compact re-ground hook clears only the session-keyed trim state, so the first refusal of the next window prints the full grammar again, and never touches a subagent's own file or a climbing name",
+      "nonOverlapNote": "Unique cases: the read-spelling trim and the per-window reset; the NVA-B-DENIALTRIM cases in guard-lifecycle-ready.test.mjs pin the three grammar codes' per-session trim and scope keys"
     }
   ]
 }

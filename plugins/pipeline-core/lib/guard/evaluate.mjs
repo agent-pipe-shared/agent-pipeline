@@ -565,7 +565,10 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
         : externalFilter !== null ? `the filter "${externalFilter}" (${EXTERNAL_DIRECTORY_FILTER_HINT})`
         : flag === null ? (recursiveSearch === null ? null : `the tree this recursive search reads (an admitted spelling of the same search: \`${recursiveSearch}\`)`)
           : `the flag "${flag}"${spelling === null ? "" : ` (${spelling})`}`;
-      return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejected));
+      const readCode = outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE;
+      // Candidate 28c (context baseline): only the read-spelling code trims; the read-scope code keeps its own full remedy.
+      const firstRead = readCode === READ_COMMAND_UNSUPPORTED_CODE ? isFirstDenialThisScope(input, root, readCode, dependencies) : true;
+      return withLifts(lifts, blocked(readCode, null, [], "", rejected, null, null, false, firstRead));
     }
   }
   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
@@ -645,7 +648,8 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
         || isOutsideRootSingleCommandRead(parsed, root);
       // CGF-10 (PO tile 2026-11-09): a pipeline of readers that is not an admitted shape is a spelling question, so no signed override is offered.
       if (!readScope && isReaderOnlyPipeline(parsed, root)) {
-        return withLifts(lifts, blocked(READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejectedGrammarElement("GUARD-OPERATOR-UNAPPROVED", (input.tool_input.command ?? input.tool_input.CommandLine), parsed)));
+        const firstRead = isFirstDenialThisScope(input, root, READ_COMMAND_UNSUPPORTED_CODE, dependencies);
+        return withLifts(lifts, blocked(READ_COMMAND_UNSUPPORTED_CODE, null, [], "", rejectedGrammarElement("GUARD-OPERATOR-UNAPPROVED", (input.tool_input.command ?? input.tool_input.CommandLine), parsed), null, null, false, firstRead));
       }
       const code = readScope
         ? READ_SCOPE_DENIAL_CODE

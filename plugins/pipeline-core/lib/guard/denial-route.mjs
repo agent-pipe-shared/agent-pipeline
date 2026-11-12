@@ -48,7 +48,8 @@ export function blocked(
       : readCredential
         ? READ_CREDENTIAL_TARGET_REMEDY
         : readUnsupported
-        ? [READ_COMMAND_UNSUPPORTED_NOTE, ...GRAMMAR_DENIAL_REMEDY]
+        // Candidate 28c (context baseline): the read-spelling refusal trims its grammar listing on repeat like the three grammar codes.
+        ? [READ_COMMAND_UNSUPPORTED_NOTE, ...(firstOccurrenceThisSession ? GRAMMAR_DENIAL_REMEDY : GRAMMAR_DENIAL_REMEDY_SHORT)]
         : (firstOccurrenceThisSession ? GRAMMAR_DENIAL_REMEDY : GRAMMAR_DENIAL_REMEDY_SHORT);
     return verdict(
       2,
