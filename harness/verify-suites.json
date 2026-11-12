@@ -4849,6 +4849,12 @@
       "file": "plugins/pipeline-core/lib/sbom-close.test.mjs",
       "invariantPinned": "The close reads the lockfiles it knows (npm, Python, Go, Rust) into CycloneDX 1.6 and SPDX 2.3 documents and a closed record; no component is an explicit not-applicable record with its reason; a manifest without a lockfile, an unpinned requirement, a format without a reader, a changed lockfile or a damaged record is a typed finding that blocks, and only a human's literal override, named in the record with every finding it covers, passes it",
       "nonOverlapNote": "Unique cases: the lockfile readers and the close record; sbom-manifest, sbom-node-adapter and sbom-release-binding tests pin the portable manifest, the Node graph adapter and the release links and do not read any lockfile"
+    },
+    {
+      "name": "context-baseline-tests",
+      "file": "scripts/context-baseline.test.mjs",
+      "invariantPinned": "The context baseline of a transcript window is the input of its first real reply, later requests count at most that much as re-read baseline, zero-usage replies are no requests, and the attachments before that reply are attributed to pipeline (pipeline-core skills, listings and hook context, the project CLAUDE.md or AGENTS.md), user (the memory index) and harness",
+      "nonOverlapNote": "Unique test suite for scripts/context-baseline.mjs; outside the harness and plugins roots the registration checker scans, so only this entry runs it"
     }
   ]
 }
