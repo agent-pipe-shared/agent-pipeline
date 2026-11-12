@@ -1923,6 +1923,42 @@ test("CGR-19: a calibrated local-only mode against a configured push remote is n
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// C28-ONBOARDING-QUESTIONS (AC-108), friction 4 (PO decision 2026-11-10): the first push setup that finds a remote under local-only OFFERS the switch as its
+// own agent step (no signature) and the push continues in the same feature. It used to say "leave it for the next feature": the promotion commit ended the
+// Critic carry. The carry now admits that exact one-token change (lib/critic-evidence-carry.mjs), so the notice carries the typed action and the way on.
+test("C28-ONBOARDING-QUESTIONS: the repository-mode notice offers the switch as an agent step without a signature and continues the push in the same feature", () => {
+  const root = mkdtempSync(join(tmpdir(), "c28-mode-"));
+  try {
+    for (const args of [["init", "-q", "-b", "main"], ["remote", "add", "origin", "https://example.invalid/project.git"]]) {
+      assert.equal(spawnSync("git", ["-C", root, ...args], { encoding: "utf8" }).status, 0);
+    }
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({ project: "p", repositoryMode: "local-only" }, null, 2)}\n`);
+    const report = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps({ dir: root }), { foldPendingApprovalWrite: false }).report;
+    const [notice] = report.notices;
+    assert.equal(notice.code, "PUSH-REPOSITORY-MODE-MISMATCH");
+    assert.equal(notice.action.kind, "command");
+    assert.equal(notice.action.executable, process.execPath);
+    assert.equal(notice.action.argv[0].endsWith(join("scripts", "repository-mode-promote.mjs")), true);
+    assert.deepEqual(notice.action.argv.slice(1), ["--root", root, "--to", "remote-tracked"]);
+    assert.equal(notice.action.mutation, true);
+    assert.equal(notice.action.requiresSignature, false, "an ordinary agent step, not a signed one");
+    assert.equal(notice.action.requiresConfirmation, false);
+    assert.equal(notice.action.recordedAs, "its own commit", "the step is recorded as its own commit");
+    assert.equal(notice.then.length >= 3, true);
+    assert.match(notice.then.join(" "), /own commit/u);
+    assert.match(notice.then.join(" "), /Verify/u, "the Verify evidence is bound to the new HEAD, so it runs again");
+    assert.match(notice.then.join(" "), /push-init/u);
+    assert.match(notice.message, /same feature/u);
+    assert.doesNotMatch(notice.message, /next feature|first commit of the next/u, "no longer deferred to the next feature");
+    assert.match(notice.message, /Critic/u, "the Critic carry across this one commit is named");
+    // QG-04 restated pins above stay true: the one narrow command and the signed route for every other change.
+    assert.match(notice.message, /repository-mode-promote\.mjs --root <project-root> --to remote-tracked/u);
+    assert.match(notice.message, /override/u);
+    assert.equal(report.ready, true, "advice: ready does not move");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // AC-108 (closest accepted criterion), CGR-18 / CGF-19: the unchanged shipped template passed the push threat-model gate; it is now named
 // template-unchanged everywhere the gate result is shown, and blocks only in the critical profile (as a scanner that did not execute does).
 test("CGF-19: an unchanged threat-model template is named template-unchanged in the check and the notices; it blocks only in the critical profile", () => {

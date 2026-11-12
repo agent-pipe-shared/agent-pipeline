@@ -35,7 +35,43 @@ const MACHINE_PLANE_KEYS = Object.freeze([
 ]);
 // C27 (PO decision 2026-11-10, EL-36 amended): may be absent, so every machine file written before it stays valid. Attribution only: the label fills `--by`,
 // it never stands in for a signature or a PO decision.
-const OPTIONAL_MACHINE_PLANE_KEYS = Object.freeze(["operatorLabel"]);
+const OPTIONAL_MACHINE_PLANE_KEYS = Object.freeze(["operatorLabel", "pushTransport"]);
+
+// C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10): optional `pushTransport` = { <remote name>: { kind, reference } }. The transport of a push (which SSH key,
+// or the credential helper) is asked once at the first push setup and kept HERE, machine-local, never in a tracked file; later pushes read it. A name or path
+// only, never a key's content (the shape check below and writeMachinePlane's key-material refusal both apply). Mirrored in lib/po-human-approval-read.mjs.
+export const PUSH_TRANSPORT_KINDS = Object.freeze(["ssh-key", "credential-helper", "configured-default"]);
+export function validPushTransport(value) {
+  if (value === null) return true;
+  if (!object(value)) return false;
+  for (const [remote, entry] of Object.entries(value)) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u.test(remote) || !object(entry)) return false;
+    if (Object.keys(entry).some((key) => key !== "kind" && key !== "reference") || !PUSH_TRANSPORT_KINDS.includes(entry.kind)) return false;
+    if (entry.kind === "configured-default") { if (entry.reference !== null) return false; continue; }
+    if (typeof entry.reference !== "string" || entry.reference.length === 0 || entry.reference.length > 512 || /[\x00-\x1f\x7f]/u.test(entry.reference)
+      || entry.reference.trim() !== entry.reference || looksLikeKeyMaterial(entry.reference)) return false;
+  }
+  return true;
+}
+
+/** The transport recorded for `remote` on this machine ({ kind, reference }), or null (unasked, or no valid plane). Never throws. */
+export function readPushTransport(remote, dependencies = {}) {
+  const read = readMachinePlane(dependencies);
+  if (read.status !== "valid" || !object(read.plane.pushTransport)) return null;
+  return Object.hasOwn(read.plane.pushTransport, remote) ? read.plane.pushTransport[remote] : null;
+}
+
+/** Records one remote's transport, keeping every other field; creates a fail-closed plane (signature default) when none exists; never overwrites an invalid one. */
+export function recordPushTransport(remote, entry, dependencies = {}) {
+  if (!validPushTransport({ [remote]: entry })) throw new Error("MP-PUSH-TRANSPORT-REFUSED: PUSH-TRANSPORT");
+  const read = readMachinePlane(dependencies);
+  if (read.status === "invalid") throw new Error("MP-WRITE-REFUSED: MP-INVALID-PLANE");
+  const base = read.status === "valid" ? read.plane : {
+    schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: null, pushApprovalDefault: "signature", routing: null, language: null, session: null, usage: null, updatedAt: new Date().toISOString(),
+  };
+  writeMachinePlane({ ...base, pushTransport: { ...(object(base.pushTransport) ? base.pushTransport : {}), [remote]: { kind: entry.kind, reference: entry.reference } }, updatedAt: new Date().toISOString() }, dependencies);
+  return { status: "recorded" };
+}
 const PUSH_APPROVAL_DEFAULTS = Object.freeze(["signature", "chat"]);
 
 /**
@@ -136,6 +172,7 @@ export function validateMachinePlane(value) {
   if (Object.hasOwn(value, "operatorLabel") && value.operatorLabel !== null && !validOperatorLabel(value.operatorLabel)) {
     return { ok: false, code: "MP-OPERATOR-LABEL", detail: "operatorLabel" };
   }
+  if (Object.hasOwn(value, "pushTransport") && !validPushTransport(value.pushTransport)) return { ok: false, code: "MP-PUSH-TRANSPORT", detail: "pushTransport" };
   return { ok: true };
 }
 

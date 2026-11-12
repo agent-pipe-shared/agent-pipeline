@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import { administrationDocumentationClassOf } from "./administration-documentation-paths.mjs";
+import { promoteRepositoryModeBytes } from "../scripts/repository-mode-promote.mjs";
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const MAX_RANGE_COMMITS = 512;
@@ -50,9 +51,33 @@ function changedEntries(root, from, to) {
   return entries;
 }
 
-function offending(entries, featureIds) {
+const CALIBRATION_TWINS = new Set(["project/pipeline.json", ".claude/pipeline.json"]);
+const GIT_ENV = { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: GIT_NULL_DEVICE,
+  GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_COUNT: "0", GIT_TERMINAL_PROMPT: "0" };
+
+function blobBytes(root, commit, path) {
+  const result = spawnSync("git", ["-C", root, "cat-file", "blob", `${commit}:${path}`], { shell: false, encoding: "buffer", timeout: 10000, maxBuffer: 2 * 1024 * 1024, env: GIT_ENV });
+  return !result.error && !result.signal && result.status === 0 ? result.stdout : null;
+}
+
+/**
+ * C28-ONBOARDING-QUESTIONS (AC-108, PO decision 2026-11-10). The calibration twins are content, so the one commit that moved `repositoryMode` from local-only
+ * to remote-tracked ended the Critic carry and the first push could not continue in the same feature. This admits exactly that change and nothing else: the
+ * twin is modified (regular file both sides) and the reviewed bytes run through repository-mode-promote.mjs's own rule equal the candidate bytes. Any other byte
+ * of the calibration, the other direction, another path or a mode change is still content. Unreadable blobs answer no.
+ */
+function isRepositoryModePromotion(entry, ctx) {
+  if (ctx === null || entry.status !== "M" || entry.oldMode !== "100644" || entry.newMode !== "100644" || !CALIBRATION_TWINS.has(entry.path)) return false;
+  const before = blobBytes(ctx.root, ctx.from, entry.path);
+  const after = blobBytes(ctx.root, ctx.to, entry.path);
+  if (before === null || after === null) return false;
+  const promoted = promoteRepositoryModeBytes(before);
+  return promoted.ok === true && Buffer.compare(promoted.bytes, after) === 0;
+}
+
+function offending(entries, featureIds, ctx = null) {
   return entries.filter((entry) => !["A", "M", "D"].includes(entry.status) || !REGULAR.has(entry.oldMode) || !REGULAR.has(entry.newMode)
-    || administrationDocumentationClassOf(entry.path, { featureIds }) === null).map((entry) => entry.path);
+    || (administrationDocumentationClassOf(entry.path, { featureIds }) === null && !isRepositoryModePromotion(entry, ctx))).map((entry) => entry.path);
 }
 
 /**
@@ -80,7 +105,7 @@ export function decideCriticEvidenceCarry({ repoRoot, reviewedCommit, candidateC
     const tree = git(repoRoot, ["rev-parse", `${candidateCommit}^{tree}`]);
     if (entries === null || tree.status !== 0 || !OID.test(tree.stdout.trim())) return answer({ ...base, code: "CEC-UNREADABLE" });
     const changedPaths = entries.map((entry) => entry.path);
-    const bad = offending(entries, featureIds);
+    const bad = offending(entries, featureIds, { root: repoRoot, from: reviewedCommit, to: candidateCommit });
     if (bad.length > 0) return answer({ ...base, code: "CEC-CONTENT-CHANGED", changedPaths: Object.freeze(changedPaths), offendingPaths: Object.freeze(bad) });
     return answer({ ...base, carried: true, code: "CEC-CARRIED", candidateTree: tree.stdout.trim(),
       passedOverCommits: Object.freeze(commits), changedPaths: Object.freeze(changedPaths) });
@@ -100,7 +125,7 @@ export function administrationDocumentationOnlyCommit(repoRoot, commit, { featur
     if (parents.status !== 0 || ids.length !== 2 || ids[0] !== commit) return false;
     const entries = changedEntries(repoRoot, ids[1], commit);
     if (entries === null || entries.length === 0) return false;
-    return entries.every((entry) => !entry.path.endsWith("/lifecycle.json")) && offending(entries, featureIds).length === 0;
+    return entries.every((entry) => !entry.path.endsWith("/lifecycle.json")) && offending(entries, featureIds, { root: repoRoot, from: ids[1], to: commit }).length === 0;
   } catch { return false; }
 }
 

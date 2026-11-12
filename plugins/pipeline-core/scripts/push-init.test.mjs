@@ -40,7 +40,7 @@ import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
 import * as po from "../lib/po-gate-authority.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { createWindowsOwnedAuthorityDirectory, createWindowsOwnedAuthorityExclusiveFile } from "../lib/windows-owned-authority-backend.mjs";
-import { chmodSync } from "node:fs";
+import { chmodSync, existsSync } from "node:fs";
 import { renderImpl, renderShim } from "./pre-push-hook-install.mjs";
 import { canonicalJson as packetCanonicalJson } from "./critic-packet-preflight.mjs";
 
@@ -578,6 +578,65 @@ test("drivePushInit: the prepare report's notices are carried into the result an
     assert.equal(unmet.outcome, "precondition-unmet");
     assert.deepEqual(unmet.notices, notices, "a refused preparation still shows its notices");
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// C28-ONBOARDING-QUESTIONS (AC-108), friction 4 (PO decision 2026-11-10): the transport of the push (which SSH key, or the credential helper) is asked ONCE at the
+// first push setup and remembered in the machine-local file, never in a tracked file; every later push-init reads it. Fixture values are fake.
+test("C28-ONBOARDING-QUESTIONS: the push transport is asked once, remembered machine-locally and read back by later pushes; the outcome never moves", async () => {
+  const { readMachinePlane } = await import("../lib/machine-plane.mjs");
+  const root = freshFixtureRoot();
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "c28-transport-home-")));
+  try {
+    const transportDeps = { homedirFn: () => home };
+    const drive = (extra = {}) => drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(), transportDeps, ...extra,
+    });
+    const asked = drive();
+    assert.equal(asked.outcome, "signature-required", "advice: the outcome is the one it was");
+    assert.equal(asked.transport.status, "unasked");
+    assert.equal(asked.transport.remote, "origin");
+    assert.match(asked.transport.question, /once/u);
+    assert.match(asked.transport.question, /SSH key|credential helper/u);
+    const flagAt = asked.transport.applyAction.argv.indexOf("--transport-kind");
+    assert.ok(flagAt > 0 && asked.transport.applyAction.argv[0].endsWith("push-init.mjs"), "the answer is one run of this same driver");
+    assert.ok(asked.transport.applyAction.argv.includes("--transport-reference"));
+    assert.equal(asked.transport.applyAction.mutation, true);
+    assert.equal(readMachinePlane(transportDeps).status, "absent", "asking writes nothing");
+    const answered = drive({ transport: { kind: "ssh-key", reference: "/home/fixture/.ssh/id_fixture_key" } });
+    assert.equal(answered.outcome, "signature-required");
+    assert.equal(answered.transport.status, "recorded-now");
+    assert.deepEqual(readMachinePlane(transportDeps).plane.pushTransport.origin, { kind: "ssh-key", reference: "/home/fixture/.ssh/id_fixture_key" });
+    const later = drive();
+    assert.equal(later.transport.status, "recorded");
+    assert.equal(later.transport.kind, "ssh-key");
+    assert.equal(later.transport.reference, "/home/fixture/.ssh/id_fixture_key");
+    assert.equal(Object.hasOwn(later.transport, "question"), false, "asked once, never again");
+    assert.equal(drive({ transport: { kind: "ssh-key", reference: "" } }).transport.status, "refused", "a refused answer is typed and writes nothing");
+    assert.equal(readMachinePlane(transportDeps).plane.pushTransport.origin.reference, "/home/fixture/.ssh/id_fixture_key");
+    // The fixture root has no .git; whatever repository files exist must not carry the transport (it lives only in the machine file).
+    const gitConfig = join(root, ".git", "config");
+    if (existsSync(gitConfig)) assert.doesNotMatch(readFileSync(gitConfig, "utf8"), /id_fixture_key/u, "nothing about the transport lands in the repository");
+    assert.equal(readFileSync(join(home, ".agent-pipeline", "machine.json"), "utf8").includes("id_fixture_key"), true, "it lives in the machine-local file");
+    // The checkpoint lane does not carry the question.
+    assert.equal(Object.hasOwn(driveCheckpointPushInit({ rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/x", run: () => ({ status: 0, stdout: "" }) }), "transport"), false);
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(home, { recursive: true, force: true }); }
+});
+
+test("C28-ONBOARDING-QUESTIONS: --transport-kind / --transport-reference parse as one answer or not at all", () => {
+  const base = ["--root", "/x", "--by", "t", "--remote", "origin", "--destination", "refs/heads/main"];
+  const ok = parseArgs([...base, "--transport-kind", "ssh-key", "--transport-reference", "/home/f/.ssh/id_fixture"]);
+  assert.deepEqual(ok.transport, { kind: "ssh-key", reference: "/home/f/.ssh/id_fixture" });
+  assert.deepEqual(parseArgs([...base, "--transport-kind", "configured-default"]).transport, { kind: "configured-default", reference: null });
+  assert.deepEqual(parseArgs([...base, "--transport-kind", "credential-helper", "--transport-reference", "manager"]).transport, { kind: "credential-helper", reference: "manager" });
+  assert.equal(parseArgs(base).transport, undefined);
+  for (const extra of [["--transport-kind", "ssh-key"], ["--transport-reference", "k"], ["--transport-kind", "password", "--transport-reference", "k"],
+    ["--transport-kind", "configured-default", "--transport-reference", "k"], ["--transport-kind", "ssh-key", "--transport-reference", "--root"]]) {
+    assert.ok(parseArgs([...base, ...extra]).error, JSON.stringify(extra));
+  }
+  const seen = [];
+  main([...base, "--transport-kind", "ssh-key", "--transport-reference", "id_fixture"], { write: () => {}, writeError: () => {}, drive: (options) => { seen.push(options); return { outcome: "usage-error" }; } });
+  assert.deepEqual(seen[0].transport, { kind: "ssh-key", reference: "id_fixture" });
 });
 
 test("drivePushInit: a proof that can be watched is handed over with its wait action, so the human reports nothing back; without one the turn ends", async () => {

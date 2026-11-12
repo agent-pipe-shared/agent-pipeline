@@ -28,6 +28,7 @@ export const ONBOARDING_CONSENT_MARK_SCHEMA_V1 = "pipeline.onboarding-consent-ma
 export const ONBOARDING_CONSENT_MARK_SCHEMA_V2 = "pipeline.onboarding-consent-mark.v2";
 export const ONBOARDING_CONSENT_QUESTION_SCHEMA = "pipeline.onboarding-consent-question.v1";
 export const ONBOARDING_CONSENT_ID = "onboarding-consent";
+export const ADVISOR_EXPORT_STEP_ID = "advisor-export";
 export const ONBOARDING_CONSENT_QUOTE_MAX = 400;
 
 const ONBOARDING = "project-onboarding-v3.mjs";
@@ -42,6 +43,14 @@ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
       { script: ONBOARDING, verbs: ["plan", "apply-portable-seed", "initialize-runtime", "apply-readback"] },
       { script: "onboarding-init.mjs", verbs: null },
     ]),
+  }),
+  // C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10): the Advisor export consent is part of THIS question, mandatory for the Pipeline, so it is never asked
+  // as a question of its own later. It names no action route: it is a consent the first answer records (`advisorExportConsentFromRecord`).
+  Object.freeze({
+    id: ADVISOR_EXPORT_STEP_ID,
+    en: "let the Pipeline's same-runner Advisor read scoped repository material for a concrete consultation (this export consent is part of using the Pipeline, so it is not asked again separately)",
+    de: "dem Advisor der Pipeline (derselbe Runner) für eine konkrete Beratung ausgewählte Repository-Inhalte zeigen (diese Exportfreigabe gehört zur Nutzung der Pipeline und wird nicht noch einmal gesondert gefragt)",
+    routes: Object.freeze([]),
   }),
   Object.freeze({
     id: "hooks",
@@ -117,8 +126,8 @@ export const ONBOARDING_CONSENT_NOT_COVERED = Object.freeze([
 ]);
 
 const QUESTION_FRAME = Object.freeze({
-  en: (covered, excluded) => `Agent Pipeline adds a structured, verifiable delivery workflow to a project. Should this project use it? If you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval: ${covered}. Your yes does not cover ${excluded}; those stay your own decisions.`,
-  de: (covered, excluded) => `Agent Pipeline ergänzt ein Projekt um einen strukturierten, nachprüfbaren Lieferablauf. Soll dieses Projekt es nutzen? Wenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird: ${covered}. Ihr Ja deckt nicht ab: ${excluded}; das bleiben Ihre eigenen Entscheidungen.`,
+  en: (covered, advisor, excluded) => `Agent Pipeline adds a structured, verifiable delivery workflow to a project. Should this project use it? If you say yes, I carry out these steps for you without asking again, up to presenting the design for your approval: ${covered}. Your yes also lets me ${advisor}. Your yes does not cover ${excluded}; those stay your own decisions.`,
+  de: (covered, advisor, excluded) => `Agent Pipeline ergänzt ein Projekt um einen strukturierten, nachprüfbaren Lieferablauf. Soll dieses Projekt es nutzen? Wenn Sie ja sagen, führe ich diese Schritte für Sie aus, ohne erneut zu fragen, bis das Design zu Ihrer Freigabe vorgelegt wird: ${covered}. Ihr Ja erlaubt außerdem, ${advisor}. Ihr Ja deckt nicht ab: ${excluded}; das bleiben Ihre eigenen Entscheidungen.`,
 });
 
 /**
@@ -127,7 +136,8 @@ const QUESTION_FRAME = Object.freeze({
  */
 export function onboardingConsentQuestion({ language = "en" } = {}) {
   const textFor = (lang) => QUESTION_FRAME[lang](
-    ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step[lang]).join("; "),
+    ONBOARDING_CONSENT_COVERED_STEPS.filter((step) => step.id !== ADVISOR_EXPORT_STEP_ID).map((step) => step[lang]).join("; "),
+    ONBOARDING_CONSENT_COVERED_STEPS.find((step) => step.id === ADVISOR_EXPORT_STEP_ID)[lang],
     ONBOARDING_CONSENT_NOT_COVERED.map((step) => step[lang]).join("; "),
   );
   const chosen = language === "de" ? "de" : "en";
@@ -196,6 +206,17 @@ export function readOnboardingConsentRecord(rootDir) {
     } catch { /* an unreadable record claims nothing */ }
   }
   return newest;
+}
+
+/**
+ * C28-ONBOARDING-QUESTIONS: "approved" exactly when the newest readable consent record is a yes whose scope names the Advisor export, otherwise null.
+ * A v1 record (no scope), an older v2 record that did not name it, a no or no record at all gives nothing: such a project keeps asking the Advisor
+ * question as before and nothing is ever inferred as approved. Never throws. `readRecord` is a test seam.
+ */
+export function advisorExportConsentFromRecord(rootDir, { readRecord = readOnboardingConsentRecord } = {}) {
+  let record = null;
+  try { record = readRecord(rootDir); } catch { return null; }
+  return record?.answer === "yes" && Array.isArray(record.scope) && record.scope.includes(ADVISOR_EXPORT_STEP_ID) ? "approved" : null;
 }
 
 export function onboardingConsentEscalationJustification(recordPath, step) {

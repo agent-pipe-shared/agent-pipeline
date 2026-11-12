@@ -33,7 +33,10 @@ read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
 mutations; then run `consentRecordAction`. When an escalation review asks why a
 covered action runs, give its `escalationJustification` line verbatim; the
 design approval, push, release and any human-guard override are never covered.
-A decline leaves the project inactive.
+A decline leaves the project inactive. That one question also carries the Advisor
+export consent (agreeing is part of using the Pipeline), so no separate Advisor
+question follows: after `consentRecordAction`, run the same `onboarding-init.mjs`
+command once more so the first round is read after the record.
 
 Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
 carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`

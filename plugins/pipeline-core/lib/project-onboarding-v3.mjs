@@ -129,6 +129,7 @@ import { observeCompletedUninstallJournals, readUninstallRetainedMetadata } from
 import { uninstallWorkspacePath } from "./project-uninstall-workspace.mjs";
 import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3, readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
+import { advisorExportConsentFromRecord } from "./onboarding-consent-scope.mjs";
 import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
 import { recordGovernanceEnrollmentAfterOnboarding, readGovernanceEnrollmentRetirement, prepareGovernanceEnrollmentBeforeIntake, governanceEnrollmentRecoveryAction, observeGovernanceScope, planGovernanceScopeDecision, applyGovernanceScopeDecision } from "./governance-scope.mjs";
 import { observeOnboardingEnrollmentHistory } from "./onboarding-continuity.mjs";
@@ -6178,6 +6179,31 @@ const INITIAL_GIT_AUTHOR_NAME_PLACEHOLDER = "<PO_GIT_AUTHOR_NAME>";
 const INITIAL_GIT_AUTHOR_EMAIL_PLACEHOLDER = "<PO_GIT_AUTHOR_EMAIL>";
 const INITIAL_PUSH_APPROVAL_PLACEHOLDER = "<signature|chat>";
 const INITIAL_ADVISOR_EXPORT_CONSENT_PLACEHOLDER = "<approved|declined>";
+// C28-ONBOARDING-QUESTIONS: said once where the Advisor question is no longer asked (shared with the driver's rewrite of this guidance).
+export const ADVISOR_EXPORT_FOLDED_GUIDANCE = "The Advisor export consent was already given with the first Pipeline consent question and is recorded with it, so do not ask it again: the returned argv carries approved.";
+const FIELDS_AT_ONCE_MARK = "Ask for every field in fieldsAtOnce";
+const FIELDS_AT_ONCE_DEFAULT_INPUTS = Object.freeze({ language: "language", humanApprovalMode: "humanApproval", advisorExportConsent: "advisorExportConsent" });
+
+/**
+ * C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10, Codex run: a second round asked for fields the first answer missed). The first-answer round names
+ * every field it needs in ONE list, each with its default where one exists (`default: null` means the PO has to answer it), and the fields a signature
+ * answer would otherwise ask in a later round (`followUpIfSignature`). Pure and idempotent: it recomputes from the action's final `inputs`, so the driver
+ * can call it again after it adds the actor label or strips the trust-anchor inputs; the guidance sentence is added once. Any other action is returned as is.
+ */
+export function withFieldsAtOnce(action) {
+  if (action === null || typeof action !== "object" || !Array.isArray(action.inputs) || !action.inputs.some((input) => input?.name === "humanApprovalMode")) return action;
+  const defaults = action.reviewedDefaults ?? {};
+  const defaultFor = (name) => {
+    if (name === "pipelineActorLabel") return "none";
+    const key = FIELDS_AT_ONCE_DEFAULT_INPUTS[name];
+    const value = key === undefined ? undefined : defaults[key]?.value;
+    return typeof value === "string" ? value : null;
+  };
+  const followUp = Array.isArray(action.followUpIfSignature) ? action.followUpIfSignature.map((field) => ({ name: field.name, default: null })) : [];
+  const guidance = typeof action.guidance !== "string" || action.guidance.includes(FIELDS_AT_ONCE_MARK) ? action.guidance
+    : `${action.guidance} ${FIELDS_AT_ONCE_MARK} in this ONE question, naming each with its default where one is given (a null default means the PO has to answer it), so a single answer completes the round and no second round asks for a field this one missed.${followUp.length === 0 ? "" : " When the approval answer is signature, also ask the followUpIfSignature fields in the same question."}`;
+  return { ...action, fieldsAtOnce: action.inputs.map((input) => ({ name: input.name, default: defaultFor(input.name) })), ...(followUp.length === 0 ? {} : { followUpIfSignature: followUp }), guidance };
+}
 const INITIAL_LANGUAGE_PLACEHOLDER = "<de|en>";
 
 // Same `collect-input` shape as `collectGoalAction()`, asking for both fields
@@ -7321,10 +7347,13 @@ function collectInitialAnswersAction(observed, fs) {
     && ["--trust-anchor-mode", "--trust-anchor-directory", "--trust-anchor-human-name", "--trust-anchor-existing-key"].every(flag => trustSetupArgv.includes(flag))
     ? observed.trustAnchorGuidanceAction
     : null;
+  // C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10): a recorded first consent that names the Advisor export IS the Advisor consent, so this round does not
+  // ask it again. Without such a record (none yet, a v1 record, an older v2 record, a no) the question stays exactly as it was and nothing is inferred.
+  const advisorFolded = advisorExportConsentFromRecord(observed.root) === "approved";
   const inputs = [
     ...authorInputs,
     observed.pushApprovalSetupAction.input,
-    { name: "advisorExportConsent", encoding: "utf8", trim: true, minBytes: 8, maxBytes: 8, singleLine: true, rejectNul: true },
+    ...(advisorFolded ? [] : [{ name: "advisorExportConsent", encoding: "utf8", trim: true, minBytes: 8, maxBytes: 8, singleLine: true, rejectNul: true }]),
     ...(answeredLanguage === null ? [{ name: "language", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 2, singleLine: true, rejectNul: true }] : []),
     ...(trustSetup?.inputs ?? []),
     // The language is asked once above and fills both commands; consent's other inputs follow.
@@ -7342,7 +7371,7 @@ function collectInitialAnswersAction(observed, fs) {
   // `--push-approval` as a read-compatible alias for old copied commands, but
   // every newly rendered action names the shared policy it actually applies.
   argv.push("--human-approval", INITIAL_PUSH_APPROVAL_PLACEHOLDER);
-  argv.push("--advisor-export-consent", INITIAL_ADVISOR_EXPORT_CONSENT_PLACEHOLDER);
+  argv.push("--advisor-export-consent", advisorFolded ? "approved" : INITIAL_ADVISOR_EXPORT_CONSENT_PLACEHOLDER);
   argv.push("--language", answeredLanguage ?? INITIAL_LANGUAGE_PLACEHOLDER);
   if (trustSetup) {
     argv.push(
@@ -7352,7 +7381,7 @@ function collectInitialAnswersAction(observed, fs) {
       "--trust-anchor-existing-key", TRUST_ANCHOR_EXISTING_KEY_PLACEHOLDER,
     );
   }
-  return {
+  return withFieldsAtOnce({
     kind: "collect-input",
     inputs,
     mutation: false,
@@ -7364,9 +7393,11 @@ function collectInitialAnswersAction(observed, fs) {
         : { value: answeredLanguage, source: "confirmed-intake-checkpoint", requiresConfirmation: false },
       gitIdentity: identityProvenance,
       humanApproval: { value: machinePushApprovalPreference(fs) ?? "signature", source: "machine-plane-or-fail-closed-default", requiresConfirmation: true },
-      advisorExportConsent: { value: "declined", source: "fresh-project-no-export-default", requiresConfirmation: true },
+      advisorExportConsent: advisorFolded
+        ? { value: "approved", source: "onboarding-consent-record", requiresConfirmation: false }
+        : { value: "declined", source: "fresh-project-no-export-default", requiresConfirmation: true },
     },
-    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. ${mergedConsent === null ? "Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. " : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (observed.runner === "claude" ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
+    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} ${advisorFolded ? ADVISOR_EXPORT_FOLDED_GUIDANCE : "Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation."} Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. ${mergedConsent === null ? "Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. " : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (observed.runner === "claude" ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
     applyAction: commandAction(
       argv,
       true,
@@ -7376,7 +7407,7 @@ function collectInitialAnswersAction(observed, fs) {
     ),
     ...(mergedConsent === null ? {} : mergedIntakeConsentFields(mergedConsent, observed.runner)),
     expected: { schema: "pipeline.onboarding-init.v1", outcomes: ["ready", "collect-input", "pending-asks", "unsupported-next-action"] },
-  };
+  });
 }
 
 function withPendingAsksSurfacedOnNextAction(observed, fs) {

@@ -19,6 +19,7 @@ import {
 import {
   ONBOARDING_CONSENT_COVERED_STEPS,
   ONBOARDING_CONSENT_NOT_COVERED,
+  advisorExportConsentFromRecord,
   coverOnboardingOutput,
   coveringStepForArgv,
   onboardingConsentQuestion,
@@ -116,6 +117,47 @@ test("G20-45: the rendered consent question names every covered step and every e
   for (const id of ["design-approval", "push", "release", "guard-override"]) assert.ok(excluded.includes(id), id);
   assert.equal(onboardingConsentQuestion({ language: "fr" }).language, "en");
   assert.equal(onboardingConsentQuestion().textByLanguage.de, onboardingConsentQuestion({ language: "de" }).text);
+});
+
+// C28-ONBOARDING-QUESTIONS (AC-108), friction 1 (PO decision 2026-11-10): the Advisor export consent is part of the FIRST consent question. Agreeing
+// activates it, so no separate Advisor question follows; a record that does not name it (v1, an older v2, a no) never reads as approved.
+test("C28-ONBOARDING-QUESTIONS: the first consent question lists the Advisor export among what agreeing activates, and a yes records it in the same record", () => {
+  const ids = ONBOARDING_CONSENT_COVERED_STEPS.map((step) => step.id);
+  assert.ok(ids.includes("advisor-export"), "the Advisor export is a covered item of the one consent");
+  assert.equal(coveringStepForArgv([STATE_SCRIPT, "submit-plan"])?.id, "submit-plan");
+  for (const route of ONBOARDING_CONSENT_COVERED_STEPS.find((step) => step.id === "advisor-export").routes) assert.fail(`the Advisor export names no action route: ${JSON.stringify(route)}`);
+  for (const language of ["en", "de"]) {
+    const question = onboardingConsentQuestion({ language });
+    assert.match(question.text, /Advisor/u, language);
+    assert.ok(question.scope.includes("advisor-export"), language);
+    assert.ok(question.text.length <= 2600, `${language}: the relayed question stays one short message (${question.text.length})`);
+  }
+  assert.match(onboardingConsentQuestion({ language: "en" }).text, /mandatory|part of using|agreeing/iu);
+  withRoot((root) => {
+    recordOnboardingConsent(root, "onboarding", "yes", "2026-11-11T10:00:00.000Z", "yes");
+    assert.ok(readOnboardingConsentRecord(root).scope.includes("advisor-export"), "the same record carries the Advisor export");
+    assert.equal(advisorExportConsentFromRecord(root), "approved");
+  });
+});
+
+test("C28-ONBOARDING-QUESTIONS: only a recorded yes that names the Advisor export reads as approved; every other record or none reads as not given", () => {
+  withRoot((root) => {
+    assert.equal(advisorExportConsentFromRecord(root), null, "no record");
+    assert.equal(advisorExportConsentFromRecord(""), null);
+    assert.equal(advisorExportConsentFromRecord(undefined), null);
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    const put = (name, body) => writeFileSync(onboardingConsentMarkerPath(root, name), `${JSON.stringify(body)}\n`);
+    put("v1", { schema: ONBOARDING_CONSENT_MARK_SCHEMA_V1, sessionId: "v1", answer: "yes", recordedAt: "2026-08-20T00:00:00.000Z" });
+    assert.equal(advisorExportConsentFromRecord(root), null, "v1 yes recorded no scope");
+    put("v1", { schema: ONBOARDING_CONSENT_MARK_SCHEMA, sessionId: "v1", answer: "yes", recordedAt: "2026-10-01T00:00:00.000Z", scope: ["install", "hooks"], notCovered: ["push"], quote: null });
+    assert.equal(advisorExportConsentFromRecord(root), null, "an older v2 yes did not name the Advisor export (existing records stay valid, nothing is inferred)");
+    put("no", { schema: ONBOARDING_CONSENT_MARK_SCHEMA, sessionId: "no", answer: "no", recordedAt: "2026-11-11T02:00:00.000Z", scope: [], notCovered: [], quote: null });
+    assert.equal(advisorExportConsentFromRecord(root), null, "a no never approves");
+    put("new", { schema: ONBOARDING_CONSENT_MARK_SCHEMA, sessionId: "new", answer: "yes", recordedAt: "2026-11-11T01:00:00.000Z", scope: ["install", "advisor-export"], notCovered: ["push"], quote: "ok" });
+    assert.equal(advisorExportConsentFromRecord(root), null, "the newest record is the later no");
+    put("no", { schema: ONBOARDING_CONSENT_MARK_SCHEMA, sessionId: "no", answer: "no", recordedAt: "2026-11-10T00:00:00.000Z", scope: [], notCovered: [], quote: null });
+    assert.equal(advisorExportConsentFromRecord(root), "approved", "the newest record is the yes that names it");
+  });
 });
 
 test("G20-45: with a recorded yes, every consent-covered action prints requiresConfirmation false, coveredBy with the record path and a verbatim escalation line", () => {

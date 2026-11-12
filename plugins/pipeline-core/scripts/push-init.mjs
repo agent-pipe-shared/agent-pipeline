@@ -122,6 +122,7 @@ import { gateConfig, loadManifest } from "../lib/manifest.mjs";
 import { classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
 import { pipelineOwnedRemedy } from "../lib/pipeline-owned-files.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { PUSH_TRANSPORT_KINDS, readPushTransport, recordPushTransport } from "../lib/machine-plane.mjs";
 import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from "./push-gate-satisfiability.mjs";
 import { pushPrepareReport as realPushPrepareReport, resolveEvidenceProjectDir } from "./push-prepare.mjs";
 import { buildLateVerifyRecoveryAction } from "./pipeline-state.mjs";
@@ -137,7 +138,7 @@ export const PUSH_INIT_SCRIPT_PATH = fileURLToPath(import.meta.url);
 export const RECONCILIATION_SCRIPT_RELATIVE_PATH = "harness/scripts/check-doc-reconciliation.mjs";
 
 export function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]]";
+  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]] [--transport-kind ssh-key|credential-helper|configured-default [--transport-reference <key path or helper name>]]";
 }
 
 export function parseArgs(argv) {
@@ -151,6 +152,11 @@ export function parseArgs(argv) {
       if (typeof value !== "string" || value === "" || value.startsWith("--")) return { error: `${arg} requires a value` };
       output[arg.slice(2)] = value;
       index += 1;
+    } else if (arg === "--transport-kind" || arg === "--transport-reference") {
+      const value = argv[index + 1];
+      if (typeof value !== "string" || value === "" || value.startsWith("--")) return { error: `${arg} requires a value` };
+      output[arg.slice(2)] = value;
+      index += 1;
     } else if (arg === "--help" || arg === "-h") {
       output.help = true;
     } else {
@@ -158,6 +164,14 @@ export function parseArgs(argv) {
     }
   }
   if (output.help) return output;
+  // C28-ONBOARDING-QUESTIONS: the transport answer is one pair or nothing (configured-default takes no reference).
+  if (output["transport-kind"] !== undefined || output["transport-reference"] !== undefined) {
+    const kind = output["transport-kind"];
+    const reference = output["transport-reference"] ?? null;
+    if (!PUSH_TRANSPORT_KINDS.includes(kind)) return { error: `--transport-kind requires one of: ${PUSH_TRANSPORT_KINDS.join(", ")}` };
+    if ((kind === "configured-default") !== (reference === null)) return { error: kind === "configured-default" ? "configured-default takes no --transport-reference" : `${kind} requires --transport-reference` };
+    output.transport = { kind, reference };
+  }
   for (const required of ["root", "by", "remote", "destination"]) {
     if (typeof output[required] !== "string" || output[required] === "") return { error: `--${required} is required` };
   }
@@ -402,9 +416,34 @@ function inspectPushCriticCoverage({ root, base, remote, destination }) {
  * blocker: the outcome, the exit status and the recovery block are those of the core, and the close gate stays the only refusing gate.
  * `inspectCriticCoverage` is the injection seam (default: the real inspection above).
  */
+/**
+ * C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10): the transport of the push (which SSH key, or the credential helper) is asked ONCE, here at the first push
+ * setup, and remembered in the machine-local file (lib/machine-plane.mjs `pushTransport`), never in a tracked file; every later push-init reads it back. Advice only:
+ * it moves neither the outcome nor the checks. A name or path is stored, never a key's content; a refused answer writes nothing.
+ */
+function pushTransportField({ root, by, remote, destination, base, candidate, recordRef, transport, transportDeps }) {
+  if (transport !== null && transport !== undefined) {
+    try { recordPushTransport(remote, transport, transportDeps); } catch { return { status: "refused", remote, code: "PUSH-TRANSPORT-REFUSED" }; }
+    return { status: "recorded-now", remote, kind: transport.kind, reference: transport.reference };
+  }
+  const recorded = readPushTransport(remote, transportDeps);
+  if (recorded !== null) return { status: "recorded", remote, kind: recorded.kind, reference: recorded.reference };
+  return {
+    status: "unasked", remote,
+    question: `Ask the PO once, now, before the first push is prepared, how a push to "${remote}" reaches the remote: the SSH key it should use (the PO names it), the Git credential helper, or the configured default when the default route already works. The answer is remembered in this machine's own Pipeline file, never in a tracked file, and read by every later push. Never list a key directory or guess key names; a name the PO gives is stored, a key's content never is.`,
+    applyAction: {
+      kind: "command", executable: process.execPath,
+      argv: [PUSH_INIT_SCRIPT_PATH, ...buildPushInitArgv({ root, by, remote, destination, base, candidate, recordRef }), "--transport-kind", "<ssh-key|credential-helper|configured-default>", "--transport-reference", "<key path or helper name; drop this pair's reference for configured-default>"],
+      mutation: true, requiresConfirmation: false, executionBoundary: "local-process",
+    },
+  };
+}
+
 export function drivePushInit(options = {}) {
-  const { inspectCriticCoverage = inspectPushCriticCoverage, ...rest } = options;
-  const result = drivePushInitCore(rest);
+  const { inspectCriticCoverage = inspectPushCriticCoverage, transport = null, transportDeps = {}, ...rest } = options;
+  const core = drivePushInitCore(rest);
+  const result = rest.checkpoint === true || typeof core?.root !== "string" || core.outcome === "usage-error" ? core
+    : { ...core, transport: pushTransportField({ root: core.root, by: rest.by, remote: rest.remote, destination: rest.destination, base: rest.base ?? null, candidate: rest.candidate ?? null, recordRef: rest.recordRef ?? null, transport, transportDeps }) };
   if (rest.checkpoint === true || typeof result?.root !== "string" || result.outcome === "usage-error") return result;
   let listing;
   try { listing = inspectCriticCoverage({ root: result.root, base: rest.base ?? null, remote: rest.remote, destination: rest.destination }); }
@@ -648,6 +687,7 @@ export function main(args = process.argv.slice(2), {
   const result = drive({
     rootDir: options.root, by: options.by, remote: options.remote, destination: options.destination,
     base: options.base ?? null, candidate: options.candidate ?? null, recordRef: options["record-ref"] ?? null, checkpoint: options.checkpoint === true,
+    transport: options.transport ?? null,
   });
   const ready = ["chat-ready", "signature-required", "checkpoint-ready", "deliver-verified-candidate"].includes(result.outcome);
   // C19-G5: the typed runbook link (push path, the driver step) is added last, once per session, and always on a refusal.

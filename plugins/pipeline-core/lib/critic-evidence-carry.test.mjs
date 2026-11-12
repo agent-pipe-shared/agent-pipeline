@@ -121,6 +121,49 @@ test("an administration-only range is carried and names the passed-over commits"
   for (const commit of [d1, d2, d3]) assert.match(readback, new RegExp(commit.slice(0, 8), "u"));
 });
 
+// C28-ONBOARDING-QUESTIONS (AC-108), friction 4. Why the correction was deferred: the calibration twins are content, so the one commit that moves
+// repositoryMode from local-only to remote-tracked ended the Critic carry (CVL-CARRY-CONTENT-CHANGED) and the first push could not continue in the same
+// feature. Only that exact byte change (repository-mode-promote.mjs's own rule) is carried; every other calibration change is still content.
+const CALIBRATION = (mode, extra = "") => `{\r\n  "project": "p",\r\n  "stakes": "standard",\r\n  "repositoryMode": "${mode}"${extra}\r\n}\r\n`;
+test("the exact repositoryMode promotion of both calibration twins is carried; any other calibration change ends the carry", (t) => {
+  const r = repo(t);
+  r.write("src/app.js", "1\n"); r.write("project/pipeline.json", CALIBRATION("local-only")); r.write(".claude/pipeline.json", CALIBRATION("local-only"));
+  const reviewed = r.commit("reviewed");
+  r.write("project/pipeline.json", CALIBRATION("remote-tracked")); r.write(".claude/pipeline.json", CALIBRATION("remote-tracked"));
+  const promoted = r.commit("promote");
+  const carried = decide(r, reviewed, promoted);
+  assert.equal(carried.carried, true, JSON.stringify(carried));
+  assert.deepEqual(carried.passedOverCommits, [promoted]);
+  assert.equal(administrationDocumentationOnlyCommit(r.root, promoted), true, "the per-commit test of the registration course agrees");
+  // Near misses, each from a fresh reviewed commit: all stay content.
+  const miss = (mutate) => {
+    const m = repo(t);
+    m.write("src/app.js", "1\n"); m.write("project/pipeline.json", CALIBRATION("local-only")); m.write(".claude/pipeline.json", CALIBRATION("local-only"));
+    const base = m.commit("reviewed");
+    mutate(m);
+    return { m, decision: decide(m, base, m.commit("change")) };
+  };
+  for (const [name, mutate] of [
+    ["another field changes with it", (m) => m.write("project/pipeline.json", CALIBRATION("remote-tracked").replace('"standard"', '"critical"'))],
+    ["a field is added", (m) => m.write("project/pipeline.json", CALIBRATION("remote-tracked", ',\r\n  "x": 1'))],
+    ["a gate is weakened without the mode moving", (m) => m.write("project/pipeline.json", CALIBRATION("local-only").replace('"standard"', '"minimal"'))],
+    ["host-managed is not the promotion target", (m) => m.write("project/pipeline.json", CALIBRATION("host-managed"))],
+    ["the bytes are rewritten (line ending changes)", (m) => m.write("project/pipeline.json", CALIBRATION("remote-tracked").replaceAll("\r\n", "\n"))],
+    ["a source file rides along", (m) => { m.write("project/pipeline.json", CALIBRATION("remote-tracked")); m.write("src/app.js", "2\n"); }],
+    ["another calibration-like path", (m) => m.write("project/other.json", CALIBRATION("remote-tracked"))],
+    ["the file becomes executable", (m) => { m.write("project/pipeline.json", CALIBRATION("remote-tracked")); chmodSync(join(m.root, "project/pipeline.json"), 0o755); }],
+  ]) {
+    const { decision } = miss(mutate);
+    assert.equal(decision.carried, false, `${name}: ${JSON.stringify(decision)}`);
+    assert.equal(decision.code, "CEC-CONTENT-CHANGED", name);
+  }
+  const back = repo(t);
+  back.write("project/pipeline.json", CALIBRATION("remote-tracked"));
+  const reviewedRemote = back.commit("reviewed remote-tracked");
+  back.write("project/pipeline.json", CALIBRATION("local-only"));
+  assert.equal(decide(back, reviewedRemote, back.commit("demote")).carried, false, "the other direction (remote-tracked to local-only) is content");
+});
+
 test("one source file anywhere in the range ends the carry, even when later commits are administration only", (t) => {
   const r = repo(t);
   r.write("src/app.js", "1\n");

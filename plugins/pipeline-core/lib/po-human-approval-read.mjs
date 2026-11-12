@@ -16,7 +16,21 @@ export const MACHINE_PLANE_SCHEMA = "pipeline.machine-plane.v1";
 const MACHINE_PLANE_KEYS = Object.freeze([
   "schema", "poKeyDirectory", "pushApprovalDefault", "routing", "language", "session", "usage", "updatedAt",
 ]);
-const OPTIONAL_MACHINE_PLANE_KEYS = Object.freeze(["operatorLabel"]);
+const OPTIONAL_MACHINE_PLANE_KEYS = Object.freeze(["operatorLabel", "pushTransport"]);
+
+// C28-ONBOARDING-QUESTIONS: read-only copy of machine-plane.mjs `validPushTransport` (this path keeps its own closed validator; the two must accept the same file).
+function validPushTransport(value) {
+  if (value === null) return true;
+  if (!object(value)) return false;
+  for (const [remote, entry] of Object.entries(value)) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u.test(remote) || !object(entry)) return false;
+    if (Object.keys(entry).some((key) => key !== "kind" && key !== "reference") || !["ssh-key", "credential-helper", "configured-default"].includes(entry.kind)) return false;
+    if (entry.kind === "configured-default") { if (entry.reference !== null) return false; continue; }
+    if (typeof entry.reference !== "string" || entry.reference.length === 0 || entry.reference.length > 512 || /[\x00-\x1f\x7f]/u.test(entry.reference)
+      || entry.reference.trim() !== entry.reference || entry.reference.includes("PRIVATE KEY") || /-----BEGIN [A-Z0-9 ]+-----/u.test(entry.reference)) return false;
+  }
+  return true;
+}
 const PUSH_APPROVAL_DEFAULTS = Object.freeze(["signature", "chat"]);
 
 /**
@@ -117,6 +131,7 @@ export function validateMachinePlane(value) {
   if (Object.hasOwn(value, "operatorLabel") && value.operatorLabel !== null && !validOperatorLabel(value.operatorLabel)) {
     return { ok: false, code: "MP-OPERATOR-LABEL", detail: "operatorLabel" };
   }
+  if (Object.hasOwn(value, "pushTransport") && !validPushTransport(value.pushTransport)) return { ok: false, code: "MP-PUSH-TRANSPORT", detail: "pushTransport" };
   return { ok: true };
 }
 

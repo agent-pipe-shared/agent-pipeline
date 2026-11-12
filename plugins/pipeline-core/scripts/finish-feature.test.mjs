@@ -1074,7 +1074,7 @@ test("R8: closed-local states what the security result covers, read from the v2 
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-test("R9: closed-local names a calibration that still says local-only beside a real remote and says to leave it for this close", () => {
+test("R9: closed-local names a calibration that still says local-only beside a real remote and says to correct it before the push in the same feature", () => {
   const f = closedLocalFixture();
   try {
     assert.equal(Object.hasOwn(oneShotClose(f.resumed, { runCommand: f.runner }), "repositoryMode"), false, "no remote: nothing to say");
@@ -1088,7 +1088,13 @@ test("R9: closed-local names a calibration that still says local-only beside a r
     assert.equal(done.status, "closed-local", JSON.stringify(done).slice(0, 400));
     assert.deepEqual(done.repositoryMode.remotes, ["publish"]);
     assert.match(done.message, /still says local-only although a remote exists \(publish\)/u);
-    assert.match(done.message, /ends the Critic carry/u);
+    // QG-04, restated in place (C28-ONBOARDING-QUESTIONS, PO decision 2026-11-10): this pin said "a calibration commit now ends the Critic carry ... leave it for
+    // the next feature". The carry now admits exactly the one-token repositoryMode promotion (lib/critic-evidence-carry.mjs), so the close names the correction
+    // before the push in the same feature, with the Verify rerun. Same subject (what the close says about the mismatch), same strength.
+    assert.match(done.message, /same feature/u);
+    assert.match(done.message, /admits exactly that one-token change/u);
+    assert.match(done.message, /repository-mode-promote\.mjs/u);
+    assert.doesNotMatch(done.message, /next feature|ends the Critic carry/u);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

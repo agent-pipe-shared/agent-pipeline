@@ -1136,7 +1136,7 @@ function onboardingConsentFields({ rootDir, scriptUrl }) {
       requiresConfirmation: false,
       executionBoundary: "host",
       expected: { schema: "pipeline.onboarding-consent-mark.v2", answer: "yes" },
-      guidance: "Relay consentQuestion.textByLanguage for the user's language (consentQuestion.text when it has no entry) verbatim, never paraphrased, as the only consent question: no question of your own before it or beside it. After an affirmative answer, run this record command once the first onboarding apply (the portable seed) has completed, replacing <the-user-answer-verbatim> with the user's answer word for word; a file written into .claude/ earlier makes a fresh root read as partial. The record is what lets later actions print coveredBy instead of asking again. A decline is recorded with --answer no and leaves the project inactive.",
+      guidance: "Relay consentQuestion.textByLanguage for the user's language (consentQuestion.text when it has no entry) verbatim, never paraphrased, as the only consent question: no question of your own before it or beside it. After an affirmative answer, run this record command once the first onboarding apply (the portable seed) has completed, replacing <the-user-answer-verbatim> with the user's answer word for word; a file written into .claude/ earlier makes a fresh root read as partial. The record is what lets later actions print coveredBy instead of asking again. A decline is recorded with --answer no and leaves the project inactive. The recorded yes also carries the Advisor export consent the question named: after recording it, run the same onboarding-init command once more so the first round is read after the record and does not ask the Advisor export consent a second time.",
     },
   };
 }

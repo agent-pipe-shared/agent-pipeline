@@ -168,9 +168,12 @@ operator's live onboarding acceptance.
 Advisor and Critic export consent is not an onboarding precondition; see
 [private review export](usage.md#private-review-export). Whether the Advisor may
 receive repository data depends on the recorded `advisor_export.consent`
-(`approved` or `declined`), which the onboarding Driver asks for explicitly;
-nothing is exported without a recorded consent, and this guide does not state a
-default for a missing field. Do not run a
+(`approved` or `declined`). The Advisor export is part of the first Pipeline
+consent question (the question names it, and a yes records it in the same consent
+record), so the first onboarding round no longer asks it a second time; a project
+whose consent record does not name it (an older record, a no, none) is still asked
+`approved` or `declined` explicitly by the onboarding Driver. Nothing is exported
+without a recorded consent, and this guide does not state a default for a missing field. Do not run a
 consultation merely to activate or bootstrap.
 
 ## Legacy consumer with no projections

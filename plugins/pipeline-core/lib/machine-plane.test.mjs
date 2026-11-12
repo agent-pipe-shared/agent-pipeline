@@ -22,6 +22,8 @@ import {
   machinePlaneFilePath,
   readMachineOperatorLabel,
   readMachinePlane,
+  readPushTransport,
+  recordPushTransport,
   resolveLocalOperatorKeyAnchor,
   validateMachinePlane,
   writeMachinePlane,
@@ -198,6 +200,41 @@ test("C27: operatorLabel is optional, so a plane without it stays valid; a prese
     assert.equal(readHumanApprovalMachinePlane(dependencies).status, "valid", "the read-only copy used by the signing path accepts the same file");
     writeFileSync(target, "{}\n");
     assert.equal(readMachineOperatorLabel(dependencies), null, "an invalid plane yields no value");
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+// C28-ONBOARDING-QUESTIONS (AC-108), friction 4 (PO decision 2026-11-10): the transport of a push (which SSH key, or the credential helper) is asked once at the
+// first push setup and remembered here, in the machine-local file and never in a tracked file; later pushes read it. Optional, so every older file stays valid.
+test("C28-ONBOARDING-QUESTIONS: pushTransport is optional and closed; it records and reads back one transport per remote without touching the other fields", () => {
+  assert.deepEqual(validateMachinePlane(validPlane()), { ok: true });
+  const entry = (kind, reference) => ({ kind, reference });
+  for (const pushTransport of [null, {}, { origin: entry("ssh-key", "/home/someone/.ssh/id_fixture") }, { origin: entry("credential-helper", "manager") },
+    { origin: entry("configured-default", null), upstream: entry("ssh-key", "id_fixture_two") }]) {
+    assert.deepEqual(validateMachinePlane(validPlane({ pushTransport })), { ok: true }, JSON.stringify(pushTransport));
+  }
+  for (const pushTransport of ["ssh", [], { "-x": entry("ssh-key", "k") }, { origin: entry("password", "k") }, { origin: entry("ssh-key", null) }, { origin: entry("ssh-key", "a\nb") },
+    { origin: entry("ssh-key", "x".repeat(513)) }, { origin: { kind: "ssh-key", reference: "k", extra: 1 } }, { origin: "id" }, { origin: entry("credential-helper", "-----BEGIN PRIVATE KEY-----") }]) {
+    assert.deepEqual(validateMachinePlane(validPlane({ pushTransport })), { ok: false, code: "MP-PUSH-TRANSPORT", detail: "pushTransport" }, JSON.stringify(pushTransport));
+  }
+  const { home } = homeFixture();
+  try {
+    const dependencies = { homedirFn: () => home };
+    assert.equal(readPushTransport("origin", dependencies), null, "no file: unasked");
+    const first = recordPushTransport("origin", entry("ssh-key", "/home/someone/.ssh/id_fixture"), dependencies);
+    assert.equal(first.status, "recorded");
+    assert.deepEqual(readPushTransport("origin", dependencies), entry("ssh-key", "/home/someone/.ssh/id_fixture"));
+    assert.equal(readPushTransport("upstream", dependencies), null, "another remote is still unasked");
+    assert.equal(readMachinePlane(dependencies).plane.pushApprovalDefault, "signature", "a file created here fails closed on the approval default");
+    writeMachinePlane({ ...readMachinePlane(dependencies).plane, pushApprovalDefault: "chat", operatorLabel: "Alex" }, dependencies);
+    recordPushTransport("upstream", entry("credential-helper", "manager"), dependencies);
+    const plane = readMachinePlane(dependencies).plane;
+    assert.equal(plane.pushApprovalDefault, "chat", "the other fields are kept");
+    assert.equal(plane.operatorLabel, "Alex");
+    assert.deepEqual(Object.keys(plane.pushTransport).sort(), ["origin", "upstream"]);
+    assert.equal(readHumanApprovalMachinePlane(dependencies).status, "valid", "the read-only copy used by the signing path accepts the same file");
+    assert.throws(() => recordPushTransport("origin", entry("ssh-key", ""), dependencies), /MP-WRITE-REFUSED|PUSH-TRANSPORT/u);
+    assert.throws(() => recordPushTransport("--evil", entry("ssh-key", "k"), dependencies), /PUSH-TRANSPORT/u);
+    assert.deepEqual(readPushTransport("origin", dependencies), entry("ssh-key", "/home/someone/.ssh/id_fixture"), "a refused record changes nothing");
   } finally { rmSync(home, { recursive: true, force: true }); }
 });
 

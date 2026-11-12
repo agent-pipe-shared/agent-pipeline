@@ -2419,6 +2419,140 @@ test("driveOnboardingInit: an unapplied migration plan missing its apply action 
   }
 });
 
+// C28-ONBOARDING-QUESTIONS (AC-108), friction 2: the host route is named BEFORE the first mutating step, never after a failure in the middle.
+// Observed in a Codex run: `spawnSync node EPERM` inside the sandbox in the middle of the init; only a retry on the host route worked.
+test("C28-ONBOARDING-QUESTIONS: a blocked execution route stops before the first mutating step and names the host route", () => {
+  const root = freshRoot();
+  try {
+    const calls = [];
+    const run = (executable, argv) => {
+      calls.push(argv);
+      return respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction: { kind: "command", executable: "node", argv: ["tool"], mutation: true } });
+    };
+    const result = driveOnboardingInit({ rootDir: root, runner: "codex", run, probeRoute: () => ({ ok: false, code: "EPERM" }) });
+    assert.equal(result.outcome, "host-route-required", JSON.stringify(result));
+    assert.equal(calls.length, 1, "only the read-only inspect ran; the mutating step never started");
+    assert.equal(result.steps.length, 1);
+    assert.equal(result.hostRoute.executionBoundary, "host");
+    assert.equal(result.hostRoute.cause, "EPERM");
+    assert.equal(result.hostRoute.mutationsExecuted, 0);
+    assert.equal(result.hostRoute.retryAction.kind, "command");
+    assert.equal(result.hostRoute.retryAction.mutation, false);
+    assert.ok(result.hostRoute.retryAction.argv.includes("--root") && result.hostRoute.retryAction.argv.includes(root));
+    assert.ok(result.hostRoute.retryAction.argv.includes("codex"), "the retry keeps the pinned runner");
+    assert.match(result.hostRoute.guidance, /host/u);
+    // A route that works changes nothing: the mutating step runs as before.
+    const open = [];
+    driveOnboardingInit({ rootDir: root, runner: "codex", run: (executable, argv) => { open.push(argv); return respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null }); }, probeRoute: () => ({ ok: true }) });
+    assert.ok(open.length >= 1);
+  } finally { dispose(root); }
+});
+
+test("C28-ONBOARDING-QUESTIONS: a spawn that is refused before it starts (EPERM, no exit status) names the host route; a started child's failure does not", () => {
+  const root = freshRoot();
+  try {
+    const refused = driveOnboardingInit({ rootDir: root, runner: "codex", run: () => ({ status: null, stdout: "", stderr: "", error: Object.assign(new Error("spawnSync node EPERM"), { code: "EPERM" }) }) });
+    assert.equal(refused.outcome, "error");
+    assert.equal(refused.error.faultCode, "spawn-failed", "the typed fault stays");
+    assert.equal(refused.hostRoute.executionBoundary, "host");
+    assert.equal(refused.hostRoute.mutationsExecuted, 0);
+    const started = driveOnboardingInit({ rootDir: root, run: () => ({ status: 1, stdout: "{}", stderr: "refused", error: Object.assign(new Error("EPERM"), { code: "EPERM" }) }) });
+    assert.equal(started.error.faultCode, "spawn-failed");
+    assert.equal(started.hostRoute, undefined, "an exit status means the child started; that is not a route problem");
+  } finally { dispose(root); }
+});
+
+// Friction 3: the first question names EVERY field with its default where one exists, so one answer completes the round.
+test("C28-ONBOARDING-QUESTIONS: the first round lists every field it needs with its default, so one answer completes it", () => {
+  const root = freshRoot();
+  try {
+    const result = driveOnboardingInit({ rootDir: root, runner: "claude" });
+    const ask = result.pendingAsks.find((entry) => entry.inputs?.some((input) => input.name === "humanApprovalMode"));
+    assert.ok(ask, "the first-answer round is published");
+    const names = ask.inputs.map((input) => input.name);
+    assert.deepEqual(ask.fieldsAtOnce.map((field) => field.name), names, "every input is named, in order, once");
+    const byName = new Map(ask.fieldsAtOnce.map((field) => [field.name, field]));
+    assert.equal(byName.get("language").default, "en");
+    assert.equal(byName.get("advisorExportConsent")?.default ?? "declined", "declined");
+    assert.ok(["signature", "chat"].includes(byName.get("humanApprovalMode").default));
+    assert.equal(byName.get("pipelineActorLabel").default, "none");
+    for (const name of ["gitAuthorName", "gitAuthorEmail", "profile"]) assert.equal(byName.get(name).default, null, `${name} has no default: the PO must answer`);
+    assert.match(ask.guidance, /every field/iu);
+    assert.match(ask.guidance, /fieldsAtOnce/u);
+  } finally { dispose(root); }
+});
+
+test("C28-ONBOARDING-QUESTIONS: the signature follow-up fields are named in the first question, not discovered in a second round", () => {
+  const stripped = [];
+  const root = freshRoot();
+  try {
+    // The driver strips the trust-anchor inputs from the first round (separate action after a signature answer); the first question must still name them.
+    const action = { kind: "collect-input", inputs: [{ name: "gitAuthorName" }, { name: "humanApprovalMode" }, { name: "language" }, { name: "trustAnchorMode" }, { name: "trustAnchorDirectory" }, { name: "trustAnchorHumanName" }, { name: "trustAnchorExistingKey" }],
+      reviewedDefaults: { language: { value: "en" }, humanApproval: { value: "signature" } },
+      applyAction: { argv: ["onboarding-init.mjs", "--human-approval", "<signature|chat>", "--trust-anchor-mode", "<m>", "--trust-anchor-directory", "<d>", "--trust-anchor-human-name", "<n>", "--trust-anchor-existing-key", "<k>"] } };
+    const result = driveOnboardingInit({ rootDir: root, runner: "claude", run: () => respond({ schema: "pipeline.project-onboarding.v4", status: "in-progress", nextAction: { kind: "command", executable: "node", argv: ["tool"], mutation: false, pendingAsks: [action] } }) });
+    const ask = result.pendingAsks[0];
+    assert.deepEqual(ask.inputs.map((input) => input.name), ["gitAuthorName", "humanApprovalMode", "language", "pipelineActorLabel"], "the driver adds the optional actor label to the round");
+    assert.deepEqual(ask.followUpIfSignature.map((field) => field.name), ["trustAnchorMode", "trustAnchorDirectory", "trustAnchorHumanName", "trustAnchorExistingKey"]);
+    assert.match(ask.guidance, /followUpIfSignature/u);
+    stripped.push(ask);
+  } finally { dispose(root); }
+  assert.equal(stripped.length, 1);
+});
+
+// Friction 1: PO decision 2026-11-10 -- the Advisor export consent is part of the FIRST Pipeline consent question; the first round no longer asks it again.
+// A record without the Advisor scope (v1, an older v2, a no) never reads as approved, so the question is still asked there (existing records stay valid).
+function consentRecordFile(root, body) {
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", ".pipeline-install-consent-onboarding.json"), `${JSON.stringify(body)}\n`);
+}
+const firstRoundAsk = (result) => result.pendingAsks.find((entry) => entry.inputs?.some((input) => input.name === "humanApprovalMode"));
+
+test("C28-ONBOARDING-QUESTIONS: a recorded first consent that names the Advisor export removes the separate Advisor question from the first round", () => {
+  const root = freshRoot();
+  try {
+    const before = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude" }));
+    assert.ok(before.inputs.some((input) => input.name === "advisorExportConsent"), "without a record the question is still asked (nothing is approved unasked)");
+    assert.ok(before.applyAction.argv.includes("<approved|declined>"));
+    consentRecordFile(root, { schema: "pipeline.onboarding-consent-mark.v2", sessionId: "onboarding", answer: "yes", recordedAt: "2026-11-11T10:00:00.000Z",
+      scope: ["install", "advisor-export"], notCovered: ["push"], quote: "ja" });
+    const ask = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude" }));
+    assert.equal(ask.inputs.some((input) => input.name === "advisorExportConsent"), false, "not asked a second time");
+    assert.equal(ask.fieldsAtOnce.some((field) => field.name === "advisorExportConsent"), false);
+    const flagAt = ask.applyAction.argv.indexOf("--advisor-export-consent");
+    assert.ok(flagAt >= 0, "the argv shape the guard admits is unchanged");
+    assert.equal(ask.applyAction.argv[flagAt + 1], "approved");
+    assert.equal(ask.applyAction.argv.includes("<approved|declined>"), false);
+    assert.equal(ask.reviewedDefaults.advisorExportConsent.source, "onboarding-consent-record");
+    assert.equal(ask.reviewedDefaults.advisorExportConsent.value, "approved");
+    assert.doesNotMatch(ask.guidance, /Ask separately/u);
+    assert.match(ask.guidance, /first Pipeline consent/u);
+    // The folded argv, answered for the remaining placeholders, is still the sanctioned command (the guard lane is unchanged).
+    const answers = new Map([["<PO_GIT_AUTHOR_NAME>", "Pin PO"], ["<PO_GIT_AUTHOR_EMAIL>", "pin@example.invalid"], ["<signature|chat>", "chat"], ["<de|en>", "en"]]);
+    const argv = ask.applyAction.argv.map((value) => answers.get(value) ?? value);
+    const quoted = [ask.applyAction.executable, ...argv].map((value) => `'${String(value).replaceAll("'", "'\\''")}'`).join(" ");
+    assert.equal(isSanctionedLifecycleCommand(quoted, root), true);
+  } finally { dispose(root); }
+});
+
+test("C28-ONBOARDING-QUESTIONS: a v1 record, an older v2 record without the Advisor scope and a recorded no keep the Advisor question", () => {
+  for (const [name, body] of [
+    ["v1 yes", { schema: "pipeline.onboarding-consent-mark.v1", sessionId: "onboarding", answer: "yes", recordedAt: "2026-08-20T00:00:00.000Z" }],
+    ["older v2 yes", { schema: "pipeline.onboarding-consent-mark.v2", sessionId: "onboarding", answer: "yes", recordedAt: "2026-11-01T00:00:00.000Z", scope: ["install", "hooks"], notCovered: ["push"], quote: "ja" }],
+    ["v2 no", { schema: "pipeline.onboarding-consent-mark.v2", sessionId: "onboarding", answer: "no", recordedAt: "2026-11-01T00:00:00.000Z", scope: [], notCovered: [], quote: null }],
+  ]) {
+    const root = freshRoot();
+    try {
+      driveOnboardingInit({ rootDir: root, runner: "claude" });
+      consentRecordFile(root, body);
+      const ask = firstRoundAsk(driveOnboardingInit({ rootDir: root, runner: "claude" }));
+      assert.ok(ask.inputs.some((input) => input.name === "advisorExportConsent"), name);
+      assert.ok(ask.applyAction.argv.includes("<approved|declined>"), name);
+      assert.equal(ask.reviewedDefaults.advisorExportConsent.value, "declined", name);
+    } finally { dispose(root); }
+  }
+});
+
 test("DEFAULT_STEP_CAP is a small, positive constant", () => {
   assert.ok(Number.isInteger(DEFAULT_STEP_CAP));
   assert.ok(DEFAULT_STEP_CAP > 0);

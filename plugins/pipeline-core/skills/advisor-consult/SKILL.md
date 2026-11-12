@@ -17,7 +17,9 @@ Advisory is a duty, never a profile phase or a Critic verdict.
 Before any child, model request, prompt export or timeout:
 
 1. Confirm project-onboarding readiness FIRST, before requesting or recording
-   any Advisor-export consent from the human: this is the same check
+   any Advisor-export consent from the human (the first Pipeline consent
+   question already carries it; a project without that recorded consent keeps
+   its own recorded `advisor_export.consent`): this is the same check
    `codex-advisory-bootstrap.mjs` already performs internally via
    `requireProjectOnboardingReady` (its first statement, ~line 85, ahead of
    even its own consent check). If that check fails (`PORG-NOT-READY`), do not

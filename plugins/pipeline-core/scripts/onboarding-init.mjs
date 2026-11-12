@@ -130,6 +130,7 @@ import {
   INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE,
   INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE,
   INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE,
+  ADVISOR_EXPORT_FOLDED_GUIDANCE, withFieldsAtOnce,
   shellWord, intakeGitAuthor,
 } from "../lib/project-onboarding-v3.mjs";
 import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
@@ -1183,6 +1184,34 @@ function applyInitialOnboardingAnswersCore({
  * process exited non-zero) is folded into a typed `ok: false` result the caller reports
  * rather than crashes on.
  */
+// C28-ONBOARDING-QUESTIONS (PO decision 2026-11-10; Codex run: `spawnSync node EPERM` in the middle of the init, only the host route worked). The execution
+// route is checked BEFORE the first mutating step and the host route is named in the answer, so nothing fails half way and nothing was changed.
+const HOST_ROUTE_CODES = new Set(["EPERM", "EACCES"]);
+
+/** Default route probe: can this context start the executable at all? Only a refused start (no status, EPERM/EACCES) says no; anything else is the step's own business. */
+function probeExecutionRoute(executable) {
+  const base = String(executable).split(/[\\/]/u).pop().toLowerCase();
+  if (executable !== process.execPath && base !== "node" && base !== "node.exe") return { ok: true };
+  const result = spawnSync(executable, ["--version"], { encoding: "utf8", shell: false, timeout: 10_000, windowsHide: true });
+  const code = result?.error?.code;
+  return (result?.status === null || result?.status === undefined) && HOST_ROUTE_CODES.has(code) ? { ok: false, code } : { ok: true };
+}
+
+function hostRouteReadback({ root, runner, cause, mutationsExecuted }) {
+  return {
+    executionBoundary: "host",
+    cause,
+    mutationsExecuted,
+    guidance: `This execution context refuses to start child processes (${cause}), so the onboarding cannot run here. ${mutationsExecuted === 0 ? "Nothing was changed. " : "Earlier steps are on disk; the run resumes from them. "}Run retryAction at the host boundary (outside the sandbox, with the host route this runner offers) from its first call; do not retry it inside the sandbox.`,
+    retryAction: {
+      kind: "command", executable: process.execPath,
+      argv: [fileURLToPath(import.meta.url), "--root", root, ...(runner ? ["--runner", runner] : [])],
+      mutation: false, requiresConfirmation: false, executionBoundary: "host",
+      expected: { schema: SCHEMA },
+    },
+  };
+}
+
 function runOnboardingStep({ executable, argv, run, env = null, projectRoot = null, timeout }) {
   const options = { encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024, timeout, killSignal: "SIGKILL" };
   // Supplying `env` lets callers override what the spawned
@@ -1221,7 +1250,9 @@ function runOnboardingStep({ executable, argv, run, env = null, projectRoot = nu
     return { ok: false, faultCode: "execution-budget-exhausted", exitCode: result.status ?? null, stderr: "The child exceeded the remaining onboarding budget. Its operation may be partial; re-inspect before any retry." };
   }
   if (result?.error && !isSuccessfulSpawn(result)) {
-    return { ok: false, faultCode: "spawn-failed", exitCode: result.status ?? null, stderr: String(result.error?.message ?? "") };
+    // C28-ONBOARDING-QUESTIONS: a spawn the sandbox refused before the child started (no exit status, EPERM/EACCES) is a route problem, not a failed command.
+    const neverStarted = (result.status === null || result.status === undefined) && HOST_ROUTE_CODES.has(result.error?.code);
+    return { ok: false, faultCode: "spawn-failed", exitCode: result.status ?? null, stderr: String(result.error?.message ?? ""), ...(neverStarted ? { hostRouteCause: result.error.code } : {}) };
   }
   const exitCode = result?.status ?? null;
   let parsed = null;
@@ -1342,6 +1373,9 @@ function isTrustAnchorAction(action) {
 function initialAnswersActionWithoutTrustAnchor(action) {
   if (!isTrustAnchorAction(action) || !action.applyAction.argv.includes("--human-approval")) return action;
   const asksLanguage = action.inputs?.some((input) => input?.name === "language") === true;
+  // C28-ONBOARDING-QUESTIONS: with the Advisor export folded into the first consent the round no longer asks it; the rewritten guidance says so too.
+  const asksAdvisor = action.inputs?.some((input) => input?.name === "advisorExportConsent") === true;
+  const trustFollowUp = (action.inputs ?? []).filter((input) => String(input?.name ?? "").startsWith("trustAnchor")).map((input) => ({ name: input.name, default: null }));
   const argv = [];
   for (let index = 0; index < action.applyAction.argv.length; index += 1) {
     const part = action.applyAction.argv[index];
@@ -1354,7 +1388,8 @@ function initialAnswersActionWithoutTrustAnchor(action) {
   return {
     ...action,
     inputs: (action.inputs ?? []).filter((input) => !String(input?.name ?? "").startsWith("trustAnchor")),
-    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy, and explicit approved|declined repository-data export consent for the same-runner Advisor${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}${action.precedingApplyAction === undefined ? "" : ", plus the intake consent values collected in this same round"}. Declined keeps the Advisor disabled; never infer approval from using the Pipeline. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval${action.precedingApplyAction === undefined ? ", and later intake consent reuses the confirmed language without asking again. " : ". "}A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. ${action.precedingApplyAction === undefined ? "" : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (action.precedingExistingFileApplyAction === undefined ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
+    ...(trustFollowUp.length === 0 ? {} : { followUpIfSignature: trustFollowUp }),
+    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy${asksAdvisor ? ", and explicit approved|declined repository-data export consent for the same-runner Advisor" : ""}${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}${action.precedingApplyAction === undefined ? "" : ", plus the intake consent values collected in this same round"}. ${asksAdvisor ? "Declined keeps the Advisor disabled; never infer approval from using the Pipeline." : ADVISOR_EXPORT_FOLDED_GUIDANCE} The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval${action.precedingApplyAction === undefined ? ", and later intake consent reuses the confirmed language without asking again. " : ". "}A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. ${action.precedingApplyAction === undefined ? "" : INITIAL_ROUND_INTAKE_CONSENT_GUIDANCE + (action.precedingExistingFileApplyAction === undefined ? INITIAL_ROUND_INTAKE_CONSENT_CLAUDE_GUIDANCE : INITIAL_ROUND_INTAKE_CONSENT_MATERIAL_GUIDANCE)}Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
     applyAction: { ...action.applyAction, argv },
   };
 }
@@ -1400,7 +1435,7 @@ function normalizeOnboardingDriverOutput(output, root) {
   if (!nextAction || typeof nextAction !== "object" || !Array.isArray(nextAction.pendingAsks)) return output;
   const pushApproval = persistedInitialPushApproval(root, output?.repository?.mode ?? "local");
   const pendingAsks = nextAction.pendingAsks
-    .map((action) => withPipelineActorAsk(initialAnswersActionWithoutTrustAnchor(action)))
+    .map((action) => withFieldsAtOnce(withPipelineActorAsk(initialAnswersActionWithoutTrustAnchor(action))))
     .filter((action) => pushApproval !== "chat" || !isTrustAnchorAction(action));
   return pendingAsks.length === nextAction.pendingAsks.length
     && pendingAsks.every((action, index) => action === nextAction.pendingAsks[index])
@@ -1484,7 +1519,7 @@ export function driveOnboardingInit(options = {}) {
   return result;
 }
 
-function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null, runBudgetMs = DEFAULT_RUN_BUDGET_MS, now = () => performance.now(), onStep = () => {} } = {}) {
+function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null, runBudgetMs = DEFAULT_RUN_BUDGET_MS, now = () => performance.now(), onStep = () => {}, probeRoute = probeExecutionRoute } = {}) {
   const root = resolve(rootDir);
   const steps = [];
   if (!Number.isSafeInteger(runBudgetMs) || runBudgetMs < 1) throw new Error("runBudgetMs must be a positive safe integer");
@@ -1511,12 +1546,23 @@ function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STE
   // evidence, not permission to replay a possibly partial mutation: callers
   // must re-inspect and use the newly returned action.
   let attemptedAction = null;
+  let routeChecked = false;
+  let mutationsExecuted = 0;
 
   for (let stepIndex = 0; stepIndex < stepCap; stepIndex += 1) {
     const remaining = Math.floor(deadline - now());
     if (remaining < 1) return { schema: SCHEMA, runner, root, outcome: "execution-budget-exhausted", stepCap, stepsExecuted: steps.length, steps, recovery, final: lastAnchorOutput };
     onStep({ step: stepIndex + 1, stepCap, remainingMs: remaining, isAnchor: isAnchorStep });
+    // C28-ONBOARDING-QUESTIONS: once, before the first step that mutates, ask whether this context can start the executable at all.
+    if (!isAnchorStep && attemptedAction?.mutation === true && !routeChecked) {
+      routeChecked = true;
+      const probe = probeRoute(executable, env);
+      if (probe?.ok === false) {
+        return { schema: SCHEMA, runner, root, outcome: "host-route-required", stepCap, stepsExecuted: steps.length, steps, hostRoute: hostRouteReadback({ root, runner, cause: String(probe.code ?? "EPERM"), mutationsExecuted }), final: lastAnchorOutput };
+      }
+    }
     const stepResult = runOnboardingStep({ executable, argv, run, env, projectRoot: root, timeout: remaining });
+    if (!isAnchorStep && attemptedAction?.mutation === true && stepResult.hostRouteCause === undefined) mutationsExecuted += 1;
     steps.push({
       executable,
       argv,
@@ -1549,6 +1595,7 @@ function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STE
         stepsExecuted: steps.length,
         steps,
         ...(stepResult.faultCode === "execution-budget-exhausted" ? { recovery } : {}),
+        ...(stepResult.hostRouteCause === undefined ? {} : { hostRoute: hostRouteReadback({ root, runner, cause: stepResult.hostRouteCause, mutationsExecuted }) }),
         error: {
           faultCode: stepResult.faultCode,
           exitCode: stepResult.exitCode,

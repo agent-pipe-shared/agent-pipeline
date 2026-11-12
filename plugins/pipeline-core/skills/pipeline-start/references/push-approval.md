@@ -274,9 +274,12 @@ which credential or remote this repository should push with. Then retry once
 with what the PO named.
 
 Resolve this before the first push is prepared, not after it fails, and ask at
-most once per repository. Record the answer (the credential's name or the
-remote, never its content) in the calibrated handover so that a later session
-reads it there instead of asking again.
+most once per repository. `push-init.mjs` asks it once at the first push setup
+and remembers the answer (the credential's name or the remote, never its content)
+in this machine's own Pipeline file (`push-init.mjs --transport-kind
+ssh-key|credential-helper|configured-default [--transport-reference <name>]`),
+never in a tracked file or the calibrated handover; every later `push-init.mjs`
+reads it back as `transport` instead of asking again.
 
 ### The two-step shape (superseded as a human step, still supported)
 
