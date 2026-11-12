@@ -383,6 +383,53 @@ const cases = [
     assert.equal(git(root, "rev-parse", "HEAD"), head, "nothing was committed on top of the advance");
   }) },
 
+  // C28-MIXED-LINEAGE (AC-108, PO tile 2026-11-11): a history that holds BOTH a sibling's proven host commit and an ordinary commit of the orchestrator used to
+  // refuse native-concurrent-unowned-head (live, twice, candidate 28 build). Each kind is admitted alone; the mix is admitted when every commit is disjoint from this
+  // slice's write scope, check and dependency paths (the receipt then takes the moved-head form, no sibling lineage is claimed).
+  { id: "NGSP9C2", name: "C28-MIXED-LINEAGE: a sibling's host commit followed by an ordinary commit of the orchestrator on another path does not stop the next host commit", run: () => fixture(({ root }) => {
+    const { runtime, launch } = setup(root);
+    const [first, second] = [launch(0), launch(1)];
+    for (const one of [first, second]) assert.equal(runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })).ok, true, one.id);
+    for (const one of [first, second]) writeFileSync(join(root, one.file), one.content);
+    const landedFirst = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: first.returned }));
+    assert.equal(landedFirst.status, "authored-commit-recorded", JSON.stringify(landedFirst));
+    writeFileSync(join(root, "plan-note.txt"), "an ordinary orchestrator commit after the sibling\n"); git(root, "add", "--", "plan-note.txt"); git(root, "commit", "-q", "-m", "plan document");
+    const advanced = git(root, "rev-parse", "HEAD");
+    const landedSecond = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: second.returned }));
+    assert.equal(landedSecond.status, "authored-commit-recorded", JSON.stringify(landedSecond));
+    assert.equal(git(root, "rev-parse", `${landedSecond.commit}^`), advanced, "the host commit sits on the mixed history");
+    assert.equal(git(root, "show", "-s", "--format=%s", landedFirst.commit).length > 0, true);
+    assert.deepEqual(registryProblems(inspectRegistry(root)), [], "the registry reads after a host commit on a mixed history");
+  }) },
+
+  { id: "NGSP9C3", name: "C28-MIXED-LINEAGE: an ordinary commit followed by a sibling's host commit that sits on it does not stop the next host commit either", run: () => fixture(({ root }) => {
+    const { runtime, launch } = setup(root);
+    const [first, second] = [launch(0), launch(1)];
+    for (const one of [first, second]) assert.equal(runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })).ok, true, one.id);
+    writeFileSync(join(root, "plan-note.txt"), "an ordinary orchestrator commit before the sibling\n"); git(root, "add", "--", "plan-note.txt"); git(root, "commit", "-q", "-m", "plan document");
+    for (const one of [first, second]) writeFileSync(join(root, one.file), one.content);
+    const landedFirst = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: first.returned }));
+    assert.equal(landedFirst.status, "authored-commit-recorded", JSON.stringify(landedFirst));
+    const landedSecond = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: second.returned }));
+    assert.equal(landedSecond.status, "authored-commit-recorded", JSON.stringify(landedSecond));
+    assert.equal(git(root, "rev-parse", `${landedSecond.commit}^`), landedFirst.commit, "the host commit sits on the sibling's commit, which sits on the ordinary one");
+    assert.deepEqual(registryProblems(inspectRegistry(root)), [], "the registry reads after that mixed history");
+  }) },
+
+  { id: "NGSP9C4", name: "C28-MIXED-LINEAGE: in a mixed history an ordinary commit that touches this slice's check path is still refused by name and nothing is committed", run: () => fixture(({ root }) => {
+    const { runtime, launch } = setup(root);
+    const [first, second] = [launch(0), launch(1)];
+    for (const one of [first, second]) assert.equal(runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input: one.input })).ok, true, one.id);
+    for (const one of [first, second]) writeFileSync(join(root, one.file), one.content);
+    const landedFirst = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: first.returned }));
+    assert.equal(landedFirst.status, "authored-commit-recorded", JSON.stringify(landedFirst));
+    writeFileSync(join(root, "src/second.test.mjs"), "// an ordinary commit on the second slice's check\n"); git(root, "add", "--", "src/second.test.mjs"); git(root, "commit", "-q", "-m", "ordinary commit on the check");
+    const head = git(root, "rev-parse", "HEAD");
+    const landedSecond = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: second.returned }));
+    assert.notEqual(landedSecond.status, "authored-commit-recorded", JSON.stringify(landedSecond));
+    assert.equal(git(root, "rev-parse", "HEAD"), head, "nothing was committed on top of the mixed history");
+  }) },
+
   // The real Windows case: the second stop starts its terminal preparation while the first stop is inside, and then finishing, its host commit.
   { id: "NGSP9D", name: "C19K-W246 (A): simultaneous: a second stop whose terminal preparation starts once the first stop's host commit moved HEAD, while that stop is still writing, lands its own host commit with the first one as its sibling proof", run: () => fixture(async ({ root }) => {
     const { repository, launch, original } = setup(root, { ownRuntime: false });

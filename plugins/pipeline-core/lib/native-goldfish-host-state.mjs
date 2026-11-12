@@ -844,7 +844,7 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
   const commits=git(repository.primaryRoot,['rev-list','--reverse','--first-parent',`${baseCommit}..${head}`]);
   if(commits===null)throw nativeManagedFault('native-concurrent-head-unavailable');
   if(commits.split('\n').filter(Boolean).length>64)throw nativeManagedFault('native-concurrent-lineage-record-bound');
-  let parent=baseCommit,unproven=false;const lineage=[];
+  let parent=baseCommit,unproven=false;const lineage=[],provenSteps=[];
   for(const commit of commits.split('\n').filter(Boolean)){
     const parents=git(repository.primaryRoot,['rev-list','--parents','-n','1',commit])?.split(' '),proof=foreignCommits.find(row=>row.commit===commit);
     if(parents?.length!==2||parents[1]!==parent)throw nativeManagedFault('native-concurrent-unowned-head');
@@ -855,10 +855,17 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
     if(!proof){if(!candidateAdvancedDisjointly(repository.primaryRoot,{commit:parent},{candidate:{commit}},[...scopePaths,...siblingScopes]))throw nativeManagedFault('native-concurrent-unowned-head');parent=commit;unproven=true;continue;}
     const observed=read.entries.find(row=>row.sourceFact.sha256===proof.observationSha256);
     if(observed.value.parent!==parent)throw nativeManagedFault('native-concurrent-parent-proof');
-    lineage.push(proof);parent=commit;
+    lineage.push(proof);provenSteps.push({parent,commit});parent=commit;
   }
-  // The receipt of a commit made on a mix of ordinary and sibling commits has no shape yet: that mix is still refused (and settled while a sibling is in flight).
-  if(unproven&&lineage.length)throw nativeManagedFault('native-concurrent-unowned-head');
+  // C28-MIXED-LINEAGE (PO tile 2026-11-11): the receipt of a commit made on a mix of ordinary and proven sibling commits takes the moved-head form that an
+  // all-ordinary history already uses: no sibling lineage is claimed (shared receipts name one chain of proofs ending at the parent, which a mix cannot).
+  // That is admitted only when every proven sibling commit is also disjoint from this slice's write scope, checks and dependencies (the ordinary ones were
+  // checked above, against the in-flight siblings' paths as well); one that touches them is refused as before, and the settle loop still waits for a proof
+  // that is not written yet because an ordinary-looking commit on a sibling's path is refused in the loop.
+  if(unproven&&lineage.length){
+    for(const step of provenSteps)if(!candidateAdvancedDisjointly(repository.primaryRoot,{commit:step.parent},{candidate:{commit:step.commit}},scopePaths))throw nativeManagedFault('native-concurrent-unowned-head');
+    return {root:repository.primaryRoot,reference,baseCommit,parentCommit:head,foreignPaths:[...foreignPaths].sort(),foreignCommits:[]};
+  }
   return {root:repository.primaryRoot,reference,baseCommit,parentCommit:head,foreignPaths:[...foreignPaths].sort(),foreignCommits:lineage};
 }
 function mintNativeConcurrentAuthority(input){const handle=Object.freeze({});nativeConcurrentAuthorities.set(handle,{input,plan:nativeConcurrentPlan(input)});return handle;}

@@ -3192,6 +3192,7 @@
         "caseIds": [
           "NGSP1",
           "NGSP2",
+          "NGSP2R",
           "NGSP3",
           "NGSP3A",
           "NGSP3A2",
@@ -3204,6 +3205,9 @@
           "NGSP9",
           "NGSP9B",
           "NGSP9C",
+          "NGSP9C2",
+          "NGSP9C3",
+          "NGSP9C4",
           "NGSP9D"
         ],
         "maxBytes": 65536
