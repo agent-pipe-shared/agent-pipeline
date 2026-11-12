@@ -138,7 +138,7 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining");
   put(`with \`&&\` is admitted only as up to ${MAX_AND_CHAIN_SEGMENTS} segments, and only when every segment is`);
   put("itself an admitted read-only shape (or the small always-safe-write allowlist:");
-  put("`echo`, `mkdir -p` under `scratch/`). The only admitted piping is the bounded");
+  put("`echo`, `mkdir -p` under `scratch/`, `cd` to the absolute project root). The only admitted piping is the bounded");
   put("read-only diagnostic pipelines (a read command into `head` or `tail`, or `rg`/`grep` into");
   put("`rg`/`grep`); every grammar refusal prints the complete current list with its");
   put("bounds, so read that list instead of guessing.");
