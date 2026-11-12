@@ -337,6 +337,14 @@ const CREATE_ADR_TITLE = (value) => typeof value === "string" && value.length > 
   && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value);
 function sanctionedCreateAdrArgs(args, root) {
   const rooted = { "--root": (value) => value === root, "--slug": (value) => CREATE_ADR_SLUG.test(value) };
+  // C28 (plan gates): `--discard --reason "<why>"` writes ONE record under docs/adr/discarded/ and leaves the draft as history. Exactly --root,
+  // --slug, --discard and a one-line reason of 1 to 300 characters; it never mixes with --refresh or any title/scope flag.
+  if (args.includes("--discard")) {
+    return !args.includes("--refresh") && matchFlagSpec(args, {
+      required: { "--discard": true },
+      requiredValue: { ...rooted, "--reason": (value) => typeof value === "string" && value.length > 0 && value.length <= 300 && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value) },
+    });
+  }
   if (args.includes("--refresh") && !args.includes("--slug")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: { "--root": rooted["--root"] } });
   if (args.includes("--refresh")) return matchFlagSpec(args, { required: { "--refresh": true }, requiredValue: rooted });
   return matchFlagSpec(args, {

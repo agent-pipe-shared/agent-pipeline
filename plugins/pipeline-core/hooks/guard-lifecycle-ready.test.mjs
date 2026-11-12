@@ -4448,6 +4448,12 @@ test("NVA-V4-PUSHDRIVER: push-init.mjs is admitted in exactly its own argv shape
       admit(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main' --base 'HEAD~5'`);
       // Flag-order-insensitive, same discipline as DRIVER_SCRIPT's own admit() pairs above.
       admit(`node '${PUSH_INIT_SCRIPT}' --destination 'refs/heads/main' --by 'tester' --root '${path}' --remote 'origin'`);
+      // C28 (onboarding questions): the transport answer is one pair; the kind is closed, configured-default takes no reference.
+      const pushBase = `node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main'`;
+      admit(`${pushBase} --transport-kind 'ssh-key' --transport-reference '~/keys/push_ed25519'`);
+      admit(`${pushBase} --transport-kind 'credential-helper' --transport-reference 'store'`);
+      admit(`${pushBase} --transport-kind 'configured-default'`);
+      admit(`${pushBase} --base 'HEAD~2' --transport-reference 'a b' --transport-kind 'ssh-key'`);
 
       // Near misses: no argv, wrong root, an empty/flag-shaped value, an unsafe --remote, a
       // --destination outside refs/heads/*, a flag push-init.mjs's own parseArgs() does not
@@ -4460,6 +4466,16 @@ test("NVA-V4-PUSHDRIVER: push-init.mjs is admitted in exactly its own argv shape
       refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'main'`);
       refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main' --step-cap 5`);
       refuse(`node '${PUSH_INIT_SCRIPT}' --root '${path}' --root '${path}' --by 'tester' --remote 'origin' --destination 'refs/heads/main'`);
+      refuse(`${pushBase} --transport-kind 'ssh-key'`);
+      refuse(`${pushBase} --transport-kind 'credential-helper'`);
+      refuse(`${pushBase} --transport-kind 'configured-default' --transport-reference 'x'`);
+      refuse(`${pushBase} --transport-reference 'x'`);
+      refuse(`${pushBase} --transport-kind 'agent-forward' --transport-reference 'x'`);
+      refuse(`${pushBase} --transport-kind 'ssh-key' --transport-reference '--root'`);
+      refuse(`${pushBase} --transport-kind 'ssh-key' --transport-reference '$(id)'`);
+      refuse(`${pushBase} --transport-kind 'ssh-key' --transport-reference 'a;b'`);
+      refuse(`${pushBase} --transport-kind 'ssh-key' --transport-reference '${"x".repeat(301)}'`);
+      refuse(`${pushBase} --transport-kind 'ssh-key' --transport-kind 'ssh-key' --transport-reference 'x'`);
 
       refuse("touch output.txt");
     }

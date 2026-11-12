@@ -657,7 +657,20 @@ test("C20 w253 create-adr: the create and refresh shapes are admitted, every nea
     bothAdmit(make("--date", "2026-11-07", "--title", "T", "--slug", "s"), f, "flag order is free");
     bothAdmit(make("--slug", "storage-adapter", "--refresh"), f, "refresh");
     bothAdmit(make("--refresh"), f, "refresh of every draft");
+    // C28 (plan gates): the discard shape is exactly --root, --slug, --discard and one reason line of 1 to 300 characters, in any order.
+    bothAdmit(make("--slug", "storage-adapter", "--discard", "--reason", "The PO chose a different storage design"), f, "discard with a reason");
+    bothAdmit(make("--reason", "Superseded", "--discard", "--slug", "storage-adapter"), f, "discard, flag order is free");
     for (const [label, action] of [
+      ["discard without a reason", make("--slug", "s", "--discard")],
+      ["discard with an empty reason", make("--slug", "s", "--discard", "--reason", "")],
+      ["discard with a multi-line reason", make("--slug", "s", "--discard", "--reason", "a\nb")],
+      ["discard with an overlong reason", make("--slug", "s", "--discard", "--reason", "x".repeat(301))],
+      ["discard with a padded reason", make("--slug", "s", "--discard", "--reason", " why")],
+      ["discard without a slug", make("--discard", "--reason", "why")],
+      ["discard with a title", make("--slug", "s", "--discard", "--reason", "why", "--title", "T")],
+      ["discard with refresh", make("--slug", "s", "--discard", "--refresh", "--reason", "why")],
+      ["discard of a foreign root", scriptAction(script, "--root", join(f.root, ".."), "--slug", "s", "--discard", "--reason", "why")],
+      ["reason without discard", make("--slug", "s", "--title", "T", "--reason", "why")],
       ["refresh of a foreign root", scriptAction(script, "--root", join(f.root, ".."), "--refresh")],
       ["foreign root", scriptAction(script, "--root", join(f.root, ".."), "--slug", "s", "--title", "T")],
       ["relative root", scriptAction(script, "--root", ".", "--slug", "s", "--title", "T")],

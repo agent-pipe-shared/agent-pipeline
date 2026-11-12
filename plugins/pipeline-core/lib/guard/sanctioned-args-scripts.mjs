@@ -167,11 +167,21 @@ export function sanctionedPushInitArgs(args, root) {
       "--base": nonEmptyNotFlagValue,
       "--candidate": nonEmptyNotFlagValue,
       "--record-ref": nonEmptyNotFlagValue,
+      // C28 (onboarding questions): the push transport answer, asked once and remembered locally. The kind is the script's closed set; the
+      // reference is a key path or a helper name, one line of printable characters, never a flag, and no shell metacharacter or quote.
+      "--transport-kind": (value) => ["ssh-key", "credential-helper", "configured-default"].includes(value),
+      "--transport-reference": (value) => nonEmptyNotFlagValue(value) && value.length <= 300 && /^[A-Za-z0-9._\/~:@+=,-][A-Za-z0-9._\/~:@+=, -]*$/u.test(value),
     },
   });
   // push-init.mjs usage: [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]]. Its parseArgs() accepts each flag, and
   // buildPushInitArgv() emits all of them; the two modes never combine, so the guard admits no mix either.
-  return matched && !(args.includes("--checkpoint") && ["--base", "--candidate", "--record-ref"].some((flag) => args.includes(flag)));
+  if (!matched || (args.includes("--checkpoint") && ["--base", "--candidate", "--record-ref"].some((flag) => args.includes(flag)))) return false;
+  // The transport answer is one pair or nothing, as the script's own parseArgs() requires: a reference needs a kind other than
+  // configured-default, and configured-default takes no reference.
+  const kindIndex = args.indexOf("--transport-kind");
+  const hasReference = args.includes("--transport-reference");
+  if (kindIndex === -1) return !hasReference;
+  return (args[kindIndex + 1] === "configured-default") !== hasReference;
 }
 
 export function sanctionedTranscriptRecoveryArgs(args, root) {
