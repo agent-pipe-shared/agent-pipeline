@@ -78,6 +78,12 @@ paths = [
 id = "sentry-access-token"
 
 [[rules.allowlists]]
+description = "held-patch evidence copies of source diffs"
+paths = [
+  '''.*/specs/[^/]+/evidence/held-patches/.*\.patch$'''
+]
+
+[[rules.allowlists]]
 paths = [
   '''.*/backlog/transitions\.ndjson$''',
   '''.*/backlog/transitions-phoenix-history\.ndjson$''',
@@ -101,8 +107,38 @@ regexes = [
   '''^[0-9a-f]{32,64}$'''
 ]
 
+# Candidate 28b (PO decision pending, optional patch): the held patches under specs/<feature>/evidence/held-patches/ are unified diffs of
+# source files that are scanned at their own paths. A diff that removes or changes a secret-shaped test fixture carries that text again as a
+# `-`/`+` line, so the evidence copy re-trips the same four rules forever and cannot be edited (evidence). Exempted ONLY for `.patch` files
+# inside a held-patches folder and ONLY for these four rule ids: the same text in any other file, every other rule and every other path
+# stay fully armed, including a real credential pasted into a held patch under any OTHER rule. Known limit (same class as the notes above):
+# gitleaks reports the absolute path, so a nested `.../specs/x/evidence/held-patches/` anywhere matches, not only the top-level one.
+[[rules]]
+id = "private-key"
+
+[[rules.allowlists]]
+description = "held-patch evidence copies of source diffs"
+paths = [
+  '''.*/specs/[^/]+/evidence/held-patches/.*\.patch$'''
+]
+
+[[rules]]
+id = "github-pat"
+
+[[rules.allowlists]]
+description = "held-patch evidence copies of source diffs"
+paths = [
+  '''.*/specs/[^/]+/evidence/held-patches/.*\.patch$'''
+]
+
 [[rules]]
 id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "held-patch evidence copies of source diffs"
+paths = [
+  '''.*/specs/[^/]+/evidence/held-patches/.*\.patch$'''
+]
 
 [[rules.allowlists]]
 description = "bare hex digests in the audit bundle and the State file written by the close"

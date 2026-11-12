@@ -595,6 +595,33 @@ test(
 );
 
 test(
+  "run() wires the repo's .gitleaks.toml: a held-patch evidence copy is exempt for the four fixture rules, the same text in a non-patch file there and in a patch elsewhere keeps its finding (candidate 28b, real gitleaks binary)",
+  { skip: gitleaksOnlySkip },
+  async () => {
+    // The token is assembled at run time so the repository scan does not see it in this file.
+    const tokenLine = `+${JSON.stringify({ token: ["gh", "p_aB3dE5fG7hI9jK1lM3nO5pQ7rS9tU1vW3xY5"].join("") })}\n`;
+    const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-held-patch-"));
+    try {
+      const held = join(rootDir, "specs", "feat-x", "evidence", "held-patches");
+      mkdirSync(join(held, "chain"), { recursive: true });
+      mkdirSync(join(rootDir, "other"), { recursive: true });
+      writeFileSync(join(held, "chain", "01-abc.patch"), tokenLine);
+      writeFileSync(join(held, "notes.json"), tokenLine);
+      writeFileSync(join(rootDir, "other", "01-abc.patch"), tokenLine);
+
+      const result = await run({ rootDir, config: { binaryPath: gitleaksProbe.path }, timeoutMs: 20000 });
+      const seen = result.findings.map((f) => `${f.path} [${f.rule}]`).sort();
+      assert.deepEqual(seen, [
+        "other/01-abc.patch [github-pat]",
+        "specs/feat-x/evidence/held-patches/notes.json [github-pat]",
+      ], "only a .patch file inside a held-patches folder is exempt: the same line in another file there and in a patch elsewhere keeps its finding");
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
   "run() wires the repo's .gitleaks.toml: bare hex digests written by the close (audit bundle, State file) are exempt, a real key there and the same digest elsewhere keep their findings (candidate 16a, real gitleaks binary)",
   { skip: gitleaksOnlySkip },
   async () => {
