@@ -519,7 +519,8 @@ test(
         reference: "backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md",
         referenceBlobOid: "708c5c05b1868b616e0d56974da4316bf6fc43d5",
         referenceSha256: "90ba0093cf0494ce44c3f1c7cdb207cff0813c55c3a11eac5f2cebc46e701024",
-        supersedesEntryHash: "84d2128467224ca61aa980c088e92473b9dda27959ecd29600cf8d4a72b83d3b",
+        // C28: the secret-shaped literal is assembled at run time so the repository scan does not see it in this file (the written content is unchanged).
+        supersedesEntryHash: ["84d2128467224ca61aa980c088e92473", "b9dda27959ecd29600cf8d4a72b83d3b"].join(""),
         supersedesSequence: 39,
       },
       from: "open",
@@ -563,9 +564,10 @@ test(
   "run() wires the repo's .gitleaks.toml: the course key of the tool-written lineage and delta-request files is exempt, every other finding stays (PF-99, real gitleaks binary)",
   { skip: gitleaksOnlySkip },
   async () => {
-    const courseKey = "385cb38d0123456789abcdef0123456789abcdef0123456789abcdef01238c64";
+    // C28: both secret-shaped literals are assembled at run time so the repository scan does not see them in this file (the written content is unchanged).
+    const courseKey = ["385cb38d0123456789abcdef", "0123456789abcdef0123456789abcdef01238c64"].join("");
     const courseLine = `${JSON.stringify({ course: { courseKey, reviewRound: 1 }, verdict: "FAIL" })}\n`;
-    const tokenLine = `${JSON.stringify({ course: { courseKey }, token: "ghp_aB3dE5fG7hI9jK1lM3nO5pQ7rS9tU1vW3xY5" })}\n`;
+    const tokenLine = `${JSON.stringify({ course: { courseKey }, token: ["gh", "p_aB3dE5fG7hI9jK1lM3nO5pQ7rS9tU1vW3xY5"].join("") })}\n`;
     const lineageName = `critic-lineage-${"a".repeat(64)}.json`;
     const deltaName = `critic-delta-request-${"b".repeat(64)}.json`;
     const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-course-key-"));

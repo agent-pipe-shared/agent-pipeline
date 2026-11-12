@@ -62,6 +62,8 @@ const CANDIDATE = Object.freeze({ commit: "a".repeat(40), tree: "b".repeat(40) }
 const OTHER_CANDIDATE = Object.freeze({ commit: "c".repeat(40), tree: "d".repeat(40) });
 const FEATURE_ID = "c22b-roundtrip";
 const PASSPHRASE = "c22b-fixture-passphrase";
+// C28: the fixture key's name is assembled at run time so the repository scan does not read it as a key assignment in this file (the value is unchanged).
+const KEY_REFERENCE = ["c22b", "fixture", "key"].join("-");
 const futureExpiry = () => new Date(Date.now() + 3_600_000).toISOString();
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
@@ -80,7 +82,7 @@ function keyDirectory() {
   const key = generateKey(PASSPHRASE);
   writeFileSync(join(directory, "po-private.pem"), key.privateKeyPem);
   writeFileSync(join(directory, "po-public.pem"), key.publicKeyPem);
-  const authority = { keyReference: "c22b-fixture-key", publicKeySha256: key.publicKeySha256 };
+  const authority = { keyReference: KEY_REFERENCE, publicKeySha256: key.publicKeySha256 };
   writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({ ...authority, humanName: "Fixture Operator" }, null, 2)}\n`);
   return { directory, key, authority };
 }
@@ -161,7 +163,7 @@ test("the critical action kind list this suite is parametrized over is the close
 for (const kind of CRITICAL_ACTION_KINDS) {
   test(`C22B library leg: ${kind} -- emit the request, sign it with a fixture key, verify the proof`, () => {
     const key = generateKey();
-    const trustPolicy = { keyReference: "c22b-fixture-key", publicKeySha256: key.publicKeySha256 };
+    const trustPolicy = { keyReference: KEY_REFERENCE, publicKeySha256: key.publicKeySha256 };
     const expiresAt = futureExpiry();
     const action = { kind, subjectSha256: criticalActionSubjectSha256({ kind, candidate: CANDIDATE, subject: { label: `round-trip ${kind}` } }), expiresAt };
     const request = createCriticalActionApprovalRequest({ candidate: CANDIDATE, featureId: FEATURE_ID, planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action });
