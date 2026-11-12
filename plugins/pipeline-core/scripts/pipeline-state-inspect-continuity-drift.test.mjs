@@ -184,7 +184,8 @@ test("R6-2 case 7: State without continuity -> continuityAuthorityDrift is an ex
   assert.equal(payload[KEY], null, "explicit null, not omitted");
   // QG-04 restatement (C19): two additive read-only keys of the same payload are named here and nothing else is allowed to appear:
   // `runbook` (G5, the typed link of the first call of a standard command) and `sealSituation` (late binding step 5, the seal readback).
-  const ADDITIVE_KEYS = new Set(["runbook", "sealSituation"]);
+  // C28 restatement: a third additive read-only key, `featureStatus` (the close projection's four status facts, candidate 28b), is named here too.
+  const ADDITIVE_KEYS = new Set(["runbook", "sealSituation", "featureStatus"]);
   assert.deepEqual(Object.keys(payload).filter((key) => key !== KEY && !ADDITIVE_KEYS.has(key)).sort(), [...ORIGINAL_KEYS].sort(), "no other key appears or disappears");
   assert.equal(payload.schema, "pipeline.inspect.v1");
   assert.equal(typeof payload.generatedAt, "string");

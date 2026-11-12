@@ -258,7 +258,10 @@ const cases = [
     assert.match(message, /scripts\/goldfish-host-commit-recover\.mjs plan --root <root> --dispatch-id gf-store-backup/u);
     assert.match(message, /--expect-sha256/u);
     const other = nativeGoldfishHookMessage(null, { stopFailure: { ...stopFailure, code: "NGHF-STOP-UNRESOLVED" } });
-    assert.doesNotMatch(other, /goldfish-host-commit-recover/u, "the recovery line belongs to the pending-unavailable code only");
+    // C28 restatement: the unresolved-stop message now names the same recover helper (plan, then apply with the digest), because a stop
+    // that cannot resolve its child needs the identical explicit recovery; the line is still absent for a code that names no failed stop.
+    assert.match(other, /goldfish-host-commit-recover/u, "the unresolved-stop code names the recovery line too");
+    assert.match(other, /No commit or authorship record is claimed/u);
   }},
 
 ];

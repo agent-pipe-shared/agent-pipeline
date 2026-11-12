@@ -216,7 +216,7 @@ function scratchScriptRelative(word, root) {
   return /^scratch\/[A-Za-z0-9._-]+\.mjs$/u.test(rel) ? rel : null;
 }
 
-// C28-GUARD-LANES (AC-108, PO decision 2026-11-10): a test run of the project's REGISTERED suites (harness/verify-suites.json, the list Verify itself runs; read through
+// C28-GUARD-LANES (AC-108, PO decision 2026-11-10): a test run of the project's REGISTERED suites (the verify-suites list, the one Verify itself runs; read through
 // the one shared loader) is not an opaque write in design draft -- the suites write only to scratch/ and the system temp directory. Exactly `node --test <file>...`
 // with no other option, every operand a plain file inside the root that the list names; one unregistered operand makes the whole run what it was before.
 function isRegisteredSuiteRun(operands, root) {
