@@ -46,9 +46,11 @@ test("a manifest without a lockfile is partial; a lockfile in an ancestor direct
 });
 
 test("a lockfile format without a reader is unsupported and not also reported as partial", () => {
-  const seen = observe({ "yarn.lock": "# yarn", "package.json": JSON.stringify({ dependencies: { a: "1" } }), "svc/Service.csproj": "<Project/>", "pom.xml": "<project/>" });
-  assert.deepEqual(seen.findings.map((f) => [f.state, f.path]).sort(), [["unsupported", "pom.xml"], ["unsupported", "svc/Service.csproj"], ["unsupported", "yarn.lock"]]);
+  const seen = observe({ "bun.lockb": "\u0000binary", "package.json": JSON.stringify({ dependencies: { a: "1" } }), "ios/Podfile.lock": "PODS:\n", "build.sbt": "libraryDependencies += x" });
+  assert.deepEqual(seen.findings.map((f) => [f.state, f.path]).sort(), [["unsupported", "build.sbt"], ["unsupported", "bun.lockb"], ["unsupported", "ios/Podfile.lock"]]);
   assert.match(sbomFindingHelp(seen.findings[0]), /SBOM_READERS/u);
+  // C28d: the names this test used to list (yarn.lock, a .csproj, pom.xml) have readers now; empty forms of them are no finding.
+  assert.deepEqual(observe({ "yarn.lock": "# yarn lockfile v1\n", "svc/Service.csproj": "<Project/>", "pom.xml": "<project/>" }).findings, []);
 });
 
 test("fixture, vendored and working paths are not the project's dependencies", () => {
@@ -91,19 +93,19 @@ test("a complete close writes both documents, valid in their profiles and bound 
 const AUTHORITY = Object.freeze({ kind: "po-signature", keyReference: "po-key", intentSha256: "a".repeat(64), proofSha256: "b".repeat(64), candidateCommit: "c".repeat(40) });
 
 test("every blocking state stops the close unless a verified PO signature comes with the override; the override names what it covers", () => {
-  const files = { "package-lock.json": NPM_LOCK, "yarn.lock": "x" };
+  const files = { "package-lock.json": NPM_LOCK, "Podfile.lock": "x" };
   const blocked = close(files);
   assert.equal(blocked.status, "blocked"); assert.equal(blocked.blocks[0].state, "unsupported");
-  assert.equal(close(files, { override: "ja, ohne SBOM fuer yarn", actor: "po" }).status, "blocked", "words alone never pass");
+  assert.equal(close(files, { override: "ja, ohne SBOM fuer CocoaPods", actor: "po" }).status, "blocked", "words alone never pass");
   const overridden = close(files, { override: "accepted by signature", authority: AUTHORITY, actor: "po" });
   assert.equal(overridden.status, "ready"); assert.equal(overridden.record.status, "overridden"); assert.equal(overridden.record.code, "SBOM-OVERRIDDEN");
-  assert.equal(overridden.record.override.statement, "accepted by signature"); assert.equal(overridden.record.override.blocked[0].path, "yarn.lock");
+  assert.equal(overridden.record.override.statement, "accepted by signature"); assert.equal(overridden.record.override.blocked[0].path, "Podfile.lock");
   assert.deepEqual(overridden.record.override.authority, AUTHORITY);
   assert.equal(overridden.record.componentCount, 3, "what could be read is still carried");
   assert.equal(sbomCloseRecordShape(overridden.record), true);
   assert.equal(sbomCloseRecordShape({ ...overridden.record, override: { ...overridden.record.override, authority: { ...AUTHORITY, kind: "words" } } }), false, "the authority is a PO signature");
   assert.equal(sbomCloseRecordShape({ ...overridden.record, override: { statement: "x", actor: "po", blocked: overridden.record.override.blocked } }), false, "an override without its authority is not a record");
-  const onlyOverride = close({ "yarn.lock": "x" }, { override: "weiter", authority: AUTHORITY, actor: "po" });
+  const onlyOverride = close({ "Podfile.lock": "x" }, { override: "weiter", authority: AUTHORITY, actor: "po" });
   assert.equal(onlyOverride.record.componentCount, 0); assert.equal(onlyOverride.record.documents.length, 0);
 });
 

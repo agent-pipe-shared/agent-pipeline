@@ -2620,6 +2620,7 @@
         "verify-phase:harness/scripts/verify.mjs:sbom-discovery-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-fixture-matrix-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-lockfile-readers-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-manifest-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-node-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-release-binding-tests"

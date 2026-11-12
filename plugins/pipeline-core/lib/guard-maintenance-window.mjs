@@ -947,6 +947,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // Candidate 28c (GMWKC01): the SBOM modules lib/audit-bundle.mjs and scripts/po-human-approval.mjs import.
   "plugins/pipeline-core/lib/sbom-close.mjs", "plugins/pipeline-core/lib/sbom-manifest.mjs",
   "plugins/pipeline-core/lib/sbom-node-adapter.mjs", "plugins/pipeline-core/lib/sbom-override-authority.mjs",
+  // Candidate 28d (GMWKC01): the lockfile readers lib/sbom-close.mjs imports.
+  "plugins/pipeline-core/lib/sbom-lockfile-readers.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

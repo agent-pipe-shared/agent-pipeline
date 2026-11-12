@@ -4873,6 +4873,12 @@
       "file": "plugins/pipeline-core/lib/pins/start-skill-fits-the-reattach-window.test.mjs",
       "invariantPinned": "The pipeline-start skill body stays at least 1,500 characters below the about 20,000-character window the runner re-attaches after a compaction, with Compact as its last section; each status- or step-conditional block moved out of it lives once in the reference its trigger line names, and the skill names fullEnvelope for the compact ready line",
       "nonOverlapNote": "Unique cases: the re-attach window and the one-home rule for the moved blocks; pipeline-start-v3.test.mjs and greenfield-machine-output-and-skill-budget.test.mjs keep the 24 KiB ceiling and the pinned phrases"
+    },
+    {
+      "name": "sbom-lockfile-readers-tests",
+      "file": "plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs",
+      "invariantPinned": "The close SBOM reads yarn.lock (v1, Berry), pnpm-lock.yaml (5, 6, 9), bun.lock, uv.lock, Gradle lockfiles, NuGet packages.lock.json, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock and committed CycloneDX files: a registry package is a component, a workspace or link member is left out, a git, path or URL pin is partial and its URL is never written, an unknown format version is unsupported and an unreadable entry invalid; a Maven pom is partial unless a CycloneDX file in its directory or above lists every direct dependency, and a .NET project or Gradle build without its lockfile is partial with help naming the switch",
+      "nonOverlapNote": "Unique cases: the readers added in candidate 28d and the Maven coverage rule; sbom-close.test.mjs keeps the npm, Python, Go and Rust readers and the close record"
     }
   ]
 }

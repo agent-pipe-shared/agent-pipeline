@@ -801,6 +801,14 @@ check), `plugins/pipeline-core/lib/sbom-manifest.mjs` (the manifest shape and it
 `plugins/pipeline-core/lib/sbom-override-authority.mjs` (the signed override's verification). All
 four are kernel paths now.
 
+Candidate 28d adds the lockfile readers for the remaining common ecosystems (JavaScript, Python,
+JVM, .NET, Ruby, PHP, Dart, Swift, Elixir, C/C++ and committed CycloneDX files). `lib/sbom-close.mjs`
+imports them from `plugins/pipeline-core/lib/sbom-lockfile-readers.mjs`, which therefore executes
+with kernel authority and is a kernel path now. It is pure: it opens no file, runs no process and
+uses no network, and it imports only `lib/sbom-manifest.mjs`, itself a kernel path. A reader that
+loosened its rules (a git pin read as a registry package, an unknown format read as empty) would
+let a close pass with an incomplete SBOM, which is why it cannot be lifted by a window.
+
 ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
 and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
 (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
