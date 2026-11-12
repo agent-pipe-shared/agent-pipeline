@@ -357,7 +357,7 @@ Core agent pipeline engine, hooks, lifecycle management, guards, and CLI scripts
 - `plugins/pipeline-core/lib/project-uninstall.mjs`: Routes back to an install after the uninstall.
 - `plugins/pipeline-core/lib/critic-generic-batch.mjs`: Counts a round holding only minor findings as passed, admits a follow-up round that moves a trust boundary as a full round, names the reason of a budget refusal and lets a course takeover retire an unregistrable round.
 - `plugins/pipeline-core/lib/architecture-prospective-materialization.mjs`: Materializes the ADR proposals bound into the design package and takes part in the single implementation entry gate.
-- `plugins/pipeline-core/lib/architecture-design.mjs`: Names every invalid module with its reason and repair, refreshes the receipt when a reopened design is approved again, names the drifted map files and the materialization commit step, and keeps the accepted design visible after its feature closed.
+- `plugins/pipeline-core/lib/architecture-design.mjs`: Names every invalid module with its reason and repair, refreshes the receipt when a reopened design is approved again, names the drifted map files and the materialization commit step, and keeps the accepted design visible after its feature closed. A follow-up feature may add modules to the design a closed feature materialized: the closed predecessor's plan must still match its receipt, every predecessor module must be present unchanged, and recorded targets are replaced only over their recorded bytes; removing or changing a predecessor module stays refused.
 - `plugins/pipeline-core/lib/design-decision-bindings.mjs`: Reads only the newest retained approval of a feature and treats a signed design approval as the PO acknowledgement.
 
 ## Verification
