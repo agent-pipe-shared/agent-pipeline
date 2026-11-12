@@ -177,10 +177,25 @@ test("C: shipped scanner config has no secret-prefix whitelist, stopwords, globa
       "# same file, a hex digest anywhere else and every other rule stay fully armed.",
       "",
     ].join("\n");
+    // Candidate 28b (PO decision 2026-11-11, option C): the one further sanctioned stanza is the path-only exemption of the held-patch evidence copies
+    // (`specs/<feature>/evidence/held-patches/*.patch`), once per rule for exactly four rules (private-key, github-pat, generic-api-key, sentry-access-token), in the repo-root file only (the plugin-shipped default
+    // carries none). Removed byte-for-byte before the checks, so any other or any widened allowlist still fails exactly as before.
+    const HELD_PATCH_STANZA = [
+      "[[rules.allowlists]]",
+      "description = \"held-patch evidence copies of source diffs\"",
+      "paths = [",
+      "  '''.*/specs/[^/]+/evidence/held-patches/.*\\.patch$'''",
+      "]",
+      "",
+    ].join("\n");
+    const HELD_PATCH_ONLY_RULES = ["private-key", "github-pat"].map((id) => `[[rules]]\nid = "${id}"\n\n${HELD_PATCH_STANZA}\n`);
     const raw = readFileSync(p, "utf8");
     assert.equal(raw.split(PF99_ALLOWLIST).length, 2, `the course-key exemption is present exactly once, byte-for-byte: ${p}`);
     assert.equal(raw.split(CLOSE_DIGEST_COMMENT + CLOSE_DIGEST_STANZA).length, 2, `the commented close-digest exemption is present exactly once: ${p}`);
-    const withoutFirst = raw.replace(CLOSE_DIGEST_COMMENT + CLOSE_DIGEST_STANZA, "");
+    const heldPatchCount = raw.split(HELD_PATCH_STANZA).length - 1;
+    assert.equal(heldPatchCount, p === resolveGitleaksConfigPath() ? 4 : 0, `the held-patch exemption is in the repo-root file (private-key, github-pat, generic-api-key, sentry-access-token) and nowhere else: ${p}`);
+    const withoutHeld = HELD_PATCH_ONLY_RULES.reduce((value, block) => value.replace(block, ""), raw).split(`${HELD_PATCH_STANZA}\n`).join("");
+    const withoutFirst = withoutHeld.replace(CLOSE_DIGEST_COMMENT + CLOSE_DIGEST_STANZA, "");
     assert.equal(withoutFirst.split(CLOSE_DIGEST_STANZA).length, 2, `the second close-digest exemption is present exactly once: ${p}`);
     const text = withoutFirst.replace(CLOSE_DIGEST_STANZA, "").replace(K98_ALLOWLIST, "").replace(PF99_ALLOWLIST, "");
     assert.doesNotMatch(text, /^\s*(regexes|stopwords|entropy|tags|commits)\s*=/mu);

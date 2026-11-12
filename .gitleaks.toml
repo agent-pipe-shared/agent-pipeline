@@ -107,7 +107,7 @@ regexes = [
   '''^[0-9a-f]{32,64}$'''
 ]
 
-# Candidate 28b (PO decision pending, optional patch): the held patches under specs/<feature>/evidence/held-patches/ are unified diffs of
+# Candidate 28b (PO decision 2026-11-11, option C): the held patches under specs/<feature>/evidence/held-patches/ are unified diffs of
 # source files that are scanned at their own paths. A diff that removes or changes a secret-shaped test fixture carries that text again as a
 # `-`/`+` line, so the evidence copy re-trips the same four rules forever and cannot be edited (evidence). Exempted ONLY for `.patch` files
 # inside a held-patches folder and ONLY for these four rule ids: the same text in any other file, every other rule and every other path
