@@ -54,6 +54,25 @@ export function describeSbomOverrideRequest(record, intentSha256) {
 }
 
 /**
+ * Offline check used by the audit bundle verifier: the carried request re-derives from its own fields, names exactly the findings the close record covered, and the carried proof is a valid Ed25519
+ * signature over that request's intent whose digests and key reference are the ones the record names. It holds no trust anchors: that the key is the project's was decided at the close, and the
+ * record names the key so a reader can compare it with the project's policy.
+ */
+export function verifySbomOverrideEvidence({ record, request, proof } = {}) {
+  const override = record?.override;
+  if (record?.status !== "overridden" || override === null || typeof override !== "object" || !exact(override.authority, ["kind", "keyReference", "intentSha256", "proofSha256", "candidateCommit"])) return false;
+  if (!exact(request, ["schema", "intentSha256", "approvalIntent", "featureId", "blocked", "candidate"]) || !exact(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"])) return false;
+  let rebuilt = null;
+  try { rebuilt = createSbomOverrideRequest({ featureId: request.featureId, blocked: request.blocked, candidate: request.candidate }); } catch { return false; }
+  if (rebuilt === null || canonical(rebuilt) !== canonical(request)) return false;
+  if (canonical(normalizeBlocked(override.blocked)) !== canonical(request.blocked)) return false;
+  if (override.authority.intentSha256 !== request.intentSha256 || override.authority.candidateCommit !== request.candidate.commit || override.authority.keyReference !== proof.keyReference) return false;
+  if (typeof proof.publicKey !== "string") return false;
+  const checked = verifyPoApprovalProof({ intent: request.approvalIntent, trustPolicy: { keyReference: proof.keyReference, publicKeySha256: createHash("sha256").update(proof.publicKey).digest("hex") }, proof });
+  return checked.verified === true && checked.proofSha256 === override.authority.proofSha256;
+}
+
+/**
  * Verifies a detached proof for exactly this feature, these findings and this candidate. `trustAnchors` comes from the project's configured policy, never from the proof.
  * Returns { verified: true, authority } with the record fields the close keeps, or { verified: false, code }.
  */

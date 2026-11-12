@@ -11,6 +11,7 @@ import { resolveEffectiveOrganizationPolicy } from "./organization-policy.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "./verify-selection.mjs";
 import { SBOM_CLOSE_CODES, SBOM_DOCUMENT_FORMATS, sbomCloseRecordShape } from "./sbom-close.mjs";
 import { validateSbomPayload } from "./sbom-manifest.mjs";
+import { verifySbomOverrideEvidence } from "./sbom-override-authority.mjs";
 
 const SHA = /^[a-f0-9]{64}$/u; const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u; const BUNDLE_ID = /^[a-z][a-z0-9-]{2,63}$/u;
 const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u; const SIGNATURE = /^[A-Za-z0-9_-]{16,16384}$/u;
@@ -27,7 +28,7 @@ function evidenceSection(manifest) {
   const projectionText = projections.length === 0 ? "" : `\n## Dispatch projection\n\nThe tracked, redacted projection of the feature's dispatches: each briefing's text with its digest and each completed dispatch record. \`redacted\` means an absolute host path was masked (the digest of the original bytes is kept next to the digest of the text carried); a \`gap\` names why a text is not carried (a typed gap with the original digest, never an omission). A private key or secret-shaped value is never copied.\n\n${projections.map(line).join("\n")}\n`;
   // C28c: the software bill of materials is its own section: the close's record, then the two documents it names.
   const sboms = manifest.evidence.items.filter((entry) => entry.item.startsWith("sbom"));
-  const sbomText = sboms.length === 0 ? "" : `\n## Software bill of materials\n\nThe close reads the lockfiles pinned in the repository (npm, Python, Go, Rust) and records the components in CycloneDX 1.6 and SPDX 2.3; the component list carries no dependency edges. \`SBOM-NOT-APPLICABLE\` means no component was found, with the reason in the record. \`SBOM-OVERRIDDEN\` means the PO signed an override of a blocked state; the record names every finding it covered and the signing key: the SBOM is then incomplete by that decision, not by accident.\n\n${sboms.map(line).join("\n")}\n`;
+  const sbomText = sboms.length === 0 ? "" : `\n## Software bill of materials\n\nThe close reads the lockfiles pinned in the repository (npm, Python, Go, Rust) and records the components in CycloneDX 1.6 and SPDX 2.3; the component list carries no dependency edges. \`SBOM-NOT-APPLICABLE\` means no component was found, with the reason in the record. \`SBOM-OVERRIDDEN\` means the PO signed an override of a blocked state; the record names every finding it covered and the signing key, and the signed request and proof travel in the bundle (\`AB-SBOM-OVERRIDE\` is the verifier's finding when the signature or its binding does not hold; whether the key is the project's is decided at the close, so compare the key reference with the project's policy): the SBOM is then incomplete by that decision, not by accident.\n\n${sboms.map(line).join("\n")}\n`;
   const approvalText = approval.length === 0 ? "" : `\n## Human approval evidence\n\nTrace verdict: \`${manifest.evidence.traceStatus ?? "not carried"}\` (\`traced\`, \`attribution-only\` or \`untraceable\`; a chat approval is an attribution record, never proof). A gap is a typed absence, not a pass.\n\n${approval.map(line).join("\n")}\n`;
   const reportText = reports.length === 0 ? "" : `\n## Critic round reports\n\nOne entry per Critic round of the feature. \`REPORT-NOT-EXPORTED\` means the round's report was never exported into the repository's tracked evidence (it lived outside the tracked tree), and \`UNREADABLE\` that the named file was missing or empty at the close: the report is NOT part of this bundle.\n\n${reports.map(line).join("\n")}\n`;
   return `${approvalText}${reportText}${projectionText}${sbomText}`;
@@ -199,8 +200,8 @@ function followUpFindings(root, manifest) {
   return findings;
 }
 function optionalKeys(value) { return value !== null && typeof value === "object" && !Array.isArray(value) ? OPTIONAL_KEYS.filter((key) => Object.hasOwn(value, key)) : []; }
-const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection", "sbom", "sbom-document"]);
-const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection", sbom: "sbom-record", sbomDocument: "sbom-document" });
+const EVIDENCE_ITEMS = new Set(["approval-trace", "approval-proofs", "verify-record", "security-scan", "critic-report", "dispatch-projection", "sbom", "sbom-document", "sbom-override"]);
+const EVIDENCE_CLASSES = Object.freeze({ trace: "approval-trace", proof: "approval-proof", verify: "verify-record", security: "security-scan", critic: "critic-report", dispatch: "dispatch-projection", sbom: "sbom-record", sbomDocument: "sbom-document", sbomOverride: "sbom-override" });
 // C28: the projection the close writes (lib/durable-evidence.mjs `projectCloseDispatches`). The verifier re-checks it offline: every carried text hashes to the digest it names, nothing is a gap with a text,
 // and no absolute host path or private key is anywhere in the file, so a producer that skipped the redaction is found even when the artifact digest is consistent with the manifest.
 const DISPATCH_PROJECTION_SCHEMA = "pipeline.close-dispatch-projection.v1"; const BRIEFING_STATUSES = new Set(["carried", "redacted", "gap"]);
@@ -314,6 +315,12 @@ function collectEvidence(root, candidate, evidence, firstIndex) {
         if (documentFile === null || documentFile.sha256 !== document.sha256) gap(item, "UNREADABLE");
         else items.push({ item, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.sbomDocument, document.path, documentFile.sha256) });
       }
+      // A signed override carries the request the PO signed and the proof next to the record, so a reader can check the signature offline.
+      if (record.status === "overridden") for (const part of ["request", "proof"]) {
+        const item = `sbom-override:${part}`; const file = readEvidenceFile(root, `${directory}override-${part}.json`);
+        if (file === null || file.bytes.length === 0) gap(item, "UNREADABLE");
+        else items.push({ item, status: "carried", code: null, bundlePath: carry(EVIDENCE_CLASSES.sbomOverride, `${directory}override-${part}.json`, file.sha256) });
+      }
     }
   }
   return { artifacts, evidence: Object.freeze({ schema: "pipeline.audit-bundle-evidence.v1", candidateBound: true, traceStatus, items: Object.freeze(items.map((entry) => Object.freeze(entry))) }) };
@@ -385,6 +392,11 @@ function evidenceFindings(root, manifest) {
       else for (const document of record.documents) {
         const named = manifest.evidence.items.find((entry) => entry.item === `sbom-document:${document.format}`);
         if (named === undefined || named.bundlePath === null || artifactDigest(named.bundlePath) !== document.sha256) findings.push(`AB-SBOM-DOCUMENT ${document.format}`);
+      }
+      // A signed override: the carried request and proof must verify offline and bind exactly the findings and the key the record names.
+      if (sbomCloseRecordShape(record) && record.status === "overridden") {
+        const carried = (part) => { const entry = manifest.evidence.items.find((candidateItem) => candidateItem.item === `sbom-override:${part}`); try { return entry?.bundlePath ? parseStrictJson(readFileSync(join(root, entry.bundlePath))) : null; } catch { return null; } };
+        if (verifySbomOverrideEvidence({ record, request: carried("request"), proof: carried("proof") }) !== true) findings.push("AB-SBOM-OVERRIDE");
       }
     }
     if (item.item.startsWith("sbom-document:") && item.bundlePath !== null) {

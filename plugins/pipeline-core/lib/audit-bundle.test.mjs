@@ -12,6 +12,8 @@ import { closeDispatchProjectionBytes, projectCloseDispatches } from "./durable-
 import { denyPrivateAbsolutePaths } from "./dispatch-record.mjs";
 import { planVerifySelection } from "./verify-selection.mjs";
 import { closeSbom } from "./sbom-close.mjs";
+import { createSbomOverrideRequest } from "./sbom-override-authority.mjs";
+import { verifyPoApprovalProof } from "./po-approval-proof.mjs";
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 // E-AC-20 fixtures: a governance export adapter profile and a delivery receipt, matching the
@@ -305,11 +307,48 @@ test("C28c a not-applicable and an overridden record are carried with their code
   assert.deepEqual(empty.plan.evidence.items.map((entry) => `${entry.item}:${entry.code}`), ["sbom:SBOM-NOT-APPLICABLE"]);
   await buildAuditBundle({ repositoryRoot: none.root, outputPath: "bundle", plan: empty.plan });
   assert.equal((await verifyAuditBundle({ bundleRoot: join(none.root, "bundle") })).status, "verified");
-  const over = fixture(); const gap = sbomBundle(over, { "package-lock.json": LOCK, "yarn.lock": "x" }, () => ({ override: "weiter", authority: { kind: "po-signature", keyReference: "po-key", intentSha256: "a".repeat(64), proofSha256: "b".repeat(64), candidateCommit: "c".repeat(40) }, actor: "po" }));
-  assert.equal(gap.plan.evidence.items[0].code, "SBOM-OVERRIDDEN");
+  const over = fixture(); const gap = signedOverrideBundle(over, { "package-lock.json": LOCK, "yarn.lock": "x" });
+  assert.deepEqual(gap.plan.evidence.items.map((entry) => `${entry.item}:${entry.status}:${entry.code}`), ["sbom:carried:SBOM-OVERRIDDEN", "sbom-document:cyclonedx-json:carried:null", "sbom-document:spdx-json:carried:null", "sbom-override:request:carried:null", "sbom-override:proof:carried:null"]);
   await buildAuditBundle({ repositoryRoot: over.root, outputPath: "bundle", plan: gap.plan });
   assert.equal((await verifyAuditBundle({ bundleRoot: join(over.root, "bundle") })).status, "verified");
   assert.match(readFileSync(join(over.root, "bundle", "README.md"), "utf8"), /SBOM-OVERRIDDEN/u);
+});
+// The PO's signed override: the bundle carries the request and the proof and the offline verifier checks the signature and what it binds.
+function signedOverrideBundle(input, files, { keyReference = "po-key", edit = (request) => request } = {}) {
+  const read = (path) => files[path] ?? null; const base = { featureId: FEATURE_ID, evidenceDir: "evidence", tracked: Object.keys(files), read };
+  const blocked = closeSbom(base).blocks;
+  const request = edit(createSbomOverrideRequest({ featureId: FEATURE_ID, blocked, candidate: { commit: "1".repeat(40), tree: "2".repeat(40) } }));
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519"); const pem = publicKey.export({ type: "spki", format: "pem" });
+  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference, publicKey: pem, signatureBase64: cryptoSign(null, Buffer.from(request.approvalIntent.sha256, "utf8"), privateKey).toString("base64") };
+  const authority = { kind: "po-signature", keyReference, intentSha256: request.intentSha256, proofSha256: verifyPoApprovalProof({ intent: request.approvalIntent, trustPolicy: { keyReference, publicKeySha256: hash(pem) }, proof }).proofSha256, candidateCommit: "1".repeat(40) };
+  const closed = closeSbom({ ...base, override: "accepted by signature", authority, actor: "po" });
+  mkdirSync(join(input.root, "evidence/sbom"), { recursive: true });
+  for (const file of closed.files) writeFileSync(join(input.root, file.path), file.text);
+  writeFileSync(join(input.root, "evidence/sbom/override-request.json"), `${JSON.stringify(request, null, 2)}\n`); writeFileSync(join(input.root, "evidence/sbom/override-proof.json"), `${JSON.stringify(proof, null, 2)}\n`);
+  return { closed, plan: planWith(input, { candidate: CANDIDATE, evidence: { sbomRecordPath: "evidence/sbom/record.json" } }) };
+}
+test("C28c a signed override that does not hold offline is found: other findings in the request, a key the record does not name, a missing proof", async () => {
+  const files = { "package-lock.json": LOCK, "yarn.lock": "x" };
+  const tampered = async (options, mutate = () => {}) => {
+    const input = fixture(); signedOverrideBundle(input, files, options); mutate(input);
+    const plan = planWith(input, { candidate: CANDIDATE, evidence: { sbomRecordPath: "evidence/sbom/record.json" } });
+    await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+    return (await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).findings;
+  };
+  assert.deepEqual(await tampered({}), [], "an honest signed override verifies");
+  // A request that names other findings than the record covered (it re-derives, so only the binding to the record catches it).
+  assert.ok((await tampered({ edit: (request) => createSbomOverrideRequest({ featureId: FEATURE_ID, blocked: [{ ...request.blocked[0], path: "other.lock" }], candidate: request.candidate }) })).includes("AB-SBOM-OVERRIDE"));
+  // A request that no longer re-derives from its own fields.
+  assert.ok((await tampered({ edit: (request) => ({ ...request, featureId: "another-feature" }) })).includes("AB-SBOM-OVERRIDE"));
+  // A proof whose signature does not match: replace the carried proof file's signature before the bundle is built.
+  const forged = await tampered({}, (input) => { const path = join(input.root, "evidence/sbom/override-proof.json"); const proof = JSON.parse(readFileSync(path, "utf8")); writeFileSync(path, `${JSON.stringify({ ...proof, signatureBase64: Buffer.from("forged").toString("base64") }, null, 2)}\n`); });
+  assert.ok(forged.includes("AB-SBOM-OVERRIDE"));
+  // A missing proof file is a typed gap in the plan, never a silent pass.
+  const input = fixture(); signedOverrideBundle(input, files); rmSync(join(input.root, "evidence/sbom/override-proof.json"));
+  const plan = planWith(input, { candidate: CANDIDATE, evidence: { sbomRecordPath: "evidence/sbom/record.json" } });
+  assert.ok(plan.evidence.items.some((entry) => entry.item === "sbom-override:proof" && entry.status === "gap" && entry.code === "UNREADABLE"));
+  await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  assert.ok((await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") })).findings.includes("AB-SBOM-OVERRIDE"));
 });
 test("C28c an unreadable record or a document that does not match its recorded digest is a typed gap; a damaged carried document is found offline", async () => {
   const absent = planWith(fixture(), { candidate: CANDIDATE, evidence: { sbomRecordPath: "evidence/sbom/absent.json" } });
