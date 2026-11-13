@@ -743,7 +743,15 @@ export function generateDispatchBinding(options, deps = {}) {
   const effortEscalation = options.effortEscalation;
   if (!RUNNERS.includes(runner)) refuse("DBG-RUNNER-UNKNOWN", `unknown runner ${JSON.stringify(runner)}; repair: pass --runner ${RUNNERS.join(" or ")} (default ${RUNNERS[0]}), or omit the flag for a Claude dispatch`);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/u.test(dispatchId)) refuse("DBG-DISPATCH-ID", `dispatch id ${JSON.stringify(dispatchId)} must match [A-Za-z0-9][A-Za-z0-9._:-]{0,119}`);
-  if (!/^[a-z0-9][a-z0-9-]{0,127}$/u.test(item)) refuse("DBG-ITEM-SLUG", `item slug ${JSON.stringify(item)} must be lowercase letters, digits and hyphens`);
+  if (!/^[a-z0-9][a-z0-9-]{0,127}$/u.test(item)) {
+    // Candidate 29 (AGY run 3, R6): the refusal did not say what the slug is. It is the bare item slug; the item id is derived from
+    // it as <spec folder>.<item>, so a value that already carries the folder prefix names its repair.
+    const bare = typeof item === "string" && item.includes(".") ? item.slice(item.lastIndexOf(".") + 1) : null;
+    const repair = bare !== null && /^[a-z0-9][a-z0-9-]{0,127}$/u.test(bare)
+      ? `; repair: pass --item ${bare} (the part after the dot), not the item id`
+      : "; repair: pass the bare slug of the work item, for example the slice or criterion name in lowercase";
+    refuse("DBG-ITEM-SLUG", `item slug ${JSON.stringify(item)} must be 1 to 128 lowercase letters, digits and hyphens, starting with a letter or digit. --item is the bare slug: the item id is derived as <spec folder>.<item> (with --criterion) or names the Alfred backlog item${repair}`);
+  }
   if (options.criterion !== undefined && !isCriterionId(options.criterion)) refuse("DBG-CRITERION-ID", `criterion ${JSON.stringify(options.criterion)} must be ${CRITERION_ID_FORMS}`);
   if (!AGENT_TYPES.includes(agentType)) refuse("DBG-AGENT-TYPE-UNKNOWN", `unknown agent type ${JSON.stringify(agentType)}; expected one of ${AGENT_TYPES.join(", ")}`);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(modelId)) refuse("DBG-MODEL-ID", `model id ${JSON.stringify(modelId)} is not a model identifier`);

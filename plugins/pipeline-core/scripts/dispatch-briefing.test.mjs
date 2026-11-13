@@ -380,6 +380,9 @@ const REFUSALS = [
   ["an unavailable ruleset identity", {}, [], { observePreflight: () => ({ rulesetSource: { loadedIdentity: { status: "unavailable" } } }) }, "DBG-RULESET-UNAVAILABLE", "unavailable"],
   ["a preflight without a ruleset source", {}, [], { observePreflight: () => ({ rulesetSource: null }) }, "DBG-RULESET-UNAVAILABLE", "absent"],
   ["a dispatch id carrying the binding marker", { "--dispatch-id": `X${MARKER}3` }, [], {}, "DBG-DISPATCH-ID", ""],
+  // Candidate 29 (AGY run 3, R6): an item id given as --item names the bare slug to pass instead.
+  ["an item id given as the item slug", { "--item": "feat-x.slice-a" }, [], {}, "DBG-ITEM-SLUG", "repair: pass --item slice-a"],
+  ["an item slug in capitals", { "--item": "Slice-A" }, [], {}, "DBG-ITEM-SLUG", "--item is the bare slug"],
   ["a path that escapes the repository", {}, ["--path", "../escape.mjs"], {}, "DBG-PATH-INVALID", "../escape.mjs"],
   ["an unreadable spec", { "--spec": "specs/feat-x/nope.md" }, [], {}, "DBG-SPEC-UNREADABLE", "specs/feat-x/nope.md"],
   ["no spec flag and no authority default", { "--spec": null }, [], {}, "DBG-SPEC-UNRESOLVED", "--spec"],
