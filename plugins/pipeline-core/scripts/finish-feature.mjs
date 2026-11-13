@@ -96,6 +96,24 @@ function applyBound(runner, plan, values, code, subcommand) {
   return applied;
 }
 
+/**
+ * C29 (Codex run 3, C2): the secret check of the close's generated files under specs/<feature>/ and audit-bundles/<feature>/,
+ * run before the close's irreversible State transition (security-scan.mjs --close-postimages, exit 2 = must stop). Returns the
+ * blocking scan or null. Only an explicit blocking result stops: the full scan on the frozen candidate stays the binding gate.
+ */
+export function closePostimageScanStop(runner, root, featureId) {
+  if (typeof featureId !== "string" || featureId === "") return null;
+  const out = runner(process.execPath, [SECURITY_SCAN, "--root", root, "--close-postimages", featureId]);
+  let scan = null;
+  try { scan = JSON.parse(String(out?.stdout ?? "").trim().split("\n").at(-1)); } catch { scan = null; }
+  return out?.status === 2 && scan?.blocking === true ? scan : null;
+}
+export function closePostimageScanText(scan) {
+  const named = (scan.findings ?? []).slice(0, 10).map((finding) => `${finding.path}:${finding.line} (${finding.rule})`).join(", ");
+  return scan.status === "error" ? `The secret check of the close outputs could not run: ${scan.reason}.` : `The close outputs hold ${scan.findings.length} blocking secret finding(s): ${named}.`;
+}
+const POSTIMAGE_REPAIR = "a real secret: remove it from the source the file was generated from (dispatch briefing, record or evidence) so the regenerated output no longer holds it; a reviewed public value in a generated file: put that exact path and line on the ignore route the close-feature skill names (gitleaks-repair-ignore.mjs --prepare-gate, then --approve-new), and leave the modified .gitleaksignore uncommitted, it travels in the one close commit";
+
 export function finishFeature({ rootDir = process.cwd(), by, architectureImpact, auditRequest, criticVerifyLifecycle, continuityCloseRequest = null, lifecycleId = null, resumeLifecycleId = null } = {}, deps = {}) {
   const root = (deps.realpathSyncFn ?? realpathSync)(resolve(rootDir));
   if (typeof by !== "string" || by.trim() === "") fail("FINISH-BY", "Feature close requires a non-empty --by.");
@@ -212,6 +230,11 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
     || next?.executable !== process.execPath
     || JSON.stringify(next?.argv) !== JSON.stringify(expectedCloseArgv)) {
     fail("FINISH-CLOSE-ACTION", "Coordinator did not return its exact bound close-feature action.");
+  }
+  // C29 (C2): point B, after the audit bundle exists and before the State close; a rerun replays the prepared phase without rebuilding the bundle.
+  const postimageStop = closePostimageScanStop(runner, root, featureId);
+  if (postimageStop !== null) {
+    fail("FINISH-CLOSE-POSTIMAGE-SECRET", `${closePostimageScanText(postimageStop)} The feature is still open: nothing past the prepared close was written. Repair: ${POSTIMAGE_REPAIR}; then rerun: ${rerun}`);
   }
   const closed = armStage("close-feature", () => runner(next.executable, next.argv), (out) => out?.status === 0);
   if (closed?.status !== 0) fail("FINISH-CLOSE", String(closed?.stderr ?? closed?.stdout ?? "State close failed.").trim() || "State close failed.");
@@ -620,6 +643,14 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
       try { criticVerifyLifecycle = JSON.parse(readFileSync(resolve(root, auditRequestPath), "utf8")).criticVerifyLifecycleId; } catch { criticVerifyLifecycle = undefined; }
       if (!/^[a-f0-9]{64}$/u.test(criticVerifyLifecycle ?? "")) return stopResult("resume", "ONESHOT-RESUME-REQUEST-MISSING", `The audit request ${auditRequestPath} written by the first call is missing or unreadable.`, `rerun without --resume-lifecycle-id to produce it again: ${rerunBase}`);
     }
+    // C29 (C2): point A, before the close coordinator starts: the generated evidence (dispatch projection, Critic exports, acceptance, SBOM) is checked while nothing is irreversible.
+    if (typeof featureId === "string") {
+      stages.push("close-postimage-scan");
+      const postimageStop = closePostimageScanStop(runner, root, featureId);
+      if (postimageStop !== null) {
+        return stopResult("close-postimage-scan", "ONESHOT-CLOSE-POSTIMAGE-SECRET", closePostimageScanText(postimageStop), `nothing irreversible was written (the feature is still open). ${POSTIMAGE_REPAIR}; then rerun the identical command: ${rerun(resumeLifecycleId)}`, { postimageScan: postimageStop, ...(resumeLifecycleId === null ? {} : { resumeLifecycleId, next: rerun(resumeLifecycleId) }) });
+      }
+    }
     stages.push("close");
     let closed;
     try {
@@ -641,7 +672,9 @@ export function oneShotClose({ rootDir = process.cwd(), by, architectureImpact, 
   const commitFacts = () => {
     // not rawGit: its trim() would eat the leading space of the first " M" status entry
     // C22: the calibrated handover is part of the one close commit when the close rewrote it (CGF-12).
-    const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`, ...(existsSync(resolve(root, handoverPath)) ? [handoverPath] : [])]);
+    const status = runner("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", statePath, `specs/${closedFeatureId}`, `audit-bundles/${closedFeatureId}`, ...(existsSync(resolve(root, handoverPath)) ? [handoverPath] : []),
+      // C29 (C2): an ignore line added on the close's postimage stop travels in the same one close commit, so the freeze and the final scan see it.
+      ...(existsSync(resolve(root, ".gitleaksignore")) ? [".gitleaksignore"] : [])]);
     const tokens = (status?.status === 0 ? String(status.stdout ?? "") : "").split("\0").filter((token) => token !== "");
     const paths = []; for (let index = 0; index < tokens.length; index += 1) { const code = tokens[index].slice(0, 2); paths.push(tokens[index].slice(3)); if (/[RC]/u.test(code)) index += 1; }
     paths.sort();

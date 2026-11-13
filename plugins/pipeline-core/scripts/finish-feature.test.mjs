@@ -22,11 +22,14 @@ function closeAction(criticVerifyLifecycle) {
     "--coordinator-lifecycle", "feature-abc", "--coordinator-sha256", "a".repeat(64),
     "--critic-verify-lifecycle", criticVerifyLifecycle] };
 }
+const POSTIMAGE_PASS = { status: 0, stdout: "{\"schema\":\"pipeline.close-postimage-scan.v1\",\"status\":\"pass\",\"blocking\":false,\"findings\":[]}\n", stderr: "" };
+const POSTIMAGE_BLOCK = { status: 2, stdout: "{\"schema\":\"pipeline.close-postimage-scan.v1\",\"status\":\"findings\",\"blocking\":true,\"findings\":[{\"rule\":\"generic-api-key\",\"path\":\"audit-bundles/feature-abc/dispatch-records/briefing-copy.json\",\"line\":7}]}\n", stderr: "" };
 function fixture() {
   const criticVerifyLifecycle = "b".repeat(64);
   const calls = [];
   let phase = 0;
   const runner = (executable, argv) => {
+    if (argv.includes("--close-postimages")) return POSTIMAGE_PASS; // C29 (C2): the postimage secret check, not part of the call order asserted below
     calls.push([executable, argv]);
     if (argv[0].endsWith("pipeline-state.mjs")) return { status: 0, stdout: "Feature closed", stderr: "" };
     const sub = argv[1];
@@ -60,6 +63,18 @@ test("one-shot driver CAS-plans every close transition then invokes only the bou
   assert.equal(f.calls.at(-1)[1][1], "close-feature");
 });
 
+test("C29-C2: a blocking secret in the close outputs stops before the State close (point B); the feature stays open and the rerun resumes", () => {
+  const f = fixture();
+  const runner = (executable, argv) => (argv.includes("--close-postimages") ? POSTIMAGE_BLOCK : f.runner(executable, argv));
+  assert.throws(() => finishFeature({ rootDir: "/repo", by: "PO", architectureImpact: "no-architecture-impact", auditRequest: "specs/feature/audit-request.json", criticVerifyLifecycle: f.criticVerifyLifecycle, lifecycleId: "feature-abc" }, {
+    realpathSyncFn: value => value,
+    readFileSyncFn: () => JSON.stringify({ activeFeature: { id: "feature-abc" } }),
+    runCommand: runner,
+  }), (error) => error.code === "FINISH-CLOSE-POSTIMAGE-SECRET" && error.lifecycleId === "feature-abc"
+    && /briefing-copy\.json:7 \(generic-api-key\)/u.test(error.message) && /--resume-lifecycle-id feature-abc/u.test(error.message) && /gitleaks-repair-ignore\.mjs/u.test(error.message));
+  assert.equal(f.calls.some(([, argv]) => argv[1] === "close-feature"), false, "the State close never ran");
+});
+
 test("resume from a checkpoint reuses the same lifecycle without repeating start or checkpoint effects", () => {
   const f = fixture();
   const runner = (executable, argv) => argv[1] === "inspect"
@@ -79,6 +94,7 @@ test("resume of a prepared close uses only its recorded operation digest and one
   const digest = "d".repeat(64);
   const calls = [];
   const runner = (executable, argv) => {
+    if (argv.includes("--close-postimages")) return POSTIMAGE_PASS;
     calls.push(argv);
     if (argv[1] === "inspect") return response({ identity: { lifecycleId: "feature-abc", featureId: "feature-abc" }, coordinator: { phase: "feature-close-prepared", architectureImpact: "no-architecture-impact", featureCloseAudit: { criticVerifyLifecycleId: f.criticVerifyLifecycle }, effects: [{ operationSha256: digest }] } });
     if (argv[1] === "apply-transition") return response({ status: "replayed", stateSha256: "a".repeat(64), nextAction: closeAction(f.criticVerifyLifecycle) });
@@ -260,7 +276,7 @@ const STATE_WRITER = new URL("./pipeline-state.mjs", import.meta.url).pathname;
 // C22 (CGR-06, restated in place, QG-04): the one-shot now asks the human once before its irreversible part, so every fixture input carries the
 // human's recorded answer unless a case sets `acceptance: false` to examine the question itself. `handover` / `telemetry` seed the files the
 // tracked-effects digest reads; with neither, no handover writer is called and the call lists of the existing cases stay as they were.
-function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null } = {}) {
+function oneShotFixture({ continuity = false, resultBound = true, verifyRed = false, securityBlocking = false, packetOnDisk = true, startPhase = null, closed = false, acknowledgementMissing = false, addendaWritten = false, acceptance = true, handover = false, telemetry = false, criticStanding = { status: "passed" }, residualOnRecord = false, language = null, postimageBlocking = false } = {}) {
   const independenceChecks = []; let retired = false;
   const root = realpathSync(mkdtempSync(join(tmpdir(), "one-shot-close-")));
   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
@@ -286,6 +302,7 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
     if (script === "close-coordinator.mjs" && sub === "critic-standing") return json(criticStanding);
     if (script === "close-coordinator.mjs" && sub === "critic-independence") { independenceChecks.push(flag(argv, "--packet")); return json(acknowledgementMissing ? { status: "acknowledgement-required", code: "CLOSE-CRITIC-CALLER-AUTHORED", message: "authored by the calling agent; record it with approve-critic-acknowledgement" } : { status: "satisfied" }); }
     if (script === "close-coordinator.mjs" && sub === "critic-addenda") return json(addendaPending ? { status: "written", commitPaths: ["specs/feature-abc/evidence/critic-addendum-r1.json"], subject: "chore(evidence): bind the Critic course to the delivery records", message: "written" } : { status: "none" });
+    if (script === "security-scan.mjs" && argv.includes("--close-postimages")) { calls.push("security-scan.mjs --close-postimages"); return postimageBlocking ? POSTIMAGE_BLOCK : POSTIMAGE_PASS; }
     calls.push(script === "verify-evidence-producer.mjs" || script === "security-scan.mjs" || script === "register-feature-package.mjs" ? script : `${script.replace(".mjs", "")} ${sub}`);
     if (script === "verify-evidence-producer.mjs") {
       if (verifyRed) return { status: 2, stdout: "", stderr: "verify-evidence-producer: VEP-FAILED: suite red\n" };
@@ -327,13 +344,31 @@ function oneShotFixture({ continuity = false, resultBound = true, verifyRed = fa
 }
 const forbidden = (calls) => calls.filter((call) => /approve-push|authorize|sign|push|release/u.test(call));
 
+test("C29-C2: a blocking secret in the generated close outputs stops the one-shot before the close coordinator starts (point A)", () => {
+  const f = oneShotFixture({ postimageBlocking: true });
+  try {
+    const result = oneShotClose(f.input, { runCommand: f.runner });
+    assert.equal(result.status, "stopped", JSON.stringify(result).slice(0, 400));
+    assert.equal(result.stage, "close-postimage-scan");
+    assert.equal(result.stop.code, "ONESHOT-CLOSE-POSTIMAGE-SECRET");
+    assert.match(result.stop.reason, /briefing-copy\.json:7 \(generic-api-key\)/u);
+    assert.match(result.stop.repair, /nothing irreversible was written/u);
+    assert.equal(result.postimageScan.blocking, true);
+    assert.equal(f.calls.some((call) => call.startsWith("close-coordinator") || call === "pipeline-state close-feature"), false, "no close transition ran");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("P3: one command takes the active feature from the approved candidate to the printed commit, and signs and pushes nothing", () => {
   const f = oneShotFixture();
   try {
     const result = oneShotClose(f.input, { runCommand: f.runner });
     assert.equal(result.status, "commit-required", JSON.stringify(result).slice(0, 400));
+    assert.ok(result.stages.includes("close-postimage-scan"));
     assert.deepEqual(f.calls, ["verify-evidence-producer.mjs", "register-feature-package.mjs", "pipeline-state feature-package-plan", "pipeline-state feature-package-apply", "pipeline-state feature-package-plan", "pipeline-state feature-package-apply",
-      "close-coordinator plan-start", "close-coordinator apply-start", "close-coordinator plan-transition", "close-coordinator apply-transition", "close-coordinator plan-transition", "close-coordinator apply-transition", "pipeline-state close-feature",
+      // C29 (C2): the close outputs are secret-checked before the coordinator starts (A) and again, with the audit bundle, before the State close (B).
+      "security-scan.mjs --close-postimages",
+      "close-coordinator plan-start", "close-coordinator apply-start", "close-coordinator plan-transition", "close-coordinator apply-transition", "close-coordinator plan-transition", "close-coordinator apply-transition",
+      "security-scan.mjs --close-postimages", "pipeline-state close-feature",
       // P3: the one-shot reads the coordinator's phase once after the State close (inspect) before it finalizes the tracked effects; the stage order is otherwise as written.
       "close-coordinator inspect", "close-coordinator plan-transition", "close-coordinator apply-transition"]);
     assert.deepEqual(forbidden(f.calls), []);

@@ -96,7 +96,7 @@
  *
  * CLI: `node plugins/pipeline-core/scripts/security-scan.mjs [--root <dir>] [--timeout-ms N]`.
  */
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
@@ -1347,6 +1347,72 @@ function printSummary(evidence, critical = false, exceptions = null) {
 // CLI
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * C29 (Codex run 3, C2): the secret check of the close's own generated files BEFORE the close's irreversible state
+ * transition. The full scan runs only on the frozen candidate after the close commit, so a finding in a generated
+ * close artifact (a briefing copy in the audit bundle) used to surface after the state and the acceptance were written.
+ * This scans exactly the changed and untracked files under specs/<feature>/ and audit-bundles/<feature>/ (a copy
+ * under scratch/, with the root .gitleaksignore, so the reviewed ignore route applies unchanged) with the gitleaks
+ * adapter, and decides blocking the way the full scan does: a finding at a block_on severity or a scanner ERROR
+ * blocks unless the security gate mode is warn or off; a missing scanner is coverage (SKIPPED), not blocking.
+ * Output carries path, rule and line only, never a matched value.
+ */
+export async function scanClosePostimages({ rootDir, featureId, env = process.env, spawnFn, platform = process.platform, timeoutMs = DEFAULT_TIMEOUT_MS, gitStatusFn } = {}) {
+  const root = resolve(rootDir);
+  const authority = resolveProjectAuthorityPaths({ rootDir: root });
+  const authorityBlocked = new Set(["mixed", "invalid"]).has(authority.status);
+  const manifest = authorityBlocked ? null : loadManifestSafe(root, authority.status === "ready" ? { manifestRelPath: authority.manifest } : undefined);
+  const mode = resolveSecurityGateMode(manifest);
+  const blocks = mode !== "warn" && mode !== "off";
+  const blockOn = resolveBlockOn(manifest);
+  const base = { schema: "pipeline.close-postimage-scan.v1", featureId, mode };
+  if (!/^[A-Za-z0-9._-]{1,128}$/u.test(featureId ?? "")) return { ...base, status: "error", blocking: true, reason: "feature id is missing or invalid", scanned: 0, findings: [] };
+  if (authorityBlocked) return { ...base, status: "error", blocking: blocks, reason: `project authority is ${authority.status}`, scanned: 0, findings: [] };
+  const status = (gitStatusFn ?? ((args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false })))(["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", `specs/${featureId}`, `audit-bundles/${featureId}`]);
+  if (status?.status !== 0) return { ...base, status: "error", blocking: blocks, reason: "git status of the close outputs could not be read", scanned: 0, findings: [] };
+  const tokens = String(status.stdout ?? "").split("\0").filter((token) => token !== "");
+  const files = [];
+  for (let index = 0; index < tokens.length; index += 1) {
+    const code = tokens[index].slice(0, 2);
+    if (!code.includes("D")) files.push(tokens[index].slice(3));
+    if (/[RC]/u.test(code)) index += 1;
+  }
+  const scanned = [...new Set(files)].sort();
+  if (!isScannerEnabled(manifest, "gitleaks")) return { ...base, status: "not-enabled", blocking: false, scanned: scanned.length, findings: [] };
+  if (scanned.length === 0) return { ...base, status: "nothing-to-scan", blocking: false, scanned: 0, findings: [] };
+  let inst = gitleaksAdapter.isInstalled(env);
+  if (inst.installed) {
+    const assessed = assessTrustedExecutablePath(inst.path, { platform });
+    inst = assessed.ok ? { installed: true, path: assessed.path } : { installed: false, status: assessed.status };
+  }
+  if (!inst.installed && typeof env?.HOME === "string" && env.HOME.length > 0) {
+    const trusted = resolveTrustedSystemExecutable("gitleaks", { platform, homeDir: env.HOME });
+    if (trusted.ok) inst = { installed: true, path: trusted.path };
+  }
+  if (!inst.installed) return { ...base, status: "scanner-missing", blocking: false, scanned: scanned.length, findings: [] };
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  const copy = mkdtempSync(join(root, "scratch", "close-postimage-scan-"));
+  try {
+    for (const relativePath of [...scanned, ".gitleaksignore"]) {
+      const source = join(root, relativePath);
+      if (!existsSync(source) || !statSync(source).isFile()) continue;
+      const target = join(copy, relativePath);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, readFileSync(source));
+    }
+    const runArgs = { rootDir: copy, config: { binaryPath: inst.path }, timeoutMs, env };
+    if (spawnFn) runArgs.spawnFn = spawnFn;
+    const result = await gitleaksAdapter.run(runArgs);
+    if (result.status === "ERROR") return { ...base, status: "error", blocking: blocks, reason: String(result.reason ?? "gitleaks error").slice(0, 300), scanned: scanned.length, findings: [] };
+    const retained = Array.isArray(result.findings) ? result.findings : [];
+    const findings = retained.map((finding) => ({ rule: finding.rule, path: finding.path, line: finding.line }));
+    const blocking = blocks && blockingFindings(retained, blockOn).length > 0;
+    return { ...base, status: findings.length > 0 ? "findings" : "pass", blocking, scanned: scanned.length, findings };
+  } finally {
+    rmSync(copy, { recursive: true, force: true });
+  }
+}
+
 function parseArgs(argv) {
   const opts = { root: process.cwd(), timeoutMs: DEFAULT_TIMEOUT_MS };
   for (let i = 0; i < argv.length; i++) {
@@ -1363,6 +1429,9 @@ function parseArgs(argv) {
     } else if (a === "--out-dir") {
       opts.outDir = argv[++i];
       if (!opts.outDir || opts.outDir.startsWith("-")) throw new Error("--out-dir requires a directory under scratch/");
+    } else if (a === "--close-postimages") {
+      opts.closePostimages = argv[++i];
+      if (!opts.closePostimages || opts.closePostimages.startsWith("-")) throw new Error("--close-postimages requires the feature id");
     } else if (a === "--remote") {
       opts.remoteName = argv[++i];
       if (!opts.remoteName || opts.remoteName.startsWith("-")) throw new Error("--remote requires a configured remote name");
@@ -1390,6 +1459,14 @@ export async function main(argv = process.argv.slice(2)) {
   if (!existsSync(rootDir)) {
     process.stderr.write(`error: --root path does not exist: ${rootDir}\n`);
     process.exitCode = 1;
+    return;
+  }
+
+  if (opts.closePostimages !== undefined) {
+    // C29 (C2): one JSON line; exit 2 when the close must stop before its state transition, else 0. Writes no evidence file.
+    const scan = await scanClosePostimages({ rootDir, featureId: opts.closePostimages, timeoutMs: opts.timeoutMs });
+    process.stdout.write(`${JSON.stringify(scan)}\n`);
+    process.exitCode = scan.blocking ? 2 : 0;
     return;
   }
 
