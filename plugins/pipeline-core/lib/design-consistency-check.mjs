@@ -5,7 +5,7 @@
  *
  *   W  the requirement register is reconciled against `traceability.md`;
  *   Y  an undeclared register (no sidecar) is a visible skip, never a finding;
- *   Z  after a round-2 (delta) review receipt, later source drift is a visible
+ *   Z  after a delta review receipt (round 2 or later), later source drift is a visible
  *      `review.unreviewedSourceDelta` the PO may sign over knowingly; after a round-1
  *      receipt the same drift stays a binding inconsistency.
  *
@@ -70,7 +70,11 @@ const REGISTER_IDS_MAX = 64;
 const COMPANIONS_MAX = 64;
 const FINDING_IDS_MAX = 64;
 const SAFE_PATH_MAX = 240;
-const MAX_REVIEW_ROUNDS = 2;
+// L3 (PO decision 2026-11-13, amending ADR-0085): delta rounds continue until the review passes; this is only the
+// structural bound on the chain length (the receipt module's DESIGN_REVIEW_MAX_ROUNDS), not a review policy.
+const MAX_REVIEW_ROUNDS = 64;
+// The optional summary key of a delta over unchanged documents that only withdraws earlier findings (PO decision 2026-11-09).
+const WITHDRAWN_KEY = "withdrawnFindingIds";
 
 const INPUT_KEYS = ["submission", "prdBytes", "specBytes", "companions", "traceability", "register", "pathStates", "reviewReceipts"];
 const SOURCES_ARGUMENT_KEYS = ["submission", "prdBytes", "specBytes", "companions", "pathStates"];
@@ -217,7 +221,13 @@ function assertSourceSet(set, label, allowNull) {
 function assertSummary(summary) {
   // K128: `fallback` is the one optional key (present only when the review ran on the typed fallback route).
   const hasFallback = isObject(summary) && Object.hasOwn(summary, "fallback");
-  if (!hasExactKeys(summary, hasFallback ? [...SUMMARY_KEYS, "fallback"] : SUMMARY_KEYS)) fail("a review receipt summary must carry exactly the ReceiptSummary keys");
+  const hasWithdrawn = isObject(summary) && Object.hasOwn(summary, WITHDRAWN_KEY);
+  if (!hasExactKeys(summary, [...SUMMARY_KEYS, ...(hasFallback ? ["fallback"] : []), ...(hasWithdrawn ? [WITHDRAWN_KEY] : [])])) fail("a review receipt summary must carry exactly the ReceiptSummary keys");
+  if (hasWithdrawn) {
+    const withdrawn = summary[WITHDRAWN_KEY];
+    if (summary.kind !== "delta" || !Array.isArray(withdrawn) || withdrawn.length === 0 || withdrawn.length > FINDING_IDS_MAX || !withdrawn.every(isRequirementId)
+      || new Set(withdrawn).size !== withdrawn.length || !Array.isArray(summary.openFindingIds) || withdrawn.some((id) => summary.openFindingIds.includes(id))) fail("a review receipt summary withdrawnFindingIds is malformed");
+  }
   if (hasFallback && !(hasExactKeys(summary.fallback, ["observedIdentity", "reasonCode", "requestedRoute", "route"])
     && Object.values(summary.fallback).every((value) => typeof value === "string"))) fail("a review receipt summary fallback is malformed");
   if (typeof summary.path !== "string" || !isSha(summary.sha256)) fail("a review receipt summary path or digest is malformed");
@@ -227,7 +237,7 @@ function assertSummary(summary) {
   if (summary.kind === "initial") {
     if (summary.round !== 1 || linkPath !== null || linkSha !== null) fail("an initial receipt summary is round 1 without a previous link");
   } else if (summary.kind === "delta") {
-    if (summary.round !== 2 || typeof linkPath !== "string" || !isSha(linkSha)) fail("a delta receipt summary is round 2 with a previous link");
+    if (!Number.isSafeInteger(summary.round) || summary.round < 2 || summary.round > MAX_REVIEW_ROUNDS || typeof linkPath !== "string" || !isSha(linkSha)) fail("a delta receipt summary is round 2 or later with a previous link");
   } else {
     fail("a review receipt summary kind must be initial or delta");
   }
@@ -368,21 +378,27 @@ function analyzeReviewChain(featureId, receipts, currentSources) {
     entries.push(makeEntry("DCC-REVIEW-ROUND-EXCEEDED", { observed: String(receipts.length) }));
     return { entries, stopped: true };
   }
-  const [first, second] = receipts;
+  const [first] = receipts;
   if (first.kind !== "initial") entries.push(makeEntry("DCC-REVIEW-DELTA-CHAIN", { path: first.path }));
-  if (second !== undefined) {
-    const brokenLink = second.kind !== "delta"
-      || second.previousReceiptSha256 !== first.sha256
-      || second.previousReceiptPath !== first.path
-      || second.sources.prd.path !== first.sources.prd.path
-      || second.sources.spec.path !== first.sources.spec.path;
+  // L3: every later receipt is the delta of the one before it (round = position), linked by path and digest.
+  for (let index = 1; index < receipts.length; index += 1) {
+    const earlier = receipts[index - 1];
+    const later = receipts[index];
+    const brokenLink = later.kind !== "delta"
+      || later.round !== index + 1
+      || later.previousReceiptSha256 !== earlier.sha256
+      || later.previousReceiptPath !== earlier.path
+      || later.sources.prd.path !== earlier.sources.prd.path
+      || later.sources.spec.path !== earlier.sources.spec.path;
     if (brokenLink) {
-      entries.push(makeEntry("DCC-REVIEW-DELTA-CHAIN", { path: second.path, expected: first.sha256, observed: second.previousReceiptSha256 }));
+      entries.push(makeEntry("DCC-REVIEW-DELTA-CHAIN", { path: later.path, expected: earlier.sha256, observed: later.previousReceiptSha256 }));
     }
-    if (canonical(second.sources) === canonical(first.sources)) entries.push(makeEntry("DCC-REVIEW-DELTA-CHAIN"));
+    // Unchanged sources are a delta only when it withdraws findings of the round before and adds none (PO decision 2026-11-09);
+    // the receipt producer enforces that rule, this check only admits the closed record of it.
+    if (canonical(later.sources) === canonical(earlier.sources) && !Object.hasOwn(later, WITHDRAWN_KEY)) entries.push(makeEntry("DCC-REVIEW-DELTA-CHAIN"));
   }
   const latest = receipts[receipts.length - 1];
-  // Decision Z: drift after a round-2 (delta) receipt is a visible delta, not an inconsistency.
+  // Decision Z: drift after a delta receipt (round 2 or later) is a visible delta, not an inconsistency.
   // A byte-identical feature-directory rebind is accepted beside canonical equality, never instead of it.
   if (latest.kind === "initial" && canonical(latest.sources) !== canonical(currentSources) && chainRebind(receipts, currentSources) === null) {
     entries.push(makeEntry("DCC-REVIEW-RECEIPT-BINDING", {

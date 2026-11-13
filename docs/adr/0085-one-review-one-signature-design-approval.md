@@ -106,3 +106,33 @@ directory (T25).
 - The consistency check fails with a typed code on a stale marker, a count
   mismatch or an untracked bound path, and passes otherwise; it never returns a
   content finding.
+
+## Amendment 2026-11-13: delta rounds until pass, no signature over an open review (D246)
+
+Accepted by PO tiles of 2026-11-13 (Claude test run 3, finding L3: a design
+approval was signed over a readiness review that was not ready). Decision step 4
+above ("at most one delta follow-up") is replaced; everything else stands.
+
+1. **Delta rounds until pass.** While the latest review round leaves findings
+   open, the next round is a delta review (a fresh reviewer, only the open
+   findings and what changed), chained to the round before by path and digest.
+   There is no round cap, like the Critic since D190. `DESIGN_REVIEW_MAX_ROUNDS`
+   (64) remains only as the structural bound on the chain length (bounded
+   input), not a review policy. A delta over unchanged documents may only
+   withdraw findings of the round before (PO decision 2026-11-09); such a
+   receipt is a valid link of the chain.
+2. **No presentation over an open review.** `present-plan` refuses with
+   `PLAN-DESIGN-REVIEW-OPEN` while the latest receipt is `open-findings`, names
+   the open ids and the delta route, and writes no request. This is a
+   presentation gate only: the pure binding and receipt modules do not refuse on
+   the verdict, so an approval already signed over open findings keeps
+   verifying, and the stored-approval and rebind readers are unchanged.
+3. **Decision Z is kept.** A source change after a passing delta round is still
+   carried as `unreviewedSourceDelta`, which the PO signs knowingly; it now
+   applies after any delta round (round 2 or later), not only after round 2.
+   After an initial round alone the same drift stays a review-chain refusal.
+4. **Reviewer model:** the PO also chose that the receipt's reviewer model is
+   host-observed from the review dispatch; that part is built separately and is
+   not decided by this amendment.
+
+Bindings over one or two receipts are byte-identical to before.

@@ -5,8 +5,10 @@
  * A receipt is the committed, byte-identical record of one design review round:
  * which sources (PRD, Spec, companions) were reviewed, by which reviewer, against
  * which report, and with which complete set of open findings. Round 1 is an
- * `initial` receipt; round 2 is a `delta` receipt chained to round 1 by path and
- * digest. There is no round 3 (DESIGN_REVIEW_MAX_ROUNDS).
+ * `initial` receipt; every later round is a `delta` receipt chained to the round before it
+ * by path and digest. Delta rounds continue until the review passes (PO decision 2026-11-13,
+ * L3, amending ADR-0085); DESIGN_REVIEW_MAX_ROUNDS is only the structural bound on the chain
+ * length (bounded input), not a review policy.
  *
  * The module is pure: no filesystem, no git, no clock (the caller supplies
  * `reviewedAt` and every byte). Receipt bytes are exactly `canonical(receipt)` plus
@@ -22,10 +24,9 @@ import { createHash } from "node:crypto";
 import { canonical } from "./po-approval-proof.mjs";
 
 export const DESIGN_REVIEW_RECEIPT_SCHEMA = "pipeline.design-review-receipt.v1";
-export const DESIGN_REVIEW_MAX_ROUNDS = 2;
+export const DESIGN_REVIEW_MAX_ROUNDS = 64;
 export const DESIGN_REVIEW_RECEIPT_MAX_BYTES = 65536;
 
-const DELTA_ROUND = 2;
 const MAX_COMPANIONS = 64;
 const MAX_FINDING_IDS = 64;
 const MAX_FINDING_ID_LENGTH = 80;
@@ -204,7 +205,7 @@ function receiptRefusal(receipt) {
   if (receipt.round > DESIGN_REVIEW_MAX_ROUNDS) return "DRR-ROUND-EXCEEDED";
   const withoutPrevious = previousReceiptPath === null && previousReceiptSha256 === null;
   const withPrevious = previousReceiptPath !== null && previousReceiptSha256 !== null;
-  const consistent = receipt.kind === "initial" ? receipt.round === 1 && withoutPrevious : receipt.round === DELTA_ROUND && withPrevious;
+  const consistent = receipt.kind === "initial" ? receipt.round === 1 && withoutPrevious : receipt.round >= 2 && withPrevious;
   return consistent ? null : "DRR-KIND-ROUND";
 }
 
@@ -212,7 +213,7 @@ function receiptRefusal(receipt) {
 
 /**
  * Parse receipt file bytes. Refusal order: SIZE, JSON, NONCANONICAL, SHAPE, PATH, SOURCES,
- * FINDING-IDS, VERDICT, ROUND-EXCEEDED (round above 2), KIND-ROUND.
+ * FINDING-IDS, VERDICT, ROUND-EXCEEDED (round above the structural bound), KIND-ROUND.
  * @param {Uint8Array} bytes
  * @returns {{ ok: true, receipt: object, sha256: string } | { ok: false, code: string }}
  */
@@ -335,7 +336,7 @@ export function assessSpecDecisionContinuity(specBytes) {
 /**
  * Build a receipt and its canonical bytes. Sorts finding IDs and companions (code-unit order),
  * rejects duplicates, derives the verdict. `previous: null` makes an initial receipt;
- * `previous: { path, bytes }` makes the round-2 delta receipt chained to it.
+ * `previous: { path, bytes }` makes the next delta receipt (previous round plus one) chained to it.
  * @returns {{ ok: true, receipt: object, bytes: Uint8Array, sha256: string } | { ok: false, code: string }}
  */
 export function createDesignReviewReceipt(input) {
@@ -384,7 +385,7 @@ export function createDesignReviewReceipt(input) {
       withdrawnFindingIds = withdrawn;
     }
     kind = "delta";
-    round = DELTA_ROUND;
+    round = earlier.round + 1;
     previousReceiptPath = previous.path;
     previousReceiptSha256 = parsed.sha256;
   }
@@ -459,19 +460,20 @@ export function summarizeDesignReviewReceipt(input) {
 /**
  * Compare the sources a receipt was written against with the current sources. Equal canonical
  * forms pass. Any difference (digest, path, added, removed or absent companion) is
- * DRR-SOURCE-DRIFT; `nextRound` is 2 after an initial receipt and null after a delta (PO-Q2
- * option b leaves this module unchanged). Malformed input drifts rather than passes.
+ * DRR-SOURCE-DRIFT; `nextRound` is the receipt's round plus one (L3: a delta may follow any
+ * round), null for a malformed summary or at the structural bound. Malformed input drifts
+ * rather than passes.
  *
  * Purpose: a strict "does this receipt still describe the current sources" check. It is NOT
  * what `present-plan` uses: after a delta receipt, `createDesignApprovalBinding`
  * (design-approval-binding.mjs) carries a later source change into the approval as
- * `unreviewedSourceDelta` for the PO to sign knowingly, so `nextRound: null` is not a dead end.
- * @returns {{ ok: true } | { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: 2 | null }}
+ * `unreviewedSourceDelta` for the PO to sign knowingly (decision Z, kept by L3).
+ * @returns {{ ok: true } | { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: number | null }}
  */
 export function checkDesignReviewReceiptSources(input) {
   const summary = isObject(input) ? input.summary : undefined;
   const currentSources = isObject(input) ? input.currentSources : undefined;
   if (isObject(summary) && sameSources(summary.sources, currentSources)) return { ok: true };
-  const afterInitial = isObject(summary) && summary.kind === "initial" && summary.round === 1;
-  return { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: afterInitial ? DELTA_ROUND : null };
+  const round = isObject(summary) && Number.isSafeInteger(summary.round) && summary.round >= 1 ? summary.round : null;
+  return { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: round !== null && round < DESIGN_REVIEW_MAX_ROUNDS ? round + 1 : null };
 }

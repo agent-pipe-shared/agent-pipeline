@@ -169,7 +169,7 @@ test("A8 legacy repair consumers stay exported and callable (nothing deleted, no
 // revision (delta receipt, rebind, one request) is pinned by revised-native-design-cannot-reach-a-new-advisor-course (v);
 // command admission of the initial and delta receipt spellings by the D64 walk (lifecycle-coordination-commands-refused-as-
 // implementation-writes). What neither runs is the whole revision chain through the real guards: reopen-design, submit-plan,
-// the delta receipt producer, and the present-plan that carries BOTH receipts (the CLI accepts one or two).
+// the delta receipt producer, and the present-plan that carries BOTH receipts (the CLI accepts the whole chain, L3).
 // Real lifecycle-ready guard plus real dev-plan shell lane; the recording seam answers `ineligible`, so a refusal is a refusal.
 async function revisionChainSteps(f, hooks, { receiptCount }) {
   const { PIPELINE_STATE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT } = await import("../guard/constants.mjs");
@@ -223,11 +223,12 @@ test("A10 revision path (single-review route): the reopen-design preview, submit
     assert.deepEqual(admitted.filter((s) => s.code !== 0 || s.lane !== null).map((s) => `${s.label}: guard exit ${s.code}${s.lane ? `, lane ${s.lane}` : ""}; ${s.stderr}`), [],
       "a revision-path command is refused by a real guard");
     assert.equal(admitted.length, 4);
-    // Control: the CLI takes one or two receipts; a third is not part of the route and must not be admitted by the same lane.
+    // L3 (PO decision 2026-11-13, delta rounds until pass): a third receipt is part of the route, so the guards admit the argv
+    // shape; whether the three files form a chain is the writer's check (DCC-REVIEW-DELTA-CHAIN, design-consistency-check.test.mjs).
     const g = hooks.fixture("feature");
     try {
       const three = await revisionChainSteps(g, hooks, { receiptCount: 3 });
-      assert.equal(three.at(-1).code !== 0 || three.at(-1).lane !== null, true, "present-plan with a third receipt is refused");
+      assert.deepEqual([three.at(-1).code, three.at(-1).lane], [0, null], `present-plan with a third receipt is admitted by the guards: ${three.at(-1).stderr}`);
     } finally { g.cleanup(); }
   } finally { f.cleanup(); }
 });

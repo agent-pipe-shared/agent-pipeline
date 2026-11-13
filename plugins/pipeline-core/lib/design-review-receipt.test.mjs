@@ -145,7 +145,8 @@ const SAFE_240 = `specs/${"a".repeat(231)}.md`;
 
 test("U2-1: exports the contract constants and the four functions", () => {
   assert.equal(DESIGN_REVIEW_RECEIPT_SCHEMA, "pipeline.design-review-receipt.v1");
-  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 2);
+  // L3 (PO decision 2026-11-13): delta rounds until pass; the constant is the structural chain bound only.
+  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 64);
   assert.equal(DESIGN_REVIEW_RECEIPT_MAX_BYTES, 65536);
   for (const fn of [createDesignReviewReceipt, parseDesignReviewReceipt, summarizeDesignReviewReceipt, checkDesignReviewReceiptSources]) {
     assert.equal(typeof fn, "function");
@@ -512,8 +513,9 @@ test("U2-10: a consistent initial and a consistent delta parse", () => {
   assert.equal(parse(deltaObject()).ok, true);
 });
 
-test("U2-10: a round above 2 is DRR-ROUND-EXCEEDED at parse", () => {
-  for (const round of [3, 4, 99]) {
+test("L3: a delta of any round from 2 up to the structural bound parses; above it is DRR-ROUND-EXCEEDED", () => {
+  for (const round of [3, 4, 64]) assert.equal(parse(deltaObject({ round })).ok, true, `round ${round}`);
+  for (const round of [65, 99]) {
     assert.deepStrictEqual(parse(deltaObject({ round })), refuse("DRR-ROUND-EXCEEDED"), `round ${round}`);
   }
 });
@@ -613,19 +615,31 @@ test("PO 2026-11-09: a delta over changed sources carries no withdrawal field", 
 
 // ------------------------------------------------------------------ U2-13
 
-test("U2-13: a delta on a delta is DRR-ROUND-EXCEEDED, even when the sources changed", () => {
+test("L3: a delta on a delta is round 3, chained to round 2 (delta rounds until pass)", () => {
   const previous = previousOf(deltaObject(), RECEIPT2_PATH);
   const sources = sourcesWith((s) => { s.companions[0].sha256 = sha("design-3"); }, SOURCES_2);
   const report = { path: "specs/feat-x/review/design-review-3.md", sha256: sha("report-3") };
-  assert.deepStrictEqual(create({ previous, sources, report }), refuse("DRR-ROUND-EXCEEDED"));
+  const result = create({ previous, sources, report });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepStrictEqual([result.receipt.kind, result.receipt.round, result.receipt.previousReceiptPath, result.receipt.previousReceiptSha256],
+    ["delta", 3, RECEIPT2_PATH, sha(previous.bytes)]);
 });
 
-test("U2-13: ROUND-EXCEEDED is decided before the chain and unchanged checks of create", () => {
+test("L3: a delta on a round-2 receipt keeps the chain and unchanged checks of create", () => {
   const report = { path: "specs/feat-x/review/design-review-3.md", sha256: sha("report-3") };
   const otherFeature = previousOf(deltaObject({ featureId: "feat-y" }), RECEIPT2_PATH);
-  assert.deepStrictEqual(create({ previous: otherFeature, sources: clone(SOURCES_2), report }), refuse("DRR-ROUND-EXCEEDED"), "previous is a round-2 receipt of another feature");
+  assert.deepStrictEqual(create({ previous: otherFeature, sources: clone(SOURCES_2), report }), refuse("DRR-DELTA-CHAIN"), "previous is a round-2 receipt of another feature");
   const identical = previousOf(deltaObject(), RECEIPT2_PATH);
-  assert.deepStrictEqual(create({ previous: identical, sources: clone(SOURCES_2), report }), refuse("DRR-ROUND-EXCEEDED"), "previous is a round-2 receipt over identical sources");
+  assert.deepStrictEqual(create({ previous: identical, sources: clone(SOURCES_2), report, openFindingIds: ["F-3"] }), refuse("DRR-DELTA-UNCHANGED"), "previous is a round-2 receipt over identical sources, nothing withdrawn");
+  const withdrawn = create({ previous: identical, sources: clone(SOURCES_2), report, openFindingIds: [] });
+  assert.equal(withdrawn.ok, true, JSON.stringify(withdrawn));
+  assert.deepStrictEqual([withdrawn.receipt.round, withdrawn.receipt.verdict, withdrawn.receipt.withdrawnFindingIds], [3, "pass", ["F-3"]], "a round-3 delta over identical sources may withdraw round 2's finding");
+});
+
+test("L3: only a receipt at the structural bound refuses a further round (DRR-ROUND-EXCEEDED, before the chain checks)", () => {
+  const report = { path: "specs/feat-x/review/design-review-65.md", sha256: sha("report-65") };
+  const atBound = previousOf(deltaObject({ round: 64, featureId: "feat-y" }), RECEIPT2_PATH);
+  assert.deepStrictEqual(create({ previous: atBound, sources: clone(SOURCES_2), report }), refuse("DRR-ROUND-EXCEEDED"));
 });
 
 // ------------------------------------------------------------------ U2-14
@@ -692,12 +706,14 @@ test("U2-15: drift after an initial receipt is DRR-SOURCE-DRIFT with nextRound 2
   }
 });
 
-test("U2-15: drift after a delta is DRR-SOURCE-DRIFT with nextRound null (PO-Q2 option b leaves U2 unchanged)", () => {
+test("L3: drift after a delta is DRR-SOURCE-DRIFT with the next round (round plus one); at the structural bound nextRound is null", () => {
   const summary = summaryOf(deltaObject(), RECEIPT2_PATH);
   assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary, currentSources: clone(SOURCES_2) }), { ok: true });
   const drifted = sourcesWith((s) => { s.companions[0].sha256 = sha("design-9"); }, SOURCES_2);
-  assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary, currentSources: drifted }), { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: null });
-  assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary, currentSources: clone(SOURCES_1) }), { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: null });
+  assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary, currentSources: drifted }), { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: 3 });
+  assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary, currentSources: clone(SOURCES_1) }), { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: 3 });
+  const atBound = summaryOf(deltaObject({ round: 64 }), RECEIPT2_PATH);
+  assert.deepStrictEqual(checkDesignReviewReceiptSources({ summary: atBound, currentSources: drifted }), { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: null });
 });
 
 // ------------------------------------------------------------------ U2-16
@@ -822,7 +838,7 @@ test("U2-18: summarize passes the parse refusal code through", () => {
     [Buffer.from(`${JSON.stringify(initialObject(), null, 2)}\n`), "DRR-NONCANONICAL"],
     [bytesOf(initialObject({ dispatchId: "d-1" })), "DRR-SHAPE"],
     [bytesOf(initialObject({ verdict: "pass", openFindingIds: ["F-3"] })), "DRR-VERDICT"],
-    [bytesOf(deltaObject({ round: 3 })), "DRR-ROUND-EXCEEDED"],
+    [bytesOf(deltaObject({ round: 65 })), "DRR-ROUND-EXCEEDED"],
   ];
   for (const [bytes, code] of cases) {
     assert.deepStrictEqual(summarizeDesignReviewReceipt({ path: RECEIPT1_PATH, bytes }), refuse(code), code);

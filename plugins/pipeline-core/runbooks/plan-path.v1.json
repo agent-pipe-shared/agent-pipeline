@@ -239,7 +239,7 @@
       "command": "node <plugin-root>/scripts/pipeline-state.mjs present-plan --by <name> --review-receipt <review-receipt-path>",
       "needs": [
         "a submitted plan",
-        "a tracked design review receipt (at most two --review-receipt)",
+        "every tracked design review receipt of the chain, initial first (one --review-receipt each)",
         "the prepared seal plan, for a draft package in the PRD release scope"
       ],
       "evidenceSchema": null,

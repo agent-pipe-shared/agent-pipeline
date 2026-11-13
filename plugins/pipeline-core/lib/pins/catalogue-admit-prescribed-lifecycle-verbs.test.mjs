@@ -133,12 +133,19 @@ function mirrorSanctionedArgs(patch) {
   return { file, dir };
 }
 
-test("AC-123 present-plan: one and two distinct review receipts are admitted by the real guard in design phase", () => {
+test("L3: the guard's review-chain bound is the receipt module's structural bound", async () => {
+  const { REVIEW_CHAIN_MAX_RECEIPTS } = await import("../guard/sanctioned-args-scripts.mjs");
+  const { DESIGN_REVIEW_MAX_ROUNDS } = await import("../design-review-receipt.mjs");
+  assert.equal(REVIEW_CHAIN_MAX_RECEIPTS, DESIGN_REVIEW_MAX_ROUNDS);
+});
+
+test("AC-123 present-plan: one, two and (L3, delta rounds until pass) three distinct review receipts are admitted by the real guard in design phase", () => {
   withFixture("feature", f => {
-    const r1 = receipt(f, "review-1"); const r2 = receipt(f, "review-2");
+    const r1 = receipt(f, "review-1"); const r2 = receipt(f, "review-2"); const r3 = receipt(f, "review-3");
     const one = stateAction("present-plan", "--by", "Fixture", "--review-receipt", r1);
     const two = stateAction("present-plan", "--by", "Fixture", "--review-receipt", r1, "--review-receipt", r2);
-    for (const action of [one, two]) {
+    const three = stateAction("present-plan", "--by", "Fixture", "--review-receipt", r1, "--review-receipt", r2, "--review-receipt", r3);
+    for (const action of [one, two, three]) {
       assert.equal(admitted(action, f), true, JSON.stringify(action.argv));
       assert.equal(guardCode(action, f), 0);
     }
@@ -149,11 +156,12 @@ test("AC-123 present-plan: one and two distinct review receipts are admitted by 
 
 test("AC-123 present-plan: admission stays narrow (no broad grammar relaxation)", () => {
   withFixture("feature", f => {
-    const r1 = receipt(f, "review-1"); const r2 = receipt(f, "review-2"); const r3 = receipt(f, "review-3");
+    const r1 = receipt(f, "review-1");
+    const aboveBound = Array.from({ length: 65 }, (_, index) => receipt(f, `bound-${index}`));
     writeFileSync(join(f.root, "evidence/not-json.txt"), "x");
     const rr = path => ["--review-receipt", path];
     const refusals = [
-      ["three receipts", ["--by", "F", ...rr(r1), ...rr(r2), ...rr(r3)]],
+      ["65 receipts, above the structural bound", ["--by", "F", ...aboveBound.flatMap(rr)]],
       ["duplicate receipt", ["--by", "F", ...rr(r1), ...rr(r1)]],
       ["missing receipt file", ["--by", "F", ...rr("evidence/absent.json")]],
       ["non-json receipt", ["--by", "F", ...rr("evidence/not-json.txt")]],
@@ -174,13 +182,13 @@ test("AC-123 present-plan: admission stays narrow (no broad grammar relaxation)"
 });
 
 test("AC-123 present-plan RED: a scratch mirror with widened receipt count admits what production refuses", async () => {
-  withFixture("feature", f => {
-    const r = ["a", "b", "c"].map(n => receipt(f, `red-${n}`));
+  return withFixture("feature", f => {
+    const r = Array.from({ length: 65 }, (_, index) => receipt(f, `red-${index}`));
     const argv = ["present-plan", "--by", "F", ...r.flatMap(p => ["--review-receipt", p])];
-    const mirror = mirrorSanctionedArgs(s => s.replace("![3, 5, 7].includes(args.length)", "![3, 5, 7, 9].includes(args.length)"));
+    const mirror = mirrorSanctionedArgs(s => s.replace("export const REVIEW_CHAIN_MAX_RECEIPTS = 64;", "export const REVIEW_CHAIN_MAX_RECEIPTS = 65;"));
     return import(pathToFileURL(mirror.file).href).then(mod => {
       try {
-        assert.equal(mod.sanctionedPipelineStateArgs(argv, f.root), true, "mutant mirror must admit three receipts");
+        assert.equal(mod.sanctionedPipelineStateArgs(argv, f.root), true, "mutant mirror must admit 65 receipts");
         assert.equal(admitted(node([stateScript, ...argv]), f), false, "production must refuse the same argv");
       } finally { rmSync(mirror.dir, { recursive: true, force: true }); }
     });

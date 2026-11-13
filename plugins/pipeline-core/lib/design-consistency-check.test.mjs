@@ -94,6 +94,7 @@ function makeSummary({
   previousPath,
   previousSha,
   reportSha,
+  round,
 }) {
   const delta = kind === "delta";
   return {
@@ -101,7 +102,7 @@ function makeSummary({
     sha256: digestOf(`receipt-${n}`),
     featureId,
     kind,
-    round: delta ? 2 : 1,
+    round: round ?? (delta ? 2 : 1),
     previousReceiptPath: delta ? (previousPath ?? previous.path) : null,
     previousReceiptSha256: delta ? (previousSha ?? previous.sha256) : null,
     sources,
@@ -551,16 +552,54 @@ test("U1-17: null or empty reviewReceipts yield exactly DCC-REVIEW-RECEIPT-MISSI
   }
 });
 
-test("U1-18: three summaries yield DCC-REVIEW-ROUND-EXCEEDED with observed 3 and no chain finding", () => {
+test("L3: summaries above the structural bound of 64 yield DCC-REVIEW-ROUND-EXCEEDED with the count and no chain finding", () => {
   const input = build({
-    receipts: (current) => [1, 2, 3].map((n) => makeSummary({
-      n, kind: "delta", sources: current, previousPath: `${DIR}/review/design-review-${n - 1}.json`, previousSha: digestOf(`receipt-${n - 1}`),
+    receipts: (current) => Array.from({ length: 65 }, (_, index) => index + 1).map((n) => makeSummary({
+      n, kind: "delta", round: Math.min(n + 1, 64), sources: current, previousPath: `${DIR}/review/design-review-${n - 1}.json`, previousSha: digestOf(`receipt-${n - 1}`),
     })),
   });
   const result = checkDesignConsistency(input);
-  assertInconsistent(result, [entry("DCC-REVIEW-ROUND-EXCEEDED", { observed: "3" })]);
+  assertInconsistent(result, [entry("DCC-REVIEW-ROUND-EXCEEDED", { observed: "65" })]);
   assert.equal(result.review, null);
-  assert.deepEqual(directChain(input), [entry("DCC-REVIEW-ROUND-EXCEEDED", { observed: "3" })]);
+  assert.deepEqual(directChain(input), [entry("DCC-REVIEW-ROUND-EXCEEDED", { observed: "65" })]);
+});
+
+test("L3: a three-round chain (initial, delta, delta) over changed sources is consistent and binds the latest round", () => {
+  const input = build({
+    receipts: (current) => {
+      const first = makeSummary({ n: 1, sources: withDigest(current, DESIGN_PATH, digestOf("design-r1")), verdict: "open-findings", openFindingIds: ["F-1"] });
+      const second = makeSummary({ n: 2, kind: "delta", round: 2, previous: first, sources: withDigest(current, DESIGN_PATH, digestOf("design-r2")), verdict: "open-findings", openFindingIds: ["F-2"] });
+      const third = makeSummary({ n: 3, kind: "delta", round: 3, previous: second, sources: current });
+      return [first, second, third];
+    },
+  });
+  assert.deepEqual(directChain(input), []);
+});
+
+test("L3: a later receipt whose round is not its chain position, or that links past its predecessor, is DCC-REVIEW-DELTA-CHAIN", () => {
+  const chain = (mutate) => build({
+    receipts: (current) => {
+      const first = makeSummary({ n: 1, sources: withDigest(current, DESIGN_PATH, digestOf("design-r1")), verdict: "open-findings", openFindingIds: ["F-1"] });
+      const second = makeSummary({ n: 2, kind: "delta", round: 2, previous: first, sources: withDigest(current, DESIGN_PATH, digestOf("design-r2")), verdict: "open-findings", openFindingIds: ["F-2"] });
+      return [first, second, mutate({ first, second, current })];
+    },
+  });
+  const skipped = chain(({ first, current }) => makeSummary({ n: 3, kind: "delta", round: 3, previous: first, sources: current }));
+  assert.ok(directChain(skipped).some((item) => item.code === "DCC-REVIEW-DELTA-CHAIN"), "links to round 1 instead of round 2");
+  const misnumbered = chain(({ second, current }) => makeSummary({ n: 3, kind: "delta", round: 4, previous: second, sources: current }));
+  assert.ok(directChain(misnumbered).some((item) => item.code === "DCC-REVIEW-DELTA-CHAIN"), "round 4 at position 3");
+});
+
+test("PO 2026-11-09 + L3: a delta over unchanged sources that withdraws findings is consistent; without the withdrawal it is DCC-REVIEW-DELTA-CHAIN", () => {
+  const input = (withdrawn) => build({
+    receipts: (current) => {
+      const first = makeSummary({ n: 1, sources: current, verdict: "open-findings", openFindingIds: ["F-1"] });
+      const second = makeSummary({ n: 2, kind: "delta", previous: first, sources: current });
+      return [first, withdrawn ? { ...second, withdrawnFindingIds: ["F-1"] } : second];
+    },
+  });
+  assert.deepEqual(directChain(input(true)), []);
+  assert.ok(directChain(input(false)).some((item) => item.code === "DCC-REVIEW-DELTA-CHAIN"));
 });
 
 // ---------------------------------------------------------------------------

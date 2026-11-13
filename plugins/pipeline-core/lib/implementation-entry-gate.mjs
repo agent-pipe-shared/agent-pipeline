@@ -55,10 +55,12 @@ const REPEAT_REVIEW = "Run the design review for the current committed bytes (a 
 
 /** The repair for a known code. Agent work, repository-relative, and never a reopen-design for something a draft can still fix. */
 const REPAIRS = new Map([
-  ["DCC-REVIEW-RECEIPT-MISSING", "Pass one or two receipts: present-plan --by <name> --review-receipt <repo-relative-json-path>. A receipt comes from design-review-receipt.mjs create, never by hand."],
+  ["DCC-REVIEW-RECEIPT-MISSING", "Pass every receipt of the review chain, initial first: present-plan --by <name> --review-receipt <repo-relative-json-path> (repeat the flag per receipt). A receipt comes from design-review-receipt.mjs create, never by hand."],
   ["DCC-REVIEW-RECEIPT-BINDING", REPEAT_REVIEW],
-  ["DCC-REVIEW-DELTA-CHAIN", "Create the later receipt with --previous <the earlier receipt>, then pass both in order."],
-  ["DCC-REVIEW-ROUND-EXCEEDED", "At most two review rounds bind one approval: keep the initial receipt and the last delta receipt."],
+  ["DCC-REVIEW-DELTA-CHAIN", "Create each later receipt with --previous <the receipt of the round before>, then pass the whole chain in order, initial first."],
+  // L3 (PO decision 2026-11-13): no signature over an open readiness review; the route is the next delta round, as often as needed.
+  ["PLAN-DESIGN-REVIEW-OPEN", "Correct the PRD or Spec for the open findings named here (commit; after submit-plan the PRD/Spec drift repairs apply: run submit-plan again), then run a delta readiness review: a fresh pipeline-core:readiness-reviewer that reads only these findings and what changed. Create its receipt with design-review-receipt.mjs create --previous <the last receipt> (a delta over unchanged documents may only withdraw findings), commit it, and run present-plan again with every receipt of the chain, initial first."],
+  ["DCC-REVIEW-ROUND-EXCEEDED", "The review chain is above the structural bound of 64 rounds: start a new initial review of the current sources and pass that chain."],
   ["DCC-PATH-UNSAFE", "The bound path must be a regular repository file; restore it or remove it from the receipt's companions."],
   ["DCC-PATH-IGNORED", "A bound file must be committed, so it cannot live under a git-ignored directory: move it into the feature folder specs/<feature>/, update the reference, commit, and create the receipt again."],
   ["DCC-PATH-UNTRACKED", `Stage this file. ${COMMIT_THEN_REPEAT}`],

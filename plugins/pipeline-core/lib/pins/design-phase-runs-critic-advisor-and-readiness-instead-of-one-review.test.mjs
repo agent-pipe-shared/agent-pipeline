@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 // Regression pin: pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review (AC-155).
-// The ordinary design phase needs exactly one review receipt (at most one delta follow-up), no mandatory
+// The ordinary design phase needs exactly one review receipt (delta follow-ups until it passes: L3, PO 2026-11-13), no mandatory
 // Advisor stage and no readiness ceremony; the design course is retired; the signed object carries only
 // the review chain. Real modules, no mocks of the behavior under test.
 import assert from "node:assert/strict";
@@ -50,17 +50,21 @@ test("one review receipt is enough: a single PASS receipt yields a binding with 
   for (const forbidden of ["advisor", "readiness", "course", "exception"]) assert.equal(text.includes(forbidden), false, forbidden);
 });
 
-test("the review is capped at one initial plus at most one delta follow-up; a third round is refused", () => {
-  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 2);
+test("L3: one initial review, then delta follow-ups until it passes; only the structural bound (64) caps the chain", () => {
+  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 64);
   const r1 = receipt("spec-v1", null, ["F-ONE"]);
-  const r2 = receipt("spec-v2", { path: "specs/f1/receipt-1.json", bytes: r1.bytes });
+  const r2 = receipt("spec-v2", { path: "specs/f1/receipt-1.json", bytes: r1.bytes }, ["F-TWO"]);
   assert.equal(r2.receipt.kind, "delta");
   assert.equal(r2.receipt.round, 2);
   const third = createDesignReviewReceipt({
     featureId: "f1", previous: { path: "specs/f1/receipt-2.json", bytes: r2.bytes }, sources: sources("spec-v3"), reviewer,
     report: ref("specs/f1/review-3.md", "r3"), openFindingIds: [], reviewedAt: "2026-10-11T00:00:00.000Z",
   });
-  assert.deepEqual([third.ok, third.code], [false, "DRR-ROUND-EXCEEDED"]);
+  assert.deepEqual([third.ok, third.receipt?.kind, third.receipt?.round, third.receipt?.verdict], [true, "delta", 3, "pass"]);
+  const binding = createDesignApprovalBinding({ featureId: "f1", currentSources: sources("spec-v3"), receipts: [
+    { path: "specs/f1/receipt-1.json", bytes: r1.bytes }, { path: "specs/f1/receipt-2.json", bytes: r2.bytes }, { path: "specs/f1/receipt-3.json", bytes: third.bytes }] });
+  assert.equal(binding.ok, true, JSON.stringify(binding));
+  assert.equal(binding.binding.verdict, "pass");
 });
 
 test("one PO approval request is built from receipts alone (no Advisor record, no readiness evidence) and re-verifies", () => {
@@ -133,15 +137,15 @@ test("RED mirror (request re-verifies): a request verified against drifted sourc
   assert.equal(verifyDesignApprovalRequest({ request: request.request, featureId: "f1", receipts, currentSources: sources("spec-v2") }).ok, false);
 });
 
-test("RED mirror (round cap): the cap is exactly two, so a zero-finding second round never turns into an unbounded loop", () => {
+test("RED mirror (no endless loop without progress): a later round over unchanged documents that withdraws nothing is refused", () => {
   const r1 = receipt("spec-v1", null, ["F-ONE"]);
   const r2 = receipt("spec-v2", { path: "specs/f1/receipt-1.json", bytes: r1.bytes }, ["F-ONE"]);
   const third = createDesignReviewReceipt({
-    featureId: "f1", previous: { path: "specs/f1/receipt-2.json", bytes: r2.bytes }, sources: sources("spec-v3"), reviewer,
+    featureId: "f1", previous: { path: "specs/f1/receipt-2.json", bytes: r2.bytes }, sources: sources("spec-v2"), reviewer,
     report: ref("specs/f1/review-3.md", "r3"), openFindingIds: ["F-ONE"], reviewedAt: "2026-10-11T00:00:00.000Z",
   });
   assert.equal(third.ok, false);
-  assert.equal(third.code, "DRR-ROUND-EXCEEDED");
+  assert.equal(third.code, "DRR-DELTA-UNCHANGED");
 });
 
 test("RED mirror (course retired): no runner value revives the multi-stage course", () => {

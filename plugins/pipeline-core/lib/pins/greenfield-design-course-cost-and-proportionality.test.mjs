@@ -45,7 +45,7 @@ const course = () => readFileSync(here("../../skills/pipeline-start/references/d
 test("order: agent submits the plan mechanically, one review, one final PO decision; retired DWP/Advisor-course routes are not recovery", () => {
   const text = course();
   assert.match(text, /mechanical agent work, not another PO permission/u);
-  assert.match(text, /one independent design review, at most one delta/u);
+  assert.match(text, /one independent design review, delta follow-ups\s+until it passes/u);
   assert.match(text, /one final PO decision/u);
   assert.match(text, /DWP-PRESENT-RETIRED/u);
   assert.match(text, /There is no\s+mandatory initial Advisor course/u);
@@ -73,7 +73,7 @@ test("evidence reuse and current-source binding: an unchanged receipt is reused 
   assert.match(course(), /The approval binding must be rebuilt after material source or review drift/u);
 });
 
-test("bounded course with one final gate: one review receipt builds the single approval request, a third round is refused", () => {
+test("one final gate: one review receipt builds the single approval request; a third round is a delta until pass (L3)", () => {
   const r1 = receipt("spec-v1");
   const receipts = [{ path: "specs/f1/receipt-1.json", bytes: r1.bytes }];
   const binding = createDesignApprovalBinding({ featureId: "f1", receipts, currentSources: sources("spec-v1") });
@@ -85,7 +85,7 @@ test("bounded course with one final gate: one review receipt builds the single a
     featureId: "f1", previous: { path: "specs/f1/receipt-2.json", bytes: r2.bytes }, sources: sources("spec-v3"), reviewer,
     report: ref("specs/f1/review-3.md", "r3"), openFindingIds: [], reviewedAt: "2026-10-11T00:00:00.000Z",
   });
-  assert.deepEqual([third.ok, third.code], [false, "DRR-ROUND-EXCEEDED"]);
+  assert.deepEqual([third.ok, third.receipt?.round], [true, 3]);
 });
 
 test("telemetry (deferred): phase wall time, tool time and human wait are recorded separately", { skip: "deferred by PO 2026-10-16 #2 and decisions D25/D121 (outside 0.7.0, no new schema before the test candidate); owner: Coordinator; follow-up: backlog/items/2026-10-16-design-course-telemetry-is-deferred.md" }, () => {

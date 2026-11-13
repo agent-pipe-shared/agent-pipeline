@@ -393,7 +393,7 @@ import { basename, dirname, isAbsolute, join, posix as posixPath, relative, reso
 import { featureStatusVocabulary, readAcceptanceRecord } from "../lib/close-acceptance-record.mjs";
 import { spawnSync } from "node:child_process";
 import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
-import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+import { DESIGN_REVIEW_MAX_ROUNDS, summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
 import { inspectDesignApprovalPreconditions, inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
 import { entryGateRepair, renderImplementationEntryGate, runImplementationEntryGate } from "../lib/implementation-entry-gate.mjs";
@@ -4507,7 +4507,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
       if (!validPlanPresentation(presentation) || presentation.schema !== PLAN_PRESENTATION_DESIGN_SCHEMA || presentation.submissionSha256 !== lifecycle.submissionSha256) {
         return { kind: "collect-input", mutation: false, requiresConfirmation: false, code: "DAB-REVIEW-RECEIPT-REQUIRED",
           inputs: [{ name: "reviewReceipt", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 240, singleLine: true, rejectNul: true }],
-          guidance: "Run present-plan --review-receipt with the explicit tracked review receipt (at most two), and --by the presenter. No design course or dispatch is required."
+          guidance: "Run present-plan --review-receipt with every tracked review receipt of the chain (initial first), and --by the presenter. No design course or dispatch is required."
             // Late binding step 5: a draft package (PRD release scope) is sealed by the approval, so its plan is prepared first.
             + (readAuthoritySeal(state?.continuity?.authority).status === "draft"
               ? " This package is an unsealed draft: run prepare-seal with no arguments BEFORE present-plan (the approval seals the PRD and the Spec; the review receipts go to present-plan). Before the PO has signed, cancel-submitted-plan is the way back."
@@ -10459,7 +10459,9 @@ function validPlanPresentation(value) {
 // ADR-0085: observe physical, tracked, clean sources and the explicit receipt chain.
 function readDesignApprovalInputs(dir, submission, paths) {
   try {
-    if (!Array.isArray(paths) || paths.length < 1 || paths.length > 2 || new Set(paths).size !== paths.length) return { ok: false, code: "DCC-REVIEW-RECEIPT-MISSING" };
+    if (!Array.isArray(paths) || paths.length < 1 || new Set(paths).size !== paths.length) return { ok: false, code: "DCC-REVIEW-RECEIPT-MISSING" };
+    // L3: every receipt of the chain is passed (initial first); above the structural bound the chain check names DCC-REVIEW-ROUND-EXCEEDED.
+    if (paths.length > DESIGN_REVIEW_MAX_ROUNDS) return { ok: false, code: "DCC-REVIEW-ROUND-EXCEEDED" };
     const receipts = paths.map(path => ({ path, bytes: physicalRebindFile(dir, path)?.bytes }));
     const summaries = receipts.map(entry => summarizeDesignReviewReceipt(entry));
     const refused = summaries.find(entry => !entry.ok);
@@ -10543,6 +10545,16 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
       if (inputs.ok) return null;
       if (Array.isArray(inputs.inconsistencies)) return inputs.inconsistencies.map(dcc);
       return { code: inputs.code, message: inputs.message ?? null, repair: entryGateRepair(inputs.code) };
+    } },
+    // L3 (Claude run 3, PO decision 2026-11-13): a design is presented for signature only over a passing readiness review. This is a
+    // presentation gate, never a binding rule: an approval already signed over open findings keeps verifying (the binding is unchanged).
+    { id: "design-review-open", run: () => {
+      if (!inputs?.ok || !Array.isArray(inputs.receipts) || inputs.receipts.length === 0) return null;
+      const latest = summarizeDesignReviewReceipt(inputs.receipts.at(-1));
+      if (!latest.ok || latest.summary.verdict !== "open-findings") return null;
+      return { code: "PLAN-DESIGN-REVIEW-OPEN", path: latest.summary.path,
+        message: `round ${latest.summary.round} of the readiness review leaves ${latest.summary.openFindingIds.length} finding(s) open: ${latest.summary.openFindingIds.join(", ")}`,
+        repair: entryGateRepair("PLAN-DESIGN-REVIEW-OPEN") };
     } },
     // C28e (Codex test run): approve-plan later reads the approval policy, the PRD, the Spec, the companions and the review receipts
     // from the commit the request binds. A file that exists only in the working tree surfaced only after the signature
@@ -12921,7 +12933,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       }
       const parsedPresentation = parseAllowedOptionalFlags(presentationArgv, new Set(["by"]));
       if (!parsedPresentation.ok) {
-        console.error("Error: present-plan accepts only --by <name> and --review-receipt <repo-relative-json-path> (one or two receipts for epic/feature; none for mini).");
+        console.error("Error: present-plan accepts only --by <name> and --review-receipt <repo-relative-json-path> (every receipt of the review chain, initial first, for epic/feature; none for mini).");
         return 2;
       }
       const presentationFlags = parsedPresentation.value;
@@ -14067,8 +14079,8 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
     case "prepare-seal": {
       const reviewPaths = [];
       for (let index = 0; index < rest.length; index += 2) {
-        if (rest[index] !== "--review-receipt" || typeof rest[index + 1] !== "string" || rest[index + 1].startsWith("--") || reviewPaths.includes(rest[index + 1]) || reviewPaths.length >= 2) {
-          console.error("Error: prepare-seal accepts only --review-receipt <repo-relative-json-path> (at most two), to bind the readiness review it should check.");
+        if (rest[index] !== "--review-receipt" || typeof rest[index + 1] !== "string" || rest[index + 1].startsWith("--") || reviewPaths.includes(rest[index + 1]) || reviewPaths.length >= DESIGN_REVIEW_MAX_ROUNDS) {
+          console.error(`Error: prepare-seal accepts only --review-receipt <repo-relative-json-path> (every receipt of the review chain, at most ${DESIGN_REVIEW_MAX_ROUNDS}), to bind the readiness review it should check.`);
           return 2;
         }
         reviewPaths.push(rest[index + 1]);

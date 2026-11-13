@@ -2,8 +2,8 @@
 
 Load this before the first `submit-plan` for an `epic` or `feature`. The
 Coordinator owns the sequence; routine preparation is agent work. ADR-0085
-governs the receipt-based flow: one independent design review, at most one delta
-follow-up, and one final PO decision. Do not assemble a design-workflow package
+governs the receipt-based flow: one independent design review, delta follow-ups
+until it passes, and one final PO decision. Do not assemble a design-workflow package
 or register an authoring dispatch as an approval input.
 
 Normal architecture/design choices use Chat tiles with concrete options,
@@ -41,8 +41,9 @@ was needed; capability evidence is not an Advisor answer.
    record holds the new title.` A criterion no user sees is tagged
    `[not user-facing: <reason>]`; `[user-facing]` forces the duty.
 2. Obtain one independent review of the final design sources. Resolve its
-   findings; if sources change, use at most one delta follow-up and bind the
-   final receipt to the current sources. Do not add a separate readiness child
+   findings; while a round leaves findings open, run a delta follow-up (fresh
+   reviewer, only the open findings and what changed) until a round passes, and
+   bind the final receipt to the current sources. Do not add a separate readiness child
    that repeats the content review. Preserve the report and canonical review
    receipt, including the receipt chain when a delta is used. Produce each
    receipt with `node <plugin-root>/scripts/design-review-receipt.mjs create`
@@ -72,13 +73,16 @@ was needed; capability evidence is not an Advisor answer.
    Every finding the report leaves open goes into the receipt as one
    `--open-finding <id>`: a report that says ready while it still lists findings
    is `open-findings`, not `pass`, and the PO sees that when signing.
-   After the delta round: if round 2 still reports open findings, correct the
-   sources now. Before `submit-plan` this is an ordinary edit and commit;
-   `reopen-design` exists only for a package that was already submitted. The
-   approval then carries the change as `unreviewedSourceDelta`, which the PO
-   signs knowingly; there is no round 3. `DRR-SOURCE-DRIFT` with
-   `nextRound: null` is not a dead end here: `present-plan` does not use that
-   check.
+   After a delta round that still reports open findings: correct the sources
+   and run the next delta round (`--previous` the last receipt); there is no
+   round cap (only a structural bound of 64). Before `submit-plan` a correction
+   is an ordinary edit and commit; `reopen-design` exists only for a package
+   that was already submitted. A delta over unchanged documents may only
+   withdraw findings of the round before. `present-plan` refuses while the last
+   receipt is `open-findings` (`PLAN-DESIGN-REVIEW-OPEN`) and names the next
+   delta round. Pass every receipt of the chain, initial first. A source change
+   after a passing delta round is carried as `unreviewedSourceDelta`, which the
+   PO signs knowingly.
 3. Use the sanctioned source-binding and document-integration routes. Update
    digests once, after the last edit: `create-adr.mjs --root <root> --refresh`
    without `--slug` recomputes every ADR draft, and the PRD's
@@ -97,9 +101,9 @@ was needed; capability evidence is not an Advisor answer.
    is mechanical agent work, not another PO permission. Inspect the resulting
    state. For `epic`/`feature`, use `present-plan --by <presenter>
    --review-receipt <repo-relative-json-path>`, repeating `--review-receipt`
-   once only when the current review chain includes the delta follow-up.
+   once per delta follow-up of the current review chain.
    `--by` is an actor attribution, not a substitute for approval.
-   Supply one or two distinct tracked receipts in chain order. The retired
+   Supply every distinct tracked receipt of the chain in chain order. The retired
    `--design-workflow-package` flag is rejected with `DWP-PRESENT-RETIRED`;
    it is not a recovery route.
 6. The lifecycle writer checks the current source/receipt binding mechanically:

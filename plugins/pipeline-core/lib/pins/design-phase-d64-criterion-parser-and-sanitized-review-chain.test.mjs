@@ -62,8 +62,8 @@ test("D64 criterion parser (RED mirror): the located-row check is meaningful, a 
   assert.notDeepEqual(scanAcceptedCriterionRows(THREE_COLUMN), scanAcceptedCriterionRows(FOUR_COLUMN));
 });
 
-test("D64 review chain: the spent-round count follows the chain, not the file names; a third round is refused under any name", () => {
-  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 2);
+test("D64 review chain: the round count follows the chain, not the file names; the third round is round 3 under any name (L3)", () => {
+  assert.equal(DESIGN_REVIEW_MAX_ROUNDS, 64);
   const r1 = receipt("spec-v1", null, "specs/f1/report-a.md", ["F-ONE"]);
   const r2 = receipt("spec-v2", { path: "specs/f1/anything-but-round-two.json", bytes: r1.bytes }, "specs/f1/report-b.md");
   assert.deepEqual([r2.receipt.kind, r2.receipt.round], ["delta", 2]);
@@ -71,7 +71,7 @@ test("D64 review chain: the spent-round count follows the chain, not the file na
     featureId: "f1", previous: { path: "specs/f1/receipt-1.json", bytes: r2.bytes }, sources: sources("spec-v3"), reviewer,
     report: ref("specs/f1/report-c.md", "c"), openFindingIds: [], reviewedAt: "2026-10-11T00:00:00.000Z",
   });
-  assert.deepEqual([third.ok, third.code], [false, "DRR-ROUND-EXCEEDED"]);
+  assert.deepEqual([third.ok, third.receipt?.kind, third.receipt?.round], [true, "delta", 3]);
 });
 
 test("D64 review chain (RED mirror): a producer given a predecessor derives round 2 from the chain, the caller cannot label it 'initial'", () => {

@@ -5,7 +5,7 @@
  *
  *   U  the binding carries the complete open-finding set of the latest review receipt
  *      (empty on PASS), so the PO signs knowingly over open findings;
- *   Z  after a round-2 (delta) receipt, later source drift is not a refusal: the binding
+ *   Z  after a delta receipt (any round from 2 on), later source drift is not a refusal: the binding
  *      carries the CURRENT sources plus a visible `unreviewedSourceDelta`; after a round-1
  *      receipt the same drift stays a review-chain refusal (decided by the U1 chain check);
  *   T  a legacy design-workflow-package intent or record is told apart, never accepted here;
@@ -51,8 +51,10 @@ const MAX_PATH_LENGTH = 240;
 const MAX_COMPANIONS = 64;
 const MAX_FINDING_IDS = 64;
 const MAX_FINDING_ID_LENGTH = 80;
-const MAX_RECEIPTS = 2;
-const DELTA_ROUND = 2;
+// L3 (PO decision 2026-11-13, amending ADR-0085): delta rounds continue until the review passes. The bound is structural
+// (bounded input, the receipt module's DESIGN_REVIEW_MAX_ROUNDS), not a review policy; a binding over one or two receipts
+// is byte-identical to before, so every signed approval keeps verifying.
+const MAX_RECEIPTS = 64;
 // Every bound path appears at most once per side (PRD, Spec and up to 64 companions).
 const MAX_DELTA_ENTRIES = 2 * (MAX_COMPANIONS + 2);
 
@@ -118,7 +120,7 @@ function isSourceSet(value) {
     && (index === 0 || compareUnits(companions[index - 1].path, companion.path) < 0));
 }
 
-/** One to two entries, ascending rounds 1 and 2. */
+/** One to MAX_RECEIPTS entries, rounds ascending from 1 without a gap. */
 function isReceiptList(value) {
   if (!Array.isArray(value) || value.length < 1 || value.length > MAX_RECEIPTS) return false;
   // K128: an entry may carry the closed `fallback` record of a receipt produced on the typed fallback route; otherwise it is exactly three keys.
@@ -167,8 +169,8 @@ function isValidBinding(binding) {
   // Decision U: the verdict is PASS exactly when no finding is open.
   if ((binding.verdict === "pass") !== (binding.openFindingIds.length === 0)) return false;
   if (Object.hasOwn(binding, "unreviewedSourceDelta")) {
-    // Decision Z: only a round-2 (delta) receipt makes later source drift a knowingly signed delta.
-    if (binding.reviewReceipts[binding.reviewReceipts.length - 1].round !== DELTA_ROUND) return false;
+    // Decision Z: only a delta receipt (round 2 or later) makes later source drift a knowingly signed delta.
+    if (binding.reviewReceipts[binding.reviewReceipts.length - 1].round < 2) return false;
     if (!isUnreviewedDelta(binding.unreviewedSourceDelta, binding.sources)) return false;
   }
   if (Object.hasOwn(binding, "pathRebind") && !isPathRebind(binding.pathRebind, binding.sources)) return false;

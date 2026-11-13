@@ -96,7 +96,7 @@ function planSteps() {
     }),
     scriptStep({
       id: "present-plan", script: STATE, verb: "present-plan", argv: ["present-plan", "--by", "<name>", "--review-receipt", "<review-receipt-path>"],
-      needs: ["a submitted plan", "a tracked design review receipt (at most two --review-receipt)", "the prepared seal plan, for a draft package in the PRD release scope"],
+      needs: ["a submitted plan", "every tracked design review receipt of the chain, initial first (one --review-receipt each)", "the prepared seal plan, for a draft package in the PRD release scope"],
       producer: "plan presentation record bound to the exact submission (and the seal plan digest), and the design approval request file under scratch/",
       next: ["sign-intent", "approve-plan"],
     }),

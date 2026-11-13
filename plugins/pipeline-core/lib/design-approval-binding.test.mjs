@@ -405,13 +405,13 @@ test("U3-6d: an empty, unsorted or malformed unreviewedSourceDelta is DAB-SHAPE 
   assertRefusal(validateDesignApprovalBinding(notHex), "DAB-SHAPE");
 });
 
-test("U3-7: no receipts is DAB-REVIEW-CHAIN with DCC-REVIEW-RECEIPT-MISSING; three receipts with DCC-REVIEW-ROUND-EXCEEDED", () => {
+test("U3-7: no receipts is DAB-REVIEW-CHAIN with DCC-REVIEW-RECEIPT-MISSING; a repeated receipt breaks the chain (L3: no round cap, DCC-REVIEW-DELTA-CHAIN)", () => {
   const scenario = deltaScenario();
   const none = createDesignApprovalBinding({ featureId: FEATURE, receipts: [], currentSources: scenario.currentSources });
   assertRefusal(none, "DAB-REVIEW-CHAIN", ["DCC-REVIEW-RECEIPT-MISSING"]);
   assert.deepStrictEqual(none.causes, chainCauses(FEATURE, [], scenario.currentSources));
   const three = createDesignApprovalBinding({ featureId: FEATURE, receipts: asInput(scenario.first, scenario.second, scenario.second), currentSources: scenario.currentSources });
-  assertRefusal(three, "DAB-REVIEW-CHAIN", ["DCC-REVIEW-ROUND-EXCEEDED"]);
+  assertRefusal(three, "DAB-REVIEW-CHAIN", ["DCC-REVIEW-DELTA-CHAIN"]);
   assert.deepStrictEqual(three.causes, chainCauses(FEATURE, asInput(scenario.first, scenario.second, scenario.second), scenario.currentSources));
 });
 
@@ -425,6 +425,45 @@ test("U3-7b: the receipts are taken in chain order, so a reversed chain is DAB-R
   assert.deepStrictEqual(refusal.causes, chainCauses(FEATURE, reversed, scenario.currentSources));
   assert.ok(refusal.causes.includes("DCC-REVIEW-DELTA-CHAIN"));
   assertRefusal(refusal, "DAB-REVIEW-CHAIN", chainCauses(FEATURE, reversed, scenario.currentSources));
+});
+
+/** L3: a third round over the delta scenario (another Spec change), with the given open findings. */
+function thirdRoundScenario(openFindingIds, sources = sourcesWith({ spec: "spec-v3" })) {
+  const base = deltaScenario();
+  const made = createDesignReviewReceipt({
+    featureId: FEATURE, previous: { path: base.second.path, bytes: base.second.bytes }, sources, reviewer: REVIEWER,
+    report: { path: `${DIR}/review/design-review-3.md`, sha256: digestOf("report-3") }, openFindingIds, reviewedAt: "2026-10-07T12:00:00.000Z",
+  });
+  assert.equal(made.ok, true, `fixture: U2 must accept the round-3 receipt (${made.code})`);
+  const third = { path: `${DIR}/review/design-review-3.json`, bytes: made.bytes, sha256: made.sha256 };
+  return { ...base, third, receipts: [base.first, base.second, third], currentSources: sources };
+}
+
+test("L3: delta rounds until pass - a three-round chain binds with three ascending entries and the latest round's verdict", () => {
+  const passing = create(thirdRoundScenario([]));
+  assert.equal(passing.ok, true, JSON.stringify(passing));
+  assert.deepStrictEqual(passing.binding.reviewReceipts.map((entry) => entry.round), [1, 2, 3]);
+  assert.deepStrictEqual([passing.binding.verdict, passing.binding.openFindingIds], ["pass", []]);
+  const open = create(thirdRoundScenario(["F-4"]));
+  assert.equal(open.ok, true, JSON.stringify(open));
+  assert.deepStrictEqual([open.binding.verdict, open.binding.openFindingIds], ["open-findings", ["F-4"]], "the binding records the open set; the presentation gate, not the binding, refuses it");
+});
+
+test("L3 + decision Z: drift after a round-3 delta is carried as unreviewedSourceDelta, and a round-1-only binding still may not carry one", () => {
+  const scenario = { ...thirdRoundScenario([]), currentSources: sourcesWith({ spec: "spec-v4" }) };
+  const drifted = create(scenario);
+  assert.equal(drifted.ok, true, JSON.stringify(drifted));
+  assert.deepStrictEqual(drifted.binding.unreviewedSourceDelta.map((entry) => entry.path), [SPEC_PATH]);
+  assert.equal(validateDesignApprovalBinding(drifted.binding).ok, true);
+});
+
+test("PO 2026-11-09 + L3: a delta over unchanged sources that withdraws the open findings binds as pass with two entries", () => {
+  const sources = sourcesWith();
+  const first = initialReceipt(sources, ["F-1"]);
+  const second = deltaReceipt(first, sources, []);
+  const bound = createDesignApprovalBinding({ featureId: FEATURE, receipts: asInput(first, second), currentSources: sources });
+  assert.equal(bound.ok, true, JSON.stringify(bound));
+  assert.deepStrictEqual([bound.binding.verdict, bound.binding.reviewReceipts.length, Object.hasOwn(bound.binding, "unreviewedSourceDelta")], ["pass", 2, false]);
 });
 
 test("U3-8: a featureId different from the receipts' (feat-y) is DAB-REVIEW-CHAIN with DCC-REVIEW-RECEIPT-BINDING, on create and on verify", () => {

@@ -14,6 +14,10 @@ import * as SANCTIONED_CONSTANTS from "./constants.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
 import { isNodeInterpreterWord, relativeUnderRoot, sameNativePath } from "../path-spelling.mjs";
 
+// The structural bound of a design review chain (DESIGN_REVIEW_MAX_ROUNDS of lib/design-review-receipt.mjs, kept as a literal so the
+// guard's import closure does not grow; lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs pins the two equal).
+export const REVIEW_CHAIN_MAX_RECEIPTS = 64;
+
 export function sanctionedSessionCriticFinalizerArgs(allArgs, root) {
   // C28c: a trailing `--stage` on `finalize` (stage exactly the printed lineage commitPaths, never commit) is judged on the form before it.
   const args = allArgs[0] === "finalize" && allArgs.length === 6 && allArgs.at(-1) === "--stage" ? allArgs.slice(0, -1) : allArgs;
@@ -453,10 +457,11 @@ export function sanctionedPipelineStateArgs(args, root) {
     });
   }
   if (args[0] === "materialize-architecture") return args.length === 1;
-  // Late binding step 4: `prepare-seal` writes only the seal plan file (never State), idempotent. It takes up to two readiness review
-  // receipts (the same closed path rule as present-plan) to check them against the bytes being sealed.
+  // Late binding step 4: `prepare-seal` writes only the seal plan file (never State), idempotent. It takes the readiness review
+  // receipts of the chain (the same closed path rule as present-plan) to check them against the bytes being sealed.
+  // L3 (PO decision 2026-11-13): delta rounds until pass, so the chain is bounded only structurally (DESIGN_REVIEW_MAX_ROUNDS).
   if (args[0] === "prepare-seal") {
-    if (args.length !== 1 && args.length !== 3 && args.length !== 5) return false;
+    if (args.length % 2 !== 1 || args.length > 1 + 2 * REVIEW_CHAIN_MAX_RECEIPTS) return false;
     const receipts = new Set();
     for (let index = 1; index < args.length; index += 2) {
       if (args[index] !== "--review-receipt" || receipts.has(args[index + 1]) || !designReviewReceiptPath(args[index + 1], root)) return false;
@@ -520,7 +525,7 @@ export function sanctionedPipelineStateArgs(args, root) {
   }
   if (args[0] === "present-plan") {
     if (args[1] !== "--by" || !validBy(args[2]) || args[2].startsWith("--")
-      || ![3, 5, 7].includes(args.length)) return false;
+      || args.length < 3 || args.length % 2 !== 1 || args.length > 3 + 2 * REVIEW_CHAIN_MAX_RECEIPTS) return false;
     const receipts = new Set();
     for (let index = 3; index < args.length; index += 2) {
       if (args[index] !== "--review-receipt" || receipts.has(args[index + 1])

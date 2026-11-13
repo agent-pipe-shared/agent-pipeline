@@ -152,6 +152,10 @@ const originalDesignCases = [
   {
     "id": "DABX014",
     "name": "C28e (Glossover G7): present-plan refuses a PRD and Spec the feature package cannot carry, before any request exists"
+  },
+  {
+    "id": "DABX015",
+    "name": "L3 (Claude run 3): present-plan refuses a review chain whose last round leaves findings open, names them and the delta route, and writes no request"
   }
 ];
 const designCompletionCases = [];
@@ -435,7 +439,7 @@ function continuityRequest(authority) {
 
 /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
 const MOVED_DIR = "specs/e2e-moved";
-async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false } = {}) {
+async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false, proofUncommitted = false, openFindingIds = [] } = {}) {
   stateModule ??= await import(pathToFileURL(CLI).href);
   const governance = await loadLib("governance-scope.mjs");
   const poGate = await loadLib("po-gate-authority.mjs");
@@ -519,7 +523,7 @@ async function buildSubmittedFeature(prefix, { fallback, move = false, changeByt
     sources: { prd: sourceFor(PLAN_PATH), spec: sourceFor(SPEC_PATH), companions: COMPANION_PATHS.map(sourceFor) },
     reviewer: { runner: "claude", model: "claude-opus-4" },
     report: sourceFor(REPORT_PATH),
-    openFindingIds: [],
+    openFindingIds,
     reviewedAt: "2026-10-09T09:00:00.000Z",
     ...(fallback === undefined ? {} : { fallback }),
   });
@@ -743,6 +747,22 @@ test("C28e (Codex test run): present-plan names a trust policy that is not in th
   // The repaired state (the same fixture with the policy committed) is route 1/2: present-plan hands over one signing step there. A
   // commit inside this fixture would move the HEAD the route owner is bound to (SDC-ROOT repository-binding-changed), so it is not
   // repeated here.
+});
+
+// L3 (PO decision 2026-11-13): no signature over an open readiness review; the route is the next delta round until it passes.
+// The binding itself still records an open set (an approval already signed over one keeps verifying), so this is the presentation gate.
+test("L3 (Claude run 3): present-plan refuses a review chain whose last round leaves findings open, names them and the delta route, and writes no request", async () => {
+  const fx = await buildSubmittedFeature("route-open-findings", { openFindingIds: ["DESIGN-REVIEW-1", "DESIGN-REVIEW-2"] });
+  await bindRouteOwner(fx);
+  const refused = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
+  assert.equal(refused.status, 2, `present-plan must refuse; stdout: ${refused.stdout}; stderr: ${refused.stderr}`);
+  assert.match(refused.stderr, /PLAN-DESIGN-REVIEW-OPEN/u);
+  assert.match(refused.stderr, /DESIGN-REVIEW-1, DESIGN-REVIEW-2/u);
+  assert.match(refused.stderr, /design-review-receipt\.mjs create --previous/u);
+  assert.equal(posixSigningCommands(refused.stdout).length, 0, "no signing command is handed over");
+  const requests = existsSync(join(fx.dir, "scratch")) ? readdirSync(join(fx.dir, "scratch")).filter((name) => name.startsWith("design-approval-request-")) : [];
+  assert.deepEqual(requests, [], "no approval request is written");
+  assert.equal(readState(fx.dir).planPresentation ?? null, null, "no presentation is recorded");
 });
 
 test("route 2: one design proof, approve-plan, and the closed v9 accepted-contract record", async (t) => {
