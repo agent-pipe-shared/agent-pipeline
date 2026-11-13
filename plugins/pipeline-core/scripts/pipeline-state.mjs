@@ -513,6 +513,7 @@ import {
 } from "../lib/plan-spec-state-v2.mjs";
 import {
   RESULT_RECONCILIATION_FENCE,
+  featurePackageArtifactPath,
   inventoryFeaturePackages,
   planFeaturePackageBootstrap,
   planFeaturePackageReconcile,
@@ -10466,6 +10467,18 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
       const current = sources();
       const paths = [policyPath, ...(current ? [current.prd.path, current.spec.path, ...current.companions.map((entry) => entry.path)] : []), ...reviewPaths];
       return designCandidateSourceGaps(dir, candidate, [...new Set(paths)], deps);
+    } },
+    // C28e (Glossover G7): after the signature the package registration carries the approved PRD and Spec at their paths. A path the
+    // package topology refuses (outside specs/, or inside another feature's package) blocked the registration and every dispatch after
+    // an approval; it is named here, before a request exists.
+    { id: "package-paths", run: () => {
+      const featureId = submitted.featureId ?? state.activeFeature?.id ?? null;
+      const gaps = [["prd", submitted.planPath], ["spec", submitted.specPath]]
+        .filter(([kind, path]) => typeof path === "string" && !featurePackageArtifactPath(dir, featureId, kind, path))
+        .map(([kind, path]) => ({ code: "DAB-PACKAGE-PATH", path,
+          message: `the ${kind === "prd" ? "PRD" : "Spec"} at ${path} cannot be carried by the feature package of ${featureId}: it must lie in specs/${featureId}/ or in another specs/ folder that is no feature package`,
+          repair: `Move it into specs/${featureId}/ (git mv), commit, then run submit-plan and present-plan again.` }));
+      return gaps.length > 0 ? gaps : null;
     } },
     { id: "decision-bindings", run: () => {
       if (sources() === null) return null;

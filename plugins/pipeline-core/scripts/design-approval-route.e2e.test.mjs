@@ -148,6 +148,10 @@ const originalDesignCases = [
   {
     "id": "DABX013",
     "name": "C28e (Codex test run): present-plan names a trust policy that is not in the commit the request would bind, and writes no request"
+  },
+  {
+    "id": "DABX014",
+    "name": "C28e (Glossover G7): present-plan refuses a PRD and Spec the feature package cannot carry, before any request exists"
   }
 ];
 const designCompletionCases = [];
@@ -979,6 +983,33 @@ test("rebind 4: a request created after the move is signed and approved by the r
   const state = readState(fx.dir);
   assert.equal(state.planApproved, true);
   assert.deepEqual(state.planApproval.designApprovalBinding.pathRebind, { fromDir: "specs/e2e", toDir: MOVED_DIR });
+  // C28e (Glossover G7): the approved PRD and Spec lie outside specs/<feature-id>/. The real registrar carries them at the approved
+  // paths (it refused FTP-ARTIFACT-0/1 "path must be canonical within specs/e2e/" before), every other artifact stays in specs/e2e/,
+  // and the accepted contract then resolves.
+  const registered = spawnSync(process.execPath, [join(HERE, "register-feature-package.mjs"), "--root", fx.dir], { encoding: "utf8" });
+  assert.equal(registered.status, 0, `register-feature-package; stdout: ${registered.stdout}; stderr: ${registered.stderr}`);
+  const manifest = JSON.parse(readFileSync(join(fx.dir, "specs/e2e/lifecycle.json"), "utf8"));
+  const pathOf = (kind) => manifest.artifacts.find((entry) => entry.class === kind)?.path;
+  assert.deepEqual([pathOf("prd"), pathOf("spec")], [`${MOVED_DIR}/prd_e2e.md`, `${MOVED_DIR}/spec.md`], "the PRD and the Spec are carried at the approved paths");
+  for (const entry of manifest.artifacts.filter((item) => item.class !== "prd" && item.class !== "spec")) assert.ok(entry.path.startsWith("specs/e2e/"), entry.path);
+  const accepted = stateModule.readAcceptedDeliveryContract({ dir: fx.dir, envelopePath: state.planApproval.acceptedContract.path });
+  assert.equal(accepted.ok, true, JSON.stringify(accepted));
+});
+
+// C28e (Glossover G7): a PRD and Spec the package could not carry (here: inside another feature's package) are named before the
+// signature, so the state that blocked every dispatch after the approval can no longer be signed.
+test("C28e (Glossover G7): present-plan refuses a PRD and Spec the feature package cannot carry, before any request exists", async (t) => {
+  const fx = await buildSubmittedFeature("rebind-foreign-package", { move: true });
+  writeFileIn(fx.dir, `${MOVED_DIR}/lifecycle.json`, "{}\n");
+  git(fx.dir, "add", "--", `${MOVED_DIR}/lifecycle.json`);
+  git(fx.dir, "commit", "-q", "-m", "fixture: the moved folder is another feature's package");
+  let out;
+  try { out = await presentOwned(fx); } catch (error) { const limitation = hostLimitationOf(error); if (limitation === null) throw error; t.skip(`HOST-LIMITATION ${limitation.reason}`); return; }
+  assert.equal(out.present.status, 2, `present-plan must refuse; stdout: ${out.present.stdout}; stderr: ${out.present.stderr}`);
+  assert.match(out.present.stderr, /DAB-PACKAGE-PATH/u);
+  assert.match(out.present.stderr, new RegExp(`${MOVED_DIR}/prd_e2e\\.md`, "u"));
+  assert.match(out.present.stderr, /Move it into specs\/e2e\/ \(git mv\)/u);
+  assert.equal(out.request, null, "no approval request is written");
 });
 
 // Every original callback registers exactly once with the official FD3 protocol.

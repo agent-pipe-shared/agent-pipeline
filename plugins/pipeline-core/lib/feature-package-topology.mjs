@@ -37,6 +37,19 @@ function packageRelative(id, value) {
   const prefix = `specs/${id}/`;
   return typeof value === "string" && value.startsWith(prefix) ? value.slice(prefix.length) : null;
 }
+// C28e (Glossover G7, PO decision 2026-11-13): the PRD and the Spec stay where the PO approved them. A feature whose id changed after the
+// design (G1) keeps its approved PRD and Spec in the earlier folder; the package carries them at that path, bound by digest like every
+// entry. Only these two classes, only inside specs/, never in a folder that is itself another feature's package; every other artifact
+// stays under specs/<id>/.
+const APPROVED_SOURCE_CLASSES = new Set(["prd", "spec"]);
+export function featurePackageArtifactPath(rootDir, id, artifactClass, value) {
+  const root = resolve(rootDir);
+  if (!SAFE_ID.test(id ?? "") || !canonicalRelative(root, value)) return false;
+  if (packageRelative(id, value) !== null) return true;
+  if (!APPROVED_SOURCE_CLASSES.has(artifactClass)) return false;
+  const parts = value.split("/");
+  return parts.length >= 3 && parts[0] === "specs" && parts[1] !== id && !existsSync(join(root, "specs", parts[1], "lifecycle.json"));
+}
 function regularFile(root, path, findings, code) {
   const safe = canonicalRelative(root, path);
   if (!safe) { findings.push(`${code}: unsafe path`); return null; }
@@ -72,8 +85,7 @@ function walk(root, start) {
 // class test and is never made configurable.
 function autoRebindMutableArtifact(root, id, artifact) {
   if (!object(artifact) || artifact.mutability !== "mutable") return null;
-  const rel = packageRelative(id, artifact.path);
-  if (!rel || !canonicalRelative(root, artifact.path)) return null;
+  if (!featurePackageArtifactPath(root, id, artifact.class, artifact.path)) return null;
   const file = regularFile(root, artifact.path, [], "FTP-AUTOREBIND");
   if (!file || !SHA256.test(artifact.sha256 ?? "")) return null;
   const currentSha256 = digest(readFileSync(join(root, file)));
@@ -185,9 +197,9 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath, pr
       else if (artifact.amendment?.previousSha256 !== previousEntry.sha256) findings.push(`${label}: amendment.previousSha256 must equal the previously recorded digest`);
     }
     if (!FEATURE_CLASSES.includes(artifact.class)) findings.push(`${label}: unsupported class`);
-    const rel = packageRelative(id, artifact.path);
-    if (!rel || !canonicalRelative(root, artifact.path)) findings.push(`${label}: path must be canonical within specs/${id}/`);
-    const file = rel ? regularFile(root, artifact.path, findings, label) : null;
+    const admitted = featurePackageArtifactPath(root, id, artifact.class, artifact.path);
+    if (!admitted) findings.push(`${label}: path must be canonical within specs/${id}/${APPROVED_SOURCE_CLASSES.has(artifact.class) ? " or, for the approved PRD or Spec, within another specs/ folder that is no feature package" : ""}`);
+    const file = admitted ? regularFile(root, artifact.path, findings, label) : null;
     const caseKey = typeof artifact.path === "string" ? artifact.path.normalize("NFKC").toLocaleLowerCase("en-US") : "";
     if (caseKey && folded.has(caseKey)) findings.push(`${label}: case-fold or Unicode-normalization collision`);
     if (caseKey) folded.add(caseKey);
@@ -511,8 +523,7 @@ export function planFeaturePackageReconcile(rootDir = process.cwd(), manifestPat
   let liftedPath = null;
   for (const [index, artifact] of (Array.isArray(value.artifacts) ? value.artifacts : []).entries()) {
     const label = `FTP-RECONCILE-${index}`;
-    const rel = packageRelative(id, artifact?.path);
-    const file = rel && canonicalRelative(root, artifact.path) ? regularFile(root, artifact.path, [], label) : null;
+    const file = featurePackageArtifactPath(root, id, artifact?.class, artifact?.path) ? regularFile(root, artifact.path, [], label) : null;
     if (!file) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "artifact-unreadable", findings: [`${label}: referenced file is missing or unsafe`] };
     const currentBytes = readFileSync(join(root, file));
     const currentSha256 = digest(currentBytes);

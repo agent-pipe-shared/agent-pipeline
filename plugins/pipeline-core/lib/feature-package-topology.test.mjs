@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { planFeaturePackageBootstrap, planFeaturePackageReconcile, planFeaturePackageTransition, validateFeaturePackage, validateFeatureTopology } from "./feature-package-topology.mjs";
+import { featurePackageArtifactPath, planFeaturePackageBootstrap, planFeaturePackageReconcile, planFeaturePackageTransition, validateFeaturePackage, validateFeatureTopology } from "./feature-package-topology.mjs";
 import { readFileSync } from "node:fs";
 
 const root = mkdtempSync(join(tmpdir(), "feature-topology-"));
@@ -283,3 +283,37 @@ try {
 
   console.log("feature-package-topology: planFeaturePackageTransition/planFeaturePackageReconcile options.autoRebindMutable passthrough, 9 passed, 0 failed");
 } finally { rmSync(wireRoot, { recursive: true, force: true }); }
+
+// C28e (Glossover G7, PO decision 2026-11-13): the feature id changed after the design, so the approved PRD and Spec stayed in the earlier
+// folder. The package carries those two at the approved path; every other class, a path outside specs/ and another feature's package stay refused.
+const approvedPathRoot = mkdtempSync(join(tmpdir(), "feature-topology-approved-path-"));
+try {
+  const id = "renamed-feature"; const base = `specs/${id}`; const earlier = "specs/2026-10-26-renamed-feature";
+  const entry = (klass, path, authority, mutability, retention) => ({ class: klass, ...fileIn(approvedPathRoot, path, `${klass} ${path}\n`), authority, mutability, retention });
+  const core = () => [entry("acceptance", `${base}/acceptance.md`, true, "mutable", "active"), entry("result", `${base}/result.md`, true, "append-only", "retain"),
+    entry("candidate-evidence", `${base}/evidence/accepted-delivery-contract-${"a".repeat(64)}.json`, false, "immutable", "retain")];
+  const manifestPath = `${base}/lifecycle.json`;
+  const validate = (artifacts) => {
+    fileIn(approvedPathRoot, manifestPath, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "approved", artifacts, candidate: null, supersedes: null })}\n`);
+    return validateFeaturePackage(approvedPathRoot, manifestPath);
+  };
+  const approved = validate([entry("prd", `${earlier}/prd.md`, true, "mutable", "active"), entry("spec", `${earlier}/spec.md`, true, "mutable", "active"), ...core()]);
+  assert.equal(approved.ok, true, JSON.stringify(approved.findings));
+  assert.equal(featurePackageArtifactPath(approvedPathRoot, id, "prd", `${base}/prd.md`), true, "inside the package as before");
+  assert.equal(featurePackageArtifactPath(approvedPathRoot, id, "acceptance", `${earlier}/acceptance.md`), false, "only the PRD and the Spec may lie elsewhere");
+  assert.equal(featurePackageArtifactPath(approvedPathRoot, id, "candidate-evidence", `${earlier}/evidence/x.json`), false);
+  for (const outside of ["docs/prd.md", "prd.md", "specs/prd.md", `${earlier}/../outside/prd.md`, `/${earlier}/prd.md`, `${earlier}\\prd.md`]) {
+    assert.equal(featurePackageArtifactPath(approvedPathRoot, id, "prd", outside), false, outside);
+  }
+  const misplaced = validate([entry("prd", `${earlier}/prd.md`, true, "mutable", "active"), entry("spec", `${earlier}/spec.md`, true, "mutable", "active"),
+    entry("acceptance", `${earlier}/acceptance.md`, true, "mutable", "active"), ...core().slice(1)]);
+  assert.equal(misplaced.ok, false);
+  assert.match(misplaced.findings.join("\n"), /FTP-ARTIFACT-2: path must be canonical within specs\/renamed-feature\/$/mu);
+  // Another feature's package is never a place for this feature's sources.
+  fileIn(approvedPathRoot, `${earlier}/lifecycle.json`, "{}\n");
+  assert.equal(featurePackageArtifactPath(approvedPathRoot, id, "prd", `${earlier}/prd.md`), false);
+  const foreign = validate([entry("prd", `${earlier}/prd.md`, true, "mutable", "active"), entry("spec", `${earlier}/spec.md`, true, "mutable", "active"), ...core()]);
+  assert.equal(foreign.ok, false);
+  assert.match(foreign.findings.join("\n"), /FTP-ARTIFACT-0: path must be canonical within specs\/renamed-feature\/ or, for the approved PRD or Spec, within another specs\/ folder that is no feature package/u);
+  console.log("feature-package-topology: approved PRD/Spec path outside the package, 12 passed, 0 failed");
+} finally { rmSync(approvedPathRoot, { recursive: true, force: true }); }
