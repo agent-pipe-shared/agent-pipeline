@@ -1557,6 +1557,18 @@ export function classifyNonLiftableGuardDenials(denials) {
   const codes = denials.map(denial => denial?.guard === "guard-lifecycle-ready.mjs"
     ? String(denial.reason ?? "").match(/^BLOCKED \(guard-lifecycle-ready, plugin pipeline-core\): ([A-Z][A-Z0-9-]+):/u)?.[1] ?? null
     : null);
+  // C28e (PO decision 2026-11-13): reopen-design is the PO's step like discard-feature; no capability and no signature delegates it.
+  const reopenOnly = codes.includes("PO-REOPEN-HUMAN-ONLY");
+  if (reopenOnly) {
+    return {
+      status: "non-liftable-recovery-required",
+      code: "PO-REOPEN-HUMAN-ONLY",
+      cause: denials.map(denial => String(denial.reason)).join("\n"),
+      recoveryGuidance: [],
+      coDenialSummary: null,
+      nextAction: { kind: "repair-required", reason: 'Run reopen-design --by "<label>" --dry-run and put the printed cost to the PO, next to the Spec addendum for a correction inside implementation. Only the PO runs reopen-design itself, in their own terminal; a signature or chat approval cannot delegate it to the agent.' },
+    };
+  }
   const humanOnly = codes.includes("PO-DISCARD-HUMAN-ONLY");
   const diagnosticOnly = codes.every(code => code === "GUARD-READ-COMMAND-UNSUPPORTED" || code === "GUARD-READ-TARGET-MISSING");
   // Antigravity greenfield 2026-11-08: GIT-03 says "no override for this rule" and an override block followed it. The message is the repair.

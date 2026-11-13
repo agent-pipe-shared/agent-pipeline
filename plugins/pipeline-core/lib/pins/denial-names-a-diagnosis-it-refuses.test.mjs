@@ -20,7 +20,8 @@ const blockedDraft = { devPlanGateVerdictFn: () => ({ verdict: 'block', reason: 
 // Fixture: an existing single-link regular review receipt under scratch/ (relative path, as the catalogue demands).
 const receiptRel = 'scratch/denial-diagnosis-pin-receipt.json';
 const SHAPES = {
-  'reopen-design': '--by tester',
+  // ADR-0095 Decision 10: the agent-runnable form a denial names is the preview; the reopen itself is the PO's step.
+  'reopen-design': '--by tester --dry-run',
   'present-plan': `--by tester --review-receipt ${receiptRel}`,
   'approve-plan': '--by tester',
   'set-phase': '--phase implementation',
@@ -120,8 +121,10 @@ check('DND004', 'all denial codes: every recovery verb a rendered denial names i
 });
 check('DND005', 'exact rendered recovery text: the denial spelling is observed against the guard, not a hand-built spelling', () => {
   const text = designAdvisoryRemediation('DAA-DESIGN-SOURCE-DRIFT');
-  const rendered = /Run (reopen-design --by <human attribution>)/u.exec(text)?.[1];
-  assert.equal(rendered, 'reopen-design --by <human attribution>', 'denial text no longer renders the pinned recovery spelling');
+  // ADR-0095 Decision 10: the denial hands the reopen to the PO and names the agent's preview.
+  assert.match(text, /ask the PO to run reopen-design --by <human attribution> in their own terminal/u);
+  const rendered = /preview it with (reopen-design --by <human attribution> --dry-run)/u.exec(text)?.[1];
+  assert.equal(rendered, 'reopen-design --by <human attribution> --dry-run', 'denial text no longer renders the pinned recovery spelling');
   // The spelling exactly as rendered, bare and with the sanctioned script prefix.
   const bare = isSanctionedLifecycleCommand(rendered, root, {});
   const prefixed = isSanctionedLifecycleCommand(`node "${script}" ${rendered}`, root, {});
@@ -224,7 +227,7 @@ check('DND012', 'D117 advisory: typed code, what was not verified, one repair ve
   const advisory = policy.unverifiedApprovalAdvisory({ ok: false, code: 'DWP-PACKAGE-PHYSICAL' }, { planApproval: { designWorkflowPackagePath: 'evidence/package.json' } });
   assert.ok(advisory, 'DWP-PACKAGE-PHYSICAL (the code this item was filed for) must degrade to an advisory');
   assert.equal(advisory.code, 'GUARD-DEVPLAN-APPROVAL-UNVERIFIED');
-  for (const needle of [advisory.code, 'DWP-PACKAGE-PHYSICAL', 'evidence/package.json', 'Nothing was verified', 'Repair: run reopen-design']) {
+  for (const needle of [advisory.code, 'DWP-PACKAGE-PHYSICAL', 'evidence/package.json', 'Nothing was verified', 'Repair: Reopening the signed design', 'reopen-design --by <human attribution> --dry-run']) {
     assert.ok(advisory.text.includes(needle), `advisory must contain: ${needle}`);
   }
   assert.ok(!refusedNames(advisory.text), 'the advisory names a script command the lane refuses');

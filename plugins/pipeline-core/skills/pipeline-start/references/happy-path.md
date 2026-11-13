@@ -53,6 +53,8 @@ The acceptance question of the one-shot close ends with ONE fixed yes form (`yes
    wait for a signature without it (live 2026-11-10: the PO had to ask where the command was). **For a draft package this one signature is the seal:** the approval writes the PRD and Spec digests into the State in the
    same transaction. A project bound before this change (`bound-unapproved`) stays locked until its approval; `pipeline-state.mjs reopen-design --by <name>` is executable in
    every state (it voids a prepared seal plan, unlocks a bound package, releases a sealed one); the refusals about a draft or a bound package name it as an exit.
+   It is the PO's own step, run in the PO's own terminal: the guard refuses it from an agent (`PO-REOPEN-HUMAN-ONLY`) and admits only the preview
+   `reopen-design --by <name> --dry-run`. A correction of the approved Spec during implementation needs no reopen: it is a Spec addendum with one PO approval (ADR-0095).
 6. `register-feature-package.mjs --root <root>` (agent). It prints `commitPaths`: commit them BEFORE the binding is generated. After registration do not edit
    the PRD, Spec, `acceptance.md`, `result.md` or the envelope. Owner: `references/implementation-continuation.md`.
    When the push gate is configured `approval: required`, also run `pipeline-state.mjs materialize-push-threat-model` now (agent, no flags; it refuses

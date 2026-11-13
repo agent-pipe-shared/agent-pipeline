@@ -50,9 +50,16 @@ import { isCurrentSessionArtifactExport } from "../current-session-artifact-expo
 // G2 / EL-36: READY permits agent work, but cannot authorize the human's
 // decision to abandon a feature. Match the actual script and verb, never text
 // mentioning them. The existing parser leaves compound commands to grammar.
-function isHumanOnlyDiscard(command, root) {
+function isHumanOnlyDiscard(command, root) { return isHumanOnlyStateVerb(command, root, (args) => args[0] === "discard-feature"); }
+// C28e (Claude test run, PO decision 2026-11-13): reopening an approved design voids the PO's signature and costs a new design round;
+// the agent started it at once although the PO had said "only if unavoidable". The void is the PO's step now, like discard-feature;
+// `reopen-design --by <x> --dry-run` stays an agent read (it prints what the void would cost and writes nothing).
+// Only the exact preview shape `reopen-design --by <label> --dry-run` is agent work; any other argv naming the verb is the PO's step.
+const REOPEN_PREVIEW = (args) => args.length === 4 && args[1] === "--by" && args[2] !== "--dry-run" && args[3] === "--dry-run";
+function isHumanOnlyReopen(command, root) { return isHumanOnlyStateVerb(command, root, (args) => args[0] === "reopen-design" && !REOPEN_PREVIEW(args)); }
+function isHumanOnlyStateVerb(command, root, matches) {
   const invocation = resolveSanctionedScriptInvocation(command, root);
-  if (invocation?.args[0] !== "discard-feature") return false;
+  if (!Array.isArray(invocation?.args) || !matches(invocation.args)) return false;
   let script = invocation.script;
   if (script.startsWith("file:")) {
     try { script = fileURLToPath(script); } catch { return false; }
@@ -258,6 +265,11 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     // Never enter HGO: neither a capability nor a signed plan delegates discard.
     return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-DISCARD-HUMAN-ONLY: discard-feature is a human-terminal action; the agent cannot discard a feature to escape an implementation block or supply --by.\n"
       + "PO recovery: in the project directory, run node plugins/pipeline-core/scripts/pipeline-state.mjs discard-feature --by \"<your name>\" --reason \"<why this feature is being abandoned>\" in your own terminal, using your own name and reason.\n");
+  }
+  if (toolName === "Bash" && isHumanOnlyReopen(input.tool_input.command ?? input.tool_input.CommandLine, root)) {
+    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-REOPEN-HUMAN-ONLY: reopen-design voids the PO's design approval and starts a new design round with a new signature; only the PO starts it.\n"
+      + "Agent route: run the same command with --dry-run (it writes nothing and prints what the void would cost), then put that cost and the alternative to the PO: a Spec correction inside implementation goes through the Spec addendum, which keeps the phase and needs one signature over the delta.\n"
+      + "PO route: in the project directory, run node plugins/pipeline-core/scripts/pipeline-state.mjs reopen-design --by \"<your name>\" in your own terminal.\n");
   }
   if (SHELL_TOOLS.includes(toolName) && isHumanPoProfileChangeCommand(
     input.tool_input.command ?? input.tool_input.CommandLine, root,

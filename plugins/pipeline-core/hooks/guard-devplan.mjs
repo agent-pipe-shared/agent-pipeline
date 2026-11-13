@@ -161,6 +161,7 @@ import {
   resolveActiveRebaseAuthority,
 } from "../lib/guard-devplan-policy.mjs";
 import { rebaseAuthorityPermitsPath } from "../lib/rebase-authority.mjs";
+import { REOPEN_DESIGN_PO_COMMAND, REOPEN_DESIGN_PO_STEP } from "../lib/reopen-design-po-step.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
@@ -578,9 +579,9 @@ const lifecycleReason = ledgerAuthorityUnresolved
     + "Re-record it: node harness/scripts/pipeline-state.mjs approve-plan --by <name> "
     + "--human-decision-file <repo-relative-reference>."
   : lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"
-  ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
+  ? `Current Plan/Spec authority is stale or closed. ${REOPEN_DESIGN_PO_STEP}`
   : lifecycle.status === "awaiting-approval"
-    ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`reopen-design --by <name>\`.`
+    ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`${REOPEN_DESIGN_PO_COMMAND}\`, which the PO runs.`
     : lifecycle.status === "approved"
       ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
       : "The feature is still in draft design and has no implementation authority.");

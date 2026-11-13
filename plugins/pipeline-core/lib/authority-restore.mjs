@@ -120,13 +120,13 @@ export function planAuthorityRestore(root, { commit = "HEAD", isBound = (state) 
   if (edited.length === 0) {
     return restoreRefusal("AUTHORITY-RESTORE-NOTHING-EDITED",
       "Every bound document already matches its approved digest; there is nothing to restore.",
-      "No action needed. To change an approved document, use the design route (`reopen-design`).");
+      "No action needed. To correct the approved Spec during implementation, use a Spec addendum (ADR-0095); to change an approved document otherwise, the PO reopens the design (`reopen-design`, the PO's own step).");
   }
   const bad = edited.find((d) => d.sourceSha256 !== d.approvedSha256);
   if (bad !== undefined) {
     return restoreRefusal("AUTHORITY-RESTORE-SOURCE-MISMATCH",
       `The bytes of ${bad.path} at ${commit} ${bad.sourceSha256 === null ? "cannot be read" : `hash to ${bad.sourceSha256}`}, not the approved ${bad.approvedSha256}.`,
-      `Name a commit that holds the approved bytes with --commit <full sha> (find it with: git log --format=%H -- ${bad.path}), or accept the edit through the design route (reopen-design, then submit-plan and approve-plan).`);
+      `Name a commit that holds the approved bytes with --commit <full sha> (find it with: git log --format=%H -- ${bad.path}), or accept the edit through the design route (the PO runs reopen-design, then submit-plan and approve-plan).`);
   }
   return { ok: true, schema: AUTHORITY_RESTORE_SCHEMA, status: "restorable", documents };
 }
@@ -145,7 +145,7 @@ export function restoreAdvice({ root }) {
   return { paths, command: `node ${RESTORE_SCRIPT} restore --root ${root}` };
 }
 
-const REOPEN_ONLY = "Current Plan/Spec authority is stale or unavailable. Use the returned sanctioned reopen-design action before resubmission or approval.";
+const REOPEN_ONLY = "Current Plan/Spec authority is stale or unavailable. The returned reopen-design action is the PO's own step: hand it to the PO for their own terminal (you may run its --dry-run preview) before resubmission or approval.";
 
 /** The `inspect` nextActionText for a `reopen-design` lifecycle: the restore command first when it can work. */
 export function reopenDesignNextActionText(root) {
@@ -153,5 +153,5 @@ export function reopenDesignNextActionText(root) {
   if (advice === null) return REOPEN_ONLY;
   return `Current Plan/Spec authority is stale: ${advice.paths.join(", ")} differs from the approved digest, and the committed bytes at HEAD still match it. `
     + `First repair, no PO round trip: ${advice.command} (restores the approved bytes; Pipeline State is not written). `
-    + "Only if the edit must stay, use the returned sanctioned reopen-design action before resubmission or approval.";
+    + "Only if the edit must stay, hand the returned reopen-design action to the PO (their own step, in their own terminal; you may run its --dry-run preview) before resubmission or approval.";
 }

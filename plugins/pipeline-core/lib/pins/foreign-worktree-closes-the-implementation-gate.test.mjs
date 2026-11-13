@@ -127,7 +127,7 @@ test('AC4 reopen-design (C6g3 D1): every DWP-APPROVAL-* reopen code has the reop
   const {designAdvisoryRemediation}=await import('../guard-devplan-policy.mjs');
   const codes=m.ARCHITECTURE_DESIGN_REOPEN_CODES.filter(c=>c.startsWith('DWP-APPROVAL-'));
   assert.ok(codes.length>=2,'parity subject must be non-empty');
-  for(const code of codes)assert.match(designAdvisoryRemediation(code),/Run reopen-design --by/u,code+': guard remediation is not reopen-design');
+  for(const code of codes)assert.match(designAdvisoryRemediation(code),/ask the PO to run reopen-design --by/u,code+': guard remediation is not the PO reopen-design step');
 });
 
 test('AC4 reopen-design (F1): a typed non-drift code (setup/availability) gets a diagnosis, not reopen-design',async()=>{
@@ -176,7 +176,8 @@ test('AC3 named diagnosis: the closed-gate denial names only admitted recovery c
   const retired=`node "${join(pluginRoot,'scripts','design-advisory-admission.mjs')}" inspect --repo-root ${repoRoot} --feature f --plan p --spec s`;
   const namesRetired=t=>/design-advisory-admission|\binspect\b|\.mjs\b|\bnode\b/u.test(t);
   const receiptRel='scratch/foreign-worktree-pin-ac3-receipt.json';
-  const shapes={'reopen-design':'--by tester','present-plan':`--by tester --review-receipt ${receiptRel}`,'approve-plan':'--by tester','set-phase':'--phase implementation'};
+  // ADR-0095 Decision 10: the agent-runnable reopen form a denial names is the dry-run preview.
+  const shapes={'reopen-design':'--by tester --dry-run','present-plan':`--by tester --review-receipt ${receiptRel}`,'approve-plan':'--by tester','set-phase':'--phase implementation'};
   const codes=['DAA-DESIGN-APPROVAL-BINDING-DRIFT','DAA-DESIGN-SOURCE-DRIFT','DAA-PUBLIC-UNAVAILABLE','DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP'];
   // Precondition: the guard really refuses the retired command in the denying state.
   assert.equal(devPlanShellRefusalHit(retired,repoRoot,blockedDraft)?.lane,'opaque-script-execution');

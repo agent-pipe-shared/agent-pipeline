@@ -4790,8 +4790,9 @@ const NEXT_ACTION_BODY_BY_STATUS = {
   ],
   implementing: [
     "The plan is approved and the feature is in implementation. Proceed with the",
-    "approved implementation packages; reopen design only through",
-    "`pipeline-state reopen-design --by <name>` if it must change.",
+    "approved implementation packages. A correction of the approved Spec goes",
+    "through a Spec addendum; the design is reopened only by the PO, through",
+    "`pipeline-state reopen-design --by <name>` in the PO's own terminal.",
   ],
 };
 

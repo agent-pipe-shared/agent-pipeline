@@ -127,7 +127,9 @@ for (const [label, lane] of LANES) {
     assert.ok(run.stderr.includes("DWP-PACKAGE-PHYSICAL"), "names the cause");
     assert.ok(run.stderr.includes(PACKAGE_PATH), "names what could not be verified");
     assert.match(run.stderr, /Nothing was verified/u);
-    assert.equal(occurrences(run.stderr, "reopen-design"), 1, "names the single repair command");
+    // ADR-0095 Decision 10: the single repair is the PO's reopen step, named once as the PO's command and once as the agent's preview.
+    assert.equal(occurrences(run.stderr, "reopen-design"), 2, "names the single repair: the PO's command and its preview");
+    assert.ok(run.stderr.includes("reopen-design --by <human attribution> --dry-run"), "names the agent's preview");
     assert.ok(!run.stderr.includes("BLOCKED"), "an advisory is not a block");
   });
 

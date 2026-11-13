@@ -104,7 +104,6 @@ const recoveries = [
   ['intake answers', onboardingScript, ['intake-design-questions-apply', '--root', root, '--answers-json', '{"choice":"git push is data"}', '--activate', '--runner', 'codex'], true, true],
   ['marker planner', onboardingScript, ['intake-spec-marker-plan', '--root', root, '--intent', 'session', '--runner', 'codex'], false, false],
   ['marker apply', onboardingScript, ['intake-spec-marker-apply', '--root', root, '--plan-sha256', digest, '--activate', '--runner', 'codex'], true, true],
-  ['reopen', script, ['reopen-design', '--by', 'fixture-actor'], true, true],
   ['reopen dry-run preview', script, ['reopen-design', '--by', 'fixture-actor', '--dry-run'], false, false],
   ['recapture plan', script, ['recapture-design-input'], false, false],
   ['recapture apply', script, ['recapture-design-input', '--plan-sha256', digest], true, true],
@@ -124,6 +123,16 @@ for (const [name, entry, argv, mutation, requiresConfirmation] of recoveries) {
         'route classification must not invent an implementation write; writer still owns confirmation/digest authority');
     });
   }
+}
+// Candidate 28e (ADR-0095 Decision 10): the reopen itself voids the PO's approval and is the PO's own step. Even when an
+// observation offers it, the closed catalogue no longer sanctions it for an agent; only the dry-run preview above is.
+for (const executable of [process.execPath, '/opt/producer-node/bin/node']) {
+  check('offered reopen (the void) is not sanctioned with ' + (executable === process.execPath ? 'guard Node' : 'producer Node'), () => {
+    const published = { kind: 'command', executable, argv: [script, 'reopen-design', '--by', 'fixture-actor'], mutation: true, requiresConfirmation: true };
+    const deps = dependencies({ ...observed, nextAction: published });
+    assert.equal(isSanctionedLifecycleCommand(recoveryCommandFor(published), root, { ...deps, processExecPath: executable }), false,
+      'reopen-design without --dry-run is a PO step, never a sanctioned agent command');
+  });
 }
 const marker = { kind: 'command', executable: '/opt/producer-node/bin/node',
   argv: [onboardingScript, 'intake-spec-marker-apply', '--root', root, '--plan-sha256', digest, '--activate', '--runner', 'codex'],

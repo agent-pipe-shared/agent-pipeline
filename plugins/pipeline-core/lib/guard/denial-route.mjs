@@ -11,6 +11,7 @@ import { readAuthoritySeal } from "../authority-seal-reader.mjs";
 import { AUTHORITY_RESTORE_SCRIPT, CONTROLLING_NON_READY_STATUSES, INTAKE_LIFECYCLE_STATUSES, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH, PARTIAL_LIFECYCLE_SCRATCH_DIR, PLUGIN_ROOT } from "./constants.mjs";
 import { GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, GRAMMAR_DENIAL_REMEDY_SHORT, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_CREDENTIAL_TARGET_REMEDY, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY } from "./grammar-denials.mjs";
 import { verdict } from "./verdict.mjs";
+import { REOPEN_DESIGN_PO_STEP, SPEC_ADDENDUM_INSTEAD } from "../reopen-design-po-step.mjs";
 
 export function blocked(
   code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "", rejectedElement = null,
@@ -284,8 +285,9 @@ export function protectedAuthorityDocumentWriteOnly(matchedRelativePath, root) {
       + "A direct edit here does not change the recorded binding -- it only drifts the "
       + "file out from under it, which the continuity check later reports as an "
       + "unavailable observation rather than as the edit that caused it.\n"
-      + "The sanctioned route for a genuine planning change: run `reopen-design --by "
-      + "<name>` to release the binding, make the edit, then rebind with `submit-plan "
+      + `${SPEC_ADDENDUM_INSTEAD}\n`
+      + "The sanctioned route for a genuine planning change releases the binding through `reopen-design --by "
+      + "<name>`: " + REOPEN_DESIGN_PO_STEP + " After it, make the edit, then rebind with `submit-plan "
       + "--by <name> --profile <epic|feature|mini>` and `approve-plan --by <name>`.\n"
       + "If the only problem is a missing/incorrect PO plan acknowledgement marker on an "
       + "otherwise-correct bound PRD, the narrower `po-authority-acknowledge-plan` / "

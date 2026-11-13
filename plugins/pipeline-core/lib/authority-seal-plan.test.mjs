@@ -505,7 +505,9 @@ test("LB5-4 draft without a plan: the readback names the next command; before th
   assert.equal(submitted.plan.status, "none");
   assert.equal(submitted.next.verb, "prepare-seal");
   assert.equal(sanctionedPipelineStateArgs(["prepare-seal"], fx.root), true, "the lifecycle guard admits the repair command");
-  assert.equal(sanctionedPipelineStateArgs(["reopen-design", "--by", "synthetic-author"], fx.root), true);
+  // Candidate 28e (ADR-0095 Decision 10): the exit itself is the PO's step; the guard admits only the agent's dry-run preview.
+  assert.equal(sanctionedPipelineStateArgs(["reopen-design", "--by", "synthetic-author", "--dry-run"], fx.root), true);
+  assert.equal(sanctionedPipelineStateArgs(["reopen-design", "--by", "synthetic-author"], fx.root), false);
   assert.equal(sanctionedPipelineStateArgs(["inspect"], fx.root), true);
   const before = fx.stateBytes();
   assert.equal(fx.cli(["inspect"]).status, 0);

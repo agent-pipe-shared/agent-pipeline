@@ -42,9 +42,11 @@ const refused = command => devPlanShellRefusalHit(command, root, deps)?.lane ===
 const admittedByClosedArgv = command => isSanctionedLifecycleCommand(command, root, deps) && devPlanShellRefusalHit(command, root, deps) === null;
 
 test('AC-207 point 1: emitted lifecycle commands (native spelling) are admitted by closed argv in the draft lifecycle', () => {
-  for (const tail of ['inspect', 'reopen-design --by X', `cancel-submitted-plan --by X --submission-sha256 ${sha}`]) {
+  // ADR-0095 Decision 10: the emitted agent form of reopen-design is the dry-run preview; the void is the PO's step.
+  for (const tail of ['inspect', 'reopen-design --by X --dry-run', `cancel-submitted-plan --by X --submission-sha256 ${sha}`]) {
     assert.equal(admittedByClosedArgv(`node ${q(state)} ${tail}`), true, tail);
   }
+  assert.equal(isSanctionedLifecycleCommand(`node ${q(state)} reopen-design --by X`, root, deps), false, 'the void is not an agent command');
 });
 
 test('AC-207 point 1 control: admission stays closed (altered argv, foreign script)', () => {
@@ -56,7 +58,7 @@ test('AC-207 point 1 control: admission stays closed (altered argv, foreign scri
 test('AC-207 point 1: forward-slash and MSYS spellings of an emitted command are normalised before matching', () => {
   for (const spell of [forward, msys]) {
     assert.equal(admittedByClosedArgv(`node ${q(spell(state))} inspect`), true, `inspect ${spell.name}`);
-    assert.equal(admittedByClosedArgv(`node ${q(spell(state))} reopen-design --by X`), true, `reopen-design ${spell.name}`);
+    assert.equal(admittedByClosedArgv(`node ${q(spell(state))} reopen-design --by X --dry-run`), true, `reopen-design preview ${spell.name}`);
   }
 });
 

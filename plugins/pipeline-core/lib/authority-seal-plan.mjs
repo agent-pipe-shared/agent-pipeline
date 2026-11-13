@@ -102,7 +102,7 @@ export function buildSealPlan(input) {
     return refuse("PSP-OUT-OF-SCOPE", "this package has no PRD release to seal at", [], "nothing is needed: the bind at the end of onboarding applies to a package outside the PRD release scope (EL-19)");
   }
   const seal = readAuthoritySeal(authority);
-  if (seal.status === "sealed") return refuse("PSP-ALREADY-SEALED", "the PRD and the Spec are sealed already", [], "nothing to do; use reopen-design --by <name> to change the sealed documents");
+  if (seal.status === "sealed") return refuse("PSP-ALREADY-SEALED", "the PRD and the Spec are sealed already", [], "nothing to do; the sealed documents change only through reopen-design --by <name>, the PO's own step (preview it with --dry-run)");
   if (seal.status !== "draft") return refuse("PSP-AUTHORITY-INVALID", seal.reason, ["reopen-design"], "reopen the design and register the package paths again");
   if (!Number.isSafeInteger(revision) || revision < 0) return refuse("PSP-AUTHORITY-INVALID", "the State revision is not readable", ["reopen-design"], "inspect the State");
   if (designInputCapture !== null && documents.designInput !== null && documents.designInput.sha256 !== designInputCapture.sha256) {

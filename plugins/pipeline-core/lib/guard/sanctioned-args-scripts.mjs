@@ -483,8 +483,9 @@ export function sanctionedPipelineStateArgs(args, root) {
   if (args[0] === "apply-legacy-v2-revocation-recovery") return false;
   if (args[0] === "reopen-design") {
     // `--dry-run` previews the void without writing (pipeline.reopen-design-preview.v1); it is a pure read.
-    return args[1] === "--by" && validBy(args[2])
-      && (args.length === 3 || (args.length === 4 && args[3] === "--dry-run"));
+    // C28e (PO decision 2026-11-13): only the preview is sanctioned agent work. The void itself is the PO's step (PO-REOPEN-HUMAN-ONLY in
+    // guard/evaluate.mjs); a sanctioned argv here made the Codex and Antigravity adapters skip the lifecycle guard and admit it.
+    return args[1] === "--by" && validBy(args[2]) && args.length === 4 && args[3] === "--dry-run";
   }
   if (args[0] === "cancel-submitted-plan") {
     return args[1] === "--by" && validBy(args[2])

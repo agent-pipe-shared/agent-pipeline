@@ -363,14 +363,14 @@
     },
     {
       "id": "reopen-design",
-      "who": "agent",
+      "who": "po-only",
       "command": "node <plugin-root>/scripts/pipeline-state.mjs reopen-design --by <name>",
       "needs": [
-        "recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before)"
+        "recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before); the agent may run the same command with --dry-run as a preview, and a Spec correction during implementation goes through a Spec addendum instead (ADR-0095)"
       ],
       "evidenceSchema": null,
-      "producer": "lifecycle returns to draft",
-      "humanGate": false,
+      "producer": "lifecycle returns to draft, run in the PO's own terminal",
+      "humanGate": true,
       "next": [
         "set-feature",
         "submit-plan"
@@ -384,7 +384,7 @@
           "--by",
           "<name>"
         ],
-        "closed": true
+        "closed": false
       }
     },
     {

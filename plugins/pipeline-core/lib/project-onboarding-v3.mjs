@@ -3647,7 +3647,7 @@ function designToImplementationHandoverAction(root, fs) {
       requiresConfirmation: false,
       // A clone or transfer with unchanged approved bytes is repaired by rebind-approval and keeps the approval;
       // reopen-design discards it, so it is named second.
-      guidance: "The current approval is stale. If this checkout is a clone or transfer of the approved project with unchanged approved bytes, first run `pipeline-state.mjs rebind-approval`: it re-binds only the device-local fields and keeps the approval. Only if it refuses, collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.",
+      guidance: "The current approval is stale. If this checkout is a clone or transfer of the approved project with unchanged approved bytes, first run `pipeline-state.mjs rebind-approval`: it re-binds only the device-local fields and keeps the approval. Only if it refuses: the exact reopen-design action voids the approval and is the PO's own step; collect the recovery actor from the PO and hand the applyAction to the PO for their own terminal (you may run it with --dry-run as a preview), before editing the PRD and preparing one final design-workflow approval.",
       applyAction: commandAction([PO_AUTHORITY_REBIND_WRITER, "reopen-design", "--by", byToken], true, true,
         "pipeline.project-onboarding.v4", ["ready"]),
     };
@@ -3709,7 +3709,7 @@ function designToImplementationHandoverAction(root, fs) {
         };
       }
       const action = reopenDesignAction();
-      action.guidance = `The approved PRD is immutable and its architecture evidence is invalid (${architecture.code ?? "ARCHITECTURE-DESIGN-INVALID"}). Collect the recovery actor, then execute the exact reopen-design action; edit the PRD only after it is a draft and submit/present one complete package for one final approval.`;
+      action.guidance = `The approved PRD is immutable and its architecture evidence is invalid (${architecture.code ?? "ARCHITECTURE-DESIGN-INVALID"}). The exact reopen-design action is the PO's own step: collect the recovery actor from the PO and hand the applyAction to the PO for their own terminal (you may run it with --dry-run as a preview); edit the PRD only after it is a draft and submit/present one complete package for one final approval.`;
       return action;
     }
     return {

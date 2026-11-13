@@ -4397,7 +4397,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     return by !== null ? action : {
       kind: 'collect-input', inputs: [{ name: 'by', encoding: 'utf8', trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true }],
       mutation: false, requiresConfirmation: false,
-      guidance: 'Current Plan/Spec authority is stale or unavailable. Collect the recovery actor, then confirm the returned sanctioned reopen-design action before resubmission or approval.',
+      guidance: "Current Plan/Spec authority is stale or unavailable. The returned reopen-design action voids the PO's approval and is the PO's own step: collect the recovery actor from the PO and hand the applyAction to the PO for their own terminal (you may run it with --dry-run as a preview) before resubmission or approval.",
       applyAction: action, expected: { schema: INSPECT_SCHEMA, statuses: ['draft'] },
     };
   }
@@ -7537,8 +7537,8 @@ function inspectSealSituation(dir, base) {
       next: fileExists ? sealCommand("prepare-seal") : null,
       exits: [reopen],
       reason: approved
-        ? "the PRD and the Spec are sealed by the plan approval; reopen-design is the only way to change them"
-        : "the PRD and the Spec were bound at onboarding and the plan is not approved yet: the project stays locked until its approval; reopen-design unlocks it",
+        ? "the PRD and the Spec are sealed by the plan approval; reopen-design, the PO's own step, is the only way to change them (a Spec correction during implementation goes through a Spec addendum)"
+        : "the PRD and the Spec were bound at onboarding and the plan is not approved yet: the project stays locked until its approval; reopen-design, the PO's own step, unlocks it",
     };
   }
   if (seal.status !== "draft") {
@@ -12306,7 +12306,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
       }
       if (phase === "design") {
         if (base.activeFeature.phase !== "design" || !new Set(["draft", "awaiting-approval"]).has(lifecycle.status)) {
-          console.error("Error: use reopen-design --by <name> before leaving an approved or implementing lifecycle.");
+          console.error("Error: use reopen-design --by <name> before leaving an approved or implementing lifecycle; that is the PO's own step, in the PO's own terminal (preview it with --dry-run). A Spec correction during implementation needs no reopen: use a Spec addendum (ADR-0095).");
           return 2;
         }
         console.log('Phase already "design"; zero-write replay accepted.');

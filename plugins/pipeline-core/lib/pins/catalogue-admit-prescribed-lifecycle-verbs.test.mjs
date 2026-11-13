@@ -256,10 +256,11 @@ test("AC-123 submit-plan, reopen-design and set-phase prescribed by the course a
     for (const profile of ["epic", "feature", "mini"]) {
       assert.equal(admitted(stateAction("submit-plan", "--by", "Fixture", "--profile", profile), f), true, profile);
     }
-    assert.equal(admitted(stateAction("reopen-design", "--by", "Fixture"), f), true);
+    // ADR-0095 Decision 10: the agent's reopen form is the dry-run preview; the reopen itself is the PO's step.
+    assert.equal(admitted(stateAction("reopen-design", "--by", "Fixture", "--dry-run"), f), true);
     assert.equal(admitted(stateAction("set-phase", "--phase", "implementation"), f), true);
     for (const argv of [["submit-plan", "--by", "Fixture", "--profile", "other"], ["submit-plan", "--profile", "feature"],
-      ["reopen-design"], ["reopen-design", "--by", "Fixture", "--extra"], ["set-phase", "--phase", "release"]]) {
+      ["reopen-design"], ["reopen-design", "--by", "Fixture"], ["reopen-design", "--by", "Fixture", "--extra"], ["set-phase", "--phase", "release"]]) {
       assert.equal(admitted(stateAction(...argv), f), false, argv.join(" "));
     }
   });

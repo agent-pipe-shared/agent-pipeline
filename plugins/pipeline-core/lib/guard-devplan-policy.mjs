@@ -55,6 +55,7 @@ import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-ap
 import { readHumanApprovalMode, verifyAgainstTrustAnchors, readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 
 import { validateDesignApprovalBinding } from "./design-approval-binding.mjs";
+import { REOPEN_DESIGN_PO_COMMAND, REOPEN_DESIGN_PO_STEP, SPEC_ADDENDUM_INSTEAD } from "./reopen-design-po-step.mjs";
 
 // The v7 approval record is verified through the re-read of its package. The lib
 // constant for this schema is not exported, so the literal is local; a v8 record
@@ -268,12 +269,12 @@ export function lifecycleDesignApprovalDenial(state, lifecycle) {
 export function designAdvisoryRemediation(code) {
   const prefix = `[guard-devplan] implementation requires a valid design approval (${code}).`;
   if (code === "DAA-DESIGN-APPROVAL-BINDING-DRIFT") return [prefix,
-    "Current design approval binding differs from the stored approval. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation."].join("\n");
+    `Current design approval binding differs from the stored approval. ${REOPEN_DESIGN_PO_STEP} After it, finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation.`].join("\n");
   if (code === "DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP") return [prefix,
     "Complete PO key setup and pin a matching public trust anchor, then run present-plan --review-receipt and approve-plan in the configured mode."].join("\n");
   const contentDrift = ["DAA-DESIGN-SOURCE-DRIFT", "DWP-APPROVAL-SOURCE-DRIFT", "DWP-APPROVAL-PLAN-SPEC-MISMATCH", "DAA-DWP-APPROVAL-SOURCE-DRIFT", "DAA-DWP-APPROVAL-PLAN-SPEC-MISMATCH"];
   if (contentDrift.includes(code)) return [prefix,
-    "Current design content differs from the approved sources. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation."].join("\n");
+    `Current design content differs from the approved sources. ${SPEC_ADDENDUM_INSTEAD} Otherwise: ${REOPEN_DESIGN_PO_STEP} After it, finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation.`].join("\n");
   return [prefix,
     "Re-present the same current design through present-plan --review-receipt, then obtain one PO approval through approve-plan in the configured mode.",
     "Use one ordinary review for finished sources; approval checks the stored binding, current source digests and configured proof or chat attribution."].join("\n");
@@ -302,7 +303,7 @@ export function unverifiedApprovalAdvisory(admission, state) {
   const text = [
     `[guard-devplan] ADVISORY (${UNVERIFIED_APPROVAL_ADVISORY_CODE}, cause ${admission.code}): the recorded design approval could not be re-verified, so this write was allowed on the recorded approval alone.`,
     `What could not be verified: the approved design workflow package${where} is missing or is not a physical repository file, so its digest, signature and bound sources were NOT checked. Nothing was verified.`,
-    "Repair: run reopen-design --by <human attribution>, then finish the sources and obtain the approval again (a package that is present but different still blocks as DWP-APPROVAL-DIGEST-DRIFT).",
+    `Repair: ${REOPEN_DESIGN_PO_STEP} Then finish the sources and obtain the approval again (a package that is present but different still blocks as DWP-APPROVAL-DIGEST-DRIFT).`,
   ].join("\n");
   return { code: UNVERIFIED_APPROVAL_ADVISORY_CODE, cause: admission.code, text };
 }
@@ -416,7 +417,7 @@ export function approvedArchitectureEditNotice(relPath, projectDir) {
   if (receipt?.schema !== "pipeline.architecture-design-materialization.v1" || !Array.isArray(receipt.targets)) return null;
   if (!receipt.targets.some((target) => String(target?.path ?? "").toLowerCase() === slashed)) return null;
   return `Notice: ${slashed} is a file of the approved architecture design (design digest ${receipt.designSha256}). This edit is admitted, but the next architecture inspection refuses it as ARCHITECTURE-DESIGN-ARTIFACT-DRIFT. `
-    + "To change the architecture, change the approved design through reopen-design and a new approval, which writes this file again; otherwise restore its bytes before the next inspection.";
+    + "To change the architecture, change the approved design through the PO's reopen-design step and a new approval, which writes this file again; otherwise restore its bytes before the next inspection.";
 }
 
 /**
@@ -607,9 +608,9 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = 
 
   // ---- verdict --------------------------------------------------------------------------
   const lifecycleReason = lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"
-    ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
+    ? `Current Plan/Spec authority is stale or closed. ${REOPEN_DESIGN_PO_STEP}`
     : lifecycle.status === "awaiting-approval"
-      ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`reopen-design --by <name>\`.`
+      ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`${REOPEN_DESIGN_PO_COMMAND}\`, which the PO runs.`
       : lifecycle.status === "approved"
         ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
         : "The feature is still in draft design and has no implementation authority.");

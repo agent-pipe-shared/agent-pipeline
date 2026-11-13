@@ -122,9 +122,10 @@ function planSteps() {
       producer: "the architecture map, fitness model and baseline, and the accepted ADR records the signed package pre-bound; continue with the implement runbook", next: [],
     }),
     scriptStep({
-      id: "reopen-design", script: STATE, verb: "reopen-design", closed: true, argv: ["reopen-design", "--by", "<name>"],
-      needs: ["recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before)"],
-      producer: "lifecycle returns to draft", next: ["set-feature", ...recovery],
+      // ADR-0095 Decision 10: a po-only step, so not a closed (agent-sanctioned) catalogue shape; only its --dry-run preview is.
+      id: "reopen-design", who: "po-only", script: STATE, verb: "reopen-design", closed: false, argv: ["reopen-design", "--by", "<name>"],
+      needs: ["recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before); the agent may run the same command with --dry-run as a preview, and a Spec correction during implementation goes through a Spec addendum instead (ADR-0095)"],
+      producer: "lifecycle returns to draft, run in the PO's own terminal", next: ["set-feature", ...recovery],
     }),
     scriptStep({
       id: "cancel-submitted-plan", script: STATE, verb: "cancel-submitted-plan", closed: true,

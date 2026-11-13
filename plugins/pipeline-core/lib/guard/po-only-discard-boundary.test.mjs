@@ -109,4 +109,29 @@ test('PODB008','closed unsupported and missing reads keep actual adapter metadat
   assert.equal(runner==='codex'?output.hookSpecificOutput.permissionDecision:output.decision,'deny');
  }
 });
+// C28e (Claude test run, PO decision 2026-11-13): reopen-design voids the approved design; only the PO starts it. The dry run stays agent work.
+test('PODB009','reopen-design is refused as the PO\'s step without an override route; its dry run stays agent work',async()=>{
+ const parsed=(result,label)=>{assert.notEqual(result.stdout,'',`${label}: no output (status ${result.status}): ${result.stderr}`);return JSON.parse(result.stdout);};
+ for(const argv of [['node',cli,'reopen-design','--by','synthetic-agent'],[process.execPath,cli,'reopen-design','--by','synthetic-agent'],[process.execPath,cli,'reopen-design','--by','--dry-run'],[process.execPath,cli,'reopen-design','--dry-run','--by','synthetic-agent']]){
+  const verdict=parsed(launch(self,['--worker',JSON.stringify({root,command:render(argv)})]),argv.slice(2).join(' '));
+  assert.equal(verdict.exitCode,2);
+  assert.match(verdict.stderr,/PO-REOPEN-HUMAN-ONLY/);assert.match(verdict.stderr,/--dry-run/);assert.match(verdict.stderr,/Spec addendum/);assert.match(verdict.stderr,/own terminal/);
+  assert.doesNotMatch(verdict.stderr,/Human override available|guard-human-override|HGO-|sign-intent|verify-audit/);
+ }
+ const dry=parsed(launch(self,['--worker',JSON.stringify({root,command:render([process.execPath,cli,'reopen-design','--by','synthetic-agent','--dry-run'])})]),'dry run');
+ assert.doesNotMatch(dry.stderr??'',/PO-REOPEN-HUMAN-ONLY/,'the dry run is not the PO\'s step');
+ const {classifyNonLiftableGuardDenials}=await import('../human-guard-override.mjs');
+ const classified=classifyNonLiftableGuardDenials([{guard:'guard-lifecycle-ready.mjs',reason:'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-REOPEN-HUMAN-ONLY: reopen-design voids the approval.'}]);
+ assert.equal(classified.status,'non-liftable-recovery-required');assert.equal(classified.code,'PO-REOPEN-HUMAN-ONLY');assert.match(classified.nextAction.reason,/--dry-run/);
+ // The same refusal through both runner adapters, with no override block.
+ // Both spellings of the interpreter: the adapters skip the lifecycle guard for a sanctioned lifecycle argv, so the plain void must not be one.
+ for(const runner of ['codex','antigravity'])for(const node of ['node',process.execPath]){
+  const command=render([node,cli,'reopen-design','--by','synthetic-agent']);
+  const input=runner==='antigravity'?{cwd:root,toolCall:{name:'run_command',args:{CommandLine:command,Cwd:root}}}:{cwd:root,session_id:'synthetic-reopen-fixture',tool_name:'Bash',tool_input:{command}};
+  const result=launch(join(hooks,`${runner}-pretool-guard.mjs`),[],input);
+  const output=parsed(result,runner);const reason=runner==='codex'?output.hookSpecificOutput.permissionDecisionReason:output.reason;
+  assert.equal(runner==='codex'?output.hookSpecificOutput.permissionDecision:output.decision,'deny',runner);
+  assert.match(reason,/PO-REOPEN-HUMAN-ONLY/,runner);assert.doesNotMatch(reason,/Human override available|guard-human-override|HGO-|sign-intent|verify-audit/,runner);
+ }
+});
 registerTestCaseCompletion({cases,fd:Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD??'3'),maxBytes:65536});

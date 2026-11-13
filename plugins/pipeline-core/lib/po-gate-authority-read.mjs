@@ -107,7 +107,8 @@ const SPEC_REPAIR = "The active PRD must bind the neighboring spec.md of the sam
   + " if this PRD has not been bound by a kickoff promotion, edit the marker in the PRD to the neighboring spec.md's current digest;"
   + " if a kickoff promotion has already bound this PRD and the plan is not yet approved, do not edit either document in place --"
   + " the promotion already bound their exact bytes, so an in-place edit only breaks that binding and does not make this check pass;"
-  + " instead run the pipeline-core script pipeline-state.mjs reopen-design --by <attribution>, edit the spec or marker, then re-submit and approve the plan;"
+  + " instead the design is reopened with the pipeline-core script pipeline-state.mjs reopen-design --by <attribution>, which is the PO's own step"
+  + " (ask the PO to run it in their own terminal; you may preview it with --dry-run); after it, edit the spec or marker, then re-submit and approve the plan;"
   + " if the plan is already approved and the Spec changed during implementation, use the sanctioned rebind rather than editing the marker by hand:"
   + " run the pipeline-core script pipeline-state.mjs po-authority-rebind-plan, then pipeline-state.mjs po-authority-rebind-apply"
   + " --plan-sha256 <sha256> --updated-at <ISO-8601> --activate with the digest and timestamp that plan reports."
@@ -127,7 +128,8 @@ const SPEC_MARKER_MISSING_REPAIR = "The active PRD does not carry the technical 
   + " If this PRD has not been bound by a kickoff promotion, add that single line to the PRD."
   + " If a kickoff promotion has already bound this PRD, do not add or edit that line in place: the promotion already"
   + " bound these exact bytes, and an in-place edit only breaks that binding without making this check pass;"
-  + " instead run the pipeline-core script pipeline-state.mjs reopen-design --by <attribution>, add the marker, then re-submit and approve the plan;"
+  + " instead the design is reopened with the pipeline-core script pipeline-state.mjs reopen-design --by <attribution>, which is the PO's own step"
+  + " (ask the PO to run it in their own terminal; you may preview it with --dry-run); after it, add the marker, then re-submit and approve the plan;"
   + " do not change activeFeature.planPath, which is not what is wrong here.";
 // PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING is additive to, never a substitute for,
 // PO-GATE-PRD-SPEC-MARKER-MISSING/-MISMATCH above: those bind the PRD to the

@@ -2830,7 +2830,10 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const poDecisionApplyAntigravity = `${poDecisionApply} --runner antigravity`;
     const legacyRevocationRecoveryPlan = `node '${PIPELINE_STATE_SCRIPT}' plan-legacy-v2-revocation-recovery --by 'Phoenix PO'`;
     const legacyRevocationRecoveryApply = `node '${PIPELINE_STATE_SCRIPT}' apply-legacy-v2-revocation-recovery --by 'Phoenix PO' --prepared-at 2026-07-29T09:00:00.000Z --preimage-sha256 ${"a".repeat(64)} --postimage-sha256 ${"b".repeat(64)} --plan-sha256 ${"c".repeat(64)} --activate true`;
-    const reopenDesign = `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery'`;
+    // C28e (PO decision 2026-11-13), restated in place (QG-04): only the preview of reopen-design is sanctioned agent work; the void
+    // itself is the PO's step and is refused PO-REOPEN-HUMAN-ONLY, asserted right after the admitted list below.
+    const reopenDesign = `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery' --dry-run`;
+    const reopenDesignVoid = `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery'`;
     const submitPlan = `node '${PIPELINE_STATE_SCRIPT}' submit-plan --by 'PO recovery' --profile epic`;
     const approvePlan = `node '${PIPELINE_STATE_SCRIPT}' approve-plan --by 'PO recovery'`;
     const approvePlanReceipt = `node '${PIPELINE_STATE_SCRIPT}' approve-plan --bootstrap-acknowledgement-receipt scratch/bootstrap-plan-acknowledgement-receipt-${"a".repeat(64)}.json`;
@@ -2858,6 +2861,8 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
         requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
       }), { exitCode: 0, stderr: "" });
     }
+    assert.equal(isSanctionedLifecycleCommand(reopenDesignVoid, path), false, "the void is not a sanctioned lifecycle argv (the adapters would skip the lifecycle guard)");
+    assert.match(evaluateLifecycleReadyGuard(bash(reopenDesignVoid), { projectDir: path, requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); } }).stderr, /PO-REOPEN-HUMAN-ONLY/u);
     // NVA-BOOTADMIT-2: flag order carries no behavioural meaning to the target CLI --
     // project-onboarding-v3.mjs parse() (lines 195-250) walks a flat, order-insensitive
     // flag set for every subcommand, so --language before --goal parses identically to the

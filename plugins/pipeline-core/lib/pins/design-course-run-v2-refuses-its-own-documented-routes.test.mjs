@@ -193,7 +193,9 @@ async function revisionChainSteps(f, hooks, { receiptCount }) {
   const round1 = produce("--report", `${review}/design-review-1.md`, "--open-finding", "F-1", "--out", first);
   assert.equal(round1.status, 0, `round 1 receipt producer: ${round1.stderr}`);
   const steps = [
-    ["reopen-design", action(PIPELINE_STATE_SCRIPT, "reopen-design", "--by", "Fixture PO")],
+    // C28e (PO decision 2026-11-13), restated in place (QG-04): the agent's step is the preview; the void itself is the PO's own step in
+    // their terminal (PO-REOPEN-HUMAN-ONLY, po-only-discard-boundary.test.mjs PODB009), so no agent guard admits it.
+    ["reopen-design preview", action(PIPELINE_STATE_SCRIPT, "reopen-design", "--by", "Fixture PO", "--dry-run")],
     ["submit-plan", action(PIPELINE_STATE_SCRIPT, "submit-plan", "--by", "Fixture", "--profile", "feature")],
     ["delta receipt", action(DESIGN_REVIEW_RECEIPT_SCRIPT, "create", "--repo", f.root, "--feature", f.featureId, "--report", `${review}/design-review-2.md`,
       "--prd", f.sources.prd.path, "--spec", f.sources.spec.path, "--previous", first, "--out", delta)],
@@ -213,7 +215,7 @@ async function revisionChainSteps(f, hooks, { receiptCount }) {
   });
 }
 
-test("A10 revision path (single-review route): reopen-design, submit-plan, the delta receipt and present-plan over both receipts are admitted by the real guards with zero overrides", async () => {
+test("A10 revision path (single-review route): the reopen-design preview, submit-plan, the delta receipt and present-plan over both receipts are admitted by the real guards with zero overrides", async () => {
   const hooks = await import("../../hooks/design-course-command-admission.test.mjs");
   const f = hooks.fixture("feature");
   try {
