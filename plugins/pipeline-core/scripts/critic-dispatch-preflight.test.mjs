@@ -1655,8 +1655,7 @@ function parentDeltaRequest(root, changedBehaviorClaims = ["fix-one"], flags = {
   assert.equal(added.status, "delta-request-added", JSON.stringify(added));
   return { added, registration: parentCommitPaths(root, added.commitPaths, "register the delta request") };
 }
-function parentRound(root, { featureId, taskId, packetId, base, candidate, registrationCommit, deltaRequestPath, diagnosticPath, verdict }) {
-  const specPath = `specs/${featureId}/spec.md`;
+function parentRound(root, { featureId, taskId, packetId, base, candidate, registrationCommit, deltaRequestPath, diagnosticPath, verdict, specPath = `specs/${featureId}/spec.md` }) {
   const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [candidate], candidateCommit: candidate, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: [specPath] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
   mkdirSync(join(root, "evidence"), { recursive: true });
   writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
@@ -1804,6 +1803,18 @@ test("K-30 a package under the feature id binding an approved Spec in its earlie
     const viaCli = preflightCriticDispatch(parsed);
     assert.equal(viaCli.status, "packet-ready", JSON.stringify(viaCli).slice(0, 600));
     assert.equal(viaCli.coordinatorOnly.courseAdmission.featureId, featureId);
+    // Without --registration-commit: the preflight derives it for the package found at the candidate.
+    const derived = parseCriticDispatchPreflightArgs(["--root", root, "--base", genesis, "--candidate", c1, "--spec", specPath, "--evidence", diagnosticPath]);
+    assert.equal(derived.courseContext?.featureId, featureId, JSON.stringify(derived.courseContext));
+    assert.equal(derived.courseContext.registrationCommit, registration);
+    // The next steps of the route: admit, finalize (the finalizer writes the lineage) and the lineage registration.
+    const finalized = parentRound(root, { featureId, specPath, taskId: "k30-task-1", packetId: "7a".repeat(16), base: genesis, candidate: c1, registrationCommit: registration, deltaRequestPath: null, diagnosticPath, verdict: PARENT_PASS });
+    const written = parentWrittenLineage(root, "7a".repeat(16), finalized);
+    parentCommitPaths(root, written.commitPaths, "register lineage of round 1");
+    const course = parentAdmissionLib.resolveRetainedCriticCourseRecords({ repoRoot: root, featureId, candidateCommit: git(root, ["rev-parse", "HEAD"]) });
+    assert.equal(course.history.length, 1);
+    assert.equal(course.history[0].verdict.status, "no-findings");
+    assert.equal(course.history[0].courseBinding?.originalFeatureId, featureId);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
