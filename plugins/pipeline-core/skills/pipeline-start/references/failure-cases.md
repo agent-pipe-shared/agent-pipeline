@@ -1,4 +1,4 @@
-# Failure cases F1–F6 (lazy)
+# Failure cases F1–F8 (lazy)
 
 Typed failures remain fail-closed: unavailable, stale, malformed, drifted,
 blocked, decision-pending, host/OS limitation and permission denial each expose
@@ -26,6 +26,20 @@ correct the governed artifact through the reviewed recovery path, rerun the
 checker, and restart the bootstrap. Do not weaken the checker, bypass it with a
 Human-override capability, or infer that a moved lazy reference preserved a
 required core contract without checker coverage.
+
+## F8 — a mutable package artifact drifted from its bound digest
+
+A feature package binds every artifact's digest in `specs/<feature>/lifecycle.json`. When an artifact
+that the manifest marks `mutability: "mutable"` (for example `acceptance.md`) was edited after
+registration, the package check reports its bound digest as drifted. The sanctioned repair is one
+agent command, never a hand edit of `lifecycle.json`:
+
+`node <plugin-root>/scripts/pipeline-state.mjs feature-package-rebind-mutable --root <repo> --manifest specs/<feature>/lifecycle.json`
+
+It rebinds only artifacts marked mutable and prints each rebind (`Rebound <path> (<class>): <from> -> <to>`),
+or that nothing was rebound. An immutable or append-only artifact is never rebound: its drift stays a
+refusal with its own route. Commit the rewritten `lifecycle.json` with the edit that caused the drift.
+(Claude greenfield run 3: the verb was only found by reading plugin code.)
 
 ## F7 — external-operator host-terminal command rendering
 
