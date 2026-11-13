@@ -43,7 +43,8 @@ export const DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS = Object.freeze([
 const SAFE_COMMIT = /^[a-f0-9]{7,40}$/u;
 const SAFE_RULESET_DIGEST = /^(?:[a-f0-9]{7,40}|[a-f0-9]{64})$/u;
 const SAFE_RULESET_PLUGIN_VERSION = /^\d{1,3}\.\d{1,3}\.\d{1,3}\+(?:claude|codex|antigravity)\.\d{14}\.[a-f0-9]{8}$/u;
-const SAFE_REPO_PATH = /^[A-Za-z0-9._@+-]+(?:\/[A-Za-z0-9._@+-]+)*$/u;
+// K-32: framework route folders (`[...slug]`, `(group)`) are safe path text too; the strip never hands a path to git.
+const SAFE_REPO_PATH = /^[A-Za-z0-9._@+()[\]-]+(?:\/[A-Za-z0-9._@+()[\]-]+)*$/u;
 
 /**
  * The house-style rationale separator inside a `report.changedFiles` bare-

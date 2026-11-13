@@ -397,10 +397,11 @@ export function apply(options) {
   writeFileSync(messageFile, buildMessage({ dispatchId: planned.dispatchId, stopFailure: planned.stopFailure }), "utf8");
   // `git commit -- <path>` knows only tracked paths: new files get an intent-to-add entry by exact pathspec first (never `add -A`).
   const fresh = untrackedPaths(planned.root).filter((p) => planned.paths.includes(p));
-  if (fresh.length > 0) git(planned.root, ["add", "--intent-to-add", "--", ...fresh]);
-  const committed = git(planned.root, ["commit", "-F", planned.messagePath, "--", ...planned.paths]);
+  // K-32: every pathspec is literal, so `[...slug]` names that folder and never a sibling a glob would match.
+  if (fresh.length > 0) git(planned.root, ["--literal-pathspecs", "add", "--intent-to-add", "--", ...fresh]);
+  const committed = git(planned.root, ["--literal-pathspecs", "commit", "-F", planned.messagePath, "--", ...planned.paths]);
   if (!committed.ok) {
-    if (fresh.length > 0) git(planned.root, ["reset", "-q", "--", ...fresh]); // refused leaves no staged state behind
+    if (fresh.length > 0) git(planned.root, ["--literal-pathspecs", "reset", "-q", "--", ...fresh]); // refused leaves no staged state behind
     return { ...planned, status: "refused", code: "GHCR-COMMIT-FAILED", refusals: [refuse("GHCR-COMMIT-FAILED", committed.err.trim().split("\n").slice(-3).join(" | "),
       "fix what the hook reported and run plan again; the message file is left in place")] };
   }

@@ -146,8 +146,12 @@ check("missing, unknown and malformed fields fail closed", () => {
   ]) assert.throws(() => validateDispatchRecord(value));
 });
 check("computed, escaping and duplicate paths are rejected", () => {
-  for (const path of ["../x", "/tmp/x", "src\\x", "src/$NAME", "src/$(pwd)", "src/*.mjs", "src//x"])
+  for (const path of ["../x", "/tmp/x", "src\\x", "src/$NAME", "src/$(pwd)", "src/*.mjs", "src//x", ":(top)src/x", "src/{a,b}", "src/a?.ts"])
     assert.throws(() => normalizeDispatchRecordPath(path));
+  // K-32 (Glossover, 29c): framework route folders are literal paths; git calls take them with --literal-pathspecs.
+  for (const path of ["src/app/(payload)/cms-api/[...slug]/route.ts", "src/app/(group)/page.tsx", "src/[id].ts"])
+    assert.equal(normalizeDispatchRecordPath(path), path);
+  assert.deepEqual(declaredPaths({ report: { changedFiles: ["src/app/(payload)/cms-api/[...slug]/route.ts - the route"] } }), ["src/app/(payload)/cms-api/[...slug]/route.ts"]);
   for (const changedFiles of [["../x"], ["src/$NAME"], ["src/x", { path: "src/x" }], [{ path: "src/x", extra: true }]])
     assert.throws(() => validateDispatchRecord({ ...terminal(), report: { text: "Done.", changedFiles } }));
 });

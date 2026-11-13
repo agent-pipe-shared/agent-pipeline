@@ -384,7 +384,10 @@ if (ghDelivery.kind === "refused") emit(2, [
 // K153 / G11: the read-only object readers (`rev-parse`, `rev-list`, `cat-file`, `ls-tree`) join the set, so a braced revision
 // such as `"HEAD^{tree}"` inside double quotes (literal there) is proven a plain read instead of a hidden push target. Every
 // other condition above is unchanged: an unquoted brace, a chain, a pipe and a push-classified substitution body still fail.
-const NON_PUSH_MARKER_SUBCOMMANDS = new Set(["commit", "grep", "log", "show", "diff", "status", "rev-parse", "rev-list", "cat-file", "ls-tree"]);
+// K-32 (Glossover, 29c): `add` joins the set, and one leading `--literal-pathspecs` is admitted before the subcommand, so the
+// Goldfish commit steps for a framework route path (`'src/app/(payload)/[...slug]/route.ts'`, single-quoted) are proven non-push.
+// A marker character still has to sit inside quotes; an unquoted one fails exactly as before.
+const NON_PUSH_MARKER_SUBCOMMANDS = new Set(["add", "commit", "grep", "log", "show", "diff", "status", "rev-parse", "rev-list", "cat-file", "ls-tree"]);
 const NON_PUSH_BODY_GIT_SUBCOMMANDS = new Set(["merge-base", "rev-parse", "log", "show", "diff", "status", "rev-list", "describe", "ls-files", "symbolic-ref"]);
 const NON_PUSH_BODY_PROGRAMS = new Set(["date", "pwd", "whoami", "hostname", "uname", "basename", "dirname", "id"]);
 const NON_PUSH_UNQUOTED_RE = /^[A-Za-z0-9_./:@%+,=^~-]$/u;
@@ -462,7 +465,9 @@ function provenNonPushMarkerCandidate(text) {
   }
   if (cur !== null) words.push(cur);
   if (words.length < 2 || words[0].quoted || words[0].text !== "git") return false;
-  if (words[1].quoted || !NON_PUSH_MARKER_SUBCOMMANDS.has(words[1].text)) return false;
+  const literal = !words[1].quoted && words[1].text === "--literal-pathspecs" ? 1 : 0;
+  const subcommand = words[1 + literal];
+  if (subcommand === undefined || subcommand.quoted || !NON_PUSH_MARKER_SUBCOMMANDS.has(subcommand.text)) return false;
   if (words.some((word) => word.text.startsWith("-O") || word.text.startsWith("--open-files-in-pager"))) return false;
   return bodies.every(substitutionBodyIsPlain);
 }

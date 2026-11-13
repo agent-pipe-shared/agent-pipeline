@@ -58,6 +58,21 @@ test("AC-185: each rendered step carries the single index.lock retry contract an
     [{ retries: 1, then: "stop-and-report" }, { retries: 1, then: "stop-and-report" }]);
 });
 
+test("K-32: a framework route path is admitted and both steps run with --literal-pathspecs; plain paths keep the old argv", () => {
+  const route = "src/app/(payload)/cms-api/[...slug]/route.ts";
+  const result = createGoldfishCommitCommandFlow({ ...input, paths: [route] });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.steps[0].argv, ["--literal-pathspecs", "add", "--", route]);
+  assert.deepEqual(result.steps[1].argv, ["--literal-pathspecs", "commit", "-F", result.messagePath, "--", route]);
+  for (const step of result.steps) {
+    const parsed = parseGuardCommand(step.command, "/fixture/repository");
+    assert.equal(parsed.parseStatus, "accepted", step.command);
+    assert.deepEqual(parsed.segments[0].argv, step.argv);
+  }
+  assert.equal(createGoldfishCommitCommandFlow({ ...input, paths: ["src/app/(group)/page.tsx"] }).steps[0].argv[0], "add", "parentheses alone are no glob");
+  for (const path of [":(top)src/x.ts", "src/*.ts", "src/{a,b}.ts"]) assert.equal(createGoldfishCommitCommandFlow({ ...input, paths: [path] }).code, "GF-COMMAND-PATH", path);
+});
+
 test("legacy command flow refuses malformed paths, duplicate paths and unsafe message metadata", () => {
   assert.equal(createGoldfishCommitCommandFlow({ ...input, paths: ["src/regular.js", "src/regular.js"] }).code,
     "GF-COMMAND-PATH-ORDER");

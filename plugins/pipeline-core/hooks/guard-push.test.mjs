@@ -2619,6 +2619,28 @@ function freshRepoIn(parentDir, name, { approvedMini = false } = {}) {
   }
 }
 
+// K-32 (Glossover, 29c): the Goldfish commit steps for a framework route path carry `( ) [ ]` inside single quotes and may lead with
+// --literal-pathspecs; they are a plain add or commit, never a push. Unquoted markers, another global flag and a chained push stay refused.
+{
+  const { dir } = freshRepo("k32-route-paths");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  for (const [id, command] of [
+    ["PG-K32-01", "git --literal-pathspecs add -- 'src/app/(payload)/cms-api/[...slug]/route.ts'"],
+    ["PG-K32-02", "git --literal-pathspecs commit -F scratch/commit-msg/T1.txt -- 'src/app/(payload)/cms-api/[...slug]/route.ts'"],
+    ["PG-K32-03", "git add -- 'src/app/(payload)/page.tsx'"],
+  ]) {
+    check(`${id} allow  exact-path add/commit of a quoted route path: ${command}`, command, dir, ALLOW, { stderrEmpty: true });
+  }
+  for (const [id, command] of [
+    ["PG-K32-04", "git --literal-pathspecs add -- src/app/(payload)/page.tsx"],
+    ["PG-K32-05", "git --literal-pathspecs push origin 'main:refs/heads/(x)'"],
+    ["PG-K32-06", "git --no-pager add -- 'src/app/(payload)/page.tsx'"],
+    ["PG-K32-07", "git --literal-pathspecs add -- 'src/(a).ts' && git push origin main:refs/heads/feature-test"],
+  ]) {
+    check(`${id} block  unquoted marker, other flag or push stays refused: ${command}`, command, dir, BLOCK);
+  }
+}
+
 // ---- PG-N27-TAG: a tag on an already published commit passes; every other tag stays gated (D206, N27a) ------------------
 // Trust assumption pinned here: a commit reachable from a LOCAL remote-tracking ref of the SAME remote name counts as published.
 {

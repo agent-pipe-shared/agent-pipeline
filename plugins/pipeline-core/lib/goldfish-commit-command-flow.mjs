@@ -45,11 +45,13 @@ export function createGoldfishCommitCommandFlow({ taskId, type, scope, summary,
     || finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings.length > 0) {
     return fail("GF-COMMAND-MESSAGE");
   }
-  const stageArgv = ["add", "--", ...normalized];
+  // K-32: a path with `[ ]` would be a glob for git; --literal-pathspecs stages and commits exactly the named files.
+  const literal = normalized.some((path) => /[[\]]/u.test(path)) ? ["--literal-pathspecs"] : [];
+  const stageArgv = [...literal, "add", "--", ...normalized];
   // Ruling 150: the message-file route. guard-push refuses `-m` with a parenthesised `--trailer`, so the
   // producer names the file (the agent writes it with its Write tool) and the commit step reads it with -F.
   const messagePath = `scratch/commit-msg/${taskId}.txt`;
-  const commitArgv = ["commit", "-F", messagePath, "--", ...normalized];
+  const commitArgv = [...literal, "commit", "-F", messagePath, "--", ...normalized];
   const stage = singleLine(boundedCopySafeCommand({ executable: "git", argv: stageArgv, forceCopyCommand: true }), stageArgv);
   const commit = singleLine(boundedCopySafeCommand({ executable: "git", argv: commitArgv, forceCopyCommand: true }), commitArgv);
   return { ok: true, schema: GOLDFISH_COMMIT_COMMAND_FLOW_SCHEMA,

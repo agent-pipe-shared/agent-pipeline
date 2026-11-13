@@ -168,7 +168,8 @@ test("AHE08 same-path content changed after admission cannot enter the host comm
     baseline, final: { outcome: "succeeded", changedPaths: ["file.txt"] },
     allowedPaths: ["file.txt"], taskId: "AGY-EXAMPLE-8",
   }, { spawnSync(command, args, options) {
-    if (args[2] === "add") writeFileSync(join(root, "file.txt"), "raced content\n");
+    // K-32: the stage call now leads with --literal-pathspecs, so the subcommand is found by name, not by position.
+    if (args.slice(2, 4).includes("add")) writeFileSync(join(root, "file.txt"), "raced content\n");
     return spawnSync(command, args, options);
   } });
   assert.equal(result.ok, false);

@@ -106,6 +106,35 @@ test("apply: exactly one commit, three trailers last, pointer to the stop failur
   } finally { cleanup(root); }
 });
 
+test("K-32: a framework route folder ([...slug], (group)) lands literally; a sibling a glob would match is not committed", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "ghcr-k32-")));
+  try {
+    git(root, "init", "-q");
+    git(root, "config", "user.name", "Fixture");
+    git(root, "config", "user.email", "fixture@example.invalid");
+    git(root, "config", "commit.gpgsign", "false");
+    writeFileSync(join(root, "README.md"), "base\n");
+    git(root, "add", "--", "README.md");
+    git(root, "commit", "-q", "-m", "base");
+    const head = git(root, "rev-parse", "HEAD");
+    const route = "src/app/(payload)/cms-api/[...slug]/route.ts";
+    const sibling = "src/app/(payload)/cms-api/s/route.ts"; // `[...slug]` read as a glob matches the folder `s`
+    for (const path of [route, sibling]) { mkdirSync(join(root, dirname(path)), { recursive: true }); writeFileSync(join(root, path), "export {};\n"); }
+    const dir = join(root, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "pending-claude-aaaaaaaa.json"), `${JSON.stringify({
+      schema: "pipeline.native-goldfish-host-state.v1", runner: "claude", sessionId: "s1", toolUseId: "toolu_1",
+      binding: { dispatchId: DISPATCH, candidateCommit: head, allowedPaths: [route] } }, null, 2)}\n`);
+    const plan = run(root, "plan").json;
+    assert.equal(plan?.status, "ready", JSON.stringify(plan));
+    assert.deepEqual(plan.paths, [route]);
+    const applied = run(root, "apply", "--dispatch-id", DISPATCH, "--expect-sha256", plan.next[plan.next.indexOf("--expect-sha256") + 1]);
+    assert.equal(applied.status, 0, applied.stderr + JSON.stringify(applied.json));
+    assert.deepEqual(git(root, "show", "--name-only", "--format=", "HEAD").split("\n"), [route], "exactly the bracket path, never the sibling");
+    assert.equal(git(root, "status", "--porcelain", "--untracked-files=all", "--", "src/app/(payload)/cms-api/s"), `?? ${sibling}`);
+  } finally { cleanup(root); }
+});
+
 test("GHCR-CAUSE plan: the stop-failure pointer carries the recorded reason and stage, and the detail's own reason when the record has none", () => {
   const recorded = fixture({ stopOver: { stage: "pending-read", reason: "NGHS-PENDING-MISSING" } });
   try {

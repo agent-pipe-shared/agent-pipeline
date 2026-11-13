@@ -37,7 +37,7 @@ function committedMessage(root, commit, spawn) {
   return boundary < 0 ? null : object.slice(boundary + 2);
 }
 function stagedBlob(root, path, spawn) {
-  const output = git(root, ["ls-files", "--stage", "-z", "--", path], spawn);
+  const output = git(root, ["--literal-pathspecs", "ls-files", "--stage", "-z", "--", path], spawn); // K-32: `[ ]` is a filename, not a glob
   if (output === null) return undefined;
   const entries = output.split("\0").filter(Boolean);
   if (entries.length === 0) return null;
@@ -118,7 +118,7 @@ function commitAdmittedReturn({ baseline, final, allowedPaths, taskId, priorAdmi
     || finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings.length > 0) {
     return fail(code("HOST-COMMIT-MESSAGE"));
   }
-  if (git(root, ["add", "-A", "--", ...admitted.paths], spawn) === null) return fail(code("HOST-COMMIT-STAGE-FAILED"));
+  if (git(root, ["--literal-pathspecs", "add", "-A", "--", ...admitted.paths], spawn) === null) return fail(code("HOST-COMMIT-STAGE-FAILED"));
   const staged = paths(git(root, ["diff", "--cached", "--name-only", "-z"], spawn));
   const unstaged = paths(git(root, ["diff", "--name-only", "-z"], spawn));
   if (staged === null || unstaged === null || !same(staged, admitted.paths) || unstaged.some(path=>!nativePlan?.foreignPaths.includes(path))) {

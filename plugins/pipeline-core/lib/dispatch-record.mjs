@@ -120,9 +120,12 @@ export function missingBriefingFields(record) {
   return missing;
 }
 
+// K-32 (Glossover Epic 2, 29c): `[ ] ( )` are ordinary filename characters in framework route folders (Next.js `[...slug]`,
+// `(group)`), and the host commit admits them. Every git call that takes such a path runs with --literal-pathspecs, so a bracket
+// is never read as a glob. `* ? { } $` and a backtick stay refused; a leading `:` is refused because git reads it as pathspec magic.
 export function normalizeDispatchRecordPath(value, label = "dispatch record path") {
   if (typeof value !== "string" || value.length === 0 || value.length > 512 || value.trim() !== value
-    || value.startsWith("/") || value.includes("\\") || /[\0\r\n`$*?{}[\]()]/u.test(value)) fail("record-path", `${label} is not a literal repository-relative path`);
+    || value.startsWith("/") || value.startsWith(":") || value.includes("\\") || /[\0\r\n`$*?{}]/u.test(value)) fail("record-path", `${label} is not a literal repository-relative path`);
   const parts = value.split("/");
   if (parts.some((part) => part === "" || part === "." || part === "..")) fail("record-path", `${label} is not normalized`);
   return value;
