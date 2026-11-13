@@ -1,0 +1,106 @@
+diff --git a/docs/operating-model.md b/docs/operating-model.md
+index 8cb65ba468e95c6ec1573be6dffd7d41248b032c..66d8da0b9321371d53537976e36b6d4b2d350e26 100644
+--- a/docs/operating-model.md
++++ b/docs/operating-model.md
+@@ -966,8 +966,8 @@ Die normative Form lautet:
+    Integration. Meldet der vollständige Critic Korrekturen, erhält ein frischer
+    Correction-Goldfish das gesamte kohärente Batch. Dieser Owner führt Befunde
+    im selben Kontext durch Testfälle, Fixes, gezielte Checks und weitere
+-   Korrektur-Diff-Befunde bis zum echten PASS oder zur Grenze von drei
+-   Korrekturprüfungen. Es gibt keinen eigenen Korrektur-Dispatch pro Item;
++   Korrektur-Diff-Befunde bis zum echten PASS oder zu einer ausdrücklichen
++   PO-Entscheidung (D190: keine Rundenzahl). Es gibt keinen eigenen Korrektur-Dispatch pro Item;
+    ursprüngliches Batch, Mitglieder und Review-Linie bleiben unverändert.
+ 6. **Critic-Grenze prüfen.** Die anwendbaren gezielten deterministischen Checks und den Packet-Preflight ausführen. Ein kandidatgebundener Critic-Mode-Verify-Receipt oder ein validierter Diagnostic kann die Review zulassen, während der Full-Release-Verify ausdrücklich noch aussteht; beides ist keine vollständige Qualifikation.
+ 
+@@ -1002,8 +1002,8 @@ Die normative Form lautet:
+    lassen. High-Risk-, Architektur-, Guardrail- und Security-Änderungen erhalten
+    den vorgeschriebenen stärkeren Reviewpfad. Jeder Befund braucht Evidenz und
+    Disposition. Pro Batch gibt es eine vollständige unabhängige Prüfung und
+-   höchstens drei Prüfungen des jeweiligen Korrektur-Diffs; bei echtem PASS
+-   endet der Kurs, insgesamt also höchstens vier Calls. Kein Full-Rerun und
++   Prüfungen des jeweiligen Korrektur-Diffs bis zum echten PASS oder zu einer
++   ausdrücklichen PO-Entscheidung (D190: keine Rundenzahl). Kein Full-Rerun und
+    keine Budgetrücksetzung durch Umbenennung oder Aufteilung. Danach den
+    konfigurierten Full Verify auf dem geprüften integrierten Batch ausführen
+    und an das verbrauchte Critic-Paket binden. Das maschinelle Ergebnis belegt
+@@ -1116,9 +1116,10 @@ ist gültig. Der Elephant entscheidet, ob jeder Befund behoben, mit Begründung
+ akzeptiert oder eskaliert wird; er darf keinen still verwerfen.
+ 
+ Die ausgewählte PO-Richtung begrenzt jedes sinnvolle Arbeitspaket künftig auf
+-eine vollständige unabhängige Critic-Prüfung und bis zu drei Prüfungen des
+-Korrektur-Diffs; bei echtem PASS endet der Kurs. Insgesamt sind höchstens vier
+-Critic-Aufrufe und kein vollständiger Prüfungs-Neustart erlaubt. Umbenennen
++eine vollständige unabhängige Critic-Prüfung und Prüfungen des
++Korrektur-Diffs bis zum echten PASS oder zu einer ausdrücklichen
++PO-Entscheidung (D190: keine Rundenzahl); ein vollständiger Prüfungs-Neustart
++ist nicht erlaubt. Umbenennen
+ oder Aufteilen desselben Pakets setzt die Historie nicht zurück. Jede
+ Korrekturprüfung beginnt beim unmittelbar zuvor geprüften Kandidaten und
+ betrachtet nur Fixes und direkte Regressionen. Der Koordinator erhält die echte
+diff --git a/plugins/pipeline-core/docs/operating-model.md b/plugins/pipeline-core/docs/operating-model.md
+index 8cb65ba468e95c6ec1573be6dffd7d41248b032c..66d8da0b9321371d53537976e36b6d4b2d350e26 100644
+--- a/plugins/pipeline-core/docs/operating-model.md
++++ b/plugins/pipeline-core/docs/operating-model.md
+@@ -966,8 +966,8 @@ Die normative Form lautet:
+    Integration. Meldet der vollständige Critic Korrekturen, erhält ein frischer
+    Correction-Goldfish das gesamte kohärente Batch. Dieser Owner führt Befunde
+    im selben Kontext durch Testfälle, Fixes, gezielte Checks und weitere
+-   Korrektur-Diff-Befunde bis zum echten PASS oder zur Grenze von drei
+-   Korrekturprüfungen. Es gibt keinen eigenen Korrektur-Dispatch pro Item;
++   Korrektur-Diff-Befunde bis zum echten PASS oder zu einer ausdrücklichen
++   PO-Entscheidung (D190: keine Rundenzahl). Es gibt keinen eigenen Korrektur-Dispatch pro Item;
+    ursprüngliches Batch, Mitglieder und Review-Linie bleiben unverändert.
+ 6. **Critic-Grenze prüfen.** Die anwendbaren gezielten deterministischen Checks und den Packet-Preflight ausführen. Ein kandidatgebundener Critic-Mode-Verify-Receipt oder ein validierter Diagnostic kann die Review zulassen, während der Full-Release-Verify ausdrücklich noch aussteht; beides ist keine vollständige Qualifikation.
+ 
+@@ -1002,8 +1002,8 @@ Die normative Form lautet:
+    lassen. High-Risk-, Architektur-, Guardrail- und Security-Änderungen erhalten
+    den vorgeschriebenen stärkeren Reviewpfad. Jeder Befund braucht Evidenz und
+    Disposition. Pro Batch gibt es eine vollständige unabhängige Prüfung und
+-   höchstens drei Prüfungen des jeweiligen Korrektur-Diffs; bei echtem PASS
+-   endet der Kurs, insgesamt also höchstens vier Calls. Kein Full-Rerun und
++   Prüfungen des jeweiligen Korrektur-Diffs bis zum echten PASS oder zu einer
++   ausdrücklichen PO-Entscheidung (D190: keine Rundenzahl). Kein Full-Rerun und
+    keine Budgetrücksetzung durch Umbenennung oder Aufteilung. Danach den
+    konfigurierten Full Verify auf dem geprüften integrierten Batch ausführen
+    und an das verbrauchte Critic-Paket binden. Das maschinelle Ergebnis belegt
+@@ -1116,9 +1116,10 @@ ist gültig. Der Elephant entscheidet, ob jeder Befund behoben, mit Begründung
+ akzeptiert oder eskaliert wird; er darf keinen still verwerfen.
+ 
+ Die ausgewählte PO-Richtung begrenzt jedes sinnvolle Arbeitspaket künftig auf
+-eine vollständige unabhängige Critic-Prüfung und bis zu drei Prüfungen des
+-Korrektur-Diffs; bei echtem PASS endet der Kurs. Insgesamt sind höchstens vier
+-Critic-Aufrufe und kein vollständiger Prüfungs-Neustart erlaubt. Umbenennen
++eine vollständige unabhängige Critic-Prüfung und Prüfungen des
++Korrektur-Diffs bis zum echten PASS oder zu einer ausdrücklichen
++PO-Entscheidung (D190: keine Rundenzahl); ein vollständiger Prüfungs-Neustart
++ist nicht erlaubt. Umbenennen
+ oder Aufteilen desselben Pakets setzt die Historie nicht zurück. Jede
+ Korrekturprüfung beginnt beim unmittelbar zuvor geprüften Kandidaten und
+ betrachtet nur Fixes und direkte Regressionen. Der Koordinator erhält die echte
+diff --git a/plugins/pipeline-core/roles/goldfish.md b/plugins/pipeline-core/roles/goldfish.md
+index 2ee6165fafdcfb41844f4f6b23b48d8f3632e6be..ad111789a9fd07a63fa69b499a76778d1fd34cfa 100644
+--- a/plugins/pipeline-core/roles/goldfish.md
++++ b/plugins/pipeline-core/roles/goldfish.md
+@@ -121,7 +121,7 @@ Six mandatory sections, in this order (report language: English, ADR-0011):
+   3. **Report-last-act:** the six-section prose report is **written into the same dispatch record** (field `report`) as your last act **before** you return it as text, and `outcome` is overwritten from `"committed-pending-report"` to the true final classification (`completed`, `blocked`, `partial`, ...). Ordering for a write task: commit → checkpoint (step 2) → ... → last commit's checkpoint → overwrite `outcome` + write `report` → return the report. A truncated final message then costs only the prose, never the deliverable or the authorship-binding evidence.
+ - **Why:** seven long dispatches in one 2026-08-07/08 block ended with a fragment of working narration instead of their report; the work existed every time, two had already committed. A dispatch whose report is lost has, from the dispatcher's side, produced an unverified diff — which is no delivery at all (P4).
+ - **No new capability:** this is a persistence and honesty duty only. You already write the dispatch record; nothing here grants a tool, a permission, or a wider scope, and a persisted draft never becomes a substitute for the returned report.
+-- **Independent Critic is a meaningful-batch gate, not one per item:** the Elephant predeclares a meaningful delivery batch and review unit before the first item dispatch, then freezes actual members and integrated scope before the full review. Item completion does not automatically trigger a Critic. Your targeted-green delivery remains distinct from batch review and PO acceptance. If the batch needs corrections, one fresh Correction Goldfish owns the coherent batch's findings, test cases, fixes and targeted checks through the allowed delta reviews; there is no fix dispatch per item. Preserve the original batch and its one-full-plus-up-to-three-delta review budget. This policy is intended across Claude Code, Codex and Antigravity, supported platforms and consumer repositories; source/runtime qualification is still required before claiming enforcement.
++- **Independent Critic is a meaningful-batch gate, not one per item:** the Elephant predeclares a meaningful delivery batch and review unit before the first item dispatch, then freezes actual members and integrated scope before the full review. Item completion does not automatically trigger a Critic. Your targeted-green delivery remains distinct from batch review and PO acceptance. If the batch needs corrections, one fresh Correction Goldfish owns the coherent batch's findings, test cases, fixes and targeted checks through the allowed delta reviews; there is no fix dispatch per item. Preserve the original batch and its review course: one full review, then correction-diff reviews until genuine PASS or an explicit PO decision (D190: no round count). This policy is intended across Claude Code, Codex and Antigravity, supported platforms and consumer repositories; source/runtime qualification is still required before claiming enforcement.
+ - **If you are resumed** after a truncated final, the resume message is **procedural only** — it names what remains and nothing about the work's quality. Finish, emit the report in the mandatory format, scope every claim to what you actually ran, and say plainly what you did not reach. Never extrapolate the unreached part.
+ - **Why condensed:** the report returns into the Elephant's context — it must carry decisions and evidence, not noise. Why "Deliberately not changed": it protects scope discipline while preserving observations that would otherwise be lost.
+ - **Check:** Format check by the Elephant at the gate; missing evidence section = automatic rework.
+diff --git a/roles/goldfish.md b/roles/goldfish.md
+index 2ee6165fafdcfb41844f4f6b23b48d8f3632e6be..ad111789a9fd07a63fa69b499a76778d1fd34cfa 100644
+--- a/roles/goldfish.md
++++ b/roles/goldfish.md
+@@ -121,7 +121,7 @@ Six mandatory sections, in this order (report language: English, ADR-0011):
+   3. **Report-last-act:** the six-section prose report is **written into the same dispatch record** (field `report`) as your last act **before** you return it as text, and `outcome` is overwritten from `"committed-pending-report"` to the true final classification (`completed`, `blocked`, `partial`, ...). Ordering for a write task: commit → checkpoint (step 2) → ... → last commit's checkpoint → overwrite `outcome` + write `report` → return the report. A truncated final message then costs only the prose, never the deliverable or the authorship-binding evidence.
+ - **Why:** seven long dispatches in one 2026-08-07/08 block ended with a fragment of working narration instead of their report; the work existed every time, two had already committed. A dispatch whose report is lost has, from the dispatcher's side, produced an unverified diff — which is no delivery at all (P4).
+ - **No new capability:** this is a persistence and honesty duty only. You already write the dispatch record; nothing here grants a tool, a permission, or a wider scope, and a persisted draft never becomes a substitute for the returned report.
+-- **Independent Critic is a meaningful-batch gate, not one per item:** the Elephant predeclares a meaningful delivery batch and review unit before the first item dispatch, then freezes actual members and integrated scope before the full review. Item completion does not automatically trigger a Critic. Your targeted-green delivery remains distinct from batch review and PO acceptance. If the batch needs corrections, one fresh Correction Goldfish owns the coherent batch's findings, test cases, fixes and targeted checks through the allowed delta reviews; there is no fix dispatch per item. Preserve the original batch and its one-full-plus-up-to-three-delta review budget. This policy is intended across Claude Code, Codex and Antigravity, supported platforms and consumer repositories; source/runtime qualification is still required before claiming enforcement.
++- **Independent Critic is a meaningful-batch gate, not one per item:** the Elephant predeclares a meaningful delivery batch and review unit before the first item dispatch, then freezes actual members and integrated scope before the full review. Item completion does not automatically trigger a Critic. Your targeted-green delivery remains distinct from batch review and PO acceptance. If the batch needs corrections, one fresh Correction Goldfish owns the coherent batch's findings, test cases, fixes and targeted checks through the allowed delta reviews; there is no fix dispatch per item. Preserve the original batch and its review course: one full review, then correction-diff reviews until genuine PASS or an explicit PO decision (D190: no round count). This policy is intended across Claude Code, Codex and Antigravity, supported platforms and consumer repositories; source/runtime qualification is still required before claiming enforcement.
+ - **If you are resumed** after a truncated final, the resume message is **procedural only** — it names what remains and nothing about the work's quality. Finish, emit the report in the mandatory format, scope every claim to what you actually ran, and say plainly what you did not reach. Never extrapolate the unreached part.
+ - **Why condensed:** the report returns into the Elephant's context — it must carry decisions and evidence, not noise. Why "Deliberately not changed": it protects scope discipline while preserving observations that would otherwise be lost.
+ - **Check:** Format check by the Elephant at the gate; missing evidence section = automatic rework.

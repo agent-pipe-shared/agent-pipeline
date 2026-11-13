@@ -1,0 +1,45 @@
+diff --git a/plugins/pipeline-core/lib/commit-message-policy.mjs b/plugins/pipeline-core/lib/commit-message-policy.mjs
+index f0cf0940dd914a30d69e854e45d71f3a8eeb2991..233c580532639a1345f9a430b9437dcef0c2c40f 100644
+--- a/plugins/pipeline-core/lib/commit-message-policy.mjs
++++ b/plugins/pipeline-core/lib/commit-message-policy.mjs
+@@ -178,7 +178,15 @@ export function finishedCommitMessageFindings(message, {
+   if ((requireDispatch || enforceProvenance) && !checkpointPair) {
+     const dispatches = trailers.filter((entry) => entry.key === DISPATCH_KEY);
+     if (dispatches.length === 0) {
+-      findings.push({ code: "GIT-03-DISPATCH-MISSING", detail: "no `Dispatch:` entry in the final Git trailer block" });
++      // Candidate 29 (AGY run 3, R8): `git commit -m <subject> -m <body> -m "AI-Assisted: true" -m "Dispatch: ..."` puts a blank line
++      // between the two trailers, so the Dispatch line exists but is not in the final block. Say so and name the form that works.
++      const splitAway = /^Dispatch:[ \t]*\S/mu.test(text);
++      findings.push({
++        code: "GIT-03-DISPATCH-MISSING",
++        detail: splitAway
++          ? "no `Dispatch:` entry in the final Git trailer block: a `Dispatch:` line is in the message but a blank line separates it from the last block (each `-m` flag starts a new paragraph); write the whole message to a file under scratch/ and commit with `git commit -F scratch/<message-file>`, both trailers as the last lines with no blank line between them"
++          : "no `Dispatch:` entry in the final Git trailer block; end the message with `AI-Assisted: true` and one `Dispatch:` line (`Dispatch: <task-id> (goldfish)` or `Dispatch: stage-0 (elephant)`) as the last lines, written with `git commit -F scratch/<message-file>`",
++      });
+     } else if (dispatches.length > 1) {
+       findings.push({ code: "GIT-03-DISPATCH-AMBIGUOUS", detail: "more than one `Dispatch:` entry in the final Git trailer block" });
+     } else if (!admittedDispatchValue(dispatches[0].value)) {
+diff --git a/plugins/pipeline-core/lib/commit-message-policy.test.mjs b/plugins/pipeline-core/lib/commit-message-policy.test.mjs
+index 68c8ffaa6d5004ff16b2bdd831062889171ede8b..840f10730ab0931b5b0c07efb59206ff29893198 100644
+--- a/plugins/pipeline-core/lib/commit-message-policy.test.mjs
++++ b/plugins/pipeline-core/lib/commit-message-policy.test.mjs
+@@ -167,6 +167,19 @@ check("CMP11d a blank line inside the trailer block is rejected", () => {
+   assert.deepEqual(codes(run("git commit -F split.txt", { requireMarker: true, requireDispatch: true })), ["GIT-03-DISPATCH-MISSING"]);
+ });
+ 
++// Candidate 29 (AGY run 3, R8): the refusal after split -m trailers names why and the -F form; an absent Dispatch line names the form.
++check("CMP11d2 a Dispatch line split away from the last block is named, with the git commit -F repair", () => {
++  const opts = { requireMarker: true, requireDispatch: true };
++  const split = finishedCommitMessageFindings("feat(x): do a thing\n\nDispatch: stage-0 (elephant)\n\nAI-Assisted: true\n", opts).findings
++    .find((finding) => finding.code === "GIT-03-DISPATCH-MISSING");
++  assert.match(split.detail, /a blank line separates it from the last block/u);
++  assert.match(split.detail, /git commit -F scratch\/<message-file>/u);
++  const absent = finishedCommitMessageFindings("feat(x): x\n\nAI-Assisted: true\n", opts).findings
++    .find((finding) => finding.code === "GIT-03-DISPATCH-MISSING");
++  assert.doesNotMatch(absent.detail, /blank line separates/u);
++  assert.match(absent.detail, /Dispatch: stage-0 \(elephant\)/u);
++});
++
+ check("CMP11e absent, duplicate and malformed dispatch bindings are distinct findings", () => {
+   const cases = [
+     ["feat(x): x\n\nAI-Assisted: true\n", "GIT-03-DISPATCH-MISSING"],

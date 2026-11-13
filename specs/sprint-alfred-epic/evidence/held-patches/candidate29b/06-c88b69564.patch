@@ -1,0 +1,37 @@
+diff --git a/plugins/pipeline-core/lib/agy-native-goldfish.mjs b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+index e96169825857f82cb2678b6cdeb8d165bd94b446..5c85bd6e2c1d5546ea366cc07fc8296b6e29078a 100644
+--- a/plugins/pipeline-core/lib/agy-native-goldfish.mjs
++++ b/plugins/pipeline-core/lib/agy-native-goldfish.mjs
+@@ -277,7 +277,11 @@ export function nativeBrainWriteRefusal({ filePath, command } = {}) {
+   if (typeof filePath === "string" && touchesHostOwnedPath(filePath, { isPath: true })) return BRAIN_REFUSAL;
+   if (typeof command === "string" && touchesHostOwnedPath(command, { isPath: false })) {
+     const readOnly = /^\s*(?:cat|ls|rg|grep|head|tail|wc|stat|file|find|pwd)\b/u.test(command) && !/>|\btee\b|-delete\b|-exec\b/u.test(command);
+-    if (!readOnly) return BRAIN_REFUSAL;
++    // Candidate 29 (AGY run 3, R4): the Pipeline's own read-only run timeline over the brain transcript names that path but writes
++    // nothing (it prints to stdout). Exactly `node <...>/scripts/usage-ledger.mjs --timeline <file> [--json]`, no shell operator.
++    const timelineRead = !/[<>|;&`$()]/u.test(command)
++      && /^\s*node(?:\.exe)?\s+\S*[\\/]scripts[\\/]usage-ledger\.mjs\s+--timeline\s+\S+(?:\s+--json)?\s*$/u.test(command);
++    if (!readOnly && !timelineRead) return BRAIN_REFUSAL;
+   }
+   return null;
+ }
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+index 473d28876f9d764148975fc292b5a08ae0cbc401..d2379ccee402cb308250c42356450f93aba15927 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-native-goldfish-dispatch-needs-consent-and-has-no-parent-binding.test.mjs
+@@ -446,6 +446,15 @@ test("an agent write under the Antigravity brain or config directory is refused"
+     assert.match(nativeBrainWriteRefusal({ filePath: null, command: `echo {} > ${cli}/worktrees/../brain/x.json` }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u);
+     assert.match(nativeBrainWriteRefusal({ filePath: null, command: `echo {} > ${descriptorPath}` }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u);
+     assert.equal(nativeBrainWriteRefusal({ filePath: null, command: `cat ${descriptorPath}` }), null);
++    // Candidate 29 (AGY run 3, R4): the Pipeline's read-only run timeline over the brain transcript is a read; any write form stays refused.
++    const transcript = `${cli}/brain/${PARENT}/.system_generated/logs/transcript.jsonl`;
++    const ledger = "/plugins/pipeline-core/scripts/usage-ledger.mjs";
++    assert.equal(nativeBrainWriteRefusal({ filePath: null, command: `node ${ledger} --timeline ${transcript} --json` }), null);
++    assert.equal(nativeBrainWriteRefusal({ filePath: null, command: `node ${ledger} --timeline ${transcript}` }), null);
++    for (const command of [`node ${ledger} --timeline ${transcript} > ${transcript}`, `node ${ledger} --timeline ${transcript}; rm ${transcript}`,
++      `node ${ledger} ${cli}/brain`, `node /tmp/other.mjs --timeline ${transcript}`, `node ${ledger} --timeline ${transcript} --row`]) {
++      assert.match(nativeBrainWriteRefusal({ filePath: null, command }) ?? "", /AGY-NATIVE-BRAIN-WRITE/u, command);
++    }
+     const res = runAdapter(fx, payload(fx, {
+       conversationId: PARENT, toolCall: { name: "write_to_file", args: { TargetFile: descriptorPath, CodeContent: "{}" } },
+     }));

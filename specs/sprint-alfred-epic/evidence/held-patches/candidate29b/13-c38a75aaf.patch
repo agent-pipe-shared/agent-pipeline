@@ -1,0 +1,66 @@
+diff --git a/plugins/pipeline-core/scripts/finish-feature.mjs b/plugins/pipeline-core/scripts/finish-feature.mjs
+index cb7ef3ffa4eb6224718037266964af106870c9fc..69c576246883fbb01e381b963e998685f78a8c3c 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.mjs
+@@ -769,9 +769,20 @@ export function stageOneShotCommit(root, result) {
+   return { ...result, staged };
+ }
+ 
++// Candidate 29 (Codex greenfield run 3, T1): `--one-shot` (and `--stage`) had to be the first (last) argument; the same
++// flags in another order ended in FINISH-USAGE. No flag value may start with `--`, so neither word can be a value: each
++// is taken from any position, at most once, and the remaining words are the flag/value pairs as before.
++export function splitOneShotArgv(argv) {
++  const count = (word) => argv.filter((entry) => entry === word).length;
++  if (count("--one-shot") !== 1) return null;
++  if (count("--stage") > 1) fail("FINISH-USAGE", "--stage may be given at most once");
++  return { stage: count("--stage") === 1, rest: argv.filter((entry) => entry !== "--one-shot" && entry !== "--stage") };
++}
++
+ function parseOneShot(argvWithStage) {
+-  const stage = argvWithStage.length > 0 && argvWithStage.at(-1) === "--stage";
+-  const argv = stage ? argvWithStage.slice(0, -1) : argvWithStage;
++  const split = splitOneShotArgv(["--one-shot", ...argvWithStage.filter((entry) => entry !== "--one-shot")]);
++  const stage = split.stage;
++  const argv = split.rest;
+   const allowed = ["--root", "--by", "--architecture-impact", "--critic-packet-id", "--resume-lifecycle-id", "--human-acceptance", "--human-decline", "--open-checks", "--sbom-override-proof"]; const value = {};
+   for (let i = 0; i < argv.length; i += 2) {
+     const flag = argv[i]; const next = argv[i + 1];
+@@ -791,10 +802,11 @@ function parse(argv) {
+   return { rootDir: value["--root"] ?? process.cwd(), by: value["--by"], architectureImpact: value["--architecture-impact"], auditRequest: value["--audit-request"], criticVerifyLifecycle: value["--critic-verify-lifecycle"], continuityCloseRequest: value["--continuity-close-request"] ?? null, resumeLifecycleId: value["--resume-lifecycle-id"] ?? null };
+ }
+ 
+-if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === "--one-shot") {
++if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.slice(2).includes("--one-shot")) {
+   // P3: the one agent command. JSON on stdout; the commit steps or the stop with its repair on stderr; exit 2 when stopped.
+   try {
+-    const parsed = parseOneShot(process.argv.slice(3));
++    if (process.argv.slice(2).filter((entry) => entry === "--one-shot").length !== 1) fail("FINISH-USAGE", "--one-shot may be given once");
++    const parsed = parseOneShot(process.argv.slice(2));
+     const closed = oneShotClose(parsed);
+     const result = parsed.stage ? stageOneShotCommit(realpathSync(resolve(parsed.rootDir)), closed) : closed;
+     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+diff --git a/plugins/pipeline-core/scripts/finish-feature.test.mjs b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+index fa70e4c04e5da27ab373af0513d5e839d5fe5604..561f2ed66a0547995f4e2ba2d6a6590c0183201e 100644
+--- a/plugins/pipeline-core/scripts/finish-feature.test.mjs
++++ b/plugins/pipeline-core/scripts/finish-feature.test.mjs
+@@ -1083,6 +1083,20 @@ test("P3: the CLI prints the result JSON on stdout and, for a stop, the typed re
+     assert.equal(usage.status, 2); assert.match(usage.stderr, /FINISH-USAGE/u);
+     const help = spawnSync(process.execPath, [script, "--help"], { encoding: "utf8" }); // measured: a run asked --help and was never told of the one-shot entry
+     assert.equal(help.status === 0, false); assert.match(help.stderr, /finish-feature\.mjs --one-shot --by/u);
++    // Candidate 29 (Codex run 3, T1): --one-shot and --stage are order-independent; the same close in another order
++    // reaches the same stop instead of FINISH-USAGE. A doubled --one-shot or --stage is still a usage refusal.
++    for (const argv of [["--root", f.root, "--one-shot", "--by", "PO", "--architecture-impact", "no-architecture-impact"],
++      ["--by", "PO", "--architecture-impact", "no-architecture-impact", "--root", f.root, "--one-shot"],
++      ["--stage", "--one-shot", "--root", f.root, "--by", "PO", "--architecture-impact", "no-architecture-impact"]]) {
++      const reordered = spawnSync(process.execPath, [script, ...argv], { encoding: "utf8" });
++      assert.equal(reordered.status, 2, argv.join(" "));
++      assert.doesNotMatch(reordered.stderr, /FINISH-USAGE/u, argv.join(" "));
++      assert.equal(JSON.parse(reordered.stdout).stop.code, "ONESHOT-NO-ACTIVE-FEATURE", argv.join(" "));
++    }
++    for (const argv of [["--one-shot", "--one-shot", "--root", f.root], ["--one-shot", "--stage", "--root", f.root, "--stage"]]) {
++      const doubled = spawnSync(process.execPath, [script, ...argv], { encoding: "utf8" });
++      assert.equal(doubled.status, 2); assert.match(doubled.stderr, /FINISH-USAGE/u, argv.join(" "));
++    }
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 

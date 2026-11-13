@@ -1,0 +1,78 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 6807b06d1d9b977352b461e5e1d17a358220bc3b..52fbd771018758647d5f6b37b88afb738a503590 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -43,6 +43,7 @@ import {
+   evaluateLifecycleReadyGuard,
+   gateStrengthShellNeedleFor,
+   governanceMarkers,
++  isAgentPoPublicCommand,
+   isClaudeSessionMemoryWritePath,
+   isForbiddenCrossRepositoryMutation,
+   isMachinePlaneWritePath,
+@@ -1084,6 +1085,44 @@ test("po-approval-gate --help and --version are read-only, never a forbidden cro
+   } finally { rmSync(path, { recursive: true, force: true }); }
+ });
+ 
++// Candidate 29 (Codex greenfield run 3, C5): `po-approval-gate.mjs verify-critical` is public readback of a prepared
++// critical-action request and its proof; it writes nothing. It was refused as GUARD-CROSS-REPO-MUTATION with a signature
++// override offered for a read. Only the exact verify shape plus one `--kind <word>` pair is admitted; prepare-critical,
++// an extra argument, a missing kind or an in-root directory still hit the blanket refusal.
++test("po-approval-gate verify-critical is agent readback, never a forbidden cross-repository mutation", () => {
++  const path = root();
++  const external = mkdtempSync(join(tmpdir(), "guard-lifecycle-verify-critical-"));
++  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
++  try {
++    markGovernedFixture(path);
++    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
++    for (const command of [
++      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${external} --kind push`,
++      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${external} --kind release-preflight`,
++    ]) {
++      assert.equal(isAgentPoPublicCommand(command, path), true, command);
++      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
++      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
++        projectDir: path,
++        requireProjectOnboardingReadyFn() { return readiness; },
++      }), { exitCode: 0, stderr: "" }, command);
++    }
++    for (const command of [
++      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${external}`,
++      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${external} --kind push --extra x`,
++      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${external} --kind --help`,
++      `node ${PO_APPROVAL_GATE_SCRIPT} verify-critical --repo-root ${path} --directory ${join(path, "scratch")} --kind push`,
++      `node ${PO_APPROVAL_GATE_SCRIPT} prepare-critical --repo-root ${path} --directory ${external} --kind push`,
++    ]) {
++      assert.equal(isAgentPoPublicCommand(command, path), false, command);
++      assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
++    }
++  } finally {
++    rmSync(path, { recursive: true, force: true });
++    rmSync(external, { recursive: true, force: true });
++  }
++});
++
+ test("cachebuster is source-root scoped while plugin installation remains operator-only", () => {
+   const path = root();
+   try {
+diff --git a/plugins/pipeline-core/lib/guard/po-commands.mjs b/plugins/pipeline-core/lib/guard/po-commands.mjs
+index 1f9ad83d4dbe177f769ae60e38bb23e2c205acd0..64ffa00bfcae5d81b1e71b9be1a6142870c6be79 100644
+--- a/plugins/pipeline-core/lib/guard/po-commands.mjs
++++ b/plugins/pipeline-core/lib/guard/po-commands.mjs
+@@ -63,6 +63,16 @@ export function isAgentPoPublicCommand(command, root) {
+     && externalApprovalDirectory(args, root, 3)) {
+     return args.length === 5 || (feature(5) && args.length === 7);
+   }
++  // Candidate 29 (Codex greenfield run 3, C5): `verify-critical` is the public readback of a prepared critical-action
++  // request and its proof, exactly like `verify`; it writes nothing (only setup/prepare/approve write). It was refused
++  // as GUARD-CROSS-REPO-MUTATION with a signature override offered for a read. Same exact shape as `verify`, plus the
++  // one `--kind <word>` pair the script requires; the script itself validates the kind vocabulary.
++  if (args[0] === "verify-critical"
++    && args[1] === "--repo-root" && args[2] === root
++    && externalApprovalDirectory(args, root, 3)
++    && args[5] === "--kind" && /^[a-z][a-z-]{0,63}$/u.test(args[6] ?? "")) {
++    return args.length === 7;
++  }
+   return false;
+ }
+ 

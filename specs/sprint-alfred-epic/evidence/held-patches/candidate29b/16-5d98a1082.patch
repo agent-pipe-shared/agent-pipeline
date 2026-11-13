@@ -1,0 +1,79 @@
+diff --git a/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+index 6faa5e8c7be6b772b1c75a3e1fb79bd6c509828d..0f2bf4fbf089f63a11fe68df5cdf2530bcc8bb38 100644
+--- a/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
++++ b/backlog/items/2026-11-10-authorship-and-test-first-are-only-self-attested.md
+@@ -18,6 +18,8 @@ The records name who wrote a change and state that a test failed before it passe
+ 
+ The Codex report adds a related gap: tests are derived by the same agent that writes the code. A test derivation by a separate agent, from the specification alone, belongs to the same decision.
+ 
++Further evidence (Codex greenfield run 3, 2026-11-13, point C11): the final tests were green, but the TDD order was mostly self-attested or missing in the dispatch records. Showing RED before the edit needs host observation, which is the same capability.
++
+ ## Decision
+ 
+ PO tile 2026-11-10: after 0.7.0. It is not part of the 0.7.0 scope.
+diff --git a/backlog/items/2026-11-13-early-dispatches-are-layer-packages-not-vertical-slices.md b/backlog/items/2026-11-13-early-dispatches-are-layer-packages-not-vertical-slices.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..a34e351f9d9e34ceb14e37c5fd3316ceb48a3b62
+--- /dev/null
++++ b/backlog/items/2026-11-13-early-dispatches-are-layer-packages-not-vertical-slices.md
+@@ -0,0 +1,25 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.early-dispatches-are-layer-packages-not-vertical-slices
++type: workflow-improvement
++owner: pipeline
++status: open
++created: 2026-11-13
++source: "Codex greenfield run 3 report, point C10 (P1); PO tile 2026-11-13 places it after candidate 29"
++sprint: alfred
++done_when: manual
++---
++
++# Early dispatches are layer packages, not the planned vertical slices
++
++## Description
++
++The Spec planned five vertical slices. The early dispatches were module or layer packages instead (one package per technical layer). So no thin end-to-end slice existed early that the PO could look at and accept. Nothing in the dispatch route compares the dispatched package with the slice plan of the Spec.
++
++## Decision
++
++PO tile 2026-11-13: a backlog item after candidate 29. This is process design, not a fix.
++
++## Done when
++
++The PO decides whether the dispatch route checks a package against the Spec's slice plan, or only reports the gap, and that decision is carried out.
+diff --git a/backlog/items/2026-11-13-scaffold-map-inventory-stays-design-pending-after-materialization.md b/backlog/items/2026-11-13-scaffold-map-inventory-stays-design-pending-after-materialization.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..1fcb8e104a466d0b433136f5c1638f214fc68d47
+--- /dev/null
++++ b/backlog/items/2026-11-13-scaffold-map-inventory-stays-design-pending-after-materialization.md
+@@ -0,0 +1,29 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.scaffold-map-inventory-stays-design-pending-after-materialization
++type: defect
++owner: pipeline
++status: open
++created: 2026-11-13
++source: "Codex greenfield run 3 report, point C13 (P2); PO tile 2026-11-13 places it after candidate 29"
++sprint: alfred
++done_when: manual
++---
++
++# The scaffold map inventory stays design-pending after materialization
++
++## Description
++
++A greenfield bootstrap writes `architecture/map/index.md` and `architecture/map/inventory.json` (schema `pipeline.architecture-map-scaffold.v1`, status `design-pending`, no modules). Materialization replaces the index with the designed module map, but it leaves `inventory.json` unchanged. So after materialization, one file still says `design-pending` with an empty module list. That misleads a reader. No gate reads it once the index has changed.
++
++## Why it was not fixed in candidate 29
++
++The materialization targets are bound in the receipt `architecture/design-materialization.json` (one digest per target). If a target is added or changed, a project that is already materialized gets a different expected receipt and is refused `ARCHITECTURE-DESIGN-RECEIPT-STALE`. That includes consumers in the middle of a feature course. A fix needs a receipt migration: a receipt written before the change must still be accepted, and that must be proven by a test against such a receipt.
++
++## Decision
++
++PO tile 2026-11-13: a backlog item after candidate 29.
++
++## Done when
++
++Materialization updates or retires the scaffold inventory, and a test proves that an earlier receipt is still accepted.

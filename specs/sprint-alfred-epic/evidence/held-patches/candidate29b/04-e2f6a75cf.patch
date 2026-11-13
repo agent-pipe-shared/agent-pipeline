@@ -1,0 +1,69 @@
+diff --git a/plugins/pipeline-core/lib/checkpoint-push-approval.mjs b/plugins/pipeline-core/lib/checkpoint-push-approval.mjs
+index e4c27a9fcefe007b025abd9da56c713f7cbab861..1cd886a0fe3b1e289e15f4d409dfb24d186df1b2 100644
+--- a/plugins/pipeline-core/lib/checkpoint-push-approval.mjs
++++ b/plugins/pipeline-core/lib/checkpoint-push-approval.mjs
+@@ -71,7 +71,7 @@ const REASONS = Object.freeze({
+   "PUSH-PROOF-BINDING-MISMATCH": "the recorded approval was given for a different remote or destination",
+   "PUSH-PROOF-THREAT-MODEL": "the push threat model changed (or is unreadable) since the approval was signed",
+   "PUSH-PROOF-KIND": "the recorded proof is not a push approval",
+-  "PUSH-PROOF-EXPIRED": "the recorded approval has expired",
++  "PUSH-PROOF-EXPIRED": "the recorded approval has expired; run push-init.mjs again with the same --remote and --destination for a fresh signing command, have the PO sign it, then approve-push with the new proof",
+   "PUSH-PROOF-SUBJECT-MISMATCH": "the signed subject does not match this commit, tree, remote and destination",
+   "PUSH-PROOF-STATE-AUTHORITY": "the approved plan and spec authority needed to check the signature is missing",
+   "PUSH-PROOF-INTENT-MISMATCH": "the approval was signed under a different plan or spec authority",
+diff --git a/plugins/pipeline-core/lib/checkpoint-push-approval.test.mjs b/plugins/pipeline-core/lib/checkpoint-push-approval.test.mjs
+index 09e5b7ee1088b64aae36ce7769a98c7c0e97d608..7b398e97f3ea22a3d7abe22fe6be4f93c0f2c653 100644
+--- a/plugins/pipeline-core/lib/checkpoint-push-approval.test.mjs
++++ b/plugins/pipeline-core/lib/checkpoint-push-approval.test.mjs
+@@ -308,6 +308,8 @@ try {
+     const { root, threatModel } = fixture({ anchorKey: key });
+     const record = approvalRecord({ key, threatModel });
+     assertRefused(call(root, stateFor(record), { now: AFTER_EXPIRY }), "PUSH-PROOF-EXPIRED");
++    // Candidate 29 (AGY run 3, R12): the reason names the way to a fresh approval.
++    assert.match(call(root, stateFor(record), { now: AFTER_EXPIRY }).reason, /run push-init\.mjs again with the same --remote and --destination/u);
+   });
+ 
+   check("CPA7 an approval bound to another destination or another remote is refused", () => {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index cbac6633df38b6f52e60c055383eceb2070c993d..7ae2880ecc4475ac43cdbe1c412abdb115258013 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -10145,9 +10145,13 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+ // bridge for a runner that issues no Source return record; the close gate names this command as its one runnable repair. Recorded through the same
+ // human-approval route as `feature-package-reconcile` (signature or chat per `gates.human_approval`), into the private approval store, never inferred.
+ /** C21B: the cause and the next step behind the two proof refusals that otherwise leave an agent reading plugin source. Empty for every other code. */
+-function criticalProofRefusalHint(code, renewal = "") {
++export function criticalProofRefusalHint(code, renewal = "") {
+   if (code === "CRITICAL-PROOF-EXTERNAL-PATH") return " The three proof paths must be absolute, must exist and must lie outside this repository: pass the requestPath, authorityPath and proofPath the signing step printed, never a copy under scratch/ or anywhere else in the project.";
+   if (code === "CRITICAL-ACTION-REQUEST-MISMATCH") return ` The signed request is not the one this action expects: sign the printed signatureCommand unchanged, because any edited value, --expires-at included, makes a different request.${renewal}`;
++  // Candidate 29 (AGY run 3, R12): a push signed in the evening and approved the next morning failed here without naming the way on.
++  if (code === "CRITICAL-ACTION-PROOF-EXPIRED") {
++    return ` The proof's signature window (its --expires-at) has passed, so it cannot be used.${renewal === "" ? " Run the step that printed the signing command again (for a push: push-init.mjs with the same --remote and --destination) to get a fresh signatureCommand, and have the PO sign that one." : renewal}`;
++  }
+   return "";
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 9a495764749e2fc936a3dd9873059680cf496c9c..29e802eccbd4184abbcd8cbe60c842f24afe0e27 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
+ 
+ import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+ import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+-import { PLAN_AUTHORITY_PRD_FRAMING_CODE, PO_ACK_APPLY_CONFIRMATION_TOKEN, SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, resolvePoRebindRunner, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
++import { PLAN_AUTHORITY_PRD_FRAMING_CODE, PO_ACK_APPLY_CONFIRMATION_TOKEN, SCHEMA_ID, continuityLockPath, criticalProofRefusalHint, externalPathIsOutsideRoot, resolvePoRebindRunner, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
+ import { INTAKE_STAGING_DIRNAME, classifyOnboardingContinuity, inactiveLifecycleTransitionTimestamp } from "../lib/onboarding-continuity.mjs";
+ import {
+   PLAN_AUTHORITY_PROMOTION_SUBCOMMAND,
+@@ -3973,3 +3973,10 @@ n26Test("N26-h a residual-acceptance proof consumed only in the private approval
+ 
+ assert.deepEqual(n26Failures, [], "N26 private approval store cases failed: " + n26Failures.join(" | "));
+ console.log("N26 private approval store cases a..h complete.");
++
++// Candidate 29 (AGY run 3, R12): an expired proof names the way to a fresh signing command; a caller's own renewal text wins.
++assert.match(criticalProofRefusalHint("CRITICAL-ACTION-PROOF-EXPIRED"), /signature window \(its --expires-at\) has passed/u);
++assert.match(criticalProofRefusalHint("CRITICAL-ACTION-PROOF-EXPIRED"), /push-init\.mjs with the same --remote and --destination/u);
++assert.match(criticalProofRefusalHint("CRITICAL-ACTION-PROOF-EXPIRED", " Run this command again."), /has passed, so it cannot be used\. Run this command again\.$/u);
++assert.equal(criticalProofRefusalHint("SOME-OTHER-CODE"), "");
++console.log("C29 R12 expired-proof hint complete.");

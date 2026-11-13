@@ -1,0 +1,53 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 7ae2880ecc4475ac43cdbe1c412abdb115258013..0b7e445e2dea2c17f266dc882396e23b1a0bd463 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -10145,7 +10145,15 @@ function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps
+ // bridge for a runner that issues no Source return record; the close gate names this command as its one runnable repair. Recorded through the same
+ // human-approval route as `feature-package-reconcile` (signature or chat per `gates.human_approval`), into the private approval store, never inferred.
+ /** C21B: the cause and the next step behind the two proof refusals that otherwise leave an agent reading plugin source. Empty for every other code. */
+-export function criticalProofRefusalHint(code, renewal = "") {
++export function criticalProofRefusalHint(code, renewal = "", mirror = null) {
++  // Candidate 29 (Codex greenfield run 3, T3): a session mixed one external proof path with two scratch paths. For a kind that
++  // admits the repository's scratch mirror (push, Critic acknowledgement, Spec addendum) the hint names both valid forms: all
++  // three external paths, or exactly these three mirror paths -- never a mix.
++  if (code === "CRITICAL-PROOF-EXTERNAL-PATH" && mirror !== null && typeof mirror?.request === "string"
++    && typeof mirror?.authority === "string" && typeof mirror?.proof === "string") {
++    return " The three proof paths are one set, never mixed: either all three external paths the signing step printed (requestPath, authorityPath, proofPath: absolute, existing, outside this repository), "
++      + `or all three of this repository's scratch mirror, exactly: --proof-request ${mirror.request} --proof-authority ${mirror.authority} --proof ${mirror.proof}.`;
++  }
+   if (code === "CRITICAL-PROOF-EXTERNAL-PATH") return " The three proof paths must be absolute, must exist and must lie outside this repository: pass the requestPath, authorityPath and proofPath the signing step printed, never a copy under scratch/ or anywhere else in the project.";
+   if (code === "CRITICAL-ACTION-REQUEST-MISMATCH") return ` The signed request is not the one this action expects: sign the printed signatureCommand unchanged, because any edited value, --expires-at included, makes a different request.${renewal}`;
+   // Candidate 29 (AGY run 3, R12): a push signed in the evening and approved the next morning failed here without naming the way on.
+@@ -13888,7 +13896,13 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         dir, state: base, kind: "push", candidate: observed,
+         subject: { sourceCommit: observed.commit, remote, destination, threatModel: threatModelBinding }, flags: parsed.value, now: approvedAt, required: true,
+       });
+-      if (!verified.ok) { console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.${criticalProofRefusalHint(verified.code)}`); return 2; }
++      if (!verified.ok) {
++        // Candidate 29 (Codex run 3, T3): name the one in-repository form a push admits, the exact scratch mirror.
++        const mirrorCommon = defaultGitCommonDir(dir);
++        const mirror = mirrorCommon.ok ? criticalScratchArtifactPaths(dir, mirrorCommon.path, "push") : null;
++        console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.${criticalProofRefusalHint(verified.code, "", mirror)}`);
++        return 2;
++      }
+       const priorConsumption = base.criticalProofConsumption;
+       if (priorConsumption !== undefined && (!Array.isArray(priorConsumption)
+         || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 29e802eccbd4184abbcd8cbe60c842f24afe0e27..2751e3c0a2f5962e26b746b0d4a8860bc222e1fa 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -139,8 +139,10 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
+   const afterMaterialize = approvePushAttempt(root, deps);
+   assert.ok(!afterMaterialize.lines.some((line) => line.includes("CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE")),
+     "AC-6: after materializing, the artifact resolves -- the refusal is no longer the artifact-unavailable one");
+-  assert.ok(afterMaterialize.lines.some((line) => /CRITICAL-PROOF-EXTERNAL-PATH\); external proof was not consumed\. The three proof paths must be absolute/u.test(line)),
+-    `a refused proof path names its cause: ${afterMaterialize.lines.join(" ")}`);
++  // Candidate 29 (Codex run 3, T3): for a push the refusal names both valid forms, the three external paths or exactly the
++  // three scratch mirror paths of this repository, never a mix.
++  assert.ok(afterMaterialize.lines.some((line) => /CRITICAL-PROOF-EXTERNAL-PATH\); external proof was not consumed\. The three proof paths are one set, never mixed: either all three external paths .* or all three of this repository's scratch mirror, exactly: --proof-request \S*scratch\/\S+ --proof-authority \S*scratch\/\S+ --proof \S*scratch\/\S+\.$/u.test(line)),
++    `a refused proof path names its cause and both valid forms: ${afterMaterialize.lines.join(" ")}`);
+ 
+   // End-to-end: a real signed approval, over the artifact exactly as materialized.
+   const external = mktempProjectDir();

@@ -1,0 +1,151 @@
+diff --git a/plugins/pipeline-core/lib/critic-accepted-contract.mjs b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+index 1227c82485b67d43b7587cd0030e906948a25926..08d6b44196966cf51ed9fda4a5baf64d1b1b5127 100644
+--- a/plugins/pipeline-core/lib/critic-accepted-contract.mjs
++++ b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+@@ -367,16 +367,22 @@ export function parseAcceptedCriticCriterion(input) {
+     const context = input.packageContext;
+     if (!own(context, ['featureId','sourceBindings']) || typeof context.featureId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u.test(context.featureId)
+       || !Array.isArray(context.sourceBindings) || context.sourceBindings.length < 1 || context.sourceBindings.length > 16) return binding();
++    // Candidate 29 (Glossover K-25): the approved PRD and Spec may stay in the earlier (dated) specs/ folder after the
++    // feature id changed -- the same one exception lib/feature-package-topology.mjs featurePackageArtifactPath() grants
++    // the package (28e). The bindings handed in here are the approved ones (plan approval sourceRefs, or the signed
++    // envelope's request binding), so a prd/spec binding is admitted under any canonical specs/<folder>/ path; a
++    // companion still has to sit inside specs/<featureId>/.
+     const prefix = `specs/${context.featureId}/`, seen = new Set();
++    const placed = entry => entry.path.startsWith(prefix) || entry.role === 'prd' || entry.role === 'spec';
+     for (const entry of context.sourceBindings) {
+-      if (!own(entry, ['path','sha256','role']) || typeof entry.path !== 'string' || !entry.path.startsWith(prefix)
++      if (!own(entry, ['path','sha256','role']) || typeof entry.path !== 'string' || !placed(entry)
+         || !/^specs\/[A-Za-z0-9][A-Za-z0-9_-]{0,127}\/[A-Za-z0-9_./-]+$/u.test(entry.path)
+         || entry.path.split('/').some(part => part === '.' || part === '..' || part === '')
+         || typeof entry.sha256 !== 'string' || !SHA.test(entry.sha256) || !['prd','spec','companion'].includes(entry.role) || seen.has(entry.path)) return binding();
+       seen.add(entry.path);
+     }
+     const matched = context.sourceBindings.filter(entry => entry.path === locator.sourcePath && entry.sha256 === locator.sourceSha256);
+-    if (matched.length !== 1 || !locator.sourcePath.startsWith(prefix)) return binding();
++    if (matched.length !== 1 || !placed(matched[0])) return binding();
+     const bytes = Buffer.from(input.sourceBytes), byteHash = value => createHash('sha256').update(value).digest('hex');
+     if (byteHash(bytes) !== locator.sourceSha256) return binding();
+     const decoder = new TextDecoder('utf-8', {fatal:true,ignoreBOM:true});
+@@ -443,7 +449,7 @@ export function readAcceptedCriticCriterion(input) {
+     locator = structuredClone(value);
+     const verified = readAcceptedDeliveryContract({dir:input.repoRoot,envelopePath:input.envelopePath});
+     if (!verified.ok) return fail(verified.code);
+-    if (verified.featureId !== input.featureId || !locator.sourcePath.startsWith(`specs/${input.featureId}/`)) return fail('CAC-CRITERION-BINDING');
++    if (verified.featureId !== input.featureId) return fail('CAC-CRITERION-BINDING');
+     const root = realpathSync(resolve(input.repoRoot));
+     const physical = path => {
+       let target = root;
+@@ -463,7 +469,10 @@ export function readAcceptedCriticCriterion(input) {
+     const sources = envelope.request.binding.sources;
+     const sourceBindings = [{...sources.prd,role:'prd'},{...sources.spec,role:'spec'},...sources.companions.map(entry=>({...entry,role:'companion'}))];
+     const bound = sourceBindings.find(entry=>entry.path === locator.sourcePath);
+-    if (!bound || bound.sha256 !== locator.sourceSha256) return fail('CAC-CRITERION-BINDING');
++    // Candidate 29 (Glossover K-25): the locator must name one of the signed bindings; inside specs/<featureId>/ as
++    // before, or the approved PRD/Spec at its approved path (the 28e package exception), never a companion elsewhere.
++    if (!bound || bound.sha256 !== locator.sourceSha256
++      || (!bound.path.startsWith(`specs/${input.featureId}/`) && bound.role !== 'prd' && bound.role !== 'spec')) return fail('CAC-CRITERION-BINDING');
+     const invoke = argv => {
+       const result = spawnSync('git',argv,{cwd:root,maxBuffer:2097152});
+       if (!isSuccessfulSpawn(result) || !Buffer.isBuffer(result.stdout)) throw Error('original Git observation unavailable');
+diff --git a/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs b/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs
+index e91b4c95a0ef2a9f8e353cba12220a00c465e661..4fa3fe4f6f3805ad3c9ade4c7c79063ac2cf9b2c 100644
+--- a/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs
++++ b/plugins/pipeline-core/lib/pins/consumer-spec-criterion-binds-the-first-item-delivery.test.mjs
+@@ -542,3 +542,39 @@ test("the host-return id grammar is the contract's grammar: equal source strings
+   }
+   assert.equal(ids.filter((id) => contract.isCriterionId(id)).length, 5);
+ });
++
++// F. Candidate 29 (Glossover K-25): the feature id changed after the design, so the approved Spec stayed in the earlier
++// dated specs/ folder (28e carries it there, lib/feature-package-topology.mjs). The host parses the criterion with the
++// ACTIVE feature id, and the parser demanded specs/<featureId>/ for every binding, so the first item dispatch was refused
++// item-course-criterion-unbound although build and probe were ready. The approved PRD/Spec binding is now admitted at
++// its approved path; a companion outside specs/<featureId>/ and a locator naming no binding stay CAC-CRITERION-BINDING.
++
++test("K-25: an approved Spec in an earlier dated folder binds its criterion under the active feature id", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx, "AC-1"), depsOf(fx));
++  assert.equal(result.ok, true, JSON.stringify(result));
++  const locator = result.binding.itemDelivery.criterionLocator;
++  const specBinding = { path: SPEC, sha256: sha(fx.specBytes), role: "spec" };
++  const parse = (featureId, sourceBindings, at = locator) => parseAcceptedCriticCriterion({
++    sourceBytes: new Uint8Array(fx.specBytes), locator: at, packageContext: { featureId, sourceBindings },
++  });
++  const ADMITTED = ["explicit-actual-independent-pass", "no-explicit-criterion"];
++  // The active feature is "shop-checkout"; the approved Spec sits in specs/shop-app/ (the earlier folder).
++  for (const bindings of [[specBinding], [{ path: "specs/shop-app/prd.md", sha256: "a".repeat(64), role: "prd" }, specBinding]]) {
++    const parsed = parse("shop-checkout", bindings);
++    assert.ok(ADMITTED.includes(parsed.status), JSON.stringify(parsed));
++  }
++  assert.ok(ADMITTED.includes(parse("shop-app", [specBinding]).status), "the unchanged same-folder case");
++  // A companion is not a carried artifact: outside specs/<featureId>/ it still refuses the whole binding.
++  const companion = parse("shop-checkout", [specBinding, { path: "specs/shop-app/notes.md", sha256: "b".repeat(64), role: "companion" }]);
++  assert.equal(companion.code, "CAC-CRITERION-BINDING", JSON.stringify(companion));
++  // The locator must still name exactly one binding, by path and digest.
++  const unbound = parse("shop-checkout", [{ ...specBinding, sha256: "c".repeat(64) }]);
++  assert.equal(unbound.code, "CAC-CRITERION-BINDING", JSON.stringify(unbound));
++  // The path grammar is unchanged: no traversal and nothing outside specs/.
++  for (const path of ["specs/shop-app/../shop-app/spec.md", "docs/spec.md"]) {
++    const refused = parse("shop-checkout", [{ ...specBinding, path }], { ...locator, sourcePath: path });
++    assert.equal(refused.code, "CAC-CRITERION-BINDING", path);
++  }
++});
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index b50690fb983eb50a596b845d539c6fc8d6d2add1..94e146c1a298b0d4dd061d6bfb1cf73afa2c10b4 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -493,6 +493,16 @@ function defaultSpecPathFromState(root) {
+   } catch { return null; }
+ }
+ 
++/** The active feature id the host parses the criterion with (K-25), or null when the project state names none. */
++function activeFeatureIdFromState(root) {
++  try {
++    const paths = resolveProjectAuthorityPaths({ rootDir: root });
++    if (paths.status !== "ready" || typeof paths.state !== "string") return null;
++    const id = JSON.parse(readFileSync(resolve(root, paths.state), "utf8"))?.activeFeature?.id;
++    return typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u.test(id) ? id : null;
++  } catch { return null; }
++}
++
+ /** A regular, non-symlinked file strictly inside the (already real) root, or null. */
+ function readRepoFile(root, rel) {
+   try {
+@@ -638,11 +648,15 @@ function findCriterionOccurrences(sourceBytes, id) {
+ }
+ 
+ /** The host's own parser must accept the criterion text exactly as the existing Alfred route requires. */
+-function requireAcceptedCriterion(specBytes, specPath, locator, describe) {
++// Candidate 29 (Glossover K-25): the host (lib/native-goldfish-host-state.mjs prepareGovernedItemQueue) parses the
++// criterion with the ACTIVE feature id, not the spec's folder name. This check took the folder name, so build and
++// probe reported ready for an approved Spec in an earlier dated folder while the dispatch itself was refused. Both now
++// pass the same feature id; the folder name is only the fallback when no project state names an active feature.
++function requireAcceptedCriterion(specBytes, specPath, locator, describe, featureId = specPath.split("/")[1]) {
+   const criterion = parseAcceptedCriticCriterion({
+     sourceBytes: new Uint8Array(specBytes),
+     locator,
+-    packageContext: { featureId: specPath.split("/")[1], sourceBindings: [{ path: specPath, sha256: locator.sourceSha256, role: "spec" }] },
++    packageContext: { featureId, sourceBindings: [{ path: specPath, sha256: locator.sourceSha256, role: "spec" }] },
+   });
+   if (!ACCEPTED_CRITERION_STATUSES.includes(criterion.status)) {
+     refuse("DBG-CRITERION-REFUSED", `the host criterion parser reports ${criterion.status} (${criterion.code}) for ${describe}`);
+@@ -839,7 +853,7 @@ export function generateDispatchBinding(options, deps = {}) {
+       endByte: only.endByte,
+       excerptSha256: sha256(specBytes.subarray(only.startByte, only.endByte)),
+     };
+-    requireAcceptedCriterion(specBytes, specPath, locator, `${options.criterion} of item ${item}`);
++    requireAcceptedCriterion(specBytes, specPath, locator, `${options.criterion} of item ${item}`, activeFeatureIdFromState(root) ?? undefined);
+     itemId = `${specPath.split("/")[1]}.${item}`;
+     if (!ITEM_ID.test(itemId)) refuse("DBG-ITEM-ID", `derived item id ${JSON.stringify(itemId)} does not match ${ITEM_ID}`);
+   } else {
+@@ -859,7 +873,7 @@ export function generateDispatchBinding(options, deps = {}) {
+       endByte: criterionCell.endByte,
+       excerptSha256: sha256(specBytes.subarray(criterionCell.startByte, criterionCell.endByte)),
+     };
+-    requireAcceptedCriterion(specBytes, specPath, locator, `${idCell.value} of item ${item}`);
++    requireAcceptedCriterion(specBytes, specPath, locator, `${idCell.value} of item ${item}`, activeFeatureIdFromState(root) ?? undefined);
+     const itemPath = /backlog\/items\/[A-Za-z0-9][A-Za-z0-9._-]*\.md/u.exec(evidenceCell.value)?.[0];
+     if (!itemPath) refuse("DBG-ITEM-EVIDENCE-MISSING", `the Evidence cell of ${idCell.value} names no backlog/items/*.md file (item ${item}); repair: put the item's backlog/items/<file>.md path in that row's Evidence cell, or file the item first (backlog/README.md) and name it there`);
+     const itemBytes = readRepoFile(root, itemPath);

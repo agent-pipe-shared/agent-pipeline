@@ -1,0 +1,80 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 52fbd771018758647d5f6b37b88afb738a503590..d3211731e6e1e97e66f35f824218a18ebae9bf30 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -7376,6 +7376,36 @@ test("NVA-LCGUARD-4 gap 1: a backup-style filename sharing a protected name as a
+   }
+ });
+ 
++// Candidate 29 (Codex greenfield run 3, C5/A02): copying a gate-strength file INTO scratch (a test fixture) only reads
++// the protected file; the one written path is inside the physical scratch boundary. The plain two-operand `cp` form is
++// admitted by this lane like `cp -- ...` already was; a copy ONTO the protected file and an option form stay refused.
++test("C29-A02: cp of a gate-strength file into scratch is a fixture copy, never a gate-strength write", () => {
++  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
++  mkdirSync(SCRATCH_ROOT, { recursive: true });
++  const path = realpathSync(mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-gsshell-fixture-copy-")));
++  markGovernedFixture(path);
++  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
++  mkdirSync(join(path, "scratch", "fx"), { recursive: true });
++  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
++    projectDir: path,
++    requireProjectOnboardingReadyFn() { return readiness; },
++  });
++  try {
++    for (const command of ["cp pipeline.user.yaml scratch/fx/pipeline.user.yaml", "cp -- pipeline.user.yaml scratch/fx/copy.yaml"]) {
++      assert.doesNotMatch(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
++    }
++    for (const command of [
++      "cp scratch/fx/pipeline.user.yaml pipeline.user.yaml",
++      "cp -f pipeline.user.yaml scratch/fx/pipeline.user.yaml",
++      "cp pipeline.user.yaml scratch/../pipeline.user.yaml",
++    ]) {
++      assert.match(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
++    }
++  } finally {
++    rmSync(path, { recursive: true, force: true });
++  }
++});
++
+ // ---------------------------------------------------------------------------------
+ // NVA-STARNEEDLE-1 (backlog: 2026-08-27-gate-strength-shell-lane-refuses-any-command-
+ // containing-a-quoted-wildcard.md). GS-15's path is `project/.onboarding-staging/*`, whose
+diff --git a/plugins/pipeline-core/lib/physical-scratch-boundary.mjs b/plugins/pipeline-core/lib/physical-scratch-boundary.mjs
+index b3de205fc79cf520986099e690657acd6e444f95..19ccb4afde64786df61de25977044a4df13a3fa4 100644
+--- a/plugins/pipeline-core/lib/physical-scratch-boundary.mjs
++++ b/plugins/pipeline-core/lib/physical-scratch-boundary.mjs
+@@ -103,5 +103,9 @@ export function isBoundedScratchOnlyWords(words, context) {
+   }
+   if (words[0] === 'touch' && words.length === 2 && !words[1].startsWith('-')) target = words[1];
+   if (words[0] === 'cp' && words.length === 4 && words[1] === '--') target = words[3];
++  // Candidate 29 (Codex greenfield run 3, C5/A02): the plain `cp <source> <scratch target>` form, which an agent writes
++  // far more often than `cp -- ...`. Exactly two operands and neither starts with `-`, so no option can hide in them;
++  // the source is only read, and the one written path must still pass the physical scratch boundary.
++  if (words[0] === 'cp' && words.length === 3 && !words[1].startsWith('-') && !words[2].startsWith('-')) target = words[2];
+   return typeof target === 'string' && isPhysicalScratchTarget(target, context);
+ }
+diff --git a/plugins/pipeline-core/lib/physical-scratch-boundary.test.mjs b/plugins/pipeline-core/lib/physical-scratch-boundary.test.mjs
+index b382f5dee13353888de28e288a36bf9c8eaae8cc..60b6773bce95f2333e5579458d578d29fd84dea3 100644
+--- a/plugins/pipeline-core/lib/physical-scratch-boundary.test.mjs
++++ b/plugins/pipeline-core/lib/physical-scratch-boundary.test.mjs
+@@ -88,7 +88,8 @@ test('file ancestors and IO errors fail closed', t => {
+ test('shell exception admits only exact parsed scratch writes', t => {
+   const root = fixture(t);
+   const context = { rootDir: root, liveRoots: [join(root, 'live')] };
+-  for (const words of [['mkdir', '-p', 'scratch/nested'], ['touch', 'scratch/hooks.json'], ['cp', '--', 'live/guard.mjs', 'scratch/copy.mjs']]) {
++  for (const words of [['mkdir', '-p', 'scratch/nested'], ['touch', 'scratch/hooks.json'], ['cp', '--', 'live/guard.mjs', 'scratch/copy.mjs'],
++    ['cp', 'live/guard.mjs', 'scratch/plain-copy.mjs']]) {
+     assert.equal(isBoundedScratchOnlyWords(words, context), true);
+   }
+   assert.equal(isBoundedScratchOnlyWords(['touch', join(root, 'scratch', 'absolute.txt')], context), true);
+@@ -104,7 +105,9 @@ test('shell exception admits only exact parsed scratch writes', t => {
+   }
+   for (const words of [['cp', '--', 'scratch/copy', 'live/guard.mjs'], ['touch', 'scratch/one', 'live/guard.mjs'],
+     ['node', '-e', 'write("scratch/hooks.json")'], ['cp', '-r', 'live', 'scratch/copy'],
+-    ['/untrusted/cp', '--', 'source', 'scratch/copy'], ['mkdir', '-p', 'scratch/../live/new'], ['touch', '-r', 'scratch/a']]) {
++    ['/untrusted/cp', '--', 'source', 'scratch/copy'], ['mkdir', '-p', 'scratch/../live/new'], ['touch', '-r', 'scratch/a'],
++    ['cp', 'scratch/copy', 'live/guard.mjs'], ['cp', '-f', 'scratch/copy'], ['cp', 'live/guard.mjs', '-t'],
++    ['cp', 'live/guard.mjs', 'scratch/../live/x.mjs']]) {
+     assert.equal(isBoundedScratchOnlyWords(words, context), false, JSON.stringify(words));
+   }
+ });

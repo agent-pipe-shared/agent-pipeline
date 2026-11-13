@@ -1,0 +1,83 @@
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index 5d8d17f2a0055353f9d08fb459cc2f268634d443..17e277df3ff096ebd2aa16df3cb0ebe18cb37c7c 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -1826,6 +1826,29 @@ function pushRecoveryTarget(command, depth = 0) {
+   return { kind: "branch", remote, destination };
+ }
+ 
++// Candidate 29 (Codex greenfield run 3, C6): a denied `node <...>/push-init.mjs ... --remote <r> --destination <ref>`
++// is not a git push, so it fell through to the fixed MAIN publication route although push-init had frozen a feature
++// branch as its destination; the session followed it and met PX-NON-FAST-FORWARD. The destination push-init names is
++// taken unchanged: main keeps the publication route, an approvable branch gets the branch approval route for exactly
++// that remote and ref, anything else is undetermined. Only one plain push-init invocation is read, nothing composed.
++function pushInitRecoveryTarget(command) {
++  const shape = stripQuotedSegments(command);
++  if (/&&|\|\||[;|\n\r`<>]|\$\(/u.test(shape) || /[$`*?[\]{}~]/u.test(shape)) return null;
++  const tokens = tokenizeArgv(command);
++  if (tokens.length < 2 || !["node", "node.exe"].includes(executableName(tokens[0]))
++    || executableName(tokens[1]) !== "push-init.mjs") return null;
++  const value = (flag) => {
++    const at = tokens.indexOf(flag, 2);
++    return at > 0 && tokens.indexOf(flag, at + 1) === -1 && typeof tokens[at + 1] === "string" && !tokens[at + 1].startsWith("-")
++      ? tokens[at + 1] : null;
++  };
++  const remote = value("--remote"), destination = value("--destination");
++  if (remote === null || destination === null) return { kind: "undetermined" };
++  if (PUSH_MAIN_NAMES.has(destination)) return { kind: "main" };
++  if (!PUSH_APPROVABLE_REF.test(destination) || destination.includes("..")) return { kind: "undetermined" };
++  return { kind: "branch", remote, destination };
++}
++
+ // Antigravity greenfield 2026-11-08: a dispatch the agent could correct itself was sent to an "external operator". Only a set made up
+ // entirely of dispatch refusals qualifies; anything else keeps its existing route. The text is closed and carries nothing from the denial.
+ function dispatchCorrectionRequired(denials) {
+@@ -1912,7 +1935,7 @@ function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
+     // denial whose command is not a push at all (a release alias) never named a
+     // destination, so there is nothing to read and the fixed publication route -- which
+     // revalidates everything from scratch anyway -- stays exactly right for it.
+-    const target = deniedPushCommand ? pushRecoveryTarget(command) : { kind: "not-a-push" };
++    const target = deniedPushCommand ? pushRecoveryTarget(command) : (pushInitRecoveryTarget(command) ?? { kind: "not-a-push" });
+     if (target.kind === "branch") {
+       return {
+         status: "narrower-recovery-required",
+diff --git a/plugins/pipeline-core/lib/human-guard-override.test.mjs b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+index a176b1ea28f1890928ebd71fcba4e3e0fb3d1e1d..9ac3c98270bf9b0b1c32f8435ef7b4630abe7b4e 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.test.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+@@ -2532,6 +2532,35 @@ test("GF-098: a denied push whose destination cannot be read is told so, never r
+   }
+ });
+ 
++// Candidate 29 (Codex greenfield run 3, C6): a denied push-init.mjs is no git push; its recovery fell through to the fixed
++// main publication route although push-init had frozen a feature branch as its destination (PX-NON-FAST-FORWARD).
++test("C29-C6: a denied push-init.mjs keeps the destination it froze: branch approval for a branch, publication only for main", () => {
++  const root = fixture();
++  try {
++    const init = (destination, extra = "") => `node /p/plugins/pipeline-core/scripts/push-init.mjs --root ${root} --by PO --remote origin --destination ${destination}${extra}`;
++    for (const command of [init("refs/heads/feat/game-v1"), init("refs/heads/feat/game-v1", " --transport-kind credential-helper --transport-reference gh")]) {
++      const observed = pushDenial(root, command, PUSH_GUARD_DENIAL);
++      assert.equal(observed.code, "HGO-NARROWER-BRANCH-PUSH-APPROVAL-REQUIRED", command);
++      const argv = observed.nextAction.action.argv;
++      assert.equal(argv[argv.indexOf("--remote") + 1], "origin");
++      assert.equal(argv[argv.indexOf("--destination") + 1], "refs/heads/feat/game-v1");
++      assert.equal(JSON.stringify(observed.nextAction).includes("refs/heads/main"), false, command);
++    }
++    const main = pushDenial(root, init("refs/heads/main"), PUSH_GUARD_DENIAL);
++    assert.equal(main.code, "HGO-NARROWER-PUBLICATION-REQUIRED");
++    for (const command of [init("refs/tags/v1"), init("refs/heads/a..b"), `${init("refs/heads/x")} --destination refs/heads/y`]) {
++      const observed = pushDenial(root, command, PUSH_GUARD_DENIAL);
++      assert.equal(observed.code, "HGO-NARROWER-PUSH-DESTINATION-REQUIRED", command);
++      assert.equal(JSON.stringify(observed.nextAction.action).includes("refs/heads/main"), false, command);
++    }
++    // Another script and a composed command keep the unchanged route.
++    assert.equal(pushDenial(root, "release-alias current", PUSH_GUARD_DENIAL).code, "HGO-NARROWER-PUBLICATION-REQUIRED");
++    assert.equal(pushDenial(root, `${init("refs/heads/x")} && git status`, PUSH_GUARD_DENIAL).code, "HGO-NARROWER-PUBLICATION-REQUIRED");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
+ test("a non-push git apply --check command whose patch path says push never selects push recovery", () => {
+   const root = fixture();
+   try {
