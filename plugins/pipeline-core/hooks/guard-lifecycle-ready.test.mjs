@@ -7376,6 +7376,36 @@ test("NVA-LCGUARD-4 gap 1: a backup-style filename sharing a protected name as a
   }
 });
 
+// Candidate 29 (Codex greenfield run 3, C5/A02): copying a gate-strength file INTO scratch (a test fixture) only reads
+// the protected file; the one written path is inside the physical scratch boundary. The plain two-operand `cp` form is
+// admitted by this lane like `cp -- ...` already was; a copy ONTO the protected file and an option form stay refused.
+test("C29-A02: cp of a gate-strength file into scratch is a fixture copy, never a gate-strength write", () => {
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const path = realpathSync(mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-gsshell-fixture-copy-")));
+  markGovernedFixture(path);
+  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  mkdirSync(join(path, "scratch", "fx"), { recursive: true });
+  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { return readiness; },
+  });
+  try {
+    for (const command of ["cp pipeline.user.yaml scratch/fx/pipeline.user.yaml", "cp -- pipeline.user.yaml scratch/fx/copy.yaml"]) {
+      assert.doesNotMatch(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+    }
+    for (const command of [
+      "cp scratch/fx/pipeline.user.yaml pipeline.user.yaml",
+      "cp -f pipeline.user.yaml scratch/fx/pipeline.user.yaml",
+      "cp pipeline.user.yaml scratch/../pipeline.user.yaml",
+    ]) {
+      assert.match(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
 // ---------------------------------------------------------------------------------
 // NVA-STARNEEDLE-1 (backlog: 2026-08-27-gate-strength-shell-lane-refuses-any-command-
 // containing-a-quoted-wildcard.md). GS-15's path is `project/.onboarding-staging/*`, whose

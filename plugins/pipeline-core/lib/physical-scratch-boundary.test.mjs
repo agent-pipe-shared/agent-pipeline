@@ -88,7 +88,8 @@ test('file ancestors and IO errors fail closed', t => {
 test('shell exception admits only exact parsed scratch writes', t => {
   const root = fixture(t);
   const context = { rootDir: root, liveRoots: [join(root, 'live')] };
-  for (const words of [['mkdir', '-p', 'scratch/nested'], ['touch', 'scratch/hooks.json'], ['cp', '--', 'live/guard.mjs', 'scratch/copy.mjs']]) {
+  for (const words of [['mkdir', '-p', 'scratch/nested'], ['touch', 'scratch/hooks.json'], ['cp', '--', 'live/guard.mjs', 'scratch/copy.mjs'],
+    ['cp', 'live/guard.mjs', 'scratch/plain-copy.mjs']]) {
     assert.equal(isBoundedScratchOnlyWords(words, context), true);
   }
   assert.equal(isBoundedScratchOnlyWords(['touch', join(root, 'scratch', 'absolute.txt')], context), true);
@@ -104,7 +105,9 @@ test('shell exception admits only exact parsed scratch writes', t => {
   }
   for (const words of [['cp', '--', 'scratch/copy', 'live/guard.mjs'], ['touch', 'scratch/one', 'live/guard.mjs'],
     ['node', '-e', 'write("scratch/hooks.json")'], ['cp', '-r', 'live', 'scratch/copy'],
-    ['/untrusted/cp', '--', 'source', 'scratch/copy'], ['mkdir', '-p', 'scratch/../live/new'], ['touch', '-r', 'scratch/a']]) {
+    ['/untrusted/cp', '--', 'source', 'scratch/copy'], ['mkdir', '-p', 'scratch/../live/new'], ['touch', '-r', 'scratch/a'],
+    ['cp', 'scratch/copy', 'live/guard.mjs'], ['cp', '-f', 'scratch/copy'], ['cp', 'live/guard.mjs', '-t'],
+    ['cp', 'live/guard.mjs', 'scratch/../live/x.mjs']]) {
     assert.equal(isBoundedScratchOnlyWords(words, context), false, JSON.stringify(words));
   }
 });

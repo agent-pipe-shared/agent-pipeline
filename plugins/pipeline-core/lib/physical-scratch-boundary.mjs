@@ -103,5 +103,9 @@ export function isBoundedScratchOnlyWords(words, context) {
   }
   if (words[0] === 'touch' && words.length === 2 && !words[1].startsWith('-')) target = words[1];
   if (words[0] === 'cp' && words.length === 4 && words[1] === '--') target = words[3];
+  // Candidate 29 (Codex greenfield run 3, C5/A02): the plain `cp <source> <scratch target>` form, which an agent writes
+  // far more often than `cp -- ...`. Exactly two operands and neither starts with `-`, so no option can hide in them;
+  // the source is only read, and the one written path must still pass the physical scratch boundary.
+  if (words[0] === 'cp' && words.length === 3 && !words[1].startsWith('-') && !words[2].startsWith('-')) target = words[2];
   return typeof target === 'string' && isPhysicalScratchTarget(target, context);
 }
