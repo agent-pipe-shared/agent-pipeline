@@ -25,13 +25,14 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { gateStrengthRuleFor } from "../hooks/guard-gate-strength.mjs";
 import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
 import { loadShippedProtectedBaseline } from "./protected-baseline.mjs";
-import { loadProtectedTestPathRules, protectedTestPathRuleFor, writerCommitMac, writerCommitStoreDir, WRITER_COMMIT_SCHEMA } from "./protected-test-paths.mjs";
+import { loadProtectedTestPathRules, protectedTestPathRuleFor, writerCommitMac, writerCommitStoreDir, WRITER_COMMIT_SCHEMA, WRITER_GATE_STRENGTH_IDS } from "./protected-test-paths.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const KEY_FILE = "mac.key";
 const WRITER_MESSAGE_FILE = "scratch/commit-msg/writer-output.txt";
 const MAX_SNAPSHOT_FILE_BYTES = 16 * 1024 * 1024;
 const sha256Of = (bytes) => createHash("sha256").update(bytes).digest("hex");
+export { WRITER_GATE_STRENGTH_IDS };
 
 function writerCommitError(code, message, heal) {
   const error = new Error(`${message}; heal: ${heal}`);
@@ -87,13 +88,16 @@ export function armWriterCommitCapability({ rootDir, writer, rerun, files, nowMs
   const staticIds = new Set(shipped.ok ? shipped.baseline.entries.map((entry) => entry.id) : []);
   const { rules } = loadProtectedTestPathRules({ rootDir: root });
   const armed = []; const excluded = []; const protectedPaths = [];
+  const writerGateIds = WRITER_GATE_STRENGTH_IDS[writer] ?? [];
   for (const file of written) {
     const rule = protectedTestPathRuleFor(rules, file.path);
     let gate = null;
     try { gate = gateStrengthRuleFor(file.path, root); } catch { gate = null; }
-    if (gate || (rule && (staticIds.has(rule.id) || rule.id === "PB-BASELINE-UNAVAILABLE"))) { excluded.push(file.path); continue; }
+    // ADR-0096: the one writer of a gate definition may arm its own output, and only the gate ids the closed map names for it.
+    const ownGate = gate !== null && writerGateIds.includes(gate.id);
+    if ((gate && !ownGate) || (rule && (staticIds.has(rule.id) || rule.id === "PB-BASELINE-UNAVAILABLE"))) { excluded.push(file.path); continue; }
     armed.push(file);
-    if (rule) protectedPaths.push(file.path);
+    if (rule || ownGate) protectedPaths.push(file.path);
   }
   const paths = armed.map((file) => file.path).sort();
   const message = commitSubject(writer);

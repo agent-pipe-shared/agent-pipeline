@@ -129,12 +129,21 @@ const headOf = (rootDir, spawn) => {
  * { admitted: false, stale: { path, writer, rerun } }: a writer armed this path with other bytes (the file changed after the
  * writer wrote it); { admitted: false, spent: true, path, writer, rerun }: those exact bytes were armed and already committed.
  */
-export function writerCommitAdmission(rootDir, relPath, { spawn = spawnSync } = {}) {
+/**
+ * ADR-0096 (D248): the closed writer -> gate-strength id map. A gate-strength path is otherwise never armed (arming) and never
+ * admitted (the hook passes `gateRuleId`). The fitness model (GS-17) has exactly one writer, the materialization of the
+ * PO-approved architecture design; that approval is its authority.
+ */
+export const WRITER_GATE_STRENGTH_IDS = Object.freeze({ "pipeline-state.mjs materialize-architecture": Object.freeze(["GS-17"]) });
+
+export function writerCommitAdmission(rootDir, relPath, { spawn = spawnSync, gateRuleId = null } = {}) {
   try {
     const store = writerCommitStoreDir(rootDir, { spawn });
     if (store === null || !existsSync(store)) return null;
     const hits = [];
     for (const { record } of writerCommitRecords(store)) {
+      // A gate-strength path is admitted only from a writer the closed map names for exactly that gate id.
+      if (gateRuleId !== null && !(WRITER_GATE_STRENGTH_IDS[record.writer] ?? []).includes(gateRuleId)) continue;
       for (const entry of record.entries) if (entry?.path === relPath) hits.push({ record, entry });
     }
     if (hits.length === 0) return null;

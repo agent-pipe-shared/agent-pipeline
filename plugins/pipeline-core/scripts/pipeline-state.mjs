@@ -15308,7 +15308,8 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
 // G20-66: the sanctioned writers whose protected output (State, lifecycle, audit bundle, result) their own commit must be able
 // to publish without a human-guard-override signature. After a successful run each arms the commit of exactly the files it
 // wrote (lib/writer-commit-capability.mjs) and prints that commit as its next step on stderr.
-export const WRITER_COMMIT_COMMANDS = new Set(["approve-plan", "close-feature"]);
+// ADR-0096: materialize-architecture writes the fitness model (GS-17) and arms that commit through the closed writer map.
+export const WRITER_COMMIT_COMMANDS = new Set(["approve-plan", "close-feature", "materialize-architecture"]);
 
 export function run(argv = process.argv.slice(2), deps = {}) {
   const sub = argv[0];

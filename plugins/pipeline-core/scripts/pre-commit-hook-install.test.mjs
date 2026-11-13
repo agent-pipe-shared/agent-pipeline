@@ -1549,6 +1549,43 @@ test("G20-66: a changed bound byte is refused as stale and names the rerun of th
   assert.doesNotMatch(old.stderr, /PB-WRITER-COMMIT-STALE/u);
 });
 
+// ADR-0096 (D248): the fitness model (GS-17) is a gate-strength path; only its one writer, materialize-architecture, arms its commit.
+test("ADR-0096: materialize-architecture arms the fitness model (GS-17); another writer's capability for the same bytes and a boundary-policy change are refused", { timeout: commitTestTimeout(4) }, async () => {
+  const { armWriterCommitCapability } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "writer-commit-capability.mjs")).href);
+  const seeded = (prefix) => {
+    const { dir, git } = freshRepo(prefix);
+    mkdirSync(join(dir, "architecture"), { recursive: true });
+    writeFileSync(join(dir, "architecture", "fitness-model.json"), "{\"m\":1}\n");
+    writeFileSync(join(dir, "architecture", "boundary-policy.json"), "{\"p\":1}\n");
+    git("add", "architecture/fitness-model.json", "architecture/boundary-policy.json");
+    git("commit", "-q", "-m", "seed the architecture gate definitions (first appearance, no hook installed yet)");
+    installHook(dir);
+    writeFileSync(join(dir, "architecture", "fitness-model.json"), "{\"m\":2}\n");
+    return { dir, git };
+  };
+  const files = [{ path: "architecture/fitness-model.json", sha256: sha256Of("{\"m\":2}\n") }];
+  const own = seeded("adr96-own-writer");
+  const armed = armWriterCommitCapability({ rootDir: own.dir, writer: "pipeline-state.mjs materialize-architecture", rerun: "node pipeline-state.mjs materialize-architecture", files });
+  assert.equal(armed.status, "armed");
+  assert.deepEqual(armed.protectedPaths, ["architecture/fitness-model.json"]);
+  own.git("add", "architecture/fitness-model.json");
+  const admitted = commit(own.dir, "chore(pipeline): commit the materialize-architecture output");
+  assert.equal(admitted.code, 0, admitted.stderr);
+  const foreign = seeded("adr96-foreign-writer");
+  const excluded = armWriterCommitCapability({ rootDir: foreign.dir, writer: "pipeline-state.mjs approve-plan", rerun: WRITER_RERUN, files });
+  assert.deepEqual(excluded.excluded, ["architecture/fitness-model.json"], "another writer never arms a gate-strength path");
+  foreign.git("add", "architecture/fitness-model.json");
+  const refused = commit(foreign.dir, "chore(pipeline): the fitness model from the wrong writer");
+  assert.notEqual(refused.code, 0);
+  assert.match(refused.stderr, /GS-17/u);
+  const boundary = seeded("adr96-boundary");
+  writeFileSync(join(boundary.dir, "architecture", "boundary-policy.json"), "{\"p\":2}\n");
+  boundary.git("add", "architecture/boundary-policy.json");
+  const weakened = commit(boundary.dir, "chore: widen the boundary policy");
+  assert.notEqual(weakened.code, 0);
+  assert.match(weakened.stderr, /GS-16/u);
+});
+
 test("G20-66: an unrelated commit between the write and the commit of the writer's bytes does not strand the capability (it is bound to bytes, not to HEAD)", { timeout: commitTestTimeout(2) }, async () => {
   const { dir, git } = await writerRepo("g2066-head-moved");
   writeFileSync(join(dir, "unrelated.txt"), "x\n");

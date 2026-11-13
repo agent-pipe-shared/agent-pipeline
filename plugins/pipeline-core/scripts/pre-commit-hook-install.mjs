@@ -1152,6 +1152,7 @@ async function main() {
   for (const relPath of paths) {
     let rule = null;
     try { rule = gateStrengthRuleFor(relPath, projectRoot); } catch { rule = null; }
+    const gateRuleId = rule ? rule.id : null; // ADR-0096: a writer commit admits a gate-strength path only for its mapped writer
     if (!rule) {
       try { rule = protectedTestPathRuleFor(testPathRules, relPath); } catch { rule = null; }
     }
@@ -1164,7 +1165,7 @@ async function main() {
     // G20-66: the commit publishes exactly the bytes a sanctioned writer (approve-plan, close-feature, finish-feature) wrote and armed;
     // an extra protected path, one changed byte or an already-spent capability is not admitted and stays a finding.
     let writerVerdict = null;
-    try { writerVerdict = typeof writerCommitAdmission === "function" ? writerCommitAdmission(projectRoot, relPath) : null; } catch { writerVerdict = null; }
+    try { writerVerdict = typeof writerCommitAdmission === "function" ? writerCommitAdmission(projectRoot, relPath, { gateRuleId }) : null; } catch { writerVerdict = null; }
     if (writerVerdict && writerVerdict.admitted === true) { writerAdmitted.push(writerVerdict); continue; }
     if (writerVerdict && writerVerdict.stale) {
       writerNotes.push({ path: relPath, text: "PB-WRITER-COMMIT-STALE: " + relPath + " no longer holds the bytes " + writerVerdict.stale.writer + " armed for commit (it changed after the writer wrote it); repair: rerun the writer: " + writerVerdict.stale.rerun });
