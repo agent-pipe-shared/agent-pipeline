@@ -1724,6 +1724,52 @@ function parentLineageFixture({ afterRound = null } = {}) {
   const c4 = correct("fix4"); const d4 = parentRegisterDiagnostic(root, featureId, c4, "r4");
   return { root, featureId, specPath, genesis, c1, c2, c3, c4, evidence4: d4.diagnosticPath, head: d4.registration };
 }
+test("K-30 a package under the feature id binding an approved Spec in its earlier dated folder admits the first course round, with the course flags and without", () => {
+  const featureId = "held-feature", prefix = `specs/${featureId}`, specPath = "specs/2026-01-01-held-feature/spec.md", manifestPath = `${prefix}/lifecycle.json`, unitPath = `${prefix}/design/critic-review-unit.json`;
+  const root = mkdtempSync(join(tmpdir(), "cdp-k30-"));
+  try {
+    git(root, ["init", "-q", "-b", "main"]);
+    mkdirSync(join(root, ".claude"), { recursive: true }); mkdirSync(join(root, "governance", "guidelines"), { recursive: true }); mkdirSync(join(root, "governance", "policies"), { recursive: true });
+    writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngovernance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
+    writeFileSync(join(root, "governance", "guidelines", "review.md"), "Review changed code.\n");
+    writeFileSync(join(root, "governance", "policies", "checklist.md"), "- verify\n");
+    writeFileSync(join(root, ".gitignore"), "/evidence/\n/scratch/\n");
+    commit(root, "base");
+    mkdirSync(join(root, "specs/2026-01-01-held-feature"), { recursive: true }); mkdirSync(join(root, prefix, "design"), { recursive: true }); mkdirSync(join(root, prefix, "evidence"), { recursive: true });
+    writeFileSync(join(root, specPath), "# Complete behavior\nAC-1: deliver complete behavior\n");
+    writeFileSync(join(root, unitPath), JSON.stringify({ schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose: "Deliver one complete behavior", specPath, logicalWorkIds: ["scope-one", "scope-two"], criterionIds: ["AC-1"], deliveryBoundary: { mainRef: git(root, ["symbolic-ref", "HEAD"]) }, singletonRationale: null }));
+    const topo = [["prd", "prd.md", true, "mutable", "active"], ["acceptance", "acceptance.md", false, "mutable", "active"], ["result", "result.md", false, "mutable", "active"], ["candidate-evidence", "evidence/seed.json", false, "immutable", "retain"]].map(([klass, rel, authority, mutability, retention]) => {
+      const path = `${prefix}/${rel}`; writeFileSync(join(root, path), `${klass}\n`);
+      return { class: klass, path, sha256: sha256(readFileSync(join(root, path))), authority, mutability, retention };
+    });
+    const manifest = { schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 2 }, state: "approved", candidate: null, supersedes: null, artifacts: [
+      { class: "spec", path: specPath, sha256: sha256(readFileSync(join(root, specPath))), authority: true, mutability: "mutable", retention: "active" },
+      { class: "design", path: unitPath, sha256: sha256(readFileSync(join(root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }, ...topo] };
+    writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
+    const genesis = commit(root, "declare feature review unit");
+    mkdirSync(join(root, "src"), { recursive: true }); writeFileSync(join(root, "src/behavior.mjs"), "export const behavior = 1;\n");
+    const c1 = commit(root, "integrate feature behavior");
+    const logPath = `${prefix}/evidence/targeted-r1.log`, diagnosticPath = `${prefix}/evidence/diagnostic-r1.json`, capturedPath = `evidence/${featureId}-targeted-r1.log`;
+    const produced = produceCriticDiagnostic({ root, candidate: c1, specPath, guardrailPaths: PARENT_GUARDRAILS, command: [process.execPath, "-e", "process.exit(0)"], logPath: capturedPath });
+    writeFileSync(join(root, logPath), readFileSync(join(root, capturedPath))); produced.targeted.log.path = logPath;
+    writeFileSync(join(root, diagnosticPath), JSON.stringify(produced));
+    for (const path of [logPath, diagnosticPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: sha256(readFileSync(join(root, path))), authority: false, mutability: "immutable", retention: "retain" });
+    writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
+    const registration = parentCommitPaths(root, [manifestPath, logPath, diagnosticPath], "register the r1 diagnostic");
+    const base = { root, base: genesis, candidate: c1, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null };
+    const withContext = preflightCriticDispatch({ ...base, courseContext: { featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: null } });
+    assert.equal(withContext.status, "packet-ready", JSON.stringify(withContext).slice(0, 600));
+    assert.equal(withContext.coordinatorOnly.courseAdmission.featureId, featureId);
+    assert.equal(withContext.coordinatorOnly.courseAdmission.round, 1);
+    // The CLI form: the course context names the package found at the candidate, not the dated folder.
+    const parsed = parseCriticDispatchPreflightArgs(["--root", root, "--base", genesis, "--candidate", c1, "--spec", specPath, "--evidence", diagnosticPath, "--registration-commit", registration]);
+    assert.equal(parsed.courseContext.featureId, featureId);
+    const viaCli = preflightCriticDispatch(parsed);
+    assert.equal(viaCli.status, "packet-ready", JSON.stringify(viaCli).slice(0, 600));
+    assert.equal(viaCli.coordinatorOnly.courseAdmission.featureId, featureId);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("CCA-PARENT a push review of a feature with course history names the last registered round and a repair that is followed to an admitted dispatch", () => {
   const fx = parentLineageFixture();
   try {

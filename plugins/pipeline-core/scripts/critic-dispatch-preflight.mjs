@@ -33,6 +33,7 @@ import {
   deriveRequiredCriticGuardrails,
 } from "../lib/critic-required-guardrails.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { resolveAuthorityArtifactPath } from "../lib/project-authority-read.mjs";
 import {
   RequirementTraceabilityError,
   evaluateRequirementTraceability,
@@ -435,8 +436,8 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   // Keep this read-only: the later session gate still owns packet/launch.
   let courseAdmission = null;
   let reviewBase = { commit: baseCommit, tree: baseTree };
-  const featureMatch = /^specs\/([^/]+)\//u.exec(spec);
-  const featureId = featureMatch?.[1] ?? null;
+  // K-30: the package may live under the feature id while the approved Spec stays in its earlier dated folder.
+  const featureId = packageFeatureIdForSpec(realRoot, candidateCommit, spec, isObject(courseContext) && typeof courseContext.featureId === "string" ? [courseContext.featureId] : []);
   if (featureId !== null && byPath.has(`specs/${featureId}/lifecycle.json`)) {
     stage = "critic-course";
     if (scope !== null) fail("CDP-COURSE-SCOPE", "A versioned feature Critic review requires an exact base-to-candidate range.");
@@ -646,11 +647,47 @@ function reviewAdmissionTaskIds({ root, baseCommit, candidateCommit, given = nul
   return { matching, considered, appliedRows };
 }
 
-/** The feature package's rigor at the candidate (the close rule reads the same field), or null when there is no readable package. Read-only. */
-function featureRigor(root, candidateCommit, specPath) {
+/** The active feature id of the project state, or null when the state names none (the host and the briefing read the same field, K-25). */
+function activeFeatureIdFromState(root) {
+  try {
+    const statePath = resolveAuthorityArtifactPath("state", { rootDir: root })?.relPath;
+    if (typeof statePath !== "string") return null;
+    const id = JSON.parse(readFileSync(resolve(root, statePath), "utf8"))?.activeFeature?.id;
+    return typeof id === "string" && PACKAGE_FEATURE_ID.test(id) ? id : null;
+  } catch { return null; }
+}
+const PACKAGE_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u;
+
+/**
+ * Glossover K-30: the feature id of the package a feature Spec belongs to, at the candidate. The Spec's folder name when that folder holds
+ * the package (the usual case). When the feature id changed after the design, the approved Spec stays in its earlier dated folder and the
+ * package lives at specs/<feature id>/ binding that Spec (28e carry, K-25): then the first of `preferred` (the course context's feature id)
+ * and the active feature id of the project state whose package at the candidate names exactly this Spec path. Otherwise the folder name.
+ * Null only for a path outside specs/<folder>/. Read-only.
+ */
+function packageFeatureIdForSpec(root, candidateCommit, specPath, preferred = []) {
   const match = /^specs\/([^/]+)\//u.exec(specPath ?? "");
   if (match === null) return null;
-  try { const value = JSON.parse(candidateText(root, candidateCommit, `specs/${match[1]}/lifecycle.json`))?.feature?.rigor; return Number.isInteger(value) && value >= 0 ? value : null; } catch { return null; }
+  const manifest = (id) => { try { return JSON.parse(candidateText(root, candidateCommit, `specs/${id}/lifecycle.json`)); } catch { return null; } };
+  if (manifest(match[1]) !== null) return match[1];
+  const binds = (id) => {
+    if (typeof id !== "string" || !PACKAGE_FEATURE_ID.test(id) || id === match[1]) return false;
+    const value = manifest(id);
+    return value?.feature?.id === id && Array.isArray(value.artifacts) && value.artifacts.some((artifact) => artifact?.class === "spec" && artifact.path === specPath);
+  };
+  for (const id of [...preferred, activeFeatureIdFromState(root)]) if (binds(id)) return id;
+  // No named id: exactly one package at the candidate that binds this Spec path; none or several keep the folder name (nothing is guessed).
+  const listed = gitOrNull(root, ["ls-tree", "-r", "--name-only", candidateCommit, "--", "specs"]);
+  const ids = (listed ?? "").split("\n").map((line) => /^specs\/([^/]+)\/lifecycle\.json$/u.exec(line.trim())?.[1]).filter((id) => id !== undefined).slice(0, 512);
+  const bound = ids.filter(binds);
+  return bound.length === 1 ? bound[0] : match[1];
+}
+
+/** The feature package's rigor at the candidate (the close rule reads the same field), or null when there is no readable package. Read-only. */
+function featureRigor(root, candidateCommit, specPath) {
+  const id = packageFeatureIdForSpec(root, candidateCommit, specPath);
+  if (id === null) return null;
+  try { const value = JSON.parse(candidateText(root, candidateCommit, `specs/${id}/lifecycle.json`))?.feature?.rigor; return Number.isInteger(value) && value >= 0 ? value : null; } catch { return null; }
 }
 
 /** MP-07 prompt lines for a Critic route that resolves to an Opus model; null for any other route. T1 and T2 select the high-risk Critic duty (as admit does). */
@@ -856,7 +893,7 @@ export function parseCriticDispatchPreflightArgs(argv) {
     const baseCommit = featureMatch === null ? null : gitOrNull(values.root, ["rev-parse", "--verify", `${values.base}^{commit}`]);
     const candidateCommit = baseCommit === null ? null : gitOrNull(values.root, ["rev-parse", "--verify", `${values.candidate}^{commit}`]);
     if (candidateCommit !== null) {
-      const derivation = deriveCriticCourseRegistrationCommit({ repoRoot: values.root, featureId: featureMatch[1], baseCommit, candidateCommit,
+      const derivation = deriveCriticCourseRegistrationCommit({ repoRoot: values.root, featureId: packageFeatureIdForSpec(values.root, candidateCommit, values.specPath), baseCommit, candidateCommit,
         deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request") });
       if (derivation.status === "derived") selectors["--registration-commit"] = derivation.commit;
       else if (derivation.status === "ambiguous") {
@@ -880,7 +917,9 @@ export function parseCriticDispatchPreflightArgs(argv) {
       catch { fail("CDP-ARGUMENT", "Criterion locator is unavailable."); }
       if (!isObject(criterionLocator) || Object.keys(criterionLocator).sort().join() !== ["criterionId", "endByte", "excerptSha256", "schema", "sourcePath", "sourceSha256", "startByte"].join()) fail("CDP-ARGUMENT", "Criterion locator must be closed.");
     }
-    values.courseContext = { featureId: match[1], registrationCommit: selectors["--registration-commit"],
+    // K-30: the package's feature id at the candidate, not the Spec's folder name, when the approved Spec stayed in an earlier dated folder.
+    const courseCandidate = typeof values.root === "string" && typeof values.candidate === "string" ? gitOrNull(values.root, ["rev-parse", "--verify", `${values.candidate}^{commit}`]) : null;
+    values.courseContext = { featureId: courseCandidate === null ? match[1] : packageFeatureIdForSpec(values.root, courseCandidate, values.specPath), registrationCommit: selectors["--registration-commit"],
       acceptedReference: acceptedPath === null ? null : { schema: "pipeline.accepted-delivery-contract-reference.v1", path: acceptedPath,
         sha256: sha256(candidateBytes(values.root, selectors["--registration-commit"], acceptedPath)) },
       criterionLocator, deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request") };
