@@ -556,6 +556,14 @@ test("D247: export-report writes the observed text, and create stamps the observ
   assert.equal(receipt.reviewer.model, "claude-opus-4");
   assert.deepEqual(receipt.reviewerObservation, { assurance: "host-observed-child-transcript", modelsUsed: ["claude-opus-4"], resultSha256: sha("# Observed review\n\nVerdict: PASS\n") });
   assert.equal("reviewerObservation" in summarizeDesignReviewReceipt({ path: RECEIPT1, bytes: readFileSync(join(repo, RECEIPT1)) }).summary, false, "the binding summary never carries it");
+  // One observed dispatch stamps one round: a delta round over the same report is refused, with or without --previous.
+  for (const over of [{ report: out, out: RECEIPT2, previous: RECEIPT1 }, { report: out, out: RECEIPT2 }]) {
+    const replayed = runMain(baseArgv(repo, over), CLAUDE, world.deps);
+    assert.equal(replayed.code, 2, JSON.stringify(over));
+    assert.equal(replayed.json.code, "DRC-OBSERVATION-REPLAYED");
+    assert.match(replayed.json.message, /design-review-1\.receipt\.json/u);
+    assert.equal(existsSync(join(repo, RECEIPT2)), false);
+  }
 }));
 
 test("D247: a sanitized report binds the observation through its unpublished original", withRepo(async (repo, t) => {
