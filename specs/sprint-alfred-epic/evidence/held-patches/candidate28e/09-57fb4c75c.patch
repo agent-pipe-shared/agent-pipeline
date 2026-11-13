@@ -1,0 +1,71 @@
+diff --git a/docs/adr/0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md b/docs/adr/0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..54abb9448ef9b292c7c2ba97ec84150f6020df37
+--- /dev/null
++++ b/docs/adr/0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md
+@@ -0,0 +1,27 @@
++# ADR-0092: The tools the Pipeline needs are one registry, asked for at onboarding
++
++> Agent-Pipeline · Sprint Alfred · 2026-11-12
++
++**Status:** accepted (2026-11-12, PO tiles, register D241). Built in candidate 28e. Not yet run in a real onboarding.
++
++**Context source (PO direction, 2026-11-12):** "all tools and packages the Pipeline needs must stand in a sensible document, be mandatory at the first install/onboarding, and the user must be asked to install them together with their agent; optional things must be named as well." Tile answers (all recommended): the required set is Node.js, Git, gitleaks, osv-scanner and semgrep, Trivy only where a project has infrastructure or container files (built with the Trivy adapter); a missing tool is asked for and installed together, the person may defer it and the deferral is recorded, and the existing plan and close checks stay.
++
++## Context
++
++The scanners the feature close drives were known to the toolchain preflight (`FIXED_TOOLS`) and to the environment readiness report, and a project calibrated critical already refused a missing scanner at plan approval and at the close. But no document listed what a machine needs, `SETUP.md` still promised a copyable install command the preflight stopped printing with the W7-2 capability contract, the version floors lived as literals in the preflight, the signing toolchain (OpenSSL with Ed25519) was nowhere named as a prerequisite, and nothing asked a new user to install anything: a missing scanner surfaced at plan approval at the earliest. A sandboxed session that could not observe a scanner was told to install it.
++
++## Decision
++
++1. **One registry.** `plugins/pipeline-core/lib/toolchain-registry.mjs` lists every program the Pipeline runs and every optional one, each with a class (`required`, `required-to-sign`, `optional`, `project-setting`), purpose, users, floor, probe and an install route per platform from the vendor's official source. It has no second copy: `docs/toolchain.md` is rendered from it (`harness/scripts/generate-toolchain-doc.mjs`), vendored into the plugin, and a test fails when the file and the registry differ; the toolchain preflight takes its major-version floors from it. Required: `node`, `git`, `gitleaks`, `osv-scanner`, `semgrep`. Required to sign: `openssl`. Optional: `gh`, `rg`, `ssh`. Project settings: the cyclonedx-maven-plugin, Gradle dependency locking, the NuGet lockfile (the SBOM of the close reads what they write, ADR-0091).
++2. **The preflight still installs nothing and prints no command** (W7-2 stays). A result for a missing tool points at its section of `docs/toolchain.md`; the routes reach only the document. The person runs a route in their own terminal (in Claude with the `!` prefix); the agent never runs an installer.
++3. **Onboarding asks.** The one onboarding consent lists the tool check as a covered item. After the consent, and at a later start while one is still open, the agent shows each missing required tool with its route and asks once: install now, or later. The readiness finding of a scanner names the tool's class, its document section and a recorded deferral.
++4. **A deferral is recorded, never a pass.** `scripts/toolchain-defer.mjs` writes the person's answer word for word into a machine-local file next to the machine plane (`<home>/.agent-pipeline/toolchain-deferrals.json`; not `machine.json`, whose exact key set would make the file invalid for every plugin copy that does not know a new key). A deferred finding stays `attended` and is not asked about again; the plan and close checks never read the deferral, so a critical calibration still refuses the missing scanner.
++5. **A check that could not look asks for no install.** A scanner the preflight could not observe (`execution_environment`, `probe_timeout`, `probe_error`, as from a sandbox) is an `unknown` finding with the repair to rerun the report in the person's own terminal.
++
++## Consequences
++
++A new user learns at the first install what the machine needs and can install it before any design work; a team without admin rights is not locked out, and the gap stays visible until the close stops on it. Known limits: Semgrep on native Windows is not verified (the trusted resolver accepts only a direct `semgrep.exe`, and a pip launcher is not one), so the document names WSL or a deferral; the routes are text a person runs, not something the Pipeline proves; the registry and the deferral module are kernel paths (`docs/guard-maintenance-window-threat-model.md`).
++
++## Affected contracts
++
++W7-2 (the preflight emits no command) is unchanged. ADR-0091's help texts and the project settings in the registry name the same build switches. The Semgrep rule pack and its blocking of new findings only (register D242) and the Trivy adapter are separate decisions of candidate 28e.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index bc8b33dfdb6e89405d26dd39bda8e1d5d3d1cdc6..2092ed2c5db7f4706de4482b2bc7a8d4400721f2 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -98,6 +98,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0089](0089-project-routing-is-user-owned.md) | A project's `pipeline.user.yaml` owns its model and effort routing | accepted | 2026-11-10 |
+ | [0090](0090-evidence-follows-every-push-and-a-release-includes-its-push.md) | The evidence follows every push, and a release includes its push | accepted | 2026-11-10 |
+ | [0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) | The software bill of materials is part of every feature close | accepted | 2026-11-11 |
++| [0092](0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md) | The tools the Pipeline needs are one registry, asked for at onboarding | accepted | 2026-11-12 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+diff --git a/docs/state.md b/docs/state.md
+index f2bccec0a1be3fc6721f95c955882c6027c3eae6..2a736c8a1342fc1877c2890c81d09f4e39650e77 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -25,7 +25,8 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **Candidate 22 installed 2026-11-09** (40 patches, stamp `ef16e1b86`); 22b installed (stamp `b92ff8a46`). No 22c: live findings and the three reports go into 23. Full Verify, Critic, native Windows proof, acceptance pending. [Open follow-ups](../backlog/items/2026-11-09-candidate-22-open-follow-ups.md).
+ **[ADR-0089](adr/0089-project-routing-is-user-owned.md) accepted 2026-11-10 (PO tile, D234):** a project's `pipeline.user.yaml` owns its model and effort routing. Built in candidate 23; a live dispatch on a changed route is still unobserved.
+ **[ADR-0090](adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md) accepted 2026-11-10 (PO tiles, D237 to D239):** the close exports the Critic reports, one follow-up commit carries the proof and the final records after any signed push, and a release includes its push. Built in candidate 27; never run on a real repository or a real signature.
+-**[ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) accepted 2026-11-11 (PO tiles, D240):** the feature close checks or writes the SBOM (CycloneDX 1.6 and SPDX 2.3 from pinned lockfiles, or an explicit `not-applicable`) and the audit bundle carries it; `stale`, `invalid`, `partial` and `unsupported` stop the close unless the PO's signed override for exactly those findings is recorded. Built in candidate 28c for npm, Python, Go and Rust; the amendment of 2026-11-12 (PO tiles) adds the other common lockfiles and Maven by pom plus CycloneDX in candidate 28d. Never run on a real repository.
++**[ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) accepted 2026-11-11 (PO tiles, D240):** the feature close checks or writes the SBOM (CycloneDX 1.6 and SPDX 2.3 from pinned lockfiles, or an explicit `not-applicable`) and the audit bundle carries it; `stale`, `invalid`, `partial` and `unsupported` stop the close unless the PO's signed override for exactly those findings is recorded. Built in candidate 28c for npm, Python, Go and Rust; the amendment of 2026-11-12 (PO tiles) adds the other common lockfiles and Maven by pom plus CycloneDX in candidate 28d. Never run on a real repository. Candidate 28e corrects the readers after the Advisor review and adds `packages.config` (PO tile 2026-11-12, D243).
++**[ADR-0092](adr/0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md) accepted 2026-11-12 (PO tiles, D241):** one tool registry feeds `docs/toolchain.md`, the preflight floors and the readiness findings; required on every machine: Node.js, Git, gitleaks, osv-scanner, semgrep (Trivy only with infrastructure files, with its adapter), OpenSSL where the PO signs; onboarding asks for a missing one, the person installs it or defers it, the deferral is recorded on the machine and lifts no check. **D242 (PO tile 2026-11-12):** the Semgrep rule pack blocks only findings new in the feature (baseline at the feature's start commit); older findings are listed, not blocking. Built in candidate 28e, never run in a real onboarding.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/governance/observation-doc-governance.json b/governance/observation-doc-governance.json
+index cd930e310dc2f548a690f2f7db83729b4e96d7a8..f97d141049ec657e4da340104daf6bba8006134a 100644
+--- a/governance/observation-doc-governance.json
++++ b/governance/observation-doc-governance.json
+@@ -292,6 +292,7 @@
+           "docs/adr/0089-project-routing-is-user-owned.md",
+           "docs/adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md",
+           "docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md",
++          "docs/adr/0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md",
+           "docs/adr/README.md"
+         ]
+       },

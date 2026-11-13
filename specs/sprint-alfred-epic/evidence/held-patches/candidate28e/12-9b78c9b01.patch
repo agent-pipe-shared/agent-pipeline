@@ -1,0 +1,27 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 14fbbe6fe7c6a33f59153d8385a34a534a9a4f6c..593f82ec2796b2bbea6e1696fd36a6653a3d196c 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -6152,7 +6152,8 @@ test("the seeded security gate refuses a push with missing security evidence and
+ // lib/security-evidence-evaluator.mjs, lib/security-capability-plan-builder.mjs,
+ // lib/security-policy-resolver.mjs, lib/document-hooks.mjs, lib/yaml-lite.mjs,
+ // lib/schema-lite.mjs, lib/worktree-lifecycle.mjs, lib/windows-private-state.mjs,
+-// lib/successful-spawn.mjs,
++// lib/successful-spawn.mjs, lib/semgrep-baseline.mjs with its closure (close-commit-split.mjs,
++// administration-documentation-paths.mjs, record-only-paths.mjs),
+ // lib/trusted-tool-resolution.mjs, config/security/gitleaks-default.toml,
+ // config/security/license-allowlist.default.json, security/semgrep/pipeline.yml (the other two
+ // plugin-shipped scanner defaults -- copied for fixture completeness even though this test's
+@@ -6207,6 +6208,12 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
+       ["./git-null-device.mjs", ["plugins", "pipeline-core", "lib", "git-null-device.mjs"]],
+       ["./windows-private-state.mjs", ["plugins", "pipeline-core", "lib", "windows-private-state.mjs"]],
+       ["./successful-spawn.mjs", ["plugins", "pipeline-core", "lib", "successful-spawn.mjs"]],
++      // QG-04 restatement (C28e, ADR-0093): security-scan.mjs reads the Semgrep baseline from this module; it resolves the feature range through
++      // close-commit-split.mjs, whose own local import closure is the next two modules (record-only-paths.mjs imports nothing local).
++      ["./semgrep-baseline.mjs", ["plugins", "pipeline-core", "lib", "semgrep-baseline.mjs"]],
++      ["./close-commit-split.mjs", ["plugins", "pipeline-core", "lib", "close-commit-split.mjs"]],
++      ["./administration-documentation-paths.mjs", ["plugins", "pipeline-core", "lib", "administration-documentation-paths.mjs"]],
++      ["./record-only-paths.mjs", ["plugins", "pipeline-core", "lib", "record-only-paths.mjs"]],
+       ["../config/security/gitleaks-default.toml", ["plugins", "pipeline-core", "config", "security", "gitleaks-default.toml"]],
+       ["../config/security/license-allowlist.default.json", ["plugins", "pipeline-core", "config", "security", "license-allowlist.default.json"]],
+       ["../security/semgrep/pipeline.yml", ["plugins", "pipeline-core", "security", "semgrep", "pipeline.yml"]],

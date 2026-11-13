@@ -1,0 +1,550 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 51202e6a45974ef17158a315da7b0bed99f04a2b..ed72203c2385399ad7dc46999eef3cbdefea612b 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1120,6 +1120,7 @@
+         "verify-phase:harness/scripts/verify.mjs:security-scanner-diagnostics-tests",
+         "verify-phase:harness/scripts/verify.mjs:self-application-attestation-gate-tests",
+         "verify-phase:harness/scripts/verify.mjs:self-verify-selection-tests",
++        "verify-phase:harness/scripts/verify.mjs:semgrep-baseline-tests",
+         "verify-phase:harness/scripts/verify.mjs:semgrep-default-rules-tests",
+         "verify-phase:harness/scripts/verify.mjs:semgrep-tests",
+         "verify-phase:harness/scripts/verify.mjs:session-authority-lock-wait-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index bf2ec017bfd9a1aa26ff44fe8bccf8553627f8c0..0467fa1d3a494ba4c7991c572e54a7d611635a8f 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4885,6 +4885,12 @@
+       "file": "plugins/pipeline-core/lib/toolchain-registry.test.mjs",
+       "invariantPinned": "One tool registry names every program the Pipeline needs, with its class, floor and an install route per platform; every preflight tool except the license control is required there and the preflight takes its version floors from it; the pointer a preflight result carries names the document and holds no command and no version; a required tool's deferral is recorded machine-locally with the answer word for word, never makes a readiness finding ok and never lifts a critical calibration's scanner refusal; a scanner the check could not observe asks for no install",
+       "nonOverlapNote": "Unique cases: the registry, its agreement with the preflight floors and the deferral; toolchain-preflight.test.mjs keeps the preflight's statuses, the W7-2 contract and the readiness report shape"
++    },
++    {
++      "name": "semgrep-baseline-tests",
++      "file": "plugins/pipeline-core/lib/semgrep-baseline.test.mjs",
++      "invariantPinned": "A Semgrep finding at a blocking severity blocks only when the feature introduced it: the baseline is read from the candidate (active or last closed feature, the shared feature-range start, an ancestor commit) and never from a caller; existing findings are matched by rule, relative path and line, recorded and listed, never removed; any unreadable baseline, failed pass, unmatched new finding or existing finding in an added file falls back to blocking everything; the real scan chain blocks a new finding, passes an older one and leaves no worktree behind",
++      "nonOverlapNote": "Unique cases: the baseline resolution, the one verdict function and the real two-pass chain; security-scan.test.mjs keeps the adapter contract and the fail-closed exit mapping, close-commit-split tests keep the commit count"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/close-commit-split.mjs b/plugins/pipeline-core/lib/close-commit-split.mjs
+index a284faecca2cb4059b11ed1936bf8d1f52231050..ca33379ff4f11facaeafeea5cabb64c153ea372e 100644
+--- a/plugins/pipeline-core/lib/close-commit-split.mjs
++++ b/plugins/pipeline-core/lib/close-commit-split.mjs
+@@ -47,18 +47,31 @@ export function parseCommitPaths(output) {
+ }
+ 
+ /**
+- * @param {{ rootDir: string, featureId: string, head?: string, runGit?: (args: string[]) => { status: number, stdout: string } }} input
+- *   `runGit` runs git in the root and defaults to a real process; a close passes its own injectable runner.
++ * The one definition of where a feature's range starts (C28e: shared by this count and the Semgrep baseline of the security scan, ADR-0093):
++ * the parent of the first first-parent commit that touched specs/<feature>/. `{ status: "found", first, base }`, where `base` is null when that
++ * first commit has no parent (the feature starts the history); `{ status: "unavailable", reason }` otherwise.
+  */
+-export function featureRangeCommitSplit({ rootDir, featureId, head = "HEAD", runGit = null } = {}) {
+-  if (!FEATURE.test(featureId ?? "")) return unavailable("the feature id is not valid");
++export function featureRangeBase({ rootDir, featureId, head = "HEAD", runGit = null } = {}) {
++  if (!FEATURE.test(featureId ?? "")) return Object.freeze({ status: "unavailable", reason: "the feature id is not valid" });
+   const git = runGit ?? ((args) => spawnSync("git", ["-C", rootDir, ...args], { encoding: "utf8", timeout: 15000 }));
+   const text = (result) => (result?.status === 0 ? String(result.stdout ?? "") : null);
+   const feature = text(git(["log", "--first-parent", "--reverse", "--format=%H", head, "--", `specs/${featureId}`]));
+   const first = feature === null ? undefined : feature.split("\n").find((line) => OID.test(line.trim()))?.trim();
+-  if (first === undefined) return unavailable(feature === null ? "git log could not read the history" : `no commit touches specs/${featureId}`);
++  if (first === undefined) return Object.freeze({ status: "unavailable", reason: feature === null ? "git log could not read the history" : `no commit touches specs/${featureId}` });
+   const parent = text(git(["rev-parse", "--verify", "--quiet", `${first}^`]))?.trim() ?? "";
+-  const base = OID.test(parent) ? parent : null;
++  return Object.freeze({ status: "found", first, base: OID.test(parent) ? parent : null });
++}
++
++/**
++ * @param {{ rootDir: string, featureId: string, head?: string, runGit?: (args: string[]) => { status: number, stdout: string } }} input
++ *   `runGit` runs git in the root and defaults to a real process; a close passes its own injectable runner.
++ */
++export function featureRangeCommitSplit({ rootDir, featureId, head = "HEAD", runGit = null } = {}) {
++  const git = runGit ?? ((args) => spawnSync("git", ["-C", rootDir, ...args], { encoding: "utf8", timeout: 15000 }));
++  const text = (result) => (result?.status === 0 ? String(result.stdout ?? "") : null);
++  const range = featureRangeBase({ rootDir, featureId, head, runGit: git });
++  if (range.status !== "found") return unavailable(range.reason);
++  const { base } = range;
+   const listing = text(git(["-c", "core.quotepath=off", "log", "--first-parent", "-m", "--no-renames", "--name-only", "--format=%x00%H", base === null ? head : `${base}..${head}`]));
+   if (listing === null) return unavailable("git log could not read the range");
+   const counts = { product: 0, evidence: 0 };
+diff --git a/plugins/pipeline-core/lib/semgrep-baseline.mjs b/plugins/pipeline-core/lib/semgrep-baseline.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e8b2a29f2bbd869483ab7e5a002f85ab9e26b83
+--- /dev/null
++++ b/plugins/pipeline-core/lib/semgrep-baseline.mjs
+@@ -0,0 +1,149 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C28e (PO tile 2026-11-12, register D242, ADR-0093): a Semgrep finding blocks only when the feature introduced it.
++ *
++ * The baseline is never an input a caller can pass. It is read from the candidate tree the scan already bound:
++ *   - the feature: the State file's active feature, else its last closed feature (the same rule the publication review
++ *     duty uses), read from the scan snapshot, so its bytes are the committed candidate's;
++ *   - the base commit: the start of that feature's range, the one definition in close-commit-split.mjs (the parent of the
++ *     first first-parent commit that touched specs/<feature>/);
++ *   - the base must be a commit and an ancestor of the candidate.
++ * Anything missing, unreadable or not an ancestor makes the baseline `unavailable`, and then every finding at a blocking
++ * severity blocks, as before. Unavailable is never an error and never "nothing is new".
++ *
++ * Which findings are new is Semgrep's own answer (`--baseline-commit`, matched by code, not by line), run by the adapter in
++ * its own throwaway worktree. Both passes see the same candidate tree, so a finding is new exactly when the baseline pass
++ * reports the same rule at the same path and line.
++ *
++ * `blockingFindings` is the one verdict function: the scan's exit decision uses it, and every gate that reads the scan's
++ * exitCode (close, push, release) inherits it. The finding envelope stays closed (security-evidence-evaluator.mjs); the
++ * judgement lives in the evidence's `semgrepBaseline` record, never in a finding.
++ */
++import { existsSync, readFileSync } from "node:fs";
++import { join } from "node:path";
++import { spawnSync } from "node:child_process";
++import { featureRangeBase } from "./close-commit-split.mjs";
++import { LEGACY_STATE, NEUTRAL_STATE } from "./project-authority-read.mjs";
++
++export const SEMGREP_BASELINE_SCHEMA = "pipeline.semgrep-baseline.v1";
++export const SEMGREP_BASELINE_SOURCE = "feature-range-start";
++const FEATURE = /^[a-z][a-z0-9-]{2,63}$/u;
++const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
++
++const unavailable = (code, reason, featureId = null) => Object.freeze({ schema: SEMGREP_BASELINE_SCHEMA, status: "unavailable", code, reason: String(reason).slice(0, 300), featureId, commit: null, source: SEMGREP_BASELINE_SOURCE });
++
++function stateRelativePath(rootDir, authority) {
++  if (authority?.status === "ready" && typeof authority.state === "string") return authority.state;
++  if (existsSync(join(rootDir, NEUTRAL_STATE)) || !existsSync(join(rootDir, LEGACY_STATE))) return NEUTRAL_STATE;
++  return LEGACY_STATE;
++}
++
++/** The feature whose start is the baseline: the active feature, else the last closed one; null when none can be named. */
++export function baselineFeatureId(state) {
++  if (state === null || typeof state !== "object" || Array.isArray(state)) return null;
++  const id = state.activeFeature?.id ?? (Array.isArray(state.closedFeatures) ? state.closedFeatures.at(-1)?.id : null);
++  return typeof id === "string" && FEATURE.test(id) ? id : null;
++}
++
++/**
++ * Resolves the baseline from the candidate snapshot. `rootDir` is the scan snapshot (a detached worktree of the candidate),
++ * `authority` the project authority resolved there, `runGit(args)` runs git in it.
++ */
++export function resolveSemgrepBaseline({ rootDir, authority = null, runGit = null } = {}) {
++  const git = runGit ?? ((args) => spawnSync("git", ["-C", rootDir, ...args], { encoding: "utf8", timeout: 15000, shell: false }));
++  let state;
++  try { state = JSON.parse(readFileSync(join(rootDir, stateRelativePath(rootDir, authority)), "utf8")); }
++  catch { return unavailable("SEMGREP-BASELINE-STATE-UNREADABLE", "the Pipeline State of the candidate could not be read, so no feature names a start"); }
++  const featureId = baselineFeatureId(state);
++  if (featureId === null) return unavailable("SEMGREP-BASELINE-NO-FEATURE", "the Pipeline State names no active or closed feature");
++  const range = featureRangeBase({ rootDir, featureId, runGit: git });
++  if (range.status !== "found") return unavailable("SEMGREP-BASELINE-RANGE-UNREADABLE", range.reason, featureId);
++  if (range.base === null) return unavailable("SEMGREP-BASELINE-NO-BASE", `the first commit of ${featureId} starts the history, so nothing predates the feature`, featureId);
++  if (!OID.test(range.base)) return unavailable("SEMGREP-BASELINE-RANGE-UNREADABLE", "the start of the feature range is not a commit id", featureId);
++  const isCommit = git(["cat-file", "-e", `${range.base}^{commit}`]);
++  if (isCommit?.status !== 0) return unavailable("SEMGREP-BASELINE-BASE-MISSING", `the start of ${featureId} (${range.base}) is not in this repository`, featureId);
++  const ancestor = git(["merge-base", "--is-ancestor", range.base, "HEAD"]);
++  if (ancestor?.status !== 0) return unavailable("SEMGREP-BASELINE-NOT-ANCESTOR", `the start of ${featureId} (${range.base}) is not an ancestor of the candidate`, featureId);
++  return Object.freeze({ schema: SEMGREP_BASELINE_SCHEMA, status: "applied", code: null, reason: null, featureId, commit: range.base, source: SEMGREP_BASELINE_SOURCE });
++}
++
++/** The identity of one Semgrep finding for the new/existing comparison: rule, scan-root-relative path, line. */
++export function semgrepFindingKey(finding) {
++  return `${finding?.rule ?? ""}\u0000${finding?.path ?? ""}\u0000${finding?.line ?? ""}`;
++}
++
++/**
++ * The findings that block: a severity in `blockOn`, except a Semgrep finding the baseline record names as existing before
++ * the feature. With no applied baseline record every blocking-severity finding blocks.
++ */
++export function blockingFindings(findings, blockOn, semgrepBaseline = null) {
++  const blockOnSet = new Set(blockOn);
++  const existing = semgrepBaseline?.status === "applied" && Array.isArray(semgrepBaseline.existing)
++    ? new Set(semgrepBaseline.existing.map(semgrepFindingKey))
++    : new Set();
++  return (Array.isArray(findings) ? findings : []).filter((finding) => blockOnSet.has(finding?.severity)
++    && !(finding?.tool === "semgrep" && existing.has(semgrepFindingKey(finding))));
++}
++
++/**
++ * Splits the blocking-severity Semgrep findings of the full scan by the baseline pass's new findings. The two passes run in
++ * two different worktrees of the same candidate, so paths are compared through `fullPath`/`newPath` (each makes a reported
++ * path relative to its own root; null when it cannot). Returns the `existing` list (rule, path, line, severity) the evidence
++ * records, with the full scan's own path so `blockingFindings` matches it exactly; every other blocking-severity finding is
++ * new. A finding whose path cannot be made relative is never existing: it blocks.
++ */
++export function existingSemgrepFindings(fullFindings, newFindings, blockOn, { fullPath = (path) => path, newPath = (path) => path } = {}) {
++  const blockOnSet = new Set(blockOn);
++  const relativeKey = (finding, toRelative) => {
++    const path = toRelative(finding?.path);
++    return path === null || path === undefined ? null : semgrepFindingKey({ rule: finding.rule, path, line: finding.line });
++  };
++  const fresh = new Set((Array.isArray(newFindings) ? newFindings : []).map((finding) => relativeKey(finding, newPath)).filter((key) => key !== null));
++  return (Array.isArray(fullFindings) ? fullFindings : [])
++    .filter((finding) => {
++      if (finding?.tool !== "semgrep" || !blockOnSet.has(finding.severity)) return false;
++      const key = relativeKey(finding, fullPath);
++      return key !== null && !fresh.has(key);
++    })
++    .map((finding) => ({ rule: finding.rule, path: finding.path, file: fullPath(finding.path), line: finding.line, severity: finding.severity }));
++}
++
++/**
++ * How many findings of the baseline pass have no counterpart (rule, relative path, line) in the full scan. Both passes scan
++ * the same candidate files, so anything above zero means they cannot be compared (measured 2026-11-12: a rule file inside
++ * the scanned tree gets a path-derived id that differs between two worktrees) and the baseline must not be applied.
++ */
++export function unmatchedNewFindings(fullFindings, newFindings, { fullPath = (path) => path, newPath = (path) => path } = {}) {
++  const keyOf = (finding, toRelative) => {
++    const path = toRelative(finding?.path);
++    return path === null || path === undefined ? null : semgrepFindingKey({ rule: finding.rule, path, line: finding.line });
++  };
++  const full = new Set((Array.isArray(fullFindings) ? fullFindings : []).map((finding) => keyOf(finding, fullPath)).filter((key) => key !== null));
++  return (Array.isArray(newFindings) ? newFindings : []).filter((finding) => {
++    const key = keyOf(finding, newPath);
++    return key === null || !full.has(key);
++  }).length;
++}
++
++/**
++ * The existing findings that sit in a file the feature added. Such a finding cannot predate the feature, so any hit means the
++ * baseline pass under-reported and the baseline must not be applied (a pass that silently returned too little would otherwise
++ * exempt new code). `addedFiles` holds the repository-relative paths `git diff --diff-filter=A <base> HEAD` names.
++ */
++export function existingInAddedFiles(existing, addedFiles) {
++  const added = addedFiles instanceof Set ? addedFiles : new Set(addedFiles ?? []);
++  return (Array.isArray(existing) ? existing : []).filter((finding) => typeof finding?.file === "string" && added.has(finding.file));
++}
++
++/** The printed lines for a scan summary: existing findings listed and named non-blocking, or why every finding blocks. */
++export function formatSemgrepBaselineLines(record, { limit = 20 } = {}) {
++  if (record?.status === "applied") {
++    const existing = Array.isArray(record.existing) ? record.existing : [];
++    const lines = [`Semgrep baseline (${record.featureId}, start ${String(record.commit).slice(0, 12)}): ${existing.length} finding(s) at a blocking severity existed before the feature and are listed, not blocking; ${record.newCount ?? 0} are new and block.`];
++    for (const finding of existing.slice(0, limit)) lines.push(`  existing ${finding.severity} ${finding.rule} ${finding.file ?? finding.path}:${finding.line ?? "?"}`);
++    if (existing.length > limit) lines.push(`  ... ${existing.length - limit} more existing finding(s) in the evidence (execution.semgrepBaseline.existing)`);
++    return lines;
++  }
++  if (record?.status === "unavailable") return [`Semgrep baseline unavailable (${record.code}): ${record.reason}. Every Semgrep finding at a blocking severity blocks.`];
++  return [];
++}
+diff --git a/plugins/pipeline-core/lib/semgrep-baseline.test.mjs b/plugins/pipeline-core/lib/semgrep-baseline.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..94f23e7e8ddcfa6054f9e255af6d545c98a53858
+--- /dev/null
++++ b/plugins/pipeline-core/lib/semgrep-baseline.test.mjs
+@@ -0,0 +1,160 @@
++// SPDX-License-Identifier: SUL-1.0
++// C28e (PO tile 2026-11-12, D242, ADR-0093): a Semgrep finding blocks only when the feature introduced it; older findings are listed, not blocking.
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { baselineFeatureId, blockingFindings, existingInAddedFiles, existingSemgrepFindings, formatSemgrepBaselineLines, resolveSemgrepBaseline, unmatchedNewFindings } from "./semgrep-baseline.mjs";
++import { featureRangeBase, featureRangeCommitSplit } from "./close-commit-split.mjs";
++import { runSecurityScan } from "../scripts/security-scan.mjs";
++
++const finding = (rule, path, line, severity = "high", tool = "semgrep") => ({ tool, severity, rule, path, line, msg: rule });
++
++test("the verdict: a blocking-severity finding blocks unless the applied baseline names it as existing; other tools are never exempt", () => {
++  const legacy = finding("r1", "/snap/a.py", 2);
++  const fresh = finding("r1", "/snap/b.py", 2);
++  const secret = finding("leak", "/snap/a.py", 2, "high", "gitleaks");
++  const medium = finding("r2", "/snap/c.py", 1, "medium");
++  const all = [legacy, fresh, secret, medium];
++  assert.deepEqual(blockingFindings(all, ["critical", "high"]), [legacy, fresh, secret], "no baseline: every blocking severity blocks");
++  const applied = { status: "applied", existing: [{ rule: "r1", path: "/snap/a.py", line: 2, severity: "high" }] };
++  assert.deepEqual(blockingFindings(all, ["critical", "high"], applied), [fresh, secret]);
++  assert.deepEqual(blockingFindings(all, ["critical", "high"], { ...applied, status: "unavailable" }), [legacy, fresh, secret], "an unavailable baseline exempts nothing");
++});
++
++test("existing findings are matched by rule, relative path and line across two worktrees; an unrelatable path is never existing", () => {
++  const full = [finding("r1", "/one/tree/a.py", 2), finding("r1", "/one/tree/b.py", 2), finding("r1", "/elsewhere/c.py", 3), finding("r2", "/one/tree/d.py", 1, "medium")];
++  const fresh = [finding("r1", "/two/tree/b.py", 2)];
++  const rel = (root) => (path) => (path.startsWith(`${root}/`) ? path.slice(root.length + 1) : null);
++  const existing = existingSemgrepFindings(full, fresh, ["high"], { fullPath: rel("/one/tree"), newPath: rel("/two/tree") });
++  assert.deepEqual(existing, [{ rule: "r1", path: "/one/tree/a.py", file: "a.py", line: 2, severity: "high" }]);
++  const lines = formatSemgrepBaselineLines({ status: "applied", featureId: "probe-feature", commit: "a".repeat(40), existing, newCount: 1 });
++  assert.match(lines[0], /1 finding\(s\) at a blocking severity existed before the feature and are listed, not blocking; 1 are new and block/u);
++  assert.match(lines[1], /existing high r1 a\.py:2/u);
++  assert.match(formatSemgrepBaselineLines({ status: "unavailable", code: "SEMGREP-BASELINE-NO-FEATURE", reason: "x" })[0], /Every Semgrep finding at a blocking severity blocks/u);
++  assert.deepEqual(formatSemgrepBaselineLines({ status: "not-needed" }), []);
++});
++
++test("fail closed: a new finding without a counterpart in the full scan, or an existing finding in an added file, is detected", () => {
++  const rel = (root) => (path) => (path.startsWith(`${root}/`) ? path.slice(root.length + 1) : null);
++  const full = [finding("tooling.rules.probe", "/one/a.py", 2), finding("tooling.rules.probe", "/one/b.py", 2)];
++  assert.equal(unmatchedNewFindings(full, [finding("tooling.rules.probe", "/two/b.py", 2)], { fullPath: rel("/one"), newPath: rel("/two") }), 0);
++  assert.equal(unmatchedNewFindings(full, [finding("tmp.x.tree.tooling.rules.probe", "/two/b.py", 2)], { fullPath: rel("/one"), newPath: rel("/two") }), 1, "a path-derived rule id that differs between the two worktrees");
++  assert.equal(unmatchedNewFindings(full, [finding("tooling.rules.probe", "/elsewhere/b.py", 2)], { fullPath: rel("/one"), newPath: rel("/two") }), 1);
++  const existing = [{ rule: "r", path: "/one/a.py", file: "a.py", line: 2, severity: "high" }, { rule: "r", path: "/one/new.py", file: "new.py", line: 1, severity: "high" }];
++  assert.deepEqual(existingInAddedFiles(existing, ["new.py", "other.txt"]).map((entry) => entry.file), ["new.py"]);
++  assert.deepEqual(existingInAddedFiles(existing, []), []);
++});
++
++test("the feature of the baseline: the active feature, else the last closed one, else none", () => {
++  assert.equal(baselineFeatureId({ activeFeature: { id: "alpha-one" }, closedFeatures: [{ id: "beta-two" }] }), "alpha-one");
++  assert.equal(baselineFeatureId({ activeFeature: null, closedFeatures: [{ id: "beta-two" }, { id: "gamma-three" }] }), "gamma-three");
++  assert.equal(baselineFeatureId({ activeFeature: { id: "../x" } }), null);
++  assert.equal(baselineFeatureId(null), null);
++});
++
++function git(root, ...args) {
++  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
++  if (result.status !== 0) throw new Error(`git ${args.join(" ")}: ${result.stderr}`);
++  return result.stdout.trim();
++}
++function commitAll(root, message) {
++  git(root, "add", "-A");
++  git(root, "commit", "-qm", message);
++  return git(root, "rev-parse", "HEAD");
++}
++function makeRepo() {
++  const root = mkdtempSync(join(tmpdir(), "semgrep-baseline-"));
++  git(root, "init", "-q");
++  git(root, "config", "user.name", "Baseline Fixture");
++  git(root, "config", "user.email", "baseline-fixture@example.invalid");
++  git(root, "config", "commit.gpgsign", "false");
++  git(root, "remote", "add", "origin", "https://example.invalid/pipeline/baseline-fixture.git");
++  return root;
++}
++const writeState = (root, state, tier = "project") => { mkdirSync(join(root, tier), { recursive: true }); writeFileSync(join(root, tier, "pipeline-state.json"), `${JSON.stringify(state)}\n`); };
++
++test("the baseline is the start of the feature range, shared with the close's commit count, and refused when it cannot be read", () => {
++  const root = makeRepo();
++  try {
++    writeFileSync(join(root, "a.txt"), "one\n");
++    writeState(root, { activeFeature: { id: "probe-feature" } });
++    const before = commitAll(root, "before the feature");
++    mkdirSync(join(root, "specs", "probe-feature"), { recursive: true });
++    writeFileSync(join(root, "specs", "probe-feature", "spec.md"), "# spec\n");
++    commitAll(root, "feature start");
++    writeFileSync(join(root, "a.txt"), "two\n");
++    commitAll(root, "feature work");
++    assert.equal(featureRangeBase({ rootDir: root, featureId: "probe-feature" }).base, before);
++    assert.equal(featureRangeCommitSplit({ rootDir: root, featureId: "probe-feature" }).base, before, "the close count uses the same start");
++    const resolved = resolveSemgrepBaseline({ rootDir: root });
++    assert.equal(resolved.status, "applied");
++    assert.equal(resolved.commit, before);
++    assert.equal(resolved.featureId, "probe-feature");
++    writeState(root, { activeFeature: null, closedFeatures: [] });
++    assert.equal(resolveSemgrepBaseline({ rootDir: root }).code, "SEMGREP-BASELINE-NO-FEATURE");
++    writeState(root, { activeFeature: { id: "other-feature" } });
++    assert.equal(resolveSemgrepBaseline({ rootDir: root }).code, "SEMGREP-BASELINE-RANGE-UNREADABLE");
++    rmSync(join(root, "project"), { recursive: true, force: true });
++    assert.equal(resolveSemgrepBaseline({ rootDir: root }).code, "SEMGREP-BASELINE-STATE-UNREADABLE");
++    const notAncestor = (args) => (args[0] === "merge-base" ? { status: 1, stdout: "" } : spawnSync("git", ["-C", root, ...args], { encoding: "utf8" }));
++    writeState(root, { activeFeature: { id: "probe-feature" } });
++    assert.equal(resolveSemgrepBaseline({ rootDir: root, runGit: notAncestor }).code, "SEMGREP-BASELINE-NOT-ANCESTOR");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++const semgrepAvailable = spawnSync("semgrep", ["--version"], { encoding: "utf8", shell: false, timeout: 60000 }).status === 0;
++
++test("the real chain: a new Semgrep finding blocks, a finding older than the feature is listed and does not block, no feature means all block", { skip: semgrepAvailable ? false : "semgrep is not installed" }, async () => {
++  const root = makeRepo();
++  try {
++    mkdirSync(join(root, ".claude"), { recursive: true });
++    writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n\ngates:\n  security:\n    mode: blocking\n    type: automated\n\nsecurity:\n  scanners:\n    gitleaks:\n      enabled: false\n    osv-scanner:\n      enabled: false\n    semgrep:\n      enabled: true\n      rules_dir: \"tooling/rules\"\n    license-check:\n      enabled: false\n");
++    mkdirSync(join(root, "tooling", "rules"), { recursive: true });
++    writeFileSync(join(root, "tooling", "rules", "probe.yml"), "rules:\n  - id: probe-eval\n    languages: [python]\n    severity: ERROR\n    message: eval call\n    pattern: eval(...)\n");
++    writeFileSync(join(root, "legacy.py"), "def old(x):\n    return eval(x)\n");
++    // The manifest sits at the legacy tier (.claude/), so the project authority names .claude/pipeline-state.json.
++    writeState(root, { activeFeature: { id: "probe-feature" } }, ".claude");
++    const base = commitAll(root, "legacy code");
++    mkdirSync(join(root, "specs", "probe-feature"), { recursive: true });
++    writeFileSync(join(root, "specs", "probe-feature", "spec.md"), "# spec\n");
++    commitAll(root, "feature start");
++    writeFileSync(join(root, "legacy.py"), "# moved by one line\ndef old(x):\n    return eval(x)\n");
++    writeFileSync(join(root, "fresh.py"), "def new(y):\n    return eval(y)\n");
++    commitAll(root, "feature work with a new finding");
++    const scanOnce = async () => runSecurityScan({ rootDir: root, env: process.env, timeoutMs: 120000, evidenceOutDir: join(root, "..", `${root.split(/[\\/]/u).at(-1)}-evidence`) });
++
++    let { evidence, exitCode } = await scanOnce();
++    let record = evidence.execution.semgrepBaseline;
++    assert.equal(evidence.scanners[0].status, "FINDINGS", JSON.stringify(evidence.scanners[0]));
++    assert.equal(record.status, "applied", JSON.stringify(record));
++    assert.equal(record.commit, base);
++    assert.deepEqual(record.existing.map((entry) => `${entry.file}:${entry.line}`), ["legacy.py:3"]);
++    assert.equal(record.newCount, 1);
++    assert.equal(record.worktreeCleanup, "removed");
++    assert.equal(exitCode, 2, "the new finding blocks");
++
++    rmSync(join(root, "fresh.py"));
++    commitAll(root, "remove the new finding");
++    ({ evidence, exitCode } = await scanOnce());
++    record = evidence.execution.semgrepBaseline;
++    assert.equal(record.status, "applied");
++    assert.equal(record.newCount, 0);
++    assert.equal(record.existing.length, 1);
++    assert.equal(evidence.findings.length, 1, "the older finding stays in the evidence");
++    assert.equal(exitCode, 0, "an older finding is listed and does not block");
++
++    writeState(root, { activeFeature: null, closedFeatures: [] }, ".claude");
++    commitAll(root, "no feature named");
++    ({ evidence, exitCode } = await scanOnce());
++    assert.equal(evidence.execution.semgrepBaseline.code, "SEMGREP-BASELINE-NO-FEATURE");
++    assert.equal(exitCode, 2, "without a baseline every blocking-severity finding blocks");
++
++    assert.equal(git(root, "worktree", "list", "--porcelain").split("\n").filter((line) => line.startsWith("worktree ")).length, 1, "no worktree is left behind");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++    rmSync(join(root, "..", `${root.split(/[\\/]/u).at(-1)}-evidence`), { recursive: true, force: true });
++  }
++});
+diff --git a/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs b/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
+index 8aac33aadddd6e179eba1cb864d59b823159640a..d1a1ca1a044aeaca81dc045029032e85c0ca5792 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
+@@ -116,7 +116,8 @@ function semgrepErrorTypeName(type) {
+ // A path semgrep reported, as a scan-root-relative forward-slash path -- or null when it cannot be
+ // named that way (not a string, empty, outside the scan root, another drive/absolute flavor).
+ // Never returns an absolute path: coverage.files and every line printed from it stay host-neutral.
+-function scanRootRelativePath(file, rootDir) {
++// C28e: exported for the baseline comparison, which compares two worktrees of the same candidate by relative path.
++export function scanRootRelativePath(file, rootDir) {
+   if (typeof file !== "string" || file.length === 0) return null;
+   const hostAbsolute = pathIsAbsolute(file);
+   if (!hostAbsolute && (pathPosix.isAbsolute(file) || pathWin32.isAbsolute(file))) return null;
+@@ -174,7 +175,14 @@ async function runScan({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutM
+   // startup/shutdown; `--timeout-threshold 0` disables semgrep's own "skip this file
+   // after N per-rule timeouts" behavior so a slow file is retried at full budget on
+   // every rule rather than silently skipped partway through.
+-  const args = ["scan", "--json", "--timeout", "45", "--timeout-threshold", "0", "--config", configArg, rootDir];
++  // C28e (D242, ADR-0093): the baseline pass. Semgrep checks the base commit out IN the scanned tree while it runs and, when
++  // killed, leaves that tree on the base (measured 2026-11-12), so the scan driver runs this pass only in a throwaway
++  // worktree of its own, never in the shared candidate snapshot. Only a full commit id is passed on.
++  const baselineCommit = config.baselineCommit;
++  if (baselineCommit !== undefined && baselineCommit !== null && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(String(baselineCommit))) {
++    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: "the baseline commit is not a full commit id" };
++  }
++  const args = ["scan", "--json", "--timeout", "45", "--timeout-threshold", "0", "--config", configArg, ...(baselineCommit ? ["--baseline-commit", baselineCommit] : []), rootDir];
+ 
+   let scratch;
+   try {
+diff --git a/plugins/pipeline-core/scripts/security-scan.mjs b/plugins/pipeline-core/scripts/security-scan.mjs
+index 825df3502c6605194c489769d78f3eb9da5ebaf9..57068b43db6fbc810e660e5430b9c32a9657b28a 100644
+--- a/plugins/pipeline-core/scripts/security-scan.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.mjs
+@@ -116,6 +116,7 @@ import {
+   securityCloseWarnings,
+ } from "../lib/security-close-status.mjs";
+ import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
++import { blockingFindings, existingInAddedFiles, existingSemgrepFindings, formatSemgrepBaselineLines, resolveSemgrepBaseline, SEMGREP_BASELINE_SCHEMA, unmatchedNewFindings } from "../lib/semgrep-baseline.mjs";
+ import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
+ 
+ import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
+@@ -572,6 +573,65 @@ function cleanupCandidateSnapshot(rootDir, snapshot) {
+   return { status: removed.status === 0 ? "removed" : "retained" };
+ }
+ 
++/**
++ * C28e (PO tile 2026-11-12, D242, ADR-0093): which blocking-severity Semgrep findings existed before the feature.
++ * Runs only when the full Semgrep scan has a finding at a blocking severity; the baseline comes from the candidate
++ * snapshot (lib/semgrep-baseline.mjs), never from a caller. The `--baseline-commit` pass runs in a second throwaway
++ * worktree of the same candidate, because Semgrep checks the base out in the tree it scans (a killed pass leaves that
++ * tree on the base), and the worktree is removed afterwards whatever happened. Any failure leaves the record
++ * `unavailable`, and then every blocking-severity finding blocks as before.
++ */
++async function semgrepBaselineStep({ rootDir, scanRoot, candidate, remoteName, authority, semgrepRun, blockOn, timeoutMs, env, spawnFn }) {
++  const blockOnSet = new Set(blockOn);
++  const candidates = (semgrepRun?.findings ?? []).filter((finding) => blockOnSet.has(finding.severity));
++  if (semgrepRun === null || candidates.length === 0) return { schema: SEMGREP_BASELINE_SCHEMA, status: "not-needed" };
++  const resolved = resolveSemgrepBaseline({ rootDir: scanRoot, authority, runGit: (args) => gitResult(scanRoot, args) });
++  if (resolved.status !== "applied") return { ...resolved };
++  const second = materializeCandidate(rootDir, candidate, remoteName);
++  if (!second.ok) return { ...resolved, status: "unavailable", code: "SEMGREP-BASELINE-WORKTREE", reason: `the worktree for the baseline pass could not be created (${second.reason})` };
++  let result;
++  let cleanup;
++  try {
++    // Semgrep derives a rule id from the rule file's path relative to its working directory, so a project rules_dir inside
++    // the snapshot is read from the second worktree's own copy (same relative path, same ids). A pack outside both trees
++    // (the plugin's default) keeps its path. The id check below still refuses any pass whose ids do not line up.
++    const rulesDir = semgrepRun.config.rulesDir;
++    const relativeRules = typeof rulesDir === "string" ? relative(scanRoot, rulesDir) : null;
++    const ownRules = relativeRules !== null && relativeRules !== "" && !relativeRules.startsWith("..") && !relativeRules.startsWith(sep) && !/^[A-Za-z]:/u.test(relativeRules)
++      ? join(second.rootDir, relativeRules)
++      : rulesDir;
++    const runArgs = { rootDir: second.rootDir, config: { ...semgrepRun.config, rulesDir: ownRules, baselineCommit: resolved.commit }, timeoutMs, env };
++    if (spawnFn) runArgs.spawnFn = spawnFn;
++    result = await semgrepRun.adapter.run(runArgs);
++  } catch (error) {
++    result = { status: "ERROR", reason: `adapter threw: ${error?.message ?? "unknown error"}` };
++  } finally {
++    cleanup = cleanupCandidateSnapshot(rootDir, second);
++  }
++  if (result?.status !== "PASS" && result?.status !== "FINDINGS") {
++    return { ...resolved, status: "unavailable", code: "SEMGREP-BASELINE-PASS-FAILED", reason: String(result?.reason ?? "the baseline pass did not complete").slice(0, 300), worktreeCleanup: cleanup.status };
++  }
++  const fullPath = (path) => semgrepAdapter.scanRootRelativePath(path, scanRoot);
++  const newPath = (path) => semgrepAdapter.scanRootRelativePath(path, second.rootDir);
++  // Fail closed: both passes scanned the same candidate files, so every new finding must be one of the full scan's findings.
++  // One without a counterpart (another rule id, an unrelatable path) means the two passes cannot be compared.
++  const unmatched = unmatchedNewFindings(semgrepRun.findings, result.findings, { fullPath, newPath });
++  if (unmatched > 0) {
++    return { ...resolved, status: "unavailable", code: "SEMGREP-BASELINE-PASSES-DISAGREE", reason: `${unmatched} finding(s) of the baseline pass have no counterpart in the full scan`, worktreeCleanup: cleanup.status };
++  }
++  const existing = existingSemgrepFindings(semgrepRun.findings, result.findings, blockOn, { fullPath, newPath });
++  // Fail closed: a finding in a file the feature added cannot predate it; one judged existing means the pass under-reported.
++  const addedListing = gitResult(scanRoot, ["-c", "core.quotepath=off", "diff", "--name-only", "--no-renames", "--diff-filter=A", "-z", resolved.commit, "HEAD"]);
++  if (addedListing?.status !== 0) {
++    return { ...resolved, status: "unavailable", code: "SEMGREP-BASELINE-DIFF-UNREADABLE", reason: "the files added since the feature start could not be listed", worktreeCleanup: cleanup.status };
++  }
++  const inAdded = existingInAddedFiles(existing, String(addedListing.stdout ?? "").split("\0").filter(Boolean));
++  if (inAdded.length > 0) {
++    return { ...resolved, status: "unavailable", code: "SEMGREP-BASELINE-PASSES-DISAGREE", reason: `${inAdded.length} finding(s) in files the feature added were not reported as new by the baseline pass`, worktreeCleanup: cleanup.status };
++  }
++  return { ...resolved, existing, newCount: candidates.length - existing.length, worktreeCleanup: cleanup.status };
++}
++
+ function childProcessError({ tool, error, timeoutMs }) {
+   if (error?.code === "EPERM" || error?.code === "EACCES") {
+     return {
+@@ -1000,6 +1060,7 @@ export async function runSecurityScan({
+   // Never read by the v1 evidence or the exit-code logic.
+   const rawByTool = {};
+   const diagnosticRecords = [];
++  let semgrepRun = null; // C28e: the completed full Semgrep scan, for the baseline step after the loop
+   const childProcessPreflight = scanRoot
+     ? runChildProcessPreflight({ rootDir: scanRoot, timeoutMs, spawnFn })
+     : { status: "ERROR", classification: "candidate_snapshot", reason: snapshot.reason };
+@@ -1060,6 +1121,9 @@ export async function runSecurityScan({
+           rawByTool[adapter.name] = result.raw ?? null; // CYB-2E: additive capture (see decl above)
+           entry = scannerEntry(adapter, result, fileSha256(inst.path));
+           entry.ruleSet = describeRuleSet(key, builtConfig, scanRoot); // CGR-10: what really ran, from the config the adapter was handed
++          if (key === "semgrep" && (result.status === "PASS" || result.status === "FINDINGS")) {
++            semgrepRun = { adapter, config: adapterConfig, findings: result.findings };
++          }
+           if (key === "semgrep") {
+             // SEM-F: a degraded-coverage result (warn-level PartialParsing only) is merged onto the
+             // entry's existing {subject, exclusions} coverage object, never replacing those keys.
+@@ -1087,9 +1151,12 @@ export async function runSecurityScan({
+   // built it -- see deriveReportStatus()'s own doc comment above.
+   for (const entry of scanners) entry.reportStatus = deriveReportStatus(entry);
+ 
+-  const blockOnSet = new Set(blockOn);
++  const semgrepBaseline = scanRoot
++    ? await semgrepBaselineStep({ rootDir, scanRoot, candidate: candidateBefore, remoteName, authority, semgrepRun, blockOn, timeoutMs, env, spawnFn })
++    : { schema: SEMGREP_BASELINE_SCHEMA, status: "not-needed" };
+   const hasErrorClass = scanners.some((s) => s.status === "ERROR");
+-  const hasBlockingFinding = findings.some((f) => blockOnSet.has(f.severity));
++  // C28e: the one verdict function (lib/semgrep-baseline.mjs); every gate reading exitCode inherits it.
++  const hasBlockingFinding = blockingFindings(findings, blockOn, semgrepBaseline).length > 0;
+   const snapshotAfter = scanRoot ? observeCandidate(scanRoot, remoteName) : null;
+   const candidateAfter = observeSubject(rootDir);
+   const candidateBound = snapshot.ok && sameCandidate(candidateBefore, candidateAfter)
+@@ -1139,6 +1206,7 @@ export async function runSecurityScan({
+         source: authority.status === "ready" ? authority.source : null,
+       },
+       snapshotCleanup: cleanup,
++      semgrepBaseline,
+     },
+     scanners,
+     findings,
+@@ -1256,6 +1324,8 @@ function printSummary(evidence, critical = false, exceptions = null) {
+   // Candidate 22 (CGR-10): which rules or rule sets really ran, for each scanner.
+   console.log("Rules that ran:");
+   for (const line of formatRuleSetLines(evidence.scanners)) console.log(`  ${line}`);
++  // C28e (D242): Semgrep findings that existed before the feature are listed and named non-blocking.
++  for (const line of formatSemgrepBaselineLines(evidence.execution?.semgrepBaseline)) console.log(line);
+   // G20-25: the four-state close status (passed / failed / not executed / not applicable), so a scanner that did not run never
+   // reads like a passed scan next to a "policy exit 0". Candidate 21h: a critical calibration reads a skipped license-check as not
+   // executed and shows every applied named exception on its line.

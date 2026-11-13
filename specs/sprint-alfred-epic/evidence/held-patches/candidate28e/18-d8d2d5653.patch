@@ -1,0 +1,53 @@
+diff --git a/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs b/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
+index d1a1ca1a044aeaca81dc045029032e85c0ca5792..378697f996b89c6957f783b669ac17a235718677 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
+@@ -96,6 +96,17 @@ function spawnFailure(error) {
+   };
+ }
+ 
++/**
++ * C28e (Codex test run): Semgrep prefixes a local rule file's ids with that file's directory, dotted (`home.<user>..codex.plugins...
++ * pipeline-default-dom-injection-sink`), so the evidence named the local home directory and changed with every install. A shipped
++ * rule is recorded by its own id; any other id stays as Semgrep reports it.
++ */
++export function shippedRuleId(checkId) {
++  if (typeof checkId !== "string" || checkId === "") return null;
++  const at = checkId.lastIndexOf("pipeline-default-");
++  return at > 0 && checkId[at - 1] === "." && /^pipeline-default-[a-z0-9-]+$/u.test(checkId.slice(at)) ? checkId.slice(at) : checkId;
++}
++
+ function mapSemgrepSeverity(extraSeverity) {
+   if (extraSeverity === "ERROR") return "high";
+   if (extraSeverity === "WARNING") return "medium";
+@@ -270,7 +281,7 @@ async function runScan({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutM
+   const findings = parsed.results.map((r) => ({
+     tool: name,
+     severity: mapSemgrepSeverity(r?.extra?.severity),
+-    rule: r?.check_id ?? "unknown-rule",
++    rule: shippedRuleId(r?.check_id) ?? "unknown-rule",
+     path: r?.path ?? null,
+     line: typeof r?.start?.line === "number" ? r.start.line : null,
+     msg: r?.extra?.message ?? r?.check_id ?? "semgrep finding",
+diff --git a/plugins/pipeline-core/scripts/security-adapters/semgrep.test.mjs b/plugins/pipeline-core/scripts/security-adapters/semgrep.test.mjs
+index a4bdd23a3f5fb62c7ba9887fe7f577e7b46a4795..9cd0dd9fd5d0d065f5c0aba6a01911e98f4a3a11 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/semgrep.test.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/semgrep.test.mjs
+@@ -15,7 +15,16 @@ import test from "node:test";
+ import path from "node:path";
+ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+-import { name, CAPABILITY_CONTRACT_V2, run } from "./semgrep.mjs";
++import { name, CAPABILITY_CONTRACT_V2, run, shippedRuleId } from "./semgrep.mjs";
++
++// C28e (Codex test run): a shipped rule is recorded by its own id, without the dotted install directory Semgrep puts in front of it.
++test("C28e (Codex test run): a shipped rule id loses the dotted install-directory prefix; any other id stays as reported", () => {
++  assert.equal(shippedRuleId("home.someone..codex.plugins.cache.agent-pipeline-local.pipeline-core.0.7.0codex.20261112203150.1333a1b.security.semgrep.pipeline-default-dom-injection-sink"), "pipeline-default-dom-injection-sink");
++  assert.equal(shippedRuleId("pipeline-default-dom-injection-sink"), "pipeline-default-dom-injection-sink");
++  assert.equal(shippedRuleId("javascript.lang.security.audit.eval-detected"), "javascript.lang.security.audit.eval-detected");
++  assert.equal(shippedRuleId("team.rules.pipeline-default-x.custom"), "team.rules.pipeline-default-x.custom", "not a shipped id when anything follows");
++  assert.equal(shippedRuleId(undefined), null);
++});
+ 
+ // ---------------------------------------------------------------------------
+ // SEM-T -- partial-parsing warnings are degraded coverage, not a scanner error.

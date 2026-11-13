@@ -1,0 +1,718 @@
+diff --git a/docs/adr/0095-a-spec-correction-during-implementation-is-a-signed-addendum.md b/docs/adr/0095-a-spec-correction-during-implementation-is-a-signed-addendum.md
+index 99122b7217e41e9afe86e06cb578db693f750014..dd1b72c6532b7b775464c5ce0536ec954b55ab47 100644
+--- a/docs/adr/0095-a-spec-correction-during-implementation-is-a-signed-addendum.md
++++ b/docs/adr/0095-a-spec-correction-during-implementation-is-a-signed-addendum.md
+@@ -29,6 +29,7 @@ A Critic round during implementation can show that the approved Spec itself is w
+    - The audit bundle carries every manifest entry, so the addenda and their approval records are exported without further code.
+ 8. **Stacking.** Addenda are numbered and read in order. A new addendum may be approved only when every earlier one is registered. An addendum whose base digest is no longer the approved Spec's (the PO reopened and re-approved the design) is history: it is neither applied nor refused, and the reader reports it as superseded; registering a record against such a Spec is refused (`FPR-SPEC-ADDENDUM-SUPERSEDED`).
+ 9. **Distinct name.** The Critic's `critic-disposition-addendum` (a disposition of a dispatch record) is unrelated; this record is always called the Spec addendum.
++10. **`reopen-design` is the PO's own step.** It voids the PO's design approval, so an agent never runs it. The lifecycle guard refuses `pipeline-state.mjs reopen-design --by <name>` from an agent on every runner (`PO-REOPEN-HUMAN-ONLY`, not liftable by a human guard override), and the closed catalogue sanctions only the preview `reopen-design --by <name> --dry-run`, which writes nothing. The Codex and Antigravity adapters skip the lifecycle guard for a sanctioned lifecycle command, so the catalogue itself no longer sanctions the void. Every text that points at the reopen (guard denials, inspect and onboarding actions, the plan runbook, where the step is `po-only`) says that the PO runs it in the PO's own terminal, names the preview, and names the Spec addendum for a correction during implementation (one wording, `lib/reopen-design-po-step.mjs`). The structured actions keep their argv: it is the command the PO runs.
+ 
+ ## Consequences
+ 
+diff --git a/plugins/pipeline-core/hooks/guard-devplan-approval-unverified.test.mjs b/plugins/pipeline-core/hooks/guard-devplan-approval-unverified.test.mjs
+index 37f40139d5140991df194914e45499f2f161cbb7..0b5d306a9a830d34de4e91c466e8a4cb2aad16f9 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan-approval-unverified.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan-approval-unverified.test.mjs
+@@ -127,7 +127,9 @@ for (const [label, lane] of LANES) {
+     assert.ok(run.stderr.includes("DWP-PACKAGE-PHYSICAL"), "names the cause");
+     assert.ok(run.stderr.includes(PACKAGE_PATH), "names what could not be verified");
+     assert.match(run.stderr, /Nothing was verified/u);
+-    assert.equal(occurrences(run.stderr, "reopen-design"), 1, "names the single repair command");
++    // ADR-0095 Decision 10: the single repair is the PO's reopen step, named once as the PO's command and once as the agent's preview.
++    assert.equal(occurrences(run.stderr, "reopen-design"), 2, "names the single repair: the PO's command and its preview");
++    assert.ok(run.stderr.includes("reopen-design --by <human attribution> --dry-run"), "names the agent's preview");
+     assert.ok(!run.stderr.includes("BLOCKED"), "an advisory is not a block");
+   });
+ 
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.mjs b/plugins/pipeline-core/hooks/guard-devplan.mjs
+index c2870e32bcb2d7e7a853372849eaac2b9a98d6b4..40a7b3fea7e59e9db9663e65ecd84452c3da3063 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.mjs
+@@ -161,6 +161,7 @@ import {
+   resolveActiveRebaseAuthority,
+ } from "../lib/guard-devplan-policy.mjs";
+ import { rebaseAuthorityPermitsPath } from "../lib/rebase-authority.mjs";
++import { REOPEN_DESIGN_PO_COMMAND, REOPEN_DESIGN_PO_STEP } from "../lib/reopen-design-po-step.mjs";
+ import { writeTargetPath } from "../lib/tool-write-target.mjs";
+ import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+@@ -578,9 +579,9 @@ const lifecycleReason = ledgerAuthorityUnresolved
+     + "Re-record it: node harness/scripts/pipeline-state.mjs approve-plan --by <name> "
+     + "--human-decision-file <repo-relative-reference>."
+   : lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"
+-  ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
++  ? `Current Plan/Spec authority is stale or closed. ${REOPEN_DESIGN_PO_STEP}`
+   : lifecycle.status === "awaiting-approval"
+-    ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`reopen-design --by <name>\`.`
++    ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`${REOPEN_DESIGN_PO_COMMAND}\`, which the PO runs.`
+     : lifecycle.status === "approved"
+       ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
+       : "The feature is still in draft design and has no implementation authority.");
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index b24a37b750a0b0567bcd8164cc9406b4a3b12d09..6807b06d1d9b977352b461e5e1d17a358220bc3b 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -2830,7 +2830,10 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
+     const poDecisionApplyAntigravity = `${poDecisionApply} --runner antigravity`;
+     const legacyRevocationRecoveryPlan = `node '${PIPELINE_STATE_SCRIPT}' plan-legacy-v2-revocation-recovery --by 'Phoenix PO'`;
+     const legacyRevocationRecoveryApply = `node '${PIPELINE_STATE_SCRIPT}' apply-legacy-v2-revocation-recovery --by 'Phoenix PO' --prepared-at 2026-07-29T09:00:00.000Z --preimage-sha256 ${"a".repeat(64)} --postimage-sha256 ${"b".repeat(64)} --plan-sha256 ${"c".repeat(64)} --activate true`;
+-    const reopenDesign = `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery'`;
++    // C28e (PO decision 2026-11-13), restated in place (QG-04): only the preview of reopen-design is sanctioned agent work; the void
++    // itself is the PO's step and is refused PO-REOPEN-HUMAN-ONLY, asserted right after the admitted list below.
++    const reopenDesign = `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery' --dry-run`;
++    const reopenDesignVoid = `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery'`;
+     const submitPlan = `node '${PIPELINE_STATE_SCRIPT}' submit-plan --by 'PO recovery' --profile epic`;
+     const approvePlan = `node '${PIPELINE_STATE_SCRIPT}' approve-plan --by 'PO recovery'`;
+     const approvePlanReceipt = `node '${PIPELINE_STATE_SCRIPT}' approve-plan --bootstrap-acknowledgement-receipt scratch/bootstrap-plan-acknowledgement-receipt-${"a".repeat(64)}.json`;
+@@ -2858,6 +2861,8 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
+         requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+       }), { exitCode: 0, stderr: "" });
+     }
++    assert.equal(isSanctionedLifecycleCommand(reopenDesignVoid, path), false, "the void is not a sanctioned lifecycle argv (the adapters would skip the lifecycle guard)");
++    assert.match(evaluateLifecycleReadyGuard(bash(reopenDesignVoid), { projectDir: path, requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); } }).stderr, /PO-REOPEN-HUMAN-ONLY/u);
+     // NVA-BOOTADMIT-2: flag order carries no behavioural meaning to the target CLI --
+     // project-onboarding-v3.mjs parse() (lines 195-250) walks a flat, order-insensitive
+     // flag set for every subcommand, so --language before --goal parses identically to the
+diff --git a/plugins/pipeline-core/lib/authority-restore.mjs b/plugins/pipeline-core/lib/authority-restore.mjs
+index f9fcc1491d3877c38c237243286a82ec0d56d039..29ca87803418ad7e5d1c30b84ae6ec9170e59c05 100644
+--- a/plugins/pipeline-core/lib/authority-restore.mjs
++++ b/plugins/pipeline-core/lib/authority-restore.mjs
+@@ -120,13 +120,13 @@ export function planAuthorityRestore(root, { commit = "HEAD", isBound = (state)
+   if (edited.length === 0) {
+     return restoreRefusal("AUTHORITY-RESTORE-NOTHING-EDITED",
+       "Every bound document already matches its approved digest; there is nothing to restore.",
+-      "No action needed. To change an approved document, use the design route (`reopen-design`).");
++      "No action needed. To correct the approved Spec during implementation, use a Spec addendum (ADR-0095); to change an approved document otherwise, the PO reopens the design (`reopen-design`, the PO's own step).");
+   }
+   const bad = edited.find((d) => d.sourceSha256 !== d.approvedSha256);
+   if (bad !== undefined) {
+     return restoreRefusal("AUTHORITY-RESTORE-SOURCE-MISMATCH",
+       `The bytes of ${bad.path} at ${commit} ${bad.sourceSha256 === null ? "cannot be read" : `hash to ${bad.sourceSha256}`}, not the approved ${bad.approvedSha256}.`,
+-      `Name a commit that holds the approved bytes with --commit <full sha> (find it with: git log --format=%H -- ${bad.path}), or accept the edit through the design route (reopen-design, then submit-plan and approve-plan).`);
++      `Name a commit that holds the approved bytes with --commit <full sha> (find it with: git log --format=%H -- ${bad.path}), or accept the edit through the design route (the PO runs reopen-design, then submit-plan and approve-plan).`);
+   }
+   return { ok: true, schema: AUTHORITY_RESTORE_SCHEMA, status: "restorable", documents };
+ }
+@@ -145,7 +145,7 @@ export function restoreAdvice({ root }) {
+   return { paths, command: `node ${RESTORE_SCRIPT} restore --root ${root}` };
+ }
+ 
+-const REOPEN_ONLY = "Current Plan/Spec authority is stale or unavailable. Use the returned sanctioned reopen-design action before resubmission or approval.";
++const REOPEN_ONLY = "Current Plan/Spec authority is stale or unavailable. The returned reopen-design action is the PO's own step: hand it to the PO for their own terminal (you may run its --dry-run preview) before resubmission or approval.";
+ 
+ /** The `inspect` nextActionText for a `reopen-design` lifecycle: the restore command first when it can work. */
+ export function reopenDesignNextActionText(root) {
+@@ -153,5 +153,5 @@ export function reopenDesignNextActionText(root) {
+   if (advice === null) return REOPEN_ONLY;
+   return `Current Plan/Spec authority is stale: ${advice.paths.join(", ")} differs from the approved digest, and the committed bytes at HEAD still match it. `
+     + `First repair, no PO round trip: ${advice.command} (restores the approved bytes; Pipeline State is not written). `
+-    + "Only if the edit must stay, use the returned sanctioned reopen-design action before resubmission or approval.";
++    + "Only if the edit must stay, hand the returned reopen-design action to the PO (their own step, in their own terminal; you may run its --dry-run preview) before resubmission or approval.";
+ }
+diff --git a/plugins/pipeline-core/lib/authority-seal-plan.mjs b/plugins/pipeline-core/lib/authority-seal-plan.mjs
+index 1a5f8eb015660b91dfb3498284f04e4b1998488e..d5c98f6ac6eb9985a4495d3e1c45fe64848ccd7f 100644
+--- a/plugins/pipeline-core/lib/authority-seal-plan.mjs
++++ b/plugins/pipeline-core/lib/authority-seal-plan.mjs
+@@ -102,7 +102,7 @@ export function buildSealPlan(input) {
+     return refuse("PSP-OUT-OF-SCOPE", "this package has no PRD release to seal at", [], "nothing is needed: the bind at the end of onboarding applies to a package outside the PRD release scope (EL-19)");
+   }
+   const seal = readAuthoritySeal(authority);
+-  if (seal.status === "sealed") return refuse("PSP-ALREADY-SEALED", "the PRD and the Spec are sealed already", [], "nothing to do; use reopen-design --by <name> to change the sealed documents");
++  if (seal.status === "sealed") return refuse("PSP-ALREADY-SEALED", "the PRD and the Spec are sealed already", [], "nothing to do; the sealed documents change only through reopen-design --by <name>, the PO's own step (preview it with --dry-run)");
+   if (seal.status !== "draft") return refuse("PSP-AUTHORITY-INVALID", seal.reason, ["reopen-design"], "reopen the design and register the package paths again");
+   if (!Number.isSafeInteger(revision) || revision < 0) return refuse("PSP-AUTHORITY-INVALID", "the State revision is not readable", ["reopen-design"], "inspect the State");
+   if (designInputCapture !== null && documents.designInput !== null && documents.designInput.sha256 !== designInputCapture.sha256) {
+diff --git a/plugins/pipeline-core/lib/authority-seal-plan.test.mjs b/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
+index c9965d695d9160bed26aa872a3227c98c556e397..125fca1dfd21cc09ba894c77e4eba0433e6b08c2 100644
+--- a/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
++++ b/plugins/pipeline-core/lib/authority-seal-plan.test.mjs
+@@ -505,7 +505,9 @@ test("LB5-4 draft without a plan: the readback names the next command; before th
+   assert.equal(submitted.plan.status, "none");
+   assert.equal(submitted.next.verb, "prepare-seal");
+   assert.equal(sanctionedPipelineStateArgs(["prepare-seal"], fx.root), true, "the lifecycle guard admits the repair command");
+-  assert.equal(sanctionedPipelineStateArgs(["reopen-design", "--by", "synthetic-author"], fx.root), true);
++  // Candidate 28e (ADR-0095 Decision 10): the exit itself is the PO's step; the guard admits only the agent's dry-run preview.
++  assert.equal(sanctionedPipelineStateArgs(["reopen-design", "--by", "synthetic-author", "--dry-run"], fx.root), true);
++  assert.equal(sanctionedPipelineStateArgs(["reopen-design", "--by", "synthetic-author"], fx.root), false);
+   assert.equal(sanctionedPipelineStateArgs(["inspect"], fx.root), true);
+   const before = fx.stateBytes();
+   assert.equal(fx.cli(["inspect"]).status, 0);
+diff --git a/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs b/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
+index c0811afdc2aa1634c1009be9412a2d2c8e1d7fed..cdaa7251882057b137aa808df0868d19a5742410 100644
+--- a/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
++++ b/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
+@@ -429,10 +429,10 @@ export function inspectCurrentCalibrationVerifyReady({rootDir,verifyCommand}={})
+ 
+ /** One-line repair per unmet configure-verify condition (AC-140, never-fully-blocking). */
+ export function configureVerifyRepair(code) {
+-  if (code === "CVCT-AUTHORITY-STALE") return "on a clone or transferred checkout with unchanged approved bytes run `pipeline-state.mjs rebind-approval` (no new approval); otherwise restore the approved PRD/Spec bytes, or run reopen-design and approve the plan again";
++  if (code === "CVCT-AUTHORITY-STALE") return "on a clone or transferred checkout with unchanged approved bytes run `pipeline-state.mjs rebind-approval` (no new approval); otherwise restore the approved PRD/Spec bytes, or have the PO reopen the design (reopen-design is the PO's own step) and approve the plan again";
+   if (code === "CVCT-PROFILE-STALE") return "on a clone or transferred checkout with unchanged approved bytes run `pipeline-state.mjs rebind-approval` (no new approval); otherwise restore the approved PO profile, or submit and approve the plan again";
+   if (code === "CVCT-FILE") return "make the State file a private regular file of its owner (mode 0600 on POSIX, owner-only ACL on Windows), then retry";
+-  if (code === "CVCT-SOURCE-MISSING" || code === "CVCT-PATH" || code === "CAC-SOURCE-BINDING-MISMATCH") return "restore the approved source file the approval names (or run reopen-design and approve again), then retry";
++  if (code === "CVCT-SOURCE-MISSING" || code === "CVCT-PATH" || code === "CAC-SOURCE-BINDING-MISMATCH") return "restore the approved source file the approval names (or have the PO reopen the design, the PO's own step, and approve again), then retry";
+   if (code === "CVCT-CAS" || code === "CVCT-APPROVAL-CAS") return "a source changed during the check; retry once no other write is running";
+   if (code === "CVCT-HEAD-UNAVAILABLE" || code === "CVCT-HEAD") return "check out a valid committed HEAD, then retry";
+   if (code === "CVCT-MODE-UNAVAILABLE") return "set the human approval mode (gates.push_approval: signature or chat) in pipeline.user.yaml, then retry";
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+index 6a021e5c1ecee4b036d192cddc9d48b385923db8..a5e123f1297c3f459ce815e163aa0cbcc590d27a 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+@@ -55,6 +55,7 @@ import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-ap
+ import { readHumanApprovalMode, verifyAgainstTrustAnchors, readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+ 
+ import { validateDesignApprovalBinding } from "./design-approval-binding.mjs";
++import { REOPEN_DESIGN_PO_COMMAND, REOPEN_DESIGN_PO_STEP, SPEC_ADDENDUM_INSTEAD } from "./reopen-design-po-step.mjs";
+ 
+ // The v7 approval record is verified through the re-read of its package. The lib
+ // constant for this schema is not exported, so the literal is local; a v8 record
+@@ -268,12 +269,12 @@ export function lifecycleDesignApprovalDenial(state, lifecycle) {
+ export function designAdvisoryRemediation(code) {
+   const prefix = `[guard-devplan] implementation requires a valid design approval (${code}).`;
+   if (code === "DAA-DESIGN-APPROVAL-BINDING-DRIFT") return [prefix,
+-    "Current design approval binding differs from the stored approval. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation."].join("\n");
++    `Current design approval binding differs from the stored approval. ${REOPEN_DESIGN_PO_STEP} After it, finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation.`].join("\n");
+   if (code === "DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP") return [prefix,
+     "Complete PO key setup and pin a matching public trust anchor, then run present-plan --review-receipt and approve-plan in the configured mode."].join("\n");
+   const contentDrift = ["DAA-DESIGN-SOURCE-DRIFT", "DWP-APPROVAL-SOURCE-DRIFT", "DWP-APPROVAL-PLAN-SPEC-MISMATCH", "DAA-DWP-APPROVAL-SOURCE-DRIFT", "DAA-DWP-APPROVAL-PLAN-SPEC-MISMATCH"];
+   if (contentDrift.includes(code)) return [prefix,
+-    "Current design content differs from the approved sources. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation."].join("\n");
++    `Current design content differs from the approved sources. ${SPEC_ADDENDUM_INSTEAD} Otherwise: ${REOPEN_DESIGN_PO_STEP} After it, finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation.`].join("\n");
+   return [prefix,
+     "Re-present the same current design through present-plan --review-receipt, then obtain one PO approval through approve-plan in the configured mode.",
+     "Use one ordinary review for finished sources; approval checks the stored binding, current source digests and configured proof or chat attribution."].join("\n");
+@@ -302,7 +303,7 @@ export function unverifiedApprovalAdvisory(admission, state) {
+   const text = [
+     `[guard-devplan] ADVISORY (${UNVERIFIED_APPROVAL_ADVISORY_CODE}, cause ${admission.code}): the recorded design approval could not be re-verified, so this write was allowed on the recorded approval alone.`,
+     `What could not be verified: the approved design workflow package${where} is missing or is not a physical repository file, so its digest, signature and bound sources were NOT checked. Nothing was verified.`,
+-    "Repair: run reopen-design --by <human attribution>, then finish the sources and obtain the approval again (a package that is present but different still blocks as DWP-APPROVAL-DIGEST-DRIFT).",
++    `Repair: ${REOPEN_DESIGN_PO_STEP} Then finish the sources and obtain the approval again (a package that is present but different still blocks as DWP-APPROVAL-DIGEST-DRIFT).`,
+   ].join("\n");
+   return { code: UNVERIFIED_APPROVAL_ADVISORY_CODE, cause: admission.code, text };
+ }
+@@ -416,7 +417,7 @@ export function approvedArchitectureEditNotice(relPath, projectDir) {
+   if (receipt?.schema !== "pipeline.architecture-design-materialization.v1" || !Array.isArray(receipt.targets)) return null;
+   if (!receipt.targets.some((target) => String(target?.path ?? "").toLowerCase() === slashed)) return null;
+   return `Notice: ${slashed} is a file of the approved architecture design (design digest ${receipt.designSha256}). This edit is admitted, but the next architecture inspection refuses it as ARCHITECTURE-DESIGN-ARTIFACT-DRIFT. `
+-    + "To change the architecture, change the approved design through reopen-design and a new approval, which writes this file again; otherwise restore its bytes before the next inspection.";
++    + "To change the architecture, change the approved design through the PO's reopen-design step and a new approval, which writes this file again; otherwise restore its bytes before the next inspection.";
+ }
+ 
+ /**
+@@ -607,9 +608,9 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate =
+ 
+   // ---- verdict --------------------------------------------------------------------------
+   const lifecycleReason = lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"
+-    ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
++    ? `Current Plan/Spec authority is stale or closed. ${REOPEN_DESIGN_PO_STEP}`
+     : lifecycle.status === "awaiting-approval"
+-      ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`reopen-design --by <name>\`.`
++      ? `The submitted Plan/Spec is immutable until approval. To change it before the PO has signed, run \`cancel-submitted-plan --by <name> --submission-sha256 ${lifecycle.submissionSha256 ?? "<digest>"}\` (agent work, no PO step), commit, and submit again. Only an already signed design goes through \`${REOPEN_DESIGN_PO_COMMAND}\`, which the PO runs.`
+       : lifecycle.status === "approved"
+         ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
+         : "The feature is still in draft design and has no implementation authority.");
+diff --git a/plugins/pipeline-core/lib/guard/denial-route.mjs b/plugins/pipeline-core/lib/guard/denial-route.mjs
+index f39a2b41648c28071b3c21728b69ca1cbbc98b60..2f38cb59512215083c9ef85cd7a543006698881b 100644
+--- a/plugins/pipeline-core/lib/guard/denial-route.mjs
++++ b/plugins/pipeline-core/lib/guard/denial-route.mjs
+@@ -11,6 +11,7 @@ import { readAuthoritySeal } from "../authority-seal-reader.mjs";
+ import { AUTHORITY_RESTORE_SCRIPT, CONTROLLING_NON_READY_STATUSES, INTAKE_LIFECYCLE_STATUSES, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH, PARTIAL_LIFECYCLE_SCRATCH_DIR, PLUGIN_ROOT } from "./constants.mjs";
+ import { GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, GRAMMAR_DENIAL_REMEDY_SHORT, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_CREDENTIAL_TARGET_REMEDY, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY } from "./grammar-denials.mjs";
+ import { verdict } from "./verdict.mjs";
++import { REOPEN_DESIGN_PO_STEP, SPEC_ADDENDUM_INSTEAD } from "../reopen-design-po-step.mjs";
+ 
+ export function blocked(
+   code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "", rejectedElement = null,
+@@ -284,8 +285,9 @@ export function protectedAuthorityDocumentWriteOnly(matchedRelativePath, root) {
+       + "A direct edit here does not change the recorded binding -- it only drifts the "
+       + "file out from under it, which the continuity check later reports as an "
+       + "unavailable observation rather than as the edit that caused it.\n"
+-      + "The sanctioned route for a genuine planning change: run `reopen-design --by "
+-      + "<name>` to release the binding, make the edit, then rebind with `submit-plan "
++      + `${SPEC_ADDENDUM_INSTEAD}\n`
++      + "The sanctioned route for a genuine planning change releases the binding through `reopen-design --by "
++      + "<name>`: " + REOPEN_DESIGN_PO_STEP + " After it, make the edit, then rebind with `submit-plan "
+       + "--by <name> --profile <epic|feature|mini>` and `approve-plan --by <name>`.\n"
+       + "If the only problem is a missing/incorrect PO plan acknowledgement marker on an "
+       + "otherwise-correct bound PRD, the narrower `po-authority-acknowledge-plan` / "
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+index cfdbbe37d9a686ac6812dba9bfbd231be08d5662..fa5a8f2b8939ae48d35675bc6cedaf1fdb7c0fd1 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+@@ -104,7 +104,6 @@ const recoveries = [
+   ['intake answers', onboardingScript, ['intake-design-questions-apply', '--root', root, '--answers-json', '{"choice":"git push is data"}', '--activate', '--runner', 'codex'], true, true],
+   ['marker planner', onboardingScript, ['intake-spec-marker-plan', '--root', root, '--intent', 'session', '--runner', 'codex'], false, false],
+   ['marker apply', onboardingScript, ['intake-spec-marker-apply', '--root', root, '--plan-sha256', digest, '--activate', '--runner', 'codex'], true, true],
+-  ['reopen', script, ['reopen-design', '--by', 'fixture-actor'], true, true],
+   ['reopen dry-run preview', script, ['reopen-design', '--by', 'fixture-actor', '--dry-run'], false, false],
+   ['recapture plan', script, ['recapture-design-input'], false, false],
+   ['recapture apply', script, ['recapture-design-input', '--plan-sha256', digest], true, true],
+@@ -125,6 +124,16 @@ for (const [name, entry, argv, mutation, requiresConfirmation] of recoveries) {
+     });
+   }
+ }
++// Candidate 28e (ADR-0095 Decision 10): the reopen itself voids the PO's approval and is the PO's own step. Even when an
++// observation offers it, the closed catalogue no longer sanctions it for an agent; only the dry-run preview above is.
++for (const executable of [process.execPath, '/opt/producer-node/bin/node']) {
++  check('offered reopen (the void) is not sanctioned with ' + (executable === process.execPath ? 'guard Node' : 'producer Node'), () => {
++    const published = { kind: 'command', executable, argv: [script, 'reopen-design', '--by', 'fixture-actor'], mutation: true, requiresConfirmation: true };
++    const deps = dependencies({ ...observed, nextAction: published });
++    assert.equal(isSanctionedLifecycleCommand(recoveryCommandFor(published), root, { ...deps, processExecPath: executable }), false,
++      'reopen-design without --dry-run is a PO step, never a sanctioned agent command');
++  });
++}
+ const marker = { kind: 'command', executable: '/opt/producer-node/bin/node',
+   argv: [onboardingScript, 'intake-spec-marker-apply', '--root', root, '--plan-sha256', digest, '--activate', '--runner', 'codex'],
+   mutation: true, requiresConfirmation: true };
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index b7b0616bc7de0f29bd2aad766cf7f64f77f19323..7f8d53a1584657ce9afc4ff6c830be1baa265c89 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -50,9 +50,16 @@ import { isCurrentSessionArtifactExport } from "../current-session-artifact-expo
+ // G2 / EL-36: READY permits agent work, but cannot authorize the human's
+ // decision to abandon a feature. Match the actual script and verb, never text
+ // mentioning them. The existing parser leaves compound commands to grammar.
+-function isHumanOnlyDiscard(command, root) {
++function isHumanOnlyDiscard(command, root) { return isHumanOnlyStateVerb(command, root, (args) => args[0] === "discard-feature"); }
++// C28e (Claude test run, PO decision 2026-11-13): reopening an approved design voids the PO's signature and costs a new design round;
++// the agent started it at once although the PO had said "only if unavoidable". The void is the PO's step now, like discard-feature;
++// `reopen-design --by <x> --dry-run` stays an agent read (it prints what the void would cost and writes nothing).
++// Only the exact preview shape `reopen-design --by <label> --dry-run` is agent work; any other argv naming the verb is the PO's step.
++const REOPEN_PREVIEW = (args) => args.length === 4 && args[1] === "--by" && args[2] !== "--dry-run" && args[3] === "--dry-run";
++function isHumanOnlyReopen(command, root) { return isHumanOnlyStateVerb(command, root, (args) => args[0] === "reopen-design" && !REOPEN_PREVIEW(args)); }
++function isHumanOnlyStateVerb(command, root, matches) {
+   const invocation = resolveSanctionedScriptInvocation(command, root);
+-  if (invocation?.args[0] !== "discard-feature") return false;
++  if (!Array.isArray(invocation?.args) || !matches(invocation.args)) return false;
+   let script = invocation.script;
+   if (script.startsWith("file:")) {
+     try { script = fileURLToPath(script); } catch { return false; }
+@@ -259,6 +266,11 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+     return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-DISCARD-HUMAN-ONLY: discard-feature is a human-terminal action; the agent cannot discard a feature to escape an implementation block or supply --by.\n"
+       + "PO recovery: in the project directory, run node plugins/pipeline-core/scripts/pipeline-state.mjs discard-feature --by \"<your name>\" --reason \"<why this feature is being abandoned>\" in your own terminal, using your own name and reason.\n");
+   }
++  if (toolName === "Bash" && isHumanOnlyReopen(input.tool_input.command ?? input.tool_input.CommandLine, root)) {
++    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-REOPEN-HUMAN-ONLY: reopen-design voids the PO's design approval and starts a new design round with a new signature; only the PO starts it.\n"
++      + "Agent route: run the same command with --dry-run (it writes nothing and prints what the void would cost), then put that cost and the alternative to the PO: a Spec correction inside implementation goes through the Spec addendum, which keeps the phase and needs one signature over the delta.\n"
++      + "PO route: in the project directory, run node plugins/pipeline-core/scripts/pipeline-state.mjs reopen-design --by \"<your name>\" in your own terminal.\n");
++  }
+   if (SHELL_TOOLS.includes(toolName) && isHumanPoProfileChangeCommand(
+     input.tool_input.command ?? input.tool_input.CommandLine, root,
+   )) return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-PROFILE-CHANGE-HUMAN-ONLY: profile acknowledgement changes require the existing attended human confirmation outside agent tools.\n");
+diff --git a/plugins/pipeline-core/lib/guard/po-only-discard-boundary.test.mjs b/plugins/pipeline-core/lib/guard/po-only-discard-boundary.test.mjs
+index c1ce34a8bb3c77c6cf89a9a11fd72aa38005ef93..6935964eabaeb96b2af23290a9ea75f5051febcb 100644
+--- a/plugins/pipeline-core/lib/guard/po-only-discard-boundary.test.mjs
++++ b/plugins/pipeline-core/lib/guard/po-only-discard-boundary.test.mjs
+@@ -109,4 +109,29 @@ test('PODB008','closed unsupported and missing reads keep actual adapter metadat
+   assert.equal(runner==='codex'?output.hookSpecificOutput.permissionDecision:output.decision,'deny');
+  }
+ });
++// C28e (Claude test run, PO decision 2026-11-13): reopen-design voids the approved design; only the PO starts it. The dry run stays agent work.
++test('PODB009','reopen-design is refused as the PO\'s step without an override route; its dry run stays agent work',async()=>{
++ const parsed=(result,label)=>{assert.notEqual(result.stdout,'',`${label}: no output (status ${result.status}): ${result.stderr}`);return JSON.parse(result.stdout);};
++ for(const argv of [['node',cli,'reopen-design','--by','synthetic-agent'],[process.execPath,cli,'reopen-design','--by','synthetic-agent'],[process.execPath,cli,'reopen-design','--by','--dry-run'],[process.execPath,cli,'reopen-design','--dry-run','--by','synthetic-agent']]){
++  const verdict=parsed(launch(self,['--worker',JSON.stringify({root,command:render(argv)})]),argv.slice(2).join(' '));
++  assert.equal(verdict.exitCode,2);
++  assert.match(verdict.stderr,/PO-REOPEN-HUMAN-ONLY/);assert.match(verdict.stderr,/--dry-run/);assert.match(verdict.stderr,/Spec addendum/);assert.match(verdict.stderr,/own terminal/);
++  assert.doesNotMatch(verdict.stderr,/Human override available|guard-human-override|HGO-|sign-intent|verify-audit/);
++ }
++ const dry=parsed(launch(self,['--worker',JSON.stringify({root,command:render([process.execPath,cli,'reopen-design','--by','synthetic-agent','--dry-run'])})]),'dry run');
++ assert.doesNotMatch(dry.stderr??'',/PO-REOPEN-HUMAN-ONLY/,'the dry run is not the PO\'s step');
++ const {classifyNonLiftableGuardDenials}=await import('../human-guard-override.mjs');
++ const classified=classifyNonLiftableGuardDenials([{guard:'guard-lifecycle-ready.mjs',reason:'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-REOPEN-HUMAN-ONLY: reopen-design voids the approval.'}]);
++ assert.equal(classified.status,'non-liftable-recovery-required');assert.equal(classified.code,'PO-REOPEN-HUMAN-ONLY');assert.match(classified.nextAction.reason,/--dry-run/);
++ // The same refusal through both runner adapters, with no override block.
++ // Both spellings of the interpreter: the adapters skip the lifecycle guard for a sanctioned lifecycle argv, so the plain void must not be one.
++ for(const runner of ['codex','antigravity'])for(const node of ['node',process.execPath]){
++  const command=render([node,cli,'reopen-design','--by','synthetic-agent']);
++  const input=runner==='antigravity'?{cwd:root,toolCall:{name:'run_command',args:{CommandLine:command,Cwd:root}}}:{cwd:root,session_id:'synthetic-reopen-fixture',tool_name:'Bash',tool_input:{command}};
++  const result=launch(join(hooks,`${runner}-pretool-guard.mjs`),[],input);
++  const output=parsed(result,runner);const reason=runner==='codex'?output.hookSpecificOutput.permissionDecisionReason:output.reason;
++  assert.equal(runner==='codex'?output.hookSpecificOutput.permissionDecision:output.decision,'deny',runner);
++  assert.match(reason,/PO-REOPEN-HUMAN-ONLY/,runner);assert.doesNotMatch(reason,/Human override available|guard-human-override|HGO-|sign-intent|verify-audit/,runner);
++ }
++});
+ registerTestCaseCompletion({cases,fd:Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD??'3'),maxBytes:65536});
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index cec180e85bc8ae95474ec8574a33d6f93cf65f91..514dd995a2f652336e679141a2917743e4820a31 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -483,8 +483,9 @@ export function sanctionedPipelineStateArgs(args, root) {
+   if (args[0] === "apply-legacy-v2-revocation-recovery") return false;
+   if (args[0] === "reopen-design") {
+     // `--dry-run` previews the void without writing (pipeline.reopen-design-preview.v1); it is a pure read.
+-    return args[1] === "--by" && validBy(args[2])
+-      && (args.length === 3 || (args.length === 4 && args[3] === "--dry-run"));
++    // C28e (PO decision 2026-11-13): only the preview is sanctioned agent work. The void itself is the PO's step (PO-REOPEN-HUMAN-ONLY in
++    // guard/evaluate.mjs); a sanctioned argv here made the Codex and Antigravity adapters skip the lifecycle guard and admit it.
++    return args[1] === "--by" && validBy(args[2]) && args.length === 4 && args[3] === "--dry-run";
+   }
+   if (args[0] === "cancel-submitted-plan") {
+     return args[1] === "--by" && validBy(args[2])
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index a9f01a2d9a4e8a48410d1b806d7986d7a4e5d5c3..5d8d17f2a0055353f9d08fb459cc2f268634d443 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -1557,6 +1557,18 @@ export function classifyNonLiftableGuardDenials(denials) {
+   const codes = denials.map(denial => denial?.guard === "guard-lifecycle-ready.mjs"
+     ? String(denial.reason ?? "").match(/^BLOCKED \(guard-lifecycle-ready, plugin pipeline-core\): ([A-Z][A-Z0-9-]+):/u)?.[1] ?? null
+     : null);
++  // C28e (PO decision 2026-11-13): reopen-design is the PO's step like discard-feature; no capability and no signature delegates it.
++  const reopenOnly = codes.includes("PO-REOPEN-HUMAN-ONLY");
++  if (reopenOnly) {
++    return {
++      status: "non-liftable-recovery-required",
++      code: "PO-REOPEN-HUMAN-ONLY",
++      cause: denials.map(denial => String(denial.reason)).join("\n"),
++      recoveryGuidance: [],
++      coDenialSummary: null,
++      nextAction: { kind: "repair-required", reason: 'Run reopen-design --by "<label>" --dry-run and put the printed cost to the PO, next to the Spec addendum for a correction inside implementation. Only the PO runs reopen-design itself, in their own terminal; a signature or chat approval cannot delegate it to the agent.' },
++    };
++  }
+   const humanOnly = codes.includes("PO-DISCARD-HUMAN-ONLY");
+   const diagnosticOnly = codes.every(code => code === "GUARD-READ-COMMAND-UNSUPPORTED" || code === "GUARD-READ-TARGET-MISSING");
+   // Antigravity greenfield 2026-11-08: GIT-03 says "no override for this rule" and an override block followed it. The message is the repair.
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index 047c6aa23aab5a5c9168015964fb118b7c372935..31841704ba24a3e545b3e0b33efb885564f26272 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -4790,8 +4790,9 @@ const NEXT_ACTION_BODY_BY_STATUS = {
+   ],
+   implementing: [
+     "The plan is approved and the feature is in implementation. Proceed with the",
+-    "approved implementation packages; reopen design only through",
+-    "`pipeline-state reopen-design --by <name>` if it must change.",
++    "approved implementation packages. A correction of the approved Spec goes",
++    "through a Spec addendum; the design is reopened only by the PO, through",
++    "`pipeline-state reopen-design --by <name>` in the PO's own terminal.",
+   ],
+ };
+ 
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index f6a43c26f318518252f1aed9d8f8203e92e57524..b18137081697c2d2f3a7b03088ca95cf80fa6bf1 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -256,10 +256,11 @@ test("AC-123 submit-plan, reopen-design and set-phase prescribed by the course a
+     for (const profile of ["epic", "feature", "mini"]) {
+       assert.equal(admitted(stateAction("submit-plan", "--by", "Fixture", "--profile", profile), f), true, profile);
+     }
+-    assert.equal(admitted(stateAction("reopen-design", "--by", "Fixture"), f), true);
++    // ADR-0095 Decision 10: the agent's reopen form is the dry-run preview; the reopen itself is the PO's step.
++    assert.equal(admitted(stateAction("reopen-design", "--by", "Fixture", "--dry-run"), f), true);
+     assert.equal(admitted(stateAction("set-phase", "--phase", "implementation"), f), true);
+     for (const argv of [["submit-plan", "--by", "Fixture", "--profile", "other"], ["submit-plan", "--profile", "feature"],
+-      ["reopen-design"], ["reopen-design", "--by", "Fixture", "--extra"], ["set-phase", "--phase", "release"]]) {
++      ["reopen-design"], ["reopen-design", "--by", "Fixture"], ["reopen-design", "--by", "Fixture", "--extra"], ["set-phase", "--phase", "release"]]) {
+       assert.equal(admitted(stateAction(...argv), f), false, argv.join(" "));
+     }
+   });
+diff --git a/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs b/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
+index b1fe68dc443f36baeb2780dcdc7b39d4f697cf05..71bdd20db249c8d3fd38551ae9a676e289d29e91 100644
+--- a/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
++++ b/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
+@@ -20,7 +20,8 @@ const blockedDraft = { devPlanGateVerdictFn: () => ({ verdict: 'block', reason:
+ // Fixture: an existing single-link regular review receipt under scratch/ (relative path, as the catalogue demands).
+ const receiptRel = 'scratch/denial-diagnosis-pin-receipt.json';
+ const SHAPES = {
+-  'reopen-design': '--by tester',
++  // ADR-0095 Decision 10: the agent-runnable form a denial names is the preview; the reopen itself is the PO's step.
++  'reopen-design': '--by tester --dry-run',
+   'present-plan': `--by tester --review-receipt ${receiptRel}`,
+   'approve-plan': '--by tester',
+   'set-phase': '--phase implementation',
+@@ -120,8 +121,10 @@ check('DND004', 'all denial codes: every recovery verb a rendered denial names i
+ });
+ check('DND005', 'exact rendered recovery text: the denial spelling is observed against the guard, not a hand-built spelling', () => {
+   const text = designAdvisoryRemediation('DAA-DESIGN-SOURCE-DRIFT');
+-  const rendered = /Run (reopen-design --by <human attribution>)/u.exec(text)?.[1];
+-  assert.equal(rendered, 'reopen-design --by <human attribution>', 'denial text no longer renders the pinned recovery spelling');
++  // ADR-0095 Decision 10: the denial hands the reopen to the PO and names the agent's preview.
++  assert.match(text, /ask the PO to run reopen-design --by <human attribution> in their own terminal/u);
++  const rendered = /preview it with (reopen-design --by <human attribution> --dry-run)/u.exec(text)?.[1];
++  assert.equal(rendered, 'reopen-design --by <human attribution> --dry-run', 'denial text no longer renders the pinned recovery spelling');
+   // The spelling exactly as rendered, bare and with the sanctioned script prefix.
+   const bare = isSanctionedLifecycleCommand(rendered, root, {});
+   const prefixed = isSanctionedLifecycleCommand(`node "${script}" ${rendered}`, root, {});
+@@ -224,7 +227,7 @@ check('DND012', 'D117 advisory: typed code, what was not verified, one repair ve
+   const advisory = policy.unverifiedApprovalAdvisory({ ok: false, code: 'DWP-PACKAGE-PHYSICAL' }, { planApproval: { designWorkflowPackagePath: 'evidence/package.json' } });
+   assert.ok(advisory, 'DWP-PACKAGE-PHYSICAL (the code this item was filed for) must degrade to an advisory');
+   assert.equal(advisory.code, 'GUARD-DEVPLAN-APPROVAL-UNVERIFIED');
+-  for (const needle of [advisory.code, 'DWP-PACKAGE-PHYSICAL', 'evidence/package.json', 'Nothing was verified', 'Repair: run reopen-design']) {
++  for (const needle of [advisory.code, 'DWP-PACKAGE-PHYSICAL', 'evidence/package.json', 'Nothing was verified', 'Repair: Reopening the signed design', 'reopen-design --by <human attribution> --dry-run']) {
+     assert.ok(advisory.text.includes(needle), `advisory must contain: ${needle}`);
+   }
+   assert.ok(!refusedNames(advisory.text), 'the advisory names a script command the lane refuses');
+diff --git a/plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs b/plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs
+index d282089875299dfcca285d984b5135a8e8f4a7ac..fe31a3cd043e96974b9b7a151658f8e81a4955cd 100644
+--- a/plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs
+@@ -193,7 +193,9 @@ async function revisionChainSteps(f, hooks, { receiptCount }) {
+   const round1 = produce("--report", `${review}/design-review-1.md`, "--open-finding", "F-1", "--out", first);
+   assert.equal(round1.status, 0, `round 1 receipt producer: ${round1.stderr}`);
+   const steps = [
+-    ["reopen-design", action(PIPELINE_STATE_SCRIPT, "reopen-design", "--by", "Fixture PO")],
++    // C28e (PO decision 2026-11-13), restated in place (QG-04): the agent's step is the preview; the void itself is the PO's own step in
++    // their terminal (PO-REOPEN-HUMAN-ONLY, po-only-discard-boundary.test.mjs PODB009), so no agent guard admits it.
++    ["reopen-design preview", action(PIPELINE_STATE_SCRIPT, "reopen-design", "--by", "Fixture PO", "--dry-run")],
+     ["submit-plan", action(PIPELINE_STATE_SCRIPT, "submit-plan", "--by", "Fixture", "--profile", "feature")],
+     ["delta receipt", action(DESIGN_REVIEW_RECEIPT_SCRIPT, "create", "--repo", f.root, "--feature", f.featureId, "--report", `${review}/design-review-2.md`,
+       "--prd", f.sources.prd.path, "--spec", f.sources.spec.path, "--previous", first, "--out", delta)],
+@@ -213,7 +215,7 @@ async function revisionChainSteps(f, hooks, { receiptCount }) {
+   });
+ }
+ 
+-test("A10 revision path (single-review route): reopen-design, submit-plan, the delta receipt and present-plan over both receipts are admitted by the real guards with zero overrides", async () => {
++test("A10 revision path (single-review route): the reopen-design preview, submit-plan, the delta receipt and present-plan over both receipts are admitted by the real guards with zero overrides", async () => {
+   const hooks = await import("../../hooks/design-course-command-admission.test.mjs");
+   const f = hooks.fixture("feature");
+   try {
+diff --git a/plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs b/plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs
+index 2a2dcb17d7dcaefe0157d260d9389bbe1e5f3a14..7c47d59511591636e83e9c7748a52b0484f9034a 100644
+--- a/plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs
++++ b/plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs
+@@ -127,7 +127,7 @@ test('AC4 reopen-design (C6g3 D1): every DWP-APPROVAL-* reopen code has the reop
+   const {designAdvisoryRemediation}=await import('../guard-devplan-policy.mjs');
+   const codes=m.ARCHITECTURE_DESIGN_REOPEN_CODES.filter(c=>c.startsWith('DWP-APPROVAL-'));
+   assert.ok(codes.length>=2,'parity subject must be non-empty');
+-  for(const code of codes)assert.match(designAdvisoryRemediation(code),/Run reopen-design --by/u,code+': guard remediation is not reopen-design');
++  for(const code of codes)assert.match(designAdvisoryRemediation(code),/ask the PO to run reopen-design --by/u,code+': guard remediation is not the PO reopen-design step');
+ });
+ 
+ test('AC4 reopen-design (F1): a typed non-drift code (setup/availability) gets a diagnosis, not reopen-design',async()=>{
+@@ -176,7 +176,8 @@ test('AC3 named diagnosis: the closed-gate denial names only admitted recovery c
+   const retired=`node "${join(pluginRoot,'scripts','design-advisory-admission.mjs')}" inspect --repo-root ${repoRoot} --feature f --plan p --spec s`;
+   const namesRetired=t=>/design-advisory-admission|\binspect\b|\.mjs\b|\bnode\b/u.test(t);
+   const receiptRel='scratch/foreign-worktree-pin-ac3-receipt.json';
+-  const shapes={'reopen-design':'--by tester','present-plan':`--by tester --review-receipt ${receiptRel}`,'approve-plan':'--by tester','set-phase':'--phase implementation'};
++  // ADR-0095 Decision 10: the agent-runnable reopen form a denial names is the dry-run preview.
++  const shapes={'reopen-design':'--by tester --dry-run','present-plan':`--by tester --review-receipt ${receiptRel}`,'approve-plan':'--by tester','set-phase':'--phase implementation'};
+   const codes=['DAA-DESIGN-APPROVAL-BINDING-DRIFT','DAA-DESIGN-SOURCE-DRIFT','DAA-PUBLIC-UNAVAILABLE','DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP'];
+   // Precondition: the guard really refuses the retired command in the denying state.
+   assert.equal(devPlanShellRefusalHit(retired,repoRoot,blockedDraft)?.lane,'opaque-script-execution');
+diff --git a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+index 5f8bc1284e3d3b8f4c202e824a16d8492bbf3615..d1e8b109d735bf3c5063d09012a5b9ccb4a94711 100644
+--- a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+@@ -42,9 +42,11 @@ const refused = command => devPlanShellRefusalHit(command, root, deps)?.lane ===
+ const admittedByClosedArgv = command => isSanctionedLifecycleCommand(command, root, deps) && devPlanShellRefusalHit(command, root, deps) === null;
+ 
+ test('AC-207 point 1: emitted lifecycle commands (native spelling) are admitted by closed argv in the draft lifecycle', () => {
+-  for (const tail of ['inspect', 'reopen-design --by X', `cancel-submitted-plan --by X --submission-sha256 ${sha}`]) {
++  // ADR-0095 Decision 10: the emitted agent form of reopen-design is the dry-run preview; the void is the PO's step.
++  for (const tail of ['inspect', 'reopen-design --by X --dry-run', `cancel-submitted-plan --by X --submission-sha256 ${sha}`]) {
+     assert.equal(admittedByClosedArgv(`node ${q(state)} ${tail}`), true, tail);
+   }
++  assert.equal(isSanctionedLifecycleCommand(`node ${q(state)} reopen-design --by X`, root, deps), false, 'the void is not an agent command');
+ });
+ 
+ test('AC-207 point 1 control: admission stays closed (altered argv, foreign script)', () => {
+@@ -56,7 +58,7 @@ test('AC-207 point 1 control: admission stays closed (altered argv, foreign scri
+ test('AC-207 point 1: forward-slash and MSYS spellings of an emitted command are normalised before matching', () => {
+   for (const spell of [forward, msys]) {
+     assert.equal(admittedByClosedArgv(`node ${q(spell(state))} inspect`), true, `inspect ${spell.name}`);
+-    assert.equal(admittedByClosedArgv(`node ${q(spell(state))} reopen-design --by X`), true, `reopen-design ${spell.name}`);
++    assert.equal(admittedByClosedArgv(`node ${q(spell(state))} reopen-design --by X --dry-run`), true, `reopen-design preview ${spell.name}`);
+   }
+ });
+ 
+diff --git a/plugins/pipeline-core/lib/po-gate-authority-read.mjs b/plugins/pipeline-core/lib/po-gate-authority-read.mjs
+index 338541065c2f44e08d969c515117ba891ddd91c4..003feba151aa60a2a8311c400aea37da68ad30b2 100644
+--- a/plugins/pipeline-core/lib/po-gate-authority-read.mjs
++++ b/plugins/pipeline-core/lib/po-gate-authority-read.mjs
+@@ -107,7 +107,8 @@ const SPEC_REPAIR = "The active PRD must bind the neighboring spec.md of the sam
+   + " if this PRD has not been bound by a kickoff promotion, edit the marker in the PRD to the neighboring spec.md's current digest;"
+   + " if a kickoff promotion has already bound this PRD and the plan is not yet approved, do not edit either document in place --"
+   + " the promotion already bound their exact bytes, so an in-place edit only breaks that binding and does not make this check pass;"
+-  + " instead run the pipeline-core script pipeline-state.mjs reopen-design --by <attribution>, edit the spec or marker, then re-submit and approve the plan;"
++  + " instead the design is reopened with the pipeline-core script pipeline-state.mjs reopen-design --by <attribution>, which is the PO's own step"
++  + " (ask the PO to run it in their own terminal; you may preview it with --dry-run); after it, edit the spec or marker, then re-submit and approve the plan;"
+   + " if the plan is already approved and the Spec changed during implementation, use the sanctioned rebind rather than editing the marker by hand:"
+   + " run the pipeline-core script pipeline-state.mjs po-authority-rebind-plan, then pipeline-state.mjs po-authority-rebind-apply"
+   + " --plan-sha256 <sha256> --updated-at <ISO-8601> --activate with the digest and timestamp that plan reports."
+@@ -127,7 +128,8 @@ const SPEC_MARKER_MISSING_REPAIR = "The active PRD does not carry the technical
+   + " If this PRD has not been bound by a kickoff promotion, add that single line to the PRD."
+   + " If a kickoff promotion has already bound this PRD, do not add or edit that line in place: the promotion already"
+   + " bound these exact bytes, and an in-place edit only breaks that binding without making this check pass;"
+-  + " instead run the pipeline-core script pipeline-state.mjs reopen-design --by <attribution>, add the marker, then re-submit and approve the plan;"
++  + " instead the design is reopened with the pipeline-core script pipeline-state.mjs reopen-design --by <attribution>, which is the PO's own step"
++  + " (ask the PO to run it in their own terminal; you may preview it with --dry-run); after it, add the marker, then re-submit and approve the plan;"
+   + " do not change activeFeature.planPath, which is not what is wrong here.";
+ // PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING is additive to, never a substitute for,
+ // PO-GATE-PRD-SPEC-MARKER-MISSING/-MISMATCH above: those bind the PRD to the
+diff --git a/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs b/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
+index 36dca6414b60e35d83bb155cce585a73ebbc3493..064f0c552efb77e51d46531b9110ba2823fe811f 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
+@@ -488,8 +488,8 @@ test("the unconfigured-verify handover exception is exact about its input and pl
+ // The fixtures below are the producer's literals (that function is module-private); the conformance test
+ // pins them against the producer's source text so a drifting producer fails here, loudly, not in the field.
+ const REOPEN_DESIGN_ACTOR_PLACEHOLDER = "<recovery actor's name>";
+-const REOPEN_STALE_GUIDANCE = "The current approval is stale. If this checkout is a clone or transfer of the approved project with unchanged approved bytes, first run `pipeline-state.mjs rebind-approval`: it re-binds only the device-local fields and keeps the approval. Only if it refuses, collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.";
+-const REOPEN_INVALID_EVIDENCE_GUIDANCE = "The approved PRD is immutable and its architecture evidence is invalid (ARCHITECTURE-DESIGN-PACKAGE-REQUIRED). Collect the recovery actor, then execute the exact reopen-design action; edit the PRD only after it is a draft and submit/present one complete package for one final approval.";
++const REOPEN_STALE_GUIDANCE = "The current approval is stale. If this checkout is a clone or transfer of the approved project with unchanged approved bytes, first run `pipeline-state.mjs rebind-approval`: it re-binds only the device-local fields and keeps the approval. Only if it refuses: the exact reopen-design action voids the approval and is the PO's own step; collect the recovery actor from the PO and hand the applyAction to the PO for their own terminal (you may run it with --dry-run as a preview), before editing the PRD and preparing one final design-workflow approval.";
++const REOPEN_INVALID_EVIDENCE_GUIDANCE = "The approved PRD is immutable and its architecture evidence is invalid (ARCHITECTURE-DESIGN-PACKAGE-REQUIRED). The exact reopen-design action is the PO's own step: collect the recovery actor from the PO and hand the applyAction to the PO for their own terminal (you may run it with --dry-run as a preview); edit the PRD only after it is a draft and submit/present one complete package for one final approval.";
+ const FOREIGN_PLUGIN_SCRIPTS = join(tmpdir(), "foreign-plugin", "scripts");
+ 
+ function materializeArchitectureAction() {
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 7b337cbb49dfd3de2c5f26f37c91aa601c281498..b5784bb5ace67fd55aecd208dd1c6e06441a3860 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -3647,7 +3647,7 @@ function designToImplementationHandoverAction(root, fs) {
+       requiresConfirmation: false,
+       // A clone or transfer with unchanged approved bytes is repaired by rebind-approval and keeps the approval;
+       // reopen-design discards it, so it is named second.
+-      guidance: "The current approval is stale. If this checkout is a clone or transfer of the approved project with unchanged approved bytes, first run `pipeline-state.mjs rebind-approval`: it re-binds only the device-local fields and keeps the approval. Only if it refuses, collect the recovery actor, then execute the exact reopen-design action before editing the PRD and preparing one final design-workflow approval.",
++      guidance: "The current approval is stale. If this checkout is a clone or transfer of the approved project with unchanged approved bytes, first run `pipeline-state.mjs rebind-approval`: it re-binds only the device-local fields and keeps the approval. Only if it refuses: the exact reopen-design action voids the approval and is the PO's own step; collect the recovery actor from the PO and hand the applyAction to the PO for their own terminal (you may run it with --dry-run as a preview), before editing the PRD and preparing one final design-workflow approval.",
+       applyAction: commandAction([PO_AUTHORITY_REBIND_WRITER, "reopen-design", "--by", byToken], true, true,
+         "pipeline.project-onboarding.v4", ["ready"]),
+     };
+@@ -3709,7 +3709,7 @@ function designToImplementationHandoverAction(root, fs) {
+         };
+       }
+       const action = reopenDesignAction();
+-      action.guidance = `The approved PRD is immutable and its architecture evidence is invalid (${architecture.code ?? "ARCHITECTURE-DESIGN-INVALID"}). Collect the recovery actor, then execute the exact reopen-design action; edit the PRD only after it is a draft and submit/present one complete package for one final approval.`;
++      action.guidance = `The approved PRD is immutable and its architecture evidence is invalid (${architecture.code ?? "ARCHITECTURE-DESIGN-INVALID"}). The exact reopen-design action is the PO's own step: collect the recovery actor from the PO and hand the applyAction to the PO for their own terminal (you may run it with --dry-run as a preview); edit the PRD only after it is a draft and submit/present one complete package for one final approval.`;
+       return action;
+     }
+     return {
+diff --git a/plugins/pipeline-core/lib/reopen-design-po-step.mjs b/plugins/pipeline-core/lib/reopen-design-po-step.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..5dfe31d1d6561f4657b4e4f1f626c99694e3c821
+--- /dev/null
++++ b/plugins/pipeline-core/lib/reopen-design-po-step.mjs
+@@ -0,0 +1,24 @@
++// SPDX-License-Identifier: SUL-1.0
++// Leaf module (imports nothing): the one wording every emitter uses when it points at reopen-design. Reopening a signed
++// design voids the PO's approval, so it is the PO's own step (ADR-0095 Decision 10): the guard refuses
++// `reopen-design --by <name>` from an agent (PO-REOPEN-HUMAN-ONLY) and admits only the `--dry-run` preview. A correction of
++// the approved Spec during implementation needs no reopen: it goes through a Spec addendum and one PO approval (ADR-0095).
++// The texts name bare verbs only (no script path, no `node`), so a denial that embeds them never names a command the shell
++// lane refuses (AC-148).
++
++/** The placeholder every emitter prints for the actor label; the PO supplies the value (EL-36). */
++export const REOPEN_DESIGN_ACTOR = "<human attribution>";
++
++/** The exact preview the agent may run itself. */
++export const REOPEN_DESIGN_PREVIEW = `reopen-design --by ${REOPEN_DESIGN_ACTOR} --dry-run`;
++
++/** The step itself, which only the PO runs, in the PO's own terminal. */
++export const REOPEN_DESIGN_PO_COMMAND = `reopen-design --by ${REOPEN_DESIGN_ACTOR}`;
++
++/** One sentence: who runs the reopen, and what the agent may run instead. */
++export const REOPEN_DESIGN_PO_STEP = "Reopening the signed design voids the PO's approval and is the PO's own step: "
++  + `ask the PO to run ${REOPEN_DESIGN_PO_COMMAND} in their own terminal; you may preview it with ${REOPEN_DESIGN_PREVIEW}.`;
++
++/** One sentence: the route that needs no reopen. */
++export const SPEC_ADDENDUM_INSTEAD = "A correction of the approved Spec during implementation needs no reopen: "
++  + "keep spec.md as approved and put the correction into a Spec addendum with one PO approval (ADR-0095).";
+diff --git a/plugins/pipeline-core/lib/runbook-paths.mjs b/plugins/pipeline-core/lib/runbook-paths.mjs
+index 9e5e3d7108da88f710dac98440e528d6bd25aeb2..a546708a8aedcc884c93abe7015757b035c3b9fb 100644
+--- a/plugins/pipeline-core/lib/runbook-paths.mjs
++++ b/plugins/pipeline-core/lib/runbook-paths.mjs
+@@ -122,9 +122,10 @@ function planSteps() {
+       producer: "the architecture map, fitness model and baseline, and the accepted ADR records the signed package pre-bound; continue with the implement runbook", next: [],
+     }),
+     scriptStep({
+-      id: "reopen-design", script: STATE, verb: "reopen-design", closed: true, argv: ["reopen-design", "--by", "<name>"],
+-      needs: ["recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before)"],
+-      producer: "lifecycle returns to draft", next: ["set-feature", ...recovery],
++      // ADR-0095 Decision 10: a po-only step, so not a closed (agent-sanctioned) catalogue shape; only its --dry-run preview is.
++      id: "reopen-design", who: "po-only", script: STATE, verb: "reopen-design", closed: false, argv: ["reopen-design", "--by", "<name>"],
++      needs: ["recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before); the agent may run the same command with --dry-run as a preview, and a Spec correction during implementation goes through a Spec addendum instead (ADR-0095)"],
++      producer: "lifecycle returns to draft, run in the PO's own terminal", next: ["set-feature", ...recovery],
+     }),
+     scriptStep({
+       id: "cancel-submitted-plan", script: STATE, verb: "cancel-submitted-plan", closed: true,
+diff --git a/plugins/pipeline-core/runbooks/index.v1.json b/plugins/pipeline-core/runbooks/index.v1.json
+index eee39ffc6e4ccc11b6f8bf67a079249d053bf9f0..7eb594aa831a44de99755f552b669bee7b1292f2 100644
+--- a/plugins/pipeline-core/runbooks/index.v1.json
++++ b/plugins/pipeline-core/runbooks/index.v1.json
+@@ -17,7 +17,7 @@
+       "pathId": "plan",
+       "path": "plugins/pipeline-core/runbooks/plan-path.v1.json",
+       "schema": "pipeline.runbook.v1",
+-      "sha256": "3f2bbdadd60dc4a46212844348e4b159594fde1a6da01154f6c6cbd423f8f908"
++      "sha256": "ca1b5d9d662964b7ca2fcd49541e0ff9570c14352596957ef6aac512b1821527"
+     },
+     {
+       "pathId": "implement",
+diff --git a/plugins/pipeline-core/runbooks/plan-path.v1.json b/plugins/pipeline-core/runbooks/plan-path.v1.json
+index bae70203e2e0d38d8fc0d115a0e8c4bbf0522fe7..c10cd1f32de91925c19c42d8e9702b9ca5cdfa70 100644
+--- a/plugins/pipeline-core/runbooks/plan-path.v1.json
++++ b/plugins/pipeline-core/runbooks/plan-path.v1.json
+@@ -363,14 +363,14 @@
+     },
+     {
+       "id": "reopen-design",
+-      "who": "agent",
++      "who": "po-only",
+       "command": "node <plugin-root>/scripts/pipeline-state.mjs reopen-design --by <name>",
+       "needs": [
+-        "recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before)"
++        "recovery or a change of the design: executable in every state (a draft voids a prepared seal plan, a package bound before its approval is unlocked, a sealed package is released as before); the agent may run the same command with --dry-run as a preview, and a Spec correction during implementation goes through a Spec addendum instead (ADR-0095)"
+       ],
+       "evidenceSchema": null,
+-      "producer": "lifecycle returns to draft",
+-      "humanGate": false,
++      "producer": "lifecycle returns to draft, run in the PO's own terminal",
++      "humanGate": true,
+       "next": [
+         "set-feature",
+         "submit-plan"
+@@ -384,7 +384,7 @@
+           "--by",
+           "<name>"
+         ],
+-        "closed": true
++        "closed": false
+       }
+     },
+     {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 4f538f2afb5f8b5d22c56eb0d9007b2fa379b7a5..cbac6633df38b6f52e60c055383eceb2070c993d 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -4397,7 +4397,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+     return by !== null ? action : {
+       kind: 'collect-input', inputs: [{ name: 'by', encoding: 'utf8', trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true }],
+       mutation: false, requiresConfirmation: false,
+-      guidance: 'Current Plan/Spec authority is stale or unavailable. Collect the recovery actor, then confirm the returned sanctioned reopen-design action before resubmission or approval.',
++      guidance: "Current Plan/Spec authority is stale or unavailable. The returned reopen-design action voids the PO's approval and is the PO's own step: collect the recovery actor from the PO and hand the applyAction to the PO for their own terminal (you may run it with --dry-run as a preview) before resubmission or approval.",
+       applyAction: action, expected: { schema: INSPECT_SCHEMA, statuses: ['draft'] },
+     };
+   }
+@@ -7537,8 +7537,8 @@ function inspectSealSituation(dir, base) {
+       next: fileExists ? sealCommand("prepare-seal") : null,
+       exits: [reopen],
+       reason: approved
+-        ? "the PRD and the Spec are sealed by the plan approval; reopen-design is the only way to change them"
+-        : "the PRD and the Spec were bound at onboarding and the plan is not approved yet: the project stays locked until its approval; reopen-design unlocks it",
++        ? "the PRD and the Spec are sealed by the plan approval; reopen-design, the PO's own step, is the only way to change them (a Spec correction during implementation goes through a Spec addendum)"
++        : "the PRD and the Spec were bound at onboarding and the plan is not approved yet: the project stays locked until its approval; reopen-design, the PO's own step, unlocks it",
+     };
+   }
+   if (seal.status !== "draft") {
+@@ -12306,7 +12306,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       }
+       if (phase === "design") {
+         if (base.activeFeature.phase !== "design" || !new Set(["draft", "awaiting-approval"]).has(lifecycle.status)) {
+-          console.error("Error: use reopen-design --by <name> before leaving an approved or implementing lifecycle.");
++          console.error("Error: use reopen-design --by <name> before leaving an approved or implementing lifecycle; that is the PO's own step, in the PO's own terminal (preview it with --dry-run). A Spec correction during implementation needs no reopen: use a Spec addendum (ADR-0095).");
+           return 2;
+         }
+         console.log('Phase already "design"; zero-write replay accepted.');
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+index 52dab4a6156dc35493c9add7865fc4eafc2dced4..37ac1b6b85c184e4996323de710a9dc4ff9f88a2 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/happy-path.md
+@@ -53,6 +53,8 @@ The acceptance question of the one-shot close ends with ONE fixed yes form (`yes
+    wait for a signature without it (live 2026-11-10: the PO had to ask where the command was). **For a draft package this one signature is the seal:** the approval writes the PRD and Spec digests into the State in the
+    same transaction. A project bound before this change (`bound-unapproved`) stays locked until its approval; `pipeline-state.mjs reopen-design --by <name>` is executable in
+    every state (it voids a prepared seal plan, unlocks a bound package, releases a sealed one); the refusals about a draft or a bound package name it as an exit.
++   It is the PO's own step, run in the PO's own terminal: the guard refuses it from an agent (`PO-REOPEN-HUMAN-ONLY`) and admits only the preview
++   `reopen-design --by <name> --dry-run`. A correction of the approved Spec during implementation needs no reopen: it is a Spec addendum with one PO approval (ADR-0095).
+ 6. `register-feature-package.mjs --root <root>` (agent). It prints `commitPaths`: commit them BEFORE the binding is generated. After registration do not edit
+    the PRD, Spec, `acceptance.md`, `result.md` or the envelope. Owner: `references/implementation-continuation.md`.
+    When the push gate is configured `approval: required`, also run `pipeline-state.mjs materialize-push-threat-model` now (agent, no flags; it refuses

@@ -1,0 +1,93 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+index 67af061dd4b6468fdb6f2eefbb4ef81bcdffd224..c8e7e02b23f9cee814e2b23e908a232b13536b3f 100644
+--- a/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
++++ b/plugins/pipeline-core/lib/onboarding-consent-scope.mjs
+@@ -61,6 +61,14 @@ export const ONBOARDING_CONSENT_COVERED_STEPS = Object.freeze([
+       { script: "refresh-mandatory-hooks.mjs", verbs: null },
+     ]),
+   }),
++  // C28e (PO tiles 2026-11-12): the required tools are part of the first install. The agent checks them and shows the route; the person installs
++  // in their own terminal or defers, and only the deferral record is a covered action (an old record without this id simply does not cover it).
++  Object.freeze({
++    id: "toolchain",
++    en: "check the tools the Pipeline needs on this machine (Node.js, Git, gitleaks, osv-scanner, semgrep; OpenSSL where you sign) and, for a missing one, show you its install route to run together or record that you install it later",
++    de: "die Werkzeuge prüfen, die die Pipeline auf diesem Rechner braucht (Node.js, Git, gitleaks, osv-scanner, semgrep; OpenSSL dort, wo Sie signieren), und Ihnen für ein fehlendes den Installationsweg zeigen, den wir gemeinsam gehen, oder festhalten, dass Sie es später installieren",
++    routes: Object.freeze([{ script: "toolchain-defer.mjs", verbs: null }]),
++  }),
+   Object.freeze({
+     id: "onboarding-commits",
+     en: "make the onboarding commits",
+diff --git a/plugins/pipeline-core/lib/toolchain-registry.test.mjs b/plugins/pipeline-core/lib/toolchain-registry.test.mjs
+index e5a193835dcd4a49fefe49358b1cec3a6879814d..6805f7931f2d05e0dfdc2251a535057697122515 100644
+--- a/plugins/pipeline-core/lib/toolchain-registry.test.mjs
++++ b/plugins/pipeline-core/lib/toolchain-registry.test.mjs
+@@ -13,6 +13,7 @@ import { FIXED_TOOLS, ENVIRONMENT_FINDING_IDS, runEnvironmentReadinessReport } f
+ import { buildHandle } from "../scripts/tool-identity.mjs";
+ import { scannerEntryReadiness } from "./security-close-status.mjs";
+ import { runToolchainDefer } from "../scripts/toolchain-defer.mjs";
++import { ONBOARDING_CONSENT_COVERED_STEPS, coveringStepForArgv, onboardingConsentQuestion } from "./onboarding-consent-scope.mjs";
+ 
+ const home = () => mkdtempSync(join(tmpdir(), "toolchain-registry-"));
+ const deps = (dir) => ({ homedirFn: () => dir, realpathSyncFn: (path) => path, now: () => new Date("2026-11-12T20:00:00.000Z") });
+@@ -126,6 +127,18 @@ test("a deferred scanner stays attended: the finding names its class, its docume
+   } finally { rmSync(dir, { recursive: true, force: true }); }
+ });
+ 
++test("the onboarding consent names every required tool, and only the deferral record is a covered action", () => {
++  const step = ONBOARDING_CONSENT_COVERED_STEPS.find((entry) => entry.id === "toolchain");
++  assert.ok(step, "the consent lists the tool check");
++  const names = { node: "Node.js", git: "Git", openssl: "OpenSSL" };
++  for (const entry of TOOLCHAIN_REGISTRY.filter((candidate) => ["required", "required-to-sign"].includes(candidate.class))) {
++    for (const language of ["en", "de"]) assert.ok(step[language].includes(names[entry.id] ?? entry.id), `${language}: ${entry.id}`);
++  }
++  assert.equal(coveringStepForArgv(["toolchain-defer.mjs", "--tool", "semgrep"])?.id, "toolchain");
++  assert.equal(coveringStepForArgv(["toolchain-preflight.mjs", "--repair", "git-hooks"]), null, "no installer or other script is covered by it");
++  for (const language of ["en", "de"]) assert.ok(onboardingConsentQuestion({ language }).text.length <= 2600, language);
++});
++
+ test("a scanner the check could not observe (a sandbox) asks for no install", async () => {
+   const dir = home();
+   try {
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 1cae32eed4a4fe92d649498a96277fb264d4fcc2..49710cf315f0511b21608e0ed6194a1d00fe283d 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -223,7 +223,7 @@ Load each reference only at its stated condition. A new-session model readback
+ and a ready architecture readback each load their matching reference at that
+ step; later implementation or Critic work loads its reference when reached:
+ 
+-- `references/onboarding-recovery.md` for a non-ready status, the consent scope, restart, kickoff, handoff, host boundary, copy commands;
++- `references/onboarding-recovery.md` for a non-ready status, the consent scope, an open required-tool finding, restart, kickoff, handoff, host boundary, copy commands;
+ - `references/local-plugin-attestation.md` for Claude/Antigravity `plugin-attestation-required` with no action;
+ - `references/model-role-codex-claude.md` / `references/model-role-antigravity.md` for that runner's model readback;
+ - `references/scratch-and-directory.md` for temporary-file cleanup, ignored evidence, a new durable directory;
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+index 40541e89483f9b6586a8336f133c44ae786769d2..2582480bfc1a1c9e2c237ea92f727de56823095a 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+@@ -53,6 +53,25 @@ you will wait for a yes. Never volunteer whether the Pipeline fits the task;
+ that call is the human's — if asked, state cost/benefit neutrally, not a
+ recommendation.
+ 
++## Required tools: install together, or record a deferral
++
++`docs/toolchain.md` of the plugin (generated from `lib/toolchain-registry.mjs`)
++lists every tool the Pipeline needs. After the consent is recorded, and at a
++later start while one is still open, read the `scanner-*` findings of
++`environmentReadiness` whose `repair.toolClass` is `required` (and
++`signing-toolchain` on the machine where the PO signs). For each open one that
++is not `repair.deferred`, show the human the tool, its purpose and the route for
++their platform from the section `repair.installDoc` names, and ask once: install
++now, or later. **Install now:** the human runs the route in their own terminal
++(in Claude with the `!` prefix); you never run an installer and never use `sudo`.
++Then rerun the readiness report. **Later:** run
++`node <plugin-root>/scripts/toolchain-defer.mjs --tool <id> --answer "<their answer, word for word>"`
++and tell them what stays blocked: a project calibrated critical refuses the
++missing scanner at plan approval and at the close. A deferral is never a pass,
++so a deferred finding is not asked about again but stays named. A finding of
++status `unknown` (the check could not look, for example from a sandbox) is no
++reason to install anything: rerun the report in the human's own terminal.
++
+ ## Host boundary and copy commands for a human
+ 
+ Treat

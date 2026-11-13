@@ -1,0 +1,106 @@
+diff --git a/docs/adr/0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md b/docs/adr/0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md
+index 874a154c889e43e7850cbdb33d34d1b8828b22c6..545ee1e4dbf5aa100e124d35e95de670f0bdf76a 100644
+--- a/docs/adr/0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md
++++ b/docs/adr/0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md
+@@ -43,4 +43,4 @@ Known limits:
+ 
+ ## Affected contracts
+ 
+-ADR-0091 (the close's SBOM) and the close-commit split share the feature-range definition. The Semgrep rule pack of candidate 28e, which makes the severe classes blocking, is a separate decision.
++ADR-0091 (the close's SBOM) and the close-commit split share the feature-range definition. The Semgrep rule pack of candidate 28e, which makes the severe classes blocking, is a separate decision (ADR-0094).
+diff --git a/docs/adr/0094-the-semgrep-default-pack-blocks-the-severe-classes-in-eight-languages.md b/docs/adr/0094-the-semgrep-default-pack-blocks-the-severe-classes-in-eight-languages.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..0851a4f294e4ed9ac11327d1f01ef2320d9d4081
+--- /dev/null
++++ b/docs/adr/0094-the-semgrep-default-pack-blocks-the-severe-classes-in-eight-languages.md
+@@ -0,0 +1,53 @@
++# ADR-0094: The Semgrep default pack blocks the severe classes in eight languages
++
++> Agent-Pipeline · Sprint Alfred · 2026-11-12
++
++**Status:** accepted (2026-11-12, PO tile, register D244). Built in candidate 28e. Not yet run on a real Java, .NET, Python, Go, PHP, Ruby or Kotlin code base.
++
++**Context source (PO tile, 2026-11-12):** the PO chose the recommended option for the shallow scanner configuration: an own offline Semgrep rule pack for Java, C#, Go, Python, PHP, Ruby, Kotlin and JavaScript/TypeScript (SQL and command injection, path traversal, deserialization, weak cryptography, disabled TLS verification, SSRF, XXE), the severe classes at ERROR so they block, each rule with a test that fires and one that stays quiet. A second tile (ADR-0093) limits the block to what the feature introduced.
++
++## Context
++
++The default pack (`plugins/pipeline-core/security/semgrep/pipeline.yml`) had eleven rules, nine of them for JavaScript/TypeScript; only the two secret rules (PEM private key, provider-shaped secret) were ERROR. Under `security.thresholds.block_on` (default critical and high; Semgrep ERROR maps to high) no code finding in any language could ever block a close. The consumer stacks the Pipeline governs (Java and .NET bank teams among them) got no code check at all.
++
++The pack runs offline (`--metrics=off`, no registry rules), so every rule is written and pinned in this repository.
++
++## Decision
++
++1. **Rule ids are `pipeline-<language>-<class>`.** Languages: `java`, `csharp`, `python`, `go`, `js` (JavaScript and TypeScript), `kotlin`, `php`, `ruby`. The eleven older rules keep their ids and severities.
++2. **Class and severity:**
++
++   | Class | Severity | Blocks under the default `block_on` |
++   |---|---|---|
++   | `sql-injection` | ERROR | yes |
++   | `command-injection` | ERROR | yes |
++   | `insecure-deserialization` | ERROR | yes |
++   | `tls-verification-disabled` | ERROR | yes |
++   | `xxe` | ERROR | yes |
++   | `path-traversal` | ERROR | yes |
++   | `ssrf` | ERROR | yes |
++   | `weak-crypto` | WARNING | no (listed) |
++
++   Not shipped: Go deserialization and XXE (the standard library has no unsafe default to match), JavaScript command injection (the existing `pipeline-default-child-process-shell-string` stays WARNING). 61 new rules, 72 in the file.
++3. **Two rule shapes.** SQL and command injection match the shape of the call itself: a query call whose SQL text is concatenated or formatted from a non-literal value, a shell started with a non-literal command line; they need no request source, so a value from anywhere counts. Path traversal and SSRF are taint rules from a request source (framework parameter, query, body, header) to the sink, because building paths and URLs from configuration is ordinary; their sources skip parameters that cannot carry a path or a host name (numbers, flags, UUID/Guid, dates, `CancellationToken`). The other classes match an unsafe API or setting directly.
++4. **Path traversal fires at the file access, not where a path is built,** and a containment check cleans the value: the normalized or real path tested with `startsWith`/`StartsWith`/`HasPrefix`/`start_with?`/`is_relative_to`/`commonpath`. In PHP a value used after an `if` whose condition tests it counts as checked, because Semgrep's side-effect sanitizer fails on `$real === false || !str_starts_with(...)`.
++5. **Hardening counts where it is written:** XXE and Java deserialization rules accept hardening in the same method or constructor (feature flags, `ACCESS_EXTERNAL_DTD ""`, `IS_SUPPORTING_EXTERNAL_ENTITIES` false, an `ObjectInputFilter`).
++6. **Test code is not gated.** Each new ERROR rule excludes test-shaped paths: the directories `test/`, `tests/`, `spec/`, `__tests__/`, `*.Tests/`, `*.UnitTests/` and the file names `*Test`/`*Tests`/`*IT` (Java, Kotlin, C#, PHP), `*_test.go`, `test_*.py`, `*_test.py`, `*_spec.rb`, `*_test.rb`, `*.test.*`, `*.spec.*`. Semgrep itself already skips `test/`, `tests/` and `*_test.go`; the rest is excluded only by the pack. Excludes anchor to the scanned root, so a project that itself lives under a `tests/` directory keeps every rule. `weak-crypto` has no exclude.
++7. **Proof per rule:** `config/security/semgrep-pack-fixtures/<language>/hits.*` must make every rule fire at its class's severity, `quiet.*` must stay silent (it carries the false-positive probes: containment checks, typed ids, hardened parsers, HTTP client options in plain arrays), and test-shaped copies must give no ERROR finding while weak-crypto proves they were scanned (`semgrep-default-rules.test.mjs`). `semgrep-baseline.test.mjs` runs the real close chain with the shipped pack.
++
++## Consequences
++
++A feature that adds a string-built query, a shell call with request input, an unchecked file access, an outgoing request to a request-supplied URL, a parser without XXE hardening, unsafe deserialization or a disabled certificate check now stops its close in any of the eight languages. With ADR-0093 only the findings the feature introduced block; older ones are listed.
++
++Known limits:
++
++- **The false-positive rate on real code is unmeasured.** The pack was tuned on fixtures and on this repository (4,566 files, mostly JavaScript; three `pipeline-js-weak-crypto` findings for the SHA-1 WebSocket accept key that RFC 6455 requires). The first rate on Java, .NET or Python code comes from a consumer or greenfield run.
++- Taint is intraprocedural (OSS Semgrep): a source in one method and the sink in another is not followed, and a containment check in a helper method is not seen.
++- The evidence names at most the first 50 rule ids of the pack (`MAX_RULE_IDS` in `security-scan.mjs`) and the count; the printed line says `(+22 more)`. The pack's digest binds the whole file.
++- Scanning this repository takes 26.8 s instead of 23.0 s.
++- A secret found by the two older Semgrep ERROR rules that predates the feature no longer blocks through Semgrep (ADR-0093); gitleaks still blocks it.
++- Semgrep OSS 1.170 on Linux (WSL2) only; not run on native Windows.
++
++## Affected contracts
++
++ADR-0093 (only feature-introduced Semgrep findings block). ADR-0092 (semgrep is a required tool). The evidence envelope and the `block_on` mapping are unchanged.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index 494c8b0870a9e354f10f10e8a23dc30d0758391b..d28edd8c7a09f9028cd8353b5cd187d235ec22ea 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -100,6 +100,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required
+ | [0091](0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) | The software bill of materials is part of every feature close | accepted | 2026-11-11 |
+ | [0092](0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md) | The tools the Pipeline needs are one registry, asked for at onboarding | accepted | 2026-11-12 |
+ | [0093](0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md) | A Semgrep finding blocks only when the feature introduced it | accepted | 2026-11-12 |
++| [0094](0094-the-semgrep-default-pack-blocks-the-severe-classes-in-eight-languages.md) | The Semgrep default pack blocks the severe classes in eight languages | accepted | 2026-11-12 |
+ | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
+ | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
+ | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
+diff --git a/docs/state.md b/docs/state.md
+index c59cabd0db44b3dda9e5ce2f7e22c6459e1dcd61..ad6c67e94ec4157f2d849c5cd8c3810dbdcc61ba 100644
+--- a/docs/state.md
++++ b/docs/state.md
+@@ -26,7 +26,7 @@ candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans
+ **[ADR-0089](adr/0089-project-routing-is-user-owned.md) accepted 2026-11-10 (PO tile, D234):** a project's `pipeline.user.yaml` owns its model and effort routing. Built in candidate 23; a live dispatch on a changed route is still unobserved.
+ **[ADR-0090](adr/0090-evidence-follows-every-push-and-a-release-includes-its-push.md) accepted 2026-11-10 (PO tiles, D237 to D239):** the close exports the Critic reports, one follow-up commit carries the proof and the final records after any signed push, and a release includes its push. Built in candidate 27; never run on a real repository or a real signature.
+ **[ADR-0091](adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md) accepted 2026-11-11 (PO tiles, D240):** the feature close checks or writes the SBOM (CycloneDX 1.6 and SPDX 2.3 from pinned lockfiles, or an explicit `not-applicable`) and the audit bundle carries it; `stale`, `invalid`, `partial` and `unsupported` stop the close unless the PO's signed override for exactly those findings is recorded. Built in candidate 28c for npm, Python, Go and Rust; the amendment of 2026-11-12 (PO tiles) adds the other common lockfiles and Maven by pom plus CycloneDX in candidate 28d. Never run on a real repository. Candidate 28e corrects the readers after the Advisor review and adds `packages.config` (PO tile 2026-11-12, D243).
+-**[ADR-0092](adr/0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md) accepted 2026-11-12 (PO tiles, D241):** one tool registry feeds `docs/toolchain.md`, the preflight floors and the readiness findings; required on every machine: Node.js, Git, gitleaks, osv-scanner, semgrep (Trivy only with infrastructure files, with its adapter), OpenSSL where the PO signs; onboarding asks for a missing one, the person installs it or defers it, the deferral is recorded on the machine and lifts no check. Built in candidate 28e, never run in a real onboarding. **[ADR-0093](adr/0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md) accepted 2026-11-12 (PO tile, D242):** a Semgrep finding at a blocking severity blocks only when the feature introduced it (a second `--baseline-commit` pass against the start of the active or last closed feature's range, in its own worktree); older findings are listed, not blocking; any doubt falls back to blocking everything, labelled. Built in candidate 28e, never run on a consumer repository.
++**[ADR-0092](adr/0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md) accepted 2026-11-12 (PO tiles, D241):** one tool registry feeds `docs/toolchain.md`, the preflight floors and the readiness findings; required on every machine: Node.js, Git, gitleaks, osv-scanner, semgrep (Trivy only with infrastructure files, with its adapter), OpenSSL where the PO signs; onboarding asks for a missing one, the person installs it or defers it, the deferral is recorded on the machine and lifts no check. Built in candidate 28e, never run in a real onboarding. **[ADR-0093](adr/0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md) accepted 2026-11-12 (PO tile, D242):** a Semgrep finding at a blocking severity blocks only when the feature introduced it (a second `--baseline-commit` pass against the start of the active or last closed feature's range, in its own worktree); older findings are listed, not blocking; any doubt falls back to blocking everything, labelled. Built in candidate 28e, never run on a consumer repository. **[ADR-0094](adr/0094-the-semgrep-default-pack-blocks-the-severe-classes-in-eight-languages.md) accepted 2026-11-12 (PO tile, D244):** the offline Semgrep default pack gains 61 `pipeline-<language>-<class>` rules for Java, C#, Python, Go, JavaScript/TypeScript, Kotlin, PHP and Ruby; SQL and command injection, insecure deserialization, disabled TLS verification, XXE, path traversal and SSRF are ERROR and block, weak cryptography is WARNING; test-shaped paths are excluded, each rule has a firing and a quiet fixture. Built in candidate 28e; the false-positive rate on real Java/.NET code is unmeasured.
+ Candidate 18/19 verification (Full Verify 5 and 6): moved verbatim to the [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) end.
+ **Candidate 20** (all greenfield blocker/major findings, clone w252) applied and stamped 2026-11-07; Full Verify fv20 26 red; Critic, macOS, agy M4c and PO acceptance pending. Detail: [candidate 19 plan](../specs/sprint-alfred-epic/plans/candidate-19-plan-2026-11-02.md) (candidate 20 section).
+ **Candidate 20b built 2026-11-08** (PO: one clean candidate with every finding): 26 held patches in `specs/sprint-alfred-epic/evidence/held-patches/c20b-chain/` (`po-apply-0.7-candidate20b.sh`), rehearsed clean; G20-46..52, G20-54 (a registered package moves approved -> implementing at set-phase), G20-55 (the close commit may stage exactly the bound closed-continuity bytes), G20-57, G20-53 (the stale-receipt repair text and the clone provisioning readback name the agent route first), G20-58 (rebind-approval outlives a model-routing-only change of the PO profile source), G20-59 (a module dispatch must carry the module's slice id), the fv20 reds, kernel closure. Applied (e9864cb29), stamped (5d863287a) and installed 2026-11-08.
+diff --git a/governance/observation-doc-governance.json b/governance/observation-doc-governance.json
+index 282ec59b823f0293fdb1b56c89e2c1e8ec806bd9..a5ff93bbc677f6e697748523a6f93618b2e8ecf7 100644
+--- a/governance/observation-doc-governance.json
++++ b/governance/observation-doc-governance.json
+@@ -294,6 +294,7 @@
+           "docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md",
+           "docs/adr/0092-the-tools-the-pipeline-needs-are-one-registry-asked-for-at-onboarding.md",
+           "docs/adr/0093-a-semgrep-finding-blocks-only-when-the-feature-introduced-it.md",
++          "docs/adr/0094-the-semgrep-default-pack-blocks-the-severe-classes-in-eight-languages.md",
+           "docs/adr/README.md"
+         ]
+       },

@@ -1,0 +1,2977 @@
+diff --git a/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs b/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
+index 27bb6a75b75770410b69bf6a80ff17ff7159a3df..d2ca8ede06003f032cbac8c58e1e0aebe69a58cf 100644
+--- a/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
++++ b/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
+@@ -13,7 +13,7 @@
+  * Run:   node plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
+  * Exit:  0 = every case passed or was honestly skipped, 1 = a real semgrep run disagreed.
+  */
+-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import { spawnSync } from "node:child_process";
+@@ -81,13 +81,30 @@ const FIXTURES = [
+   { rule: "pipeline-default-hardcoded-credential-assignment", name: "environment reads and placeholders", fires: false, code: "const password = process.env.DB_PASSWORD;\nconst apiKey = '<your-api-key>';\nconst token = '';" },
+ ];
+ 
++// C28e (ADR-0094): the per-language pack. Its ids are read from the YAML, never listed twice; the expected inventory below is the class table of
++// ADR-0094 (Go has no deserialization or XXE rule, JS/TS keeps its command rule in the web/Node pack). The fixtures live in semgrep-pack-fixtures/
++// as <lang>/hits.<ext> (every rule of the language fires) and <lang>/quiet.<ext> (one look-alike per class, nothing fires); they are copied into
++// a temporary directory before the scan so the repository path never meets a rule's test-path exclude.
++const FIXTURE_DIR = fileURLToPath(new URL("./semgrep-pack-fixtures/", import.meta.url));
++const LANG_EXT = { java: "java", csharp: "cs", kotlin: "kt", python: "py", go: "go", js: "ts", php: "php", ruby: "rb" };
++const PACK_CLASSES = ["sql-injection", "command-injection", "insecure-deserialization", "tls-verification-disabled", "xxe", "path-traversal", "ssrf", "weak-crypto"];
++const NOT_SHIPPED = { go: ["insecure-deserialization", "xxe"], js: ["command-injection"] };
++const WARNING_CLASSES = new Set(["weak-crypto"]);
++const LANG_ID = /^pipeline-(java|csharp|kotlin|python|go|js|php|ruby)-(.+)$/u;
++const expectedLangIds = Object.keys(LANG_EXT)
++  .flatMap((lang) => PACK_CLASSES.filter((cls) => !(NOT_SHIPPED[lang] ?? []).includes(cls)).map((cls) => `pipeline-${lang}-${cls}`));
++
+ const binary = findSemgrep();
+ record("semgrep-default-rules.yml exists on disk", existsSync(RULES_PATH), RULES_PATH);
++const rulesText = existsSync(RULES_PATH) ? readFileSync(RULES_PATH, "utf8") : "";
++const langIds = [...rulesText.matchAll(/^\s*-\s+id:\s*(\S+)/gmu)].map((m) => m[1]).filter((id) => LANG_ID.test(id));
+ {
+-  const rulesText = existsSync(RULES_PATH) ? readFileSync(RULES_PATH, "utf8") : "";
+   const listed = new Set([...rulesText.matchAll(/^\s*-\s+id:\s*(\S+)/gmu)].map((m) => m[1]));
+   record("default pack lists both original rules and every new rule id (no semgrep binary needed)", ["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval", ...NEW_RULES].every((id) => listed.has(id)), `missing: ${JSON.stringify(["pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval", ...NEW_RULES].filter((id) => !listed.has(id)))}`);
+   record("default pack: every new rule has at least one positive and one negative fixture", NEW_RULES.every((id) => FIXTURES.some((f) => f.rule === id && f.fires) && FIXTURES.some((f) => f.rule === id && !f.fires)), "fixture table incomplete");
++  record("language pack: the YAML carries exactly the class table of ADR-0094 (no semgrep binary needed)", JSON.stringify([...langIds].sort()) === JSON.stringify([...expectedLangIds].sort()), `missing ${JSON.stringify(expectedLangIds.filter((id) => !langIds.includes(id)))}, extra ${JSON.stringify(langIds.filter((id) => !expectedLangIds.includes(id)))}`);
++  const missingFixtures = Object.entries(LANG_EXT).flatMap(([lang, ext]) => [`${lang}/hits.${ext}`, `${lang}/quiet.${ext}`]).filter((rel) => !existsSync(join(FIXTURE_DIR, rel)));
++  record("language pack: every language has a firing and a quiet fixture file", missingFixtures.length === 0, `missing: ${JSON.stringify(missingFixtures)}`);
+ }
+ 
+ if (!binary) {
+@@ -159,6 +176,53 @@ if (!binary) {
+     record(`default pack: ${fixture.rule} ${fixture.fires ? "fires on" : "stays quiet on"} ${fixture.name}`, fired === fixture.fires, `fired: ${JSON.stringify([...firedIn(index)])}`);
+   });
+ 
++  // Case 4 (C28e, ADR-0094): the per-language pack. All 16 fixture files in ONE semgrep spawn. Every rule fires in its language's hits file with the
++  // severity of the class table (weak-crypto WARNING, every other class ERROR), and no language rule fires in any quiet file.
++  const langDir = join(scratch, "lang");
++  for (const [lang, ext] of Object.entries(LANG_EXT)) {
++    mkdirSync(join(langDir, lang), { recursive: true });
++    for (const kind of ["hits", "quiet"]) copyFileSync(join(FIXTURE_DIR, lang, `${kind}.${ext}`), join(langDir, lang, `${kind}.${ext}`));
++  }
++  const langRun = spawnSync(binary, ["scan", "--json", "--config", RULES_PATH, langDir], { encoding: "utf8", env, shell: false, maxBuffer: 64 * 1024 * 1024 });
++  let langParsed = null;
++  try { langParsed = JSON.parse(langRun.stdout ?? ""); } catch { /* asserted below */ }
++  record("language pack: the fixture directory scans to parseable JSON with no error payload", langParsed !== null && (langParsed.errors ?? []).length === 0, `${langRun.stderr?.slice(0, 300)} ${JSON.stringify(langParsed?.errors)?.slice(0, 300)}`);
++  const langResults = (langParsed?.results ?? []).map((r) => ({ rule: r.check_id.split(".").pop(), file: r.path.split(/[\\/]/u).slice(-2).join("/"), severity: r.extra?.severity }));
++  for (const id of langIds) {
++    const [, lang, cls] = LANG_ID.exec(id);
++    const hitsFile = `${lang}/hits.${LANG_EXT[lang]}`;
++    const fired = langResults.filter((r) => r.rule === id && r.file === hitsFile);
++    const expectedSeverity = WARNING_CLASSES.has(cls) ? "WARNING" : "ERROR";
++    record(`language pack: ${id} fires on ${hitsFile} as ${expectedSeverity}`, fired.length > 0 && fired.every((r) => r.severity === expectedSeverity), JSON.stringify(fired));
++    const quiet = langResults.filter((r) => r.rule === id && r.file.endsWith(`/quiet.${LANG_EXT[lang]}`));
++    record(`language pack: ${id} stays quiet on ${lang}/quiet.${LANG_EXT[lang]}`, quiet.length === 0, JSON.stringify(quiet));
++  }
++  const quietAny = langResults.filter((r) => LANG_ID.test(r.rule) && /\/quiet\./u.test(`/${r.file}`));
++  record("language pack: no language rule fires on any quiet file", quietAny.length === 0, JSON.stringify(quietAny));
++
++  // Case 5 (C28e): test code is excluded from the ERROR rules. The same firing fixtures under test-shaped names produce no ERROR finding of the
++  // language pack; weak-crypto (WARNING, no exclude) may still appear and blocks nothing.
++  const exclDir = join(scratch, "excluded");
++  const exclCopies = [
++    ["java", "hits.java", join("src", "main", "OrderServiceTest.java")],
++    ["csharp", "hits.cs", join("Orders.Tests", "OrdersControllerTests.cs")],
++    ["go", "hits.go", join("orders", "orders_test.go")],
++    ["python", "hits.py", join("app", "test_orders.py")],
++    ["js", "hits.ts", join("web", "orders.spec.ts")],
++    ["ruby", "hits.rb", join("spec", "orders_spec.rb")],
++    ["php", "hits.php", join("app", "OrdersTest.php")],
++    ["kotlin", "hits.kt", join("src", "main", "OrderServiceTest.kt")],
++  ];
++  for (const [lang, file, target] of exclCopies) {
++    mkdirSync(dirname(join(exclDir, target)), { recursive: true });
++    copyFileSync(join(FIXTURE_DIR, lang, file), join(exclDir, target));
++  }
++  const exclRun = spawnSync(binary, ["scan", "--json", "--config", RULES_PATH, exclDir], { encoding: "utf8", env, shell: false, maxBuffer: 64 * 1024 * 1024 });
++  let exclParsed = null;
++  try { exclParsed = JSON.parse(exclRun.stdout ?? ""); } catch { /* asserted below */ }
++  const exclErrors = (exclParsed?.results ?? []).filter((r) => LANG_ID.test(r.check_id.split(".").pop()) && r.extra?.severity === "ERROR");
++  record("language pack: test-shaped paths carry no ERROR finding of the language pack", exclParsed !== null && exclErrors.length === 0, JSON.stringify(exclErrors.map((r) => `${r.path}:${r.start?.line} ${r.check_id.split(".").pop()}`)));
++
+   try { rmSync(scratch, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
+ }
+ 
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/README.md b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..245233cdfa7fa04b3ac96921aba70dda4a3f3c22
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/README.md
+@@ -0,0 +1,10 @@
++# Semgrep pack fixtures (candidate 28e, ADR-0094)
++
++Fixtures for `../semgrep-default-rules.test.mjs`. They are scanned by that test only, after it copies them into a temporary
++directory; they are never built or run.
++
++- `<lang>/hits.<ext>`: every `pipeline-<lang>-*` rule of `security/semgrep/pipeline.yml` must fire here at least once.
++- `<lang>/quiet.<ext>`: the look-alike of every class (bound parameters, a fixed command, a safe parser setting, a sanitized
++  path, a URL with a fixed host, a strong hash). No `pipeline-<lang>-*` rule may fire here.
++
++The code is deliberately vulnerable in `hits.*`. Do not copy it anywhere else.
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/csharp/hits.cs b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/csharp/hits.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..11cccc76a028c89f619edb9020703a045a3d2827
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/csharp/hits.cs
+@@ -0,0 +1,82 @@
++using System;
++using System.Data.SqlClient;
++using System.Diagnostics;
++using System.IO;
++using System.Net.Http;
++using System.Runtime.Serialization.Formatters.Binary;
++using System.Security.Cryptography;
++using System.Xml;
++using Microsoft.AspNetCore.Mvc;
++using Microsoft.EntityFrameworkCore;
++using Newtonsoft.Json;
++
++namespace Demo
++{
++    public class OrdersController : ControllerBase
++    {
++        private readonly SqlConnection _conn;
++        private readonly AppDb _db;
++        private readonly HttpClient _http;
++
++        public IActionResult Find(string name)
++        {
++            var cmd = new SqlCommand($"SELECT * FROM Orders WHERE Name = '{name}'", _conn);
++            return Ok(cmd.ExecuteScalar());
++        }
++
++        public IActionResult Remove(string id)
++        {
++            var sql = "DELETE FROM Orders WHERE Id = " + id;
++            _db.Database.ExecuteSqlRaw(sql);
++            return Ok();
++        }
++
++        public IActionResult Ping(string host)
++        {
++            Process.Start("cmd.exe", "/c ping " + host);
++            return Ok();
++        }
++
++        public object Load(Stream body)
++        {
++            var formatter = new BinaryFormatter();
++            return formatter.Deserialize(body);
++        }
++
++        public JsonSerializerSettings Settings()
++        {
++            return new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.All };
++        }
++
++        public HttpClientHandler Handler()
++        {
++            var handler = new HttpClientHandler();
++            handler.ServerCertificateCustomValidationCallback = (msg, cert, chain, errors) => true;
++            return handler;
++        }
++
++        public XmlReaderSettings Xml()
++        {
++            var settings = new XmlReaderSettings();
++            settings.DtdProcessing = DtdProcessing.Parse;
++            return settings;
++        }
++
++        public IActionResult Download(string fileName)
++        {
++            var bytes = System.IO.File.ReadAllBytes(Path.Combine("/srv/files", fileName));
++            return File(bytes, "application/octet-stream");
++        }
++
++        public async System.Threading.Tasks.Task<string> Proxy(string url)
++        {
++            return await _http.GetStringAsync(url);
++        }
++
++        public byte[] Hash(byte[] data)
++        {
++            using var md5 = MD5.Create();
++            return md5.ComputeHash(data);
++        }
++    }
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/csharp/quiet.cs b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/csharp/quiet.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..91cc4482c8ad579ea37dc5cbf75c026b06de8190
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/csharp/quiet.cs
+@@ -0,0 +1,72 @@
++using System;
++using System.Data.SqlClient;
++using System.Diagnostics;
++using System.IO;
++using System.Net.Http;
++using System.Security.Cryptography;
++using System.Text.Json;
++using System.Xml;
++using Microsoft.AspNetCore.Mvc;
++using Microsoft.EntityFrameworkCore;
++
++namespace Demo
++{
++    public class CatalogController : ControllerBase
++    {
++        private readonly SqlConnection _conn;
++        private readonly AppDb _db;
++        private readonly HttpClient _http;
++
++        public IActionResult Find(string name)
++        {
++            var cmd = new SqlCommand("SELECT * FROM Orders WHERE Name = @name", _conn);
++            cmd.Parameters.AddWithValue("@name", name);
++            return Ok(cmd.ExecuteScalar());
++        }
++
++        public IActionResult Remove(int id)
++        {
++            _db.Database.ExecuteSql($"DELETE FROM Orders WHERE Id = {id}");
++            return Ok();
++        }
++
++        public IActionResult Greeting(string name)
++        {
++            var text = $"Select your product, {name}";
++            return Ok(text);
++        }
++
++        public IActionResult Build()
++        {
++            Process.Start("dotnet", "build --configuration Release");
++            Process.Start("cmd.exe", "/c dir");
++            return Ok();
++        }
++
++        public T Load<T>(Stream body)
++        {
++            return JsonSerializer.Deserialize<T>(body);
++        }
++
++        public XmlReaderSettings Xml()
++        {
++            return new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null };
++        }
++
++        public IActionResult Download(string fileName)
++        {
++            var bytes = System.IO.File.ReadAllBytes(Path.Combine("/srv/files", Path.GetFileName(fileName)));
++            return File(bytes, "application/octet-stream");
++        }
++
++        public async System.Threading.Tasks.Task<string> Item(int id)
++        {
++            return await _http.GetStringAsync($"https://api.internal.example/items/{id}");
++        }
++
++        public byte[] Hash(byte[] data)
++        {
++            return SHA256.HashData(data);
++        }
++    }
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/go/hits.go b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/go/hits.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..c4f0dc04ceafd38010f5a228d87c85297f13825a
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/go/hits.go
+@@ -0,0 +1,52 @@
++package demo
++
++import (
++	"crypto/md5"
++	"crypto/tls"
++	"database/sql"
++	"fmt"
++	"net/http"
++	"os"
++	"os/exec"
++	"path/filepath"
++
++	"github.com/gin-gonic/gin"
++)
++
++func FindUser(db *sql.DB, name string) (*sql.Rows, error) {
++	return db.Query(fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", name))
++}
++
++func DeleteOrder(db *sql.DB, id string) error {
++	q := "DELETE FROM orders WHERE id = " + id
++	_, err := db.Exec(q)
++	return err
++}
++
++func Ping(host string) error {
++	return exec.Command("sh", "-c", "ping -c 1 "+host).Run()
++}
++
++func Client() *http.Client {
++	return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
++}
++
++func ReadFile(w http.ResponseWriter, r *http.Request) {
++	name := r.URL.Query().Get("name")
++	data, _ := os.ReadFile(filepath.Join("/srv/files", name))
++	w.Write(data)
++}
++
++func Download(c *gin.Context) {
++	c.File(c.Query("path"))
++}
++
++func Proxy(w http.ResponseWriter, r *http.Request) {
++	target := r.FormValue("url")
++	resp, _ := http.Get(target)
++	defer resp.Body.Close()
++}
++
++func Digest(data []byte) [16]byte {
++	return md5.Sum(data)
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/go/quiet.go b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/go/quiet.go
+new file mode 100644
+index 0000000000000000000000000000000000000000..76fe88a311e06a39f4b2d11e9ac0095ff40d25ed
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/go/quiet.go
+@@ -0,0 +1,51 @@
++package demo
++
++import (
++	"crypto/sha256"
++	"crypto/tls"
++	"database/sql"
++	"fmt"
++	"net/http"
++	"os"
++	"os/exec"
++	"path/filepath"
++)
++
++func FindUser(db *sql.DB, name string) (*sql.Rows, error) {
++	return db.Query("SELECT * FROM users WHERE name = $1", name)
++}
++
++func Count(db *sql.DB) *sql.Row {
++	return db.QueryRow("SELECT count(*) FROM users " + "WHERE active")
++}
++
++func Greeting(name string) string {
++	return fmt.Sprintf("select a product, %s", name)
++}
++
++func Build() error {
++	if err := exec.Command("git", "status").Run(); err != nil {
++		return err
++	}
++	return exec.Command("sh", "-c", "make build").Run()
++}
++
++func Client() *http.Client {
++	return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12}}}
++}
++
++func ReadFile(w http.ResponseWriter, r *http.Request) {
++	name := filepath.Base(r.URL.Query().Get("name"))
++	data, _ := os.ReadFile(filepath.Join("/srv/files", name))
++	w.Write(data)
++}
++
++func Item(w http.ResponseWriter, r *http.Request) {
++	id := r.FormValue("id")
++	resp, _ := http.Get("https://api.internal.example/items/" + id)
++	defer resp.Body.Close()
++}
++
++func Digest(data []byte) [32]byte {
++	return sha256.Sum256(data)
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/java/hits.java b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/java/hits.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..89d78efb2df329d63487a2da9c2f49729f44783c
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/java/hits.java
+@@ -0,0 +1,81 @@
++package demo;
++
++import java.io.*;
++import java.net.*;
++import java.nio.file.*;
++import java.security.MessageDigest;
++import java.sql.*;
++import javax.crypto.Cipher;
++import javax.net.ssl.*;
++import javax.servlet.http.HttpServletRequest;
++import javax.xml.parsers.DocumentBuilderFactory;
++import org.springframework.web.bind.annotation.*;
++import org.springframework.web.client.RestTemplate;
++
++@RestController
++public class Hits {
++    Connection conn;
++    RestTemplate rest;
++
++    public ResultSet sqlDirect(String name) throws Exception {
++        Statement st = conn.createStatement();
++        return st.executeQuery("SELECT * FROM users WHERE name = '" + name + "'");
++    }
++
++    public ResultSet sqlViaVariable(String id) throws Exception {
++        String q = String.format("DELETE FROM orders WHERE id = %s", id);
++        return conn.createStatement().executeQuery(q);
++    }
++
++    public void shell(String host) throws Exception {
++        new ProcessBuilder("sh", "-c", "ping -c 1 " + host).start();
++        Runtime.getRuntime().exec("nslookup " + host);
++    }
++
++    public Object deserialize(InputStream in) throws Exception {
++        ObjectInputStream ois = new ObjectInputStream(in);
++        return ois.readObject();
++    }
++
++    public HostnameVerifier trustAllHosts() {
++        return (h, s) -> true;
++    }
++
++    public void allHosts(HttpsURLConnection c) {
++        c.setHostnameVerifier((h, s) -> true);
++    }
++
++    public Object parse(InputStream in) throws Exception {
++        DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
++        return f.newDocumentBuilder().parse(in);
++    }
++
++    @GetMapping("/file")
++    public byte[] read(@RequestParam String name) throws Exception {
++        return Files.readAllBytes(Paths.get("/srv/files", name));
++    }
++
++    @GetMapping("/fetch")
++    public String fetch(@RequestParam("url") String target) {
++        return rest.getForObject(target, String.class);
++    }
++
++    public void servletFile(HttpServletRequest req) throws Exception {
++        String p = req.getParameter("path");
++        new FileInputStream(p).close();
++    }
++
++    public byte[] md5(byte[] data) throws Exception {
++        return MessageDigest.getInstance("MD5").digest(data);
++    }
++
++    public Cipher ecb() throws Exception {
++        return Cipher.getInstance("AES");
++    }
++}
++
++class TrustAll implements X509TrustManager {
++    public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
++    public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
++    public java.security.cert.X509Certificate[] getAcceptedIssuers() { return null; }
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/java/quiet.java b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/java/quiet.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..e7e460735bb2d92e14f4913a3f5db7b34fb4d2c1
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/java/quiet.java
+@@ -0,0 +1,63 @@
++package demo;
++
++import java.io.*;
++import java.net.*;
++import java.nio.file.*;
++import java.security.MessageDigest;
++import java.sql.*;
++import javax.crypto.Cipher;
++import javax.xml.XMLConstants;
++import javax.xml.parsers.DocumentBuilderFactory;
++import org.apache.commons.io.FilenameUtils;
++import org.springframework.web.bind.annotation.*;
++import org.springframework.web.client.RestTemplate;
++
++@RestController
++public class Quiet {
++    Connection conn;
++    RestTemplate rest;
++    static final String TABLE_QUERY = "SELECT id FROM users";
++
++    public ResultSet sqlBound(String name) throws Exception {
++        PreparedStatement ps = conn.prepareStatement("SELECT * FROM users WHERE name = ?");
++        ps.setString(1, name);
++        return ps.executeQuery();
++    }
++
++    public ResultSet sqlConstant() throws Exception {
++        return conn.createStatement().executeQuery("SELECT id FROM users " + "ORDER BY id");
++    }
++
++    public void logMessage(String name) {
++        System.out.println("select a user: " + name);
++    }
++
++    public void shellConstant() throws Exception {
++        new ProcessBuilder("sh", "-c", "ls -l /srv").start();
++        new ProcessBuilder("git", "status").start();
++    }
++
++    public Object parseSafe(InputStream in) throws Exception {
++        DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
++        f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
++        return f.newDocumentBuilder().parse(in);
++    }
++
++    @GetMapping("/file")
++    public byte[] read(@RequestParam String name) throws Exception {
++        return Files.readAllBytes(Paths.get("/srv/files", FilenameUtils.getName(name)));
++    }
++
++    @GetMapping("/fetch")
++    public String fetch(@RequestParam("id") String id) {
++        return rest.getForObject("https://api.internal.example/items/{id}", String.class, id);
++    }
++
++    public byte[] sha256(byte[] data) throws Exception {
++        return MessageDigest.getInstance("SHA-256").digest(data);
++    }
++
++    public Cipher gcm() throws Exception {
++        return Cipher.getInstance("AES/GCM/NoPadding");
++    }
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/js/hits.ts b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/js/hits.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..578e7e23df6c0bdfc52d996726fa3b1eead02e89
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/js/hits.ts
+@@ -0,0 +1,48 @@
++import crypto from "crypto";
++import fs from "fs";
++import https from "https";
++import axios from "axios";
++import express from "express";
++import libxmljs from "libxmljs";
++import serialize from "node-serialize";
++
++const app = express();
++const pool: any = {};
++
++export async function findUser(name: string) {
++  return pool.query(`SELECT * FROM users WHERE name = '${name}'`);
++}
++
++export async function deleteOrder(id: string) {
++  const sql = "DELETE FROM orders WHERE id = " + id;
++  return pool.query(sql);
++}
++
++export function load(body: string) {
++  return serialize.unserialize(body);
++}
++
++export const agent = new https.Agent({ rejectUnauthorized: false });
++
++export function parse(xml: string) {
++  return libxmljs.parseXml(xml, { noent: true });
++}
++
++app.get("/file", (req, res) => {
++  const name = req.query.name as string;
++  res.send(fs.readFileSync(`/srv/files/${name}`));
++});
++
++app.get("/download", (req, res) => {
++  res.sendFile(req.params.path);
++});
++
++app.get("/proxy", async (req, res) => {
++  const target = req.query.url as string;
++  const answer = await axios.get(target);
++  res.send(answer.data);
++});
++
++export function digest(data: string) {
++  return crypto.createHash("md5").update(data).digest("hex");
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/js/quiet.ts b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/js/quiet.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8fe900e7283ecb980649eef8ed4dbf3f57bf53e7
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/js/quiet.ts
+@@ -0,0 +1,51 @@
++import crypto from "crypto";
++import fs from "fs";
++import https from "https";
++import path from "path";
++import axios from "axios";
++import express from "express";
++import libxmljs from "libxmljs";
++
++const app = express();
++const pool: any = {};
++const sql: any = {};
++
++export async function findUser(name: string) {
++  return pool.query("SELECT * FROM users WHERE name = $1", [name]);
++}
++
++export async function count() {
++  return pool.query("SELECT count(*) FROM users " + "WHERE active");
++}
++
++export async function tagged(name: string) {
++  return pool.query(sql`SELECT * FROM users WHERE name = ${name}`);
++}
++
++export function greeting(name: string) {
++  return `select a product, ${name}`;
++}
++
++export function load(body: string) {
++  return JSON.parse(body);
++}
++
++export const agent = new https.Agent({ rejectUnauthorized: true });
++
++export function parse(xml: string) {
++  return libxmljs.parseXml(xml, { noent: false });
++}
++
++app.get("/file", (req, res) => {
++  const name = path.basename(req.query.name as string);
++  res.send(fs.readFileSync(path.join("/srv/files", name)));
++});
++
++app.get("/item", async (req, res) => {
++  const answer = await axios.get(`https://api.internal.example/items/${req.query.id}`);
++  res.send(answer.data);
++});
++
++export function digest(data: string) {
++  return crypto.createHash("sha256").update(data).digest("hex");
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/kotlin/hits.kt b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/kotlin/hits.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..3756a34c2cfe7ca5d1a154d437a0f8dce89325a5
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/kotlin/hits.kt
+@@ -0,0 +1,61 @@
++package demo
++
++import java.io.File
++import java.io.InputStream
++import java.io.ObjectInputStream
++import java.net.URL
++import java.security.MessageDigest
++import java.security.cert.X509Certificate
++import javax.net.ssl.HostnameVerifier
++import javax.net.ssl.X509TrustManager
++import javax.xml.parsers.DocumentBuilderFactory
++import org.springframework.jdbc.core.JdbcTemplate
++import org.springframework.web.bind.annotation.GetMapping
++import org.springframework.web.bind.annotation.RequestParam
++import org.springframework.web.bind.annotation.RestController
++
++@RestController
++class Hits(private val jdbc: JdbcTemplate) {
++
++    fun findUser(name: String): List<Map<String, Any>> =
++        jdbc.queryForList("SELECT * FROM users WHERE name = '$name'")
++
++    fun deleteOrder(id: String) {
++        val q = "DELETE FROM orders WHERE id = " + id
++        jdbc.update(q)
++    }
++
++    fun ping(host: String) {
++        ProcessBuilder("sh", "-c", "ping -c 1 $host").start()
++    }
++
++    fun load(input: InputStream): Any? {
++        val ois = ObjectInputStream(input)
++        return ois.readObject()
++    }
++
++    val allHosts = HostnameVerifier { _, _ -> true }
++
++    fun parse(input: InputStream): Any {
++        val f = DocumentBuilderFactory.newInstance()
++        return f.newDocumentBuilder().parse(input)
++    }
++
++    @GetMapping("/file")
++    fun read(@RequestParam name: String): ByteArray {
++        return File("/srv/files", name).readBytes()
++    }
++
++    @GetMapping("/fetch")
++    fun fetch(@RequestParam("url") target: String): String {
++        return URL(target).readText()
++    }
++
++    fun md5(data: ByteArray): ByteArray = MessageDigest.getInstance("MD5").digest(data)
++}
++
++class TrustAll : X509TrustManager {
++    override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
++    override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
++    override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/kotlin/quiet.kt b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/kotlin/quiet.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..1609a6f248d52f7294d4fe68b4ab198c4736d870
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/kotlin/quiet.kt
+@@ -0,0 +1,45 @@
++package demo
++
++import java.io.File
++import java.io.InputStream
++import java.net.URL
++import java.security.MessageDigest
++import javax.xml.parsers.DocumentBuilderFactory
++import org.springframework.jdbc.core.JdbcTemplate
++import org.springframework.web.bind.annotation.GetMapping
++import org.springframework.web.bind.annotation.RequestParam
++import org.springframework.web.bind.annotation.RestController
++
++@RestController
++class Quiet(private val jdbc: JdbcTemplate) {
++
++    fun findUser(name: String): List<Map<String, Any>> =
++        jdbc.queryForList("SELECT * FROM users WHERE name = ?", name)
++
++    fun count(): Int? = jdbc.queryForObject("SELECT count(*) FROM users " + "WHERE active", Int::class.java)
++
++    fun greeting(name: String) = "select a product, $name"
++
++    fun build() {
++        ProcessBuilder("sh", "-c", "make build").start()
++        ProcessBuilder("git", "status").start()
++    }
++
++    fun parse(input: InputStream): Any {
++        val f = DocumentBuilderFactory.newInstance()
++        f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
++        return f.newDocumentBuilder().parse(input)
++    }
++
++    @GetMapping("/file")
++    fun read(@RequestParam name: String): ByteArray {
++        return File("/srv/files", File(name).name).readBytes()
++    }
++
++    @GetMapping("/item")
++    fun item(@RequestParam id: String): String {
++        return URL("https://api.internal.example/items/$id").readText()
++    }
++
++    fun sha256(data: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(data)
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/php/hits.php b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/php/hits.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..b9767ac1d889af53fd5472164fa9b5ce03146707
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/php/hits.php
+@@ -0,0 +1,52 @@
++<?php
++
++function findUser($pdo, $name)
++{
++    return $pdo->query("SELECT * FROM users WHERE name = '$name'");
++}
++
++function deleteOrder($conn, $id)
++{
++    $sql = 'DELETE FROM orders WHERE id = ' . $id;
++    return mysqli_query($conn, $sql);
++}
++
++function ping($host)
++{
++    return shell_exec("ping -c 1 " . $host);
++}
++
++function load($blob)
++{
++    return unserialize($blob);
++}
++
++function client()
++{
++    $ch = curl_init('https://api.internal.example/');
++    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
++    return $ch;
++}
++
++function parse($xml)
++{
++    $doc = new DOMDocument();
++    $doc->loadXML($xml, LIBXML_NOENT);
++    return $doc;
++}
++
++function readUpload()
++{
++    return file_get_contents('/srv/files/' . $_GET['name']);
++}
++
++function proxy()
++{
++    $ch = curl_init($_GET['url']);
++    return curl_exec($ch);
++}
++
++function digest($data)
++{
++    return hash('md5', $data);
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/php/quiet.php b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/php/quiet.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..001034f5eb9d18ff15763d526efb34059f7ec504
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/php/quiet.php
+@@ -0,0 +1,59 @@
++<?php
++
++function findUser($pdo, $name)
++{
++    $stmt = $pdo->prepare('SELECT * FROM users WHERE name = :name');
++    $stmt->execute(['name' => $name]);
++    return $stmt->fetchAll();
++}
++
++function countUsers($pdo)
++{
++    return $pdo->query('SELECT count(*) FROM users ' . 'WHERE active');
++}
++
++function greeting($name)
++{
++    return "select a product, $name";
++}
++
++function build($dir)
++{
++    system('make build');
++    return shell_exec('ls -l ' . escapeshellarg($dir));
++}
++
++function load($blob)
++{
++    return unserialize($blob, ['allowed_classes' => false]);
++}
++
++function client()
++{
++    $ch = curl_init('https://api.internal.example/');
++    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
++    return $ch;
++}
++
++function parse($xml)
++{
++    $doc = new DOMDocument();
++    $doc->loadXML($xml);
++    return $doc;
++}
++
++function readUpload()
++{
++    return file_get_contents('/srv/files/' . basename($_GET['name']));
++}
++
++function item()
++{
++    $ch = curl_init('https://api.internal.example/items/' . $_GET['id']);
++    return curl_exec($ch);
++}
++
++function digest($data)
++{
++    return hash('sha256', $data);
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/python/hits.py b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/python/hits.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ee4236d634190395a79b87dbd725f86deb1a8675
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/python/hits.py
+@@ -0,0 +1,73 @@
++import hashlib
++import os
++import pickle
++import ssl
++import subprocess
++
++import requests
++import yaml
++from flask import Flask, request, send_file
++from lxml import etree
++from sqlalchemy import text
++
++app = Flask(__name__)
++
++
++def find_user(cursor, name):
++    cursor.execute(f"SELECT * FROM users WHERE name = '{name}'")
++
++
++def delete_order(cursor, order_id):
++    q = "DELETE FROM orders WHERE id = %s" % order_id
++    cursor.execute(q)
++
++
++def report(session, region):
++    return session.execute(text("SELECT * FROM sales WHERE region = '" + region + "'"))
++
++
++def ping(host):
++    subprocess.run(f"ping -c 1 {host}", shell=True)
++    os.system("nslookup " + host)
++
++
++def load(blob):
++    return pickle.loads(blob)
++
++
++def load_config(stream):
++    return yaml.load(stream, Loader=yaml.Loader)
++
++
++def fetch_insecure(url):
++    return requests.get(url, verify=False)
++
++
++def context():
++    return ssl._create_unverified_context()
++
++
++def parse(data):
++    parser = etree.XMLParser(resolve_entities=True)
++    return etree.fromstring(data, parser)
++
++
++@app.route("/file")
++def read_file():
++    name = request.args.get("name")
++    return open(os.path.join("/srv/files", name)).read()
++
++
++@app.route("/download")
++def download():
++    return send_file(request.args["path"])
++
++
++@app.route("/proxy")
++def proxy():
++    target = request.args.get("url")
++    return requests.get(target).text
++
++
++def digest(data):
++    return hashlib.md5(data).hexdigest()
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/python/quiet.py b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/python/quiet.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..2fd583fcfe2470f1a24cc91b38dfb1998915ef60
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/python/quiet.py
+@@ -0,0 +1,67 @@
++import hashlib
++import json
++import os
++import subprocess
++
++import requests
++import yaml
++from flask import Flask, request, send_file
++from lxml import etree
++from werkzeug.utils import secure_filename
++
++app = Flask(__name__)
++
++
++def find_user(cursor, name):
++    cursor.execute("SELECT * FROM users WHERE name = %s", (name,))
++
++
++def count(cursor):
++    cursor.execute("SELECT count(*) FROM users " + "WHERE active")
++
++
++def greeting(name):
++    return f"select a product, {name}"
++
++
++def build():
++    subprocess.run(["git", "status"])
++    subprocess.run("make build", shell=True)
++    os.system("uptime")
++
++
++def load(blob):
++    return json.loads(blob)
++
++
++def load_config(stream):
++    return yaml.safe_load(stream)
++
++
++def fetch(url):
++    return requests.get(url, timeout=5)
++
++
++def parse(data):
++    parser = etree.XMLParser(resolve_entities=False, no_network=True)
++    return etree.fromstring(data, parser)
++
++
++@app.route("/file")
++def read_file():
++    name = secure_filename(request.args.get("name"))
++    return open(os.path.join("/srv/files", name)).read()
++
++
++@app.route("/item")
++def item():
++    item_id = request.args.get("id")
++    return requests.get(f"https://api.internal.example/items/{item_id}").text
++
++
++def checksum(data):
++    return hashlib.md5(data, usedforsecurity=False).hexdigest()
++
++
++def strong(data):
++    return hashlib.sha256(data).hexdigest()
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/ruby/hits.rb b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/ruby/hits.rb
+new file mode 100644
+index 0000000000000000000000000000000000000000..3bb97a284d9628d48458246183606f5a5b904e94
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/ruby/hits.rb
+@@ -0,0 +1,49 @@
++require "digest"
++require "net/http"
++require "nokogiri"
++require "open3"
++require "openssl"
++
++class OrdersController < ApplicationController
++  def search
++    @users = User.where("name = '#{params[:name]}'")
++  end
++
++  def purge
++    sql = "DELETE FROM orders WHERE id = #{params[:id]}"
++    ActiveRecord::Base.connection.execute(sql)
++  end
++
++  def ping
++    host = params[:host]
++    output = `ping -c 1 #{host}`
++    system("nslookup " + host)
++    render plain: output
++  end
++
++  def restore
++    Marshal.load(request.body.read)
++  end
++
++  def client
++    http = Net::HTTP.new("api.internal.example", 443)
++    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
++    http
++  end
++
++  def parse
++    Nokogiri::XML(request.body.read) { |config| config.noent }
++  end
++
++  def download
++    send_file params[:path]
++  end
++
++  def proxy
++    render plain: Net::HTTP.get(URI(params[:url]))
++  end
++
++  def digest
++    Digest::MD5.hexdigest(params[:data])
++  end
++end
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/ruby/quiet.rb b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/ruby/quiet.rb
+new file mode 100644
+index 0000000000000000000000000000000000000000..dc2c63005e41457b1e4ed088678ef993876b32a5
+--- /dev/null
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/ruby/quiet.rb
+@@ -0,0 +1,51 @@
++require "digest"
++require "json"
++require "net/http"
++require "nokogiri"
++require "openssl"
++
++class CatalogController < ApplicationController
++  def search
++    @users = User.where("name = ?", params[:name])
++  end
++
++  def count
++    ActiveRecord::Base.connection.execute("SELECT count(*) FROM users WHERE active")
++  end
++
++  def greeting
++    render plain: "select a product, #{params[:name]}"
++  end
++
++  def build
++    system("make", "build")
++    output = `uptime`
++    render plain: output
++  end
++
++  def restore
++    JSON.parse(request.body.read)
++  end
++
++  def client
++    http = Net::HTTP.new("api.internal.example", 443)
++    http.verify_mode = OpenSSL::SSL::VERIFY_PEER
++    http
++  end
++
++  def parse
++    Nokogiri::XML(request.body.read)
++  end
++
++  def download
++    send_file Rails.root.join("public", "files", File.basename(params[:path]))
++  end
++
++  def item
++    render plain: Net::HTTP.get(URI("https://api.internal.example/items/#{params[:id]}"))
++  end
++
++  def digest
++    Digest::SHA256.hexdigest(params[:data])
++  end
++end
+diff --git a/plugins/pipeline-core/scripts/security-scan.test.mjs b/plugins/pipeline-core/scripts/security-scan.test.mjs
+index 4c19af563c811b91394263023cba2ded0bb17b88..e2e7f56ec806c62974c4c7d944aea676adaec67d 100644
+--- a/plugins/pipeline-core/scripts/security-scan.test.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.test.mjs
+@@ -2194,13 +2194,22 @@ security:
+   const semgrep = byTool("semgrep")?.ruleSet;
+   assertEqual("rule provenance: semgrep names the plugin default rule file it really passed to --config", [semgrep?.source, semgrep?.ref], ["plugin-default", "plugin:security/semgrep/pipeline.yml"]);
+   // QG-04 restated in place (C28, AC-108): the file listed two ids; it now also carries the default web/Node pack. The original two stay first and unchanged,
+-  // and the provenance still lists exactly the ids of the file, in file order.
+-  assertEqual("rule provenance: semgrep lists the rule ids of that file", semgrep?.ruleIds, [
++  // and the provenance still lists exactly the ids of the file, in file order. C28e (ADR-0094) appends the per-language pack, language by language and
++  // class by class in the order below; Go has no deserialization or XXE rule, and JS/TS keeps its command rule in the web/Node pack above.
++  const c28eClasses = ["sql-injection", "command-injection", "insecure-deserialization", "tls-verification-disabled", "xxe", "path-traversal", "ssrf", "weak-crypto"];
++  const c28eNotShipped = { go: ["insecure-deserialization", "xxe"], js: ["command-injection"] };
++  const c28eIds = ["java", "csharp", "python", "go", "js", "kotlin", "php", "ruby"]
++    .flatMap((lang) => c28eClasses.filter((cls) => !(c28eNotShipped[lang] ?? []).includes(cls)).map((cls) => `pipeline-${lang}-${cls}`));
++  const allIds = [
+     "pipeline-default-hardcoded-private-key", "pipeline-default-dynamic-code-eval",
+     "pipeline-default-dom-injection-sink", "pipeline-default-eval-like-call", "pipeline-default-unsafe-url-scheme", "pipeline-default-unvalidated-redirect",
+     "pipeline-default-postmessage-no-origin-check", "pipeline-default-prototype-pollution", "pipeline-default-child-process-shell-string",
+     "pipeline-default-hardcoded-secret", "pipeline-default-hardcoded-credential-assignment",
+-  ]);
++    ...c28eIds,
++  ];
++  // The record keeps the first 50 ids (MAX_RULE_IDS) and counts all of them; the printed line then says "(+N more)".
++  assertEqual("rule provenance: semgrep lists the rule ids of that file", [semgrep?.ruleIds, semgrep?.ruleCount], [allIds.slice(0, 50), allIds.length]);
++  assertTrue("rule provenance: the printed rule set line names how many ids it left out", scanModule.formatRuleSetLines(evidence.scanners).find((l) => l.startsWith("semgrep: "))?.includes(`(+${allIds.length - 50} more)`), "no (+N more) on the semgrep line");
+   assertTrue("rule provenance: semgrep binds the rule file bytes by digest", /^[0-9a-f]{64}$/u.test(semgrep?.sha256 ?? ""), JSON.stringify(semgrep));
+   assertEqual("rule provenance: gitleaks names its config and says it extends the built-in default ruleset", [byTool("gitleaks")?.ruleSet?.ref?.endsWith("gitleaks-default.toml") || byTool("gitleaks")?.ruleSet?.ref === ".gitleaks.toml", /built-in default/u.test(byTool("gitleaks")?.ruleSet?.description ?? "")], [true, true]);
+   assertEqual("rule provenance: osv-scanner says it uses the advisory database of the detected package sources, not a rule file", byTool("osv-scanner")?.ruleSet?.source, "builtin");
+diff --git a/plugins/pipeline-core/security/semgrep/pipeline.yml b/plugins/pipeline-core/security/semgrep/pipeline.yml
+index 20212719258632c2dde2bf9dd586fae84c4cb0a6..31a5742d6e9ddec3f8d6115bfcda692cef64f351 100644
+--- a/plugins/pipeline-core/security/semgrep/pipeline.yml
++++ b/plugins/pipeline-core/security/semgrep/pipeline.yml
+@@ -16,9 +16,10 @@
+ #
+ # Severity mapping (semgrep.mjs, unchanged by this file): ERROR -> high,
+ # WARNING -> medium, INFO -> info. Default `security.thresholds.block_on` is
+-# ["critical", "high"], so only the ERROR-severity rule below is blocking by
+-# default; the WARNING-severity rule surfaces as a visible, non-blocking
+-# finding.
++# ["critical", "high"], so the ERROR-severity rules below block by default and
++# the WARNING-severity rules surface as visible, non-blocking findings. Since
++# ADR-0093 an ERROR finding blocks a close only when the feature introduced it;
++# an older one is listed, not blocking. ADR-0094 records which classes are ERROR.
+ rules:
+   - id: pipeline-default-hardcoded-private-key
+     languages: [generic]
+@@ -51,8 +52,9 @@ rules:
+ 
+   # ---------------------------------------------------------------------------
+   # C28 (AC-108, PO decision 2026-11-10): the default web/Node pack -- the common OWASP classes for browser and Node code. Plain Semgrep rules, no new
+-  # tool. Every heuristic rule is WARNING (medium, non-blocking under the default block_on): a default pack must never newly block a project that did not
+-  # choose it. Only a provider-shaped hard-coded secret is ERROR, like the private-key rule above. Each rule has a positive and a negative fixture in
++  # tool. Every heuristic rule in this web/Node block is WARNING (medium, non-blocking under the default block_on); only a provider-shaped hard-coded
++  # secret is ERROR, like the private-key rule above. (C28e reverses the old "a default pack never newly blocks" stance for the severe classes below,
++  # PO tiles 2026-11-12, ADR-0094; these web/Node rules keep their severity.) Each rule has a positive and a negative fixture in
+   # config/security/semgrep-default-rules.test.mjs.
+   # ---------------------------------------------------------------------------
+   - id: pipeline-default-dom-injection-sink
+@@ -227,3 +229,1748 @@ rules:
+     patterns:
+       - pattern-regex: '(?i)\b(?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["'']?\s*[:=]\s*["''][^"''\s$<>{}]{8,}["'']'
+       - pattern-not-regex: '(?i)(changeme|example|placeholder|your[_-]|dummy|xxxx|process\.env|\*{3,})'
++
++  # ---------------------------------------------------------------------------
++  # C28e (PO tiles 2026-11-12, ADR-0094): the severe classes per language -- SQL injection, command injection, insecure deserialization,
++  # TLS verification switched off, XML external entities, path traversal and server-side request forgery -- for Java, C#, Kotlin, Python,
++  # PHP, Ruby, Go and JavaScript/TypeScript. These are ERROR (blocking under the default block_on); under ADR-0093 a finding blocks only
++  # when the feature introduced it. Weak cryptography is WARNING: MD5 and SHA-1 are common for checksums that protect nothing.
++  # Request-to-sink classes use Semgrep's OSS taint mode (within one function). Test code is excluded from the ERROR rules (it disables
++  # TLS and builds queries on purpose and does not ship); every ERROR rule repeats the same exclude list (Semgrep's rule parser does not resolve YAML anchors). Every rule has a firing and
++  # a quiet fixture in config/security/semgrep-default-rules.test.mjs.
++  # ---------------------------------------------------------------------------
++
++  # ----- Java -----
++  - id: pipeline-java-sql-injection
++    languages: [java]
++    severity: ERROR
++    message: >-
++      A SQL statement is built by concatenating or formatting a runtime value into the SQL text and handed to a query call. Use a
++      PreparedStatement or named parameters and bind the value.
++    metadata: {category: security, cwe: "CWE-89: SQL Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: $DB.$EXEC($Q, ...)
++          - patterns:
++              - pattern-inside: |
++                  $T $V = $Q;
++                  ...
++              - pattern: $DB.$EXEC($V, ...)
++          - patterns:
++              - pattern-inside: |
++                  $V = $Q;
++                  ...
++              - pattern: $DB.$EXEC($V, ...)
++      - metavariable-regex:
++          metavariable: $EXEC
++          regex: ^(executeQuery|executeUpdate|executeLargeUpdate|execute|addBatch|prepareStatement|prepareCall|createQuery|createNativeQuery|createSQLQuery|query|queryForObject|queryForList|queryForMap|queryForRowSet|update|batchUpdate)$
++      - metavariable-regex:
++          metavariable: $Q
++          regex: '(?is)^(?:"{1,3}\s*(?:select|insert|update|delete|merge|with|call|exec)\b[^"]*"{1,3}\s*\+(?:\s*"[^"]*"\s*\+)*\s*[^"\s]|String\.format\(\s*"{1,3}\s*(?:select|insert|update|delete|merge|with|call|exec)\b|"{1,3}\s*(?:select|insert|update|delete|merge|with|call|exec)\b[^"]*"{1,3}\s*\.formatted\()'
++  - id: pipeline-java-command-injection
++    languages: [java]
++    severity: ERROR
++    message: >-
++      A shell is started with a command line built from a runtime value, or Runtime.exec gets a concatenated string. Run the program
++      directly with an argument array and no shell, and validate the arguments.
++    metadata: {category: security, cwe: "CWE-78: OS Command Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - patterns:
++          - pattern-either:
++              - pattern: new ProcessBuilder($SH, $FLAG, $CMD, ...)
++              - pattern: $R.exec(new String[]{$SH, $FLAG, $CMD, ...}, ...)
++              - pattern: $R.exec(new String[]{$SH, $FLAG, $CMD, ...})
++          - metavariable-regex:
++              metavariable: $SH
++              regex: '(?i)^"(?:[^"]*[\\/])?(?:sh|bash|zsh|ksh|dash|cmd|cmd\.exe|powershell|powershell\.exe|pwsh|pwsh\.exe)"$'
++          - metavariable-regex:
++              metavariable: $FLAG
++              regex: '(?i)^"(?:-c|/c|-command)"$'
++          - metavariable-regex:
++              metavariable: $CMD
++              regex: '^(?!"[^"]*"$)'
++      - patterns:
++          - pattern: Runtime.getRuntime().exec($C, ...)
++          - metavariable-regex:
++              metavariable: $C
++              regex: '(?s)^"[^"]*"\s*\+'
++  - id: pipeline-java-insecure-deserialization
++    languages: [java]
++    severity: ERROR
++    message: >-
++      Java serialization (ObjectInputStream, XMLDecoder) or Jackson default typing turns the bytes into arbitrary classes, which is
++      remote code execution on untrusted input. Use a data format without type information, or an ObjectInputFilter allowlist.
++    metadata: {category: security, cwe: "CWE-502: Deserialization of Untrusted Data", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - patterns:
++          - pattern-either:
++              - pattern: (ObjectInputStream $O).readObject()
++              - pattern: (ObjectInputStream $O).readUnshared()
++              - pattern: new ObjectInputStream(...).readObject()
++          - pattern-not-inside: |
++              $RT $M(...) {
++                ...
++                $X.setObjectInputFilter(...);
++                ...
++              }
++      - pattern: new XMLDecoder(...)
++      - pattern: $MAPPER.enableDefaultTyping(...)
++      - pattern: $MAPPER.activateDefaultTyping(LaissezFaireSubTypeValidator.instance, ...)
++  - id: pipeline-java-tls-verification-disabled
++    languages: [java]
++    severity: ERROR
++    message: >-
++      Certificate or host name verification is switched off (an empty checkServerTrusted, a host name verifier that accepts every
++      host, a trust-all strategy). Any network attacker can then read and change the traffic. Keep the default verification.
++    metadata: {category: security, cwe: "CWE-295: Improper Certificate Validation", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: |
++          void checkServerTrusted(...) {}
++      - pattern: |
++          void checkServerTrusted(...) throws $E {}
++      - pattern: |
++          boolean verify(String $H, SSLSession $S) { return true; }
++      - pattern: $C.setHostnameVerifier(($H, $S) -> true)
++      - pattern: HttpsURLConnection.setDefaultHostnameVerifier(($H, $S) -> true)
++      - pattern: NoopHostnameVerifier.INSTANCE
++      - pattern: new NoopHostnameVerifier()
++      - pattern: SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER
++      - pattern: TrustAllStrategy.INSTANCE
++      - pattern: new TrustAllStrategy()
++      - pattern: InsecureTrustManagerFactory.INSTANCE
++  - id: pipeline-java-xxe
++    languages: [java]
++    severity: ERROR
++    message: >-
++      An XML parser factory is created without switching off DOCTYPE declarations or external entities in the same method, so a
++      document can read local files or reach internal hosts (XXE). Set disallow-doctype-decl (or the StAX SUPPORT_DTD false) right
++      after creating the factory.
++    metadata: {category: security, cwe: "CWE-611: Improper Restriction of XML External Entity Reference", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: DocumentBuilderFactory.newInstance()
++          - pattern: SAXParserFactory.newInstance()
++          - pattern: XMLInputFactory.newInstance()
++          - pattern: XMLInputFactory.newFactory()
++      - pattern-not-inside: |
++          $RT $M(...) {
++            ...
++            $F.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
++            ...
++          }
++      - pattern-not-inside: |
++          $RT $M(...) {
++            ...
++            $F.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
++            ...
++          }
++      - pattern-not-inside: |
++          $RT $M(...) {
++            ...
++            $F.setFeature("http://xml.org/sax/features/external-general-entities", false);
++            ...
++          }
++      - pattern-not-inside: |
++          $RT $M(...) {
++            ...
++            $F.setProperty(XMLInputFactory.SUPPORT_DTD, false);
++            ...
++          }
++      - pattern-not-inside: |
++          $RT $M(...) {
++            ...
++            $F.setProperty("javax.xml.stream.supportDTD", false);
++            ...
++          }
++  - id: pipeline-java-path-traversal
++    languages: [java]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value reaches a file path. A value such as ../../etc/passwd then reads or writes outside the intended directory. Reduce
++      it to a file name (FilenameUtils.getName) or check the normalized path stays under the base directory.
++    metadata: {category: security, cwe: "CWE-22: Path Traversal", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - patterns:
++          - pattern-either:
++              - pattern-inside: |
++                  $RT $M(..., @$A(...) $T $P, ...) { ... }
++              - pattern-inside: |
++                  $RT $M(..., @$A $T $P, ...) { ... }
++          - metavariable-regex:
++              metavariable: $A
++              regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
++          - pattern: $P
++      - pattern: (HttpServletRequest $REQ).getParameter(...)
++      - pattern: (HttpServletRequest $REQ).getParameterValues(...)
++      - pattern: (HttpServletRequest $REQ).getHeader(...)
++      - pattern: (HttpServletRequest $REQ).getPathInfo()
++    pattern-sinks:
++      - pattern: new File(...)
++      - pattern: new FileInputStream(...)
++      - pattern: new FileOutputStream(...)
++      - pattern: new FileReader(...)
++      - pattern: new FileWriter(...)
++      - pattern: new RandomAccessFile(...)
++      - pattern: Paths.get(...)
++      - pattern: Path.of(...)
++      - pattern: (Path $BASE).resolve(...)
++    pattern-sanitizers:
++      - pattern: FilenameUtils.getName(...)
++  - id: pipeline-java-ssrf
++    languages: [java]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value decides which URL the server calls. An attacker can then make the server reach internal hosts or cloud metadata
++      (SSRF). Map the input to an allowlisted host or path instead of passing a URL through.
++    metadata: {category: security, cwe: "CWE-918: Server-Side Request Forgery", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - patterns:
++          - pattern-either:
++              - pattern-inside: |
++                  $RT $M(..., @$A(...) $T $P, ...) { ... }
++              - pattern-inside: |
++                  $RT $M(..., @$A $T $P, ...) { ... }
++          - metavariable-regex:
++              metavariable: $A
++              regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
++          - pattern: $P
++      - pattern: (HttpServletRequest $REQ).getParameter(...)
++      - pattern: (HttpServletRequest $REQ).getParameterValues(...)
++      - pattern: (HttpServletRequest $REQ).getHeader(...)
++      - pattern: (HttpServletRequest $REQ).getPathInfo()
++    pattern-sinks:
++      # The URL argument is the sink; one that starts with a literal scheme, host and "/" fixes the host and does not count.
++      - patterns:
++          - pattern-either:
++              - pattern: new URL($U, ...)
++              - pattern: new URI($U, ...)
++              - pattern: URI.create($U)
++              - pattern: HttpRequest.newBuilder($U)
++              - pattern: new HttpGet($U)
++              - pattern: new HttpPost($U)
++              - pattern: $C.getForObject($U, ...)
++              - pattern: $C.getForEntity($U, ...)
++              - pattern: $C.postForObject($U, ...)
++              - pattern: $C.postForEntity($U, ...)
++              - pattern: $C.exchange($U, ...)
++              - pattern: $C.uri($U, ...)
++          - metavariable-regex:
++              metavariable: $U
++              regex: '^(?!"https?://[^"/]+/)'
++          - focus-metavariable: $U
++  - id: pipeline-java-weak-crypto
++    languages: [java]
++    severity: WARNING
++    message: >-
++      A broken hash or cipher (MD5, SHA-1, DES, 3DES, RC2, RC4, Blowfish) or the ECB mode (also the default of a bare "AES") is used.
++      Use SHA-256 or better, and AES-GCM.
++    metadata: {category: security, cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm", confidence: MEDIUM}
++    patterns:
++      - pattern-either:
++          - pattern: MessageDigest.getInstance($ALG, ...)
++          - pattern: Cipher.getInstance($ALG, ...)
++          - pattern: KeyGenerator.getInstance($ALG, ...)
++      - metavariable-regex:
++          metavariable: $ALG
++          regex: '(?i)^"(?:(?:md2|md4|md5|sha|sha-?1|des|desede|tripledes|rc2|rc4|arcfour|blowfish)(?:/[^"]*)?|aes|[^"]*/ecb/[^"]*)"$'
++
++  # ----- C# -----
++  - id: pipeline-csharp-sql-injection
++    languages: [csharp]
++    severity: ERROR
++    message: >-
++      A SQL statement is built by interpolating, concatenating or formatting a runtime value into the SQL text and handed to a command
++      or a raw query. Use SqlParameter, Dapper parameters or FromSql/ExecuteSql with an interpolated FormattableString.
++    metadata: {category: security, cwe: "CWE-89: SQL Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: new $CMDTYPE($Q, ...)
++          - pattern: $CMD.CommandText = $Q
++          - pattern: $DB.$EXEC($Q, ...)
++          - patterns:
++              - pattern-inside: |
++                  var $V = $Q;
++                  ...
++              - pattern-either:
++                  - pattern: new $CMDTYPE($V, ...)
++                  - pattern: $CMD.CommandText = $V
++                  - pattern: $DB.$EXEC($V, ...)
++          - patterns:
++              - pattern-inside: |
++                  string $V = $Q;
++                  ...
++              - pattern-either:
++                  - pattern: new $CMDTYPE($V, ...)
++                  - pattern: $CMD.CommandText = $V
++                  - pattern: $DB.$EXEC($V, ...)
++      - metavariable-regex:
++          metavariable: $Q
++          regex: '(?is)^(?:(?:\$@?|@\$)"{1,3}\s*(?:select|insert|update|delete|merge|with|exec|execute)\b[^"]*\{|@?"\s*(?:select|insert|update|delete|merge|with|exec|execute)\b[^"]*"\s*\+|(?:string|String)\.Format\(\s*@?"\s*(?:select|insert|update|delete|merge|with|exec|execute)\b)'
++      - pattern-either:
++          - patterns:
++              - pattern-either:
++                  - pattern: new $CMDTYPE($X, ...)
++              - metavariable-regex:
++                  metavariable: $CMDTYPE
++                  regex: ^(SqlCommand|SqlDataAdapter|OracleCommand|NpgsqlCommand|MySqlCommand|SqliteCommand|OleDbCommand|OdbcCommand)$
++          - pattern: $CMD.CommandText = $X
++          - patterns:
++              - pattern: $DB.$EXEC(...)
++              - metavariable-regex:
++                  metavariable: $EXEC
++                  regex: ^(ExecuteSqlRaw|ExecuteSqlRawAsync|FromSqlRaw|SqlQueryRaw|Query|QueryAsync|QueryFirst|QueryFirstAsync|QueryFirstOrDefault|QueryFirstOrDefaultAsync|QuerySingle|QuerySingleAsync|QuerySingleOrDefault|QuerySingleOrDefaultAsync|QueryMultiple|QueryMultipleAsync|Execute|ExecuteAsync|ExecuteScalar|ExecuteScalarAsync|ExecuteReader|ExecuteReaderAsync)$
++  - id: pipeline-csharp-command-injection
++    languages: [csharp]
++    severity: ERROR
++    message: >-
++      A shell (cmd, PowerShell, sh) is started with arguments built from a runtime value. Start the program itself with
++      ProcessStartInfo.ArgumentList and no shell, and validate the arguments.
++    metadata: {category: security, cwe: "CWE-78: OS Command Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: Process.Start($SH, $ARGS)
++          - pattern: new ProcessStartInfo($SH, $ARGS)
++          - pattern: new ProcessStartInfo { ..., FileName = $SH, ..., Arguments = $ARGS, ... }
++      - metavariable-regex:
++          metavariable: $SH
++          regex: '(?i)^@?"(?:[^"]*[\\/])?(?:cmd|cmd\.exe|powershell|powershell\.exe|pwsh|pwsh\.exe|bash|sh)"$'
++      - metavariable-regex:
++          metavariable: $ARGS
++          regex: '^(?!@?"[^"]*"$)'
++  - id: pipeline-csharp-insecure-deserialization
++    languages: [csharp]
++    severity: ERROR
++    message: >-
++      BinaryFormatter, SoapFormatter, NetDataContractSerializer, LosFormatter, ObjectStateFormatter or Json.NET TypeNameHandling other
++      than None turn input into arbitrary types, which is remote code execution on untrusted data. Use System.Text.Json or
++      DataContractSerializer with known types.
++    metadata: {category: security, cwe: "CWE-502: Deserialization of Untrusted Data", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: new BinaryFormatter(...)
++      - pattern: new SoapFormatter(...)
++      - pattern: new NetDataContractSerializer(...)
++      - pattern: new LosFormatter(...)
++      - pattern: new ObjectStateFormatter(...)
++      - pattern: TypeNameHandling.All
++      - pattern: TypeNameHandling.Objects
++      - pattern: TypeNameHandling.Arrays
++      - pattern: TypeNameHandling.Auto
++      - pattern: new JavaScriptSerializer(new SimpleTypeResolver())
++  - id: pipeline-csharp-tls-verification-disabled
++    languages: [csharp]
++    severity: ERROR
++    message: >-
++      A certificate validation callback accepts every certificate. Any network attacker can then read and change the traffic. Remove the
++      callback, or pin the expected certificate inside it.
++    metadata: {category: security, cwe: "CWE-295: Improper Certificate Validation", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: $X.ServerCertificateValidationCallback = ($A, $B, $C, $D) => true
++      - pattern: $X.ServerCertificateValidationCallback += ($A, $B, $C, $D) => true
++      - pattern: $X.ServerCertificateCustomValidationCallback = ($A, $B, $C, $D) => true
++      - pattern: |
++          $X.ServerCertificateValidationCallback = delegate { return true; }
++      - pattern: |
++          $X.ServerCertificateValidationCallback += delegate { return true; }
++      - pattern: HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
++      - pattern: new $H { ..., ServerCertificateCustomValidationCallback = ($A, $B, $C, $D) => true, ... }
++  - id: pipeline-csharp-xxe
++    languages: [csharp]
++    severity: ERROR
++    message: >-
++      DTD processing is switched on or an XmlUrlResolver is set, so an XML document can read local files or reach internal hosts (XXE).
++      Keep DtdProcessing.Prohibit and XmlResolver null.
++    metadata: {category: security, cwe: "CWE-611: Improper Restriction of XML External Entity Reference", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: $S.DtdProcessing = DtdProcessing.Parse
++      - pattern: new $T { ..., DtdProcessing = DtdProcessing.Parse, ... }
++      - pattern: $D.XmlResolver = new XmlUrlResolver()
++      - pattern: new $T { ..., XmlResolver = new XmlUrlResolver(), ... }
++      - pattern: $S.ProhibitDtd = false
++  - id: pipeline-csharp-path-traversal
++    languages: [csharp]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value reaches a file path. A value such as ..\..\web.config then reads or writes outside the intended directory. Reduce it
++      to a file name (Path.GetFileName) or check the full path stays under the base directory.
++    metadata: {category: security, cwe: "CWE-22: Path Traversal", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - patterns:
++          - pattern-inside: |
++              class $C : $BASE { ... }
++          - metavariable-regex:
++              metavariable: $BASE
++              regex: ^(Controller|ControllerBase|ApiController|PageModel)$
++          - pattern-inside: |
++              public $RT $M(..., $T $P, ...) { ... }
++          - pattern: $P
++      - pattern: Request.Query[...]
++      - pattern: Request.Form[...]
++      - pattern: Request.QueryString[...]
++      - pattern: Request.Headers[...]
++      - pattern: $CTX.Request.Query[...]
++      - pattern: $CTX.Request.Form[...]
++    pattern-sinks:
++      - pattern: File.$FN(...)
++      - pattern: System.IO.File.$FN(...)
++      - pattern: new FileStream(...)
++      - pattern: new StreamReader(...)
++      - pattern: new StreamWriter(...)
++      - pattern: new FileInfo(...)
++      - pattern: Directory.$FN(...)
++      - pattern: PhysicalFile(...)
++    pattern-sanitizers:
++      - pattern: Path.GetFileName(...)
++  - id: pipeline-csharp-ssrf
++    languages: [csharp]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value decides which URL the server calls. An attacker can then make the server reach internal hosts or cloud metadata
++      (SSRF). Map the input to an allowlisted host or path instead of passing a URL through.
++    metadata: {category: security, cwe: "CWE-918: Server-Side Request Forgery", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - patterns:
++          - pattern-inside: |
++              class $C : $BASE { ... }
++          - metavariable-regex:
++              metavariable: $BASE
++              regex: ^(Controller|ControllerBase|ApiController|PageModel)$
++          - pattern-inside: |
++              public $RT $M(..., $T $P, ...) { ... }
++          - pattern: $P
++      - pattern: Request.Query[...]
++      - pattern: Request.Form[...]
++      - pattern: Request.QueryString[...]
++      - pattern: Request.Headers[...]
++      - pattern: $CTX.Request.Query[...]
++      - pattern: $CTX.Request.Form[...]
++    pattern-sinks:
++      # The URL argument is the sink; one that starts with a literal scheme, host and "/" fixes the host and does not count.
++      - patterns:
++          - pattern-either:
++              - pattern: new Uri($U, ...)
++              - pattern: WebRequest.Create($U)
++              - pattern: new HttpRequestMessage($M, $U)
++              - pattern: $H.GetAsync($U, ...)
++              - pattern: $H.GetStringAsync($U, ...)
++              - pattern: $H.GetByteArrayAsync($U, ...)
++              - pattern: $H.GetStreamAsync($U, ...)
++              - pattern: $H.PostAsync($U, ...)
++              - pattern: $H.PutAsync($U, ...)
++              - pattern: $H.DeleteAsync($U, ...)
++              - pattern: $W.DownloadString($U, ...)
++              - pattern: $W.DownloadData($U, ...)
++          - metavariable-regex:
++              metavariable: $U
++              regex: '^(?!(?:\$@?|@\$)?"https?://[^"/{]+/)'
++          - focus-metavariable: $U
++  - id: pipeline-csharp-weak-crypto
++    languages: [csharp]
++    severity: WARNING
++    message: >-
++      A broken hash or cipher (MD5, SHA-1, DES, 3DES, RC2) or the ECB mode is used. Use SHA-256 or better, and AES-GCM.
++    metadata: {category: security, cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm", confidence: MEDIUM}
++    pattern-either:
++      - pattern: MD5.Create(...)
++      - pattern: SHA1.Create(...)
++      - pattern: MD5.HashData(...)
++      - pattern: SHA1.HashData(...)
++      - pattern: new MD5CryptoServiceProvider()
++      - pattern: new SHA1CryptoServiceProvider()
++      - pattern: new SHA1Managed()
++      - pattern: DES.Create(...)
++      - pattern: TripleDES.Create(...)
++      - pattern: RC2.Create(...)
++      - pattern: new DESCryptoServiceProvider()
++      - pattern: new TripleDESCryptoServiceProvider()
++      - pattern: CipherMode.ECB
++
++  # ----- Python -----
++  - id: pipeline-python-sql-injection
++    languages: [python]
++    severity: ERROR
++    message: >-
++      A SQL statement is built with an f-string, % formatting, .format() or concatenation and handed to execute(), raw() or text().
++      Pass the values as query parameters instead.
++    metadata: {category: security, cwe: "CWE-89: SQL Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: $DB.$EXEC($Q, ...)
++          - pattern: $FN($Q, ...)
++          - patterns:
++              - pattern-inside: |
++                  $V = $Q
++                  ...
++              - pattern-either:
++                  - pattern: $DB.$EXEC($V, ...)
++                  - pattern: $FN($V, ...)
++      - metavariable-regex:
++          metavariable: $Q
++          regex: '(?is)^(?:[rRbB]?[fF][rRbB]?(?:"""|''''''|"|'')\s*(?:select|insert|update|delete|merge|with|call|exec)\b[^{]*\{(?!\{)|[rRbBuU]?("""|''''''|"|'')\s*(?:select|insert|update|delete|merge|with|call|exec)\b.*?\1(?:\s*\+\s*(?:"[^"]*"|''[^'']*''))*\s*(?:%|\.format\(|\+\s*[^"''\s]))'
++      - pattern-either:
++          - patterns:
++              - pattern: $DB.$EXEC(...)
++              - metavariable-regex:
++                  metavariable: $EXEC
++                  regex: ^(execute|executemany|executescript|exec_driver_sql|raw|mogrify)$
++          - patterns:
++              - pattern: $FN(...)
++              - metavariable-regex:
++                  metavariable: $FN
++                  regex: ^(text|sqlalchemy\.text|pd\.read_sql|pandas\.read_sql|read_sql|RawSQL)$
++  - id: pipeline-python-command-injection
++    languages: [python]
++    severity: ERROR
++    message: >-
++      A shell runs a command line that is not a fixed string (os.system, os.popen, subprocess with shell=True). Pass an argument list
++      without shell=True and validate the arguments.
++    metadata: {category: security, cwe: "CWE-78: OS Command Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: subprocess.$F($CMD, ..., shell=True, ...)
++          - pattern: os.system($CMD)
++          - pattern: os.popen($CMD, ...)
++          - pattern: subprocess.getoutput($CMD)
++          - pattern: subprocess.getstatusoutput($CMD)
++      - metavariable-regex:
++          metavariable: $CMD
++          regex: '^(?![rRbBuU]?(?:"[^"]*"|''[^'']*'')$|\[)'
++  - id: pipeline-python-insecure-deserialization
++    languages: [python]
++    severity: ERROR
++    message: >-
++      pickle, marshal, dill, jsonpickle, shelve or a YAML load with the full or unsafe loader turns the input into arbitrary objects,
++      which is remote code execution on untrusted data. Use JSON or yaml.safe_load.
++    metadata: {category: security, cwe: "CWE-502: Deserialization of Untrusted Data", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: pickle.loads(...)
++      - pattern: pickle.load(...)
++      - pattern: pickle.Unpickler(...)
++      - pattern: cPickle.loads(...)
++      - pattern: cPickle.load(...)
++      - pattern: dill.loads(...)
++      - pattern: dill.load(...)
++      - pattern: marshal.loads(...)
++      - pattern: marshal.load(...)
++      - pattern: jsonpickle.decode(...)
++      - pattern: pandas.read_pickle(...)
++      - pattern: pd.read_pickle(...)
++      - pattern: shelve.open(...)
++      - pattern: yaml.unsafe_load(...)
++      - pattern: yaml.unsafe_load_all(...)
++      - pattern: yaml.load(..., Loader=yaml.Loader, ...)
++      - pattern: yaml.load(..., Loader=yaml.UnsafeLoader, ...)
++      - pattern: yaml.load(..., Loader=yaml.FullLoader, ...)
++      - pattern: yaml.load_all(..., Loader=yaml.Loader, ...)
++      - pattern: yaml.load_all(..., Loader=yaml.UnsafeLoader, ...)
++  - id: pipeline-python-tls-verification-disabled
++    languages: [python]
++    severity: ERROR
++    message: >-
++      Certificate or host name verification is switched off (verify=False, an unverified SSL context, CERT_NONE). Any network attacker
++      can then read and change the traffic. Keep the verification on, or point verify at the CA bundle.
++    metadata: {category: security, cwe: "CWE-295: Improper Certificate Validation", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: requests.$M(..., verify=False, ...)
++      - pattern: httpx.$M(..., verify=False, ...)
++      - pattern: aiohttp.TCPConnector(..., ssl=False, ...)
++      - pattern: $S.verify = False
++      - pattern: ssl._create_unverified_context(...)
++      - pattern: $CTX.check_hostname = False
++      - pattern: $CTX.verify_mode = ssl.CERT_NONE
++      - pattern: ssl.wrap_socket(..., cert_reqs=ssl.CERT_NONE, ...)
++  - id: pipeline-python-xxe
++    languages: [python]
++    severity: ERROR
++    message: >-
++      The XML parser is told to resolve external entities, so a document can read local files or reach internal hosts (XXE). Leave
++      entity resolution off, or parse with defusedxml.
++    metadata: {category: security, cwe: "CWE-611: Improper Restriction of XML External Entity Reference", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: $ET.XMLParser(..., resolve_entities=True, ...)
++      - pattern: $ET.XMLParser(..., no_network=False, ...)
++      - pattern: $P.setFeature(feature_external_ges, True)
++      - pattern: $P.setFeature(xml.sax.handler.feature_external_ges, True)
++      - pattern: $P.setFeature(handler.feature_external_ges, True)
++  - id: pipeline-python-path-traversal
++    languages: [python]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value reaches a file path. A value such as ../../etc/passwd then reads or writes outside the intended directory. Reduce
++      it to a file name (os.path.basename, secure_filename) or check the resolved path stays under the base directory.
++    metadata: {category: security, cwe: "CWE-22: Path Traversal", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - patterns:
++          - pattern-either:
++              - pattern: request.$ATTR
++              - pattern: flask.request.$ATTR
++          - metavariable-regex:
++              metavariable: $ATTR
++              regex: ^(args|form|values|files|cookies|headers|json|view_args|GET|POST|COOKIES|FILES|query_params|path_params)$
++    pattern-sinks:
++      - patterns:
++          - pattern-either:
++              - pattern: open($P, ...)
++              - pattern: io.open($P, ...)
++              - pattern: send_file($P, ...)
++              - pattern: flask.send_file($P, ...)
++              - pattern: FileResponse($P, ...)
++              - pattern: os.remove($P)
++              - pattern: os.unlink($P)
++              - pattern: shutil.rmtree($P, ...)
++              - pattern: Path($P)
++              - pattern: pathlib.Path($P)
++          - focus-metavariable: $P
++    pattern-sanitizers:
++      - pattern: os.path.basename(...)
++      - pattern: secure_filename(...)
++      - pattern: werkzeug.utils.secure_filename(...)
++  - id: pipeline-python-ssrf
++    languages: [python]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value decides which URL the server calls. An attacker can then make the server reach internal hosts or cloud metadata
++      (SSRF). Map the input to an allowlisted host or path instead of passing a URL through.
++    metadata: {category: security, cwe: "CWE-918: Server-Side Request Forgery", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - patterns:
++          - pattern-either:
++              - pattern: request.$ATTR
++              - pattern: flask.request.$ATTR
++          - metavariable-regex:
++              metavariable: $ATTR
++              regex: ^(args|form|values|cookies|headers|json|view_args|GET|POST|COOKIES|query_params|path_params)$
++    pattern-sinks:
++      # The URL argument is the sink; one that starts with a literal scheme, host and "/" fixes the host and does not count.
++      - patterns:
++          - pattern-either:
++              - pattern: requests.$M($U, ...)
++              - pattern: httpx.$M($U, ...)
++              - pattern: urllib.request.urlopen($U, ...)
++              - pattern: urlopen($U, ...)
++              - pattern: urllib.request.Request($U, ...)
++          - metavariable-regex:
++              metavariable: $U
++              regex: '^(?![rRbBuUfF]{0,2}["'']https?://[^"''/{]+/)'
++          - focus-metavariable: $U
++  - id: pipeline-python-weak-crypto
++    languages: [python]
++    severity: WARNING
++    message: >-
++      A broken hash or cipher (MD5, SHA-1, DES, 3DES, RC4) or the ECB mode is used. Use SHA-256 or better and AES-GCM; for a
++      non-security checksum pass usedforsecurity=False.
++    metadata: {category: security, cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm", confidence: MEDIUM}
++    pattern-either:
++      - patterns:
++          - pattern-either:
++              - pattern: hashlib.md5(...)
++              - pattern: hashlib.sha1(...)
++          - pattern-not: hashlib.$H(..., usedforsecurity=False, ...)
++      - patterns:
++          - pattern: hashlib.new($ALG, ...)
++          - pattern-not: hashlib.new($ALG, ..., usedforsecurity=False, ...)
++          - metavariable-regex:
++              metavariable: $ALG
++              regex: '(?i)^["''](md4|md5|sha1|sha)["'']$'
++      - pattern: DES.new(...)
++      - pattern: DES3.new(...)
++      - pattern: ARC4.new(...)
++      - pattern: $C.new(..., $C.MODE_ECB, ...)
++      - pattern: modes.ECB(...)
++      - pattern: algorithms.TripleDES(...)
++      - pattern: algorithms.ARC4(...)
++
++  # ----- Go -----
++  - id: pipeline-go-sql-injection
++    languages: [go]
++    severity: ERROR
++    message: >-
++      A SQL statement is built with fmt.Sprintf or concatenation and handed to Query, Exec or Raw. Use placeholders and pass the values
++      as arguments.
++    metadata: {category: security, cwe: "CWE-89: SQL Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: $DB.$EXEC($Q, ...)
++          - pattern: $DB.$EXEC($CTX, $Q, ...)
++          - patterns:
++              - pattern-inside: |
++                  $V := $Q
++                  ...
++              - pattern-either:
++                  - pattern: $DB.$EXEC($V, ...)
++                  - pattern: $DB.$EXEC($CTX, $V, ...)
++      - metavariable-regex:
++          metavariable: $EXEC
++          regex: ^(Query|QueryRow|QueryContext|QueryRowContext|Exec|ExecContext|Prepare|PrepareContext|Raw|Select|Get|NamedExec|Queryx|QueryRowx)$
++      - metavariable-regex:
++          metavariable: $Q
++          regex: '(?is)^(?:fmt\.Sprintf\(\s*["`]\s*(?:select|insert|update|delete|merge|with|call|exec)\b|["`]\s*(?:select|insert|update|delete|merge|with|call|exec)\b[^"`]*["`]\s*\+(?:\s*["`][^"`]*["`]\s*\+)*\s*[^"`\s])'
++  - id: pipeline-go-command-injection
++    languages: [go]
++    severity: ERROR
++    message: >-
++      A shell is started with a command line that is not a fixed string. Run the program itself with exec.Command and separate
++      arguments, without a shell, and validate them.
++    metadata: {category: security, cwe: "CWE-78: OS Command Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: exec.Command($SH, $FLAG, $CMD, ...)
++          - pattern: exec.CommandContext($CTX, $SH, $FLAG, $CMD, ...)
++      - metavariable-regex:
++          metavariable: $SH
++          regex: '(?i)^"(?:[^"]*[\\/])?(?:sh|bash|zsh|ksh|dash|cmd|cmd\.exe|powershell|powershell\.exe|pwsh|pwsh\.exe)"$'
++      - metavariable-regex:
++          metavariable: $FLAG
++          regex: '(?i)^"(?:-c|/c|-command)"$'
++      - metavariable-regex:
++          metavariable: $CMD
++          regex: '^(?!(?:"[^"]*"|`[^`]*`)$)'
++  - id: pipeline-go-tls-verification-disabled
++    languages: [go]
++    severity: ERROR
++    message: >-
++      InsecureSkipVerify switches certificate and host name verification off. Any network attacker can then read and change the
++      traffic. Keep it false and add the CA to RootCAs instead.
++    metadata: {category: security, cwe: "CWE-295: Improper Certificate Validation", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: |
++          tls.Config{..., InsecureSkipVerify: true, ...}
++      - pattern: $C.InsecureSkipVerify = true
++  - id: pipeline-go-path-traversal
++    languages: [go]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value reaches a file path. A value such as ../../etc/passwd then reads or writes outside the intended directory. Reduce
++      it to a file name (filepath.Base) or check the cleaned path stays under the base directory.
++    metadata: {category: security, cwe: "CWE-22: Path Traversal", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      # Semgrep OSS does not resolve typed receivers such as ($R *http.Request) in Go; gin is bound through the handler signature.
++      - pattern: $R.URL.Query()
++      - pattern: $R.FormValue(...)
++      - pattern: $R.PostFormValue(...)
++      - pattern: $R.URL.Path
++      - pattern: mux.Vars(...)
++      - pattern: $C.QueryParam(...)
++      - patterns:
++          - pattern-either:
++              - pattern-inside: |
++                  func $F(..., $C *gin.Context, ...) { ... }
++              - pattern-inside: |
++                  func(..., $C *gin.Context, ...) { ... }
++          - pattern-either:
++              - pattern: $C.Query(...)
++              - pattern: $C.Param(...)
++              - pattern: $C.PostForm(...)
++              - pattern: $C.DefaultQuery(...)
++    pattern-sinks:
++      - patterns:
++          - pattern-either:
++              - pattern: os.Open($P)
++              - pattern: os.OpenFile($P, ...)
++              - pattern: os.ReadFile($P)
++              - pattern: os.WriteFile($P, ...)
++              - pattern: os.Create($P)
++              - pattern: os.Remove($P)
++              - pattern: os.RemoveAll($P)
++              - pattern: ioutil.ReadFile($P)
++              - pattern: ioutil.WriteFile($P, ...)
++              - pattern: http.ServeFile($W, $REQ, $P)
++              - patterns:
++                  - pattern-either:
++                      - pattern-inside: |
++                          func $F(..., $C *gin.Context, ...) { ... }
++                      - pattern-inside: |
++                          func(..., $C *gin.Context, ...) { ... }
++                  - pattern: $C.File($P)
++          - focus-metavariable: $P
++    pattern-sanitizers:
++      - pattern: filepath.Base(...)
++      - pattern: path.Base(...)
++  - id: pipeline-go-ssrf
++    languages: [go]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value decides which URL the server calls. An attacker can then make the server reach internal hosts or cloud metadata
++      (SSRF). Map the input to an allowlisted host or path instead of passing a URL through.
++    metadata: {category: security, cwe: "CWE-918: Server-Side Request Forgery", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - pattern: $R.URL.Query()
++      - pattern: $R.FormValue(...)
++      - pattern: $R.PostFormValue(...)
++      - pattern: mux.Vars(...)
++      - pattern: $C.QueryParam(...)
++      - patterns:
++          - pattern-either:
++              - pattern-inside: |
++                  func $F(..., $C *gin.Context, ...) { ... }
++              - pattern-inside: |
++                  func(..., $C *gin.Context, ...) { ... }
++          - pattern-either:
++              - pattern: $C.Query(...)
++              - pattern: $C.Param(...)
++              - pattern: $C.PostForm(...)
++              - pattern: $C.DefaultQuery(...)
++    pattern-sinks:
++      # The URL argument is the sink; one that starts with a literal scheme, host and "/" fixes the host and does not count.
++      - patterns:
++          - pattern-either:
++              - pattern: http.Get($U)
++              - pattern: http.Head($U)
++              - pattern: http.Post($U, ...)
++              - pattern: http.PostForm($U, ...)
++              - pattern: http.NewRequest($M, $U, ...)
++              - pattern: http.NewRequestWithContext($CTX, $M, $U, ...)
++          - metavariable-regex:
++              metavariable: $U
++              regex: '^(?!(?:fmt\.Sprintf\()?["`]https?://[^"`/]+/)'
++          - focus-metavariable: $U
++  - id: pipeline-go-weak-crypto
++    languages: [go]
++    severity: WARNING
++    message: >-
++      A broken hash or cipher (MD5, SHA-1, DES, 3DES, RC4) is used. Use SHA-256 or better and AES-GCM.
++    metadata: {category: security, cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm", confidence: MEDIUM}
++    pattern-either:
++      - pattern: md5.New()
++      - pattern: md5.Sum(...)
++      - pattern: sha1.New()
++      - pattern: sha1.Sum(...)
++      - pattern: des.NewCipher(...)
++      - pattern: des.NewTripleDESCipher(...)
++      - pattern: rc4.NewCipher(...)
++
++  # ----- JavaScript / TypeScript -----
++  # The shell-string command rule for JS/TS is pipeline-default-child-process-shell-string above (WARNING, unchanged).
++  - id: pipeline-js-sql-injection
++    languages: [javascript, typescript]
++    severity: ERROR
++    message: >-
++      A SQL statement is built with a template literal or concatenation and handed to query(), execute(), raw() or an *Unsafe Prisma
++      call. Use placeholders, or a tagged sql`...` template that binds the values.
++    metadata: {category: security, cwe: "CWE-89: SQL Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: $DB.$EXEC($Q, ...)
++          - patterns:
++              - pattern-inside: |
++                  const $V = $Q;
++                  ...
++              - pattern: $DB.$EXEC($V, ...)
++          - patterns:
++              - pattern-inside: |
++                  let $V = $Q;
++                  ...
++              - pattern: $DB.$EXEC($V, ...)
++      - metavariable-regex:
++          metavariable: $EXEC
++          regex: ^(query|execute|raw|whereRaw|joinRaw|orderByRaw|havingRaw|\$queryRawUnsafe|\$executeRawUnsafe|unsafe)$
++      - metavariable-regex:
++          metavariable: $Q
++          regex: '(?is)^(?:`\s*(?:select|insert|update|delete|merge|with|call|exec)\b[^`]*\$\{|["'']\s*(?:select|insert|update|delete|merge|with|call|exec)\b[^"'']*["'']\s*\+(?:\s*["''][^"'']*["'']\s*\+)*\s*[^"''\s])'
++  - id: pipeline-js-insecure-deserialization
++    languages: [javascript, typescript]
++    severity: ERROR
++    message: >-
++      node-serialize (and the similar funcster/serialize-to-js unserializers) run functions embedded in the input, which is remote code
++      execution on untrusted data. Use JSON.parse.
++    metadata: {category: security, cwe: "CWE-502: Deserialization of Untrusted Data", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - patterns:
++          - pattern-either:
++              - pattern-inside: |
++                  $S = require("node-serialize");
++                  ...
++              - pattern-inside: |
++                  import $S from "node-serialize";
++                  ...
++              - pattern-inside: |
++                  import * as $S from "node-serialize";
++                  ...
++          - pattern: $S.unserialize(...)
++      - pattern: require("node-serialize").unserialize(...)
++      - pattern: require("serialize-to-js").deserialize(...)
++      - pattern: require("funcster").deepDeserialize(...)
++  - id: pipeline-js-tls-verification-disabled
++    languages: [javascript, typescript]
++    severity: ERROR
++    message: >-
++      Certificate verification is switched off (rejectUnauthorized false, NODE_TLS_REJECT_UNAUTHORIZED 0). Any network attacker can
++      then read and change the traffic. Keep it on and pass the CA instead.
++    metadata: {category: security, cwe: "CWE-295: Improper Certificate Validation", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: |
++          {..., rejectUnauthorized: false, ...}
++      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = $V
++      - pattern: process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = $V
++  - id: pipeline-js-xxe
++    languages: [javascript, typescript]
++    severity: ERROR
++    message: >-
++      libxmljs is told to substitute entities (noent true), so an XML document can read local files or reach internal hosts (XXE).
++      Leave noent off.
++    metadata: {category: security, cwe: "CWE-611: Improper Restriction of XML External Entity Reference", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: |
++          $L.parseXml($X, {..., noent: true, ...})
++      - pattern: |
++          $L.parseXmlString($X, {..., noent: true, ...})
++      - pattern: |
++          $L.parseXmlAsync($X, {..., noent: true, ...})
++  - id: pipeline-js-path-traversal
++    languages: [javascript, typescript]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value reaches a file path. A value such as ../../etc/passwd then reads or writes outside the intended directory. Reduce
++      it to a file name (path.basename) or check the resolved path stays under the base directory.
++    metadata: {category: security, cwe: "CWE-22: Path Traversal", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - patterns:
++          - pattern-either:
++              - pattern: req.$ATTR
++              - pattern: request.$ATTR
++              - pattern: ctx.$ATTR
++              - pattern: ctx.request.$ATTR
++          - metavariable-regex:
++              metavariable: $ATTR
++              regex: ^(query|params|body|cookies|headers|files|file)$
++    pattern-sinks:
++      - patterns:
++          - pattern-either:
++              - pattern: fs.$FN($P, ...)
++              - pattern: fs.promises.$FN($P, ...)
++              - pattern: fsp.$FN($P, ...)
++          - metavariable-regex:
++              metavariable: $FN
++              regex: ^(readFile|readFileSync|createReadStream|writeFile|writeFileSync|createWriteStream|appendFile|appendFileSync|unlink|unlinkSync|rm|rmSync|open|openSync|readdir|readdirSync|copyFile|copyFileSync|rename|renameSync)$
++          - focus-metavariable: $P
++      - patterns:
++          - pattern-either:
++              - pattern: $RES.sendFile($P, ...)
++              - pattern: $RES.download($P, ...)
++          - focus-metavariable: $P
++    pattern-sanitizers:
++      - pattern: path.basename(...)
++  - id: pipeline-js-ssrf
++    languages: [javascript, typescript]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value decides which URL the server calls. An attacker can then make the server reach internal hosts or cloud metadata
++      (SSRF). Map the input to an allowlisted host or path instead of passing a URL through.
++    metadata: {category: security, cwe: "CWE-918: Server-Side Request Forgery", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - patterns:
++          - pattern-either:
++              - pattern: req.$ATTR
++              - pattern: request.$ATTR
++              - pattern: ctx.$ATTR
++              - pattern: ctx.request.$ATTR
++          - metavariable-regex:
++              metavariable: $ATTR
++              regex: ^(query|params|body|cookies|headers)$
++    pattern-sinks:
++      # The URL argument is the sink; one that starts with a literal scheme, host and "/" fixes the host and does not count.
++      - patterns:
++          - pattern-either:
++              - pattern: fetch($U, ...)
++              - pattern: axios($U, ...)
++              - pattern: axios.$M($U, ...)
++              - pattern: got($U, ...)
++              - pattern: got.$M($U, ...)
++              - pattern: http.get($U, ...)
++              - pattern: https.get($U, ...)
++              - pattern: http.request($U, ...)
++              - pattern: https.request($U, ...)
++              - pattern: needle($M, $U, ...)
++              - pattern: superagent.$M($U, ...)
++          - metavariable-regex:
++              metavariable: $U
++              regex: '^(?![`"'']https?://[^`"''/$]+/)'
++          - focus-metavariable: $U
++  - id: pipeline-js-weak-crypto
++    languages: [javascript, typescript]
++    severity: WARNING
++    message: >-
++      A broken hash or cipher (MD5, SHA-1, DES, 3DES, RC4) or the ECB mode is used. Use SHA-256 or better and AES-GCM.
++    metadata: {category: security, cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm", confidence: MEDIUM}
++    patterns:
++      - pattern-either:
++          - pattern: crypto.createHash($ALG, ...)
++          - pattern: createHash($ALG, ...)
++          - pattern: crypto.createCipheriv($ALG, ...)
++          - pattern: createCipheriv($ALG, ...)
++      - metavariable-regex:
++          metavariable: $ALG
++          regex: '(?i)^["''`](?:md4|md5|sha1|rmd160|des|des-[a-z0-9-]*|des3|des-ede[a-z0-9-]*|rc2[a-z0-9-]*|rc4[a-z0-9-]*|bf[a-z0-9-]*|[a-z0-9-]*-ecb)["''`]$'
++
++  # ----- Kotlin -----
++  - id: pipeline-kotlin-sql-injection
++    languages: [kotlin]
++    severity: ERROR
++    message: >-
++      A SQL statement is built with a string template or concatenation and handed to a query call. Use placeholders or named
++      parameters and bind the value.
++    metadata: {category: security, cwe: "CWE-89: SQL Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: $DB.$EXEC($Q, ...)
++          - patterns:
++              - pattern-inside: |
++                  val $V = $Q
++                  ...
++              - pattern: $DB.$EXEC($V, ...)
++      - metavariable-regex:
++          metavariable: $EXEC
++          regex: ^(executeQuery|executeUpdate|executeLargeUpdate|execute|addBatch|prepareStatement|prepareCall|createQuery|createNativeQuery|query|queryForObject|queryForList|queryForMap|queryForRowSet|update|batchUpdate|sql)$
++      - metavariable-regex:
++          metavariable: $Q
++          regex: '(?is)^(?:"{1,3}\s*(?:select|insert|update|delete|merge|with|call|exec)\b[^"]*\$[{A-Za-z_]|"{1,3}\s*(?:select|insert|update|delete|merge|with|call|exec)\b[^"]*"{1,3}\s*\+(?:\s*"[^"]*"\s*\+)*\s*[^"\s])'
++  - id: pipeline-kotlin-command-injection
++    languages: [kotlin]
++    severity: ERROR
++    message: >-
++      A shell is started with a command line built from a runtime value, or Runtime.exec gets a templated or concatenated string. Run
++      the program directly with an argument list and no shell, and validate the arguments.
++    metadata: {category: security, cwe: "CWE-78: OS Command Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - patterns:
++          - pattern: ProcessBuilder($SH, $FLAG, $CMD, ...)
++          - metavariable-regex:
++              metavariable: $SH
++              regex: '(?i)^"(?:[^"]*[\\/])?(?:sh|bash|zsh|ksh|dash|cmd|cmd\.exe|powershell|powershell\.exe|pwsh|pwsh\.exe)"$'
++          - metavariable-regex:
++              metavariable: $FLAG
++              regex: '(?i)^"(?:-c|/c|-command)"$'
++          - metavariable-regex:
++              metavariable: $CMD
++              regex: '^(?!"[^"$]*"$)'
++      - patterns:
++          - pattern: Runtime.getRuntime().exec($C, ...)
++          - metavariable-regex:
++              metavariable: $C
++              regex: '(?s)^(?:"[^"]*\$[{A-Za-z_]|"[^"]*"\s*\+)'
++  - id: pipeline-kotlin-insecure-deserialization
++    languages: [kotlin]
++    severity: ERROR
++    message: >-
++      Java serialization (ObjectInputStream, XMLDecoder) or Jackson default typing turns the bytes into arbitrary classes, which is
++      remote code execution on untrusted input. Use a data format without type information, or an ObjectInputFilter allowlist.
++    metadata: {category: security, cwe: "CWE-502: Deserialization of Untrusted Data", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: ObjectInputStream(...).readObject()
++      - patterns:
++          - pattern-inside: |
++              val $O = ObjectInputStream(...)
++              ...
++          - pattern: $O.readObject()
++      - pattern: XMLDecoder(...)
++      - pattern: $MAPPER.enableDefaultTyping(...)
++  - id: pipeline-kotlin-tls-verification-disabled
++    languages: [kotlin]
++    severity: ERROR
++    message: >-
++      Certificate or host name verification is switched off (an empty checkServerTrusted, a host name verifier that accepts every
++      host). Any network attacker can then read and change the traffic. Keep the default verification.
++    metadata: {category: security, cwe: "CWE-295: Improper Certificate Validation", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: |
++          fun checkServerTrusted(...) {}
++      - pattern: HostnameVerifier { $A, $B -> true }
++      - pattern: $B.hostnameVerifier { $A, $S -> true }
++      - pattern: NoopHostnameVerifier.INSTANCE
++      - pattern: NoopHostnameVerifier()
++      - pattern: TrustAllStrategy.INSTANCE
++      - pattern: InsecureTrustManagerFactory.INSTANCE
++  - id: pipeline-kotlin-xxe
++    languages: [kotlin]
++    severity: ERROR
++    message: >-
++      An XML parser factory is created without switching off DOCTYPE declarations or external entities in the same function, so a
++      document can read local files or reach internal hosts (XXE). Set disallow-doctype-decl right after creating the factory.
++    metadata: {category: security, cwe: "CWE-611: Improper Restriction of XML External Entity Reference", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: DocumentBuilderFactory.newInstance()
++          - pattern: SAXParserFactory.newInstance()
++          - pattern: XMLInputFactory.newInstance()
++          - pattern: XMLInputFactory.newFactory()
++      - pattern-not-inside: |
++          fun $M(...): $RT {
++            ...
++            $F.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
++            ...
++          }
++      - pattern-not-inside: |
++          fun $M(...) {
++            ...
++            $F.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
++            ...
++          }
++      - pattern-not-inside: |
++          fun $M(...): $RT {
++            ...
++            $F.setProperty(XMLInputFactory.SUPPORT_DTD, false)
++            ...
++          }
++      - pattern-not-inside: |
++          fun $M(...) {
++            ...
++            $F.setProperty(XMLInputFactory.SUPPORT_DTD, false)
++            ...
++          }
++  - id: pipeline-kotlin-path-traversal
++    languages: [kotlin]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value reaches a file path. A value such as ../../etc/passwd then reads or writes outside the intended directory. Reduce
++      it to a file name (File(name).name) or check the normalized path stays under the base directory.
++    metadata: {category: security, cwe: "CWE-22: Path Traversal", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - patterns:
++          - pattern-either:
++              - pattern-inside: |
++                  fun $M(..., @$A(...) $P: $T, ...): $RT { ... }
++              - pattern-inside: |
++                  fun $M(..., @$A $P: $T, ...): $RT { ... }
++              - pattern-inside: |
++                  fun $M(..., @$A(...) $P: $T, ...) { ... }
++              - pattern-inside: |
++                  fun $M(..., @$A $P: $T, ...) { ... }
++          - metavariable-regex:
++              metavariable: $A
++              regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
++          - pattern: $P
++      - pattern: $REQ.getParameter(...)
++      - pattern: $CALL.request.queryParameters[...]
++      - pattern: $CALL.parameters[...]
++    pattern-sinks:
++      - patterns:
++          - pattern-either:
++              - pattern: File($P)
++              - pattern: File($BASE, $P)
++              - pattern: FileInputStream($P)
++              - pattern: FileOutputStream($P)
++              - pattern: Paths.get(..., $P, ...)
++              - pattern: Path.of(..., $P, ...)
++              - pattern: $BASE.resolve($P)
++          - focus-metavariable: $P
++    pattern-sanitizers:
++      - pattern: FilenameUtils.getName(...)
++      - pattern: File(...).name
++  - id: pipeline-kotlin-ssrf
++    languages: [kotlin]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value decides which URL the server calls. An attacker can then make the server reach internal hosts or cloud metadata
++      (SSRF). Map the input to an allowlisted host or path instead of passing a URL through.
++    metadata: {category: security, cwe: "CWE-918: Server-Side Request Forgery", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - patterns:
++          - pattern-either:
++              - pattern-inside: |
++                  fun $M(..., @$A(...) $P: $T, ...): $RT { ... }
++              - pattern-inside: |
++                  fun $M(..., @$A $P: $T, ...): $RT { ... }
++              - pattern-inside: |
++                  fun $M(..., @$A(...) $P: $T, ...) { ... }
++              - pattern-inside: |
++                  fun $M(..., @$A $P: $T, ...) { ... }
++          - metavariable-regex:
++              metavariable: $A
++              regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
++          - pattern: $P
++      - pattern: $REQ.getParameter(...)
++      - pattern: $CALL.request.queryParameters[...]
++      - pattern: $CALL.parameters[...]
++    pattern-sinks:
++      # The URL argument is the sink; one that starts with a literal scheme, host and "/" fixes the host and does not count.
++      - patterns:
++          - pattern-either:
++              - pattern: URL($U)
++              - pattern: URI($U)
++              - pattern: URI.create($U)
++              - pattern: $C.getForObject($U, ...)
++              - pattern: $C.getForEntity($U, ...)
++              - pattern: $C.postForObject($U, ...)
++              - pattern: $C.exchange($U, ...)
++              - pattern: $C.uri($U, ...)
++              - pattern: $C.get($U)
++          - metavariable-regex:
++              metavariable: $U
++              regex: '^(?!"https?://[^"/$]+/)'
++          - focus-metavariable: $U
++  - id: pipeline-kotlin-weak-crypto
++    languages: [kotlin]
++    severity: WARNING
++    message: >-
++      A broken hash or cipher (MD5, SHA-1, DES, 3DES, RC2, RC4, Blowfish) or the ECB mode (also the default of a bare "AES") is used.
++      Use SHA-256 or better, and AES-GCM.
++    metadata: {category: security, cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm", confidence: MEDIUM}
++    patterns:
++      - pattern-either:
++          - pattern: MessageDigest.getInstance($ALG, ...)
++          - pattern: Cipher.getInstance($ALG, ...)
++          - pattern: KeyGenerator.getInstance($ALG, ...)
++      - metavariable-regex:
++          metavariable: $ALG
++          regex: '(?i)^"(?:(?:md2|md4|md5|sha|sha-?1|des|desede|tripledes|rc2|rc4|arcfour|blowfish)(?:/[^"]*)?|aes|[^"]*/ecb/[^"]*)"$'
++
++  # ----- PHP -----
++  - id: pipeline-php-sql-injection
++    languages: [php]
++    severity: ERROR
++    message: >-
++      A SQL statement is built by interpolating or concatenating a variable into the SQL text and handed to query(), exec() or a raw
++      query. Use a prepared statement with bound parameters.
++    metadata: {category: security, cwe: "CWE-89: SQL Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: $DB->$EXEC($Q, ...)
++          - pattern: $CLS::$EXEC($Q, ...)
++          - pattern: $FN($CONN, $Q, ...)
++          - patterns:
++              - pattern-inside: |
++                  $V = $Q;
++                  ...
++              - pattern-either:
++                  - pattern: $DB->$EXEC($V, ...)
++                  - pattern: $CLS::$EXEC($V, ...)
++                  - pattern: $FN($CONN, $V, ...)
++      - metavariable-regex:
++          metavariable: $Q
++          regex: '(?is)^(?:"\s*(?:select|insert|update|delete|merge|with|call|exec)\b[^"]*\$|["'']\s*(?:select|insert|update|delete|merge|with|call|exec)\b.*?["'']\s*\.(?:\s*["''][^"'']*["'']\s*\.)*\s*[^"''\s]|sprintf\(\s*["'']\s*(?:select|insert|update|delete|merge|with|call|exec)\b)'
++      - pattern-either:
++          - patterns:
++              - pattern-either:
++                  - pattern: $DB->$EXEC(...)
++                  - pattern: $CLS::$EXEC(...)
++              - metavariable-regex:
++                  metavariable: $EXEC
++                  regex: ^(query|exec|prepare|multi_query|real_query|select|statement|unprepared|raw|whereRaw|selectRaw|orderByRaw|havingRaw|fetchAll|executeQuery|executeStatement)$
++          - patterns:
++              - pattern: $FN(...)
++              - metavariable-regex:
++                  metavariable: $FN
++                  regex: ^(mysqli_query|mysqli_multi_query|mysqli_real_query|pg_query|sqlsrv_query|odbc_exec|oci_parse)$
++  - id: pipeline-php-command-injection
++    languages: [php]
++    severity: ERROR
++    message: >-
++      A shell runs a command line that is not a fixed string. Use escapeshellarg() for every argument, or avoid the shell (proc_open
++      with an argument array).
++    metadata: {category: security, cwe: "CWE-78: OS Command Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern-either:
++          - pattern: system($CMD, ...)
++          - pattern: exec($CMD, ...)
++          - pattern: shell_exec($CMD)
++          - pattern: passthru($CMD, ...)
++          - pattern: popen($CMD, ...)
++      - metavariable-regex:
++          metavariable: $CMD
++          regex: '(?s)^(?!''[^'']*''$|"[^"$]*"$)(?!.*escapeshell(?:arg|cmd)\()'
++  - id: pipeline-php-insecure-deserialization
++    languages: [php]
++    severity: ERROR
++    message: >-
++      unserialize() without allowed_classes false instantiates any class the input names, which is object injection and often remote
++      code execution. Use json_decode, or pass ['allowed_classes' => false].
++    metadata: {category: security, cwe: "CWE-502: Deserialization of Untrusted Data", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    patterns:
++      - pattern: unserialize(...)
++      - pattern-not: unserialize($X, ['allowed_classes' => false])
++      - pattern-not: unserialize($X, array('allowed_classes' => false))
++  - id: pipeline-php-tls-verification-disabled
++    languages: [php]
++    severity: ERROR
++    message: >-
++      Certificate or host name verification is switched off (CURLOPT_SSL_VERIFYPEER/VERIFYHOST, verify_peer, Guzzle verify false).
++      Any network attacker can then read and change the traffic. Keep the verification on.
++    metadata: {category: security, cwe: "CWE-295: Improper Certificate Validation", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: curl_setopt($C, CURLOPT_SSL_VERIFYPEER, false)
++      - pattern: curl_setopt($C, CURLOPT_SSL_VERIFYPEER, 0)
++      - pattern: curl_setopt($C, CURLOPT_SSL_VERIFYHOST, 0)
++      - pattern: curl_setopt($C, CURLOPT_SSL_VERIFYHOST, false)
++      - pattern: |
++          [..., 'verify_peer' => false, ...]
++      - pattern: |
++          [..., 'verify_peer_name' => false, ...]
++      - pattern: |
++          [..., 'verify' => false, ...]
++  - id: pipeline-php-xxe
++    languages: [php]
++    severity: ERROR
++    message: >-
++      LIBXML_NOENT or LIBXML_DTDLOAD, or re-enabling the entity loader, lets an XML document read local files or reach internal hosts
++      (XXE). Parse without these flags.
++    metadata: {category: security, cwe: "CWE-611: Improper Restriction of XML External Entity Reference", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: LIBXML_NOENT
++      - pattern: LIBXML_DTDLOAD
++      - pattern: libxml_disable_entity_loader(false)
++  - id: pipeline-php-path-traversal
++    languages: [php]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value reaches a file path or an include. A value such as ../../etc/passwd then reads, writes or executes outside the
++      intended directory. Reduce it to a file name (basename) or check the realpath stays under the base directory.
++    metadata: {category: security, cwe: "CWE-22: Path Traversal", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - pattern: $_GET
++      - pattern: $_POST
++      - pattern: $_REQUEST
++      - pattern: $_COOKIE
++      - pattern: $_FILES
++      - pattern: $REQUEST->input(...)
++      - pattern: $REQUEST->query(...)
++    pattern-sinks:
++      - patterns:
++          - pattern-either:
++              - pattern: file_get_contents($P, ...)
++              - pattern: file_put_contents($P, ...)
++              - pattern: fopen($P, ...)
++              - pattern: readfile($P, ...)
++              - pattern: file($P, ...)
++              - pattern: unlink($P, ...)
++              - pattern: include($P)
++              - pattern: include_once($P)
++              - pattern: require($P)
++              - pattern: require_once($P)
++          - focus-metavariable: $P
++    pattern-sanitizers:
++      - pattern: basename(...)
++  - id: pipeline-php-ssrf
++    languages: [php]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value decides which URL the server calls. An attacker can then make the server reach internal hosts or cloud metadata
++      (SSRF). Map the input to an allowlisted host or path instead of passing a URL through.
++    metadata: {category: security, cwe: "CWE-918: Server-Side Request Forgery", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - pattern: $_GET
++      - pattern: $_POST
++      - pattern: $_REQUEST
++      - pattern: $_COOKIE
++      - pattern: $REQUEST->input(...)
++      - pattern: $REQUEST->query(...)
++    pattern-sinks:
++      # The URL argument is the sink; one that starts with a literal scheme, host and "/" fixes the host and does not count.
++      - patterns:
++          - pattern-either:
++              - pattern: curl_init($U)
++              - pattern: curl_setopt($C, CURLOPT_URL, $U)
++              - pattern: $CLIENT->request($M, $U, ...)
++              - pattern: Http::get($U, ...)
++              - pattern: Http::post($U, ...)
++          - metavariable-regex:
++              metavariable: $U
++              regex: '^(?!["'']https?://[^"''/$]+/)'
++          - focus-metavariable: $U
++  - id: pipeline-php-weak-crypto
++    languages: [php]
++    severity: WARNING
++    message: >-
++      A broken hash or cipher (MD5, SHA-1, DES, RC4) or the ECB mode is used for a security purpose. Use hash('sha256') or
++      password_hash() and AES-GCM.
++    metadata: {category: security, cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm", confidence: LOW}
++    pattern-either:
++      - pattern: md5(...)
++      - pattern: sha1(...)
++      - patterns:
++          - pattern-either:
++              - pattern: hash($ALG, ...)
++              - pattern: openssl_encrypt($D, $ALG, ...)
++              - pattern: openssl_decrypt($D, $ALG, ...)
++          - metavariable-regex:
++              metavariable: $ALG
++              regex: '(?i)^["''](?:md4|md5|sha1|des[a-z0-9-]*|rc2[a-z0-9-]*|rc4[a-z0-9-]*|bf[a-z0-9-]*|[a-z0-9-]*-ecb)["'']$'
++
++  # ----- Ruby -----
++  - id: pipeline-ruby-sql-injection
++    languages: [ruby]
++    severity: ERROR
++    message: >-
++      A SQL fragment is built with string interpolation or concatenation and handed to where/order/find_by_sql/execute. Use bound
++      parameters (where("name = ?", name), sanitize_sql) instead.
++    metadata: {category: security, cwe: "CWE-89: SQL Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - patterns:
++          - pattern: $M.$EXEC($Q, ...)
++          - metavariable-regex:
++              metavariable: $EXEC
++              regex: ^(where|having|order|reorder|group|joins|from|pluck|lock|find_by|delete_all|update_all|destroy_all|exists\?)$
++          - metavariable-regex:
++              metavariable: $Q
++              regex: '(?s)^(?:"[^"]*#\{|["''][^"'']*["'']\s*\+\s*[^"''\s])'
++      - patterns:
++          - pattern-either:
++              - pattern: $M.$EXEC($Q, ...)
++              - patterns:
++                  - pattern-inside: |
++                      $V = $Q
++                      ...
++                  - pattern: $M.$EXEC($V, ...)
++          - metavariable-regex:
++              metavariable: $EXEC
++              regex: ^(execute|exec_query|exec_update|exec_delete|exec_insert|find_by_sql|count_by_sql|select_all|select_one|select_value|select_values|select_rows)$
++          - metavariable-regex:
++              metavariable: $Q
++              regex: '(?is)^(?:"\s*(?:select|insert|update|delete|merge|with|call|exec)\b[^"]*#\{|["'']\s*(?:select|insert|update|delete|merge|with|call|exec)\b[^"'']*["'']\s*\+\s*[^"''\s])'
++  - id: pipeline-ruby-command-injection
++    languages: [ruby]
++    severity: ERROR
++    message: >-
++      A shell runs a command line built with interpolation, concatenation or a variable (system, exec, backticks, %x, IO.popen, Open3
++      with one string). Pass the program and its arguments separately so no shell is involved.
++    metadata: {category: security, cwe: "CWE-78: OS Command Injection", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - patterns:
++          - pattern-either:
++              - pattern: system($CMD)
++              - pattern: exec($CMD)
++              - pattern: spawn($CMD)
++              - pattern: IO.popen($CMD, ...)
++              - pattern: Open3.capture2($CMD)
++              - pattern: Open3.capture2e($CMD)
++              - pattern: Open3.capture3($CMD)
++              - pattern: Open3.popen3($CMD)
++          - metavariable-regex:
++              metavariable: $CMD
++              regex: '^(?!''[^'']*''$|"[^"#]*"$|\[)'
++      - pattern-regex: '(?m)^[^#\n]*(?:`[^`\n]*#\{[^`\n]*`|%x[\(\{\[][^\n]*#\{)'
++  - id: pipeline-ruby-insecure-deserialization
++    languages: [ruby]
++    severity: ERROR
++    message: >-
++      Marshal.load, YAML/Psych unsafe_load or Oj object mode turn the input into arbitrary objects, which is remote code execution on
++      untrusted data. Use JSON or YAML.safe_load.
++    metadata: {category: security, cwe: "CWE-502: Deserialization of Untrusted Data", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: Marshal.load(...)
++      - pattern: Marshal.restore(...)
++      - pattern: YAML.unsafe_load(...)
++      - pattern: Psych.unsafe_load(...)
++      - pattern: Oj.object_load(...)
++      - pattern: 'Oj.load(..., mode: :object, ...)'
++  - id: pipeline-ruby-tls-verification-disabled
++    languages: [ruby]
++    severity: ERROR
++    message: >-
++      Certificate verification is switched off (OpenSSL::SSL::VERIFY_NONE, verify false). Any network attacker can then read and
++      change the traffic. Keep VERIFY_PEER.
++    metadata: {category: security, cwe: "CWE-295: Improper Certificate Validation", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: OpenSSL::SSL::VERIFY_NONE
++      - pattern: 'Faraday.new(..., ssl: {verify: false}, ...)'
++      - pattern: 'HTTParty.$M(..., verify: false, ...)'
++  - id: pipeline-ruby-xxe
++    languages: [ruby]
++    severity: ERROR
++    message: >-
++      The XML parser is told to substitute entities or load the DTD (NOENT, DTDLOAD), so a document can read local files or reach
++      internal hosts (XXE). Parse with the default options.
++    metadata: {category: security, cwe: "CWE-611: Improper Restriction of XML External Entity Reference", confidence: HIGH}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-either:
++      - pattern: Nokogiri::XML::ParseOptions::NOENT
++      - pattern: Nokogiri::XML::ParseOptions::DTDLOAD
++      - pattern: LibXML::XML::Parser::Options::NOENT
++      - pattern: $CONFIG.noent
++      - pattern: $CONFIG.dtdload
++  - id: pipeline-ruby-path-traversal
++    languages: [ruby]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value reaches a file path. A value such as ../../etc/passwd then reads or writes outside the intended directory. Reduce
++      it to a file name (File.basename) or check the expanded path stays under the base directory.
++    metadata: {category: security, cwe: "CWE-22: Path Traversal", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - pattern: params
++      - pattern: cookies
++      - pattern: request.params
++    pattern-sinks:
++      - patterns:
++          - pattern-either:
++              - pattern: File.read($P, ...)
++              - pattern: File.open($P, ...)
++              - pattern: File.new($P, ...)
++              - pattern: File.write($P, ...)
++              - pattern: File.delete($P, ...)
++              - pattern: File.binread($P, ...)
++              - pattern: IO.read($P, ...)
++              - pattern: FileUtils.rm_rf($P, ...)
++              - pattern: send_file($P, ...)
++          - focus-metavariable: $P
++    pattern-sanitizers:
++      - pattern: File.basename(...)
++  - id: pipeline-ruby-ssrf
++    languages: [ruby]
++    severity: ERROR
++    mode: taint
++    message: >-
++      A request value decides which URL the server calls. An attacker can then make the server reach internal hosts or cloud metadata
++      (SSRF). Map the input to an allowlisted host or path instead of passing a URL through.
++    metadata: {category: security, cwe: "CWE-918: Server-Side Request Forgery", confidence: MEDIUM}
++    paths:
++      exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
++        "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
++        "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    pattern-sources:
++      - pattern: params
++      - pattern: cookies
++      - pattern: request.params
++    pattern-sinks:
++      # The URL argument is the sink; one that starts with a literal scheme, host and "/" fixes the host and does not count.
++      - patterns:
++          - pattern-either:
++              - pattern: URI($U)
++              - pattern: URI.parse($U)
++              - pattern: URI.open($U, ...)
++              - pattern: Net::HTTP.get($U, ...)
++              - pattern: Net::HTTP.get_response($U, ...)
++              - pattern: HTTParty.$M($U, ...)
++              - pattern: Faraday.$M($U, ...)
++              - pattern: RestClient.$M($U, ...)
++          - metavariable-regex:
++              metavariable: $U
++              regex: '^(?!(?:URI(?:\.parse)?\(\s*)?["'']https?://[^"''/#]+/)'
++          - focus-metavariable: $U
++  - id: pipeline-ruby-weak-crypto
++    languages: [ruby]
++    severity: WARNING
++    message: >-
++      A broken hash or cipher (MD5, SHA-1, DES, RC4) or the ECB mode is used. Use SHA-256 or better and AES-GCM.
++    metadata: {category: security, cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm", confidence: MEDIUM}
++    pattern-either:
++      - pattern: Digest::MD5.$M(...)
++      - pattern: Digest::SHA1.$M(...)
++      - pattern: OpenSSL::Digest::MD5.new(...)
++      - pattern: OpenSSL::Digest::SHA1.new(...)
++      - patterns:
++          - pattern-either:
++              - pattern: OpenSSL::Digest.new($ALG)
++              - pattern: OpenSSL::Cipher.new($ALG)
++          - metavariable-regex:
++              metavariable: $ALG
++              regex: '(?i)^["''](?:md4|md5|sha1|des[a-z0-9-]*|rc2[a-z0-9-]*|rc4[a-z0-9-]*|bf[a-z0-9-]*|[a-z0-9-]*-ecb)["'']$'

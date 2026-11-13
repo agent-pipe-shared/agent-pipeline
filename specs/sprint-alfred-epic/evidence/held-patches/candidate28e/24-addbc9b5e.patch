@@ -1,0 +1,188 @@
+diff --git a/plugins/pipeline-core/lib/feature-package-topology.mjs b/plugins/pipeline-core/lib/feature-package-topology.mjs
+index b1dfccbbcc3e1a2bb42a37e9e99143e72c2c9c10..78fdcd28bfc6e85acc66616e0593c4838fadb710 100644
+--- a/plugins/pipeline-core/lib/feature-package-topology.mjs
++++ b/plugins/pipeline-core/lib/feature-package-topology.mjs
+@@ -37,6 +37,19 @@ function packageRelative(id, value) {
+   const prefix = `specs/${id}/`;
+   return typeof value === "string" && value.startsWith(prefix) ? value.slice(prefix.length) : null;
+ }
++// C28e (Glossover G7, PO decision 2026-11-13): the PRD and the Spec stay where the PO approved them. A feature whose id changed after the
++// design (G1) keeps its approved PRD and Spec in the earlier folder; the package carries them at that path, bound by digest like every
++// entry. Only these two classes, only inside specs/, never in a folder that is itself another feature's package; every other artifact
++// stays under specs/<id>/.
++const APPROVED_SOURCE_CLASSES = new Set(["prd", "spec"]);
++export function featurePackageArtifactPath(rootDir, id, artifactClass, value) {
++  const root = resolve(rootDir);
++  if (!SAFE_ID.test(id ?? "") || !canonicalRelative(root, value)) return false;
++  if (packageRelative(id, value) !== null) return true;
++  if (!APPROVED_SOURCE_CLASSES.has(artifactClass)) return false;
++  const parts = value.split("/");
++  return parts.length >= 3 && parts[0] === "specs" && parts[1] !== id && !existsSync(join(root, "specs", parts[1], "lifecycle.json"));
++}
+ function regularFile(root, path, findings, code) {
+   const safe = canonicalRelative(root, path);
+   if (!safe) { findings.push(`${code}: unsafe path`); return null; }
+@@ -72,8 +85,7 @@ function walk(root, start) {
+ // class test and is never made configurable.
+ function autoRebindMutableArtifact(root, id, artifact) {
+   if (!object(artifact) || artifact.mutability !== "mutable") return null;
+-  const rel = packageRelative(id, artifact.path);
+-  if (!rel || !canonicalRelative(root, artifact.path)) return null;
++  if (!featurePackageArtifactPath(root, id, artifact.class, artifact.path)) return null;
+   const file = regularFile(root, artifact.path, [], "FTP-AUTOREBIND");
+   if (!file || !SHA256.test(artifact.sha256 ?? "")) return null;
+   const currentSha256 = digest(readFileSync(join(root, file)));
+@@ -185,9 +197,9 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath, pr
+       else if (artifact.amendment?.previousSha256 !== previousEntry.sha256) findings.push(`${label}: amendment.previousSha256 must equal the previously recorded digest`);
+     }
+     if (!FEATURE_CLASSES.includes(artifact.class)) findings.push(`${label}: unsupported class`);
+-    const rel = packageRelative(id, artifact.path);
+-    if (!rel || !canonicalRelative(root, artifact.path)) findings.push(`${label}: path must be canonical within specs/${id}/`);
+-    const file = rel ? regularFile(root, artifact.path, findings, label) : null;
++    const admitted = featurePackageArtifactPath(root, id, artifact.class, artifact.path);
++    if (!admitted) findings.push(`${label}: path must be canonical within specs/${id}/${APPROVED_SOURCE_CLASSES.has(artifact.class) ? " or, for the approved PRD or Spec, within another specs/ folder that is no feature package" : ""}`);
++    const file = admitted ? regularFile(root, artifact.path, findings, label) : null;
+     const caseKey = typeof artifact.path === "string" ? artifact.path.normalize("NFKC").toLocaleLowerCase("en-US") : "";
+     if (caseKey && folded.has(caseKey)) findings.push(`${label}: case-fold or Unicode-normalization collision`);
+     if (caseKey) folded.add(caseKey);
+@@ -511,8 +523,7 @@ export function planFeaturePackageReconcile(rootDir = process.cwd(), manifestPat
+   let liftedPath = null;
+   for (const [index, artifact] of (Array.isArray(value.artifacts) ? value.artifacts : []).entries()) {
+     const label = `FTP-RECONCILE-${index}`;
+-    const rel = packageRelative(id, artifact?.path);
+-    const file = rel && canonicalRelative(root, artifact.path) ? regularFile(root, artifact.path, [], label) : null;
++    const file = featurePackageArtifactPath(root, id, artifact?.class, artifact?.path) ? regularFile(root, artifact.path, [], label) : null;
+     if (!file) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "artifact-unreadable", findings: [`${label}: referenced file is missing or unsafe`] };
+     const currentBytes = readFileSync(join(root, file));
+     const currentSha256 = digest(currentBytes);
+diff --git a/plugins/pipeline-core/lib/feature-package-topology.test.mjs b/plugins/pipeline-core/lib/feature-package-topology.test.mjs
+index 58e9583c127b0f1c7b3ce5214d2b09b893d5a6cb..f855bca67b20adf380ad446930991c5e111dc1e0 100644
+--- a/plugins/pipeline-core/lib/feature-package-topology.test.mjs
++++ b/plugins/pipeline-core/lib/feature-package-topology.test.mjs
+@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
+ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+-import { planFeaturePackageBootstrap, planFeaturePackageReconcile, planFeaturePackageTransition, validateFeaturePackage, validateFeatureTopology } from "./feature-package-topology.mjs";
++import { featurePackageArtifactPath, planFeaturePackageBootstrap, planFeaturePackageReconcile, planFeaturePackageTransition, validateFeaturePackage, validateFeatureTopology } from "./feature-package-topology.mjs";
+ import { readFileSync } from "node:fs";
+ 
+ const root = mkdtempSync(join(tmpdir(), "feature-topology-"));
+@@ -283,3 +283,37 @@ try {
+ 
+   console.log("feature-package-topology: planFeaturePackageTransition/planFeaturePackageReconcile options.autoRebindMutable passthrough, 9 passed, 0 failed");
+ } finally { rmSync(wireRoot, { recursive: true, force: true }); }
++
++// C28e (Glossover G7, PO decision 2026-11-13): the feature id changed after the design, so the approved PRD and Spec stayed in the earlier
++// folder. The package carries those two at the approved path; every other class, a path outside specs/ and another feature's package stay refused.
++const approvedPathRoot = mkdtempSync(join(tmpdir(), "feature-topology-approved-path-"));
++try {
++  const id = "renamed-feature"; const base = `specs/${id}`; const earlier = "specs/2026-10-26-renamed-feature";
++  const entry = (klass, path, authority, mutability, retention) => ({ class: klass, ...fileIn(approvedPathRoot, path, `${klass} ${path}\n`), authority, mutability, retention });
++  const core = () => [entry("acceptance", `${base}/acceptance.md`, true, "mutable", "active"), entry("result", `${base}/result.md`, true, "append-only", "retain"),
++    entry("candidate-evidence", `${base}/evidence/accepted-delivery-contract-${"a".repeat(64)}.json`, false, "immutable", "retain")];
++  const manifestPath = `${base}/lifecycle.json`;
++  const validate = (artifacts) => {
++    fileIn(approvedPathRoot, manifestPath, `${JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "approved", artifacts, candidate: null, supersedes: null })}\n`);
++    return validateFeaturePackage(approvedPathRoot, manifestPath);
++  };
++  const approved = validate([entry("prd", `${earlier}/prd.md`, true, "mutable", "active"), entry("spec", `${earlier}/spec.md`, true, "mutable", "active"), ...core()]);
++  assert.equal(approved.ok, true, JSON.stringify(approved.findings));
++  assert.equal(featurePackageArtifactPath(approvedPathRoot, id, "prd", `${base}/prd.md`), true, "inside the package as before");
++  assert.equal(featurePackageArtifactPath(approvedPathRoot, id, "acceptance", `${earlier}/acceptance.md`), false, "only the PRD and the Spec may lie elsewhere");
++  assert.equal(featurePackageArtifactPath(approvedPathRoot, id, "candidate-evidence", `${earlier}/evidence/x.json`), false);
++  for (const outside of ["docs/prd.md", "prd.md", "specs/prd.md", `${earlier}/../outside/prd.md`, `/${earlier}/prd.md`, `${earlier}\\prd.md`]) {
++    assert.equal(featurePackageArtifactPath(approvedPathRoot, id, "prd", outside), false, outside);
++  }
++  const misplaced = validate([entry("prd", `${earlier}/prd.md`, true, "mutable", "active"), entry("spec", `${earlier}/spec.md`, true, "mutable", "active"),
++    entry("acceptance", `${earlier}/acceptance.md`, true, "mutable", "active"), ...core().slice(1)]);
++  assert.equal(misplaced.ok, false);
++  assert.match(misplaced.findings.join("\n"), /FTP-ARTIFACT-2: path must be canonical within specs\/renamed-feature\/$/mu);
++  // Another feature's package is never a place for this feature's sources.
++  fileIn(approvedPathRoot, `${earlier}/lifecycle.json`, "{}\n");
++  assert.equal(featurePackageArtifactPath(approvedPathRoot, id, "prd", `${earlier}/prd.md`), false);
++  const foreign = validate([entry("prd", `${earlier}/prd.md`, true, "mutable", "active"), entry("spec", `${earlier}/spec.md`, true, "mutable", "active"), ...core()]);
++  assert.equal(foreign.ok, false);
++  assert.match(foreign.findings.join("\n"), /FTP-ARTIFACT-0: path must be canonical within specs\/renamed-feature\/ or, for the approved PRD or Spec, within another specs\/ folder that is no feature package/u);
++  console.log("feature-package-topology: approved PRD/Spec path outside the package, 12 passed, 0 failed");
++} finally { rmSync(approvedPathRoot, { recursive: true, force: true }); }
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 85cb79d4def573764656f76442596aea08729627..42b473ba32c9d80477c881466d8eaf079305571b 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -148,6 +148,10 @@ const originalDesignCases = [
+   {
+     "id": "DABX013",
+     "name": "C28e (Codex test run): present-plan names a trust policy that is not in the commit the request would bind, and writes no request"
++  },
++  {
++    "id": "DABX014",
++    "name": "C28e (Glossover G7): present-plan refuses a PRD and Spec the feature package cannot carry, before any request exists"
+   }
+ ];
+ const designCompletionCases = [];
+@@ -979,6 +983,33 @@ test("rebind 4: a request created after the move is signed and approved by the r
+   const state = readState(fx.dir);
+   assert.equal(state.planApproved, true);
+   assert.deepEqual(state.planApproval.designApprovalBinding.pathRebind, { fromDir: "specs/e2e", toDir: MOVED_DIR });
++  // C28e (Glossover G7): the approved PRD and Spec lie outside specs/<feature-id>/. The real registrar carries them at the approved
++  // paths (it refused FTP-ARTIFACT-0/1 "path must be canonical within specs/e2e/" before), every other artifact stays in specs/e2e/,
++  // and the accepted contract then resolves.
++  const registered = spawnSync(process.execPath, [join(HERE, "register-feature-package.mjs"), "--root", fx.dir], { encoding: "utf8" });
++  assert.equal(registered.status, 0, `register-feature-package; stdout: ${registered.stdout}; stderr: ${registered.stderr}`);
++  const manifest = JSON.parse(readFileSync(join(fx.dir, "specs/e2e/lifecycle.json"), "utf8"));
++  const pathOf = (kind) => manifest.artifacts.find((entry) => entry.class === kind)?.path;
++  assert.deepEqual([pathOf("prd"), pathOf("spec")], [`${MOVED_DIR}/prd_e2e.md`, `${MOVED_DIR}/spec.md`], "the PRD and the Spec are carried at the approved paths");
++  for (const entry of manifest.artifacts.filter((item) => item.class !== "prd" && item.class !== "spec")) assert.ok(entry.path.startsWith("specs/e2e/"), entry.path);
++  const accepted = stateModule.readAcceptedDeliveryContract({ dir: fx.dir, envelopePath: state.planApproval.acceptedContract.path });
++  assert.equal(accepted.ok, true, JSON.stringify(accepted));
++});
++
++// C28e (Glossover G7): a PRD and Spec the package could not carry (here: inside another feature's package) are named before the
++// signature, so the state that blocked every dispatch after the approval can no longer be signed.
++test("C28e (Glossover G7): present-plan refuses a PRD and Spec the feature package cannot carry, before any request exists", async (t) => {
++  const fx = await buildSubmittedFeature("rebind-foreign-package", { move: true });
++  writeFileIn(fx.dir, `${MOVED_DIR}/lifecycle.json`, "{}\n");
++  git(fx.dir, "add", "--", `${MOVED_DIR}/lifecycle.json`);
++  git(fx.dir, "commit", "-q", "-m", "fixture: the moved folder is another feature's package");
++  let out;
++  try { out = await presentOwned(fx); } catch (error) { const limitation = hostLimitationOf(error); if (limitation === null) throw error; t.skip(`HOST-LIMITATION ${limitation.reason}`); return; }
++  assert.equal(out.present.status, 2, `present-plan must refuse; stdout: ${out.present.stdout}; stderr: ${out.present.stderr}`);
++  assert.match(out.present.stderr, /DAB-PACKAGE-PATH/u);
++  assert.match(out.present.stderr, new RegExp(`${MOVED_DIR}/prd_e2e\\.md`, "u"));
++  assert.match(out.present.stderr, /Move it into specs\/e2e\/ \(git mv\)/u);
++  assert.equal(out.request, null, "no approval request is written");
+ });
+ 
+ // Every original callback registers exactly once with the official FD3 protocol.
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 301633e18a71065327605fd876d4834e5e4627a7..97077044f1ec10c48bd2c24181ddc58732f9a72c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -513,6 +513,7 @@ import {
+ } from "../lib/plan-spec-state-v2.mjs";
+ import {
+   RESULT_RECONCILIATION_FENCE,
++  featurePackageArtifactPath,
+   inventoryFeaturePackages,
+   planFeaturePackageBootstrap,
+   planFeaturePackageReconcile,
+@@ -10467,6 +10468,18 @@ function beforeSignatureEntryGate(dir, state, submitted, reviewPaths, deps, { ha
+       const paths = [policyPath, ...(current ? [current.prd.path, current.spec.path, ...current.companions.map((entry) => entry.path)] : []), ...reviewPaths];
+       return designCandidateSourceGaps(dir, candidate, [...new Set(paths)], deps);
+     } },
++    // C28e (Glossover G7): after the signature the package registration carries the approved PRD and Spec at their paths. A path the
++    // package topology refuses (outside specs/, or inside another feature's package) blocked the registration and every dispatch after
++    // an approval; it is named here, before a request exists.
++    { id: "package-paths", run: () => {
++      const featureId = submitted.featureId ?? state.activeFeature?.id ?? null;
++      const gaps = [["prd", submitted.planPath], ["spec", submitted.specPath]]
++        .filter(([kind, path]) => typeof path === "string" && !featurePackageArtifactPath(dir, featureId, kind, path))
++        .map(([kind, path]) => ({ code: "DAB-PACKAGE-PATH", path,
++          message: `the ${kind === "prd" ? "PRD" : "Spec"} at ${path} cannot be carried by the feature package of ${featureId}: it must lie in specs/${featureId}/ or in another specs/ folder that is no feature package`,
++          repair: `Move it into specs/${featureId}/ (git mv), commit, then run submit-plan and present-plan again.` }));
++      return gaps.length > 0 ? gaps : null;
++    } },
+     { id: "decision-bindings", run: () => {
+       if (sources() === null) return null;
+       decisionDraft = inspectDesignDecisionBindingsDraft({ rootDir: dir, sources: sources() });

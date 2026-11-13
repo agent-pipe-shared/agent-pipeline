@@ -1,0 +1,95 @@
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 7ebd9237773b2520f9489d75351376034b14d40f..ffb32cb0f5ae70b23e4d4ee5edf5db2211e7ea17 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -307,8 +307,11 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
+   if (unitSeen.kind === "other") return refused("FPR-ARTIFACT-INVALID", `${unitPath} exists but is not a regular file; it is never replaced`, { path: unitPath, manifestPath });
+   if (unitSeen.kind === "file") {
+     // C28e (PO decision 2026-11-13): a unit this registrar generated for an earlier approval names that Spec's criterion ids. When the
+-    // approved Spec now names other ids, the found unit would skip a new criterion and block the Critic batch on a dropped one
+-    // (CGB-REVIEW-UNIT-BINDING); it is rendered anew. A unit of any other shape (a hand-written multi-item unit) is kept as found.
++    // approved Spec now names other ids and no Critic round has run yet, it is rendered anew, so the first round binds the approved ids.
++    // Once a round is retained, the course is bound to the unit's bytes (the declaration commit, CCA/CGB-REVIEW-UNIT-BINDING) and every
++    // later round must carry the same acceptance ids (CRL-V2-CARRY-COVERAGE): the unit is then kept and reported as bound to the course.
++    // A unit of any other shape (a hand-written multi-item unit) is kept as found.
++    const courseStarted = (superseded ?? []).some((entry) => entry.class === "candidate-evidence" && LINEAGE_FILE.test(entry.path));
+     let found = null;
+     try { found = JSON.parse(unitSeen.bytes.toString("utf8")); } catch { found = null; }
+     const rendered = renderCriticReviewUnit({ featureId, specPath, specBytes, mainRef: primaryMainRef(root) });
+@@ -317,9 +320,14 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
+       && Array.isArray(found.logicalWorkIds) && found.logicalWorkIds.length === 1 && found.logicalWorkIds[0] === featureId && Array.isArray(found.criterionIds);
+     const stale = fresh !== null && generatedShape
+       && (found.specPath !== specPath || JSON.stringify([...found.criterionIds].sort()) !== JSON.stringify(fresh.criterionIds));
+-    if (stale) {
++    if (stale && !courseStarted) {
+       entries.push({ class: "design", path: unitPath, bytes: rendered.bytes, generated: true, replaces: unitSeen.bytes, ...REVIEW_UNIT_ARTIFACT });
+       reviewUnit = { status: "re-rendered", path: unitPath, previousCriterionIds: found.criterionIds, criterionIds: fresh.criterionIds };
++    } else if (stale) {
++      entries.push({ class: "design", path: unitPath, bytes: unitSeen.bytes, generated: false, ...REVIEW_UNIT_ARTIFACT });
++      reviewUnit = { status: "stale-bound-to-course", path: unitPath, criterionIds: found.criterionIds, approvedCriterionIds: fresh.criterionIds,
++        reason: "a Critic round of this feature is retained; its course is bound to the review unit's bytes and acceptance ids, so the unit is kept. "
++          + "Criteria the approved Spec added are not covered by this course: review them in a new feature (rigor 1, its own PRD and Spec) or ask the PO how to proceed." };
+     } else {
+       entries.push({ class: "design", path: unitPath, bytes: unitSeen.bytes, generated: false, ...REVIEW_UNIT_ARTIFACT });
+       reviewUnit = { status: "found", path: unitPath };
+@@ -387,7 +395,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
+     found: entries.filter((entry) => !entry.generated && (entry.class === "acceptance" || entry.class === "result" || entry.class === "design")).map(summary),
+     reviewUnit,
+     choices: {
+-      design: "the Critic review unit: absent -> generated for the whole feature as one course, binding the Spec's AC-<n> ids (authority:false, immutable, retain); present -> registered as found, except a generated single-course unit whose criterion ids or Spec path no longer match the approved Spec, which is rendered anew (reviewUnit.status re-rendered); a Spec with no criterion id gets none (reviewUnit names why)",
++      design: "the Critic review unit: absent -> generated for the whole feature as one course, binding the Spec's AC-<n> ids (authority:false, immutable, retain); present -> registered as found, except a generated single-course unit whose criterion ids or Spec path no longer match the approved Spec, which is rendered anew before the first Critic round (reviewUnit.status re-rendered) and kept once a round is retained (stale-bound-to-course); a Spec with no criterion id gets none (reviewUnit names why)",
+       state: `${lifecycle.status} (the plan lifecycle status; the topology requires prd, spec, acceptance, result and candidate-evidence for it)`,
+       rigor: `${rigor.rigor} (${rigor.source}: ${rigor.basis}; judgment call, no shipped source defines the profile-to-level mapping)`,
+       prd: "authority:true, mutable, active (the approved bytes are already bound by the signed envelope; the topology fixes no mutability for this class)",
+diff --git a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+index 10d10c06c278b3db5b09a29a949fe95b10063f94..7deee908463b92067afa65244da8100326d634c8 100644
+--- a/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-baseline.test.mjs
+@@ -821,9 +821,10 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+       }
+     });
+ 
+-    // C28e (PO decision 2026-11-13): a re-approved Spec with other criterion ids met the unit generated for the earlier approval, and the
+-    // Critic batch refused the dropped id (CGB-REVIEW-UNIT-BINDING). A generated single-course unit is rendered anew; a hand-written one is kept.
+-    it("7.13d a re-approval re-renders a generated review unit whose criterion ids no longer match the approved Spec; a hand-written unit is kept", async () => {
++    // C28e (PO decision 2026-11-13): a re-approved Spec with other criterion ids met the unit generated for the earlier approval, so the first
++    // Critic round would bind the earlier ids. Before any round, a generated single-course unit is rendered anew; once a round is retained the
++    // course is bound to the unit (CCA/CGB-REVIEW-UNIT-BINDING, CRL-V2-CARRY-COVERAGE) and it is kept and reported; a hand-written one is kept.
++    it("7.13d a re-approval re-renders a generated review unit whose criterion ids no longer match the approved Spec before the first Critic round; a retained round or a hand-written unit keeps it", async () => {
+       const { f } = await fixtureWalk({ predecessorSidecar: false });
+       const REGISTER = path.join(here, "register-feature-package.mjs");
+       const manifestPath = path.join(f.dir, "specs/e2e/lifecycle.json");
+@@ -836,8 +837,8 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+       const unitFile = path.join(f.dir, unitPath);
+       const fresh = JSON.parse(fs.readFileSync(unitFile, "utf8"));
+       assert.ok(fresh.criterionIds.length > 0, "the fixture's Spec names criterion ids");
+-      const supersede = () => fs.writeFileSync(manifestPath, `${JSON.stringify({ ...current, state: "implementing",
+-        artifacts: current.artifacts.map((entry) => (entry === envelope ? { ...entry, path: earlierPath, sha256: sha(earlierBytes) } : entry)) }, null, 2)}\n`);
++      const supersede = (extra = []) => fs.writeFileSync(manifestPath, `${JSON.stringify({ ...current, state: "implementing",
++        artifacts: [...current.artifacts.map((entry) => (entry === envelope ? { ...entry, path: earlierPath, sha256: sha(earlierBytes) } : entry)), ...extra] }, null, 2)}\n`);
+       const unitEntry = () => JSON.parse(fs.readFileSync(manifestPath, "utf8")).artifacts.find((entry) => entry.path === unitPath);
+ 
+       fs.writeFileSync(unitFile, `${JSON.stringify({ ...fresh, criterionIds: ["AC-999"] }, null, 2)}\n`);
+@@ -857,6 +858,22 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", ()
+       assert.equal(kept.reviewUnit.status, "found", "a multi-item unit is the author's, never rendered anew");
+       assert.equal(fs.readFileSync(unitFile, "utf8"), handBytes);
+       assert.equal(unitEntry().sha256, sha(handBytes));
++
++      // A retained Critic round binds the course to the unit: kept byte-identical and reported, never rendered anew.
++      const staleBytes = `${JSON.stringify({ ...fresh, criterionIds: ["AC-999"] }, null, 2)}\n`;
++      fs.writeFileSync(unitFile, staleBytes);
++      const lineageBytes = "{\"round\":1}\n";
++      const lineagePath = `specs/e2e/evidence/critic-lineage-${sha(lineageBytes)}.json`;
++      fs.writeFileSync(path.join(f.dir, lineagePath), lineageBytes);
++      supersede([{ class: "candidate-evidence", path: lineagePath, sha256: sha(lineageBytes), authority: false, mutability: "immutable", retention: "retain" }]);
++      const bound = JSON.parse(ok(REGISTER, "--root", f.dir).stdout);
++      assert.equal(bound.status, "registered");
++      assert.equal(bound.reviewUnit.status, "stale-bound-to-course");
++      assert.deepEqual(bound.reviewUnit.criterionIds, ["AC-999"]);
++      assert.deepEqual(bound.reviewUnit.approvedCriterionIds, fresh.criterionIds);
++      assert.match(bound.reviewUnit.reason, /new feature/u);
++      assert.equal(fs.readFileSync(unitFile, "utf8"), staleBytes, "the course-bound unit is never replaced");
++      assert.equal(unitEntry().sha256, sha(staleBytes));
+     });
+ 
+     it("7.13a the binding step refuses a git-ignored selection and one holding a private identifier before anything is written, and names the repair", () => {

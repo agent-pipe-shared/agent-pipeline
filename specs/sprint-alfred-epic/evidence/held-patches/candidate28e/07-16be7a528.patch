@@ -1,0 +1,99 @@
+diff --git a/SETUP.md b/SETUP.md
+index f459abed9213abe23ea085c57ee5364ec042ed79..4828b70b36fa74e466a5ae3c8d503f1db7ee9195 100644
+--- a/SETUP.md
++++ b/SETUP.md
+@@ -19,7 +19,12 @@ terminology, continue with this setup guide, then read the operator-facing
+ <!-- capability:plugin-distribution-and-publication -->
+ <a id="capability-plugin-distribution-and-publication"></a>
+ 
+-- Node.js 24 or newer and Git are required for the included scripts.
++- **Required tools, with the install route for Linux/WSL, macOS and Windows:**
++  [`docs/toolchain.md`](docs/toolchain.md) (generated from the Pipeline's one
++  tool registry; the plugin ships the same file). Every machine needs Node.js 24
++  or newer, Git, `gitleaks`, `osv-scanner` and `semgrep`; the machine where the
++  PO signs also needs OpenSSL with Ed25519. The same page names the optional
++  tools and the build settings the SBOM of the close reads.
+ - Four categories back the security gates: secrets (`gitleaks`), dependency
+   vulnerabilities (`osv-scanner`), static analysis (`semgrep`), and licenses.
+   The license check is a built-in `license-check` control that reads a license
+@@ -28,10 +33,13 @@ terminology, continue with this setup guide, then read the operator-facing
+   **A missing scanner makes its gate report `skipped`, not `pass`.** `skipped`
+   means the gate checked nothing for that category — it is not a substitute for
+   a passing scan, and a green Verify result built on a skipped gate does not
+-  mean that category was actually scanned. After binding the plugin, the
++  mean that category was actually scanned. Onboarding checks the required tools
++  and asks you to install a missing one together with your agent; you may defer
++  it, and the deferral is recorded on your machine without lifting any check.
++  After binding the plugin, the
+   [toolchain preflight](#missing-prerequisite-guidance-in-a-consumer-project)
+-  shows every configured tool with its observed version, or a copyable
+-  platform-appropriate install command for whatever is missing.
++  shows every configured tool with its observed version, and for a missing one
++  the section of `docs/toolchain.md` with its install route.
+ - Keep each governed repository under version control. The pipeline itself is
+   obtained from its approved GitHub distribution; do not copy a maintainer
+   checkout or its generated files into the governed repository.
+@@ -177,7 +185,9 @@ without scrolling past it. Follow that procedure, then continue at step 1.
+ #### Missing prerequisite guidance in a consumer project
+ 
+ The installed plugin's read-only toolchain preflight reports each configured
+-tool, observed version, blocked claim and a copyable platform command. In this
++tool, observed version and blocked claim, and for a missing tool the section of
++`docs/toolchain.md` that holds its install route per platform; it installs
++nothing and prints no install command itself. In this
+ guide `<plugin-root>` is the installed Pipeline plugin directory and
+ `<project-root>` the governed repository root (see the
+ [command convention](docs/README.md)). From the governed project root, run:
+@@ -186,8 +196,11 @@ guide `<plugin-root>` is the installed Pipeline plugin directory and
+ node "<plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
+ ```
+ 
+-Review any offered installer command under your host/package-management
+-policy, then repeat the preflight. npm is never substituted for non-npm
++Run the install route from `docs/toolchain.md` yourself, under your
++host/package-management policy, then repeat the preflight. To install a
++required tool later, record that on this machine with
++`node "<plugin-root>/scripts/toolchain-defer.mjs" --tool <id> --answer "<your answer>"`;
++the readiness report keeps naming it. npm is never substituted for non-npm
+ scanners; bounded Semgrep settings avoid treating ordinary home-directory
+ writes as a missing installation.
+ 
+diff --git a/docs/README.md b/docs/README.md
+index 6faa2960beaf4b216dac5095661e757ab340cf9f..c61d2d569b82b1119b1edd292178c6c063160883 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -24,6 +24,9 @@ guides, release records, architecture decision records, and state archives.
+ 
+ - [`../SETUP.md`](../SETUP.md) — routine consumer adoption, prerequisites, and
+   later source-maintainer reference.
++- [`toolchain.md`](toolchain.md) — every tool the Pipeline needs on a machine
++  (required, required to sign, optional) with the install route per platform,
++  and the build settings the SBOM of the close reads.
+ - [`../PIPELINE_FLOW.md`](../PIPELINE_FLOW.md) — route selection, gates,
+   recovery, and close. [Deutsche Lesefassung](../PIPELINE_FLOW.de.md).
+ - [`usage.md`](usage.md) — the normal user journey after a project is ready.
+diff --git a/governance/observation-doc-governance.json b/governance/observation-doc-governance.json
+index 3a1a25effd973a0b916fe8abe8586f3afd0c54c2..cd930e310dc2f548a690f2f7db83729b4e96d7a8 100644
+--- a/governance/observation-doc-governance.json
++++ b/governance/observation-doc-governance.json
+@@ -96,6 +96,7 @@
+           "docs/runner-support.md",
+           "docs/runtime-boundary.md",
+           "docs/security-controls.md",
++          "docs/toolchain.md",
+           "docs/usage.md",
+           "docs/v3-consumer-onboarding.md",
+           "docs/whats-new-0.5.0.md",
+diff --git a/harness/scripts/generate-vendored-canon.test.mjs b/harness/scripts/generate-vendored-canon.test.mjs
+index 9b82fa8d56b0b812ae35f4eac542c2cbe2f61c5f..fc8779ab5bef3a5ed68f783eda450692ce5633f9 100644
+--- a/harness/scripts/generate-vendored-canon.test.mjs
++++ b/harness/scripts/generate-vendored-canon.test.mjs
+@@ -87,7 +87,7 @@ test("AC-2: manifest completeness -- every tracked vendored file has an entry, e
+   const manifestDests = new Set(manifest.map((entry) => entry.dest));
+ 
+   const scanDirs = ["plugins/pipeline-core/guardrails", "plugins/pipeline-core/roles", "plugins/pipeline-core/templates/prompts", "plugins/pipeline-core/docs/adr"];
+-  const standaloneVendored = ["plugins/pipeline-core/docs/push-release-flow.md", "plugins/pipeline-core/docs/operating-model.md"];
++  const standaloneVendored = ["plugins/pipeline-core/docs/push-release-flow.md", "plugins/pipeline-core/docs/operating-model.md", "plugins/pipeline-core/docs/toolchain.md"];
+   const trackedVendored = execFileSync("git", ["ls-files", "--", ...scanDirs, ...standaloneVendored], {
+     cwd: REPO_ROOT,
+     encoding: "utf8",

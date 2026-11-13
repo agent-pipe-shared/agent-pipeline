@@ -1,0 +1,752 @@
+diff --git a/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs b/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
+index d2ca8ede06003f032cbac8c58e1e0aebe69a58cf..40c58c334cadd08a9f75093146b17d1f0ca04364 100644
+--- a/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
++++ b/plugins/pipeline-core/config/security/semgrep-default-rules.test.mjs
+@@ -201,12 +201,13 @@ if (!binary) {
+   record("language pack: no language rule fires on any quiet file", quietAny.length === 0, JSON.stringify(quietAny));
+ 
+   // Case 5 (C28e): test code is excluded from the ERROR rules. The same firing fixtures under test-shaped names produce no ERROR finding of the
+-  // language pack; weak-crypto (WARNING, no exclude) may still appear and blocks nothing.
++  // language pack. weak-crypto (WARNING, no exclude) is the positive control: it must still fire in every copy, which proves the copy was scanned
++  // at all. Semgrep's own built-in ignore list already skips test/, tests/ and *_test.go entirely (measured 2026-11-12), so the copies use the
++  // names only the pack's own excludes cover, and Go (whose only convention is *_test.go) is not among them.
+   const exclDir = join(scratch, "excluded");
+   const exclCopies = [
+     ["java", "hits.java", join("src", "main", "OrderServiceTest.java")],
+     ["csharp", "hits.cs", join("Orders.Tests", "OrdersControllerTests.cs")],
+-    ["go", "hits.go", join("orders", "orders_test.go")],
+     ["python", "hits.py", join("app", "test_orders.py")],
+     ["js", "hits.ts", join("web", "orders.spec.ts")],
+     ["ruby", "hits.rb", join("spec", "orders_spec.rb")],
+@@ -222,6 +223,21 @@ if (!binary) {
+   try { exclParsed = JSON.parse(exclRun.stdout ?? ""); } catch { /* asserted below */ }
+   const exclErrors = (exclParsed?.results ?? []).filter((r) => LANG_ID.test(r.check_id.split(".").pop()) && r.extra?.severity === "ERROR");
+   record("language pack: test-shaped paths carry no ERROR finding of the language pack", exclParsed !== null && exclErrors.length === 0, JSON.stringify(exclErrors.map((r) => `${r.path}:${r.start?.line} ${r.check_id.split(".").pop()}`)));
++  for (const [lang, , target] of exclCopies) {
++    const control = (exclParsed?.results ?? []).filter((r) => r.check_id.endsWith(`pipeline-${lang}-weak-crypto`) && r.path.replaceAll("\\", "/").endsWith(target.replaceAll("\\", "/")));
++    record(`language pack: ${target} was scanned (its weak-crypto WARNING fires), so its missing ERROR findings are the exclude`, control.length > 0, "the copy was not scanned at all");
++  }
++
++  // Case 6 (C28e): the excludes anchor to the scanned root, not to a directory above it. A project that itself lives under a directory named
++  // tests/ keeps its blocking rules (the adapter scans the absolute root with the root as cwd, as here).
++  const anchoredRoot = join(scratch, "tests", "proj");
++  mkdirSync(join(anchoredRoot, "src", "main", "java"), { recursive: true });
++  copyFileSync(join(FIXTURE_DIR, "java", "hits.java"), join(anchoredRoot, "src", "main", "java", "App.java"));
++  const anchoredRun = spawnSync(binary, ["scan", "--json", "--config", RULES_PATH, anchoredRoot], { cwd: anchoredRoot, encoding: "utf8", env, shell: false, maxBuffer: 64 * 1024 * 1024 });
++  let anchoredParsed = null;
++  try { anchoredParsed = JSON.parse(anchoredRun.stdout ?? ""); } catch { /* asserted below */ }
++  const anchoredErrors = (anchoredParsed?.results ?? []).filter((r) => /pipeline-java-/u.test(r.check_id) && r.extra?.severity === "ERROR");
++  record("language pack: a project under a directory named tests/ keeps every Java ERROR rule", new Set(anchoredErrors.map((r) => r.check_id.split(".").pop())).size === langIds.filter((id) => id.startsWith("pipeline-java-") && !id.endsWith("weak-crypto")).length, JSON.stringify(anchoredErrors.map((r) => r.check_id.split(".").pop())));
+ 
+   try { rmSync(scratch, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
+ }
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/csharp/quiet.cs b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/csharp/quiet.cs
+index 91cc4482c8ad579ea37dc5cbf75c026b06de8190..97fcb710886bb87ecab2fc8b06778c6dc9bfa48e 100644
+--- a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/csharp/quiet.cs
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/csharp/quiet.cs
+@@ -68,5 +68,23 @@ namespace Demo
+         {
+             return SHA256.HashData(data);
+         }
++
++        private const string BaseDir = "/srv/files/";
++
++        public IActionResult Contained(string name)
++        {
++            var full = Path.GetFullPath(Path.Combine(BaseDir, name));
++            if (!full.StartsWith(BaseDir, StringComparison.Ordinal))
++            {
++                return BadRequest();
++            }
++            return File(System.IO.File.ReadAllBytes(full), "application/octet-stream");
++        }
++
++        public IActionResult Invoice(int id, Guid tenant, CancellationToken cancellationToken)
++        {
++            var bytes = System.IO.File.ReadAllBytes(Path.Combine(BaseDir, tenant.ToString(), $"{id}.pdf"));
++            return File(bytes, "application/pdf");
++        }
+     }
+ }
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/go/quiet.go b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/go/quiet.go
+index 76fe88a311e06a39f4b2d11e9ac0095ff40d25ed..046628deff1a4e6f178929c59a4320c0d33d0ca7 100644
+--- a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/go/quiet.go
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/go/quiet.go
+@@ -9,6 +9,7 @@ import (
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
++	"strings"
+ )
+ 
+ func FindUser(db *sql.DB, name string) (*sql.Rows, error) {
+@@ -49,3 +50,15 @@ func Item(w http.ResponseWriter, r *http.Request) {
+ func Digest(data []byte) [32]byte {
+ 	return sha256.Sum256(data)
+ }
++
++const base = "/srv/files/"
++
++func Contained(w http.ResponseWriter, r *http.Request) {
++	full := filepath.Clean(filepath.Join(base, r.URL.Query().Get("name")))
++	if !strings.HasPrefix(full, base) {
++		http.Error(w, "outside", http.StatusBadRequest)
++		return
++	}
++	data, _ := os.ReadFile(full)
++	w.Write(data)
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/java/quiet.java b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/java/quiet.java
+index e7e460735bb2d92e14f4913a3f5db7b34fb4d2c1..3d57f7ad8a628be42077dedc3f122d4fdf58bfcb 100644
+--- a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/java/quiet.java
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/java/quiet.java
+@@ -60,4 +60,43 @@ public class Quiet {
+     public Cipher gcm() throws Exception {
+         return Cipher.getInstance("AES/GCM/NoPadding");
+     }
++
++    private final Path base = Paths.get("/srv/files");
++
++    @GetMapping("/contained")
++    public byte[] contained(@RequestParam String name) throws Exception {
++        Path p = base.resolve(name).normalize();
++        if (!p.startsWith(base)) {
++            throw new SecurityException("outside the base directory");
++        }
++        return Files.readAllBytes(p);
++    }
++
++    @GetMapping("/invoice/{id}")
++    public byte[] invoice(@PathVariable Long id) throws Exception {
++        return Files.readAllBytes(base.resolve(id + ".pdf"));
++    }
++
++    @GetMapping("/item/{id}")
++    public String itemById(@PathVariable long id) {
++        return rest.getForObject("https://api.internal.example/items/" + id, String.class);
++    }
++}
++
++class HardenedParsers {
++    private final DocumentBuilderFactory dbf;
++    private final javax.xml.stream.XMLInputFactory xif;
++
++    HardenedParsers() throws Exception {
++        dbf = DocumentBuilderFactory.newInstance();
++        dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
++        xif = javax.xml.stream.XMLInputFactory.newInstance();
++        xif.setProperty(javax.xml.stream.XMLInputFactory.SUPPORT_DTD, false);
++    }
++
++    DocumentBuilderFactory accessHardened() {
++        DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
++        f.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
++        return f;
++    }
+ }
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/js/quiet.ts b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/js/quiet.ts
+index 8fe900e7283ecb980649eef8ed4dbf3f57bf53e7..9c5fa84ff9e40677daf266e32095e66dbf680f7a 100644
+--- a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/js/quiet.ts
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/js/quiet.ts
+@@ -49,3 +49,23 @@ app.get("/item", async (req, res) => {
+ export function digest(data: string) {
+   return crypto.createHash("sha256").update(data).digest("hex");
+ }
++
++const BASE = "/srv/files";
++
++app.get("/contained", (req, res) => {
++  const full = path.resolve(BASE, req.query.name as string);
++  if (!full.startsWith(BASE + path.sep)) {
++    res.status(400).end();
++    return;
++  }
++  res.send(fs.readFileSync(full));
++});
++
++app.get("/static/:name", (req, res) => {
++  res.sendFile(req.params.name, { root: BASE });
++});
++
++app.post("/upload", (req: any, res) => {
++  fs.unlinkSync(req.file.path);
++  res.end();
++});
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/kotlin/quiet.kt b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/kotlin/quiet.kt
+index 1609a6f248d52f7294d4fe68b4ab198c4736d870..14a25273975b1bfe468b8e90d5f6475831ac5683 100644
+--- a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/kotlin/quiet.kt
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/kotlin/quiet.kt
+@@ -42,4 +42,30 @@ class Quiet(private val jdbc: JdbcTemplate) {
+     }
+ 
+     fun sha256(data: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(data)
++
++    private val base = File("/srv/files").canonicalFile
++
++    @GetMapping("/contained")
++    fun contained(@RequestParam name: String): ByteArray {
++        val f = File(base, name).canonicalFile
++        if (!f.startsWith(base)) {
++            throw SecurityException("outside the base directory")
++        }
++        return f.readBytes()
++    }
++
++    @GetMapping("/order/{id}")
++    fun order(@PathVariable id: String, repo: Map<String, String>, resolver: Resolver): String? {
++        val name = resolver.resolve(id)
++        return repo.get(id) + name
++    }
++
++    @GetMapping("/invoice/{id}")
++    fun invoice(@PathVariable id: Long): ByteArray {
++        return File(base, "$id.pdf").readBytes()
++    }
++}
++
++interface Resolver {
++    fun resolve(key: String): String
+ }
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/php/quiet.php b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/php/quiet.php
+index 001034f5eb9d18ff15763d526efb34059f7ec504..c161ae997f10adf381d8708961526d0633e1db13 100644
+--- a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/php/quiet.php
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/php/quiet.php
+@@ -57,3 +57,18 @@ function digest($data)
+ {
+     return hash('sha256', $data);
+ }
++
++function routes()
++{
++    return ['path' => '/orders', 'verify' => false, 'methods' => ['GET']];
++}
++
++function contained()
++{
++    $base = '/srv/files/';
++    $full = realpath($base . $_GET['name']);
++    if ($full === false || !str_starts_with($full, $base)) {
++        return null;
++    }
++    return file_get_contents($full);
++}
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/python/quiet.py b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/python/quiet.py
+index 2fd583fcfe2470f1a24cc91b38dfb1998915ef60..609240cfbdeb82f6f3963e2f14c20e0e3ddb7c72 100644
+--- a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/python/quiet.py
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/python/quiet.py
+@@ -65,3 +65,14 @@ def checksum(data):
+ 
+ def strong(data):
+     return hashlib.sha256(data).hexdigest()
++
++
++BASE = "/srv/files"
++
++
++@app.route("/contained")
++def contained():
++    full = os.path.realpath(os.path.join(BASE, request.args.get("name")))
++    if not full.startswith(BASE + os.sep):
++        return "", 400
++    return open(full).read()
+diff --git a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/ruby/quiet.rb b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/ruby/quiet.rb
+index dc2c63005e41457b1e4ed088678ef993876b32a5..7061c8745483bf909f51152556943faa347f79fe 100644
+--- a/plugins/pipeline-core/config/security/semgrep-pack-fixtures/ruby/quiet.rb
++++ b/plugins/pipeline-core/config/security/semgrep-pack-fixtures/ruby/quiet.rb
+@@ -48,4 +48,13 @@ class CatalogController < ApplicationController
+   def digest
+     Digest::SHA256.hexdigest(params[:data])
+   end
++
++  BASE = "/srv/files/"
++
++  def contained
++    full = File.expand_path(params[:name], BASE)
++    return head(:bad_request) unless full.start_with?(BASE)
++
++    send_file full
++  end
+ end
+diff --git a/plugins/pipeline-core/lib/semgrep-baseline.test.mjs b/plugins/pipeline-core/lib/semgrep-baseline.test.mjs
+index 94f23e7e8ddcfa6054f9e255af6d545c98a53858..a2135674619189d58423c5d652b86f5740f853ec 100644
+--- a/plugins/pipeline-core/lib/semgrep-baseline.test.mjs
++++ b/plugins/pipeline-core/lib/semgrep-baseline.test.mjs
+@@ -158,3 +158,61 @@ test("the real chain: a new Semgrep finding blocks, a finding older than the fea
+     rmSync(join(root, "..", `${root.split(/[\\/]/u).at(-1)}-evidence`), { recursive: true, force: true });
+   }
+ });
++
++// C28e (ADR-0094): the same chain with the plugin's shipped pack and its taint rules. One Java controller holds an older path-traversal finding
++// that the feature moves down, and the feature adds an SSRF finding to the same file: exactly the new one blocks, and the two passes agree.
++const JAVA_LEGACY = [
++  "package demo;",
++  "import java.nio.file.*;",
++  "import org.springframework.web.bind.annotation.*;",
++  "import org.springframework.web.client.RestTemplate;",
++  "@RestController",
++  "public class Files2 {",
++  "  RestTemplate rest;",
++  "  @GetMapping(\"/file\")",
++  "  public byte[] read(@RequestParam String name) throws Exception {",
++  "    return Files.readAllBytes(Paths.get(\"/srv/files\", name));",
++  "  }",
++];
++test("the real chain with the shipped language pack: a feature-introduced taint finding blocks, the older one in the same file is listed", { skip: semgrepAvailable ? false : "semgrep is not installed" }, async () => {
++  const root = makeRepo();
++  try {
++    mkdirSync(join(root, ".claude"), { recursive: true });
++    writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n\ngates:\n  security:\n    mode: blocking\n    type: automated\n\nsecurity:\n  scanners:\n    gitleaks:\n      enabled: false\n    osv-scanner:\n      enabled: false\n    semgrep:\n      enabled: true\n    license-check:\n      enabled: false\n");
++    mkdirSync(join(root, "src", "main", "java", "demo"), { recursive: true });
++    const javaFile = join(root, "src", "main", "java", "demo", "Files2.java");
++    writeFileSync(javaFile, `${[...JAVA_LEGACY, "}"].join("\n")}\n`);
++    writeState(root, { activeFeature: { id: "probe-feature" } }, ".claude");
++    const base = commitAll(root, "legacy controller");
++    mkdirSync(join(root, "specs", "probe-feature"), { recursive: true });
++    writeFileSync(join(root, "specs", "probe-feature", "spec.md"), "# spec\n");
++    commitAll(root, "feature start");
++    const feature = [
++      ...JAVA_LEGACY.slice(0, 7),
++      "  // the feature adds a proxy endpoint above the old one",
++      "  @GetMapping(\"/fetch\")",
++      "  public String fetch(@RequestParam(\"url\") String target) {",
++      "    return rest.getForObject(target, String.class);",
++      "  }",
++      ...JAVA_LEGACY.slice(7),
++      "}",
++    ];
++    writeFileSync(javaFile, `${feature.join("\n")}\n`);
++    commitAll(root, "feature work with a new taint finding");
++    const evidenceDir = join(root, "..", `${root.split(/[\\/]/u).at(-1)}-evidence`);
++    const { evidence, exitCode } = await runSecurityScan({ rootDir: root, env: process.env, timeoutMs: 240000, evidenceOutDir: evidenceDir });
++    const record = evidence.execution.semgrepBaseline;
++    const semgrep = evidence.scanners.find((s) => s.tool === "semgrep");
++    assert.equal(semgrep?.ruleSet?.source, "plugin-default", JSON.stringify(semgrep?.ruleSet));
++    assert.equal(record.status, "applied", JSON.stringify(record));
++    assert.equal(record.commit, base);
++    assert.deepEqual(record.existing.map((entry) => `${entry.rule.split(".").at(-1)} ${entry.file}:${entry.line}`), ["pipeline-java-path-traversal src/main/java/demo/Files2.java:15"]);
++    assert.equal(record.newCount, 1, JSON.stringify(record));
++    assert.deepEqual(blockingFindings(evidence.findings, ["critical", "high"], record).map((f) => `${f.rule.split(".").at(-1)}:${f.line}`), ["pipeline-java-ssrf:11"]);
++    assert.equal(exitCode, 2, "the new taint finding blocks");
++    assert.equal(git(root, "worktree", "list", "--porcelain").split("\n").filter((line) => line.startsWith("worktree ")).length, 1, "no worktree is left behind");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++    rmSync(join(root, "..", `${root.split(/[\\/]/u).at(-1)}-evidence`), { recursive: true, force: true });
++  }
++});
+diff --git a/plugins/pipeline-core/security/semgrep/pipeline.yml b/plugins/pipeline-core/security/semgrep/pipeline.yml
+index 31a5742d6e9ddec3f8d6115bfcda692cef64f351..e287ed6c3c1e3abd49ff5a45ee014b066278ce0e 100644
+--- a/plugins/pipeline-core/security/semgrep/pipeline.yml
++++ b/plugins/pipeline-core/security/semgrep/pipeline.yml
+@@ -320,7 +320,7 @@ rules:
+               - pattern: (ObjectInputStream $O).readUnshared()
+               - pattern: new ObjectInputStream(...).readObject()
+           - pattern-not-inside: |
+-              $RT $M(...) {
++              $C(...) {
+                 ...
+                 $X.setObjectInputFilter(...);
+                 ...
+@@ -358,14 +358,15 @@ rules:
+     languages: [java]
+     severity: ERROR
+     message: >-
+-      An XML parser factory is created without switching off DOCTYPE declarations or external entities in the same method, so a
+-      document can read local files or reach internal hosts (XXE). Set disallow-doctype-decl (or the StAX SUPPORT_DTD false) right
+-      after creating the factory.
++      An XML parser factory is created without switching off DOCTYPE declarations, external entities or external DTD access in the same
++      method or constructor, so a document can read local files or reach internal hosts (XXE). Set disallow-doctype-decl (StAX:
++      SUPPORT_DTD false) or ACCESS_EXTERNAL_DTD "" right after creating the factory.
+     metadata: {category: security, cwe: "CWE-611: Improper Restriction of XML External Entity Reference", confidence: MEDIUM}
+     paths:
+       exclude: ["**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**", "**/*.Tests/**", "**/*.UnitTests/**", "**/*Test.java",
+         "**/*Tests.java", "**/*IT.java", "**/*Test.kt", "**/*Tests.kt", "**/*Test.cs", "**/*Tests.cs", "**/*_test.go", "**/test_*.py",
+         "**/*_test.py", "**/*_spec.rb", "**/*_test.rb", "**/*Test.php", "**/*.test.*", "**/*.spec.*"]
++    # $C(...) { ... } matches a method and a constructor alike (measured), so hardening in either counts.
+     patterns:
+       - pattern-either:
+           - pattern: DocumentBuilderFactory.newInstance()
+@@ -373,35 +374,53 @@ rules:
+           - pattern: XMLInputFactory.newInstance()
+           - pattern: XMLInputFactory.newFactory()
+       - pattern-not-inside: |
+-          $RT $M(...) {
++          $C(...) {
+             ...
+             $F.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+             ...
+           }
+       - pattern-not-inside: |
+-          $RT $M(...) {
++          $C(...) {
+             ...
+             $F.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+             ...
+           }
+       - pattern-not-inside: |
+-          $RT $M(...) {
++          $C(...) {
+             ...
+             $F.setFeature("http://xml.org/sax/features/external-general-entities", false);
+             ...
+           }
+       - pattern-not-inside: |
+-          $RT $M(...) {
++          $C(...) {
+             ...
+             $F.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+             ...
+           }
+       - pattern-not-inside: |
+-          $RT $M(...) {
++          $C(...) {
+             ...
+             $F.setProperty("javax.xml.stream.supportDTD", false);
+             ...
+           }
++      - pattern-not-inside: |
++          $C(...) {
++            ...
++            $F.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
++            ...
++          }
++      - pattern-not-inside: |
++          $C(...) {
++            ...
++            $F.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
++            ...
++          }
++      - pattern-not-inside: |
++          $C(...) {
++            ...
++            $F.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
++            ...
++          }
+   - id: pipeline-java-path-traversal
+     languages: [java]
+     severity: ERROR
+@@ -424,23 +443,42 @@ rules:
+           - metavariable-regex:
+               metavariable: $A
+               regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
++          # A number, a flag, a UUID or a date cannot carry ../ or a host name.
++          - metavariable-regex:
++              metavariable: $T
++              regex: '^(?!(?:int|long|short|byte|boolean|double|float|Int|Integer|Long|Short|Byte|Boolean|Double|Float|UUID|java\.util\.UUID|BigDecimal|BigInteger|LocalDate|LocalDateTime|Instant|OffsetDateTime)\??$)'
+           - pattern: $P
+       - pattern: (HttpServletRequest $REQ).getParameter(...)
+       - pattern: (HttpServletRequest $REQ).getParameterValues(...)
+       - pattern: (HttpServletRequest $REQ).getHeader(...)
+       - pattern: (HttpServletRequest $REQ).getPathInfo()
++    # The sink is the file ACCESS, not the building of a path: a path built with Paths.get/resolve and then checked to stay under the base
++    # (the containment check this message recommends) is cleaned by that check before it reaches an access.
+     pattern-sinks:
+-      - pattern: new File(...)
+-      - pattern: new FileInputStream(...)
+-      - pattern: new FileOutputStream(...)
+-      - pattern: new FileReader(...)
+-      - pattern: new FileWriter(...)
+-      - pattern: new RandomAccessFile(...)
+-      - pattern: Paths.get(...)
+-      - pattern: Path.of(...)
+-      - pattern: (Path $BASE).resolve(...)
++      - patterns:
++          - pattern-either:
++              - pattern: new FileInputStream($P, ...)
++              - pattern: new FileOutputStream($P, ...)
++              - pattern: new FileReader($P, ...)
++              - pattern: new FileWriter($P, ...)
++              - pattern: new RandomAccessFile($P, ...)
++              - pattern: Files.$FN($P, ...)
++          - focus-metavariable: $P
++      - patterns:
++          - pattern: (File $F).$ACCESS(...)
++          - metavariable-regex:
++              metavariable: $ACCESS
++              regex: ^(delete|renameTo|createNewFile|mkdirs|listFiles)$
++          - focus-metavariable: $F
+     pattern-sanitizers:
+       - pattern: FilenameUtils.getName(...)
++      - by-side-effect: true
++        patterns:
++          - pattern-either:
++              - pattern: $X.startsWith(...)
++              - pattern: $X.getCanonicalPath().startsWith(...)
++              - pattern: $X.toRealPath(...).startsWith(...)
++          - focus-metavariable: $X
+   - id: pipeline-java-ssrf
+     languages: [java]
+     severity: ERROR
+@@ -463,6 +501,10 @@ rules:
+           - metavariable-regex:
+               metavariable: $A
+               regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
++          # A number, a flag, a UUID or a date cannot carry ../ or a host name.
++          - metavariable-regex:
++              metavariable: $T
++              regex: '^(?!(?:int|long|short|byte|boolean|double|float|Int|Integer|Long|Short|Byte|Boolean|Double|Float|UUID|java\.util\.UUID|BigDecimal|BigInteger|LocalDate|LocalDateTime|Instant|OffsetDateTime)\??$)'
+           - pattern: $P
+       - pattern: (HttpServletRequest $REQ).getParameter(...)
+       - pattern: (HttpServletRequest $REQ).getParameterValues(...)
+@@ -657,6 +699,10 @@ rules:
+               regex: ^(Controller|ControllerBase|ApiController|PageModel)$
+           - pattern-inside: |
+               public $RT $M(..., $T $P, ...) { ... }
++          # A number, a flag, a Guid, a date or a CancellationToken cannot carry ..\ or a host name.
++          - metavariable-regex:
++              metavariable: $T
++              regex: '^(?!(?:int|long|short|byte|uint|ulong|ushort|sbyte|bool|decimal|double|float|Guid|DateTime|DateTimeOffset|DateOnly|TimeOnly|TimeSpan|CancellationToken)\??$)'
+           - pattern: $P
+       - pattern: Request.Query[...]
+       - pattern: Request.Form[...]
+@@ -670,11 +716,17 @@ rules:
+       - pattern: new FileStream(...)
+       - pattern: new StreamReader(...)
+       - pattern: new StreamWriter(...)
+-      - pattern: new FileInfo(...)
+       - pattern: Directory.$FN(...)
+       - pattern: PhysicalFile(...)
+     pattern-sanitizers:
+       - pattern: Path.GetFileName(...)
++      # The containment check the message recommends: a full path checked to start with the base directory.
++      - by-side-effect: true
++        patterns:
++          - pattern-either:
++              - pattern: $X.StartsWith(...)
++              - pattern: Path.GetFullPath($X).StartsWith(...)
++          - focus-metavariable: $X
+   - id: pipeline-csharp-ssrf
+     languages: [csharp]
+     severity: ERROR
+@@ -696,6 +748,10 @@ rules:
+               regex: ^(Controller|ControllerBase|ApiController|PageModel)$
+           - pattern-inside: |
+               public $RT $M(..., $T $P, ...) { ... }
++          # A number, a flag, a Guid, a date or a CancellationToken cannot carry ..\ or a host name.
++          - metavariable-regex:
++              metavariable: $T
++              regex: '^(?!(?:int|long|short|byte|uint|ulong|ushort|sbyte|bool|decimal|double|float|Guid|DateTime|DateTimeOffset|DateOnly|TimeOnly|TimeSpan|CancellationToken)\??$)'
+           - pattern: $P
+       - pattern: Request.Query[...]
+       - pattern: Request.Form[...]
+@@ -902,13 +958,26 @@ rules:
+               - pattern: os.remove($P)
+               - pattern: os.unlink($P)
+               - pattern: shutil.rmtree($P, ...)
+-              - pattern: Path($P)
+-              - pattern: pathlib.Path($P)
+           - focus-metavariable: $P
++      # A pathlib.Path built from the value is not yet an access; reading, writing or deleting through it is.
++      - patterns:
++          - pattern: $F.$ACCESS(...)
++          - metavariable-regex:
++              metavariable: $ACCESS
++              regex: ^(read_text|read_bytes|write_text|write_bytes|open|unlink|rmdir|touch|rename|replace)$
++          - focus-metavariable: $F
+     pattern-sanitizers:
+       - pattern: os.path.basename(...)
+       - pattern: secure_filename(...)
+       - pattern: werkzeug.utils.secure_filename(...)
++      # The containment check the message recommends: the resolved path checked to stay under the base directory.
++      - by-side-effect: true
++        patterns:
++          - pattern-either:
++              - pattern: $X.startswith(...)
++              - pattern: $X.is_relative_to(...)
++              - pattern: os.path.commonpath([..., $X, ...])
++          - focus-metavariable: $X
+   - id: pipeline-python-ssrf
+     languages: [python]
+     severity: ERROR
+@@ -1092,6 +1161,11 @@ rules:
+     pattern-sanitizers:
+       - pattern: filepath.Base(...)
+       - pattern: path.Base(...)
++      # The containment check the message recommends: the cleaned path checked to stay under the base directory.
++      - by-side-effect: true
++        patterns:
++          - pattern: strings.HasPrefix($X, ...)
++          - focus-metavariable: $X
+   - id: pipeline-go-ssrf
+     languages: [go]
+     severity: ERROR
+@@ -1262,9 +1336,10 @@ rules:
+               - pattern: request.$ATTR
+               - pattern: ctx.$ATTR
+               - pattern: ctx.request.$ATTR
++          # req.file / req.files (upload middleware) are left out: their .path is the server's own temporary file.
+           - metavariable-regex:
+               metavariable: $ATTR
+-              regex: ^(query|params|body|cookies|headers|files|file)$
++              regex: ^(query|params|body|cookies|headers)$
+     pattern-sinks:
+       - patterns:
+           - pattern-either:
+@@ -1275,13 +1350,23 @@ rules:
+               metavariable: $FN
+               regex: ^(readFile|readFileSync|createReadStream|writeFile|writeFileSync|createWriteStream|appendFile|appendFileSync|unlink|unlinkSync|rm|rmSync|open|openSync|readdir|readdirSync|copyFile|copyFileSync|rename|renameSync)$
+           - focus-metavariable: $P
++      # sendFile with a root option refuses a path that leaves the root, so only the root-less form is a sink.
+       - patterns:
+           - pattern-either:
+               - pattern: $RES.sendFile($P, ...)
+               - pattern: $RES.download($P, ...)
++          - pattern-not: |
++              $RES.sendFile($P, {..., root: $R, ...}, ...)
++          - pattern-not: |
++              $RES.download($P, $N, {..., root: $R, ...}, ...)
+           - focus-metavariable: $P
+     pattern-sanitizers:
+       - pattern: path.basename(...)
++      # The containment check the message recommends: the resolved path checked to stay under the base directory.
++      - by-side-effect: true
++        patterns:
++          - pattern: $X.startsWith(...)
++          - focus-metavariable: $X
+   - id: pipeline-js-ssrf
+     languages: [javascript, typescript]
+     severity: ERROR
+@@ -1474,6 +1559,18 @@ rules:
+             $F.setProperty(XMLInputFactory.SUPPORT_DTD, false)
+             ...
+           }
++      - pattern-not-inside: |
++          fun $M(...): $RT {
++            ...
++            $F.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
++            ...
++          }
++      - pattern-not-inside: |
++          fun $M(...) {
++            ...
++            $F.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
++            ...
++          }
+   - id: pipeline-kotlin-path-traversal
+     languages: [kotlin]
+     severity: ERROR
+@@ -1500,24 +1597,46 @@ rules:
+           - metavariable-regex:
+               metavariable: $A
+               regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
++          # A number, a flag, a UUID or a date cannot carry ../ or a host name.
++          - metavariable-regex:
++              metavariable: $T
++              regex: '^(?!(?:int|long|short|byte|boolean|double|float|Int|Integer|Long|Short|Byte|Boolean|Double|Float|UUID|java\.util\.UUID|BigDecimal|BigInteger|LocalDate|LocalDateTime|Instant|OffsetDateTime)\??$)'
+           - pattern: $P
+       - pattern: $REQ.getParameter(...)
+       - pattern: $CALL.request.queryParameters[...]
+       - pattern: $CALL.parameters[...]
++    # The sink is the file ACCESS, not the building of a path (File(...), resolve): a path checked to stay under the base is cleaned by
++    # that check before it reaches an access.
+     pattern-sinks:
+       - patterns:
+           - pattern-either:
+-              - pattern: File($P)
+-              - pattern: File($BASE, $P)
+-              - pattern: FileInputStream($P)
+-              - pattern: FileOutputStream($P)
+-              - pattern: Paths.get(..., $P, ...)
+-              - pattern: Path.of(..., $P, ...)
+-              - pattern: $BASE.resolve($P)
++              - pattern: FileInputStream($P, ...)
++              - pattern: FileOutputStream($P, ...)
++              - pattern: FileReader($P, ...)
++              - pattern: FileWriter($P, ...)
++              - pattern: Files.$FN($P, ...)
+           - focus-metavariable: $P
++      - patterns:
++          - pattern: $F.$ACCESS(...)
++          - metavariable-regex:
++              metavariable: $ACCESS
++              regex: ^(readBytes|readText|readLines|writeText|writeBytes|appendText|appendBytes|delete|deleteRecursively|inputStream|outputStream|bufferedReader|bufferedWriter|reader|writer|forEachLine|useLines|copyTo|renameTo)$
++          - focus-metavariable: $F
+     pattern-sanitizers:
+       - pattern: FilenameUtils.getName(...)
+       - pattern: File(...).name
++      # A URL is not a file path (URL(...).readText() is the SSRF rule's business).
++      - pattern: URL(...)
++      - pattern: URI(...)
++      - pattern: URI.create(...)
++      - by-side-effect: true
++        patterns:
++          - pattern-either:
++              - pattern: $X.startsWith(...)
++              - pattern: $X.canonicalPath.startsWith(...)
++              - pattern: $X.canonicalFile.startsWith(...)
++              - pattern: $X.normalize().startsWith(...)
++          - focus-metavariable: $X
+   - id: pipeline-kotlin-ssrf
+     languages: [kotlin]
+     severity: ERROR
+@@ -1544,6 +1663,10 @@ rules:
+           - metavariable-regex:
+               metavariable: $A
+               regex: ^(RequestParam|PathVariable|RequestHeader|CookieValue|RequestBody|RequestPart|QueryParam|PathParam|FormParam|HeaderParam)$
++          # A number, a flag, a UUID or a date cannot carry ../ or a host name.
++          - metavariable-regex:
++              metavariable: $T
++              regex: '^(?!(?:int|long|short|byte|boolean|double|float|Int|Integer|Long|Short|Byte|Boolean|Double|Float|UUID|java\.util\.UUID|BigDecimal|BigInteger|LocalDate|LocalDateTime|Instant|OffsetDateTime)\??$)'
+           - pattern: $P
+       - pattern: $REQ.getParameter(...)
+       - pattern: $CALL.request.queryParameters[...]
+@@ -1560,7 +1683,8 @@ rules:
+               - pattern: $C.postForObject($U, ...)
+               - pattern: $C.exchange($U, ...)
+               - pattern: $C.uri($U, ...)
+-              - pattern: $C.get($U)
++              - pattern: Request.Builder().url($U)
++              - pattern: $C.get(urlString = $U)
+           - metavariable-regex:
+               metavariable: $U
+               regex: '^(?!"https?://[^"/$]+/)'
+@@ -1678,8 +1802,18 @@ rules:
+           [..., 'verify_peer' => false, ...]
+       - pattern: |
+           [..., 'verify_peer_name' => false, ...]
++      # 'verify' => false only counts as an HTTP client option (Guzzle, Laravel's Http); the key is too common in other arrays.
++      - pattern: |
++          new Client([..., 'verify' => false, ...])
++      - pattern: |
++          new \GuzzleHttp\Client([..., 'verify' => false, ...])
++      - pattern: |
++          $C->request($M, $U, [..., 'verify' => false, ...])
++      - pattern: |
++          $C->$VERB($U, [..., 'verify' => false, ...])
+       - pattern: |
+-          [..., 'verify' => false, ...]
++          Http::withOptions([..., 'verify' => false, ...])
++      - pattern: Http::withoutVerifying()
+   - id: pipeline-php-xxe
+     languages: [php]
+     severity: ERROR
+@@ -1731,6 +1865,18 @@ rules:
+           - focus-metavariable: $P
+     pattern-sanitizers:
+       - pattern: basename(...)
++      # The containment check the message recommends: the realpath checked to stay under the base directory. Matched as "used after an if
++      # whose condition tests it", because the common form ($real === false || !str_starts_with($real, $base)) defeats a side-effect
++      # sanitizer at the || (measured).
++      - patterns:
++          - pattern-either:
++              - pattern-inside: |
++                  if (<... str_starts_with($X, ...) ...>) { ... }
++                  ...
++              - pattern-inside: |
++                  if (<... strpos($X, ...) ...>) { ... }
++                  ...
++          - pattern: $X
+   - id: pipeline-php-ssrf
+     languages: [php]
+     severity: ERROR
+@@ -1924,6 +2070,11 @@ rules:
+           - focus-metavariable: $P
+     pattern-sanitizers:
+       - pattern: File.basename(...)
++      # The containment check the message recommends: the expanded path checked to stay under the base directory.
++      - by-side-effect: true
++        patterns:
++          - pattern: $X.start_with?(...)
++          - focus-metavariable: $X
+   - id: pipeline-ruby-ssrf
+     languages: [ruby]
+     severity: ERROR

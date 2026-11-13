@@ -1,0 +1,89 @@
+diff --git a/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs b/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs
+index cdc1611a003c3e5f6aebc004f2675965b29a83d1..600cc8ee0ecc7489fa7337837c14352d06f47541 100644
+--- a/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs
++++ b/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs
+@@ -351,7 +351,7 @@ async function main() {
+   // Candidate 16b: a deliberately public value (a hex key published as the tracked file public/<key>.txt) is admitted besides a plain
+   // domain, but only with a written reason, which is printed so the chat confirmation and the close report can quote it.
+   // Candidate 28e (PO 2026-11-13): a public identifier the tracked source holds verbatim (rule generic-api-key only) takes the same reason.
+-  const valueClass = reviewedValueClass(rootDir, reviewedValue, undefined, args.rule);
++  const valueClass = reviewedValueClass(rootDir, reviewedValue, undefined, args.rule, args.path);
+   if (valueClass === null) { console.error(`gitleaks-repair-ignore: ${REVIEWED_VALUE_REFUSAL}`); process.exitCode = 1; return; }
+   if (valueClass === "public-key-file" || valueClass === "public-identifier") {
+     if (typeof args.reason !== "string" || args.reason.trim().length < 10) {
+diff --git a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs
+index 8f9827be37cbbbe093049f55a31d62968669059e..99cc6488410051948ca5a0b00651b8860ca27143 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs
+@@ -18,7 +18,7 @@ const safePath = value => typeof value === "string" && value.length > 0 && !isAb
+ // a hex key of 32..64 characters that the project itself publishes as the tracked file `public/<key>.txt` whose whole content is that
+ // key (the IndexNow protocol). The proof is checked here, not claimed: a regular non-linked file, tracked by Git, identical content.
+ // Any other credential-shaped value stays refused, and the refusal text names what is accepted.
+-export const REVIEWED_VALUE_REFUSAL = "reviewed value is not accepted: give a plain domain, a hex key of 32 to 64 characters that is published as the tracked file public/<key>.txt containing exactly that key, or (rule generic-api-key only) a public identifier such as app.results.v1 that the project's own tracked source code holds verbatim as a quoted string";
++export const REVIEWED_VALUE_REFUSAL = "reviewed value is not accepted: give a plain domain, a hex key of 32 to 64 characters that is published as the tracked file public/<key>.txt containing exactly that key, or (rule generic-api-key only, for a finding in a Pipeline record under specs/<feature>/evidence/ or audit-bundles/) a public identifier such as app.results.v1 that the project's own tracked source code holds verbatim as a quoted string";
+ const PUBLIC_KEY = /^[a-f0-9]{32,64}$/u;
+ // Candidate 28e (Codex test run, PO decision 2026-11-13): a public application identifier (a storage key or namespace name such as
+ // `app.results.v1`) is admitted for the rule generic-api-key only. The shape is closed: 2 to 8 segments joined by `.`, `_` or `-`, each a
+@@ -37,9 +37,14 @@ function publicIdentifierInTrackedSource(rootDir, value, gitFn) {
+   const found = gitFn("git", ["grep", "-l", "-F", ...quoted, "--", ".", ...IDENTIFIER_RECORD_PATHS], { cwd: rootDir, encoding: "utf8", shell: false });
+   return found.status === 0 && typeof found.stdout === "string" && found.stdout.trim() !== "";
+ }
+-export function reviewedValueClass(rootDir, value, gitFn = spawnSync, rule = null) {
++// The class is admitted only for a finding in one of the Pipeline's own records (feature evidence, an audit bundle): that is where the
++// identifier was copied from the source and flagged after the source had been scanned clean. A finding in source code keeps the existing
++// route (fix the code); a word-shaped passphrase hard-coded in source is never reviewable as a public identifier.
++const PIPELINE_RECORD_PATH = /^(?:specs\/[a-z0-9][a-z0-9-]*\/evidence\/|audit-bundles\/)[^\0]+$/u;
++export function reviewedValueClass(rootDir, value, gitFn = spawnSync, rule = null, findingPath = null) {
+   if (domain(value)) return "domain";
+-  if (rule === "generic-api-key" && typeof rootDir === "string" && publicIdentifierShape(value)) {
++  if (rule === "generic-api-key" && typeof rootDir === "string" && publicIdentifierShape(value)
++    && typeof findingPath === "string" && PIPELINE_RECORD_PATH.test(findingPath) && !findingPath.split("/").includes("..")) {
+     try { return publicIdentifierInTrackedSource(rootDir, value, gitFn) ? "public-identifier" : null; } catch { return null; }
+   }
+   if (typeof value !== "string" || !PUBLIC_KEY.test(value) || typeof rootDir !== "string") return null;
+@@ -95,7 +100,7 @@ function selectedFindingFromRaw(rawReport, rootDir, gate, reviewedValue) {
+ 
+ export async function reproduceReviewedFinding({ rootDir, binaryPath, path, rule, line, column,
+   reviewedValue, spawnFn = spawnSync, env = process.env }) {
+-  if (reviewedValueClass(rootDir, reviewedValue, spawnSync, rule) === null) return { ok: false, reason: REVIEWED_VALUE_REFUSAL };
++  if (reviewedValueClass(rootDir, reviewedValue, spawnSync, rule, path) === null) return { ok: false, reason: REVIEWED_VALUE_REFUSAL };
+   if (!safePath(path) || typeof rule !== "string" || !/^[a-z0-9][a-z0-9._-]*$/iu.test(rule)
+     || !Number.isSafeInteger(line) || line < 1 || !Number.isSafeInteger(column) || column < 1) {
+     return { ok: false, reason: "invalid finding selector" };
+@@ -153,7 +158,7 @@ export async function verifyReproductionGate({ gate, ...options }) {
+ export function reproductionGateFactsStillMatch({ gate, rootDir, binaryPath, reviewedValue, rawReport, observedReportSha256 }) {
+   try {
+     const configPath = resolveGitleaksConfigPath();
+-    return reviewedValueClass(rootDir, reviewedValue, spawnSync, gate?.rule ?? null) !== null && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
++    return reviewedValueClass(rootDir, reviewedValue, spawnSync, gate?.rule ?? null, gate?.path ?? null) !== null && gate?.schema === "pipeline.gitleaks-reproduction-gate.v1"
+       && digest(reviewedValue) === gate.valueSha256
+       && (typeof rawReport === "string" ? selectedFindingFromRaw(rawReport, rootDir, gate, reviewedValue) : observedReportSha256) === gate.reportSha256
+       && fileDigest(sourcePath(rootDir, gate.path)) === gate.inputSha256
+diff --git a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs
+index 1e5f4b2afcf0dc2e4b55a0c46a6046ac4af3deae..a673da25846728b8cd4654d410b00a10fde8bab5 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs
+@@ -140,7 +140,9 @@ const identifierFixture = ({ source = "tracked", rule = RULE } = {}) => {
+ test("C28e (Codex test run): a public identifier the tracked source holds verbatim is reviewable for generic-api-key and the gate verifies", async () => {
+   const f = identifierFixture();
+   try {
+-    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE), "public-identifier");
++    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE, RECORD_PATH), "public-identifier");
++    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE, "src/platform/results.js"), null, "a finding in source code is fixed in the code, never reviewed as a public identifier");
++    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE), null, "without the finding's path the class does not apply");
+     const result = await reproduceReviewedFinding(f);
+     assert.equal(result.ok, true, result.reason);
+     assert.doesNotMatch(JSON.stringify(result.gate), /sampleapp/u, "the value itself never enters the gate");
+@@ -161,9 +163,10 @@ test("C28e (Codex test run): the public-identifier class is closed: other rule,
+   const f = identifierFixture();
+   try {
+     for (const value of ["sampleapp", "Sampleapp.Results.V1", "k3j9x2q8.z7w4", "ab12cd34ef.results.v1", `${"a".repeat(30)}.${"b".repeat(30)}.v1`, "results.v1/../x", "1.2.3"]) {
+-      assert.equal(reviewedValueClass(f.rootDir, value, spawnSync, RULE), null, `refused shape: ${value}`);
++      assert.equal(reviewedValueClass(f.rootDir, value, spawnSync, RULE, RECORD_PATH), null, `refused shape: ${value}`);
+     }
+-    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER), null, "without the rule the identifier class does not apply");
++    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, null, RECORD_PATH), null, "without the rule the identifier class does not apply");
++    assert.equal(reviewedValueClass(f.rootDir, IDENTIFIER, spawnSync, RULE, "specs/f/evidence/../../src/platform/results.js"), null, "a dot-dot path is no record");
+   } finally { rmSync(f.rootDir, { recursive: true, force: true }); }
+ });
+ 

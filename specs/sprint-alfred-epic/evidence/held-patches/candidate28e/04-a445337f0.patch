@@ -1,0 +1,74 @@
+diff --git a/plugins/pipeline-core/lib/sbom-close.mjs b/plugins/pipeline-core/lib/sbom-close.mjs
+index f1c350f9857e88bc6d20908db478ef1260200162..d1b17691085ae27b9321b1651241e471c0e99e2c 100644
+--- a/plugins/pipeline-core/lib/sbom-close.mjs
++++ b/plugins/pipeline-core/lib/sbom-close.mjs
+@@ -193,7 +193,7 @@ export function observeSbomInputs({ tracked, read }) {
+     if (chosen !== null) {
+       const raw = read(path);
+       if (typeof raw !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
+-      const text = raw.replace(/^﻿/u, ""); // C28e: Windows tools write a UTF-8 byte-order mark; the digest below still binds the raw bytes
++      const text = raw.replace(/^\uFEFF/u, ""); // C28e: Windows tools write a UTF-8 byte-order mark; the digest below still binds the raw bytes
+       // A file merely NAMED bom.json is an input only when it is a CycloneDX document; a *.cdx.json file must be one. C28e: a bom.json that
+       // is not JSON at all is invalid, never skipped (skipping it made a pom report "no CycloneDX file covers" for a damaged one).
+       if (name === "bom.json") {
+@@ -214,7 +214,7 @@ export function observeSbomInputs({ tracked, read }) {
+     if (lockCovers(needs, dir) || ancestors(dir).some((candidate) => unsupportedDirs.has(candidate)) || (name === "pyproject.toml" && paths.some((other) => baseName(other) === "requirements.txt" && dirOf(other) === dir))) continue;
+     const text = read(path);
+     if (typeof text !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
+-    if (manifestDeclaresDependencies(name, text.replace(/^﻿/u, ""))) findings.push(finding("partial", SBOM_LIFECYCLE_CODES.partial, path, `${name} declares dependencies but no lockfile pins them (${needs.join(" or ")})`));
++    if (manifestDeclaresDependencies(name, text.replace(/^\uFEFF/u, ""))) findings.push(finding("partial", SBOM_LIFECYCLE_CODES.partial, path, `${name} declares dependencies but no lockfile pins them (${needs.join(" or ")})`));
+   }
+   // Maven: a pom lists its direct dependencies only. It is complete when a CycloneDX file in its directory or an ancestor lists every one of
+   // them (by version where the pom fixes one); otherwise it is partial and names what is missing, so a stale CycloneDX file does not pass.
+diff --git a/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs b/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
+index 7ebdf80eab810f7abba6ec8f08b4676aa2de2d48..d7198787a637b7afa6cc817e44133e1570ab21a1 100644
+--- a/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
++++ b/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
+@@ -48,6 +48,10 @@ function yarnEntries(text) {
+ }
+ const unquote = (value) => value.replace(/^"(.*)"$/u, "$1");
+ const safePathname = (url) => { try { return new URL(url).pathname; } catch { return ""; } };
++const safeHost = (url) => { try { return new URL(url).host; } catch { return ""; } };
++// A forge's source archive (GitLab `/-/archive/`, GitHub `/archive/` or `/tar.gz/`); a registry tarball always sits under `<name>/-/`, so a
++// package that is merely NAMED archive or zip is not one.
++const gitArchivePath = (pathname) => /\/-\/archive\//iu.test(pathname) || (!pathname.includes("/-/") && /\/(?:archive|tar\.gz|zip|legacy\.tar\.gz)\//iu.test(pathname));
+ const yarnProp = (props, key) => { for (const line of props) { const match = new RegExp(`^ {2}"?${key}"?:? (.+)$`, "u").exec(line); if (match) return unquote(match[1].trim()); } return null; };
+ 
+ export function parseYarnLock(text, path) {
+@@ -76,6 +80,11 @@ export function parseYarnLock(text, path) {
+       if (/^link:/u.test(range)) continue;
+       if (/^file:/u.test(range)) { issues.push(finding("partial", path, `${name} is a local file dependency, not a registry version`)); continue; }
+       if (/^[a-z][a-z0-9+.-]*:/iu.test(range) || range.includes("/")) { issues.push(finding("partial", path, `${name} is pinned to a git commit or URL, not a registry version`)); continue; }
++      // A `resolutions` override can put a git or local source under a plain semver descriptor: a resolved source that is recognisably git
++      // (a git protocol, a codeload or archive tarball, a .git repository) or a local file is still not a registry version.
++      if (resolved !== null && (/^(?:git\+|git:|ssh:|github:|gitlab:|bitbucket:|file:|link:)/iu.test(resolved) || /\.git(?:#|$)/iu.test(resolved) || /(?:^|\.)codeload\./iu.test(safeHost(resolved)) || gitArchivePath(safePathname(resolved)))) {
++        issues.push(finding("partial", path, `${name} is resolved from a git commit or a local path (an override of its range), not a registry version`)); continue;
++      }
+       if (typeof version !== "string" || !SEMVER.test(version)) throw new Error(`${name}: entry without a version`);
+       const real = resolved === null ? undefined : /\/((?:@[^/]+\/)?[^/]+)\/-\//u.exec(safePathname(resolved))?.[1];
+       out.push(npm(real === undefined ? name : decodeURIComponent(real), version));
+diff --git a/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs b/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
+index 6cd8523af6366ef06308cde0a500323e5b50cd89..f7f784886776405227e7a8bb39e32a1ebbab8b78 100644
+--- a/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
++++ b/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
+@@ -602,6 +602,11 @@ test("C28e: private registries without the default tarball path, aliases to scop
+   const v1 = parseYarnLock(github, "yarn.lock");
+   assert.deepEqual(purls(v1), ["pkg:npm/%40owner/pkg@1.0.0", "pkg:npm/%40corp/ui@2.1.0"], "GitHub Packages serves tarballs without /-/; the descriptor's range decides");
+   assert.deepEqual(states(v1), ["partial"]); assert.doesNotMatch(JSON.stringify(v1), /:\/\/|codeload|npm\.pkg/u);
++  // A `resolutions` override keeps the semver descriptor but resolves a git source: still partial. A registry package merely named archive is not.
++  const overridden = `# yarn lockfile v1\n\n\nleft-pad@^1.3.0:\n  version "1.3.0"\n  resolved "https://codeload.github.com/owner/left-pad/tar.gz/abc"\n\nis-odd@^3.0.0:\n  version "3.0.1"\n  resolved "git+ssh://git@example.invalid/owner/is-odd.git#abc"\n\nleft-zip@^1.0.0:\n  version "1.0.0"\n  resolved "https://gitlab.example.invalid/owner/left-zip/-/archive/abc/left-zip-abc.tar.gz"\n\narchive@^1.0.0:\n  version "1.0.0"\n  resolved "https://registry.yarnpkg.com/archive/-/archive-1.0.0.tgz#abc"\n`;
++  const resolvedGit = parseYarnLock(overridden, "yarn.lock");
++  assert.deepEqual(purls(resolvedGit), ["pkg:npm/archive@1.0.0"]);
++  assert.deepEqual(states(resolvedGit), ["partial", "partial", "partial"]); noUrl(resolvedGit, "yarn v1 resolutions");
+   const pnpm6 = "lockfileVersion: '6.0'\n\npackages:\n\n  npm.corp.example.invalid/@corp/ui@2.1.0:\n    resolution: {integrity: sha512-w, tarball: https://npm.corp.example.invalid/@corp/ui/-/ui-2.1.0.tgz}\n    dev: false\n";
+   const pnpm5 = "lockfileVersion: 5.4\n\npackages:\n\n  npm.corp.example.invalid/@corp/ui/2.1.0:\n    resolution: {integrity: sha512-w, tarball: https://npm.corp.example.invalid/@corp/ui/-/ui-2.1.0.tgz}\n    dev: false\n";
+   for (const [label, text] of [["pnpm 6", pnpm6], ["pnpm 5", pnpm5]]) {
+@@ -617,7 +622,7 @@ test("C28e: a UTF-8 byte-order mark and CRLF line ends read exactly like the pla
+     "composer.lock": COMPOSER_LOCK, "pubspec.lock": PUBSPEC_LOCK, "Package.resolved": PACKAGE_RESOLVED_2, "mix.lock": MIX_LOCK, "pom.xml": POM, "bom.json": FULL_CDX,
+     "g/conan.lock": JSON.stringify({ version: "0.5", requires: ["zlib/1.3#x"], build_requires: [], python_requires: [] }, null, 2),
+     "j/packages.config": PACKAGES_CONFIG, "h/build.gradle": "dependencies {\n  implementation 'a:b:1'\n}\n", "i/Svc.csproj": '<Project><ItemGroup><PackageReference Include="X" Version="1.0.0" /></ItemGroup></Project>\n' };
+-  const windows = Object.fromEntries(Object.entries(files).map(([path, text]) => [path, `﻿${text.replace(/\r?\n/gu, "\r\n")}`]));
++  const windows = Object.fromEntries(Object.entries(files).map(([path, text]) => [path, `\uFEFF${text.replace(/\r?\n/gu, "\r\n")}`]));
+   const plain = observe(files); const crlf = observe(windows);
+   assert.ok(plain.components.length >= 25);
+   assert.deepEqual(crlf.components, plain.components);

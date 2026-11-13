@@ -1,0 +1,381 @@
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index ffb32cb0f5ae70b23e4d4ee5edf5db2211e7ea17..740debcdf291ffbe8021639f05d66aa5b83e04b0 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -46,6 +46,9 @@ import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.m
+ import { readConsumedCourseClaimBinding } from "./critic-verify-lifecycle.mjs";
+ import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
+ import { sha256Canonical } from "./review-economy.mjs";
++import { SPEC_ADDENDUM_APPROVAL_FILE, SPEC_ADDENDUM_KIND, isSpecAddendumPath, readSpecAddenda, specAddendumApprovalPath } from "./spec-addendum.mjs";
++import { criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
++import { readPrivateApprovals } from "./critical-action-authorization.mjs";
+ import { readdirSync } from "node:fs";
+ 
+ export const FEATURE_PACKAGE_REGISTRATION_SCHEMA = "pipeline.feature-package-registration.v1";
+@@ -636,6 +639,106 @@ export function addVerifyEvidence({ root: rootInput, state, path: evidenceRel, r
+   };
+ }
+ 
++/**
++ * ADR-0095: registers one PO-approved Spec addendum (`--add-spec-addendum <approval record>`). The record is the file
++ * `pipeline-state.mjs approve-spec-addendum` wrote; it must be named by its own digest, bind the package's approved Spec, match a
++ * private approval of kind spec-addendum for the same subject digest and commit, and the addendum it names must hold the approved
++ * bytes in the working tree and at the approved commit, which is an ancestor of HEAD. The addendum is added as an immutable
++ * non-authority `design` entry and the record as `candidate-evidence`; nothing else of the manifest changes and nothing is committed.
++ */
++export function addSpecAddendum({ root: rootInput, state, approvalPath, readAcceptedDeliveryContract } = {}) {
++  if (!object(state) || typeof approvalPath !== "string") return refused("FPR-ARGS", "root, state and the Spec addendum approval record path are required");
++  let root;
++  try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
++  const featureId = state.activeFeature?.id;
++  if (!SAFE_ID.test(featureId ?? "")) return refused("FPR-NO-APPROVED-PLAN", "no active feature; set-feature first");
++  const manifestPath = `specs/${featureId}/lifecycle.json`;
++  const manifestRead = inspect(root, manifestPath);
++  if (manifestRead.kind !== "file") return refused("FPR-MANIFEST-MISSING", `no manifest ${manifestPath}; register the feature package first (register-feature-package.mjs --root <root>)`, { manifestPath });
++  let manifest;
++  try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
++  const checked = validateFeaturePackage(root, manifestPath);
++  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
++  const where = { manifestPath, path: approvalPath };
++  if (!SPEC_ADDENDUM_APPROVAL_FILE.test(approvalPath) || !approvalPath.startsWith(`specs/${featureId}/evidence/`)) {
++    return refused("FPR-SPEC-ADDENDUM-PATH", `${approvalPath} is not a Spec addendum approval record of this feature (specs/${featureId}/evidence/spec-addendum-approval-<sha256>.json, written by pipeline-state.mjs approve-spec-addendum)`, where);
++  }
++  const seen = inspect(root, approvalPath);
++  if (seen.kind !== "file") return refused("FPR-SPEC-ADDENDUM-PATH", `${approvalPath} is missing or is not a regular file`, where);
++  try { if (realpathSync(join(root, approvalPath)) !== join(root, approvalPath)) return refused("FPR-SPEC-ADDENDUM-PATH", `${approvalPath} resolves through a link`, where); } catch { return refused("FPR-SPEC-ADDENDUM-PATH", `${approvalPath} does not resolve`, where); }
++  if (specAddendumApprovalPath(featureId, seen.bytes) !== approvalPath) return refused("FPR-SPEC-ADDENDUM-RECORD", `${approvalPath} is not named by the digest of its bytes; the record was changed after the approval`, where);
++  let record;
++  try { record = JSON.parse(seen.bytes.toString("utf8")); } catch { return refused("FPR-SPEC-ADDENDUM-RECORD", "the record is not JSON", where); }
++  const subject = record?.subject;
++  const addendumPath = object(subject) ? subject.addendumPath : null;
++  if (!isSpecAddendumPath(addendumPath)) return refused("FPR-SPEC-ADDENDUM-RECORD", "the record names no Spec addendum", where);
++  const recordSha256 = digest(seen.bytes);
++  const registeredRecord = manifest.artifacts.find((entry) => entry.path === approvalPath);
++  const registeredAddendum = manifest.artifacts.find((entry) => entry.path === addendumPath);
++  if (registeredRecord && registeredRecord.sha256 === recordSha256 && registeredAddendum?.class === "design" && registeredAddendum.sha256 === subject.addendumSha256) {
++    return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, approvalPath, addendumPath };
++  }
++  if (registeredRecord || registeredAddendum) return refused("FPR-SPEC-ADDENDUM-DUPLICATE", `${registeredAddendum ? addendumPath : approvalPath} is already registered; an addendum is registered once, and a further correction is the next addendum`, where);
++  // The record must bind its own subject: the subject digest is recomputed, never taken from the file.
++  const candidate = record.candidate;
++  if (!object(candidate) || typeof candidate.commit !== "string" || typeof candidate.tree !== "string"
++    || criticalActionSubjectSha256({ kind: SPEC_ADDENDUM_KIND, candidate: { commit: candidate.commit, tree: candidate.tree }, subject }) !== record.subjectSha256) {
++    return refused("FPR-SPEC-ADDENDUM-RECORD", "the record's subject digest does not bind its subject and candidate", where);
++  }
++  const head = gitOut(root, ["rev-parse", "HEAD"]);
++  const approvedTree = gitOut(root, ["rev-parse", "--verify", "--quiet", `${candidate.commit}^{tree}`]);
++  if (!head || approvedTree !== candidate.tree || spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", candidate.commit, head], { shell: false, timeout: 15000 }).status !== 0) {
++    return refused("FPR-SPEC-ADDENDUM-CANDIDATE", `the approved commit ${candidate.commit} is not this repository's commit with the recorded tree, or not an ancestor of HEAD`, where);
++  }
++  const approvedBlob = spawnSync("git", ["-C", root, "show", `${candidate.commit}:${addendumPath}`], { shell: false, timeout: 15000, maxBuffer: 16 * 1024 * 1024 });
++  if (approvedBlob.status !== 0 || digest(approvedBlob.stdout) !== subject.addendumSha256) {
++    return refused("FPR-SPEC-ADDENDUM-DIGEST", `${addendumPath} at the approved commit does not hold the approved bytes`, { ...where, addendumPath });
++  }
++  const addendumSeen = inspect(root, addendumPath);
++  if (addendumSeen.kind !== "file" || digest(addendumSeen.bytes) !== subject.addendumSha256) {
++    return refused("FPR-SPEC-ADDENDUM-DIGEST", `${addendumPath} in the working tree does not hold the approved bytes; an approved addendum is never edited, a further correction is the next addendum`, { ...where, addendumPath });
++  }
++  // The PO's approval itself lives in the private store; a committed record without it is not an approval.
++  const common = gitOut(root, ["rev-parse", "--git-common-dir"]);
++  let gitCommonDir = null;
++  try { gitCommonDir = common ? realpathSync(resolve(root, common)) : null; } catch { gitCommonDir = null; }
++  const approved = gitCommonDir !== null && readPrivateApprovals(gitCommonDir, SPEC_ADDENDUM_KIND).some((envelope) => envelope.forCommit === candidate.commit
++    && envelope.approval?.subjectSha256 === record.subjectSha256 && envelope.approval.forTree === candidate.tree && envelope.approval.approvedBy === record.approvedBy
++    && envelope.approval.approvedAt === record.approvedAt && (envelope.approval.criticalProof?.proofSha256 ?? null) === record.proofSha256);
++  if (!approved) return refused("FPR-SPEC-ADDENDUM-UNAPPROVED", "no private PO approval of kind spec-addendum matches this record (subject digest, commit, label, time and proof); run pipeline-state.mjs approve-spec-addendum in this repository", where);
++  const additions = [
++    { class: "design", path: addendumPath, sha256: subject.addendumSha256, authority: false, mutability: "immutable", retention: "retain" },
++    { ...DIAGNOSTIC_ARTIFACT, path: approvalPath, sha256: recordSha256 },
++  ];
++  const amended = { ...manifest, artifacts: [...manifest.artifacts, ...additions] };
++  // The one reader of the briefing, the delta request and the close must accept the amended manifest and see this addendum applied.
++  const read = readSpecAddenda({ root, featureId, manifest: amended });
++  const mine = read.addenda.find((entry) => entry.approvalPath === approvalPath);
++  if (!read.ok) return refused("FPR-SPEC-ADDENDUM-READ", "the Spec addendum reader refuses the amended manifest; it was not written", { ...where, findings: read.findings });
++  if (mine?.status !== "applied") return refused("FPR-SPEC-ADDENDUM-SUPERSEDED", "the record binds a Spec that is no longer the package's approved Spec (the design was reopened and re-approved); write and approve a new addendum against the approved Spec", where);
++  const bytes = Buffer.from(`${JSON.stringify(amended, null, 2)}\n`);
++  const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* the readback below reports a manifest it cannot restore */ } };
++  const temp = join(root, `${manifestPath}.addendum-${process.pid}.tmp`);
++  try { writeFileSync(temp, bytes, { flag: "wx", mode: 0o644 }); renameSync(temp, join(root, manifestPath)); }
++  catch (error) { try { unlinkSync(temp); } catch { /* not created */ } restore(); return refused("FPR-WRITE-FAILED", `the Spec addendum could not be registered (${error?.code ?? "error"}); the manifest was restored`, { manifestPath }); }
++  const validated = validateFeaturePackage(root, manifestPath);
++  if (!validated.ok) { restore(); return refused("FPR-VALIDATION-FAILED", "the topology validator refused the amended manifest; it was restored", { manifestPath, findings: validated.findings }); }
++  const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
++  if (envelopes.length === 1) {
++    const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
++    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") {
++      restore();
++      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) });
++    }
++  }
++  return {
++    schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "spec-addendum-added", manifestPath, approvalPath, addendumPath,
++    registered: additions.map((entry) => ({ path: entry.path, sha256: entry.sha256 })), manifestSha256: digest(bytes),
++    commitPaths: [manifestPath, approvalPath],
++    next: `commit ${manifestPath} and ${approvalPath} in one commit; then hand the correction to the Goldfish with ${addendumPath} in its context. The next Critic round on this feature is a delta round that covers the addendum.`,
++  };
++}
++
+ /**
+  * PF-94: registers the lineage record of a CONSUMED course round (`--add-review-lineage --packet <id>`). Everything but the
+  * packet id is derived from the repository: the feature (the single registered feature course), registrationCommit = HEAD,
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index d80c87e1315cfb49339585a844e0652d81768f51..a08c6bf16675355b3f829cb6becac1141fd6f000 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -247,7 +247,8 @@ function sanctionedRegisterFeaturePackageArgs(allArgs, root) {
+   // PF-94: the delta request form names one repository-relative input file (same path rules as the diagnostic form).
+   // D165-CDR: the diagnostic evidence form names one repository-relative path (no dash, no absolute path, no `..`).
+   // The Verify evidence form (feature-close audit route) takes the same single repository-relative path.
+-  return args.length === 4 && (args[2] === "--add-diagnostic-evidence" || args[2] === "--add-delta-request" || args[2] === "--add-verify-evidence") && typeof args[3] === "string" && args[3] !== ""
++  // ADR-0095: the Spec addendum form names the approval record; it registers only what a private PO approval already covers.
++  return args.length === 4 && ["--add-diagnostic-evidence", "--add-delta-request", "--add-verify-evidence", "--add-spec-addendum"].includes(args[2]) && typeof args[3] === "string" && args[3] !== ""
+     && !args[3].startsWith("-") && !args[3].startsWith("/") && !/^[A-Za-z]:/u.test(args[3]) && !args[3].includes("\\") && !args[3].split("/").includes("..");
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 37e80a57b0fcdb9c1d16b60bc2bce273acbfbd8e..f6a43c26f318518252f1aed9d8f8203e92e57524 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -499,7 +499,11 @@ test("D64 feature-package registration: exactly the documented forms are admitte
+     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-unit"), f, "add review unit");
+     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/diagnostic.json"), f, "add diagnostic evidence");
+     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-verify-evidence", "specs/feature/verify.json"), f, "add verify evidence");
+-    for (const [label, argv] of [["verify flag before root", ["--add-verify-evidence", "specs/feature/verify.json", "--root", f.root]],
++    // ADR-0095: the Spec addendum form takes the one approval record path, with the same path rules.
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-spec-addendum", `specs/feature/evidence/spec-addendum-approval-${"a".repeat(64)}.json`), f, "add spec addendum");
++    for (const [label, argv] of [["addendum without path", ["--root", f.root, "--add-spec-addendum"]], ["addendum absolute path", ["--root", f.root, "--add-spec-addendum", join(f.root, "a.json")]],
++      ["addendum parent path", ["--root", f.root, "--add-spec-addendum", "specs/feature/../../a.json"]], ["addendum extra argument", ["--root", f.root, "--add-spec-addendum", "a.json", "--force"]],
++      ["verify flag before root", ["--add-verify-evidence", "specs/feature/verify.json", "--root", f.root]],
+       ["verify without path", ["--root", f.root, "--add-verify-evidence"]], ["verify absolute path", ["--root", f.root, "--add-verify-evidence", join(f.root, "v.json")]],
+       ["verify parent path", ["--root", f.root, "--add-verify-evidence", "specs/feature/../../x.json"]], ["verify dash path", ["--root", f.root, "--add-verify-evidence", "--force"]],
+       ["verify extra argument", ["--root", f.root, "--add-verify-evidence", "v.json", "--force"]],
+diff --git a/plugins/pipeline-core/lib/spec-addendum-registration.test.mjs b/plugins/pipeline-core/lib/spec-addendum-registration.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..d27bb82e73d4132e51cea40e62768301103e7c2f
+--- /dev/null
++++ b/plugins/pipeline-core/lib/spec-addendum-registration.test.mjs
+@@ -0,0 +1,153 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++//
++// ADR-0095: `register-feature-package.mjs --add-spec-addendum <record>` (addSpecAddendum). Real git, a real feature package,
++// the record the approval verb writes (specAddendumApprovalBytes) and the private approval it stores (writeCriticalApproval).
++// SAR-01 registers once; SAR-02..07 are the refusals that keep an unapproved or changed addendum out of the package.
++
++import assert from "node:assert/strict";
++import { execFileSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++
++import { criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
++import { writeCriticalApproval } from "./critical-action-authorization.mjs";
++import { addSpecAddendum } from "./feature-package-registration.mjs";
++import { SPEC_ADDENDUM_KIND, buildSpecAddendumSubject, readSpecAddenda, specAddendumApprovalBytes, specAddendumApprovalPath } from "./spec-addendum.mjs";
++import { REGISTER_FEATURE_PACKAGE_HELP } from "../scripts/register-feature-package.mjs";
++
++const ID = "sa-pkg";
++const PACKET = "e".repeat(32);
++const ADDENDUM = `specs/${ID}/spec-addendum-01.md`;
++const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
++const gitIn = (root, args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.invalid", GIT_COMMITTER_NAME: "Fixture", GIT_COMMITTER_EMAIL: "fixture@example.invalid" } }).trim();
++const head = (root) => ({ commit: gitIn(root, ["rev-parse", "HEAD"]), tree: gitIn(root, ["rev-parse", "HEAD^{tree}"]) });
++
++/** A valid implementing package, a reviewed commit, the committed addendum, its record and (unless `approve: false`) the private approval. */
++function fixture({ approve = true } = {}) {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "sa-reg-")));
++  gitIn(root, ["init", "-q"]);
++  const base = `specs/${ID}`;
++  mkdirSync(join(root, base, "evidence"), { recursive: true });
++  const entries = [["prd", "prd.md", true, "mutable"], ["spec", "spec.md", true, "mutable"], ["acceptance", "acceptance.md", false, "mutable"], ["result", "result.md", false, "mutable"], ["candidate-evidence", "envelope.json", false, "immutable"]].map(([klass, name, authority, mutability]) => {
++    const bytes = `${klass} of ${ID}\n`;
++    writeFileSync(join(root, base, name), bytes);
++    return { class: klass, path: `${base}/${name}`, sha256: sha256(bytes), authority, mutability, retention: "active" };
++  });
++  const manifestRel = `${base}/lifecycle.json`;
++  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: ID, rigor: 1 }, state: "implementing", artifacts: entries, candidate: null, supersedes: null };
++  writeFileSync(join(root, manifestRel), `${JSON.stringify(manifest, null, 2)}\n`);
++  gitIn(root, ["add", "-A"]);
++  gitIn(root, ["commit", "-qm", "work"]);
++  const reviewed = head(root);
++  const specSha = entries[1].sha256;
++  writeFileSync(join(root, ADDENDUM), `Base Spec: ${base}/spec.md sha256:${specSha}\nCritic packet: ${PACKET}\nFindings: CRF-${PACKET}-1\n\nThe board shows the best score, not the last one.\n`);
++  gitIn(root, ["add", "-A"]);
++  gitIn(root, ["commit", "-qm", "spec addendum 01"]);
++  const candidate = head(root);
++  const built = buildSpecAddendumSubject({ root, featureId: ID, addendumPath: ADDENDUM, controlRoot: "/unused",
++    readReceipt: () => ({ receipt: { packetId: PACKET, candidate: reviewed } }), readResult: () => ({ result: { verdict: { findings: [{ severity: "major" }] } } }) });
++  assert.equal(built.ok, true, JSON.stringify(built));
++  const subjectSha256 = criticalActionSubjectSha256({ kind: SPEC_ADDENDUM_KIND, candidate, subject: built.subject });
++  const approvedAt = "2026-11-13T10:00:00.000Z";
++  const bytes = specAddendumApprovalBytes({ subject: built.subject, candidate, subjectSha256, approvedBy: "PO", approvedAt, mode: "chat-attributed-unattested" });
++  const recordPath = specAddendumApprovalPath(ID, bytes);
++  writeFileSync(join(root, recordPath), bytes);
++  if (approve) {
++    const stored = writeCriticalApproval({ gitCommonDir: join(root, ".git"), kind: SPEC_ADDENDUM_KIND, consumedAt: approvedAt,
++      approval: { approvedBy: "PO", approvedAt, forCommit: candidate.commit, forTree: candidate.tree, ...built.subject, subjectSha256, criticalProof: null } });
++    assert.equal(stored.ok, true);
++  }
++  const readManifest = () => readFileSync(join(root, manifestRel), "utf8");
++  return { root, manifestRel, recordPath, subject: built.subject, candidate, subjectSha256, approvedAt, readManifest, state: { activeFeature: { id: ID } }, cleanup: () => rmSync(root, { recursive: true, force: true }) };
++}
++
++test("SAR-01 an approved addendum is registered once: the addendum as immutable design, the record as candidate evidence, read back as applied", () => {
++  const f = fixture();
++  try {
++    const added = addSpecAddendum({ root: f.root, state: f.state, approvalPath: f.recordPath });
++    assert.equal(added.status, "spec-addendum-added", JSON.stringify(added));
++    assert.deepEqual(added.commitPaths, [f.manifestRel, f.recordPath]);
++    const manifest = JSON.parse(f.readManifest());
++    const design = manifest.artifacts.find((entry) => entry.path === ADDENDUM);
++    assert.deepEqual(design, { class: "design", path: ADDENDUM, sha256: f.subject.addendumSha256, authority: false, mutability: "immutable", retention: "retain" });
++    assert.equal(manifest.artifacts.find((entry) => entry.path === f.recordPath)?.class, "candidate-evidence");
++    const read = readSpecAddenda({ root: f.root, featureId: ID, manifest });
++    assert.equal(read.ok, true, JSON.stringify(read));
++    assert.deepEqual(read.applied.map((entry) => [entry.path, entry.approvedBy, entry.mode]), [[ADDENDUM, "PO", "chat-attributed-unattested"]]);
++    assert.equal(addSpecAddendum({ root: f.root, state: f.state, approvalPath: f.recordPath }).status, "already-registered");
++  } finally { f.cleanup(); }
++});
++
++test("SAR-02 a committed record without the private PO approval is refused and the manifest is untouched", () => {
++  const f = fixture({ approve: false });
++  try {
++    const before = f.readManifest();
++    const refused = addSpecAddendum({ root: f.root, state: f.state, approvalPath: f.recordPath });
++    assert.equal(refused.code, "FPR-SPEC-ADDENDUM-UNAPPROVED", JSON.stringify(refused));
++    assert.equal(f.readManifest(), before);
++  } finally { f.cleanup(); }
++});
++
++test("SAR-03 an addendum edited after its approval is refused (working tree), never registered with other bytes", () => {
++  const f = fixture();
++  try {
++    writeFileSync(join(f.root, ADDENDUM), `${readFileSync(join(f.root, ADDENDUM), "utf8")}A sentence added after the approval.\n`);
++    const before = f.readManifest();
++    const refused = addSpecAddendum({ root: f.root, state: f.state, approvalPath: f.recordPath });
++    assert.equal(refused.code, "FPR-SPEC-ADDENDUM-DIGEST", JSON.stringify(refused));
++    assert.equal(f.readManifest(), before);
++  } finally { f.cleanup(); }
++});
++
++test("SAR-04 a changed record is refused: other bytes under the old name, and a re-named record whose subject no longer binds its digest", () => {
++  const f = fixture();
++  try {
++    const record = JSON.parse(readFileSync(join(f.root, f.recordPath), "utf8"));
++    writeFileSync(join(f.root, f.recordPath), `${JSON.stringify({ ...record, approvedBy: "someone else" }, null, 2)}\n`);
++    assert.equal(addSpecAddendum({ root: f.root, state: f.state, approvalPath: f.recordPath }).code, "FPR-SPEC-ADDENDUM-RECORD");
++    const forged = Buffer.from(`${JSON.stringify({ ...record, subject: { ...record.subject, findingIds: [`CRF-${PACKET}-2`] } }, null, 2)}\n`);
++    const forgedPath = specAddendumApprovalPath(ID, forged);
++    writeFileSync(join(f.root, forgedPath), forged);
++    assert.equal(addSpecAddendum({ root: f.root, state: f.state, approvalPath: forgedPath }).code, "FPR-SPEC-ADDENDUM-RECORD");
++  } finally { f.cleanup(); }
++});
++
++test("SAR-05 a record that binds a Spec the package no longer approves (design reopened and re-approved) is refused as superseded", () => {
++  const f = fixture();
++  try {
++    const manifest = JSON.parse(f.readManifest());
++    const spec = manifest.artifacts.find((entry) => entry.class === "spec");
++    writeFileSync(join(f.root, spec.path), "spec of sa-pkg, re-approved\n");
++    spec.sha256 = sha256("spec of sa-pkg, re-approved\n");
++    writeFileSync(join(f.root, f.manifestRel), `${JSON.stringify(manifest, null, 2)}\n`);
++    const refused = addSpecAddendum({ root: f.root, state: f.state, approvalPath: f.recordPath });
++    assert.equal(refused.code, "FPR-SPEC-ADDENDUM-SUPERSEDED", JSON.stringify(refused));
++  } finally { f.cleanup(); }
++});
++
++test("SAR-06 a path that is not a Spec addendum approval record of this feature is refused before anything is read", () => {
++  const f = fixture();
++  try {
++    for (const path of [`specs/${ID}/${f.recordPath.split("/").at(-1)}`, `specs/other/evidence/${f.recordPath.split("/").at(-1)}`, ADDENDUM]) {
++      assert.equal(addSpecAddendum({ root: f.root, state: f.state, approvalPath: path }).code, "FPR-SPEC-ADDENDUM-PATH", path);
++    }
++  } finally { f.cleanup(); }
++});
++
++test("SAR-07 an approved commit that is not an ancestor of HEAD is refused", () => {
++  const f = fixture();
++  try {
++    gitIn(f.root, ["checkout", "-q", "--detach", "HEAD~1"]);
++    const refused = addSpecAddendum({ root: f.root, state: f.state, approvalPath: f.recordPath });
++    assert.equal(refused.code, "FPR-SPEC-ADDENDUM-CANDIDATE", JSON.stringify(refused));
++  } finally { f.cleanup(); }
++});
++
++test("SAR-08 the registration help names the Spec addendum route", () => {
++  assert.match(REGISTER_FEATURE_PACKAGE_HELP, /--add-spec-addendum <approval record>/u);
++  assert.match(REGISTER_FEATURE_PACKAGE_HELP, /approve-spec-addendum --by <label the PO gives>/u);
++});
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 2b469fd2dbc5eb189eed56a482be221d16a9115b..75b92689a98663734357c7cb61f13a3f8a52dbf5 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -10,6 +10,9 @@
+ // immutable candidate-evidence entries of the feature manifest, after validating it against its own
+ // recorded candidate; it prints the paths to commit.
+ //
++// `--add-spec-addendum <record>` (ADR-0095) registers a PO-approved Spec addendum (immutable `design`)
++// and its approval record (candidate-evidence) once the private approval of kind spec-addendum exists.
++//
+ // `--add-review-unit` (PF-34) adds the Critic review unit and its manifest entry to a feature
+ // registered before the unit existed; it prints the two paths to commit and the review base.
+ //
+@@ -31,7 +34,7 @@ import { existsSync, realpathSync, statSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
+-import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
++import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, addSpecAddendum, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+ import { readAcceptedDeliveryContract, readState } from "./pipeline-state.mjs";
+ 
+ function git(root, args) {
+@@ -72,7 +75,7 @@ export function pushThreatModelReadback(root) {
+ }
+ 
+ export const REGISTER_FEATURE_PACKAGE_HELP = [
+-  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>] [--stage]",
++  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> | --add-spec-addendum <approval record>] [--stage]",
+   "",
+   "Add --stage as the LAST argument to stage exactly the paths the result names in commitPaths (the result then carries staged: [...]). It never commits and stages nothing else:",
+   "  your commit stays one `git commit -F <message file>` of what is staged.",
+@@ -113,6 +116,12 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "  7. Rerun critic-dispatch-preflight.mjs with the arguments the verb prints.",
+   "  8. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value). Optional: the preflight derives the same bindings itself when the flag is omitted (echoed with derived: true); a history-named file in the range is refused early with CDP-HISTORY-IN-RANGE.",
+   "",
++  "Spec addendum route (ADR-0095; a Critic finding needs a Spec correction inside the approved criteria):",
++  "  1. Write specs/<feature>/spec-addendum-<NN>.md (header: Base Spec, Critic packet, Findings) and commit it alone.",
++  "  2. The PO approves it: pipeline-state.mjs approve-spec-addendum --by <label the PO gives> --addendum <path> (signature mode prints the signing step first).",
++  "  3. Register it: register-feature-package.mjs --root <root> --add-spec-addendum specs/<feature>/evidence/spec-addendum-approval-<sha256>.json",
++  "  4. Commit the manifest and the record in one commit, then correct the code; the next Critic round is a delta round that covers the addendum.",
++  "",
+   "Late lineage: if correction commits already follow a consumed round, its lineage can no longer be registered (CCA-TRANSPORT-SOURCE-DRIFT).",
+   "  Retire the old batch with session-critic-finalizer inspect-course-takeover and supersede-course-takeover, then rerun round 1 on the course path.",
+   "",
+@@ -153,8 +162,10 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+   const addLineage = argv.length === 5 && argv[2] === "--add-review-lineage" && argv[3] === "--packet" && /^[a-f0-9]{32}$/u.test(argv[4] ?? "");
+   // PF-94: `--add-delta-request <input.json>` builds, writes and registers the delta request of the next Critic round.
+   const addDelta = argv.length === 4 && argv[2] === "--add-delta-request" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+-  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+-    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path>]" })}\n`);
++  // ADR-0095: `--add-spec-addendum <approval record>` registers a PO-approved Spec addendum and its approval record.
++  const addAddendum = argv.length === 4 && argv[2] === "--add-spec-addendum" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
++  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta && !addAddendum) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
++    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> | --add-spec-addendum <approval record>]" })}\n`);
+     return 2;
+   }
+   let root;
+@@ -174,6 +185,11 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+     out(emit(added));
+     return added.status === "refused" ? 2 : 0;
+   }
++  if (addAddendum) {
++    const added = addSpecAddendum({ root, state: read.state, approvalPath: argv[3], readAcceptedDeliveryContract });
++    out(emit(added));
++    return added.status === "refused" ? 2 : 0;
++  }
+   if (addLineage) {
+     const added = addCriticReviewLineage({ root, packetId: argv[4], readAcceptedDeliveryContract });
+     out(emit(added));

@@ -1,0 +1,76 @@
+diff --git a/plugins/pipeline-core/lib/spec-addendum-registration.test.mjs b/plugins/pipeline-core/lib/spec-addendum-registration.test.mjs
+index d27bb82e73d4132e51cea40e62768301103e7c2f..3e2924d02495de757f748d5fdde324e561be4f19 100644
+--- a/plugins/pipeline-core/lib/spec-addendum-registration.test.mjs
++++ b/plugins/pipeline-core/lib/spec-addendum-registration.test.mjs
+@@ -18,6 +18,7 @@ import { writeCriticalApproval } from "./critical-action-authorization.mjs";
+ import { addSpecAddendum } from "./feature-package-registration.mjs";
+ import { SPEC_ADDENDUM_KIND, buildSpecAddendumSubject, readSpecAddenda, specAddendumApprovalBytes, specAddendumApprovalPath } from "./spec-addendum.mjs";
+ import { REGISTER_FEATURE_PACKAGE_HELP } from "../scripts/register-feature-package.mjs";
++import { specAddendumContextLines } from "../scripts/dispatch-briefing.mjs";
+ 
+ const ID = "sa-pkg";
+ const PACKET = "e".repeat(32);
+@@ -147,6 +148,20 @@ test("SAR-07 an approved commit that is not an ancestor of HEAD is refused", ()
+   } finally { f.cleanup(); }
+ });
+ 
++test("SAR-09 the Goldfish briefing names a registered addendum next to the Spec, and a changed one as a stop", () => {
++  const f = fixture();
++  try {
++    assert.deepEqual(specAddendumContextLines(f.root, `specs/${ID}/spec.md`), [], "an approved but unregistered addendum is not yet context");
++    assert.equal(addSpecAddendum({ root: f.root, state: f.state, approvalPath: f.recordPath }).status, "spec-addendum-added");
++    const lines = specAddendumContextLines(f.root, `specs/${ID}/spec.md`);
++    assert.equal(lines.length, 1);
++    assert.match(lines[0], new RegExp(`\`${ADDENDUM}\` \\(sha256 \`${f.subject.addendumSha256}\`\\) corrects \`CRF-${PACKET}-1\`; where it and \`specs/${ID}/spec.md\` differ, the addendum wins`, "u"));
++    writeFileSync(join(f.root, ADDENDUM), "changed\n");
++    assert.match(specAddendumContextLines(f.root, `specs/${ID}/spec.md`)[0], /do not read back .*SPEC-ADDENDUM-DIGEST.*stop and report it/u);
++    assert.deepEqual(specAddendumContextLines(f.root, "specs/no-package/spec.md"), []);
++  } finally { f.cleanup(); }
++});
++
+ test("SAR-08 the registration help names the Spec addendum route", () => {
+   assert.match(REGISTER_FEATURE_PACKAGE_HELP, /--add-spec-addendum <approval record>/u);
+   assert.match(REGISTER_FEATURE_PACKAGE_HELP, /approve-spec-addendum --by <label the PO gives>/u);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 87638f897df5c591e7c864393495b4a5586e329d..38beb875d5f984542121cd9eee54484ebdb67b6c 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -48,6 +48,7 @@ import { dirname, resolve, relative } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
+ import { readSettledPendingPreview } from "../lib/routine-repair.mjs";
++import { readSpecAddenda } from "../lib/spec-addendum.mjs";
+ 
+ const directInvocation = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+ const cliArguments = process.argv.slice(2);
+@@ -705,6 +706,21 @@ export function architectureContextLines(root, paths, loadMap = loadMapBundle) {
+   return lines;
+ }
+ 
++/**
++ * ADR-0095: the approved Spec addenda of the Spec's feature package, one line each, so a correction is read together with the Spec it
++ * corrects. Prose only, like the architecture lines: no addendum is an empty list, a package the reader refuses is named, never a refusal.
++ */
++export function specAddendumContextLines(root, specPath) {
++  const featureId = typeof specPath === "string" ? specPath.split("/")[1] : null;
++  const manifestPath = featureId ? resolve(root, "specs", featureId, "lifecycle.json") : null;
++  if (manifestPath === null || !existsSync(manifestPath)) return [];
++  let manifest;
++  try { manifest = JSON.parse(readFileSync(manifestPath, "utf8")); } catch { return [`- Spec addenda: \`specs/${featureId}/lifecycle.json\` is not JSON; ask the Coordinator before relying on \`${specPath}\` alone.`]; }
++  const read = readSpecAddenda({ root, featureId, manifest });
++  if (!read.ok) return [`- Spec addenda: the registered addenda of \`specs/${featureId}\` do not read back (${read.findings.slice(0, 2).join("; ")}); stop and report it, do not implement against the Spec alone.`];
++  return read.applied.map((addendum) => `- Spec addendum (ADR-0095, PO-approved, part of the Spec): \`${addendum.path}\` (sha256 \`${addendum.sha256}\`) corrects ${addendum.findingIds.map((id) => `\`${id}\``).join(", ")}; where it and \`${specPath}\` differ, the addendum wins.`);
++}
++
+ /** Build the binding, its block and the skeleton from parsed options. Throws BriefingRefusal. */
+ export function generateDispatchBinding(options, deps = {}) {
+   const git = deps.git ?? defaultGit;
+@@ -1172,7 +1188,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     block, "", NATIVE_GOLDFISH_HOST_DIRECTIVE, "",
+     `## Briefing ${dispatchId}: {{TITLE}}`, "",
+     "### 1. Goal", "", "{{GOAL}}", "",
+-    "### 2. Context files", "", ...architectureContextLines(root, allowedPaths, deps.loadMapBundle), "", "{{CONTEXT_FILES}}", "",
++    "### 2. Context files", "", ...architectureContextLines(root, allowedPaths, deps.loadMapBundle), ...specAddendumContextLines(root, specPath), "", "{{CONTEXT_FILES}}", "",
+     "### 3. DoD checks", "", "{{DOD_CHECKS}}", "",
+     "### 4. Forbidden", "", "{{FORBIDDEN}}", "",
+     "### 5. Stop conditions", "", "{{STOP_CONDITIONS}}", "",

@@ -1,0 +1,982 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 228862376121c7322449e9a6563e8ff55933073b..1101eb71ad7412bed37ea545014faa4564b38511 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -809,6 +809,17 @@ uses no network, and it imports only `lib/sbom-manifest.mjs`, itself a kernel pa
+ loosened its rules (a git pin read as a registry package, an unknown format read as empty) would
+ let a close pass with an incomplete SBOM, which is why it cannot be lifted by a window.
+ 
++Candidate 28e adds the one tool registry and the machine-local deferral of a required tool.
++`scripts/toolchain-preflight.mjs` imports `plugins/pipeline-core/lib/toolchain-registry.mjs` (the
++version floors it checks and the document pointer it prints) and
++`plugins/pipeline-core/lib/toolchain-deferrals.mjs` (whether the person deferred installing a
++scanner on this machine), so both execute with kernel authority and are kernel paths now. The
++registry is pure data; the deferral module reads and writes only its own file next to the machine
++plane and imports only `lib/machine-plane.mjs`, itself a kernel path, and the registry. A loosened
++floor would admit a scanner version the close cannot drive, and a deferral read as a pass would
++hide a missing scanner, which is why neither can be lifted by a window. A deferral never reaches
++the plan or close check: `lib/security-close-status.mjs` reads the preflight result, not the report.
++
+ ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
+ and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
+ (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 2d931a7b12a58b46c784cafc89d85a0baa26c16f..51202e6a45974ef17158a315da7b0bed99f04a2b 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1184,6 +1184,7 @@
+         "verify-phase:harness/scripts/verify.mjs:threat-model-tests",
+         "verify-phase:harness/scripts/verify.mjs:tmp-leak-enumerate-tests",
+         "verify-phase:harness/scripts/verify.mjs:tmp-leak-guard-tests",
++        "verify-phase:harness/scripts/verify.mjs:toolchain-registry-tests",
+         "verify-phase:harness/scripts/verify.mjs:transfer-classification-tests",
+         "verify-phase:harness/scripts/verify.mjs:trust-anchor-bootstrap-circularity-repro-tests",
+         "verify-phase:harness/scripts/verify.mjs:v3-bootstrap-authority-tests",
+diff --git a/docs/toolchain.md b/docs/toolchain.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..af602f5ce12a2f3cb41c558d8a8f3c02131fd8d1
+--- /dev/null
++++ b/docs/toolchain.md
+@@ -0,0 +1,143 @@
++# Tools the Pipeline needs
++
++<!-- GENERATED from plugins/pipeline-core/lib/toolchain-registry.mjs by harness/scripts/generate-toolchain-doc.mjs; do not edit by hand. -->
++
++Every program the Pipeline runs on a machine, and every optional one it can use. Install a tool yourself, in your own terminal (in a Claude session you can run the command with the `!` prefix); the Pipeline's own checks never install anything. The install routes below name the vendor's official source. Afterwards the tool must resolve from a directory the Pipeline trusts: the system directories, `~/.local/bin` and `~/go/bin`; on Windows the named `C:\Program Files` directories and `%USERPROFILE%\.local\bin`; or a root you list in `~/.config/agent-pipeline/trusted-tool-roots.json`.
++
++Check the state of this machine with `node <plugin root>/scripts/toolchain-preflight.mjs --environment-readiness`. Record that you install a required tool later with `node <plugin root>/scripts/toolchain-defer.mjs --tool <id> --answer "<your answer>"`, and remove the record with `--clear <id>`.
++
++## Required on every machine
++
++The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check: a project calibrated critical refuses a missing scanner at plan approval and at the close, and any other project gets a notice there.
++
++### node
++
++- **Purpose:** runs every Pipeline script, hook and guard.
++- **Used by:** every Pipeline command.
++- **Minimum:** major version 24 or later.
++- **Check:** `node --version`.
++- **Linux and WSL:** Node.js 24 or later from your distribution's package source or the official binary archive of nodejs.org.
++- **macOS:** `brew install node`.
++- **Windows:** `winget install OpenJS.NodeJS.LTS`.
++
++### git
++
++- **Purpose:** reads and writes the repository, the hooks and every evidence binding.
++- **Used by:** every Pipeline command; the git hooks.
++- **Minimum:** a release that supports `rev-parse --show-object-format` and diff path filters; not Git for Windows 2.56.0.windows.1.
++- **Check:** `git --version`.
++- **Linux and WSL:** `sudo apt-get install git` (Debian, Ubuntu) or your distribution's git package.
++- **macOS:** `xcode-select --install`, or `brew install git`.
++- **Windows:** `winget install Git.Git`.
++
++### gitleaks
++
++- **Purpose:** secret scan of every feature close.
++- **Used by:** the security gate of the feature close.
++- **Minimum:** a release with `--source`, `--report-format`, `--report-path`, `--no-banner` and `--exit-code` (8.x).
++- **Check:** `gitleaks version`.
++- **Linux and WSL:** download `gitleaks_<version>_linux_x64.tar.gz` from github.com/gitleaks/gitleaks/releases, check it against the release's checksums file, and put `gitleaks` into `~/.local/bin`.
++- **macOS:** `brew install gitleaks`.
++- **Windows:** download `gitleaks_<version>_windows_x64.zip` from github.com/gitleaks/gitleaks/releases, check it against the release's checksums file, and put `gitleaks.exe` into `%USERPROFILE%\.local\bin` or `C:\Program Files\Gitleaks`.
++
++### osv-scanner
++
++- **Purpose:** known-vulnerability scan of the project's dependencies at every feature close.
++- **Used by:** the security gate of the feature close.
++- **Minimum:** a 2.x release.
++- **Check:** `osv-scanner --version`.
++- **Linux and WSL:** download `osv-scanner_linux_amd64` (2.x) from github.com/google/osv-scanner/releases, check it against the release's checksums file, and put it into `~/.local/bin` as `osv-scanner`.
++- **macOS:** `brew install osv-scanner`.
++- **Windows:** download `osv-scanner_windows_amd64.exe` (2.x) from github.com/google/osv-scanner/releases, check it against the release's checksums file, and put it into `%USERPROFILE%\.local\bin` or `C:\Program Files\OSV-Scanner` as `osv-scanner.exe`.
++
++### semgrep
++
++- **Purpose:** static code analysis (the Pipeline's rule pack) at every feature close.
++- **Used by:** the security gate of the feature close.
++- **Minimum:** a release with `--json` and `--config`.
++- **Check:** `semgrep --version`.
++- **Linux and WSL:** `pipx install semgrep` (installs into `~/.local/bin`).
++- **macOS:** `brew install semgrep`.
++- **Windows:** not verified on native Windows: the trusted resolver accepts only a direct `semgrep.exe` (in `C:\Program Files\Semgrep`, `%USERPROFILE%\.local\bin` or a root named in the trusted-roots file), and a pip launcher is not one; run the Pipeline from WSL, or defer and accept the block at the close.
++
++## Required on the machine of the person who signs
++
++Signed approvals (the default push gate, signed overrides, acceptance by signature) need this on the machine where the PO signs. The readiness report checks it as `signing-toolchain`.
++
++### openssl
++
++- **Purpose:** signs and checks the PO's Ed25519 approvals (push approval, overrides, acceptance by signature).
++- **Used by:** po-human-approval.mjs.
++- **Minimum:** a build that signs and verifies Ed25519 with `pkeyutl -rawin` (OpenSSL 3).
++- **Check:** `openssl version`.
++- **Linux and WSL:** your distribution's openssl package (OpenSSL 3).
++- **macOS:** `brew install openssl@3`, when the system openssl fails the signing-toolchain readiness check.
++- **Windows:** comes with Git for Windows (`C:\Program Files\Git\mingw64\bin\openssl.exe`).
++
++## Optional
++
++A feature that works without these, or has a fallback. Install one when you use the feature it names.
++
++### gh
++
++- **Purpose:** GitHub issue operations and public observation capture.
++- **Used by:** the github-issue-operations and capture-observation skills.
++- **Minimum:** any current release, signed in with `gh auth login`.
++- **Check:** `gh --version`.
++- **Linux and WSL:** your distribution's gh package or the official repository of cli.github.com.
++- **macOS:** `brew install gh`.
++- **Windows:** `winget install GitHub.cli`.
++
++### rg
++
++- **Purpose:** fast searches; the agent's read grammar prefers it, and the passive-read check has a bounded fallback without it.
++- **Used by:** the agent's read commands; passive-read-policy.mjs.
++- **Minimum:** any current release.
++- **Check:** `rg --version`.
++- **Linux and WSL:** `sudo apt-get install ripgrep` or your distribution's ripgrep package.
++- **macOS:** `brew install ripgrep`.
++- **Windows:** `winget install BurntSushi.ripgrep.MSVC`.
++
++### ssh
++
++- **Purpose:** pushes over an SSH key, when the push transport recorded for a remote is `ssh-key`.
++- **Used by:** publication-executor.mjs.
++- **Minimum:** any OpenSSH release.
++- **Check:** `ssh -V`.
++- **Linux and WSL:** your distribution's openssh-client package.
++- **macOS:** comes with macOS.
++- **Windows:** comes with Git for Windows and with Windows (the OpenSSH client feature).
++
++## Settings in the project's own build
++
++Not programs: switches in the project's build that produce the files the SBOM of the close reads. The close names the one that is missing.
++
++### cyclonedx-maven-plugin
++
++- **Purpose:** writes the CycloneDX file that lets a Maven project's SBOM pass the close (a pom alone stays partial).
++- **Used by:** the SBOM of the feature close (ADR-0091).
++- **Minimum:** goal `makeAggregateBom` or `makeBom` with `outputDirectory` set to `${project.basedir}`.
++- **Check:** a committed `bom.json` next to `pom.xml` or above it (what the close looks for).
++- **Linux and WSL:** add the plugin to the build in `pom.xml` and commit the file it writes.
++- **macOS:** as on Linux.
++- **Windows:** as on Linux.
++
++### gradle-dependency-locking
++
++- **Purpose:** writes the `gradle.lockfile` of every Gradle project, which the SBOM reads.
++- **Used by:** the SBOM of the feature close (ADR-0091).
++- **Minimum:** `dependencyLocking { lockAllConfigurations() }` for every project, locks written per project.
++- **Check:** a committed `gradle.lockfile` next to every build file that declares dependencies (what the close looks for).
++- **Linux and WSL:** enable it in the build and commit each project's `gradle.lockfile`.
++- **macOS:** as on Linux.
++- **Windows:** as on Linux.
++
++### nuget-lockfile
++
++- **Purpose:** writes the `packages.lock.json` of every .NET project that uses PackageReference, which the SBOM reads.
++- **Used by:** the SBOM of the feature close (ADR-0091).
++- **Minimum:** `<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>`.
++- **Check:** a committed `packages.lock.json` next to every project file with a PackageReference (what the close looks for).
++- **Linux and WSL:** set the property (for example in `Directory.Build.props`), restore once and commit each `packages.lock.json`.
++- **macOS:** as on Linux.
++- **Windows:** as on Linux.
+diff --git a/harness/scripts/generate-toolchain-doc.mjs b/harness/scripts/generate-toolchain-doc.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..5edc125d9004e3848692730d842f9b5cd24bed45
+--- /dev/null
++++ b/harness/scripts/generate-toolchain-doc.mjs
+@@ -0,0 +1,24 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Purpose: write docs/toolchain.md from the one tool registry (plugins/pipeline-core/lib/toolchain-registry.mjs, candidate 28e).
++ * Usage:   node harness/scripts/generate-toolchain-doc.mjs            (from the repository root; then regenerate the vendored canon)
++ *          node harness/scripts/generate-toolchain-doc.mjs --check    (exit 1 when the committed file differs from the registry)
++ * lib/toolchain-registry.test.mjs runs the same comparison in Verify.
++ */
++import { readFileSync, writeFileSync } from "node:fs";
++import { resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import { renderToolchainDoc } from "../../plugins/pipeline-core/lib/toolchain-doc.mjs";
++
++const target = resolve(fileURLToPath(new URL("../../docs/toolchain.md", import.meta.url)));
++const text = renderToolchainDoc();
++if (process.argv[2] === "--check") {
++  let current = null;
++  try { current = readFileSync(target, "utf8"); } catch { /* absent reads as drift */ }
++  process.stdout.write(current === text ? "docs/toolchain.md matches the registry\n" : "docs/toolchain.md differs from the registry: run harness/scripts/generate-toolchain-doc.mjs\n");
++  process.exitCode = current === text ? 0 : 1;
++} else {
++  writeFileSync(target, text, "utf8");
++  process.stdout.write("wrote docs/toolchain.md\n");
++}
+diff --git a/harness/scripts/generate-vendored-canon.mjs b/harness/scripts/generate-vendored-canon.mjs
+index 630745c52e570113fbba1062ca04999eb7bd405d..1a333bdca30b50ad4adf85d5831eccf3304a4cbc 100644
+--- a/harness/scripts/generate-vendored-canon.mjs
++++ b/harness/scripts/generate-vendored-canon.mjs
+@@ -140,6 +140,13 @@ export const UNIVERSAL_STANDALONE_FILES = Object.freeze([
+       "the vendored artifacts themselves cite this file as their own normative source. Vendored as a " +
+       "single standalone doc rather than rewriting every citing role/guardrail file.",
+   },
++  {
++    path: "docs/toolchain.md",
++    reason:
++      "Candidate 28e (PO tiles 2026-11-12): the list of every tool a consuming project's machine needs, with the install " +
++      "route per platform. The toolchain preflight's guidance and the readiness findings point at it, and a consumer has " +
++      "no repository docs/ of the Pipeline, so it ships with the plugin. Generated from lib/toolchain-registry.mjs.",
++  },
+ ]);
+ 
+ /**
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 8ea6c77207eb12999d49c6a07a4b17b2bc2ffeab..bf2ec017bfd9a1aa26ff44fe8bccf8553627f8c0 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4879,6 +4879,12 @@
+       "file": "plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs",
+       "invariantPinned": "The close SBOM reads yarn.lock (v1, Berry), pnpm-lock.yaml (5, 6, 9), bun.lock, uv.lock, Gradle lockfiles, NuGet packages.lock.json, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock and committed CycloneDX files: a registry package is a component, a workspace or link member is left out, a git, path or URL pin is partial and its URL is never written, an unknown format version is unsupported and an unreadable entry invalid; a Maven pom is partial unless a CycloneDX file in its directory or above lists every direct dependency, and a .NET project or Gradle build without its lockfile is partial with help naming the switch",
+       "nonOverlapNote": "Unique cases: the readers added in candidate 28d and the Maven coverage rule; sbom-close.test.mjs keeps the npm, Python, Go and Rust readers and the close record"
++    },
++    {
++      "name": "toolchain-registry-tests",
++      "file": "plugins/pipeline-core/lib/toolchain-registry.test.mjs",
++      "invariantPinned": "One tool registry names every program the Pipeline needs, with its class, floor and an install route per platform; every preflight tool except the license control is required there and the preflight takes its version floors from it; the pointer a preflight result carries names the document and holds no command and no version; a required tool's deferral is recorded machine-locally with the answer word for word, never makes a readiness finding ok and never lifts a critical calibration's scanner refusal; a scanner the check could not observe asks for no install",
++      "nonOverlapNote": "Unique cases: the registry, its agreement with the preflight floors and the deferral; toolchain-preflight.test.mjs keeps the preflight's statuses, the W7-2 contract and the readiness report shape"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/docs/toolchain.md b/plugins/pipeline-core/docs/toolchain.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..af602f5ce12a2f3cb41c558d8a8f3c02131fd8d1
+--- /dev/null
++++ b/plugins/pipeline-core/docs/toolchain.md
+@@ -0,0 +1,143 @@
++# Tools the Pipeline needs
++
++<!-- GENERATED from plugins/pipeline-core/lib/toolchain-registry.mjs by harness/scripts/generate-toolchain-doc.mjs; do not edit by hand. -->
++
++Every program the Pipeline runs on a machine, and every optional one it can use. Install a tool yourself, in your own terminal (in a Claude session you can run the command with the `!` prefix); the Pipeline's own checks never install anything. The install routes below name the vendor's official source. Afterwards the tool must resolve from a directory the Pipeline trusts: the system directories, `~/.local/bin` and `~/go/bin`; on Windows the named `C:\Program Files` directories and `%USERPROFILE%\.local\bin`; or a root you list in `~/.config/agent-pipeline/trusted-tool-roots.json`.
++
++Check the state of this machine with `node <plugin root>/scripts/toolchain-preflight.mjs --environment-readiness`. Record that you install a required tool later with `node <plugin root>/scripts/toolchain-defer.mjs --tool <id> --answer "<your answer>"`, and remove the record with `--clear <id>`.
++
++## Required on every machine
++
++The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check: a project calibrated critical refuses a missing scanner at plan approval and at the close, and any other project gets a notice there.
++
++### node
++
++- **Purpose:** runs every Pipeline script, hook and guard.
++- **Used by:** every Pipeline command.
++- **Minimum:** major version 24 or later.
++- **Check:** `node --version`.
++- **Linux and WSL:** Node.js 24 or later from your distribution's package source or the official binary archive of nodejs.org.
++- **macOS:** `brew install node`.
++- **Windows:** `winget install OpenJS.NodeJS.LTS`.
++
++### git
++
++- **Purpose:** reads and writes the repository, the hooks and every evidence binding.
++- **Used by:** every Pipeline command; the git hooks.
++- **Minimum:** a release that supports `rev-parse --show-object-format` and diff path filters; not Git for Windows 2.56.0.windows.1.
++- **Check:** `git --version`.
++- **Linux and WSL:** `sudo apt-get install git` (Debian, Ubuntu) or your distribution's git package.
++- **macOS:** `xcode-select --install`, or `brew install git`.
++- **Windows:** `winget install Git.Git`.
++
++### gitleaks
++
++- **Purpose:** secret scan of every feature close.
++- **Used by:** the security gate of the feature close.
++- **Minimum:** a release with `--source`, `--report-format`, `--report-path`, `--no-banner` and `--exit-code` (8.x).
++- **Check:** `gitleaks version`.
++- **Linux and WSL:** download `gitleaks_<version>_linux_x64.tar.gz` from github.com/gitleaks/gitleaks/releases, check it against the release's checksums file, and put `gitleaks` into `~/.local/bin`.
++- **macOS:** `brew install gitleaks`.
++- **Windows:** download `gitleaks_<version>_windows_x64.zip` from github.com/gitleaks/gitleaks/releases, check it against the release's checksums file, and put `gitleaks.exe` into `%USERPROFILE%\.local\bin` or `C:\Program Files\Gitleaks`.
++
++### osv-scanner
++
++- **Purpose:** known-vulnerability scan of the project's dependencies at every feature close.
++- **Used by:** the security gate of the feature close.
++- **Minimum:** a 2.x release.
++- **Check:** `osv-scanner --version`.
++- **Linux and WSL:** download `osv-scanner_linux_amd64` (2.x) from github.com/google/osv-scanner/releases, check it against the release's checksums file, and put it into `~/.local/bin` as `osv-scanner`.
++- **macOS:** `brew install osv-scanner`.
++- **Windows:** download `osv-scanner_windows_amd64.exe` (2.x) from github.com/google/osv-scanner/releases, check it against the release's checksums file, and put it into `%USERPROFILE%\.local\bin` or `C:\Program Files\OSV-Scanner` as `osv-scanner.exe`.
++
++### semgrep
++
++- **Purpose:** static code analysis (the Pipeline's rule pack) at every feature close.
++- **Used by:** the security gate of the feature close.
++- **Minimum:** a release with `--json` and `--config`.
++- **Check:** `semgrep --version`.
++- **Linux and WSL:** `pipx install semgrep` (installs into `~/.local/bin`).
++- **macOS:** `brew install semgrep`.
++- **Windows:** not verified on native Windows: the trusted resolver accepts only a direct `semgrep.exe` (in `C:\Program Files\Semgrep`, `%USERPROFILE%\.local\bin` or a root named in the trusted-roots file), and a pip launcher is not one; run the Pipeline from WSL, or defer and accept the block at the close.
++
++## Required on the machine of the person who signs
++
++Signed approvals (the default push gate, signed overrides, acceptance by signature) need this on the machine where the PO signs. The readiness report checks it as `signing-toolchain`.
++
++### openssl
++
++- **Purpose:** signs and checks the PO's Ed25519 approvals (push approval, overrides, acceptance by signature).
++- **Used by:** po-human-approval.mjs.
++- **Minimum:** a build that signs and verifies Ed25519 with `pkeyutl -rawin` (OpenSSL 3).
++- **Check:** `openssl version`.
++- **Linux and WSL:** your distribution's openssl package (OpenSSL 3).
++- **macOS:** `brew install openssl@3`, when the system openssl fails the signing-toolchain readiness check.
++- **Windows:** comes with Git for Windows (`C:\Program Files\Git\mingw64\bin\openssl.exe`).
++
++## Optional
++
++A feature that works without these, or has a fallback. Install one when you use the feature it names.
++
++### gh
++
++- **Purpose:** GitHub issue operations and public observation capture.
++- **Used by:** the github-issue-operations and capture-observation skills.
++- **Minimum:** any current release, signed in with `gh auth login`.
++- **Check:** `gh --version`.
++- **Linux and WSL:** your distribution's gh package or the official repository of cli.github.com.
++- **macOS:** `brew install gh`.
++- **Windows:** `winget install GitHub.cli`.
++
++### rg
++
++- **Purpose:** fast searches; the agent's read grammar prefers it, and the passive-read check has a bounded fallback without it.
++- **Used by:** the agent's read commands; passive-read-policy.mjs.
++- **Minimum:** any current release.
++- **Check:** `rg --version`.
++- **Linux and WSL:** `sudo apt-get install ripgrep` or your distribution's ripgrep package.
++- **macOS:** `brew install ripgrep`.
++- **Windows:** `winget install BurntSushi.ripgrep.MSVC`.
++
++### ssh
++
++- **Purpose:** pushes over an SSH key, when the push transport recorded for a remote is `ssh-key`.
++- **Used by:** publication-executor.mjs.
++- **Minimum:** any OpenSSH release.
++- **Check:** `ssh -V`.
++- **Linux and WSL:** your distribution's openssh-client package.
++- **macOS:** comes with macOS.
++- **Windows:** comes with Git for Windows and with Windows (the OpenSSH client feature).
++
++## Settings in the project's own build
++
++Not programs: switches in the project's build that produce the files the SBOM of the close reads. The close names the one that is missing.
++
++### cyclonedx-maven-plugin
++
++- **Purpose:** writes the CycloneDX file that lets a Maven project's SBOM pass the close (a pom alone stays partial).
++- **Used by:** the SBOM of the feature close (ADR-0091).
++- **Minimum:** goal `makeAggregateBom` or `makeBom` with `outputDirectory` set to `${project.basedir}`.
++- **Check:** a committed `bom.json` next to `pom.xml` or above it (what the close looks for).
++- **Linux and WSL:** add the plugin to the build in `pom.xml` and commit the file it writes.
++- **macOS:** as on Linux.
++- **Windows:** as on Linux.
++
++### gradle-dependency-locking
++
++- **Purpose:** writes the `gradle.lockfile` of every Gradle project, which the SBOM reads.
++- **Used by:** the SBOM of the feature close (ADR-0091).
++- **Minimum:** `dependencyLocking { lockAllConfigurations() }` for every project, locks written per project.
++- **Check:** a committed `gradle.lockfile` next to every build file that declares dependencies (what the close looks for).
++- **Linux and WSL:** enable it in the build and commit each project's `gradle.lockfile`.
++- **macOS:** as on Linux.
++- **Windows:** as on Linux.
++
++### nuget-lockfile
++
++- **Purpose:** writes the `packages.lock.json` of every .NET project that uses PackageReference, which the SBOM reads.
++- **Used by:** the SBOM of the feature close (ADR-0091).
++- **Minimum:** `<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>`.
++- **Check:** a committed `packages.lock.json` next to every project file with a PackageReference (what the close looks for).
++- **Linux and WSL:** set the property (for example in `Directory.Build.props`), restore once and commit each `packages.lock.json`.
++- **macOS:** as on Linux.
++- **Windows:** as on Linux.
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 4d67d29bf2b591cc4f262c3f36c6a3725d9a42a6..006410a2777261ee474a6fe1392e3eeed8d44205 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -949,6 +949,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/sbom-node-adapter.mjs", "plugins/pipeline-core/lib/sbom-override-authority.mjs",
+   // Candidate 28d (GMWKC01): the lockfile readers lib/sbom-close.mjs imports.
+   "plugins/pipeline-core/lib/sbom-lockfile-readers.mjs",
++  // Candidate 28e (GMWKC01): the tool registry and the deferral module scripts/toolchain-preflight.mjs imports.
++  "plugins/pipeline-core/lib/toolchain-registry.mjs", "plugins/pipeline-core/lib/toolchain-deferrals.mjs",
+ ]);
+ 
+ // The "plugins/pipeline-core/..." entries above are written against whatever
+diff --git a/plugins/pipeline-core/lib/toolchain-deferrals.mjs b/plugins/pipeline-core/lib/toolchain-deferrals.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..e8db3acd54b3a393abaa8c192dcb033c28cfe846
+--- /dev/null
++++ b/plugins/pipeline-core/lib/toolchain-deferrals.mjs
+@@ -0,0 +1,98 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C28e (PO tile 2026-11-12): when a required tool is missing at onboarding, the person may say "later". That answer is recorded on THIS machine,
++ * so the agent does not ask again in every session, and it stays visible: the readiness finding of the tool still reads `attended` and names the
++ * deferral. A deferral is never a pass: it changes no finding to ok, and the plan and close checks (lib/security-close-status.mjs) never read it,
++ * so a critical calibration still refuses a scanner that did not run.
++ *
++ * Stored in its own file next to the machine plane (`<home>/.agent-pipeline/toolchain-deferrals.json`), not in machine.json: that file has an
++ * exact key set, and a new key would make it invalid for every plugin copy that does not know the key yet. The directory is derived from
++ * machinePlaneFilePath (lib/machine-plane.mjs, the one derivation of that location).
++ */
++import { randomBytes } from "node:crypto";
++import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
++import { dirname, join } from "node:path";
++import { machinePlaneFilePath } from "./machine-plane.mjs";
++import { toolchainEntry } from "./toolchain-registry.mjs";
++
++export const TOOLCHAIN_DEFERRALS_SCHEMA = "pipeline.toolchain-deferrals.v1";
++const ANSWER_MAX = 200;
++const MAX_FILE_BYTES = 16_384;
++
++/** `<home>/.agent-pipeline/toolchain-deferrals.json`, or null when no home directory resolves (the machine plane's own rule). */
++export function toolchainDeferralsPath(dependencies = {}) {
++  const plane = machinePlaneFilePath(dependencies);
++  return plane === null ? null : join(dirname(plane), "toolchain-deferrals.json");
++}
++
++const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
++function validEntry(id, entry) {
++  return toolchainEntry(id) !== null && object(entry) && Object.keys(entry).every((key) => key === "deferredAt" || key === "answer")
++    && typeof entry.deferredAt === "string" && Number.isFinite(Date.parse(entry.deferredAt))
++    && typeof entry.answer === "string" && entry.answer.length > 0 && entry.answer.length <= ANSWER_MAX && !/[\x00-\x1f\x7f]/u.test(entry.answer);
++}
++export function validToolchainDeferrals(value) {
++  return object(value) && value.schema === TOOLCHAIN_DEFERRALS_SCHEMA && Object.keys(value).every((key) => key === "schema" || key === "tools")
++    && object(value.tools) && Object.entries(value.tools).every(([id, entry]) => validEntry(id, entry));
++}
++
++/** The whole file: `{ status: "absent" | "valid" | "invalid", deferrals }`. Never throws; an unreadable or malformed file defers nothing. */
++export function readToolchainDeferrals(dependencies = {}) {
++  const path = toolchainDeferralsPath(dependencies);
++  if (path === null) return { status: "absent", deferrals: null };
++  try {
++    const info = (dependencies.lstatSyncFn ?? lstatSync)(path);
++    if (!info.isFile() || info.size > MAX_FILE_BYTES) return { status: "invalid", deferrals: null };
++    const parsed = JSON.parse((dependencies.readFileSyncFn ?? readFileSync)(path, "utf8"));
++    return validToolchainDeferrals(parsed) ? { status: "valid", deferrals: parsed } : { status: "invalid", deferrals: null };
++  } catch (error) {
++    return { status: error?.code === "ENOENT" ? "absent" : "invalid", deferrals: null };
++  }
++}
++
++/** The deferral recorded for one tool on this machine ({ deferredAt, answer }), or null. Never throws. */
++export function readToolDeferral(id, dependencies = {}) {
++  const read = readToolchainDeferrals(dependencies);
++  return read.status === "valid" && Object.hasOwn(read.deferrals.tools, id) ? read.deferrals.tools[id] : null;
++}
++
++/**
++ * Records that the person deferred installing `id`, with their answer word for word (bounded). Only a tool of the registry whose class is
++ * `required` or `required-to-sign` can be deferred; an optional tool needs no deferral. An invalid existing file is never overwritten.
++ */
++export function recordToolDeferral(id, answer, dependencies = {}) {
++  const entry = toolchainEntry(id);
++  if (entry === null || !["required", "required-to-sign"].includes(entry.class)) throw new Error(`TOOLCHAIN-DEFER-REFUSED: ${String(id).slice(0, 64)} is not a required tool of the registry`);
++  const quote = String(answer ?? "").replace(/\s+/gu, " ").trim().slice(0, ANSWER_MAX);
++  if (quote === "") throw new Error("TOOLCHAIN-DEFER-REFUSED: the person's answer is required, word for word");
++  const read = readToolchainDeferrals(dependencies);
++  if (read.status === "invalid") throw new Error("TOOLCHAIN-DEFER-REFUSED: the existing deferral file is invalid; remove it in your own terminal first");
++  const path = toolchainDeferralsPath(dependencies);
++  if (path === null) throw new Error("TOOLCHAIN-DEFER-REFUSED: no home directory");
++  const next = { schema: TOOLCHAIN_DEFERRALS_SCHEMA, tools: { ...(read.deferrals?.tools ?? {}), [id]: { deferredAt: (dependencies.now ?? (() => new Date()))().toISOString(), answer: quote } } };
++  if ((dependencies.existsSyncFn ?? existsSync)(path) && (dependencies.lstatSyncFn ?? lstatSync)(path).isSymbolicLink()) throw new Error("TOOLCHAIN-DEFER-REFUSED: the deferral file is a symbolic link");
++  (dependencies.mkdirSyncFn ?? mkdirSync)(dirname(path), { recursive: true });
++  const temporary = `${path}.tmp-${randomBytes(12).toString("hex")}`;
++  let fd;
++  try {
++    fd = openSync(temporary, "wx", 0o600);
++    writeFileSync(fd, `${JSON.stringify(next, null, 2)}\n`, "utf8");
++    fsyncSync(fd); closeSync(fd); fd = undefined;
++    renameSync(temporary, path);
++  } catch (error) {
++    if (fd !== undefined) { try { closeSync(fd); } catch { /* keep the original failure */ } }
++    try { unlinkSync(temporary); } catch { /* nothing of ours is left */ }
++    throw error;
++  }
++  return { status: "recorded", tool: id, deferredAt: next.tools[id].deferredAt };
++}
++
++/** Removes the deferral of one tool (the person installed it, or wants to be asked again). Absent is not an error. */
++export function clearToolDeferral(id, dependencies = {}) {
++  const read = readToolchainDeferrals(dependencies);
++  if (read.status !== "valid" || !Object.hasOwn(read.deferrals.tools, id)) return { status: read.status === "invalid" ? "invalid" : "absent", tool: id };
++  const { [id]: _removed, ...rest } = read.deferrals.tools;
++  const path = toolchainDeferralsPath(dependencies);
++  writeFileSync(path, `${JSON.stringify({ schema: TOOLCHAIN_DEFERRALS_SCHEMA, tools: rest }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
++  return { status: "cleared", tool: id };
++}
+diff --git a/plugins/pipeline-core/lib/toolchain-doc.mjs b/plugins/pipeline-core/lib/toolchain-doc.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..cd720dad19edac82b23d4a44a4ac13157ad5877d
+--- /dev/null
++++ b/plugins/pipeline-core/lib/toolchain-doc.mjs
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C28e: renders docs/toolchain.md from the one tool registry (lib/toolchain-registry.mjs). harness/scripts/generate-toolchain-doc.mjs writes it;
++ * lib/toolchain-registry.test.mjs fails when the committed file differs from this rendering, so the document never drifts from the registry.
++ */
++import { TOOLCHAIN_REGISTRY } from "./toolchain-registry.mjs";
++
++const PLATFORM_NAMES = Object.freeze({ linux: "Linux and WSL", darwin: "macOS", win32: "Windows" });
++const CLASS_TITLES = Object.freeze({
++  required: "Required on every machine",
++  "required-to-sign": "Required on the machine of the person who signs",
++  optional: "Optional",
++  "project-setting": "Settings in the project's own build",
++});
++const CLASS_INTROS = Object.freeze({
++  required: "The feature close runs these. Onboarding checks them and asks you to install a missing one together with your agent; you may defer one, and the deferral is recorded on this machine. A deferral does not lift any check: a project calibrated critical refuses a missing scanner at plan approval and at the close, and any other project gets a notice there.",
++  "required-to-sign": "Signed approvals (the default push gate, signed overrides, acceptance by signature) need this on the machine where the PO signs. The readiness report checks it as `signing-toolchain`.",
++  optional: "A feature that works without these, or has a fallback. Install one when you use the feature it names.",
++  "project-setting": "Not programs: switches in the project's build that produce the files the SBOM of the close reads. The close names the one that is missing.",
++});
++
++// Registry text marks commands and paths as `code`; outside a code span a backslash, a placeholder in angle brackets or a star must survive
++// Markdown rendering.
++const md = (text) => text.split(/(`[^`]*`)/u).map((part) => (part.startsWith("`") ? part : part.replace(/[\\<>*]/gu, (char) => `\\${char}`))).join("");
++
++/** The complete Markdown text of docs/toolchain.md, deterministic for one registry. */
++export function renderToolchainDoc() {
++  const lines = [
++    "# Tools the Pipeline needs",
++    "",
++    "<!-- GENERATED from plugins/pipeline-core/lib/toolchain-registry.mjs by harness/scripts/generate-toolchain-doc.mjs; do not edit by hand. -->",
++    "",
++    "Every program the Pipeline runs on a machine, and every optional one it can use. Install a tool yourself, in your own terminal (in a Claude session you can run the command with the `!` prefix); the Pipeline's own checks never install anything. The install routes below name the vendor's official source. Afterwards the tool must resolve from a directory the Pipeline trusts: the system directories, `~/.local/bin` and `~/go/bin`; on Windows the named `C:\\Program Files` directories and `%USERPROFILE%\\.local\\bin`; or a root you list in `~/.config/agent-pipeline/trusted-tool-roots.json`.",
++    "",
++    "Check the state of this machine with `node <plugin root>/scripts/toolchain-preflight.mjs --environment-readiness`. Record that you install a required tool later with `node <plugin root>/scripts/toolchain-defer.mjs --tool <id> --answer \"<your answer>\"`, and remove the record with `--clear <id>`.",
++    "",
++  ];
++  for (const toolClass of Object.keys(CLASS_TITLES)) {
++    const entries = TOOLCHAIN_REGISTRY.filter((entry) => entry.class === toolClass);
++    if (entries.length === 0) continue;
++    lines.push(`## ${CLASS_TITLES[toolClass]}`, "", CLASS_INTROS[toolClass], "");
++    for (const entry of entries) {
++      const check = toolClass === "project-setting" ? `${md(entry.probe)} (what the close looks for)` : `\`${entry.probe}\``;
++      lines.push(`### ${entry.id}`, "", `- **Purpose:** ${md(entry.purpose)}.`, `- **Used by:** ${md(entry.usedBy.join("; "))}.`, `- **Minimum:** ${md(entry.floor.text)}.`, `- **Check:** ${check}.`);
++      for (const [platform, name] of Object.entries(PLATFORM_NAMES)) lines.push(`- **${name}:** ${md(entry.install[platform])}.`);
++      lines.push("");
++    }
++  }
++  return `${lines.join("\n").replace(/\n+$/u, "")}\n`;
++}
+diff --git a/plugins/pipeline-core/lib/toolchain-registry.mjs b/plugins/pipeline-core/lib/toolchain-registry.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..351547076f4d912b2da4eb87374f0f34d23bc8aa
+--- /dev/null
++++ b/plugins/pipeline-core/lib/toolchain-registry.mjs
+@@ -0,0 +1,146 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C28e (PO tiles 2026-11-12): the ONE machine-readable list of every program the Pipeline needs on a machine, and of the optional ones it can use.
++ *
++ * It feeds three readers and has no second copy anywhere:
++ *   - the user document docs/toolchain.md (rendered by lib/toolchain-doc.mjs, written by harness/scripts/generate-toolchain-doc.mjs, drift-checked
++ *     by lib/toolchain-registry.test.mjs),
++ *   - the toolchain preflight (scripts/toolchain-preflight.mjs): the major-version floors it checks and the document pointer it prints,
++ *   - the environment readiness findings the start preflight carries (each scanner finding names its class and its section of the document).
++ *
++ * Classes: `required` (every machine that runs the Pipeline: the close needs it), `required-to-sign` (the machine of the person who signs approvals,
++ * the default push gate), `optional` (a feature that works without it, or has a fallback), `project-setting` (a switch in the project's own build,
++ * not a program; named so the SBOM help and this list agree).
++ *
++ * The install routes are what a PERSON runs in their own terminal (in a Claude session with the `!` prefix), never the preflight: the preflight
++ * installs nothing and prints no command (capability contract W7-2), so these texts reach only the document. A route names the vendor's official
++ * source; the result must land in a directory the trusted resolver accepts (lib/trusted-tool-resolution.mjs). Commands and paths are written as
++ * Markdown code spans.
++ */
++
++export const TOOLCHAIN_REGISTRY_SCHEMA = "pipeline.toolchain-registry.v1";
++export const TOOL_CLASSES = Object.freeze(["required", "required-to-sign", "optional", "project-setting"]);
++export const TOOL_PLATFORMS = Object.freeze(["linux", "darwin", "win32"]);
++
++const tool = (entry) => Object.freeze({ ...entry, floor: Object.freeze({ ...entry.floor }), install: Object.freeze({ ...entry.install }), usedBy: Object.freeze([...entry.usedBy]) });
++const SAME_AS_LINUX = "as on Linux";
++
++export const TOOLCHAIN_REGISTRY = Object.freeze([
++  tool({
++    id: "node", class: "required", purpose: "runs every Pipeline script, hook and guard",
++    usedBy: ["every Pipeline command"], probe: "node --version",
++    floor: { text: "major version 24 or later", majorMin: 24 },
++    install: {
++      linux: "Node.js 24 or later from your distribution's package source or the official binary archive of nodejs.org",
++      darwin: "`brew install node`",
++      win32: "`winget install OpenJS.NodeJS.LTS`",
++    },
++  }),
++  tool({
++    id: "git", class: "required", purpose: "reads and writes the repository, the hooks and every evidence binding",
++    usedBy: ["every Pipeline command", "the git hooks"], probe: "git --version",
++    floor: { text: "a release that supports `rev-parse --show-object-format` and diff path filters; not Git for Windows 2.56.0.windows.1" },
++    install: {
++      linux: "`sudo apt-get install git` (Debian, Ubuntu) or your distribution's git package",
++      darwin: "`xcode-select --install`, or `brew install git`",
++      win32: "`winget install Git.Git`",
++    },
++  }),
++  tool({
++    id: "gitleaks", class: "required", purpose: "secret scan of every feature close",
++    usedBy: ["the security gate of the feature close"], probe: "gitleaks version",
++    floor: { text: "a release with `--source`, `--report-format`, `--report-path`, `--no-banner` and `--exit-code` (8.x)" },
++    install: {
++      linux: "download `gitleaks_<version>_linux_x64.tar.gz` from github.com/gitleaks/gitleaks/releases, check it against the release's checksums file, and put `gitleaks` into `~/.local/bin`",
++      darwin: "`brew install gitleaks`",
++      win32: "download `gitleaks_<version>_windows_x64.zip` from github.com/gitleaks/gitleaks/releases, check it against the release's checksums file, and put `gitleaks.exe` into `%USERPROFILE%\\.local\\bin` or `C:\\Program Files\\Gitleaks`",
++    },
++  }),
++  tool({
++    id: "osv-scanner", class: "required", purpose: "known-vulnerability scan of the project's dependencies at every feature close",
++    usedBy: ["the security gate of the feature close"], probe: "osv-scanner --version",
++    floor: { text: "a 2.x release", majorMin: 2, majorBelow: 3 },
++    install: {
++      linux: "download `osv-scanner_linux_amd64` (2.x) from github.com/google/osv-scanner/releases, check it against the release's checksums file, and put it into `~/.local/bin` as `osv-scanner`",
++      darwin: "`brew install osv-scanner`",
++      win32: "download `osv-scanner_windows_amd64.exe` (2.x) from github.com/google/osv-scanner/releases, check it against the release's checksums file, and put it into `%USERPROFILE%\\.local\\bin` or `C:\\Program Files\\OSV-Scanner` as `osv-scanner.exe`",
++    },
++  }),
++  tool({
++    id: "semgrep", class: "required", purpose: "static code analysis (the Pipeline's rule pack) at every feature close",
++    usedBy: ["the security gate of the feature close"], probe: "semgrep --version",
++    floor: { text: "a release with `--json` and `--config`" },
++    install: {
++      linux: "`pipx install semgrep` (installs into `~/.local/bin`)",
++      darwin: "`brew install semgrep`",
++      win32: "not verified on native Windows: the trusted resolver accepts only a direct `semgrep.exe` (in `C:\\Program Files\\Semgrep`, `%USERPROFILE%\\.local\\bin` or a root named in the trusted-roots file), and a pip launcher is not one; run the Pipeline from WSL, or defer and accept the block at the close",
++    },
++  }),
++  tool({
++    id: "openssl", class: "required-to-sign", purpose: "signs and checks the PO's Ed25519 approvals (push approval, overrides, acceptance by signature)",
++    usedBy: ["po-human-approval.mjs"], probe: "openssl version",
++    floor: { text: "a build that signs and verifies Ed25519 with `pkeyutl -rawin` (OpenSSL 3)" },
++    install: {
++      linux: "your distribution's openssl package (OpenSSL 3)",
++      darwin: "`brew install openssl@3`, when the system openssl fails the signing-toolchain readiness check",
++      win32: "comes with Git for Windows (`C:\\Program Files\\Git\\mingw64\\bin\\openssl.exe`)",
++    },
++  }),
++  tool({
++    id: "gh", class: "optional", purpose: "GitHub issue operations and public observation capture",
++    usedBy: ["the github-issue-operations and capture-observation skills"], probe: "gh --version",
++    floor: { text: "any current release, signed in with `gh auth login`" },
++    install: { linux: "your distribution's gh package or the official repository of cli.github.com", darwin: "`brew install gh`", win32: "`winget install GitHub.cli`" },
++  }),
++  tool({
++    id: "rg", class: "optional", purpose: "fast searches; the agent's read grammar prefers it, and the passive-read check has a bounded fallback without it",
++    usedBy: ["the agent's read commands", "passive-read-policy.mjs"], probe: "rg --version",
++    floor: { text: "any current release" },
++    install: { linux: "`sudo apt-get install ripgrep` or your distribution's ripgrep package", darwin: "`brew install ripgrep`", win32: "`winget install BurntSushi.ripgrep.MSVC`" },
++  }),
++  tool({
++    id: "ssh", class: "optional", purpose: "pushes over an SSH key, when the push transport recorded for a remote is `ssh-key`",
++    usedBy: ["publication-executor.mjs"], probe: "ssh -V",
++    floor: { text: "any OpenSSH release" },
++    install: { linux: "your distribution's openssh-client package", darwin: "comes with macOS", win32: "comes with Git for Windows and with Windows (the OpenSSH client feature)" },
++  }),
++  tool({
++    id: "cyclonedx-maven-plugin", class: "project-setting", purpose: "writes the CycloneDX file that lets a Maven project's SBOM pass the close (a pom alone stays partial)",
++    usedBy: ["the SBOM of the feature close (ADR-0091)"], probe: "a committed `bom.json` next to `pom.xml` or above it",
++    floor: { text: "goal `makeAggregateBom` or `makeBom` with `outputDirectory` set to `${project.basedir}`" },
++    install: { linux: "add the plugin to the build in `pom.xml` and commit the file it writes", darwin: SAME_AS_LINUX, win32: SAME_AS_LINUX },
++  }),
++  tool({
++    id: "gradle-dependency-locking", class: "project-setting", purpose: "writes the `gradle.lockfile` of every Gradle project, which the SBOM reads",
++    usedBy: ["the SBOM of the feature close (ADR-0091)"], probe: "a committed `gradle.lockfile` next to every build file that declares dependencies",
++    floor: { text: "`dependencyLocking { lockAllConfigurations() }` for every project, locks written per project" },
++    install: { linux: "enable it in the build and commit each project's `gradle.lockfile`", darwin: SAME_AS_LINUX, win32: SAME_AS_LINUX },
++  }),
++  tool({
++    id: "nuget-lockfile", class: "project-setting", purpose: "writes the `packages.lock.json` of every .NET project that uses PackageReference, which the SBOM reads",
++    usedBy: ["the SBOM of the feature close (ADR-0091)"], probe: "a committed `packages.lock.json` next to every project file with a PackageReference",
++    floor: { text: "`<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>`" },
++    install: { linux: "set the property (for example in `Directory.Build.props`), restore once and commit each `packages.lock.json`", darwin: SAME_AS_LINUX, win32: SAME_AS_LINUX },
++  }),
++]);
++
++/** The registry entry of one tool id, or null. */
++export function toolchainEntry(id) { return TOOLCHAIN_REGISTRY.find((entry) => entry.id === id) ?? null; }
++
++/** Whether a parsed `[major, minor, patch]` version meets the entry's major-version floor (an entry without one accepts every parsed version). */
++export function meetsVersionFloor(id, parsed) {
++  const floor = toolchainEntry(id)?.floor;
++  if (!Array.isArray(parsed) || floor === undefined) return false;
++  if (Number.isInteger(floor.majorMin) && parsed[0] < floor.majorMin) return false;
++  if (Number.isInteger(floor.majorBelow) && parsed[0] >= floor.majorBelow) return false;
++  return true;
++}
++
++/** The section anchor of one tool in docs/toolchain.md (the document the generator writes; vendored into the plugin as docs/toolchain.md). */
++export function toolchainDocAnchor(id) { return `docs/toolchain.md#${id}`; }
++
++/**
++ * The pointer a preflight result or a readiness finding carries: where the person finds the install route for their platform. It holds no command
++ * and no version number, because the preflight's own text never does (W7-2; scripts/toolchain-preflight.test.mjs pins both).
++ */
++export function toolchainDocPointer(id) { return toolchainEntry(id) === null ? null : `Install routes per platform: ${toolchainDocAnchor(id)} (the Pipeline plugin ships the same file).`; }
+diff --git a/plugins/pipeline-core/lib/toolchain-registry.test.mjs b/plugins/pipeline-core/lib/toolchain-registry.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..e5a193835dcd4a49fefe49358b1cec3a6879814d
+--- /dev/null
++++ b/plugins/pipeline-core/lib/toolchain-registry.test.mjs
+@@ -0,0 +1,140 @@
++// SPDX-License-Identifier: SUL-1.0
++// C28e (PO tiles 2026-11-12): the one tool registry, its agreement with the toolchain preflight, and the machine-local deferral of a required tool.
++import assert from "node:assert/strict";
++import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++import { renderToolchainDoc } from "./toolchain-doc.mjs";
++import { TOOLCHAIN_REGISTRY, TOOL_CLASSES, TOOL_PLATFORMS, meetsVersionFloor, toolchainDocPointer, toolchainEntry } from "./toolchain-registry.mjs";
++import { readToolDeferral, readToolchainDeferrals, recordToolDeferral, clearToolDeferral, toolchainDeferralsPath } from "./toolchain-deferrals.mjs";
++import { FIXED_TOOLS, ENVIRONMENT_FINDING_IDS, runEnvironmentReadinessReport } from "../scripts/toolchain-preflight.mjs";
++import { buildHandle } from "../scripts/tool-identity.mjs";
++import { scannerEntryReadiness } from "./security-close-status.mjs";
++import { runToolchainDefer } from "../scripts/toolchain-defer.mjs";
++
++const home = () => mkdtempSync(join(tmpdir(), "toolchain-registry-"));
++const deps = (dir) => ({ homedirFn: () => dir, realpathSyncFn: (path) => path, now: () => new Date("2026-11-12T20:00:00.000Z") });
++
++test("the registry: unique ids, known classes, an install route for every platform, and every preflight tool except the license control", () => {
++  const ids = TOOLCHAIN_REGISTRY.map((entry) => entry.id);
++  assert.equal(new Set(ids).size, ids.length);
++  for (const entry of TOOLCHAIN_REGISTRY) {
++    assert.ok(TOOL_CLASSES.includes(entry.class), entry.id);
++    for (const platform of TOOL_PLATFORMS) assert.equal(typeof entry.install[platform], "string", `${entry.id} ${platform}`);
++    assert.ok(entry.purpose.length > 0 && entry.floor.text.length > 0 && entry.usedBy.length > 0, entry.id);
++    assert.ok(Object.isFrozen(entry) && Object.isFrozen(entry.install), entry.id);
++  }
++  for (const toolId of FIXED_TOOLS.filter((id) => id !== "license-check")) assert.equal(toolchainEntry(toolId)?.class, "required", `${toolId} is a required tool of the registry`);
++  assert.equal(toolchainEntry("openssl").class, "required-to-sign");
++});
++
++test("docs/toolchain.md is the registry's rendering, in the repository and in the plugin's vendored copy", () => {
++  const text = renderToolchainDoc();
++  for (const entry of TOOLCHAIN_REGISTRY) assert.ok(text.includes(`### ${entry.id}\n`), entry.id);
++  assert.ok(text.includes("`gitleaks_<version>_linux_x64.tar.gz`") && text.includes("`%USERPROFILE%\\.local\\bin`"), "code spans keep their text");
++  const outsideCode = text.split(/`[^`\n]*`/u).join("").replace(/<!--[^\n]*-->/u, "");
++  assert.doesNotMatch(outsideCode, /(?<!\\)[<>]/u, "outside a code span an angle bracket is escaped for Markdown");
++  const pluginRoot = fileURLToPath(new URL("../", import.meta.url));
++  for (const path of [join(pluginRoot, "..", "..", "docs", "toolchain.md"), join(pluginRoot, "docs", "toolchain.md")]) {
++    if (!existsSync(path)) continue; // a consumer's plugin copy carries only the vendored file; the repository carries both
++    assert.equal(readFileSync(path, "utf8"), text, `${path} differs from the registry: run harness/scripts/generate-toolchain-doc.mjs, then the vendored canon generator`);
++  }
++});
++
++test("the version floors the preflight checks come from the registry", () => {
++  assert.equal(meetsVersionFloor("node", [24, 0, 0]), true);
++  assert.equal(meetsVersionFloor("node", [22, 9, 0]), false);
++  assert.equal(meetsVersionFloor("osv-scanner", [2, 7, 0]), true);
++  assert.equal(meetsVersionFloor("osv-scanner", [3, 0, 0]), false);
++  assert.equal(meetsVersionFloor("osv-scanner", [1, 9, 0]), false);
++  assert.equal(meetsVersionFloor("semgrep", [1, 170, 0]), true, "no major floor: any parsed version");
++  assert.equal(meetsVersionFloor("node", null), false);
++});
++
++test("the pointer a preflight result carries names the document and holds no command and no version number (W7-2)", () => {
++  for (const entry of TOOLCHAIN_REGISTRY) {
++    const pointer = toolchainDocPointer(entry.id);
++    assert.ok(pointer.includes(`docs/toolchain.md#${entry.id}`), entry.id);
++    assert.doesNotMatch(pointer, /\d+\.\d+|\d+\.x|apt-get|go install|brew install|winget install|pipx install|sudo/u);
++  }
++  assert.equal(toolchainDocPointer("no-such-tool"), null);
++});
++
++test("a deferral is recorded on this machine with the answer word for word, read back, and cleared", () => {
++  const dir = home();
++  try {
++    assert.equal(toolchainDeferralsPath(deps(dir)), join(dir, ".agent-pipeline", "toolchain-deferrals.json"));
++    assert.equal(readToolDeferral("semgrep", deps(dir)), null);
++    assert.deepEqual(recordToolDeferral("semgrep", "  später,\n nach der Freigabe  ", deps(dir)), { status: "recorded", tool: "semgrep", deferredAt: "2026-11-12T20:00:00.000Z" });
++    assert.deepEqual(readToolDeferral("semgrep", deps(dir)), { deferredAt: "2026-11-12T20:00:00.000Z", answer: "später, nach der Freigabe" });
++    assert.throws(() => recordToolDeferral("gh", "later", deps(dir)), /not a required tool/u, "an optional tool needs no deferral");
++    assert.throws(() => recordToolDeferral("semgrep", "   ", deps(dir)), /answer is required/u);
++    assert.deepEqual(runToolchainDefer(["--list"], deps(dir)).tools.semgrep.answer, "später, nach der Freigabe");
++    assert.deepEqual(clearToolDeferral("semgrep", deps(dir)), { status: "cleared", tool: "semgrep" });
++    assert.equal(readToolDeferral("semgrep", deps(dir)), null);
++    assert.throws(() => runToolchainDefer(["--tool", "semgrep"], deps(dir)), /Usage/u);
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++});
++
++test("an invalid deferral file defers nothing and is never overwritten", () => {
++  const dir = home();
++  try {
++    mkdirSync(join(dir, ".agent-pipeline"));
++    const path = join(dir, ".agent-pipeline", "toolchain-deferrals.json");
++    writeFileSync(path, JSON.stringify({ schema: "pipeline.toolchain-deferrals.v1", tools: { semgrep: { deferredAt: "x", answer: "later" } } }));
++    assert.equal(readToolchainDeferrals(deps(dir)).status, "invalid");
++    assert.equal(readToolDeferral("semgrep", deps(dir)), null);
++    assert.throws(() => recordToolDeferral("gitleaks", "later", deps(dir)), /invalid/u);
++    assert.match(readFileSync(path, "utf8"), /"deferredAt":"x"/u);
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++});
++
++const observed = (tool, version, capabilities) => ({ ok: true, status: "ready", handle: buildHandle(tool, { realPath: `/tools/${tool}`, device: "1", inode: "2", size: 3, mtimeNs: "4", sha256: "a".repeat(64) }, version, capabilities, "2026-11-12T12:00:00.000Z") });
++const stubOk = Object.fromEntries(ENVIRONMENT_FINDING_IDS.filter((id) => !id.startsWith("scanner-")).map((id) => [id, () => ({ status: "ok", cause: "stub", repair: null })]));
++function reportDeps({ semgrep, deferral = null }) {
++  return {
++    probeNodeFn: () => observed("node", "24.15.0", ["spawn-shell-false"]), probeGitFn: () => observed("git", "2.50.1", ["object-format", "diff-paths"]),
++    resolveExecutableFn: (name) => `/tools/${name}`, resolveInstallerFn: () => null,
++    scannerProbes: {
++      gitleaks: () => observed("gitleaks", "8.18.0", ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"]),
++      "osv-scanner": () => observed("osv-scanner", "2.0.0", ["--format", "recursive-source"]),
++      semgrep,
++    },
++    findingProbes: stubOk,
++    readToolDeferral: (tool) => (tool === "semgrep" ? deferral : null),
++  };
++}
++
++test("a deferred scanner stays attended: the finding names its class, its document section and the deferral, and is never ok", async () => {
++  const dir = home();
++  try {
++    const missing = () => ({ ok: false, status: "binary_missing" });
++    const report = await runEnvironmentReadinessReport({ rootDir: dir, platform: "linux", tempDir: dir }, reportDeps({ semgrep: missing, deferral: { deferredAt: "2026-11-12T20:00:00.000Z", answer: "later" } }));
++    const finding = report.findings.find((entry) => entry.findingId === "scanner-semgrep");
++    assert.equal(finding.status, "attended");
++    assert.match(finding.cause, /deferred on this machine \(2026-11-12T20:00:00\.000Z\)/u);
++    assert.equal(finding.repair.toolClass, "required");
++    assert.equal(finding.repair.installDoc, "docs/toolchain.md#semgrep");
++    assert.equal(finding.repair.deferred, true);
++    assert.doesNotMatch(JSON.stringify(finding), /sudo|apt-get|go install|brew install|winget|pipx install/u);
++    assert.equal(report.ok, false, "a deferral never makes the report clean");
++    // The plan and close check reads the preflight result, not this report: a critical calibration still refuses the scanner.
++    const refusal = scannerEntryReadiness({ results: [{ tool: "semgrep", status: "binary_missing", guidance: "" }] }, { critical: true });
++    assert.equal(refusal.refusals.length, 1);
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++});
++
++test("a scanner the check could not observe (a sandbox) asks for no install", async () => {
++  const dir = home();
++  try {
++    for (const status of ["probe_error", "execution_environment", "probe_timeout"]) {
++      const report = await runEnvironmentReadinessReport({ rootDir: dir, platform: "linux", tempDir: dir }, reportDeps({ semgrep: () => ({ ok: false, status }) }));
++      const finding = report.findings.find((entry) => entry.findingId === "scanner-semgrep");
++      assert.equal(finding.status, "unknown", status);
++      assert.equal(finding.repair.prerequisite, "semgrep-observable", status);
++      assert.match(finding.repair.summary, /do not reinstall/u, status);
++    }
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/scripts/toolchain-defer.mjs b/plugins/pipeline-core/scripts/toolchain-defer.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..bccfa44ad1dd1b43012557ef2c7fc973cbf096d2
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/toolchain-defer.mjs
+@@ -0,0 +1,35 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * C28e (PO tile 2026-11-12): records on this machine that the person deferred installing a required tool, with their answer word for word.
++ *
++ *   node toolchain-defer.mjs --tool <id> --answer "<the person's answer, verbatim>"   record a deferral
++ *   node toolchain-defer.mjs --clear <id>                                               remove it (installed, or ask again)
++ *   node toolchain-defer.mjs --list                                                     print the deferrals of this machine
++ *
++ * The agent runs it only after the person said they install the tool later. A deferral never makes a readiness finding ok and never lifts the
++ * plan or close check of a critical calibration (lib/toolchain-deferrals.mjs). Prints one JSON line.
++ */
++import { clearToolDeferral, readToolchainDeferrals, recordToolDeferral } from "../lib/toolchain-deferrals.mjs";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++
++const USAGE = "Usage: toolchain-defer.mjs --tool <id> --answer <verbatim answer> | --clear <id> | --list";
++
++export function runToolchainDefer(argv, dependencies = {}) {
++  if (argv.length === 1 && argv[0] === "--list") {
++    const read = readToolchainDeferrals(dependencies);
++    return { status: read.status, tools: read.deferrals?.tools ?? {} };
++  }
++  if (argv.length === 2 && argv[0] === "--clear") return clearToolDeferral(argv[1], dependencies);
++  if (argv.length === 4 && argv[0] === "--tool" && argv[2] === "--answer") return recordToolDeferral(argv[1], argv[3], dependencies);
++  throw new Error(USAGE);
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  try {
++    process.stdout.write(`${JSON.stringify(runToolchainDefer(process.argv.slice(2)))}\n`);
++  } catch (error) {
++    process.stderr.write(`toolchain-defer: ${error.message}\n`);
++    process.exitCode = 2;
++  }
++}
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+index 1359d9709ee60bb4cf68e4e0d8be3dadd50d767f..f11f2b67f2ae0501b28b8e3af6087828fa2b6284 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+@@ -70,6 +70,8 @@ import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs"
+ import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
+ import { buildHandle, executableIdentity, resolveSystemExecutable, resolveTrustedSystemExecutable, runProbe, sha256 } from "./tool-identity.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { meetsVersionFloor, toolchainDocAnchor, toolchainDocPointer, toolchainEntry } from "../lib/toolchain-registry.mjs";
++import { readToolDeferral } from "../lib/toolchain-deferrals.mjs";
+ 
+ export const TOOLCHAIN_SCHEMA = "pipeline.toolchain-preflight.v1";
+ export const FIXED_TOOLS = Object.freeze(["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check"]);
+@@ -134,7 +136,10 @@ function actionableResult(entry, platform, installers = new Set()) {
+       ? `Create the configured project inputs required by ${entry.tool}.`
+       : GUIDANCE[platform][entry.tool]
+     : null;
+-  const installerGuidance = contract === null ? "" : ` ${contract}`;
++  // C28e: a missing or incompatible tool also names its section of docs/toolchain.md, where the install route for each platform stands; the
++  // pointer itself holds no command and no version number (W7-2).
++  const docPointer = contract === null ? null : toolchainDocPointer(entry.tool);
++  const installerGuidance = contract === null ? "" : ` ${contract}${docPointer === null ? "" : ` ${docPointer}`}`;
+   return {
+     ...entry,
+     affectedClaim,
+@@ -146,10 +151,11 @@ function actionableResult(entry, platform, installers = new Set()) {
+ function readyCompatibility(tool, observed) {
+   if (!observed.ok) return result(tool, observed.status ?? "probe_error", observed);
+   const parsed = semver(observed.handle.version);
+-  if (tool === "node" && (!parsed || parsed[0] < 24)) return result(tool, "incompatible_version", observed);
++  // C28e: the major-version floors come from the one tool registry (lib/toolchain-registry.mjs), which also writes docs/toolchain.md.
++  if (tool === "node" && !meetsVersionFloor("node", parsed)) return result(tool, "incompatible_version", observed);
+   if (tool === "git" && (!parsed || !["object-format", "diff-paths"].every((capability) => observed.handle.capabilities.includes(capability)))) return result(tool, parsed ? "incompatible_capability" : "incompatible_version", observed);
+   if (tool === "gitleaks" && !parsed) return result(tool, "incompatible_version", observed);
+-  if (tool === "osv-scanner" && (!parsed || parsed[0] < 2 || parsed[0] >= 3)) return result(tool, "incompatible_version", observed);
++  if (tool === "osv-scanner" && !meetsVersionFloor("osv-scanner", parsed)) return result(tool, "incompatible_version", observed);
+   if (tool === "semgrep" && !parsed) return result(tool, "incompatible_version", observed);
+   const required = REQUIRED_CAPABILITIES[tool] ?? [];
+   if (!required.every((capability) => observed.handle.capabilities.includes(capability))) return result(tool, "incompatible_capability", observed);
+@@ -308,6 +314,7 @@ export const ENVIRONMENT_READINESS_SCHEMA = "pipeline.environment-readiness.v1";
+ export const GIT_HOOKS_REPAIR_SCHEMA = "pipeline.git-hooks-repair.v1";
+ export const ENVIRONMENT_FINDING_IDS = Object.freeze(["git-version", "signing-toolchain", "po-key-directory", "trust-anchor-match", "git-hooks", "bound-paths-tracked", "orphan-descriptors", "approval-verifiable", "scanner-gitleaks", "scanner-osv-scanner", "scanner-semgrep"]);
+ const FINDING_STATES = Object.freeze(["ok", "repairable", "attended", "unknown"]);
++const HOST_BOUNDARY_STATES = new Set(["execution_environment", "probe_timeout", "probe_error"]);
+ const MAX_CAUSE_CHARS = 400;
+ const MANDATORY_HOOK_IDS = Object.freeze(["pre-push-hook", "pre-commit-hook", "commit-msg-hook"]);
+ const HOOK_INSTALLERS = Object.freeze({ "pre-push-hook": "./pre-push-hook-install.mjs", "pre-commit-hook": "./pre-commit-hook-install.mjs", "commit-msg-hook": "./commit-msg-hook-install.mjs" });
+@@ -476,7 +483,24 @@ const scannerProbe = (tool) => (context) => {
+   const entry = context.scanners.results.find((candidate) => candidate.tool === tool);
+   if (entry?.status === "ready") return { status: "ok", cause: `${tool} ${entry.version ?? "(version unreported)"} is ready`, repair: null };
+   const status = entry?.status ?? "unobserved";
+-  return { status: "attended", cause: `${tool} prerequisite status: ${status}`, repair: attendedPrerequisite(`${tool}-installed`, GUIDANCE[platformName(context.platform)][tool]) };
++  // C28e: a state that says the check itself could not look (a sandboxed session on WSL) asks for no install: the tool may well be present.
++  if (HOST_BOUNDARY_STATES.has(status)) {
++    return { status: "unknown", cause: `${tool} could not be observed at this execution boundary (${status})`, repair: attendedPrerequisite(`${tool}-observable`, `re-run the readiness report in your own terminal, outside any sandbox; do not reinstall ${tool} from this result.`) };
++  }
++  // C28e (PO tiles 2026-11-12): the repair names the tool's class in the one registry and its section of docs/toolchain.md, and a deferral the
++  // person recorded on this machine (lib/toolchain-deferrals.mjs). A deferral never makes the finding ok and never reaches the plan or close
++  // check (lib/security-close-status.mjs scannerEntryReadiness reads the preflight result, not this report).
++  const deferral = (context.deps.readToolDeferral ?? readToolDeferral)(tool, context.deps.deferralDependencies ?? {});
++  return {
++    status: "attended",
++    cause: `${tool} prerequisite status: ${status}${deferral === null ? "" : `; installing it was deferred on this machine (${deferral.deferredAt})`}`,
++    repair: {
++      ...attendedPrerequisite(`${tool}-installed`, `${GUIDANCE[platformName(context.platform)][tool]} ${toolchainDocPointer(tool) ?? ""}`.trim()),
++      toolClass: toolchainEntry(tool)?.class ?? null,
++      installDoc: toolchainDocAnchor(tool),
++      deferred: deferral !== null,
++    },
++  };
+ };
+ 
+ const DEFAULT_FINDING_PROBES = Object.freeze({

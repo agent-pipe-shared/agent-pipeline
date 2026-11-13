@@ -1,0 +1,168 @@
+diff --git a/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md b/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+index 30a9e5da8fabadcc7f3d886f91c5c796ed160d5b..70cd8b9e5140fb011e2be68f8d0641cff7931a5b 100644
+--- a/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
++++ b/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+@@ -38,7 +38,8 @@ ADR-0032 made the full CycloneDX SBOM an option and rejected it as a mandate, be
+ 3. **A damaged `bom.json` is `invalid`,** never skipped: skipping it made the pom report that no CycloneDX file covers it, which named the wrong cause.
+ 4. **Byte-order mark and line ends.** A UTF-8 byte-order mark (written by Windows tools) is removed before any reader runs, and every reader reads CRLF line ends as it reads LF; the input digest still binds the raw bytes.
+ 5. **Private registries.** A pnpm 5.x/6.x key that starts with the registry host (a registry other than the default) is a registry package, the host dropped. In yarn v1 the descriptor's range decides, not the tarball URL's shape: a semver range or dist-tag is a registry package whatever path the registry serves (GitHub Packages has no `/-/`), an `npm:` alias names the real package (a scoped one included), and a protocol, a URL or an `owner/repo` shorthand is `partial`.
+-6. **Known limit, Maven parent bump.** A version that a parent pom or an imported BOM manages is matched by name only, so a CycloneDX file written before a parent version bump still covers the pom: nothing offline can see the newly managed version. Teams regenerate the CycloneDX file with every parent bump; the close cannot prove they did.
++6. **`packages.config` has a reader** (PO tile 2026-11-12): a .NET Framework project lists every package it restores there, the transitive ones included, each with one exact version; `developmentDependency="true"` is a dev component, and a version range or an entry without an id and a version makes the file `invalid`. It leaves the `unsupported` list of the 28d amendment, point 4.
++7. **Known limit, Maven parent bump.** A version that a parent pom or an imported BOM manages is matched by name only, so a CycloneDX file written before a parent version bump still covers the pom: nothing offline can see the newly managed version. Teams regenerate the CycloneDX file with every parent bump; the close cannot prove they did.
+ 
+ ## Consequences
+ 
+diff --git a/plugins/pipeline-core/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md b/plugins/pipeline-core/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+index 30a9e5da8fabadcc7f3d886f91c5c796ed160d5b..70cd8b9e5140fb011e2be68f8d0641cff7931a5b 100644
+--- a/plugins/pipeline-core/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
++++ b/plugins/pipeline-core/docs/adr/0091-the-software-bill-of-materials-is-part-of-every-feature-close.md
+@@ -38,7 +38,8 @@ ADR-0032 made the full CycloneDX SBOM an option and rejected it as a mandate, be
+ 3. **A damaged `bom.json` is `invalid`,** never skipped: skipping it made the pom report that no CycloneDX file covers it, which named the wrong cause.
+ 4. **Byte-order mark and line ends.** A UTF-8 byte-order mark (written by Windows tools) is removed before any reader runs, and every reader reads CRLF line ends as it reads LF; the input digest still binds the raw bytes.
+ 5. **Private registries.** A pnpm 5.x/6.x key that starts with the registry host (a registry other than the default) is a registry package, the host dropped. In yarn v1 the descriptor's range decides, not the tarball URL's shape: a semver range or dist-tag is a registry package whatever path the registry serves (GitHub Packages has no `/-/`), an `npm:` alias names the real package (a scoped one included), and a protocol, a URL or an `owner/repo` shorthand is `partial`.
+-6. **Known limit, Maven parent bump.** A version that a parent pom or an imported BOM manages is matched by name only, so a CycloneDX file written before a parent version bump still covers the pom: nothing offline can see the newly managed version. Teams regenerate the CycloneDX file with every parent bump; the close cannot prove they did.
++6. **`packages.config` has a reader** (PO tile 2026-11-12): a .NET Framework project lists every package it restores there, the transitive ones included, each with one exact version; `developmentDependency="true"` is a dev component, and a version range or an entry without an id and a version makes the file `invalid`. It leaves the `unsupported` list of the 28d amendment, point 4.
++7. **Known limit, Maven parent bump.** A version that a parent pom or an imported BOM manages is matched by name only, so a CycloneDX file written before a parent version bump still covers the pom: nothing offline can see the newly managed version. Teams regenerate the CycloneDX file with every parent bump; the close cannot prove they did.
+ 
+ ## Consequences
+ 
+diff --git a/plugins/pipeline-core/lib/sbom-close.mjs b/plugins/pipeline-core/lib/sbom-close.mjs
+index afb5796f6398b97c0e1d900484e9e851eed1d79e..f1c350f9857e88bc6d20908db478ef1260200162 100644
+--- a/plugins/pipeline-core/lib/sbom-close.mjs
++++ b/plugins/pipeline-core/lib/sbom-close.mjs
+@@ -6,7 +6,8 @@
+  * and uses no network or package manager. It reads LOCKFILES (what is pinned), never resolves anything itself:
+  *   npm (package-lock.json, npm-shrinkwrap.json), Python (poetry.lock, Pipfile.lock, pinned requirements.txt), Go (go.mod), Rust (Cargo.lock),
+  *   and since candidate 28d (sbom-lockfile-readers.mjs) yarn, pnpm, bun, uv, Gradle, NuGet, Bundler, Composer, pub, SwiftPM, Mix, Conan,
+- *   a committed CycloneDX file, and Maven pom.xml for its direct dependencies (partial unless a CycloneDX file of the build covers it).
++ *   a committed CycloneDX file, and Maven pom.xml for its direct dependencies (partial unless a CycloneDX file of the build covers it);
++ *   since candidate 28e the packages.config of a .NET Framework project.
+  * A manifest without a lockfile, an unpinned requirement or a lockfile format this module has no reader for is NAMED as a finding of a typed
+  * state (`partial`, `unsupported`, `invalid`, `stale`); every such finding BLOCKS the close, unless the PO's signed override for exactly those findings is recorded.
+  * No component at all is an explicit `not-applicable` record with its reason, never an absent file.
+@@ -17,7 +18,7 @@ import { generateNodeSbom, NODE_GRAPH_SCHEMA } from "./sbom-node-adapter.mjs";
+ import { SBOM_LIFECYCLE_CODES } from "./sbom-manifest.mjs";
+ import {
+   mavenCoverage, parseBunLock, parseCargoLock, parseComposerLock, parseConanLock, parseCycloneDx, parseGemfileLock, parseGradleLockfile, parseMixLock,
+-  parseNugetLock, parsePackageResolved, parsePnpmLock, parsePoetryLock, parsePomXml, parsePubspecLock, parseUvLock, parseYarnLock,
++  parseNugetLock, parsePackageResolved, parsePackagesConfig, parsePnpmLock, parsePoetryLock, parsePomXml, parsePubspecLock, parseUvLock, parseYarnLock,
+ } from "./sbom-lockfile-readers.mjs";
+ 
+ export const SBOM_CLOSE_RECORD_SCHEMA = "pipeline.sbom-close-record.v1";
+@@ -31,7 +32,7 @@ const sha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex")
+ // Paths holding fixtures, vendored code, generated output or the pipeline's own working files are not the project's dependencies.
+ const IGNORED_SEGMENTS = new Set(["node_modules", "vendor", "third_party", "fixtures", "fixture", "__fixtures__", "testdata", "scratch", "specs", "docs", "examples", ".claude", ".git", "dist", "build", "target", ".venv", "venv"]);
+ // Dependency inputs no reader exists for yet (candidate 28d moved every other name of the first list to a reader).
+-const UNSUPPORTED_NAMES = new Set(["bun.lockb", "Podfile", "Podfile.lock", "build.sbt", "packages.config", "paket.lock", "pdm.lock", "pylock.toml", "vcpkg.json"]);
++const UNSUPPORTED_NAMES = new Set(["bun.lockb", "Podfile", "Podfile.lock", "build.sbt", "paket.lock", "pdm.lock", "pylock.toml", "vcpkg.json"]);
+ 
+ const baseName = (path) => path.slice(path.lastIndexOf("/") + 1);
+ const dirOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
+@@ -126,6 +127,8 @@ export const SBOM_READERS = Object.freeze({
+   "gradle.lockfile": parseGradleLockfile, "buildscript-gradle.lockfile": parseGradleLockfile, "packages.lock.json": parseNugetLock,
+   "Gemfile.lock": parseGemfileLock, "gems.locked": parseGemfileLock, "composer.lock": parseComposerLock, "pubspec.lock": parsePubspecLock,
+   "Package.resolved": parsePackageResolved, "mix.lock": parseMixLock, "conan.lock": parseConanLock, "pom.xml": parsePomXml, "bom.json": parseCycloneDx,
++  // Candidate 28e.
++  "packages.config": parsePackagesConfig,
+ });
+ // Readers chosen by a path pattern instead of an exact file name (a pattern row, still not a branch elsewhere).
+ const SBOM_READER_PATTERNS = Object.freeze([[/\.cdx\.json$/u, parseCycloneDx, "CycloneDX"], [/(?:^|\/)gradle\/dependency-locks\/[^/]+\.lockfile$/u, parseGradleLockfile, "Gradle dependency-locks"]]);
+@@ -239,7 +242,7 @@ export function sbomFindingHelp(item) {
+     if (name === "pom.xml") return "Maven pins no transitive dependency. Generate a CycloneDX file with your build (the cyclonedx-maven-plugin, goal makeAggregateBom or makeBom, writes bom.json into target/ by default, which the close does not read: set outputDirectory to ${project.basedir}), commit it next to pom.xml or in a parent directory, make sure it lists every direct dependency of this pom outside the test scope, and run the close again. Otherwise the PO signs the override.";
+     if (name === "build.gradle" || name === "build.gradle.kts") return "Enable Gradle dependency locking for every project (allprojects { dependencyLocking { lockAllConfigurations() } }), write the locks of each project (gradle dependencies --write-locks runs for the root project only; run it per subproject or with a task that resolves all configurations), commit each project's gradle.lockfile next to its build file, and run the close again.";
+     if (PROJECT_FILE.test(name)) return "Enable the NuGet lockfile (<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>), restore once, commit packages.lock.json next to the project file, and run the close again.";
+-    return "Pin the dependencies in a lockfile a reader knows (package-lock.json, npm-shrinkwrap.json, yarn.lock, pnpm-lock.yaml, bun.lock, Cargo.lock, poetry.lock, Pipfile.lock, uv.lock, requirements.txt with ==, go.mod, gradle.lockfile, packages.lock.json, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock), commit it, and run the close again. A dependency pinned to a git commit, a local path or a URL stays partial until it comes from a registry; otherwise the PO signs the override.";
++    return "Pin the dependencies in a lockfile a reader knows (package-lock.json, npm-shrinkwrap.json, yarn.lock, pnpm-lock.yaml, bun.lock, Cargo.lock, poetry.lock, Pipfile.lock, uv.lock, requirements.txt with ==, go.mod, gradle.lockfile, packages.lock.json, packages.config, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock), commit it, and run the close again. A dependency pinned to a git commit, a local path or a URL stays partial until it comes from a registry; otherwise the PO signs the override.";
+   }
+   if (item.state === "stale") return "The recorded SBOM no longer matches the lockfiles. Remove the sbom directory named in the finding (the close writes a fresh one from the current lockfiles) and run the close again.";
+   return "Repair or remove the named file, then run the close again.";
+diff --git a/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs b/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
+index 390d0c882c3c68db1d4bac29813d3406426485ab..7ebdf80eab810f7abba6ec8f08b4676aa2de2d48 100644
+--- a/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
++++ b/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
+@@ -321,6 +321,24 @@ export function parseNugetLock(text, path) {
+   return { components: dedupe(out), issues: [] };
+ }
+ 
++/**
++ * C28e (PO tile 2026-11-12): the packages.config of a .NET Framework project lists every package it restores, the transitive ones included,
++ * each with one exact version; `developmentDependency="true"` marks a package used only at build time. No entry carries a source URL.
++ */
++export function parsePackagesConfig(text) {
++  const body = text.replace(/<!--[\s\S]*?-->/gu, "");
++  if (!/<packages[\s/>]/u.test(body)) throw new Error("not a NuGet packages.config");
++  const out = [];
++  for (const match of body.matchAll(/<package\b([^>]*)>/gu)) {
++    const attr = (key) => new RegExp(`(?:^|\\s)${key}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "u").exec(match[1])?.slice(1).find((value) => value !== undefined);
++    const id = attr("id"); const version = attr("version");
++    if (!id || !version) throw new Error("a package without an id and a version");
++    if (!/^\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u.test(version)) throw new Error(`${short(id)}: ${short(version)} is not an exact NuGet version`);
++    out.push(component("nuget", "nuget", id, version, attr("developmentDependency") === "true" ? "dev" : "required"));
++  }
++  return { components: dedupe(out), issues: [] };
++}
++
+ export function parseGemfileLock(text, path) {
+   const out = []; const issues = []; let section = null; let inSpecs = false; let sawSection = false;
+   for (const line of text.split(/\r?\n/u)) {
+diff --git a/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs b/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
+index e5fd9f3e33b45ac819e7de8e45811b901c14f2b3..6cd8523af6366ef06308cde0a500323e5b50cd89 100644
+--- a/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
++++ b/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
+@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
+ import test from "node:test";
+ import {
+   mavenCoverage, parseBunLock, parseCargoLock, parseComposerLock, parseConanLock, parseCycloneDx, parseGemfileLock, parseGradleLockfile, parseMixLock,
+-  parseNugetLock, parsePackageResolved, parsePnpmLock, parsePoetryLock, parsePomXml, parsePubspecLock, parseUvLock, parseYarnLock, readPomDependencies,
++  parseNugetLock, parsePackageResolved, parsePackagesConfig, parsePnpmLock, parsePoetryLock, parsePomXml, parsePubspecLock, parseUvLock, parseYarnLock, readPomDependencies,
+ } from "./sbom-lockfile-readers.mjs";
+ import { SBOM_READERS, closeSbom, observeSbomInputs, sbomFindingHelp } from "./sbom-close.mjs";
+ 
+@@ -392,6 +392,29 @@ test("packages.lock.json (NuGet): every target framework is read once, project r
+   assert.throws(() => parseNugetLock(JSON.stringify({ version: 1, dependencies: { "net8.0": { X: { type: "Direct" } } } }), "packages.lock.json"), /without a resolved version/u);
+ });
+ 
++const PACKAGES_CONFIG = `<?xml version="1.0" encoding="utf-8"?>
++<packages>
++  <!-- <package id="Commented.Out" version="1.0.0" targetFramework="net48" /> -->
++  <package id="Newtonsoft.Json" version="13.0.3" targetFramework="net48" />
++  <package targetFramework="net48" version='4.5.5' id='System.Memory' />
++  <package id="Microsoft.Net.Compilers" version="4.2.0" targetFramework="net48" developmentDependency="true" />
++  <package id="EntityFramework" version="6.4.4.1" targetFramework="net472" allowedVersions="[6,7)" />
++</packages>
++`;
++
++test("C28e: packages.config (.NET Framework) lists every package with one exact version; a development dependency is dev", () => {
++  const result = parsePackagesConfig(PACKAGES_CONFIG, "Legacy/packages.config");
++  assert.deepEqual(scoped(result), [["pkg:nuget/Newtonsoft.Json@13.0.3", "required"], ["pkg:nuget/System.Memory@4.5.5", "required"], ["pkg:nuget/Microsoft.Net.Compilers@4.2.0", "dev"], ["pkg:nuget/EntityFramework@6.4.4.1", "required"]]);
++  assert.deepEqual(result.issues, []);
++  assert.deepEqual(parsePackagesConfig("<packages />", "packages.config"), { components: [], issues: [] });
++  assert.throws(() => parsePackagesConfig('<packages><package id="X" version="[1.0,2.0)" /></packages>', "packages.config"), /not an exact NuGet version/u);
++  assert.throws(() => parsePackagesConfig('<packages><package id="X" /></packages>', "packages.config"), /without an id and a version/u);
++  assert.throws(() => parsePackagesConfig("<configuration />", "packages.config"), /not a NuGet packages.config/u);
++  const seen = observe({ "Legacy/packages.config": PACKAGES_CONFIG, "Legacy/Legacy.csproj": '<Project ToolsVersion="15.0"><ItemGroup><Reference Include="Newtonsoft.Json"><HintPath>..\\packages\\Newtonsoft.Json.13.0.3\\lib\\net45\\Newtonsoft.Json.dll</HintPath></Reference></ItemGroup></Project>' });
++  assert.deepEqual(seen.findings, [], "packages.config is read, no longer unsupported");
++  assert.equal(seen.components.length, 4);
++});
++
+ const GEMFILE_LOCK = `GIT
+   remote: https://secret@example.invalid/mine.git
+   revision: abc
+@@ -513,7 +536,7 @@ test("conan.lock: the 0.5 reference lists and the 0.4 graph, build requirements
+ });
+ 
+ test("the close finds each reader by file name or path pattern, and a manifest with its lockfile is no finding", () => {
+-  for (const name of ["yarn.lock", "pnpm-lock.yaml", "bun.lock", "uv.lock", "gradle.lockfile", "packages.lock.json", "Gemfile.lock", "gems.locked", "composer.lock", "pubspec.lock", "Package.resolved", "mix.lock", "conan.lock", "pom.xml", "bom.json"]) assert.equal(typeof SBOM_READERS[name], "function", name);
++  for (const name of ["yarn.lock", "pnpm-lock.yaml", "bun.lock", "uv.lock", "gradle.lockfile", "packages.lock.json", "packages.config", "Gemfile.lock", "gems.locked", "composer.lock", "pubspec.lock", "Package.resolved", "mix.lock", "conan.lock", "pom.xml", "bom.json"]) assert.equal(typeof SBOM_READERS[name], "function", name);
+   const seen = observe({
+     "package.json": JSON.stringify({ dependencies: { "left-pad": "^1.3.0" } }), "pnpm-lock.yaml": PNPM_9.replace(/\n {2}mine@[\s\S]*?version: 0\.0\.1\n/u, "\n"),
+     "svc/Service.csproj": '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Newtonsoft.Json" Version="13.0.3" /></ItemGroup></Project>', "svc/packages.lock.json": NUGET_LOCK,
+@@ -593,7 +616,7 @@ test("C28e: a UTF-8 byte-order mark and CRLF line ends read exactly like the pla
+     "Cargo.lock": CARGO_LOCK, "poetry.lock": POETRY_LOCK, "f/uv.lock": UV_LOCK, "gradle.lockfile": GRADLE_LOCK, "packages.lock.json": NUGET_LOCK, "Gemfile.lock": GEMFILE_LOCK,
+     "composer.lock": COMPOSER_LOCK, "pubspec.lock": PUBSPEC_LOCK, "Package.resolved": PACKAGE_RESOLVED_2, "mix.lock": MIX_LOCK, "pom.xml": POM, "bom.json": FULL_CDX,
+     "g/conan.lock": JSON.stringify({ version: "0.5", requires: ["zlib/1.3#x"], build_requires: [], python_requires: [] }, null, 2),
+-    "h/build.gradle": "dependencies {\n  implementation 'a:b:1'\n}\n", "i/Svc.csproj": '<Project><ItemGroup><PackageReference Include="X" Version="1.0.0" /></ItemGroup></Project>\n' };
++    "j/packages.config": PACKAGES_CONFIG, "h/build.gradle": "dependencies {\n  implementation 'a:b:1'\n}\n", "i/Svc.csproj": '<Project><ItemGroup><PackageReference Include="X" Version="1.0.0" /></ItemGroup></Project>\n' };
+   const windows = Object.fromEntries(Object.entries(files).map(([path, text]) => [path, `﻿${text.replace(/\r?\n/gu, "\r\n")}`]));
+   const plain = observe(files); const crlf = observe(windows);
+   assert.ok(plain.components.length >= 25);

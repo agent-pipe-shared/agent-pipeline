@@ -1,0 +1,251 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 383131793e2de2a835844b397b216bfbe5a40c20..8c0933b551b9b48deedc64252a1102610aa6bf32 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -284,6 +284,26 @@ export function deriveRegisteredCriticCourseSource({ repoRoot, featureId, baseCo
+ // specs/<feature>/evidence/critic/<packetId>/; the index schema mirrors SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA there.
+ const CRITIC_EXPORT_FILES = ["index.json", "receipt.json", "report.md"];
+ const CRITIC_EXPORT_INDEX_SCHEMA = "pipeline.session-critic-evidence-index.v1";
++/**
++ * The receipt binding of added Critic export directories (`exports`: dir -> { packetId, files }), shared by the export-only commit and
++ * the close commit: each directory holds exactly the three export files, its index binds the receipt and report digests, and the receipt
++ * bytes are the canonical consumed receipt of that packet in this repository's private packet store. Throws on a read failure.
++ */
++function criticExportDirectoriesBound(root, commit, exports, readReceipt) {
++  const commonDir = gitBytes(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], "CCA-RANGE-READ").toString("utf8").trim();
++  for (const [dir, { packetId, files }] of exports) {
++    if (files.length !== CRITIC_EXPORT_FILES.length || !CRITIC_EXPORT_FILES.every((name) => files.includes(name))) return false;
++    const blob = (name) => { regularBlobAt(root, commit, `${dir}/${name}`); return gitBytes(root, ["show", `${commit}:${dir}/${name}`], "CCA-EVIDENCE-READ"); };
++    const receiptBytes = blob("receipt.json"), report = blob("report.md"), index = JSON.parse(blob("index.json").toString("utf8"));
++    const { receipt } = readReceipt({ controlRoot: join(commonDir, "agent-pipeline", "critic-packets"), packetId });
++    if (!object(index) || index.schema !== CRITIC_EXPORT_INDEX_SCHEMA || index.packetId !== packetId || report.length === 0
++      || index.receiptSha256 !== digest(receiptBytes) || index.reportSha256 !== digest(report)
++      || !receiptBytes.equals(Buffer.from(packetCanonicalJson(receipt), "utf8")) || receipt.packetId !== packetId
++      || index.candidate?.commit !== receipt.candidate?.commit || index.candidate?.tree !== receipt.candidate?.tree
++      || index.reviewPass !== receipt.reviewPass || index.findingCount !== receipt.findingCount) return false;
++  }
++  return true;
++}
+ /**
+  * A commit that only adds exports of consumed Critic reviews is evidence, not unreviewed content (consumer finding N23,
+  * 2026-10-30: the export commit after a passed round broke the carry-forward and the lineage transport). Every changed
+@@ -313,18 +333,7 @@ export function criticExportOnlyCommit(root, commit, featureIds, readReceipt = r
+       if (!exports.has(key)) exports.set(key, { packetId: match[2], files: [] });
+       exports.get(key).files.push(match[3]);
+     }
+-    const commonDir = gitBytes(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], "CCA-RANGE-READ").toString("utf8").trim();
+-    for (const [dir, { packetId, files }] of exports) {
+-      if (files.length !== CRITIC_EXPORT_FILES.length || !CRITIC_EXPORT_FILES.every((name) => files.includes(name))) return false;
+-      const blob = (name) => { regularBlobAt(root, commit, `${dir}/${name}`); return gitBytes(root, ["show", `${commit}:${dir}/${name}`], "CCA-EVIDENCE-READ"); };
+-      const receiptBytes = blob("receipt.json"), report = blob("report.md"), index = JSON.parse(blob("index.json").toString("utf8"));
+-      const { receipt } = readReceipt({ controlRoot: join(commonDir, "agent-pipeline", "critic-packets"), packetId });
+-      if (!object(index) || index.schema !== CRITIC_EXPORT_INDEX_SCHEMA || index.packetId !== packetId || report.length === 0
+-        || index.receiptSha256 !== digest(receiptBytes) || index.reportSha256 !== digest(report)
+-        || !receiptBytes.equals(Buffer.from(packetCanonicalJson(receipt), "utf8")) || receipt.packetId !== packetId
+-        || index.candidate?.commit !== receipt.candidate?.commit || index.candidate?.tree !== receipt.candidate?.tree
+-        || index.reviewPass !== receipt.reviewPass || index.findingCount !== receipt.findingCount) return false;
+-    }
++    if (!criticExportDirectoriesBound(root, commit, exports, readReceipt)) return false;
+     if (lineage.length === 0 && manifestPath === null) return true;
+     // The extended form: lineage files and the manifest change come together, one feature, every lineage file named by its own digest and
+     // naming one of the exports of this commit, and the manifest after the commit equals the manifest before plus exactly those entries.
+@@ -433,7 +442,7 @@ const CLOSE_DOC_PATH = /^(?:docs|backlog)\/(?:[^/]+\/)*[^/]+\.md$/u;
+  * file. Added and modified files must be regular, non-executable blobs (no symlink, no mode change). Any other path -- source, tests,
+  * configuration, agent or skill prompts, another feature's directory -- ends the classification and the commit stays a correction.
+  */
+-export function criticCloseCommit(root, commit, featureId) {
++export function criticCloseCommit(root, commit, featureId, readReceipt = readConsumedCandidateReceipt) {
+   try {
+     const parents = gitBytes(root, ["rev-list", "--parents", "-n", "1", commit], "CCA-RANGE-READ").toString("utf8").trim().split(/\s+/u);
+     if (parents.length !== 2 || typeof featureId !== "string" || featureId === "") return false;
+@@ -441,20 +450,35 @@ export function criticCloseCommit(root, commit, featureId) {
+     if (fields.length === 0 || fields.length % 2 !== 0) return false;
+     const specs = `specs/${featureId}/`;
+     const bundles = `audit-bundles/${featureId}/`;
++    const exports = new Map();
+     for (let index = 0; index < fields.length; index += 2) {
+       const meta = /^:(\d{6}) (\d{6}) [0-9a-f]+ [0-9a-f]+ ([AMD])$/u.exec(fields[index]);
+       const path = fields[index + 1];
+       if (!meta) return false;
+-      // The export subtree of a consumed Critic review has its own receipt-bound classifier (`criticExportOnlyCommit`); a close commit
+-      // must not become a second, weaker way in for forged or extended exports.
+-      if (path.startsWith(`${specs}evidence/critic/`)) return false;
++      // The export subtree of a consumed Critic review is admitted only through the same receipt-bound check as an export-only commit
++      // (`criticExportDirectoriesBound`), never by path alone: only added files, exactly the three export files of a packet whose
++      // canonical consumed receipt they carry. The one-shot close exports the missing rounds itself, inside the one close commit
++      // (PO tile 2026-11-10); refusing every such path made that close commit a correction and blocked the push of every one-shot
++      // close (VEP-CVL-CARRY-CONTENT-CHANGED, Antigravity test run 2026-11-12).
++      if (path.startsWith(`${specs}evidence/critic/`)) {
++        const match = /^specs\/[^/]+\/evidence\/critic\/([a-f0-9]{32})\/([^/]+)$/u.exec(path);
++        if (meta[3] !== "A" || meta[2] !== "100644" || !match || !CRITIC_EXPORT_FILES.includes(match[2])) return false;
++        const key = `${specs}evidence/critic/${match[1]}`;
++        if (!exports.has(key)) exports.set(key, { packetId: match[1], files: [] });
++        exports.get(key).files.push(match[2]);
++        continue;
++      }
+       const inside = path.startsWith(specs) || path.startsWith(bundles);
+       if (!(inside || CLOSE_DOC_PATH.test(path) || CLOSE_STATE_FILES.has(path))) return false;
+       if (path.split("/").some((part) => part === "" || part === "." || part === "..")) return false;
+       if (meta[3] !== "D" && meta[2] !== "100644") return false;
+       if (meta[3] === "M" && meta[1] !== "100644") return false;
+     }
+-    return true;
++    if (exports.size === 0) return true;
++    // Lineage files of a review are bound to their export only by the export classifier's extended form (digest-named, manifest delta
++    // recomputed); a close commit that carries an export must not become a way around that binding.
++    const lineageAlongside = fields.some((field, index) => index % 2 === 1 && /^specs\/[^/]+\/evidence\/critic-lineage-[^/]+$/u.test(field));
++    return !lineageAlongside && criticExportDirectoriesBound(root, commit, exports, readReceipt);
+   } catch { return false; }
+ }
+ 
+@@ -568,7 +592,7 @@ export function classifyRegisteredEvidenceOnlyCommits({ repoRoot, featureId, bas
+   for (const commit of source.rangeCommits) {
+     const registered = evidenceOnlyCommit(root, commit, source.manifestPath, featureId)
+       || (admitCriticExports === true && (criticExportOnlyCommit(root, commit, [featureId], readConsumedCandidateReceiptFn)
+-        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId)));
++        || criticAddendumOnlyCommit(root, commit) || criticCloseCommit(root, commit, featureId, readConsumedCandidateReceiptFn)));
+     // AC-108: with the carry option, a commit that changes only administration and documentation paths is passed over as well.
+     const passedOver = registered || (admitCriticExports === true && administrationDocumentationOnlyCommit(root, commit, { featureIds: [featureId] }));
+     if (passedOver && !registered) administration.push(commit);
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+index ca5c660b6310243f3dcc69e706f99af75dc28d02..6ebf0d9e32b6b1f6072a7ec20aa651aa5a63bc1a 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs
+@@ -608,6 +608,45 @@ test("16c the close commit and handover-only commits carry the Critic; any sourc
+   const link = closeCommitAt("a symlink named like a document", () => symlinkSync("../src/app.js", join(root, "docs/linked.md")));
+   assert.equal(courseAdmission.criticCloseCommit(root, link.commit, featureId), false, "a symlink is not a document");
+   assert.equal(courseAdmission.criticCloseCommit(root, reviewed.commit, featureId), false, "the root commit has no single parent");
++
++  // Candidate 28e (Antigravity test run 2026-11-12): the one-shot close exports the missing Critic rounds itself, inside the one close
++  // commit (PO tile 2026-11-10). A receipt-bound export there carries; refusing it made the printed push-evidence command fail with
++  // VEP-CVL-CARRY-CONTENT-CHANGED. A forged, partial or extra export file in a close commit still ends the classification.
++  const dir = `specs/${featureId}/evidence/critic/${read.receipt.packetId}`;
++  const exportFiles = ({ receiptBytes = canonicalJson(read.receipt), report = "# Critic notes\n\nNo findings.\n", index = {}, skip = null, extra = null } = {}) => {
++    const files = {
++      "receipt.json": receiptBytes,
++      "report.md": report,
++      "index.json": canonicalJson({ schema: "pipeline.session-critic-evidence-index.v1", packetId: read.receipt.packetId,
++        candidate: { commit: reviewed.commit, tree: reviewed.tree }, receiptSha256: sha256(receiptBytes), reportSha256: sha256(report),
++        reviewPass: true, findingCount: 0, ...index }),
++    };
++    for (const [name, text] of Object.entries(files)) if (name !== skip) writeAt(`${dir}/${name}`, text);
++    if (extra) writeAt(`${dir}/${extra}`, "extra\n");
++  };
++  const oneShotClose = closeCommitAt("the one-shot close commit with its own Critic export", () => {
++    writeAt("docs/state.md", "# State\n\nClosed.\n");
++    writeAt(`audit-bundles/${featureId}/${reviewed.commit}/manifest.json`, "{}\n");
++    writeAt(`specs/${featureId}/evidence/verify-latest.json`, "{}\n");
++    writeAt(`specs/${featureId}/evidence/sbom/record.json`, "{}\n");
++    exportFiles();
++  });
++  assert.equal(courseAdmission.criticCloseCommit(root, oneShotClose.commit, featureId, deps.readConsumedCandidateReceiptFn), true,
++    "a receipt-bound export inside the close commit is close evidence");
++  assert.deepEqual(carry(oneShotClose).proof.evidenceOnlyCommits, [oneShotClose.commit], "the push carry-forward passes over the one-shot close commit");
++  assert.equal(courseAdmission.criticCloseCommit(root, oneShotClose.commit, featureId), false,
++    "without the consumed receipt in the packet store the export is not bound");
++  const forged = {
++    "an export whose receipt bytes are not the consumed receipt": () => exportFiles({ receiptBytes: canonicalJson({ ...read.receipt, findingCount: 7 }) }),
++    "an export without its index": () => exportFiles({ skip: "index.json" }),
++    "an export with an extra file": () => exportFiles({ extra: "notes.md" }),
++    "an export whose index claims a different pass": () => exportFiles({ index: { reviewPass: false } }),
++  };
++  for (const [name, edit] of Object.entries(forged)) {
++    const commit = closeCommitAt(name, () => { writeAt("docs/state.md", "# State\n\nClosed.\n"); edit(); });
++    assert.equal(courseAdmission.criticCloseCommit(root, commit.commit, featureId, deps.readConsumedCandidateReceiptFn), false, name);
++    assert.throws(() => carry(commit), error => error.code === "CVL-CARRY-CONTENT-CHANGED", name);
++  }
+ });
+ 
+ // Candidate 17 (Toolbox close): the close accepts content commits after the last Critic-reviewed candidate, the push carry-forward does not.
+diff --git a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+index 6c767fc5935aa0928eb6f44397b08c7213e140d6..ca1c982b63dd543756a091406879888d8740c967 100644
+--- a/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/close-path-e2e.test.mjs
+@@ -261,7 +261,7 @@ const WALKS = Object.freeze([
+ ]);
+ 
+ // C22 (CGF-04): the walk body is one function so the same fixture, Critic course and close prerequisites serve the manual coordinator walks (below) and the one-shot close walk.
+-async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false, decline = false, route = "push-then-release" }) {
++async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = false, decline = false, route = "push-then-release", selfExport = false }) {
+   {
+     const log = [];
+     const fx = consumerFixture(log, identity);
+@@ -386,6 +386,9 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+       assert.equal(finalized.status, "completed", `${identity.runner}: the Critic return is consumed and read back identically`);
+       assert.equal(finalized.independence, criticReturn === "none" ? "caller-authored-fallback" : "source-issued-origin", `${identity.runner}: ${criticReturn}`);
+       assert.equal(finalized.receipt.session.id, `${identity.runner}-critic-1`);
++      // Candidate 28e (Antigravity test run 2026-11-12): `selfExport` walks the one-shot close WITHOUT a prior export, so the close exports the
++      // round from the private journal itself, inside its one close commit (PO tile 2026-11-10), as a runner that never ran the export verb does.
++      if (!selfExport) {
+       writeFileSync(join(fx.root, "evidence", "critic-report.md"), "# Critic report\n\nNo findings.\n");
+       const exported = json(finalizer("export", {
+         schema: "pipeline.session-critic-export-request.v1", packetId, reportPath: "evidence/critic-report.md", outDir: `specs/${FEATURE_ID}/evidence/critic/${packetId}`,
+@@ -402,6 +405,7 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+       // VEP-CVL-CARRY-CONTENT-CHANGED by the Critic-bound candidate Verify below).
+       const exportCommit = commit(log, fx.root, "docs: exported Critic evidence and its registered lineage");
+       assert.notEqual(exportCommit, candidate, "the exported evidence follows the reviewed candidate");
++      }
+       const lifecycle = `close-${identity.runner}`;
+       const coordinator = (verb, extra) => json(step(log, `${identity.runner}: close-coordinator ${verb}`, process.execPath,
+         [script("close-coordinator.mjs"), verb, "--root", fx.root, "--lifecycle", lifecycle, ...extra], { cwd: fx.root }));
+@@ -586,6 +590,16 @@ async function walkTheClosePath({ identity, criticReturn, catalogue, oneShot = f
+         for (const stage of ["verify-candidate-frozen", "security-scan", "final-verify-green", "cleanup-complete", "closed-local"]) assert.ok(last.result.stages.includes(stage), `${identity.runner}: the resumed close ran ${stage}: ${last.result.stages}`);
+         assert.match(last.result.pushEvidence?.command ?? "", /--mode release --critic-packet-id/u, "the push boundary names the Critic-bound Verify, which the close never writes itself");
+         assert.equal(stateOf().closedFeatures.filter((entry) => entry.id === FEATURE_ID).length, 1, "the feature is closed exactly once");
++        if (selfExport) {
++          const exportDir = `specs/${FEATURE_ID}/evidence/critic/${packetId}`;
++          assert.deepEqual(git(log, fx.root, ["ls-files", "--", exportDir]).split("\n").filter(Boolean).map((path) => path.slice(exportDir.length + 1)).sort(),
++            ["index.json", "receipt.json", "report.md"], `${identity.runner}: the close exported the round itself and committed it`);
++        }
++        // Candidate 28e (Antigravity test run 2026-11-12): the push-evidence command the close printed runs green on the closed candidate. It
++        // carries the Critic across the close commit, including a close commit that holds the close's own Critic export.
++        const pushVerify = spawnSync(process.execPath, last.result.pushEvidence.argv,
++          { cwd: fx.root, env: walkEnv, encoding: "utf8", timeout: 300_000, maxBuffer: 1 << 26 });
++        assert.equal(pushVerify.status, 0, `${identity.runner}: the printed push-evidence command: ${pushVerify.stdout.slice(-1500)}\n${pushVerify.stderr.slice(-1500)}`);
+         return;
+       }
+       const bound = JSON.parse(readFileSync(statePath, "utf8"));
+@@ -870,6 +884,10 @@ test("C22 CGF-04: the one-shot close CLI walks the whole close on the real fixtu
+   await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true });
+ });
+ 
++test("C28e (Antigravity test run): a one-shot close without a prior export exports the Critic round itself in its close commit, and the push-evidence command it prints runs green", { timeout: 600_000 }, async () => {
++  await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, selfExport: true });
++});
++
+ test("C28 AC-108: a declined acceptance returns the feature to a correction round: a non-yes answer records nothing, the decline retires the bound Result, and the second close binds a Result again, asks again for the new candidate, and closes on a yes", { timeout: 900_000 }, async () => {
+   await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, decline: true });
+ });
+@@ -881,3 +899,32 @@ test("C28 AC-108: the same declined-acceptance chain in a project with a session
+ test("C23 F25: in a project with a catalogue from the start the one-shot close binds the Result on the owner route and closes without a detour", { timeout: 600_000 }, async () => {
+   await walkTheClosePath({ identity: RUNNER_IDENTITIES[0], criticReturn: "stop-hook", oneShot: true, catalogue: true });
+ });
++
++// C28e (Claude test run, PO 2026-11-13): the real approve -> materialize -> set-phase route, then every planned surface written and
++// committed: a second implementation entry (the one a re-approved design asks for) met class 9 profile-drift "unavailable" on every
++// design-package project, and the greenfield-pending allowance no longer applied. Class 9 is now reported as unmeasured, not blocking.
++test("C28e (Claude test run): a design-package project re-enters implementation after every planned surface is written; class 9 is reported, not blocking", { timeout: 300_000 }, async () => {
++  const fx = consumerFixture([], RUNNER_IDENTITIES[0]);
++  walkEnv = runnerEnv(RUNNER_IDENTITIES[0].runner, fx.root);
++  try {
++    fx.write("src/index.mjs", "export const ready = true;\n");
++    fx.write("tests/unit.test.mjs", "import { ready } from \"../src/index.mjs\";\nif (ready !== true) throw new Error(\"not ready\");\n");
++    fx.gitOk("add", "--", "src/index.mjs", "tests/unit.test.mjs");
++    fx.gitOk("commit", "-q", "-m", "implementation surfaces");
++    const { evaluateArchitectureFitness } = await import("./architecture-fitness.mjs");
++    const { architectureFitnessAuthorityVerdict } = await import("../lib/guard/entry-gates.mjs");
++    const { PIPELINE_STATE_SCRIPT } = await import("../lib/guard/constants.mjs");
++    const seen = [];
++    const verdict = architectureFitnessAuthorityVerdict(fx.root, `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`,
++      { evaluateArchitectureFitnessFn: (input) => { const result = evaluateArchitectureFitness(input); seen.push(result); return result; } });
++    assert.equal(seen.length, 1, "the guard evaluated planning fitness once");
++    const class9 = seen[0].outcomes.find((outcome) => outcome.classId === 9);
++    assert.equal(class9.outcome, "unavailable", JSON.stringify(class9));
++    assert.equal(class9.evidence?.source, "approved-design-package", "the unmeasured class 9 names the design package as its source");
++    assert.deepEqual(seen[0].outcomes.filter((outcome) => outcome.classId !== 9 && outcome.classId !== 10 && outcome.outcome !== "pass").map((outcome) => outcome.propertyId), [],
++      "every other blocking class passes with all planned surfaces written");
++    assert.equal(verdict, null, verdict === null ? "" : verdict.stderr);
++  } finally {
++    rmSync(fx.parent, { recursive: true, force: true, maxRetries: 3 });
++  }
++});

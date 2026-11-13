@@ -1,0 +1,54 @@
+diff --git a/plugins/pipeline-core/lib/spec-addendum.mjs b/plugins/pipeline-core/lib/spec-addendum.mjs
+index 3580254a59472db9369c9452fc7d19c29c7b943c..2cc4a467d2696deeb580b064289be0ec5335b139 100644
+--- a/plugins/pipeline-core/lib/spec-addendum.mjs
++++ b/plugins/pipeline-core/lib/spec-addendum.mjs
+@@ -18,8 +18,15 @@ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { lstatSync, readFileSync } from "node:fs";
+ import { join } from "node:path";
+-import { CRITERION_ID_SOURCE } from "./critic-accepted-contract.mjs";
+-import { canonicalJson } from "./critic-packet-preflight-read.mjs";
++
++// This module is a LEAF (node built-ins only): po-human-approval.mjs, pipeline-state.mjs, the close and the briefing generator import it,
++// and an import of critic-accepted-contract.mjs here closed a cycle through pipeline-state.mjs that left SPEC_ADDENDUM_KIND uninitialized
++// when the briefing generator was the entry point. The two values below are therefore restated; spec-addendum.test.mjs pins both equal to
++// their owners (critic-accepted-contract.mjs CRITERION_ID_SOURCE, critic-packet-preflight-read.mjs canonicalJson).
++export const SPEC_ADDENDUM_CRITERION_ID_SOURCE = "AC-(?:[1-9][0-9]{0,60}|E[1-9][0-9]{0,3}-[0-9]{1,4}-[0-9]{1,4})";
++const CRITERION_ID_SOURCE = SPEC_ADDENDUM_CRITERION_ID_SOURCE;
++export const specAddendumReceiptCanonicalJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
++const canonicalJson = specAddendumReceiptCanonicalJson;
+ 
+ export const SPEC_ADDENDUM_KIND = "spec-addendum";
+ export const SPEC_ADDENDUM_APPROVAL_SCHEMA = "pipeline.spec-addendum-approval.v1";
+diff --git a/plugins/pipeline-core/lib/spec-addendum.test.mjs b/plugins/pipeline-core/lib/spec-addendum.test.mjs
+index acaf85844103a2ecd46cac502fd1b138f05c3166..3e04c28547be11d3c1a4b6771240a438319f7b79 100644
+--- a/plugins/pipeline-core/lib/spec-addendum.test.mjs
++++ b/plugins/pipeline-core/lib/spec-addendum.test.mjs
+@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import {
+   buildSpecAddendumSubject, criterionIdsIn, isSpecAddendumPath, parseSpecAddendum, readSpecAddenda, specAddendumApprovalBytes,
+-  specAddendumApprovalPath, specAddendumCriteriaRefusal, specAddendumNumber,
++  specAddendumApprovalPath, specAddendumCriteriaRefusal, specAddendumNumber, SPEC_ADDENDUM_CRITERION_ID_SOURCE, specAddendumReceiptCanonicalJson,
+ } from "./spec-addendum.mjs";
+ 
+ const sha = (value) => createHash("sha256").update(value).digest("hex");
+@@ -140,3 +140,18 @@ describe("Spec addendum (ADR-0095)", () => {
+     assert.match(drifted.findings.join("\n"), /SPEC-ADDENDUM-DIGEST/u);
+   });
+ });
++
++describe("SA-07 the leaf module restates two values; both stay equal to their owners", () => {
++  it("criterion id pattern and receipt canonical JSON", async () => {
++    const { CRITERION_ID_SOURCE } = await import("./critic-accepted-contract.mjs");
++    const { canonicalJson } = await import("./critic-packet-preflight-read.mjs");
++    assert.equal(SPEC_ADDENDUM_CRITERION_ID_SOURCE, CRITERION_ID_SOURCE);
++    const receipt = { schema: "x", nested: { b: 1, a: [2, 3] } };
++    assert.equal(specAddendumReceiptCanonicalJson(receipt), canonicalJson(receipt));
++  });
++  it("the module imports node built-ins only (no cycle through pipeline-state.mjs)", () => {
++    const source = readFileSync(new URL("./spec-addendum.mjs", import.meta.url), "utf8");
++    const imports = [...source.matchAll(/^import .* from "([^"]+)";$/gmu)].map((match) => match[1]);
++    assert.ok(imports.length > 0 && imports.every((name) => name.startsWith("node:")), imports.join(", "));
++  });
++});

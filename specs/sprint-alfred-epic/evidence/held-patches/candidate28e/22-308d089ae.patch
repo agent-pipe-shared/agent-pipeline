@@ -1,0 +1,81 @@
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index 5e86ccdde407494f23c07063aa4f354019e1f657..9f44d5303c6832e79bedf396115499b028fe2058 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -213,6 +213,17 @@ function inspectCheckpointDebt(root, map, deps) {
+   return { status: "clear", openCount: 0, targets: [] };
+ }
+ 
++/**
++ * C28e (Claude test run, PO 2026-11-13): class 9 cannot be measured for a repository adopted through an approved design package
++ * (no adoption authority subject, so no accepted snapshot). It is report-only there, the same rule the greenfield-pending allowance
++ * already applied at the first entry; every other unavailable class 9 still blocks.
++ */
++function isDesignPackageProfileDriftUnmeasured(outcome) {
++  return outcome?.classId === 9 && outcome.propertyId === "profile-drift" && outcome.outcome === "unavailable"
++    && outcome.details === "Valid approved-scoped authority is unavailable"
++    && outcome.evidence?.status === "unavailable" && outcome.evidence?.source === "approved-design-package";
++}
++
+ function projectPlanningFitness(fitness, { adoptionDisposition = null } = {}) {
+   const outcomes = Array.isArray(fitness?.outcomes) ? fitness.outcomes : [];
+   const expectedClasses = new Set(Array.from({ length: 10 }, (_, index) => index + 1));
+@@ -234,7 +245,7 @@ function projectPlanningFitness(fitness, { adoptionDisposition = null } = {}) {
+       && Array.isArray(outcome.evidence?.required)
+       && outcome.evidence.required.includes("measured-calibration")
+       && outcome.evidence.required.includes("explicit-threshold-promotion")
+-  ));
++  ) || isDesignPackageProfileDriftUnmeasured(outcome));
+   const blocking = outcomes.filter((outcome) => !reportOnly.includes(outcome));
+   let blockingOverallStatus = "pass";
+   if (blocking.some((outcome) => outcome.outcome === "finding")) blockingOverallStatus = "blocked";
+diff --git a/plugins/pipeline-core/lib/guard/entry-gates-greenfield-pending.test.mjs b/plugins/pipeline-core/lib/guard/entry-gates-greenfield-pending.test.mjs
+index e8556bdd7986bbe923d62f08a1babb70c7f548d1..589689889f4af03b5f334504cac70e452a9e4198 100644
+--- a/plugins/pipeline-core/lib/guard/entry-gates-greenfield-pending.test.mjs
++++ b/plugins/pipeline-core/lib/guard/entry-gates-greenfield-pending.test.mjs
+@@ -238,6 +238,17 @@ test("Claude Windows report: a ready readiness names only the allowance code, no
+   assert.doesNotMatch(verdict.stderr, /Entry readiness is/u);
+ });
+ 
++// C28e (Claude test run, PO 2026-11-13): class 9 is unmeasurable for a design-package adoption; it is report-only there, and only there.
++const C28E_CLASS9 = (evidence) => ({ classId: 9, propertyId: D1_CLASSES[8], outcome: "unavailable", violations: [],
++  details: "Valid approved-scoped authority is unavailable", evidence });
++test("C28e (Claude test run) class 9 unmeasured for an approved design package is admitted beside the uncalibrated class 10", () => {
++  assert.equal(d1Verdict(d1Fitness([D1_UNCALIBRATED, C28E_CLASS9({ status: "unavailable", source: "approved-design-package", measured: false })])), null);
++});
++test("C28e (Claude test run) class 9 unavailable without the design-package source is still denied", () => {
++  denied(d1Verdict(d1Fitness([D1_UNCALIBRATED, C28E_CLASS9({ status: "unavailable" })])), "class 9, no design package");
++  denied(d1Verdict(d1Fitness([D1_UNCALIBRATED, { ...C28E_CLASS9({ status: "unavailable", source: "approved-design-package" }), details: "Accepted reference does not cover profile, routing and module map" }])), "class 9, other cause");
++});
++
+ test("D165-D1 (d) a malformed nine-outcome set is denied", () => {
+   const fitness = d1Fitness([D1_UNCALIBRATED]);
+   fitness.outcomes = fitness.outcomes.slice(0, 9);
+diff --git a/plugins/pipeline-core/scripts/architecture-fitness.mjs b/plugins/pipeline-core/scripts/architecture-fitness.mjs
+index 1bb7dade2d0e773465ad0ce2c292325d6b8ebd92..2b449314cf25a27b08cad3a82596049d0850144c 100755
+--- a/plugins/pipeline-core/scripts/architecture-fitness.mjs
++++ b/plugins/pipeline-core/scripts/architecture-fitness.mjs
+@@ -752,9 +752,14 @@ export function evaluateProfileDrift({ rootDir, now = new Date(), profileDrift =
+   const violations = [];
+   let evidence;
+   let unavailable = null;
++  let designPackage = false;
+   try {
+     if (!rootDir) throw new Error("Repository root is required for accepted-reference readback");
+     const accepted = resolveAdoptionState(rootDir, now);
++    // C28e (Claude test run, PO 2026-11-13): an approved design package is adopted without an adoption authority subject, so there
++    // is no accepted snapshot to measure against. The outcome stays unavailable, marked with its source so the planning projection
++    // reports it instead of blocking every re-entry into implementation.
++    designPackage = accepted?.state === "approved-scoped" && typeof accepted.decisionRef === "string" && accepted.decisionRef.startsWith("approved-design-package:");
+     if (accepted.state !== "approved-scoped" || !accepted.authority?.request?.subject) throw new Error("Valid approved-scoped authority is unavailable");
+     const subject = accepted.authority.request.subject;
+     const scope = subject.scope.map(s => s.replace(/\/$/u, ""));
+@@ -789,7 +794,7 @@ export function evaluateProfileDrift({ rootDir, now = new Date(), profileDrift =
+   }
+ 
+   if (unavailable) return { classId: 9, propertyId: "profile-drift", outcome: OUTCOME_UNAVAILABLE,
+-    details: unavailable, violations: [], evidence: { status: "unavailable" } };
++    details: unavailable, violations: [], evidence: designPackage ? { status: "unavailable", source: "approved-design-package", measured: false } : { status: "unavailable" } };
+ 
+   return {
+     classId: 9,

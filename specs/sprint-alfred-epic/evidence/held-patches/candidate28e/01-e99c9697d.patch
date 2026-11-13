@@ -1,0 +1,249 @@
+diff --git a/plugins/pipeline-core/lib/sbom-close.mjs b/plugins/pipeline-core/lib/sbom-close.mjs
+index 9fb60edee7e15e1e2abab8138f47f76d92b700d2..afb5796f6398b97c0e1d900484e9e851eed1d79e 100644
+--- a/plugins/pipeline-core/lib/sbom-close.mjs
++++ b/plugins/pipeline-core/lib/sbom-close.mjs
+@@ -172,8 +172,11 @@ export function observeSbomInputs({ tracked, read }) {
+   const lockDirs = new Map(); // lockfile name -> directories holding it
+   for (const path of paths) { const name = baseName(path); if (LOCKFILE_NAMES.has(name)) { if (!lockDirs.has(name)) lockDirs.set(name, new Set()); lockDirs.get(name).add(dirOf(path)); } }
+   const legacyGradleLocks = new Set(paths.filter((path) => /(?:^|\/)gradle\/dependency-locks\/[^/]+\.lockfile$/u.test(path)).map((path) => dirOf(dirOf(dirOf(path)))));
+-  const lockCovers = (needs, dir) => needs.some((name) => ancestors(dir).some((candidate) => lockDirs.get(name)?.has(candidate)))
+-    || (needs.includes("gradle.lockfile") && ancestors(dir).some((candidate) => legacyGradleLocks.has(candidate)));
++  // C28e: a Gradle or NuGet lockfile belongs to exactly one project (`--write-locks` on the root locks only the root project), so it covers
++  // only the build or project file in its own directory; the workspace lockfiles of the other ecosystems also cover the directories below.
++  const PER_PROJECT = new Set(["gradle.lockfile", "packages.lock.json"]);
++  const lockCovers = (needs, dir) => needs.some((name) => (PER_PROJECT.has(name) ? [dir] : ancestors(dir)).some((candidate) => lockDirs.get(name)?.has(candidate)))
++    || (needs.includes("gradle.lockfile") && legacyGradleLocks.has(dir));
+   const unsupportedDirs = new Set(paths.filter((path) => UNSUPPORTED_NAMES.has(baseName(path))).map(dirOf));
+   const record = (path, label, parsed) => {
+     findings.push(...parsed.issues);
+@@ -185,11 +188,16 @@ export function observeSbomInputs({ tracked, read }) {
+     if (UNSUPPORTED_NAMES.has(name)) { findings.push(finding("unsupported", SBOM_LIFECYCLE_CODES.unsupported, path, `no reader exists yet for ${name}`)); continue; }
+     const chosen = readerFor(path);
+     if (chosen !== null) {
+-      const text = read(path);
+-      if (typeof text !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
+-      // A file merely NAMED bom.json is an input only when it is a CycloneDX document; a *.cdx.json file must be one.
+-      if (name === "bom.json") { let probe = null; try { probe = JSON.parse(text); } catch { probe = null; } if (probe?.bomFormat !== "CycloneDX") continue; }
+-      inputs.push({ path, sha256: sha256(text) });
++      const raw = read(path);
++      if (typeof raw !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
++      const text = raw.replace(/^﻿/u, ""); // C28e: Windows tools write a UTF-8 byte-order mark; the digest below still binds the raw bytes
++      // A file merely NAMED bom.json is an input only when it is a CycloneDX document; a *.cdx.json file must be one. C28e: a bom.json that
++      // is not JSON at all is invalid, never skipped (skipping it made a pom report "no CycloneDX file covers" for a damaged one).
++      if (name === "bom.json") {
++        let probe; try { probe = JSON.parse(text); } catch (error) { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, `the file is not readable as JSON: ${String(error.message).slice(0, 160)}`)); continue; }
++        if (probe?.bomFormat !== "CycloneDX") continue;
++      }
++      inputs.push({ path, sha256: sha256(raw) });
+       let parsed;
+       try { parsed = chosen.reader(text, path); } catch (error) { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, `the file is not readable as ${chosen.label}: ${String(error.message).slice(0, 160)}`)); continue; }
+       if (parsed.maven !== undefined) { poms.push({ path, parsed }); continue; }
+@@ -203,7 +211,7 @@ export function observeSbomInputs({ tracked, read }) {
+     if (lockCovers(needs, dir) || ancestors(dir).some((candidate) => unsupportedDirs.has(candidate)) || (name === "pyproject.toml" && paths.some((other) => baseName(other) === "requirements.txt" && dirOf(other) === dir))) continue;
+     const text = read(path);
+     if (typeof text !== "string") { findings.push(finding("invalid", SBOM_LIFECYCLE_CODES.invalidRecord, path, "the file could not be read")); continue; }
+-    if (manifestDeclaresDependencies(name, text)) findings.push(finding("partial", SBOM_LIFECYCLE_CODES.partial, path, `${name} declares dependencies but no lockfile pins them (${needs.join(" or ")})`));
++    if (manifestDeclaresDependencies(name, text.replace(/^﻿/u, ""))) findings.push(finding("partial", SBOM_LIFECYCLE_CODES.partial, path, `${name} declares dependencies but no lockfile pins them (${needs.join(" or ")})`));
+   }
+   // Maven: a pom lists its direct dependencies only. It is complete when a CycloneDX file in its directory or an ancestor lists every one of
+   // them (by version where the pom fixes one); otherwise it is partial and names what is missing, so a stale CycloneDX file does not pass.
+@@ -228,8 +236,8 @@ export function sbomFindingHelp(item) {
+   if (item.state === "unsupported") return `Add a reader: one function from the file's text to { ecosystem, name, version, purl, scope } components, registered by file name in SBOM_READERS (plugins/pipeline-core/lib/sbom-close.mjs), with a test in sbom-close.test.mjs. Until it exists, generate the SBOM with your own tool and have the PO sign the override.`;
+   if (item.state === "partial") {
+     const name = baseName(String(item.path ?? ""));
+-    if (name === "pom.xml") return "Maven pins no transitive dependency. Generate a CycloneDX file with your build (for example the cyclonedx-maven-plugin with outputName bom, so the file is bom.json), commit it next to pom.xml or in a parent directory (target/ and build/ are not read), make sure it lists every direct dependency of this pom, and run the close again. Otherwise the PO signs the override.";
+-    if (name === "build.gradle" || name === "build.gradle.kts") return "Enable Gradle dependency locking (dependencyLocking { lockAllConfigurations() }), write the locks (gradle dependencies --write-locks), commit gradle.lockfile, and run the close again.";
++    if (name === "pom.xml") return "Maven pins no transitive dependency. Generate a CycloneDX file with your build (the cyclonedx-maven-plugin, goal makeAggregateBom or makeBom, writes bom.json into target/ by default, which the close does not read: set outputDirectory to ${project.basedir}), commit it next to pom.xml or in a parent directory, make sure it lists every direct dependency of this pom outside the test scope, and run the close again. Otherwise the PO signs the override.";
++    if (name === "build.gradle" || name === "build.gradle.kts") return "Enable Gradle dependency locking for every project (allprojects { dependencyLocking { lockAllConfigurations() } }), write the locks of each project (gradle dependencies --write-locks runs for the root project only; run it per subproject or with a task that resolves all configurations), commit each project's gradle.lockfile next to its build file, and run the close again.";
+     if (PROJECT_FILE.test(name)) return "Enable the NuGet lockfile (<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>), restore once, commit packages.lock.json next to the project file, and run the close again.";
+     return "Pin the dependencies in a lockfile a reader knows (package-lock.json, npm-shrinkwrap.json, yarn.lock, pnpm-lock.yaml, bun.lock, Cargo.lock, poetry.lock, Pipfile.lock, uv.lock, requirements.txt with ==, go.mod, gradle.lockfile, packages.lock.json, Gemfile.lock, composer.lock, pubspec.lock, Package.resolved, mix.lock, conan.lock), commit it, and run the close again. A dependency pinned to a git commit, a local path or a URL stays partial until it comes from a registry; otherwise the PO signs the override.";
+   }
+diff --git a/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs b/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
+index 595aa56b18aeda38d2dc9c8ec6dba1cecb81d147..390d0c882c3c68db1d4bac29813d3406426485ab 100644
+--- a/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
++++ b/plugins/pipeline-core/lib/sbom-lockfile-readers.mjs
+@@ -47,6 +47,7 @@ function yarnEntries(text) {
+   return entries;
+ }
+ const unquote = (value) => value.replace(/^"(.*)"$/u, "$1");
++const safePathname = (url) => { try { return new URL(url).pathname; } catch { return ""; } };
+ const yarnProp = (props, key) => { for (const line of props) { const match = new RegExp(`^ {2}"?${key}"?:? (.+)$`, "u").exec(line); if (match) return unquote(match[1].trim()); } return null; };
+ 
+ export function parseYarnLock(text, path) {
+@@ -66,13 +67,17 @@ export function parseYarnLock(text, path) {
+     const { name } = descriptorName(first);
+     const version = yarnProp(entry.props, "version");
+     if (v1) {
+-      const range = descriptorName(first).range;
++      // C28e: the DESCRIPTOR decides, not the tarball URL's shape. A semver range or dist-tag is resolved from a registry, whatever path the
++      // registry serves its tarballs under (GitHub Packages has no `/-/`); a protocol, a URL or an owner/repo shorthand is not.
++      // `name@npm:^1` is the registry protocol spelled out; `alias@npm:real@^1` and `alias@npm:@scope/real@^1` name the real package first.
++      let range = descriptorName(first).range;
++      if (/^npm:/u.test(range)) { const target = range.slice(4); range = target.includes("@") ? descriptorName(target).range : target; }
+       const resolved = yarnProp(entry.props, "resolved");
+       if (/^link:/u.test(range)) continue;
+-      if (resolved === null && /^file:/u.test(range)) { issues.push(finding("partial", path, `${name} is a local file dependency, not a registry version`)); continue; }
+-      if (typeof version !== "string" || version === "") throw new Error(`${name}: entry without a version`);
+-      if (resolved === null || !/\/-\/[^/]+\.tgz(?:#.*)?$/u.test(resolved)) { issues.push(finding("partial", path, `${name} is pinned to a git commit or URL, not a registry version`)); continue; }
+-      const real = /\/((?:@[^/]+\/)?[^/]+)\/-\//u.exec(new URL(resolved).pathname)?.[1];
++      if (/^file:/u.test(range)) { issues.push(finding("partial", path, `${name} is a local file dependency, not a registry version`)); continue; }
++      if (/^[a-z][a-z0-9+.-]*:/iu.test(range) || range.includes("/")) { issues.push(finding("partial", path, `${name} is pinned to a git commit or URL, not a registry version`)); continue; }
++      if (typeof version !== "string" || !SEMVER.test(version)) throw new Error(`${name}: entry without a version`);
++      const real = resolved === null ? undefined : /\/((?:@[^/]+\/)?[^/]+)\/-\//u.exec(safePathname(resolved))?.[1];
+       out.push(npm(real === undefined ? name : decodeURIComponent(real), version));
+       continue;
+     }
+@@ -102,9 +107,12 @@ function pnpmSections(doc) {
+   }
+   return sections;
+ }
+-function pnpmKey(key, major) {
++function pnpmKey(rawKey, major) {
+   // 9.x: name@version ; 6.x: /name@version(peers) ; 5.x: /name/version_peers. A key outside these forms names no registry package.
+-  if (major === 9) { const at = key.indexOf("@", key.startsWith("@") ? 1 : 0); return at === -1 ? null : { name: key.slice(0, at), version: key.slice(at + 1).replace(/\(.*$/u, "") }; }
++  if (major === 9) { const at = rawKey.indexOf("@", rawKey.startsWith("@") ? 1 : 0); return at === -1 ? null : { name: rawKey.slice(0, at), version: rawKey.slice(at + 1).replace(/\(.*$/u, "") }; }
++  // C28e: before 9.x a package from a registry other than the default is keyed by that registry's host (`npm.corp.example/name/1.0.0`);
++  // the host is dropped (never written). A tarball URL or a git host key keeps a non-semver last part and stays partial.
++  const key = /^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d+)?\//iu.test(rawKey) ? rawKey.slice(rawKey.indexOf("/")) : rawKey;
+   if (!key.startsWith("/")) return null;
+   if (major === 6) { const body = key.slice(1); const at = body.indexOf("@", body.startsWith("@") ? 1 : 0); return at === -1 ? null : { name: body.slice(0, at), version: body.slice(at + 1).replace(/\(.*$/u, "") }; }
+   const parts = key.slice(1).split("/"); const version = parts.pop()?.replace(/_.*$/u, ""); return parts.length === 0 ? null : { name: parts.join("/"), version };
+@@ -254,12 +262,17 @@ const xmlText = (block, tag) => new RegExp(`<${tag}>\\s*([^<]*?)\\s*</${tag}>`,
+  */
+ export function readPomDependencies(text) {
+   if (!/<project[\s/>]/u.test(text)) throw new Error("not a Maven pom");
+-  const body = text.replace(/<!--[\s\S]*?-->/gu, "").replace(/<dependencyManagement>[\s\S]*?<\/dependencyManagement>/gu, "").replace(/<build>[\s\S]*?<\/build>/gu, "").replace(/<parent>[\s\S]*?<\/parent>/gu, "");
++  // C28e: a profile's dependencies are not part of the default build, so the build's CycloneDX file never lists them; they are not direct.
++  const uncommented = text.replace(/<!--[\s\S]*?-->/gu, "").replace(/<profiles>[\s\S]*?<\/profiles>/gu, "");
++  const body = uncommented.replace(/<dependencyManagement>[\s\S]*?<\/dependencyManagement>/gu, "").replace(/<build>[\s\S]*?<\/build>/gu, "").replace(/<parent>[\s\S]*?<\/parent>/gu, "");
+   const properties = new Map();
+-  for (const block of text.replace(/<!--[\s\S]*?-->/gu, "").match(/<properties>[\s\S]*?<\/properties>/gu) ?? []) for (const match of block.matchAll(/<([A-Za-z0-9_.-]+)>\s*([^<]*?)\s*<\/\1>/gu)) properties.set(match[1], match[2]);
+-  const own = body.replace(/<dependencies>[\s\S]*?<\/dependencies>/gu, "").replace(/<profiles>[\s\S]*?<\/profiles>/gu, "");
+-  const parent = /<parent>([\s\S]*?)<\/parent>/u.exec(text.replace(/<!--[\s\S]*?-->/gu, ""))?.[1] ?? "";
+-  for (const [key, value] of [["project.groupId", xmlText(own, "groupId") ?? xmlText(parent, "groupId")], ["project.artifactId", xmlText(own, "artifactId")], ["project.version", xmlText(own, "version") ?? xmlText(parent, "version")]]) if (value !== undefined) properties.set(key, value);
++  for (const block of uncommented.match(/<properties>[\s\S]*?<\/properties>/gu) ?? []) for (const match of block.matchAll(/<([A-Za-z0-9_.-]+)>\s*([^<]*?)\s*<\/\1>/gu)) properties.set(match[1], match[2]);
++  const own = body.replace(/<dependencies>[\s\S]*?<\/dependencies>/gu, "");
++  const parent = /<parent>([\s\S]*?)<\/parent>/u.exec(uncommented)?.[1] ?? "";
++  for (const [key, value] of [
++    ["project.groupId", xmlText(own, "groupId") ?? xmlText(parent, "groupId")], ["project.artifactId", xmlText(own, "artifactId")], ["project.version", xmlText(own, "version") ?? xmlText(parent, "version")],
++    ["project.parent.groupId", xmlText(parent, "groupId")], ["project.parent.artifactId", xmlText(parent, "artifactId")], ["project.parent.version", xmlText(parent, "version")],
++  ]) if (value !== undefined) properties.set(key, value);
+   const resolve = (value) => { if (value === undefined) return null; const resolved = value.replace(/\$\{([^}]+)\}/gu, (whole, key) => properties.get(key) ?? whole); return /\$\{|[[\]()]|,/u.test(resolved) || resolved === "" ? null : resolved; };
+   return (body.match(/<dependency>[\s\S]*?<\/dependency>/gu) ?? []).map((block) => {
+     const rawGroup = xmlText(block, "groupId"); const rawArtifact = xmlText(block, "artifactId");
+@@ -274,11 +287,23 @@ export function parsePomXml(text, path) {
+   const direct = readPomDependencies(text);
+   return { components: dedupe(direct.filter((entry) => entry.version !== null).map((entry) => component("maven", "maven", entry.name, entry.version, entry.scope))), issues: [], maven: { path, direct } };
+ }
+-/** Which direct dependencies of a pom a CycloneDX file does not list: by name and version, or by name alone when the pom names no version. */
++/**
++ * Which direct dependencies of a pom a CycloneDX file does not list: by name and version, or by name alone when the pom names no version.
++ * C28e: a test-scope dependency is not required, because the cyclonedx-maven-plugin leaves the test scope out by default
++ * (includeTestScope=false); a name part this pom cannot resolve (a property of the parent pom or of the build, e.g. a Scala binary
++ * version suffix) matches any value in that part. Known limit: a version the parent or an imported BOM manages is matched by name only,
++ * so a CycloneDX file from before a parent bump still covers the pom; nothing offline can see the new managed version.
++ */
+ export function mavenCoverage(direct, cycloneComponents) {
+-  const listed = new Set(); const names = new Set();
+-  for (const entry of cycloneComponents) if (entry.ecosystem === "maven") { listed.add(`${entry.name}@${entry.version}`); names.add(entry.name); }
+-  return direct.filter((entry) => (entry.version === null ? !names.has(entry.name) : !listed.has(`${entry.name}@${entry.version}`))).map((entry) => `${entry.name}${entry.version === null ? "" : `@${entry.version}`}`);
++  const maven = cycloneComponents.filter((entry) => entry.ecosystem === "maven");
++  const listed = new Set(maven.map((entry) => `${entry.name}@${entry.version}`));
++  const namePattern = (name) => new RegExp(`^${name.split(/\$\{[^}]+\}/u).map((part) => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("[^/]+")}$`, "u");
++  const covered = (entry) => {
++    if (entry.version !== null) return listed.has(`${entry.name}@${entry.version}`);
++    const pattern = namePattern(entry.name);
++    return maven.some((listedEntry) => pattern.test(listedEntry.name));
++  };
++  return direct.filter((entry) => entry.scope !== "dev" && !covered(entry)).map((entry) => `${entry.name}${entry.version === null ? "" : `@${entry.version}`}`);
+ }
+ 
+ // ---------------------------------------------------------------------------------------------------------------- .NET, Ruby, PHP, Dart, Swift, Elixir, C/C++
+diff --git a/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs b/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
+index 5af062c59824961f842d1ed40c372704fa52124e..e5fd9f3e33b45ac819e7de8e45811b901c14f2b3 100644
+--- a/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
++++ b/plugins/pipeline-core/lib/sbom-lockfile-readers.test.mjs
+@@ -366,7 +366,8 @@ test("pom.xml: direct dependencies outside management, build and comments; versi
+   assert.deepEqual(purls(parsePomXml(POM, "pom.xml")), ["pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.16.0", "pkg:maven/com.example/svc-api@1.0.0"]);
+   const listed = parseCycloneDx(FULL_CDX, "bom.json").components;
+   assert.deepEqual(mavenCoverage(direct, listed), []);
+-  assert.deepEqual(mavenCoverage(direct, listed.filter((c) => c.name !== "junit/junit")), ["junit/junit"]);
++  assert.deepEqual(mavenCoverage(direct, listed.filter((c) => c.name !== "junit/junit")), [], "the cyclonedx-maven-plugin leaves the test scope out by default, so a test dependency is not required");
++  assert.deepEqual(mavenCoverage(direct, listed.filter((c) => c.name !== "org.springframework.boot/spring-boot-starter-web")), ["org.springframework.boot/spring-boot-starter-web"]);
+   assert.deepEqual(mavenCoverage(direct, listed.map((c) => (c.name === "com.fasterxml.jackson.core/jackson-databind" ? { ...c, version: "2.15.0" } : c))), ["com.fasterxml.jackson.core/jackson-databind@2.16.0"], "a stale CycloneDX file does not cover a pinned version");
+   assert.throws(() => readPomDependencies("<projects/>"), /not a Maven pom/u);
+ });
+@@ -537,13 +538,71 @@ test("a Maven pom is partial unless a CycloneDX file in its directory or above l
+   assert.deepEqual(alone.findings.map((f) => [f.state, f.path]), [["partial", "pom.xml"]]);
+   assert.match(alone.findings[0].reason, /no CycloneDX file of the build covers/u); assert.match(sbomFindingHelp(alone.findings[0]), /cyclonedx-maven-plugin/u);
+   assert.deepEqual(observe({ "svc/pom.xml": POM, "bom.json": FULL_CDX }).findings, [], "a CycloneDX file above the pom covers it");
+-  const stale = observe({ "pom.xml": POM, "bom.json": cdx(JSON.parse(FULL_CDX).components.filter((c) => c.name !== "junit")) });
+-  assert.match(stale.findings[0].reason, /does not list 1 direct dependency of this pom \(junit\/junit\)/u);
++  const stale = observe({ "pom.xml": POM, "bom.json": cdx(JSON.parse(FULL_CDX).components.filter((c) => c.name !== "jackson-databind")) });
++  assert.match(stale.findings[0].reason, /does not list 1 direct dependency of this pom \(com\.fasterxml\.jackson\.core\/jackson-databind@2\.16\.0\)/u);
++  assert.deepEqual(observe({ "pom.xml": POM, "bom.json": cdx(JSON.parse(FULL_CDX).components.filter((c) => c.name !== "junit")) }).findings, [], "a CycloneDX file without the test scope covers the pom");
+   assert.deepEqual(observe({ "pom.xml": POM, "svc/bom.json": FULL_CDX }).findings.map((f) => f.path), ["pom.xml"], "a CycloneDX file below the pom does not cover it");
+   const notCdx = observe({ "pom.xml": POM, "bom.json": JSON.stringify({ name: "a bill of materials of another kind" }) });
+   assert.deepEqual(notCdx.inputs.map((i) => i.path), ["pom.xml"], "a bom.json that is no CycloneDX document is no input");
+ });
+ 
++test("C28e: a profile's dependencies are not direct; parent properties resolve; an unresolved name part matches any value", () => {
++  const withProfile = POM.replace("  </dependencies>\n  <build>", "  </dependencies>\n  <profiles><profile><id>it</id><dependencies><dependency><groupId>org.testcontainers</groupId><artifactId>postgresql</artifactId><version>1.19.3</version></dependency></dependencies></profile></profiles>\n  <build>");
++  assert.notEqual(withProfile, POM);
++  assert.deepEqual(readPomDependencies(withProfile), readPomDependencies(POM), "the default build's CycloneDX file never lists a profile's dependencies");
++  const child = `<project><parent><groupId>com.example</groupId><artifactId>platform</artifactId><version>4.0.0</version></parent><artifactId>svc</artifactId><dependencies>
++    <dependency><groupId>\${project.parent.groupId}</groupId><artifactId>platform-core</artifactId><version>\${project.parent.version}</version></dependency>
++    <dependency><groupId>com.typesafe.akka</groupId><artifactId>akka-actor_\${scala.binary.version}</artifactId><version>2.8.5</version></dependency>
++  </dependencies></project>`;
++  const direct = readPomDependencies(child);
++  assert.deepEqual(direct.map((d) => [d.name, d.version]), [["com.example/platform-core", "4.0.0"], ["com.typesafe.akka/akka-actor_${scala.binary.version}", null]]);
++  assert.deepEqual(purls(parsePomXml(child, "pom.xml")), ["pkg:maven/com.example/platform-core@4.0.0"], "a name this pom cannot resolve is never a component");
++  const listed = (names) => parseCycloneDx(cdx(names.map(([group, artifact, version]) => mavenComponent(group, artifact, version))), "bom.json").components;
++  assert.deepEqual(mavenCoverage(direct, listed([["com.example", "platform-core", "4.0.0"], ["com.typesafe.akka", "akka-actor_2.13", "2.8.5"]])), []);
++  assert.deepEqual(mavenCoverage(direct, listed([["com.example", "platform-core", "4.0.0"], ["com.typesafe.akka", "akka-stream_2.13", "2.8.5"]])), ["com.typesafe.akka/akka-actor_${scala.binary.version}"], "the wildcard covers one name part, not another artifact");
++});
++
++test("C28e: a Gradle or NuGet lockfile covers only its own project; a bom.json that is not JSON is invalid", () => {
++  const gradleBuild = "dependencies {\n  implementation 'com.google.guava:guava:32.1.3-jre'\n}\n";
++  const gradle = observe({ "build.gradle": gradleBuild, "gradle.lockfile": GRADLE_LOCK, "app/build.gradle": gradleBuild, "lib/build.gradle": gradleBuild, "lib/gradle.lockfile": GRADLE_LOCK });
++  assert.deepEqual(gradle.findings.map((f) => [f.state, f.path]), [["partial", "app/build.gradle"]], "the root lockfile does not lock a subproject");
++  assert.match(sbomFindingHelp(gradle.findings[0]), /--write-locks runs for the root project only/u);
++  const csproj = '<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Newtonsoft.Json" Version="13.0.3" /></ItemGroup></Project>';
++  const nuget = observe({ "packages.lock.json": NUGET_LOCK, "Root.csproj": csproj, "svc/Service.csproj": csproj });
++  assert.deepEqual(nuget.findings.map((f) => [f.state, f.path]), [["partial", "svc/Service.csproj"]]);
++  const damaged = observe({ "pom.xml": POM, "bom.json": "{ \"bomFormat\": \"CycloneDX\", " });
++  assert.deepEqual(damaged.findings.map((f) => [f.state, f.path]), [["invalid", "bom.json"], ["partial", "pom.xml"]], "a damaged CycloneDX file is named, never silently skipped");
++});
++
++test("C28e: private registries without the default tarball path, aliases to scoped packages, owner/repo shorthands", () => {
++  const github = `# yarn lockfile v1\n\n\n"@owner/pkg@^1.0.0":\n  version "1.0.0"\n  resolved "https://npm.pkg.github.com/download/@owner/pkg/1.0.0/0123456789abcdef"\n\n"ui-alias@npm:@corp/ui@^2.0.0":\n  version "2.1.0"\n  resolved "https://registry.yarnpkg.com/@corp/ui/-/ui-2.1.0.tgz"\n\nmine@owner/mine#abc:\n  version "0.0.1"\n  resolved "https://codeload.github.com/owner/mine/tar.gz/abc"\n`;
++  const v1 = parseYarnLock(github, "yarn.lock");
++  assert.deepEqual(purls(v1), ["pkg:npm/%40owner/pkg@1.0.0", "pkg:npm/%40corp/ui@2.1.0"], "GitHub Packages serves tarballs without /-/; the descriptor's range decides");
++  assert.deepEqual(states(v1), ["partial"]); assert.doesNotMatch(JSON.stringify(v1), /:\/\/|codeload|npm\.pkg/u);
++  const pnpm6 = "lockfileVersion: '6.0'\n\npackages:\n\n  npm.corp.example.invalid/@corp/ui@2.1.0:\n    resolution: {integrity: sha512-w, tarball: https://npm.corp.example.invalid/@corp/ui/-/ui-2.1.0.tgz}\n    dev: false\n";
++  const pnpm5 = "lockfileVersion: 5.4\n\npackages:\n\n  npm.corp.example.invalid/@corp/ui/2.1.0:\n    resolution: {integrity: sha512-w, tarball: https://npm.corp.example.invalid/@corp/ui/-/ui-2.1.0.tgz}\n    dev: false\n";
++  for (const [label, text] of [["pnpm 6", pnpm6], ["pnpm 5", pnpm5]]) {
++    const result = parsePnpmLock(text, "pnpm-lock.yaml");
++    assert.deepEqual(purls(result), ["pkg:npm/%40corp/ui@2.1.0"], `${label}: a key that starts with the registry host is a registry package`);
++    assert.deepEqual(result.issues, []); noUrl(result, label);
++  }
++});
++
++test("C28e: a UTF-8 byte-order mark and CRLF line ends read exactly like the plain file; the digest binds the raw bytes", () => {
++  const files = { "yarn.lock": YARN_V1, "a/yarn.lock": YARN_BERRY, "b/pnpm-lock.yaml": PNPM_9, "c/pnpm-lock.yaml": PNPM_6, "d/pnpm-lock.yaml": PNPM_5, "e/bun.lock": BUN_LOCK,
++    "Cargo.lock": CARGO_LOCK, "poetry.lock": POETRY_LOCK, "f/uv.lock": UV_LOCK, "gradle.lockfile": GRADLE_LOCK, "packages.lock.json": NUGET_LOCK, "Gemfile.lock": GEMFILE_LOCK,
++    "composer.lock": COMPOSER_LOCK, "pubspec.lock": PUBSPEC_LOCK, "Package.resolved": PACKAGE_RESOLVED_2, "mix.lock": MIX_LOCK, "pom.xml": POM, "bom.json": FULL_CDX,
++    "g/conan.lock": JSON.stringify({ version: "0.5", requires: ["zlib/1.3#x"], build_requires: [], python_requires: [] }, null, 2),
++    "h/build.gradle": "dependencies {\n  implementation 'a:b:1'\n}\n", "i/Svc.csproj": '<Project><ItemGroup><PackageReference Include="X" Version="1.0.0" /></ItemGroup></Project>\n' };
++  const windows = Object.fromEntries(Object.entries(files).map(([path, text]) => [path, `﻿${text.replace(/\r?\n/gu, "\r\n")}`]));
++  const plain = observe(files); const crlf = observe(windows);
++  assert.ok(plain.components.length >= 25);
++  assert.deepEqual(crlf.components, plain.components);
++  assert.deepEqual(crlf.findings, plain.findings);
++  assert.deepEqual(crlf.inputs.map((i) => i.path), plain.inputs.map((i) => i.path));
++  assert.ok(crlf.inputs.every((input, index) => input.sha256 !== plain.inputs[index].sha256), "the input digest is of the raw file, byte-order mark included");
++});
++
+ test("a lockfile a reader cannot read is invalid, never skipped; a whole close of every format writes no URL into the SBOM", () => {
+   assert.deepEqual(observe({ "yarn.lock": "left-pad@^1:\n  version \"1\"\n" }).findings.map((f) => f.state), ["invalid"]);
+   const files = { "yarn.lock": YARN_V1, "a/pnpm-lock.yaml": PNPM_9, "b/bun.lock": BUN_LOCK, "Cargo.lock": CARGO_LOCK, "poetry.lock": POETRY_LOCK, "c/uv.lock": UV_LOCK,
