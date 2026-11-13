@@ -499,7 +499,11 @@ test("D64 feature-package registration: exactly the documented forms are admitte
     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-unit"), f, "add review unit");
     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/diagnostic.json"), f, "add diagnostic evidence");
     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-verify-evidence", "specs/feature/verify.json"), f, "add verify evidence");
-    for (const [label, argv] of [["verify flag before root", ["--add-verify-evidence", "specs/feature/verify.json", "--root", f.root]],
+    // ADR-0095: the Spec addendum form takes the one approval record path, with the same path rules.
+    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-spec-addendum", `specs/feature/evidence/spec-addendum-approval-${"a".repeat(64)}.json`), f, "add spec addendum");
+    for (const [label, argv] of [["addendum without path", ["--root", f.root, "--add-spec-addendum"]], ["addendum absolute path", ["--root", f.root, "--add-spec-addendum", join(f.root, "a.json")]],
+      ["addendum parent path", ["--root", f.root, "--add-spec-addendum", "specs/feature/../../a.json"]], ["addendum extra argument", ["--root", f.root, "--add-spec-addendum", "a.json", "--force"]],
+      ["verify flag before root", ["--add-verify-evidence", "specs/feature/verify.json", "--root", f.root]],
       ["verify without path", ["--root", f.root, "--add-verify-evidence"]], ["verify absolute path", ["--root", f.root, "--add-verify-evidence", join(f.root, "v.json")]],
       ["verify parent path", ["--root", f.root, "--add-verify-evidence", "specs/feature/../../x.json"]], ["verify dash path", ["--root", f.root, "--add-verify-evidence", "--force"]],
       ["verify extra argument", ["--root", f.root, "--add-verify-evidence", "v.json", "--force"]],

@@ -10,6 +10,9 @@
 // immutable candidate-evidence entries of the feature manifest, after validating it against its own
 // recorded candidate; it prints the paths to commit.
 //
+// `--add-spec-addendum <record>` (ADR-0095) registers a PO-approved Spec addendum (immutable `design`)
+// and its approval record (candidate-evidence) once the private approval of kind spec-addendum exists.
+//
 // `--add-review-unit` (PF-34) adds the Critic review unit and its manifest entry to a feature
 // registered before the unit existed; it prints the two paths to commit and the review base.
 //
@@ -31,7 +34,7 @@ import { existsSync, realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
-import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, addSpecAddendum, addVerifyEvidence, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
 import { readAcceptedDeliveryContract, readState } from "./pipeline-state.mjs";
 
 function git(root, args) {
@@ -72,7 +75,7 @@ export function pushThreatModelReadback(root) {
 }
 
 export const REGISTER_FEATURE_PACKAGE_HELP = [
-  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>] [--stage]",
+  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> | --add-spec-addendum <approval record>] [--stage]",
   "",
   "Add --stage as the LAST argument to stage exactly the paths the result names in commitPaths (the result then carries staged: [...]). It never commits and stages nothing else:",
   "  your commit stays one `git commit -F <message file>` of what is staged.",
@@ -112,6 +115,12 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
   "  6. Commit the manifest and the request file the verb names (evidence-only commit).",
   "  7. Rerun critic-dispatch-preflight.mjs with the arguments the verb prints.",
   "  8. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value). Optional: the preflight derives the same bindings itself when the flag is omitted (echoed with derived: true); a history-named file in the range is refused early with CDP-HISTORY-IN-RANGE.",
+  "",
+  "Spec addendum route (ADR-0095; a Critic finding needs a Spec correction inside the approved criteria):",
+  "  1. Write specs/<feature>/spec-addendum-<NN>.md (header: Base Spec, Critic packet, Findings) and commit it alone.",
+  "  2. The PO approves it: pipeline-state.mjs approve-spec-addendum --by <label the PO gives> --addendum <path> (signature mode prints the signing step first).",
+  "  3. Register it: register-feature-package.mjs --root <root> --add-spec-addendum specs/<feature>/evidence/spec-addendum-approval-<sha256>.json",
+  "  4. Commit the manifest and the record in one commit, then correct the code; the next Critic round is a delta round that covers the addendum.",
   "",
   "Late lineage: if correction commits already follow a consumed round, its lineage can no longer be registered (CCA-TRANSPORT-SOURCE-DRIFT).",
   "  Retire the old batch with session-critic-finalizer inspect-course-takeover and supersede-course-takeover, then rerun round 1 on the course path.",
@@ -153,8 +162,10 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   const addLineage = argv.length === 5 && argv[2] === "--add-review-lineage" && argv[3] === "--packet" && /^[a-f0-9]{32}$/u.test(argv[4] ?? "");
   // PF-94: `--add-delta-request <input.json>` builds, writes and registers the delta request of the next Critic round.
   const addDelta = argv.length === 4 && argv[2] === "--add-delta-request" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
-  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
-    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path>]" })}\n`);
+  // ADR-0095: `--add-spec-addendum <approval record>` registers a PO-approved Spec addendum and its approval record.
+  const addAddendum = argv.length === 4 && argv[2] === "--add-spec-addendum" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addVerify && !addLineage && !addDelta && !addAddendum) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-verify-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json> | --add-spec-addendum <approval record>]" })}\n`);
     return 2;
   }
   let root;
@@ -171,6 +182,11 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   }
   if (addDelta) {
     const added = addCriticDeltaRequest({ root, inputPath: argv[3], readAcceptedDeliveryContract });
+    out(emit(added));
+    return added.status === "refused" ? 2 : 0;
+  }
+  if (addAddendum) {
+    const added = addSpecAddendum({ root, state: read.state, approvalPath: argv[3], readAcceptedDeliveryContract });
     out(emit(added));
     return added.status === "refused" ? 2 : 0;
   }
