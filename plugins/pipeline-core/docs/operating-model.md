@@ -966,8 +966,8 @@ Die normative Form lautet:
    Integration. Meldet der vollständige Critic Korrekturen, erhält ein frischer
    Correction-Goldfish das gesamte kohärente Batch. Dieser Owner führt Befunde
    im selben Kontext durch Testfälle, Fixes, gezielte Checks und weitere
-   Korrektur-Diff-Befunde bis zum echten PASS oder zur Grenze von drei
-   Korrekturprüfungen. Es gibt keinen eigenen Korrektur-Dispatch pro Item;
+   Korrektur-Diff-Befunde bis zum echten PASS oder zu einer ausdrücklichen
+   PO-Entscheidung (D190: keine Rundenzahl). Es gibt keinen eigenen Korrektur-Dispatch pro Item;
    ursprüngliches Batch, Mitglieder und Review-Linie bleiben unverändert.
 6. **Critic-Grenze prüfen.** Die anwendbaren gezielten deterministischen Checks und den Packet-Preflight ausführen. Ein kandidatgebundener Critic-Mode-Verify-Receipt oder ein validierter Diagnostic kann die Review zulassen, während der Full-Release-Verify ausdrücklich noch aussteht; beides ist keine vollständige Qualifikation.
 
@@ -1002,8 +1002,8 @@ Die normative Form lautet:
    lassen. High-Risk-, Architektur-, Guardrail- und Security-Änderungen erhalten
    den vorgeschriebenen stärkeren Reviewpfad. Jeder Befund braucht Evidenz und
    Disposition. Pro Batch gibt es eine vollständige unabhängige Prüfung und
-   höchstens drei Prüfungen des jeweiligen Korrektur-Diffs; bei echtem PASS
-   endet der Kurs, insgesamt also höchstens vier Calls. Kein Full-Rerun und
+   Prüfungen des jeweiligen Korrektur-Diffs bis zum echten PASS oder zu einer
+   ausdrücklichen PO-Entscheidung (D190: keine Rundenzahl). Kein Full-Rerun und
    keine Budgetrücksetzung durch Umbenennung oder Aufteilung. Danach den
    konfigurierten Full Verify auf dem geprüften integrierten Batch ausführen
    und an das verbrauchte Critic-Paket binden. Das maschinelle Ergebnis belegt
@@ -1116,9 +1116,10 @@ ist gültig. Der Elephant entscheidet, ob jeder Befund behoben, mit Begründung
 akzeptiert oder eskaliert wird; er darf keinen still verwerfen.
 
 Die ausgewählte PO-Richtung begrenzt jedes sinnvolle Arbeitspaket künftig auf
-eine vollständige unabhängige Critic-Prüfung und bis zu drei Prüfungen des
-Korrektur-Diffs; bei echtem PASS endet der Kurs. Insgesamt sind höchstens vier
-Critic-Aufrufe und kein vollständiger Prüfungs-Neustart erlaubt. Umbenennen
+eine vollständige unabhängige Critic-Prüfung und Prüfungen des
+Korrektur-Diffs bis zum echten PASS oder zu einer ausdrücklichen
+PO-Entscheidung (D190: keine Rundenzahl); ein vollständiger Prüfungs-Neustart
+ist nicht erlaubt. Umbenennen
 oder Aufteilen desselben Pakets setzt die Historie nicht zurück. Jede
 Korrekturprüfung beginnt beim unmittelbar zuvor geprüften Kandidaten und
 betrachtet nur Fixes und direkte Regressionen. Der Koordinator erhält die echte
