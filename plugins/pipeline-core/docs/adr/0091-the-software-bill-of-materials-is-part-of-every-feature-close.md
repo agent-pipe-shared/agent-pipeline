@@ -2,7 +2,7 @@
 
 > Agent-Pipeline · Sprint Alfred · 2026-11-11
 
-**Status:** accepted (2026-11-11, PO tiles, register D240). Built in candidate 28c; the readers of the amendment of 2026-11-12 in candidate 28d. Not yet run on a real repository.
+**Status:** accepted (2026-11-11, PO tiles, register D240). Built in candidate 28c; the readers of the amendment of 2026-11-12 in candidate 28d, their corrections in candidate 28e. Not yet run on a real repository.
 
 **Context source (PO direction, 2026-11-11, from the tile answers):** the SBOM is a standard part of the audit bundle and is written by the close; a stale or invalid one blocks the close; more languages than Node in the first version; no component means an explicit `not-applicable` with a reason; an existing SBOM is checked and otherwise generated; `partial` and `unsupported` block as well, with an override and a help text on how an adapter can be added.
 
@@ -28,6 +28,17 @@ ADR-0032 made the full CycloneDX SBOM an option and rejected it as a mandate, be
 3. **Maven.** Maven pins no transitive dependency, so `pom.xml` is read for its direct dependencies (outside `dependencyManagement`, `build`, `parent` and comments; a version from a literal or this pom's own properties). A pom is `partial` unless a CycloneDX file in its directory or a parent directory lists every one of them, by version where the pom fixes one; the finding names what is missing, so a stale CycloneDX file does not pass. The help names the cyclonedx-maven-plugin. `target/` and `build/` stay unobserved, so the file has to be committed where the close reads it.
 4. **A manifest needs its lockfile.** `Gemfile`, `gems.rb`, `composer.json`, `pubspec.yaml`, `mix.exs`, `Package.swift`, `build.gradle(.kts)`, `conanfile.txt`/`.py` and a .NET project file that declare dependencies without the lockfile next to them (or in a parent directory) are `partial`, with help that names the switch to turn on (Gradle `dependencyLocking`, NuGet `RestorePackagesWithLockFile`). Files with no reader yet are named `unsupported`: `bun.lockb`, `Podfile`/`Podfile.lock`, `build.sbt`, `packages.config`, `paket.lock`, `pdm.lock`, `pylock.toml` and `vcpkg.json`.
 5. **The module is a kernel path** (`docs/guard-maintenance-window-threat-model.md`): a loosened reader would let a close pass with an incomplete SBOM.
+
+## Amendment 2026-11-12: corrections after the Advisor review (candidate 28e)
+
+**Context source:** the Advisor review of the 28d readers the PO asked for (2026-11-12), checked against the cyclonedx-maven-plugin's own documentation (`makeBom`: `includeTestScope` defaults to false, `outputDirectory` to `${project.build.directory}`). Each point below removed either a false block or a false pass on the first close of a JVM or .NET project.
+
+1. **Maven, false blocks.** A test-scope dependency is no longer required in the CycloneDX file, because the plugin leaves the test scope out by default. The dependencies of a `<profile>` are not direct: the default build's CycloneDX file never lists them. `${project.parent.groupId}`, `${project.parent.artifactId}` and `${project.parent.version}` resolve from the pom's `<parent>`; a name part the pom still cannot resolve (a property of the parent pom or of the build, such as a Scala binary version suffix) matches any value in that one part. The help names `makeAggregateBom`/`makeBom` and the `outputDirectory` the close needs, because the default `target/` is never read.
+2. **Gradle and NuGet, false pass.** `gradle.lockfile` and `packages.lock.json` belong to exactly one project (`gradle dependencies --write-locks` locks the root project only), so each covers only the build or project file in its own directory; point 4 of the 28d amendment ("or in a parent directory") no longer applies to them. The workspace lockfiles of the other ecosystems still cover the directories below them. The Gradle help says how to lock every subproject.
+3. **A damaged `bom.json` is `invalid`,** never skipped: skipping it made the pom report that no CycloneDX file covers it, which named the wrong cause.
+4. **Byte-order mark and line ends.** A UTF-8 byte-order mark (written by Windows tools) is removed before any reader runs, and every reader reads CRLF line ends as it reads LF; the input digest still binds the raw bytes.
+5. **Private registries.** A pnpm 5.x/6.x key that starts with the registry host (a registry other than the default) is a registry package, the host dropped. In yarn v1 the descriptor's range decides, not the tarball URL's shape: a semver range or dist-tag is a registry package whatever path the registry serves (GitHub Packages has no `/-/`), an `npm:` alias names the real package (a scoped one included), and a protocol, a URL or an `owner/repo` shorthand is `partial`.
+6. **Known limit, Maven parent bump.** A version that a parent pom or an imported BOM manages is matched by name only, so a CycloneDX file written before a parent version bump still covers the pom: nothing offline can see the newly managed version. Teams regenerate the CycloneDX file with every parent bump; the close cannot prove they did.
 
 ## Consequences
 
