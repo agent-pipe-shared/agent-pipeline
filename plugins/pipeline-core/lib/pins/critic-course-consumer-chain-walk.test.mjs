@@ -41,6 +41,7 @@ import { createGovernanceScopeController } from "../governance-scope.mjs";
 import { criticBoundVerifyRemedy } from "../../scripts/push-prepare.mjs";
 import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../plan-spec-state-v2.mjs";
 import { resolvePublicationReviewRequirement } from "../publication-review-requirement.mjs";
+import { readSpecAddenda } from "../spec-addendum.mjs";
 
 const SCRIPTS = fileURLToPath(new URL("../../scripts/", import.meta.url));
 const ENV = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
@@ -217,7 +218,7 @@ function acceptResidual(root, packetId, { boundToPacket = packetId } = {}) {
  * Returns the repository and a log of what every step observed.
  */
 function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeGenesis = null, unlistedFindingFile = false, acceptBoundToRound = null, guardCorrections = false, leaveLineageUncommittedAt = null, sabotageLineageAtRound = null,
-  derived = false, skeletonDelta = false, extraCorrectionFiles = null, listedExtra = null, duplicateDiagAtRound = null }) {
+  derived = false, skeletonDelta = false, extraCorrectionFiles = null, listedExtra = null, duplicateDiagAtRound = null, beforeCorrection = null }) {
   // W9 slice 3 options: `derived` passes NEITHER a bindings file NOR a registration commit (the preflight derives both);
   // `skeletonDelta` creates the delta request through the missing-input skeleton route; `extraCorrectionFiles` = { round, files } adds
   // files to that round's correction commit; `listedExtra` lists one more path in criticFindingRecordPaths of BOTH calibration mirrors
@@ -288,6 +289,11 @@ function walkCourse({ label, rounds, slices, rootBase = false, extraSliceBeforeG
     const round = rounds[index], n = index + 1, tag = `r${n}`, packetId = packetIdOf(n + 9), step = { n, kind: round.kind };
     let candidate = head, delta = null, registrationCommit, deltaRequestPath = null;
     if (n > 1) {
+      // ADR-0095 (PATH D): steps the Coordinator takes between the last round and the correction (a Spec addendum and its approval).
+      if (beforeCorrection !== null && beforeCorrection.round === n) {
+        step.beforeCorrection = beforeCorrection.run({ root, observed, prior });
+        if (step.beforeCorrection?.stop === true) { observed.rounds.push(step); observed.refusedAt = { round: n, step: "before-correction", body: step.beforeCorrection }; return { root, observed, genesis }; }
+      }
       put(root, `src/fix${n}.mjs`, `export const fix${n} = ${n};\n`);
       put(root, "docs/findings.md", `findings quoted here\n${priorFindings.map((entry) => `- round ${entry.n}: ${entry.gap}`).join("\n")}\n`);
       put(root, "docs/state.md", `state v${n}\n`);
@@ -1076,4 +1082,129 @@ test("W9 SLICE 3 NEGATIVE (6): a history-named file in the range is refused CDP-
     const role = listed.observed.rounds[1].derivedEcho.bindings.exclusions.find((entry) => entry.path === "docs/history-notes.md")?.role;
     assert.equal(role, "finding-disposition record", "the calibrated file is an exclusion binding");
   } finally { cleanup(listed); }
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Path D (ADR-0095): a Critic finding needs a Spec correction inside the approved criteria. The Coordinator commits the addendum alone,
+// the PO approves it through the REAL verb `pipeline-state approve-spec-addendum` (chat mode, as the fixture's pipeline.user.yaml
+// configures), the record is registered through the REAL `register-feature-package.mjs --add-spec-addendum`, and the next round is a
+// delta round over the addendum, its registration and the code correction. Seam (named): the fixture keeps two features apart (the
+// State's active feature is the closing feature, the Critic course is another package); the approval and the registration read the
+// active feature, so for those two calls the State names the course's package and is restored byte-identical afterwards.
+// ---------------------------------------------------------------------------------------------------------------------------------
+const ADDENDUM_PATH = `specs/${FEATURE}/spec-addendum-01.md`;
+
+/** Runs `fn` with the State's active feature set to the Critic course's package; the State bytes are restored afterwards. */
+function asCourseFeature(root, fn) {
+  const statePath = join(root, ".claude/pipeline-state.json");
+  const bytes = readFileSync(statePath);
+  const state = JSON.parse(bytes.toString("utf8"));
+  writeFileSync(statePath, json({ ...state, activeFeature: { ...state.activeFeature, id: FEATURE } }));
+  try { return fn(); } finally { writeFileSync(statePath, bytes); }
+}
+
+/** One real `approve-spec-addendum` call (the exported function the CLI calls); its printed lines are returned. */
+function approveAddendumViaVerb(root, path) {
+  const lines = [];
+  const originalError = console.error, originalLog = console.log;
+  console.error = (...args) => { lines.push(args.join(" ")); };
+  console.log = (...args) => { lines.push(args.join(" ")); };
+  let status;
+  try { status = asCourseFeature(root, () => pipelineStateRun(["approve-spec-addendum", "--by", "PO", "--addendum", path], { dir: root, now: () => new Date().toISOString() })); }
+  finally { console.error = originalError; console.log = originalLog; }
+  const text = lines.join("\n");
+  return { status, text, recordPath: /--add-spec-addendum (\S+),/u.exec(text)?.[1] ?? null };
+}
+
+/** The addendum leg between round 1 and the round 2 correction; `variant` selects a negative. */
+function specAddendumLeg(variant = null) {
+  return {
+    round: 2,
+    run: ({ root, prior }) => {
+      const manifest = JSON.parse(readFileSync(join(root, `specs/${FEATURE}/lifecycle.json`), "utf8"));
+      const spec = manifest.artifacts.find((entry) => entry.class === "spec" && entry.authority === true);
+      const baseDigest = variant === "wrong-base" ? "0".repeat(64) : spec.sha256;
+      put(root, ADDENDUM_PATH, `Base Spec: ${SPEC_PATH} sha256:${baseDigest}\nCritic packet: ${prior.packetId}\nFindings: CRF-${prior.packetId}-1\n\nAC-1 includes the empty input: complete behavior returns an empty result, never an error.\n`);
+      const addendumCommit = commitPaths(root, [ADDENDUM_PATH], "docs(spec): addendum 01 corrects AC-1 for the empty input");
+      const approval = approveAddendumViaVerb(root, ADDENDUM_PATH);
+      if (approval.status !== 0) return { stop: true, step: "approve", approval };
+      if (variant === "tampered") put(root, ADDENDUM_PATH, `${readFileSync(join(root, ADDENDUM_PATH), "utf8")}A sentence added after the approval.\n`);
+      const registered = asCourseFeature(root, () => cli("register-feature-package.mjs", ["--root", root, "--add-spec-addendum", approval.recordPath]));
+      if (registered.status !== 0) return { stop: true, step: "register", approval, registered };
+      const registrationCommit = commitPaths(root, registered.body.commitPaths, "chore(spec): register addendum 01 and its approval");
+      return { addendumCommit, approval, registered: registered.body, registrationCommit };
+    },
+  };
+}
+
+test("PATH D (ADR-0095 Spec addendum): finding, addendum, real approval verb, registration, correction and a delta round that covers the addendum", () => {
+  const fx = walkCourse({ label: "d-addendum", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: PASS }], slices: ["TASK-ONE"], beforeCorrection: specAddendumLeg() });
+  try {
+    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt, null, 1));
+    const [first, second] = fx.observed.rounds;
+    const leg = second.beforeCorrection;
+    assert.match(leg.approval.text, /Spec addendum specs\/held-feature\/spec-addendum-01\.md approved by "PO" \(chat-attributed-unattested\)/u);
+    assert.equal(leg.registered.status, "spec-addendum-added");
+    assert.equal(second.finalized, "completed");
+    // The delta round reviews the range from round 1's candidate: the addendum commit, its registration and the correction.
+    assert.equal(second.reviewBase, first.candidate);
+    const reviewed = git(fx.root, ["diff", "--name-only", first.candidate, second.candidate]).split("\n");
+    for (const path of [ADDENDUM_PATH, leg.approval.recordPath, `specs/${FEATURE}/lifecycle.json`, "src/fix2.mjs"]) assert.ok(reviewed.includes(path), `the delta range holds ${path}`);
+    const read = readSpecAddenda({ root: fx.root, featureId: FEATURE, manifest: JSON.parse(readFileSync(join(fx.root, `specs/${FEATURE}/lifecycle.json`), "utf8")) });
+    assert.equal(read.ok, true, JSON.stringify(read));
+    assert.deepEqual(read.applied.map((entry) => [entry.path, entry.packetId]), [[ADDENDUM_PATH, first.packetId]]);
+    // The close: the delta round reviewed the addendum, so the Spec addendum gate passes and the close plans.
+    const addenda = writeAddenda(fx, ["TASK-ONE"]);
+    assert.equal(addenda["TASK-ONE"].status, 0, `${addenda["TASK-ONE"].text}${addenda["TASK-ONE"].stderr}`);
+    const closed = closeToPrepared(fx);
+    assert.equal(closed.planned.status, 0, JSON.stringify(closed.planned.body));
+    assert.equal(closed.planned.body.phase, "feature-close-prepared");
+  } finally { cleanup(fx); }
+});
+
+test("PATH D close negatives: an unapproved addendum file blocks the close; once approved and registered, it still blocks until a registered round reviewed it", () => {
+  const fx = walkCourse({ label: "d-close", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: PASS }], slices: ["TASK-ONE"], beforeCorrection: specAddendumLeg() });
+  try {
+    assert.equal(fx.observed.refusedAt, undefined, JSON.stringify(fx.observed.refusedAt, null, 1));
+    const [first] = fx.observed.rounds;
+    const second = `specs/${FEATURE}/spec-addendum-02.md`;
+    const manifest = JSON.parse(readFileSync(join(fx.root, `specs/${FEATURE}/lifecycle.json`), "utf8"));
+    const spec = manifest.artifacts.find((entry) => entry.class === "spec" && entry.authority === true);
+    put(fx.root, second, `Base Spec: ${SPEC_PATH} sha256:${spec.sha256}\nCritic packet: ${first.packetId}\nFindings: CRF-${first.packetId}-2\n\nAC-1 also names the error text for a missing input.\n`);
+    commitPaths(fx.root, [second], "docs(spec): addendum 02, not yet approved");
+    const writtenAddenda = writeAddenda(fx, ["TASK-ONE"]);
+    assert.equal(writtenAddenda["TASK-ONE"].status, 0, `${writtenAddenda["TASK-ONE"].text}${writtenAddenda["TASK-ONE"].stderr}`);
+    const unapproved = closeToPrepared(fx).planned;
+    assert.equal(unapproved.status, 2, JSON.stringify(unapproved.body));
+    assert.equal(unapproved.body.code, "CLOSE-SPEC-ADDENDUM-UNCOVERED", JSON.stringify(unapproved.body));
+    assert.match(unapproved.body.message, /spec-addendum-02\.md: not an approved, registered Spec addendum/u);
+    // Approved and registered, but no registered Critic round reviewed it: still blocked, with the delta round as the repair.
+    const approval = approveAddendumViaVerb(fx.root, second);
+    assert.equal(approval.status, 0, approval.text);
+    const registered = asCourseFeature(fx.root, () => cli("register-feature-package.mjs", ["--root", fx.root, "--add-spec-addendum", approval.recordPath]));
+    assert.equal(registered.status, 0, registered.text);
+    commitPaths(fx.root, registered.body.commitPaths, "chore(spec): register addendum 02");
+    // The close was already started and checkpointed above: plan the same transition again, as its refusal says.
+    const again = spawnSync(process.execPath, [join(SCRIPTS, "close-coordinator.mjs"), "plan-transition", "--root", fx.root, "--lifecycle", `close-${basename(fx.root)}`, "--actor", "PO",
+      "--phase", "feature-close-prepared", "--architecture-impact", "architecture-conforms", "--continuity-close-request", "evidence/close-request.json"], { encoding: "utf8", shell: false, env: ENV });
+    const uncovered = { status: again.status, body: JSON.parse(again.stdout) };
+    assert.equal(uncovered.body.code, "CLOSE-SPEC-ADDENDUM-UNCOVERED", JSON.stringify(uncovered.body));
+    assert.match(uncovered.body.message, /spec-addendum-02\.md: no registered Critic round .* reviewed it/u);
+    assert.doesNotMatch(uncovered.body.message, /spec-addendum-01\.md/u, "the addendum the delta round reviewed is covered");
+  } finally { cleanup(fx); }
+});
+
+test("PATH D negatives: a wrong base digest is refused at the approval; an addendum changed after the approval is refused at the registration; nothing reaches round 2", () => {
+  const wrongBase = walkCourse({ label: "d-wrong-base", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: PASS }], slices: ["TASK-ONE"], beforeCorrection: specAddendumLeg("wrong-base") });
+  try {
+    const refused = wrongBase.observed.refusedAt?.body;
+    assert.equal(refused?.step, "approve", JSON.stringify(wrongBase.observed.refusedAt));
+    assert.match(refused.approval.text, /SPEC-ADDENDUM-BASE/u);
+  } finally { cleanup(wrongBase); }
+  const tampered = walkCourse({ label: "d-tampered", rounds: [{ kind: "full", verdict: FAIL_MAJOR }, { kind: "delta", verdict: PASS }], slices: ["TASK-ONE"], beforeCorrection: specAddendumLeg("tampered") });
+  try {
+    const refused = tampered.observed.refusedAt?.body;
+    assert.equal(refused?.step, "register", JSON.stringify(tampered.observed.refusedAt));
+    assert.equal(refused.registered.body.code, "FPR-SPEC-ADDENDUM-DIGEST", refused.registered.text);
+  } finally { cleanup(tampered); }
 });

@@ -38,6 +38,7 @@ import { AUTHORIZE_CRITICAL_COMMAND_KINDS, prepareAuthorizeCriticalLine, runHuma
 import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
 import { buildSpecAddendumSubject } from "../lib/spec-addendum.mjs";
+import { addSpecAddendum } from "../lib/feature-package-registration.mjs";
 import { residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
 import { PO_APPROVAL_DIRECTORY_ENV } from "../lib/po-human-approval-read.mjs";
 import { run as runPipelineState } from "./pipeline-state.mjs";
@@ -326,9 +327,14 @@ const SPEC_ADDENDUM_PATH = `specs/${FEATURE_ID}/spec-addendum-01.md`;
 const ADDENDUM_PACKET = "f".repeat(32);
 /** A repository whose package binds the consumer Spec, a reviewed commit the packet names, and a committed addendum on top. */
 function specAddendumRepository() {
+  // A package the topology validator accepts, so the registration step (--add-spec-addendum) can run on it as well.
+  const extra = { [`specs/${FEATURE_ID}/acceptance.md`]: "acceptance\n", [`specs/${FEATURE_ID}/result.md`]: "result\n", [`specs/${FEATURE_ID}/evidence/envelope.json`]: "{}\n" };
+  const entry = (klass, path, bytes, authority, mutability) => ({ class: klass, path, sha256: sha256(bytes), authority, mutability, retention: "active" });
   const manifest = { schema: "pipeline.feature-package.v1", feature: { id: FEATURE_ID, rigor: 1 }, state: "implementing",
-    artifacts: [{ class: "spec", path: STATE_SPEC_PATH, sha256: sha256("spec"), authority: true, mutability: "immutable", retention: "active" }], candidate: null, supersedes: null };
-  const root = fixtureRepository(consumerFiles({ [`specs/${FEATURE_ID}/lifecycle.json`]: `${JSON.stringify(manifest, null, 2)}\n` }));
+    artifacts: [entry("spec", STATE_SPEC_PATH, "spec", true, "immutable"), entry("prd", STATE_PLAN_PATH, "plan", true, "mutable"),
+      ...Object.entries(extra).map(([path, bytes]) => entry(path.endsWith(".json") ? "candidate-evidence" : path.endsWith("acceptance.md") ? "acceptance" : "result", path, bytes, false, path.endsWith(".json") ? "immutable" : "mutable"))],
+    candidate: null, supersedes: null };
+  const root = fixtureRepository(consumerFiles({ [`specs/${FEATURE_ID}/lifecycle.json`]: `${JSON.stringify(manifest, null, 2)}\n`, ...extra }));
   const reviewed = { commit: gitOut(root, "rev-parse", "HEAD"), tree: gitOut(root, "rev-parse", "HEAD^{tree}") };
   commitFiles(root, { [SPEC_ADDENDUM_PATH]: `Base Spec: ${STATE_SPEC_PATH} sha256:${sha256("spec")}\nCritic packet: ${ADDENDUM_PACKET}\nFindings: CRF-${ADDENDUM_PACKET}-1\n\nThe board renders the last score, not the best one.\n` }, "spec addendum 01");
   const head = { commit: gitOut(root, "rev-parse", "HEAD"), tree: gitOut(root, "rev-parse", "HEAD^{tree}") };
@@ -509,6 +515,9 @@ test("ADR-0095 consumer leg: spec-addendum -- the line approve-spec-addendum pri
   assert.equal(record.candidate.commit, fixture.head.commit);
   const replay = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys, dependencies: fixture.readers });
   assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
+  // The registration step finds the private approval the verb stored (same store, same subject digest, commit, time and proof).
+  const registered = addSpecAddendum({ root: fixture.root, state: { activeFeature: { id: FEATURE_ID } }, approvalPath: recordPath });
+  assert.equal(registered.status, "spec-addendum-added", JSON.stringify(registered));
 });
 
 test("C22B consumer leg: push -- the printed push line is signed by the verb and approve-push consumes the mirrored proof", () => {

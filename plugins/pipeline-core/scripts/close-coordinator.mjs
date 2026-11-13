@@ -38,6 +38,7 @@ import {
 } from "../lib/private-boundary.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { criticCarryAdvisory } from "../lib/critic-course-admission.mjs";
+import { specAddendumCloseFindings } from "../lib/spec-addendum-coverage.mjs";
 import { buildCleanupReceipt } from "../lib/close-cleanup-receipt.mjs";
 import { describeCloseActions, describeCloseChain, missingCloseInputs, CLOSE_STEP_REQUIREMENTS, PUSH_THREAT_MODEL_FILE } from "../lib/close-chain-guide.mjs";
 import { attachRunbookLink } from "../lib/runbook-link.mjs";
@@ -739,6 +740,10 @@ async function transitionPlan(values, { deriveCriticAddenda = false } = {}) {
       }
     }
     courseAuthorship = assertCourseCriticEvidence(root, observed.feature, { audited: values.auditRequest !== undefined, deriveAddenda: deriveCriticAddenda });
+    // ADR-0095: every approved Spec addendum of an active package is covered by a registered Critic round, and no addendum file at the
+    // candidate is unapproved or unregistered.
+    const addendumGate = specAddendumCloseFindings({ root, candidateCommit: git(root, ["rev-parse", "HEAD"]) });
+    if (!addendumGate.ok) fail("CLOSE-SPEC-ADDENDUM-UNCOVERED", `feature close preparation is blocked by the Spec addenda: ${addendumGate.findings.slice(0, 5).join("; ")}${addendumGate.findings.length > 5 ? `; and ${addendumGate.findings.length - 5} more` : ""}`);
     // A missing slice queue says nothing about whether the whole candidate
     // received independent review. Resolve the State and package contracts.
     // The audit route below reads the consumed Critic packet and exact Verify
