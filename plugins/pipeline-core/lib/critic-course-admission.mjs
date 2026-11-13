@@ -17,6 +17,7 @@ import { validateCriticDispositionAddendum } from "./critic-disposition-addendum
 import { canonicalJson as packetCanonicalJson, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
 import { administrationDocumentationOnlyCommit } from "./critic-evidence-carry.mjs";
 import { locateCourseEvidenceGap } from "./course-evidence-gap.mjs";
+import { isSpecAddendumPath } from "./spec-addendum.mjs";
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const MODES = new Set(["full", "delta"]);
@@ -468,6 +469,9 @@ export function criticCloseCommit(root, commit, featureId, readReceipt = readCon
         exports.get(key).files.push(match[2]);
         continue;
       }
+      // ADR-0095: a Spec addendum corrects what the Critic reviews against; it is content, never close evidence, so a commit that
+      // adds or changes one stays a correction and the next round must cover it.
+      if (isSpecAddendumPath(path)) return false;
       const inside = path.startsWith(specs) || path.startsWith(bundles);
       if (!(inside || CLOSE_DOC_PATH.test(path) || CLOSE_STATE_FILES.has(path))) return false;
       if (path.split("/").some((part) => part === "" || part === "." || part === "..")) return false;

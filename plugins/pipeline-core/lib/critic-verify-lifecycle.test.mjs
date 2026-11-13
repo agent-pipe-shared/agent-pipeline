@@ -599,6 +599,8 @@ test("16c the close commit and handover-only commits carry the Critic; any sourc
     "a Critic export that bypasses its receipt classifier": () => writeAt(`specs/${featureId}/evidence/critic/${"a".repeat(32)}/report.md`, "# forged\n"),
     "a removed source file": () => { git(["rm", "--quiet", "src/app.js"]); },
     "an executable Markdown file": () => { writeAt("docs/exec.md", "# x\n"); chmodSync(join(root, "docs/exec.md"), 0o755); },
+    // ADR-0095: a Spec addendum changes what the Critic reviews against, even though it lives in the feature's own directory.
+    "a Spec addendum in the feature directory": () => writeAt(`specs/${featureId}/spec-addendum-01.md`, "Base Spec: x\n"),
   };
   for (const [name, edit] of Object.entries(refused)) {
     const commit = closeCommitAt(name, edit);
