@@ -1826,6 +1826,29 @@ function pushRecoveryTarget(command, depth = 0) {
   return { kind: "branch", remote, destination };
 }
 
+// Candidate 29 (Codex greenfield run 3, C6): a denied `node <...>/push-init.mjs ... --remote <r> --destination <ref>`
+// is not a git push, so it fell through to the fixed MAIN publication route although push-init had frozen a feature
+// branch as its destination; the session followed it and met PX-NON-FAST-FORWARD. The destination push-init names is
+// taken unchanged: main keeps the publication route, an approvable branch gets the branch approval route for exactly
+// that remote and ref, anything else is undetermined. Only one plain push-init invocation is read, nothing composed.
+function pushInitRecoveryTarget(command) {
+  const shape = stripQuotedSegments(command);
+  if (/&&|\|\||[;|\n\r`<>]|\$\(/u.test(shape) || /[$`*?[\]{}~]/u.test(shape)) return null;
+  const tokens = tokenizeArgv(command);
+  if (tokens.length < 2 || !["node", "node.exe"].includes(executableName(tokens[0]))
+    || executableName(tokens[1]) !== "push-init.mjs") return null;
+  const value = (flag) => {
+    const at = tokens.indexOf(flag, 2);
+    return at > 0 && tokens.indexOf(flag, at + 1) === -1 && typeof tokens[at + 1] === "string" && !tokens[at + 1].startsWith("-")
+      ? tokens[at + 1] : null;
+  };
+  const remote = value("--remote"), destination = value("--destination");
+  if (remote === null || destination === null) return { kind: "undetermined" };
+  if (PUSH_MAIN_NAMES.has(destination)) return { kind: "main" };
+  if (!PUSH_APPROVABLE_REF.test(destination) || destination.includes("..")) return { kind: "undetermined" };
+  return { kind: "branch", remote, destination };
+}
+
 // Antigravity greenfield 2026-11-08: a dispatch the agent could correct itself was sent to an "external operator". Only a set made up
 // entirely of dispatch refusals qualifies; anything else keeps its existing route. The text is closed and carries nothing from the denial.
 function dispatchCorrectionRequired(denials) {
@@ -1912,7 +1935,7 @@ function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
     // denial whose command is not a push at all (a release alias) never named a
     // destination, so there is nothing to read and the fixed publication route -- which
     // revalidates everything from scratch anyway -- stays exactly right for it.
-    const target = deniedPushCommand ? pushRecoveryTarget(command) : { kind: "not-a-push" };
+    const target = deniedPushCommand ? pushRecoveryTarget(command) : (pushInitRecoveryTarget(command) ?? { kind: "not-a-push" });
     if (target.kind === "branch") {
       return {
         status: "narrower-recovery-required",

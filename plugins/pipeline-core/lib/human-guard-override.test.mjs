@@ -2532,6 +2532,35 @@ test("GF-098: a denied push whose destination cannot be read is told so, never r
   }
 });
 
+// Candidate 29 (Codex greenfield run 3, C6): a denied push-init.mjs is no git push; its recovery fell through to the fixed
+// main publication route although push-init had frozen a feature branch as its destination (PX-NON-FAST-FORWARD).
+test("C29-C6: a denied push-init.mjs keeps the destination it froze: branch approval for a branch, publication only for main", () => {
+  const root = fixture();
+  try {
+    const init = (destination, extra = "") => `node /p/plugins/pipeline-core/scripts/push-init.mjs --root ${root} --by PO --remote origin --destination ${destination}${extra}`;
+    for (const command of [init("refs/heads/feat/game-v1"), init("refs/heads/feat/game-v1", " --transport-kind credential-helper --transport-reference gh")]) {
+      const observed = pushDenial(root, command, PUSH_GUARD_DENIAL);
+      assert.equal(observed.code, "HGO-NARROWER-BRANCH-PUSH-APPROVAL-REQUIRED", command);
+      const argv = observed.nextAction.action.argv;
+      assert.equal(argv[argv.indexOf("--remote") + 1], "origin");
+      assert.equal(argv[argv.indexOf("--destination") + 1], "refs/heads/feat/game-v1");
+      assert.equal(JSON.stringify(observed.nextAction).includes("refs/heads/main"), false, command);
+    }
+    const main = pushDenial(root, init("refs/heads/main"), PUSH_GUARD_DENIAL);
+    assert.equal(main.code, "HGO-NARROWER-PUBLICATION-REQUIRED");
+    for (const command of [init("refs/tags/v1"), init("refs/heads/a..b"), `${init("refs/heads/x")} --destination refs/heads/y`]) {
+      const observed = pushDenial(root, command, PUSH_GUARD_DENIAL);
+      assert.equal(observed.code, "HGO-NARROWER-PUSH-DESTINATION-REQUIRED", command);
+      assert.equal(JSON.stringify(observed.nextAction.action).includes("refs/heads/main"), false, command);
+    }
+    // Another script and a composed command keep the unchanged route.
+    assert.equal(pushDenial(root, "release-alias current", PUSH_GUARD_DENIAL).code, "HGO-NARROWER-PUBLICATION-REQUIRED");
+    assert.equal(pushDenial(root, `${init("refs/heads/x")} && git status`, PUSH_GUARD_DENIAL).code, "HGO-NARROWER-PUBLICATION-REQUIRED");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a non-push git apply --check command whose patch path says push never selects push recovery", () => {
   const root = fixture();
   try {
