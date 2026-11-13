@@ -23,6 +23,8 @@ export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action
 export const CRITICAL_ACTION_KINDS = Object.freeze([
   "push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion",
   "accept-residual-critic-findings", "acknowledge-caller-authored-critic",
+  // ADR-0095: the PO's approval of one Spec addendum; its subject comes from lib/spec-addendum.mjs only.
+  "spec-addendum",
 ]);
 
 const SHA = /^[a-f0-9]{64}$/u;

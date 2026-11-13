@@ -34,6 +34,7 @@ import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verif
 import { RESIDUAL_REASON_CLASS, residualAcceptanceSubject, residualReasonClassRefusal } from "../lib/critic-verify-lifecycle.mjs";
 import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
 import { CRITIC_ACKNOWLEDGEMENT_KIND, criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+import { SPEC_ADDENDUM_KIND, buildSpecAddendumSubject } from "../lib/spec-addendum.mjs";
 import { SIGNED_QUALITY_PACKAGE_SCHEMA, describeSignedQualityPackageIntent, physicalQualityPackageFile } from "../lib/signed-quality-package.mjs";
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { describeHumanGuardOverrideSelection, describeHumanGuardOverrideSignatureRequest } from "../lib/human-guard-override.mjs";
@@ -1101,7 +1102,7 @@ function suggestSubcommand(input, candidates) {
  * governance-fork-disposition-style verification bypass concern either.
  */
 const RESIDUAL_ACCEPTANCE_KIND = "accept-residual-critic-findings";
-const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND, "acknowledge-caller-authored-critic"]);
+const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND, "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND]);
 const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
 const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 
@@ -1111,7 +1112,7 @@ export function parseHumanArgs(argv, dependencies = {}) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "criticPacket", "reasonClass", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence", "existingKey"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "criticPacket", "addendum", "reasonClass", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence", "existingKey"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
   // GF-104: keyReference always carries a default ("local-po-key") even when the
@@ -1185,6 +1186,12 @@ export function parseHumanArgs(argv, dependencies = {}) {
   if (values.criticPacket !== undefined && values.kind === CRITIC_ACKNOWLEDGEMENT_KIND) {
     if (values.subject !== undefined) return { error: `${USAGE}\n${CRITIC_ACKNOWLEDGEMENT_KIND} with --critic-packet takes no --subject: the subject is computed from the consumed Critic packet.` };
     if (!/^[a-f0-9]{32}$/u.test(values.criticPacket)) return { error: `${USAGE}\n${CRITIC_ACKNOWLEDGEMENT_KIND} requires --critic-packet <32 lowercase hexadecimal characters>.` };
+  }
+  // ADR-0095: the Spec addendum names its file; the subject is derived from HEAD, the package and the consumed packet, never typed.
+  if (values.addendum !== undefined && !(command.endsWith("-critical") && values.kind === SPEC_ADDENDUM_KIND)) return { error: `${USAGE}\n--addendum is only valid for --kind ${SPEC_ADDENDUM_KIND} with prepare-critical or authorize-critical.` };
+  if (values.kind === SPEC_ADDENDUM_KIND && (command === "prepare-critical" || command === "authorize-critical")) {
+    if (values.subject !== undefined) return { error: `${USAGE}\n${SPEC_ADDENDUM_KIND} takes no --subject: the subject is derived from the addendum named by --addendum.` };
+    if (!/^specs\/[a-z0-9][a-z0-9._-]{0,62}\/spec-addendum-(0[1-9]|[1-9][0-9])\.md$/u.test(values.addendum ?? "")) return { error: `${USAGE}\n${SPEC_ADDENDUM_KIND} requires --addendum specs/<feature>/spec-addendum-<NN>.md.` };
   }
   // D227: the optional reason class of a residual acceptance of a MAJOR finding; it rides in the signed subject.
   if (values.reasonClass !== undefined && !(command.endsWith("-critical") && values.kind === RESIDUAL_ACCEPTANCE_KIND)) return { error: `${USAGE}\n--reason-class is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} with prepare-critical or authorize-critical.` };
@@ -1951,6 +1958,16 @@ function criticAcknowledgementConfirmationLines(kind, subject) {
   ];
 }
 
+function specAddendumConfirmationLines(kind, subject) {
+  if (kind !== SPEC_ADDENDUM_KIND || subject === null || typeof subject !== "object" || Array.isArray(subject)) return [];
+  return [
+    `spec addendum: ${subject.addendumPath} (sha256 ${subject.addendumSha256})`,
+    `base spec: ${subject.specPath} (sha256 ${subject.specSha256}), unchanged`,
+    `critic packet: ${subject.packetId}, findings: ${subject.findingIds.join(", ")}`,
+    "this approval accepts ONLY this addendum as a correction of the approved Spec inside its existing criteria; the design approval is not reopened and the next Critic round reviews the correction.",
+  ];
+}
+
 function residualAcceptanceConfirmationLines(kind, subject) {
   if (kind !== RESIDUAL_ACCEPTANCE_KIND || subject === null || typeof subject !== "object") return [];
   return [
@@ -1985,6 +2002,16 @@ function criticalApprovalRequest({ args, repository, featureId, gitCommonDir, de
     const resolved = resolveCriticAcknowledgementSubject({ args, gitCommonDir, dependencies });
     subjectPreimage = resolved.subject;
     candidate = resolved.candidate;
+  } else if (args.kind === SPEC_ADDENDUM_KIND) {
+    // ADR-0095: the one builder the recording step uses too; the candidate is the clean HEAD that holds the addendum.
+    const built = buildSpecAddendumSubject({ root: repository, featureId, addendumPath: args.addendum, controlRoot: join(gitCommonDir, "agent-pipeline", "critic-packets"),
+      readReceipt: dependencies.readConsumedCandidateReceiptFn ?? readConsumedCandidateReceipt, readResult: dependencies.readConsumedCandidateResultFn ?? readConsumedCandidateResult });
+    if (!built.ok) fail(`critical approval request is invalid (${built.code}): ${built.detail}`);
+    if (built.candidate.commit !== candidate.commit || built.candidate.tree !== candidate.tree) fail("critical approval request is invalid (SPEC-ADDENDUM-UNCOMMITTED): the addendum's commit is not the clean HEAD");
+    const computed = criticalActionSubjectSha256({ kind: SPEC_ADDENDUM_KIND, candidate, subject: built.subject });
+    if (text(args.subjectSha256) && args.subjectSha256 !== computed) fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the addendum (expected ${computed})`);
+    args.subjectSha256 = computed;
+    subjectPreimage = built.subject;
   } else {
     subjectPreimage = resolveSubjectPreimage({ args, repository, candidate });
   }
@@ -2143,7 +2170,7 @@ export function authorizeCriticalPushCommand({
  * The kinds the `authorize-critical` terminal command takes a bare `--subject-sha256` for (the USAGE list above).
  * Residual-acceptance and the governance/interruption kinds have their own subject builders and are not rendered here.
  */
-export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile", "acknowledge-caller-authored-critic"]);
+export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight", "feature-package-reconcile", "acknowledge-caller-authored-critic", SPEC_ADDENDUM_KIND]);
 
 /**
  * N30 (D210): the kind-parametric sibling of `authorizeCriticalPushCommand`. The push builder is the `kind: "push"`
@@ -2152,11 +2179,11 @@ export const AUTHORIZE_CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy",
  * It renders; it never executes, signs or reads a key.
  */
 export function authorizeCriticalActionCommand({
-  kind, repoRoot, directory = null, featureId, plan, spec, subjectSha256, expiresAt, criticPacket = null,
+  kind, repoRoot, directory = null, featureId, plan, spec, subjectSha256, expiresAt, criticPacket = null, addendum = null,
   launcher = fileURLToPath(import.meta.url),
 } = {}) {
   return renderAuthorizeCriticalCommand("authorizeCriticalActionCommand", {
-    kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, criticPacket, launcher,
+    kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, criticPacket, addendum, launcher,
   });
 }
 
@@ -2186,8 +2213,9 @@ export function prepareAuthorizeCriticalLine({ kind, candidate, subject, ...rest
 }
 
 function renderAuthorizeCriticalCommand(name, {
-  kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, criticPacket = null, launcher,
+  kind, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt, criticPacket = null, addendum = null, launcher,
 }) {
+  if ((addendum !== null) !== (kind === SPEC_ADDENDUM_KIND)) throw new TypeError(`${name} takes an addendum exactly for kind ${SPEC_ADDENDUM_KIND}`);
   if (!AUTHORIZE_CRITICAL_COMMAND_KINDS.includes(kind)) {
     throw new TypeError(`${name} requires a known kind (${AUTHORIZE_CRITICAL_COMMAND_KINDS.join(", ")})`);
   }
@@ -2208,6 +2236,7 @@ function renderAuthorizeCriticalCommand(name, {
     "--spec", spec,
     "--kind", kind,
     ...(criticPacket === null ? [] : ["--critic-packet", criticPacket]),
+    ...(addendum === null ? [] : ["--addendum", addendum]),
     "--subject-sha256", subjectSha256,
     "--expires-at", expiresAt,
   );
@@ -2698,6 +2727,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
       ...interruptionPromotionConfirmationLines(request.action.kind, subjectPreimage),
       ...residualAcceptanceConfirmationLines(request.action.kind, subjectPreimage),
       ...criticAcknowledgementConfirmationLines(request.action.kind, subjectPreimage),
+      ...specAddendumConfirmationLines(request.action.kind, subjectPreimage),
       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
     ], dependencies, humanFacingLanguage);
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });

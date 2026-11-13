@@ -37,6 +37,7 @@ import test, { after } from "node:test";
 import { AUTHORIZE_CRITICAL_COMMAND_KINDS, prepareAuthorizeCriticalLine, runHumanApproval } from "./po-human-approval.mjs";
 import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { criticAcknowledgementSubject } from "../lib/critic-acknowledgement.mjs";
+import { buildSpecAddendumSubject } from "../lib/spec-addendum.mjs";
 import { residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
 import { PO_APPROVAL_DIRECTORY_ENV } from "../lib/po-human-approval-read.mjs";
 import { run as runPipelineState } from "./pipeline-state.mjs";
@@ -156,7 +157,7 @@ function verifyWritten({ result, expectedCandidate, expectedAction, trustPolicy,
 test("the critical action kind list this suite is parametrized over is the closed set the product exports", () => {
   assert.deepEqual([...CRITICAL_ACTION_KINDS].sort(), [
     "accept-residual-critic-findings", "acknowledge-caller-authored-critic", "deploy", "feature-package-reconcile",
-    "governance-fork-disposition", "interruption-promotion", "publication", "push", "release-preflight",
+    "governance-fork-disposition", "interruption-promotion", "publication", "push", "release-preflight", "spec-addendum",
   ], "a new kind must add its round trip here (and a note on which leg proves it), not slip in unproven");
 });
 
@@ -269,6 +270,7 @@ for (const kind of PRINTED_KINDS) {
       kind, candidate: CANDIDATE, subject: { label: `printed ${kind}` }, repoRoot: join(tmpdir(), "repo with space"), featureId: FEATURE_ID,
       plan: PRINTED_PLAN, spec: PRINTED_SPEC, expiresAt: "2030-01-01T00:00:00.000Z",
       ...(kind === "acknowledge-caller-authored-critic" ? { criticPacket: "e".repeat(32) } : {}),
+      ...(kind === "spec-addendum" ? { addendum: `specs/${FEATURE_ID}/spec-addendum-01.md` } : {}),
     });
     assert.equal(prepared.argv[prepared.argv.indexOf("--kind") + 1], kind);
     assert.equal(prepared.argv[prepared.argv.indexOf("--subject-sha256") + 1], criticalActionSubjectSha256({ kind, candidate: CANDIDATE, subject: { label: `printed ${kind}` } }));
@@ -312,18 +314,45 @@ function emitterInput(kind) {
       dependencies: { readConsumedCandidateReceiptFn: () => ({ packet: { packetId: ACK_PACKET }, receipt: ACK_RECEIPT }) },
     };
   }
+  if (kind === "spec-addendum") {
+    // ADR-0095: the verb rebuilds the subject from a real repository (HEAD holds the addendum, the package binds the Spec, the packet is consumed).
+    const fixture = specAddendumRepository();
+    return { repoRoot: fixture.root, candidate: fixture.head, subject: fixture.subject, extra: { addendum: SPEC_ADDENDUM_PATH }, observed: fixture.head, dependencies: fixture.readers };
+  }
   return { candidate: { ...CANDIDATE }, subject: { label: `verb ${kind}` }, extra: {}, observed: { ...CANDIDATE }, dependencies: {} };
+}
+
+const SPEC_ADDENDUM_PATH = `specs/${FEATURE_ID}/spec-addendum-01.md`;
+const ADDENDUM_PACKET = "f".repeat(32);
+/** A repository whose package binds the consumer Spec, a reviewed commit the packet names, and a committed addendum on top. */
+function specAddendumRepository() {
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: FEATURE_ID, rigor: 1 }, state: "implementing",
+    artifacts: [{ class: "spec", path: STATE_SPEC_PATH, sha256: sha256("spec"), authority: true, mutability: "immutable", retention: "active" }], candidate: null, supersedes: null };
+  const root = fixtureRepository(consumerFiles({ [`specs/${FEATURE_ID}/lifecycle.json`]: `${JSON.stringify(manifest, null, 2)}\n` }));
+  const reviewed = { commit: gitOut(root, "rev-parse", "HEAD"), tree: gitOut(root, "rev-parse", "HEAD^{tree}") };
+  commitFiles(root, { [SPEC_ADDENDUM_PATH]: `Base Spec: ${STATE_SPEC_PATH} sha256:${sha256("spec")}\nCritic packet: ${ADDENDUM_PACKET}\nFindings: CRF-${ADDENDUM_PACKET}-1\n\nThe board renders the last score, not the best one.\n` }, "spec addendum 01");
+  const head = { commit: gitOut(root, "rev-parse", "HEAD"), tree: gitOut(root, "rev-parse", "HEAD^{tree}") };
+  const receipt = { schema: "pipeline.session-critic-receipt.v1", reviewPass: false, findingCount: 1, packetId: ADDENDUM_PACKET, candidate: reviewed };
+  const readers = {
+    readConsumedCandidateReceiptFn: () => ({ packet: { packetId: ADDENDUM_PACKET }, receipt }),
+    readConsumedCandidateResultFn: () => ({ result: { verdict: { findings: [{ severity: "major", gap: "the Spec says best score" }] } } }),
+  };
+  const built = buildSpecAddendumSubject({ root, featureId: FEATURE_ID, addendumPath: SPEC_ADDENDUM_PATH, controlRoot: "/unused",
+    readReceipt: readers.readConsumedCandidateReceiptFn, readResult: readers.readConsumedCandidateResultFn });
+  assert.equal(built.ok, true, JSON.stringify(built));
+  return { root, head, subject: built.subject, readers };
 }
 
 for (const kind of PRINTED_KINDS) {
   test(`C22B verb leg: the printed ${kind} line runs unchanged through authorize-critical and the proof it writes verifies`, () => {
-    const repoRoot = fixtureRepository();
+    const input = emitterInput(kind);
+    const repoRoot = input.repoRoot ?? fixtureRepository();
     const keys = keyDirectory();
     const home = fixtureDir("home");
-    const input = emitterInput(kind);
     const expiresAt = futureExpiry();
+    const plan = input.repoRoot === undefined ? "plan.md" : STATE_PLAN_PATH, spec = input.repoRoot === undefined ? "spec.md" : STATE_SPEC_PATH;
     const prepared = prepareAuthorizeCriticalLine({
-      kind, candidate: input.candidate, subject: input.subject, repoRoot, featureId: FEATURE_ID, plan: "plan.md", spec: "spec.md", expiresAt, ...input.extra,
+      kind, candidate: input.candidate, subject: input.subject, repoRoot, featureId: FEATURE_ID, plan, spec, expiresAt, ...input.extra,
     });
     const prompts = [];
     const result = runPrintedArgv({
@@ -450,6 +479,35 @@ test("C22B consumer leg: acknowledge-caller-authored-critic -- the line approve-
   assert.equal(acknowledged.code, 0, describeRun(acknowledged));
   assert.match(acknowledged.stdout, /Caller-authored Critic acknowledged by "PO"/u);
   const replay = runPipelineStateVerb(follow.slice(1), { dir: repoRoot, home, keys, dependencies: stateDependencies });
+  assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
+});
+
+test("ADR-0095 consumer leg: spec-addendum -- the line approve-spec-addendum prints is signed by the verb, the follow-up records it once and writes the committed approval record", () => {
+  const fixture = specAddendumRepository();
+  const keys = keyDirectory();
+  const home = fixtureDir("home");
+  const verb = ["approve-spec-addendum", "--by", "PO", "--addendum", SPEC_ADDENDUM_PATH];
+
+  const first = runPipelineStateVerb(verb, { dir: fixture.root, home, keys, dependencies: fixture.readers });
+  assert.equal(first.code, 2, describeRun(first));
+  const printed = JSON.parse(first.lines.at(-1));
+  assert.equal(printed.status, "signature-required");
+  assert.equal(printed.signatureCommand.argv[printed.signatureCommand.argv.indexOf("--addendum") + 1], SPEC_ADDENDUM_PATH);
+
+  const signed = runPrintedArgv({ argv: printed.signatureCommand.argv.slice(1), keys, home, dependencies: { observeCandidate: () => fixture.head, ...fixture.readers } });
+  assert.equal(signed.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY");
+  assert.deepEqual(signed.candidate, fixture.head, "the signed candidate is the commit that holds the addendum");
+
+  const follow = printed.recordCommand.argv;
+  const recorded = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys, dependencies: fixture.readers });
+  assert.equal(recorded.code, 0, describeRun(recorded));
+  const recordPath = /--add-spec-addendum (\S+),/u.exec(recorded.stdout)?.[1];
+  assert.match(recordPath ?? "", /^specs\/c22b-roundtrip\/evidence\/spec-addendum-approval-[a-f0-9]{64}\.json$/u);
+  const record = readJson(join(fixture.root, recordPath));
+  assert.equal(record.mode, "signature");
+  assert.deepEqual(record.subject, fixture.subject);
+  assert.equal(record.candidate.commit, fixture.head.commit);
+  const replay = runPipelineStateVerb(follow.slice(1), { dir: fixture.root, home, keys, dependencies: fixture.readers });
   assert.notEqual(replay.code, 0, "the same proof is not consumed twice");
 });
 

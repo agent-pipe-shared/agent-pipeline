@@ -199,6 +199,8 @@ export const CRITICAL_APPROVAL_CONSUMPTION_SCHEMA = "pipeline.critical-approval-
 const CRITICAL_APPROVAL_SLOTS = Object.freeze({ push: "pushApproval", "feature-package-reconcile": "featurePackageReconcileApproval",
   // G20-39: the PO acknowledgement of a caller-authored Critic (lib/critic-acknowledgement.mjs); read per packet, not through the slot overlay.
   "acknowledge-caller-authored-critic": "criticAcknowledgement",
+  // ADR-0095: the PO approval of one Spec addendum (lib/spec-addendum.mjs); read per addendum, not through the slot overlay.
+  "spec-addendum": "specAddendumApproval",
   // G20-42: the consumer release approval (release-preflight-cli.mjs writes it for a ready record; guard-push reads it for the version tag push).
   "release-preflight": "releasePreflightApproval" });
 
