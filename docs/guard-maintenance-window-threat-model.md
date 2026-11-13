@@ -833,6 +833,19 @@ at the void of the design approval, an addendum reader that skipped its approval
 apply an unapproved Spec correction, and a looser id grammar could address another feature's
 state, which is why none of them can be lifted by a window.
 
+Candidate 29c adds four modules that the kernel imports. `hooks/guard-gate-strength.mjs` imports
+`plugins/pipeline-core/lib/private-state-write-guard.mjs`, which refuses an agent's own write into
+`.git/agent-pipeline/`. `scripts/pipeline-state.mjs` and `scripts/po-human-approval.mjs` import
+`plugins/pipeline-core/lib/gate-definition-changes.mjs`, the derived proof of every gate-definition
+change in a feature range (ADR-0096), and `plugins/pipeline-core/lib/maintenance-delivery.mjs`,
+the red-before proof of a maintenance delivery (ADR-0097), which `lib/native-goldfish-host-state.mjs`
+also imports. The change walk imports `plugins/pipeline-core/lib/close-commit-split.mjs` for the
+feature range base. Every first-party module these four import is itself a kernel path. A write
+guard that admitted private state would let an agent forge a host record, a change walk that missed
+a range would hide a weakened gate, a maintenance proof read loosely would admit a dispatch that no
+criterion and no red-before proof covers, and a wrong range base would move the walk, which is why
+none of them can be lifted by a window.
+
 ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
 and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
 (the hook spawns it, a spawn edge rather than an import, because the hook sits in a module

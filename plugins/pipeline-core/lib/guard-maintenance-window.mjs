@@ -956,6 +956,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // scripts/pipeline-state.mjs, scripts/po-human-approval.mjs).
   "plugins/pipeline-core/lib/reopen-design-po-step.mjs", "plugins/pipeline-core/lib/spec-addendum.mjs",
   "plugins/pipeline-core/lib/feature-id.mjs",
+  // Candidate 29c (GMWKC01): the private-state write guard (hooks/guard-gate-strength.mjs), the gate-definition change walk
+  // (ADR-0096) and the maintenance delivery (ADR-0097), imported by scripts/pipeline-state.mjs, scripts/po-human-approval.mjs
+  // and lib/native-goldfish-host-state.mjs, plus the commit split the walk imports.
+  "plugins/pipeline-core/lib/private-state-write-guard.mjs", "plugins/pipeline-core/lib/gate-definition-changes.mjs",
+  "plugins/pipeline-core/lib/maintenance-delivery.mjs", "plugins/pipeline-core/lib/close-commit-split.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
